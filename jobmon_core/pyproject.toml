@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm[toml]"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jobmon_core"
+description="Shared functionality for Jobmon Namespace Packages"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.7",
+]
+dependencies = [
+    'configparser',
+    'psutil',
+    'requests',
+    'tenacity',
+    'typing_extensions; python_version<"3.8"',
+]
+dynamic = ["version"]
+
+[project.scripts]
+jobmon_config = "jobmon.core.configuration:main"
+jobmon_distributor = "jobmon.distributor.cli:main"
+worker_node_entry_point = "jobmon.worker_node.cli:run"
+
+[tool.setuptools]
+license-files = ["../LICENSE"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools_scm]
+root = ".."
+local_scheme = "no-local-version"
+version_scheme = "release-branch-semver"
+git_describe_command = [
+    'git',
+    'describe',
+    '--dirty',
+    '--tags',
+    '--long',
+    '--match',
+    'core-[0-9]*',  # only match on tags prefixed with this subdirectory tags
+]

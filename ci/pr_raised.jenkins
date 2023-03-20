@@ -1,0 +1,119 @@
+pipeline {
+  agent {
+    label "slurm"
+  }
+  triggers {
+    bitBucketTrigger(
+      [
+        [
+          $class: 'BitBucketPPRPullRequestServerTriggerFilter',
+          actionFilter: [
+            $class: 'BitBucketPPRPullRequestServerCreatedActionFilter',
+            allowedBranches: ''
+          ]
+        ],
+        [
+          $class: 'BitBucketPPRPullRequestServerTriggerFilter',
+          actionFilter: [
+            $class: 'BitBucketPPRPullRequestServerSourceUpdatedActionFilter',
+            allowedBranches: ''
+          ]
+        ]
+      ]
+    )
+  }
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '30'))
+  } // End options
+  environment {
+    // Jenkins commands run in separate processes, so need to activate the environment to run nox.
+    ACTIVATE = ". /homes/svcscicompci/miniconda3/bin/activate base"
+  } // End environment
+  stages {
+    stage('Merge Branches') {
+      steps {
+        checkout scm: BbS(
+          branches: [[name: '${BITBUCKET_SOURCE_BRANCH}']],
+          credentialsId: 'svcscicompci',
+          extensions: [
+            [$class: 'PreBuildMerge',
+             options: [mergeRemote: 'jobmon',
+                       mergeTarget: '${BITBUCKET_TARGET_BRANCH}']
+            ]
+          ],
+          // derive this id and serverId from Snippet Generator/Pipeline Syntax, with "bbs_checkout: BitbucketSCMStep" Sample Step
+          // and they are specific to the jenkins instance
+          id: 'df088ae2-55d6-4cb6-9c4b-227f56610811',
+          mirrorName: '',
+          projectName: 'Scicomp',
+          repositoryName: 'jobmon',
+          serverId: '385a5727-3afb-4ab4-8c38-b7999408e96e',
+          sshCredentialsId: 'jenkins'
+        )
+      } // End step
+    } // End remote checkout repo stage
+    stage("parallel") {
+      parallel {
+        stage("Lint") {
+          steps {
+            sh "${ACTIVATE} && nox --session lint"
+          } // End step
+        } // End lint stage
+        stage("Typecheck") {
+          steps {
+            sh "${ACTIVATE} && nox --session typecheck"
+          } // End step
+        } // End typecheck stage
+        stage("Build Docs") {
+          steps {
+            sh "${ACTIVATE} && nox --session docs"
+          } // End step
+          post {
+            always {
+              // Publish the documentation.
+              publishHTML([
+                allowMissing: true,
+                alwaysLinkToLastBuild: false,
+                keepAll: true,
+                reportDir: 'out/_html',
+                reportFiles: 'index.html',
+                reportName: 'Documentation',
+                reportTitles: ''
+              ])
+            } // End always
+          } // End post
+        } // End build docs stage
+        stage('Tests') {
+          steps {
+            sh "${ACTIVATE} && nox --session tests -- tests/ -n 4"
+          }
+          post {
+            always {
+              // Publish the coverage reports.
+              publishHTML([
+                allowMissing: true,
+                alwaysLinkToLastBuild: false,
+                keepAll: true,
+                reportDir: 'jobmon_coverage_html_report',
+                reportFiles: 'index.html',
+                reportName: 'Coverage Report',
+                reportTitles: ''
+              ])
+              // Publish the test results
+              junit([
+                testResults: "test_report.xml",
+                allowEmptyResults: true
+              ])
+            } // End always
+          } // End post
+        } // End tests stage
+      } // End parallel
+    } // End parallel stage
+  } // end stages
+  post {
+    always {
+      // Delete the workspace directory.
+      deleteDir()
+    } // End always
+  } // End post
+} // End pipeline
