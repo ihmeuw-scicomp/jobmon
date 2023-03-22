@@ -187,6 +187,7 @@ class ClusterDistributor(Protocol):
                 ["worker_node_job", "--task_instance_id", str(task_instance_id)]
             )
         elif array_id is not None and batch_number is not None:
+            # TODO: Update the worker node command to accept batch_id instead of batch number
             wrapped_cmd.extend(
                 [
                     "worker_node_array",

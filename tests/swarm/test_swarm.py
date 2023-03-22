@@ -4,7 +4,7 @@ import os
 import time
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from jobmon.plugins.dummy import DummyDistributor
@@ -14,17 +14,18 @@ from jobmon.client.workflow import DistributorContext
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import WorkflowRunStatus, TaskInstanceStatus
 from jobmon.core.exceptions import CallableReturnedInvalidObject
-from jobmon.distributor.distributor_service import DistributorService
 from jobmon.server.web import session_factory
 from jobmon.server.web._compat import subtract_time
-from jobmon.server.web.models.task import Task
-from jobmon.server.web.models.task_instance import TaskInstance
-from jobmon.server.web.models.task_status import TaskStatus
-from jobmon.server.web.models import load_model
+from jobmon.server.web.models.api import (
+    Batch,
+    DistributorInstance as ServerDistributorInstance,
+    Task,
+    TaskInstance,
+    TaskStatus
+)
+from jobmon.server.web.models.distributor_instance import \
+    add_distributor_instances_with_associations
 from jobmon.worker_node.cli import WorkerNodeCLI
-
-
-load_model()
 
 
 logger = logging.getLogger(__name__)
@@ -574,3 +575,63 @@ def test_resume_from_workflow_id(tool, task_template):
     resume_swarm.set_initial_fringe()
     assert len(resume_swarm.ready_to_run) == 1
     assert resume_swarm.ready_to_run[0] == st3
+
+
+def test_batch_reassignment(tool, task_template, db_engine, requester_in_memory):
+    workflow = tool.create_workflow()
+
+    # Manually instantiate a distributor to associate with this WFR
+    with Session(bind=db_engine) as session:
+        # Use the sequential cluster ID - known from test setup
+        distributor1 = add_distributor_instances_with_associations(
+            cluster_ids=[2], session=session
+        )
+        distributor1_id = distributor1.id
+        session.commit()
+
+    t1 = task_template.create_task(arg="sleep 1")
+    t2 = task_template.create_task(arg="sleep 2")
+
+    workflow.add_tasks([t1, t2])
+    workflow.bind()
+    workflow._bind_tasks()
+    factory = WorkflowRunFactory(workflow.workflow_id)
+    wfr = factory.create_workflow_run()
+    swarm = SwarmWorkflowRun(
+        workflow_run_id=wfr.workflow_run_id,
+        distributor_instance_id=distributor1_id,
+    )
+    swarm.from_workflow(workflow)
+
+    # Queue both active tasks - should belong in 1 batch
+    swarm.queue_task_batch(list(swarm.tasks.values()))
+    assert len(swarm._active_batch_ids) == 1
+
+    # Mark distributor1 as expunged, create a new one
+    with Session(bind=db_engine) as session:
+        distributor1 = session.execute(
+            select(ServerDistributorInstance)
+            .where(ServerDistributorInstance.id == distributor1_id)
+        ).scalar()
+        distributor1.expunge()
+
+        distributor2 = add_distributor_instances_with_associations(
+            cluster_ids=[2], session=session
+        )
+        distributor2_id = distributor2.id
+        session.commit()
+
+    # Check the reassignment logic
+    swarm._reassign_distributor_instances()
+
+    with session.begin():
+        query = (
+            select(
+                Batch.distributor_instance_id
+            )
+            .where(
+                Batch.workflow_run_id == swarm.workflow_run_id
+            )
+        )
+        resp = session.execute(query).scalar()
+        assert resp == distributor2_id

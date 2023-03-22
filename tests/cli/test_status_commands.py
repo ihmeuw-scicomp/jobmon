@@ -33,12 +33,7 @@ from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskStatus, WorkflowStatus, WorkflowRunStatus
 from jobmon.core.exceptions import InvalidResponse, ConfigError
 from jobmon.core.requester import Requester
-from jobmon.server.web.models import load_model
-from jobmon.server.web.models.task_instance import TaskInstance
-from jobmon.server.web.models.task import Task
-from jobmon.server.web.models.workflow import Workflow as WorkflowModel
-
-load_model()
+from jobmon.server.web.models.api import Task, TaskInstance, Workflow as WorkflowModel
 
 
 def get_task_template(tool, template_name="my_template"):

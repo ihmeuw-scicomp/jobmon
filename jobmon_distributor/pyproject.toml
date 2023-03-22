@@ -3,29 +3,24 @@ requires = ["setuptools", "setuptools-scm[toml]"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "jobmon"
-description="A dependency management utility for batch computation."
-requires-python = ">=3.7"
+name = "jobmon_distributor"
+description="The central service responsible for "
+requires-python = ">=3.9"
 classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.7",
 ]
 dependencies = [
-    'jobmon_core>=3.2.1',
-    'numpy',
-    'pandas',
-    'pyyaml',
-    'tabulate',
+    'jobmon_core',
 ]
 dynamic = ["version"]
 
 [project.scripts]
-jobmon = "jobmon.client.cli:main"
+jobmon = "jobmon.distributor.cli:main"
 
 [project.optional-dependencies]
 server = ["jobmon_server"]
-distributor = ["jobmon_distributor"]
 ihme = ["jobmon_installer_ihme"]
 
 [tool.setuptools]
@@ -42,5 +37,5 @@ git_describe_command = [
     '--tags',
     '--long',
     '--match',
-    'client-[0-9]*',  # only match on tags prefixed with this subdirectory tags
+    'distributor-[0-9]*',  # only match on tags prefixed with this subdirectory tags
 ]

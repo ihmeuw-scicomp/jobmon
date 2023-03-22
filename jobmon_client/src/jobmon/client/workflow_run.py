@@ -24,9 +24,9 @@ class WorkflowRunFactory:
     """
 
     # TODO: workflow run factory is for now mostly a placeholder for various functions
-    # useful for instantiating workflow runs either from a workflow or from the CLI.
-    # Might want to consider unifying the resume API more, think about how to handle
-    # task resource caching and creation as well in order to resume.
+    #   useful for instantiating workflow runs either from a workflow or from the CLI.
+    #   Might want to consider unifying the resume API more, think about how to handle
+    #   task resource caching and creation as well in order to resume.
 
     def __init__(self, workflow_id: int, requester: Optional[Requester] = None) -> None:
         """Initialization of client WorkflowRun."""

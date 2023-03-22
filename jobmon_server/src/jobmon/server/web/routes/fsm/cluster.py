@@ -5,8 +5,7 @@ from typing import Any
 from flask import jsonify
 from sqlalchemy import select
 
-from jobmon.server.web.models.cluster import Cluster
-from jobmon.server.web.models.cluster_type import ClusterType
+from jobmon.server.web.models.api import Cluster, ClusterType
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
 

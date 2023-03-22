@@ -223,6 +223,7 @@ def test_cold_resume(tool):
 
 
 def test_hot_resume(tool, task_template):
+
     workflow1 = tool.create_workflow(name="hot_resume")
     tasks = []
     for i in range(6):

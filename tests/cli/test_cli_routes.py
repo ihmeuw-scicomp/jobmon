@@ -5,9 +5,6 @@ import pandas as pd
 from jobmon.client.api import Tool
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import MaxConcurrentlyRunning, WorkflowRunStatus
-from jobmon.server.web.models import load_model
-
-load_model()
 
 
 def test_get_task_template_version(db_engine, tool):

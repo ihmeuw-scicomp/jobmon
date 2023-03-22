@@ -13,19 +13,21 @@ from sqlalchemy.sql import func
 import structlog
 
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
-from jobmon.server.web.models.arg import Arg
-from jobmon.server.web.models.array import Array
-from jobmon.server.web.models.node import Node
-from jobmon.server.web.models.node_arg import NodeArg
-from jobmon.server.web.models.queue import Queue
-from jobmon.server.web.models.task import Task
-from jobmon.server.web.models.task_instance import TaskInstance
-from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
-from jobmon.server.web.models.task_resources import TaskResources
-from jobmon.server.web.models.task_template import TaskTemplate
-from jobmon.server.web.models.task_template_version import TaskTemplateVersion
-from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.models.workflow_run import WorkflowRun
+from jobmon.server.web.models.api import (
+    Arg,
+    Array,
+    Node,
+    NodeArg,
+    Queue,
+    Task,
+    TaskInstance,
+    TaskInstanceErrorLog,
+    TaskResources,
+    TaskTemplate,
+    TaskTemplateVersion,
+    Workflow,
+    WorkflowRun,
+)
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.cli import blueprint
 from jobmon.server.web.routes.cli.workflow import _cli_label_mapping

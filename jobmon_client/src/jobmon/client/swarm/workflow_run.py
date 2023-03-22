@@ -84,6 +84,7 @@ class WorkflowRun:
         fail_after_n_executions: int = 1_000_000_000,
         status: Optional[str] = None,
         requester: Optional[Requester] = None,
+        distributor_instance_id: Optional[int] = None,
     ) -> None:
         """Initialization of the swarm WorkflowRun."""
         self.workflow_run_id = workflow_run_id
@@ -91,7 +92,6 @@ class WorkflowRun:
         # state tracking
         self._active_states = [
             TaskStatus.QUEUED,
-            TaskStatus.INSTANTIATING,
             TaskStatus.LAUNCHED,
             TaskStatus.RUNNING,
         ]
@@ -101,7 +101,6 @@ class WorkflowRun:
         self._task_status_map: Dict[str, Set[SwarmTask]] = {
             TaskStatus.REGISTERING: set(),
             TaskStatus.QUEUED: set(),
-            TaskStatus.INSTANTIATING: set(),
             TaskStatus.LAUNCHED: set(),
             TaskStatus.RUNNING: set(),
             TaskStatus.DONE: set(),
@@ -132,11 +131,17 @@ class WorkflowRun:
         if requester is None:
             requester = Requester.from_defaults()
         self.requester = requester
+        # This attribute can optionally be set if the distributor ID is known
+        # Will be the case for testing, or for sequential/multiprocess workflow runs
+        self.distributor_instance_id = distributor_instance_id
 
         # This signal is set if the workflow run receives a resume
         self._terminated = False
 
         self.initialized = False  # Need to call from_workflow or from_workflow_id
+
+        # Keep a registry of tracked batch IDs
+        self._active_batch_ids = []
 
     @property
     def status(self) -> Optional[str]:
@@ -598,11 +603,15 @@ class WorkflowRun:
 
         try:
             unscheduled_tasks: List[SwarmTask] = []
+            # minor TODO: could probably do this faster by working with sets
+            # key = (hash(array_id, task_resources), batches[key] += 1
+            # one pass over all ready to run tasks instead of n passes
             while self.ready_to_run and workflow_capacity > 0:
                 # pop the next task off of the queue
                 next_task = self.ready_to_run.popleft()
                 array_id = next_task.array_id
                 task_resources = next_task.current_task_resources
+                cluster_id = next_task.cluster.id
 
                 # check capacity. add to current batch if room.
                 current_batch: List[SwarmTask] = []
@@ -678,6 +687,22 @@ class WorkflowRun:
         self._log_heartbeat()
         self._task_status_updates(full_sync=full_sync)
         self._synchronize_max_concurrently_running()
+        # If connected to a remote distributor (i.e. no attribute set),
+        # we'll need to periodically check for liveliness and reassign the batches
+        if not self.distributor_instance_id:
+            self._reassign_distributor_instances()
+
+    def _reassign_distributor_instances(self):
+
+        if not any(self._active_batch_ids):
+            # No batches registered yet, so no need to reassign anything
+            return
+
+        self.requester.send_request(
+            app_route='/workflow_run/reassign_active_batches',
+            message={"batch_ids": self._active_batch_ids},
+            request_type='post'
+        )
 
     def _refresh_task_status_map(self, updated_tasks: Set[SwarmTask]) -> None:
         # remove these tasks from old mapping
@@ -882,7 +907,7 @@ class WorkflowRun:
         if not task_resources.is_bound:
             task_resources.bind()
 
-        app_route = f"/array/{first_task.array_id}/queue_task_batch"
+        app_route = f"/batch/queue_task_batch"
         return_code, response = self.requester.send_request(
             app_route=app_route,
             message={
@@ -890,21 +915,24 @@ class WorkflowRun:
                 "task_resources_id": task_resources.id,
                 "workflow_run_id": self.workflow_run_id,
                 "cluster_id": first_task.cluster.id,
+                "array_id": first_task.array_id,
+                "distributor_instance_id": self.distributor_instance_id
             },
             request_type="post",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
+
+        task_status_dict = response["tasks_by_status"]
+        batch_id = response["batch_id"]
+
         updated_tasks = set()
-        for status, task_ids in response["tasks_by_status"].items():
+        for status, task_ids in task_status_dict.items():
             for task_id in task_ids:
                 task = self.tasks[task_id]
                 task.status = status
                 updated_tasks.add(task)
+
+        # Record the active batches on this workflow run
+        self._active_batch_ids.append(batch_id)
         self._refresh_task_status_map(updated_tasks)
 
     def _set_validated_task_resources(self, task: SwarmTask) -> None:

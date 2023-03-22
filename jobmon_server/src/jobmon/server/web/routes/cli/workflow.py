@@ -10,15 +10,17 @@ import structlog
 
 from jobmon.core.constants import TaskStatus as TStatus
 from jobmon.core.constants import WorkflowStatus as Statuses
-from jobmon.server.web.models.node import Node
-from jobmon.server.web.models.task import Task
-from jobmon.server.web.models.task_template import TaskTemplate
-from jobmon.server.web.models.task_template_version import TaskTemplateVersion
-from jobmon.server.web.models.tool import Tool
-from jobmon.server.web.models.tool_version import ToolVersion
-from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.models.workflow_run import WorkflowRun
-from jobmon.server.web.models.workflow_status import WorkflowStatus
+from jobmon.server.web.models.api import (
+    Node,
+    Task,
+    TaskTemplate,
+    TaskTemplateVersion,
+    Tool,
+    ToolVersion,
+    Workflow,
+    WorkflowRun,
+    WorkflowStatus,
+)
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.cli import blueprint
 

@@ -2,15 +2,11 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from jobmon.server.web.models import load_model
-from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.models.workflow_run import WorkflowRun as WFR
+from jobmon.server.web.models.api import Workflow, WorkflowRun as WFR
 from mock import patch, PropertyMock
 
 from jobmon.core.constants import WorkflowRunStatus, WorkflowStatus
 from jobmon.server import __version__
-
-load_model()
 
 
 def get_workflow_status(db_engine, workflow_id):

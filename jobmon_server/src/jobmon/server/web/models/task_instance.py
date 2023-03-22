@@ -58,8 +58,7 @@ class TaskInstance(Base):
     workflow_run_id = Column(Integer, ForeignKey("workflow_run.id"))
     array_id = Column(Integer, ForeignKey("array.id"), default=None)
     task_id = Column(Integer, ForeignKey("task.id"))
-    task_resources_id = Column(Integer, ForeignKey("task_resources.id"), index=True)
-    array_batch_num = Column(Integer, index=True)
+    batch_id = Column(Integer, ForeignKey("batch.id"), index=True)
     array_step_id = Column(Integer, index=True)
 
     distributor_id = Column(String(20), index=True)
@@ -91,13 +90,13 @@ class TaskInstance(Base):
     # ORM relationships
     task = relationship("Task", back_populates="task_instances")
     errors = relationship("TaskInstanceErrorLog", back_populates="task_instance")
-    task_resources = relationship("TaskResources")
+    batch = relationship("Batch", lazy="joined")
 
     __table_args__ = (
         Index(
             "ix_array_batch_index",
             "array_id",
-            "array_batch_num",
+            "batch_id",
             "array_step_id",
         ),
         Index("ix_status_status_date", "status", "status_date"),
@@ -105,20 +104,18 @@ class TaskInstance(Base):
 
     # finite state machine transition information
     valid_transitions = [
-        # task instance is moved from queued to instantiated by distributor
-        (TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED),
-        # task instance is queued and waiting to instantiate when a new workflow run starts and
+        # task instance is moved from queued to launched by distributor
+        (TaskInstanceStatus.QUEUED, TaskInstanceStatus.LAUNCHED),
+        # task instance is queued and waiting to launch when a new workflow run starts and
         # tells it to die
         (TaskInstanceStatus.QUEUED, TaskInstanceStatus.KILL_SELF),
-        # task instance is launched by distributor
-        (TaskInstanceStatus.INSTANTIATED, TaskInstanceStatus.LAUNCHED),
         # task instance submission hit weird bug and didn't get an distributor_id
-        (TaskInstanceStatus.INSTANTIATED, TaskInstanceStatus.NO_DISTRIBUTOR_ID),
+        (TaskInstanceStatus.QUEUED, TaskInstanceStatus.NO_DISTRIBUTOR_ID),
         # task instance is mid submission and a new workflow run starts and
         # tells it to die
-        (TaskInstanceStatus.INSTANTIATED, TaskInstanceStatus.KILL_SELF),
+        (TaskInstanceStatus.QUEUED, TaskInstanceStatus.KILL_SELF),
         # task instance logs running before submitted due to race condition
-        (TaskInstanceStatus.INSTANTIATED, TaskInstanceStatus.RUNNING),
+        (TaskInstanceStatus.QUEUED, TaskInstanceStatus.RUNNING),
         # task instance running after transitioning from launched
         (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.RUNNING),
         # task instance disappeared from distributor heartbeat and never logged
@@ -159,6 +156,8 @@ class TaskInstance(Base):
         (TaskInstanceStatus.TRIAGING, TaskInstanceStatus.UNKNOWN_ERROR),
         # task instance error_fatal after transitioning from triaging
         (TaskInstanceStatus.TRIAGING, TaskInstanceStatus.ERROR_FATAL),
+        # Task instance in a pending state is picked up by a new distributor
+        (TaskInstanceStatus.TRIAGING, TaskInstanceStatus.LAUNCHED),
         # task instance error after transitioning from kill_self
         (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.ERROR_FATAL),
     ]
@@ -213,6 +212,14 @@ class TaskInstance(Base):
         TaskInstanceStatus.KILL_SELF,
     ]
 
+    active_statuses = [
+        TaskInstanceStatus.QUEUED,
+        TaskInstanceStatus.LAUNCHED,
+        TaskInstanceStatus.RUNNING,
+        TaskInstanceStatus.KILL_SELF,
+        TaskInstanceStatus.TRIAGING
+    ]
+
     def transition(self, new_state: str) -> None:
         """Transition the TaskInstance status."""
         # if the transition is timely, move to new state. Otherwise do nothing
@@ -230,8 +237,6 @@ class TaskInstance(Base):
             self.status_date = func.now()
             if new_state == TaskInstanceStatus.QUEUED:
                 self.task.transition(TaskStatus.QUEUED)
-            if new_state == TaskInstanceStatus.INSTANTIATED:
-                self.task.transition(TaskStatus.INSTANTIATING)
             if new_state == TaskInstanceStatus.LAUNCHED:
                 self.task.transition(TaskStatus.LAUNCHED)
             if new_state == TaskInstanceStatus.RUNNING:
@@ -244,6 +249,12 @@ class TaskInstance(Base):
                 # if the task instance is F, the task status should be F too
                 self.task.transition(TaskStatus.ERROR_RECOVERABLE)
                 self.task.transition(TaskStatus.ERROR_FATAL)
+
+            if new_state not in self.__class__.active_statuses:
+                # TODO: Validate this is a DB-level transaction, not python
+                # Assumption: all transitions to terminal states are done using the ORM.
+                # AFAIK this assumption is currently true
+                self.batch.c.completed_task_instances = self.batch.c.completed_task_instances + 1
 
     def _validate_transition(self, new_state: str) -> None:
         """Ensure the TaskInstance status transition is valid."""

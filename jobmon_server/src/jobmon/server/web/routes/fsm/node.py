@@ -7,8 +7,7 @@ from sqlalchemy import insert, select
 import structlog
 
 
-from jobmon.server.web.models.node import Node
-from jobmon.server.web.models.node_arg import NodeArg
+from jobmon.server.web.models.api import Node, NodeArg
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
 

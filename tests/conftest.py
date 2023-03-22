@@ -162,7 +162,7 @@ def client_env(web_server_process, monkeypatch):
 
 @pytest.fixture(scope="function")
 def requester_no_retry(client_env):
-    return Requester(client_env, max_retries=0)
+    return Requester(client_env, stop_after_delay=0)
 
 
 @pytest.fixture(scope="function")
@@ -173,10 +173,14 @@ def web_server_in_memory(sqlite_file, monkeypatch):
     from jobmon.server.web.app_factory import AppFactory
 
     # The create_app call sets up database connections
+    database_uri = f"sqlite:///{sqlite_file}"
     monkeypatch.setenv(
-        "JOBMON__FLASK__SQLALCHEMY_DATABASE_URI", f"sqlite:///{sqlite_file}"
+        "JOBMON__FLASK__SQLALCHEMY_DATABASE_URI", database_uri
     )
-    app_factory = AppFactory()
+    config = JobmonConfig(
+        dict_config={"db": {"sqlalchemy_database_uri": database_uri}}
+    )
+    app_factory = AppFactory(config=config)
     app = app_factory.get_app()
     app.config["TESTING"] = True
     with app.app_context():

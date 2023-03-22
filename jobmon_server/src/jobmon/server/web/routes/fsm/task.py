@@ -13,15 +13,17 @@ from sqlalchemy.sql import func
 import structlog
 
 from jobmon.core import constants
-from jobmon.server.web.models.task import Task
-from jobmon.server.web.models.task_arg import TaskArg
-from jobmon.server.web.models.task_attribute import TaskAttribute
-from jobmon.server.web.models.task_attribute_type import TaskAttributeType
-from jobmon.server.web.models.task_instance import TaskInstance
-from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
-from jobmon.server.web.models.task_resources import TaskResources
-from jobmon.server.web.models.task_status import TaskStatus
-from jobmon.server.web.models.workflow import Workflow
+from jobmon.server.web.models.api import (
+    Task,
+    TaskArg,
+    TaskAttribute,
+    TaskAttributeType,
+    TaskInstance,
+    TaskInstanceErrorLog,
+    TaskResources,
+    TaskStatus,
+    Workflow,
+)
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError

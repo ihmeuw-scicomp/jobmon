@@ -509,33 +509,27 @@ class SerializeTaskResources:
         }
 
 
-class SerializeTaskInstanceBatch:
+class SerializeBatch:
     """Serialize the data to and from the database for TaskInstance batch."""
 
     @staticmethod
     def to_wire(
-        array_id: int,
-        array_name: str,
-        array_batch_num: int,
+        batch_id: int,
         task_resources_id: int,
-        task_instance_ids: List[int],
+        array_name: str,
     ) -> tuple:
         """Serialize the TaskInstanceBatch metadata."""
         return (
-            array_id,
-            array_name,
-            array_batch_num,
+            batch_id,
             task_resources_id,
-            task_instance_ids,
+            array_name,
         )
 
     @staticmethod
     def kwargs_from_wire(wire_tuple: tuple) -> dict:
         """Deserialize the TaskInstanceBatch metadata."""
         return {
-            "array_id": wire_tuple[0],
-            "array_name": wire_tuple[1],
-            "array_batch_num": wire_tuple[2],
-            "task_resources_id": wire_tuple[3],
-            "task_instance_ids": wire_tuple[4],
+            "batch_id": wire_tuple[0],
+            "task_resources_id": wire_tuple[1],
+            "array_name": wire_tuple[2],
         }

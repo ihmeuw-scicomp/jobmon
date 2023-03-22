@@ -9,10 +9,12 @@ from sqlalchemy.orm import Session
 import structlog
 
 from jobmon.core import constants
-from jobmon.server.web.models.arg import Arg
-from jobmon.server.web.models.task_template import TaskTemplate
-from jobmon.server.web.models.task_template_version import TaskTemplateVersion
-from jobmon.server.web.models.template_arg_map import TemplateArgMap
+from jobmon.server.web.models.api import (
+    Arg,
+    TaskTemplate,
+    TaskTemplateVersion,
+    TemplateArgMap,
+)
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage

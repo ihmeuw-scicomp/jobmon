@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jobmon_server"
 description="Web Service and Model for Jobmon"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 classifiers = [
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.7",
 ]
 dependencies = [
     'jobmon_core>=3.2.1',

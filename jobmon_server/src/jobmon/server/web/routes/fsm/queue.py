@@ -5,7 +5,7 @@ from typing import Any
 from flask import jsonify
 from sqlalchemy import select
 
-from jobmon.server.web.models.queue import Queue
+from jobmon.server.web.models.api import Queue
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
 

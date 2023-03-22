@@ -38,7 +38,15 @@ def add_string_length_constraint(Base: DeclarativeMeta, cls_: Any) -> None:
 
 
 def load_model() -> None:
-    """Iterate through the modules in the current package."""
+    """Iterate through the modules in the current package.
+
+    This function is necessary because it's the only way to defer an import * statement.
+    If from jobmon.server.web.models.api is included at the top of this module,
+    we will raise ciruclar import errors since the models import Base.
+
+    Imports are only necessary for registering against the declarative base. So defer to that
+    method.
+    """
     package_dir = Path(__file__).resolve().parent
     for _, module_name, _ in iter_modules([str(package_dir)]):
         import_module(f"{__name__}.{module_name}")

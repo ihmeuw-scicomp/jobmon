@@ -8,13 +8,20 @@ import structlog
 
 from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition
-from jobmon.server.web.models.task import Task
-from jobmon.server.web.models.task_instance import TaskInstance
-from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
-from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.models.workflow_run import WorkflowRun
+from jobmon.server.web.models.api import (
+    Batch,
+    DistributorInstance,
+    Task,
+    TaskInstance,
+    TaskInstanceErrorLog,
+    Workflow,
+    WorkflowRun,
+)
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
+from jobmon.server.web.routes.fsm.distributor_instance import (
+    _get_active_distributor_instance_id,
+)
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -225,59 +232,6 @@ def log_workflow_run_status_update(workflow_run_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/workflow_run/<workflow_run_id>/sync_status", methods=["POST"])
-def task_instances_status_check(workflow_run_id: int) -> Any:
-    """Sync status of given task intance IDs."""
-    structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
-    try:
-        workflow_run_id = int(workflow_run_id)
-        data = cast(Dict, request.get_json())
-        task_instance_ids = data["task_instance_ids"]
-        status = data["status"]
-    except Exception as e:
-        raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
-        ) from e
-
-    session = SessionLocal()
-    with session.begin():
-        # get time from db
-        db_time = session.execute(select(func.now())).scalar()
-        str_time = db_time.strftime("%Y-%m-%d %H:%M:%S")
-
-        where_clause = [TaskInstance.workflow_run_id == workflow_run_id]
-        if len(task_instance_ids) > 0:
-            # Filters for
-            # 1) instances that have changed out of the declared status
-            # 2) instances that have changed into the declared status
-            where_clause.append(
-                (
-                    TaskInstance.id.in_(task_instance_ids)
-                    & (TaskInstance.status != status)
-                )
-                | (
-                    TaskInstance.id.notin_(task_instance_ids)
-                    & (TaskInstance.status == status)
-                )
-            )
-        else:
-            where_clause.append(TaskInstance.status == status)
-
-        select_stmt = (
-            select(TaskInstance.status, func.group_concat(TaskInstance.id))
-            .where(*where_clause)
-            .group_by(TaskInstance.status)
-        )
-
-        return_dict: Dict[str, List[int]] = {}
-        for row in session.execute(select_stmt):
-            return_dict[row[0]] = [int(tid) for tid in row[1].split(",")]
-
-    resp = jsonify(status_updates=return_dict, time=str_time)
-    resp.status_code = StatusCodes.OK
-    return resp
-
-
 @blueprint.route(
     "/workflow_run/<workflow_run_id>/set_status_for_triaging", methods=["POST"]
 )
@@ -287,6 +241,10 @@ def set_status_for_triaging(workflow_run_id: int) -> Any:
     Query all task instances that are submitted to distributor or running which haven't
     reported as alive in the allocated time, and set them for Triaging(from Running)
     and Kill_self(from Launched).
+
+    Also look for batches associated with the active workflow run ID that do not have
+    lively distributor instances associated.
+    Just reassign the batch ids or move task instances to triaging?
     """
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
     try:
@@ -323,6 +281,48 @@ def set_status_for_triaging(workflow_run_id: int) -> Any:
             .execution_options(synchronize_session=False)
         )
         session.execute(update_stmt)
+    resp = jsonify()
+    resp.status_code = StatusCodes.OK
+    return resp
+
+
+@blueprint.route("/workflow_run/reassign_active_batches", methods=["POST"])
+def reassign_active_batches():
+
+    data = cast(Dict, request.get_json())
+    batch_ids = data.get("batch_ids")
+
+    batch_select_query = select(Batch.id, Batch.cluster_id).where(
+        Batch.id.in_(batch_ids),
+        Batch.distributor_instance_id == DistributorInstance.id,
+        DistributorInstance.expunged == True,
+    )
+    session = SessionLocal()
+
+    with session.begin():
+        inactive_batches = session.execute(batch_select_query).all()
+
+    if any(inactive_batches):
+
+        # Get a new distributor instance to assign
+        # Assumption: all batches are run on a single cluster, therefore can reassign all
+        # batches to a single new distributor instance.
+
+        # Since this route is called at the workflow run level (for now), should be a safe
+        # assumption
+        new_distributor_instance_id = _get_active_distributor_instance_id(
+            inactive_batches[0].cluster_id
+        )
+
+        update_stmt = (
+            update(Batch)
+            .where(Batch.id.in_([batch.id for batch in inactive_batches]))
+            .values(distributor_instance_id=new_distributor_instance_id)
+        )
+
+        with session.begin():
+            session.execute(update_stmt)
+
     resp = jsonify()
     resp.status_code = StatusCodes.OK
     return resp

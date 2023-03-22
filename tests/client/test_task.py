@@ -6,12 +6,7 @@ from jobmon.client.task import Task
 from jobmon.client.workflow_run import WorkflowRun
 from jobmon.core.constants import WorkflowRunStatus, TaskStatus, TaskInstanceStatus
 from jobmon.core.exceptions import InvalidResponse
-from jobmon.server.web.models import load_model
-from jobmon.server.web.models import task
-from jobmon.server.web.models.task_attribute import TaskAttribute
-from jobmon.server.web.models.task_attribute_type import TaskAttributeType
-
-load_model()
+from jobmon.server.web.models.api import Task, TaskAttribute, TaskAttributeType
 
 
 def test_good_names():
@@ -223,7 +218,7 @@ def test_get_errors(db_engine, tool):
 
     # Validate that the database indicates the Dag and its Jobs are complete
     with Session(bind=db_engine) as session:
-        t = session.get(task.Task, task_a.task_id)
+        t = session.get(Task, task_a.task_id)
         assert t.status == TaskStatus.ERROR_FATAL
 
     # make sure we see the 2 task_instance_error_log when checking
@@ -280,7 +275,7 @@ def test_reset_attempts_on_resume(db_engine, tool):
 
     # Validate that the database indicates the Dag and its Jobs are complete
     with Session(bind=db_engine) as session:
-        t = session.get(task.Task, task_a.task_id)
+        t = session.get(Task, task_a.task_id)
         assert t.max_attempts == 3
         assert t.num_attempts == 0
         assert t.status == TaskStatus.REGISTERING

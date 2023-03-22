@@ -16,6 +16,7 @@ blueprint.add_url_rule(
 
 from jobmon.server.web.routes.fsm import (
     array,
+    batch,
     cluster,
     dag,
     node,

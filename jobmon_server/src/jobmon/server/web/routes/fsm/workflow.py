@@ -10,15 +10,17 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 import structlog
 
-from jobmon.server.web.models.array import Array
-from jobmon.server.web.models.dag import Dag
-from jobmon.server.web.models.queue import Queue
-from jobmon.server.web.models.task import Task
-from jobmon.server.web.models.task_resources import TaskResources
-from jobmon.server.web.models.task_status import TaskStatus
-from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.models.workflow_attribute import WorkflowAttribute
-from jobmon.server.web.models.workflow_attribute_type import WorkflowAttributeType
+from jobmon.server.web.models.api import (
+    Array,
+    Dag,
+    Queue,
+    Task,
+    TaskResources,
+    TaskStatus,
+    Workflow,
+    WorkflowAttribute,
+    WorkflowAttributeType,
+)
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage

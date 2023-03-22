@@ -7,11 +7,9 @@ from sqlalchemy import func, select, update
 import structlog
 
 from jobmon.core.exceptions import InvalidStateTransition
-from jobmon.server.web.models.task import Task
-from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.models.workflow_run import WorkflowRun
-from jobmon.server.web.models.workflow_run_status import WorkflowRunStatus
-from jobmon.server.web.models.workflow_status import WorkflowStatus
+from jobmon.server.web.models.api import (
+    Task, Workflow, WorkflowRun, WorkflowRunStatus, WorkflowStatus
+)
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.reaper import blueprint
 

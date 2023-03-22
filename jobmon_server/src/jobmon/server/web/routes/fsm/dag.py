@@ -8,8 +8,7 @@ from sqlalchemy import insert, select, update
 from sqlalchemy.sql import func
 import structlog
 
-from jobmon.server.web.models.dag import Dag
-from jobmon.server.web.models.edge import Edge
+from jobmon.server.web.models.api import Dag, Edge
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage

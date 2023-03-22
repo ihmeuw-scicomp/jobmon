@@ -12,17 +12,13 @@ from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.core.cluster import Cluster
 from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
-from jobmon.distributor.distributor_service import DistributorService
+from jobmon.distributor.distributor_instance import DistributorInstance
 from jobmon.plugins.dummy import DummyDistributor
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
-from jobmon.server.web.models import load_model
-from jobmon.server.web.models.task_instance import TaskInstance
+from jobmon.server.web.models.api import TaskInstance
 from jobmon.worker_node.worker_node_task_instance import WorkerNodeTaskInstance
 from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
-
-
-load_model()
 
 
 class DoNothingDistributor(DummyDistributor):

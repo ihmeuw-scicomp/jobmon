@@ -33,6 +33,9 @@ class Requester(object):
     ) -> None:
         """Initialize the Requester object with the url to make requests to."""
         self.url = url
+        # TODO: max_retries is completely misnamed here. It actually controls exponential
+        #   backoff, not the maximum number of attempts in the retrying object.
+        #   Should either be renamed or a new control parameter be introduced
         self.max_retries = max_retries
         self.stop_after_delay = stop_after_delay
         self.server_structlog_context: Dict[str, str] = {}

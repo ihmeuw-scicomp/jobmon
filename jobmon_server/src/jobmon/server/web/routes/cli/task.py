@@ -12,12 +12,14 @@ import structlog
 from jobmon.core import constants
 from jobmon.core.constants import Direction
 from jobmon.core.serializers import SerializeTaskResourceUsage
-from jobmon.server.web.models.edge import Edge
-from jobmon.server.web.models.task import Task
-from jobmon.server.web.models.task_instance import TaskInstance
-from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
-from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
-from jobmon.server.web.models.workflow import Workflow
+from jobmon.server.web.models.api import (
+    Edge,
+    Task,
+    TaskInstance,
+    TaskInstanceErrorLog,
+    TaskInstanceStatus,
+    Workflow,
+)
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.cli import blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage

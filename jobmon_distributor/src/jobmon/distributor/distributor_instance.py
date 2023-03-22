@@ -19,30 +19,27 @@ from typing import (
 )
 
 from jobmon.core.cluster_protocol import ClusterDistributor
+from jobmon.core.cluster import Cluster
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import DistributorInterruptedError, InvalidResponse
 from jobmon.core.requester import http_request_ok, Requester
-from jobmon.core.serializers import SerializeTaskInstanceBatch
+from jobmon.distributor.batch import Batch
 from jobmon.distributor.distributor_command import DistributorCommand
 from jobmon.distributor.distributor_task_instance import DistributorTaskInstance
-from jobmon.distributor.distributor_workflow_run import DistributorWorkflowRun
-from jobmon.distributor.task_instance_batch import TaskInstanceBatch
-
 
 logger = logging.getLogger(__name__)
 
 
-class DistributorService:
+class DistributorInstance:
     def __init__(
         self,
-        cluster_interface: ClusterDistributor,
+        clusters: List[str],
         requester: Optional[Requester] = None,
         workflow_run_heartbeat_interval: Optional[int] = None,
         task_instance_heartbeat_interval: Optional[int] = None,
         heartbeat_report_by_buffer: Optional[float] = None,
         distributor_poll_interval: Optional[int] = None,
-        raise_on_error: bool = False,
     ) -> None:
         """Initialization of DistributorService."""
         # operational args
@@ -71,11 +68,18 @@ class DistributorService:
             )
         else:
             self._distributor_poll_interval = distributor_poll_interval
-        self.raise_on_error = raise_on_error
+
+        self._distributor_instance_id = None
+
+        # Store allowed cluster distributor objects
+        self._cluster_interface_map: Dict[int, ClusterDistributor] = {}
+        for cluster_name in clusters:
+            cluster = Cluster.get_cluster(cluster_name)
+            self._cluster_interface_map[cluster.id] = cluster.get_distributor()
 
         # indexing of task instance by associated id
         self._task_instances: Dict[int, DistributorTaskInstance] = {}
-        self._task_instance_batches: Dict[Tuple[int, int], TaskInstanceBatch] = {}
+        self._batches: Dict[int, Batch] = {}
 
         # work queue
         self._distributor_commands: Iterator[DistributorCommand] = it.chain([])
@@ -83,26 +87,20 @@ class DistributorService:
         # indexing of task instances by status
         self._task_instance_status_map: Dict[str, Set[DistributorTaskInstance]] = {
             TaskInstanceStatus.QUEUED: set(),
-            TaskInstanceStatus.INSTANTIATED: set(),
             TaskInstanceStatus.LAUNCHED: set(),
             TaskInstanceStatus.RUNNING: set(),
             TaskInstanceStatus.TRIAGING: set(),
             TaskInstanceStatus.KILL_SELF: set(),
         }
         # order through which we processes work
-        gen_map: Dict[str, Callable[..., Generator[DistributorCommand, None, None]]] = {
+        self._command_generator_map: Dict[str, Callable[..., Generator[DistributorCommand, None, None]]] = {
             TaskInstanceStatus.QUEUED: self._check_queued_for_work,
-            TaskInstanceStatus.INSTANTIATED: self._check_instantiated_for_work,
             TaskInstanceStatus.TRIAGING: self._check_triaging_for_work,
             TaskInstanceStatus.KILL_SELF: self._check_kill_self_for_work,
         }
-        self._command_generator_map = gen_map
 
         # syncronization timings
         self._last_heartbeat_time = time.time()
-
-        # cluster API
-        self.cluster_interface = cluster_interface
 
         # web service API
         if requester is None:
@@ -114,32 +112,68 @@ class DistributorService:
     def _next_report_increment(self) -> float:
         return self._heartbeat_report_by_buffer * self._task_instance_heartbeat_interval
 
-    def set_workflow_run(self, workflow_run_id: int) -> None:
-        workflow_run = DistributorWorkflowRun(workflow_run_id, self.requester)
-        self.workflow_run = workflow_run
-        self.workflow_run.transition_to_instantiated()
+    def _initialize_signal_handlers(self) -> None:
+        def handle_sighup(signal: int, frame: Any) -> None:
+            raise DistributorInterruptedError("Got signal SIGHUP.")
+
+        def handle_sigterm(signal: int, frame: Any) -> None:
+            raise DistributorInterruptedError("Got signal SIGTERM.")
+
+        def handle_sigint(signal: int, frame: Any) -> None:
+            pass
+
+        signal.signal(signal.SIGTERM, handle_sigterm)
+        signal.signal(signal.SIGHUP, handle_sighup)
+        signal.signal(signal.SIGINT, handle_sigint)
+
+    @property
+    def distributor_instance_id(self):
+        if self._distributor_instance_id is None:
+            raise ValueError(
+                "distributor_instance_id not available until DistributorInstance registers "
+                " with the server via DistributorInstance.register()"
+            )
+        return self._distributor_instance_id
+
+    def register(self) -> None:
+        """Register this DistributorInstance with the database. Get an ID"""
+        app_route = "/distributor_instance/register"
+        return_code, result = self.requester.send_request(
+            app_route=app_route,
+            message={"cluster_ids": list(self._cluster_interface_map.keys())},
+            request_type="post",
+        )
+        if not http_request_ok(return_code):
+            raise InvalidResponse(
+                f"Unexpected status code {return_code} from POST "
+                f"request through route {app_route}. Expected "
+                f"code 200. Response content: {result}"
+            )
+        self._distributor_instance_id = result["distributor_instance_id"]
 
     def run(self) -> None:
         # start the cluster
         try:
             self._initialize_signal_handlers()
-            self.cluster_interface.start()
-            self.workflow_run.transition_to_launched()
+            for interface in self._cluster_interface_map.values():
+                interface.start()
 
             # signal via pipe that we are alive
-            sys.stderr.write("ALIVE")
+            sys.stderr.write(f"ALIVE: distributor_instance_id={self._distributor_instance_id}")
             sys.stderr.flush()
 
             done: List[str] = []
             todo = [
                 TaskInstanceStatus.QUEUED,
-                TaskInstanceStatus.INSTANTIATED,
                 TaskInstanceStatus.LAUNCHED,
                 TaskInstanceStatus.RUNNING,
                 TaskInstanceStatus.TRIAGING,
                 TaskInstanceStatus.KILL_SELF,
             ]
-            while True:
+            while self._not_expunged():
+
+                self.log_task_instance_report_by_date()
+
                 # loop through all statuses and do as much work as we can till the heartbeat
                 time_till_next_heartbeat = self._workflow_run_heartbeat_interval - (
                     time.time() - self._last_heartbeat_time
@@ -182,8 +216,6 @@ class DistributorService:
                 if time_till_next_heartbeat > 0:
                     time.sleep(time_till_next_heartbeat)
 
-                self.log_task_instance_report_by_date()
-
         except DistributorInterruptedError:
             logger.info("Interrupt received!")
         except Exception as e:
@@ -191,7 +223,8 @@ class DistributorService:
             raise
         finally:
             # stop distributor
-            self.cluster_interface.stop()
+            for interface in self.cluster_interface_map.values():
+                interface.stop()
 
             # signal via pipe that we are shutdown
             sys.stderr.write("SHUTDOWN")
@@ -235,68 +268,17 @@ class DistributorService:
         for task_instance in task_instances:
             self._task_instance_status_map[task_instance.status].add(task_instance)
 
-    def instantiate_task_instances(
-        self, task_instances: List[DistributorTaskInstance]
-    ) -> None:
-        app_route = "/task_instance/instantiate_task_instances"
-        return_code, result = self.requester.send_request(
-            app_route=app_route,
-            message={
-                "task_instance_ids": [
-                    task_instance.task_instance_id for task_instance in task_instances
-                ]
-            },
-            request_type="post",
-        )
-        if not http_request_ok(return_code):
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {result}"
-            )
-
-        # construct batch. associations are made inside batch init
-        for batch in result["task_instance_batches"]:
-            task_instance_batch_kwargs = SerializeTaskInstanceBatch.kwargs_from_wire(
-                batch
-            )
-
-            array_id = task_instance_batch_kwargs["array_id"]
-            batch_number = task_instance_batch_kwargs["array_batch_num"]
-            try:
-                task_instance_batch = self._task_instance_batches[
-                    (array_id, batch_number)
-                ]
-            except KeyError:
-                task_instance_batch = TaskInstanceBatch(
-                    array_id=array_id,
-                    array_name=task_instance_batch_kwargs["array_name"],
-                    array_batch_num=batch_number,
-                    task_resources_id=task_instance_batch_kwargs["task_resources_id"],
-                    requester=self.requester,
-                )
-                self._task_instance_batches[
-                    (array_id, batch_number)
-                ] = task_instance_batch
-
-            for task_instance_id in task_instance_batch_kwargs["task_instance_ids"]:
-                task_instance = self._task_instances[task_instance_id]
-                task_instance.status = TaskInstanceStatus.INSTANTIATED
-                task_instance_batch.add_task_instance(task_instance)
-
     def launch_task_instance_batch(
-        self, task_instance_batch: TaskInstanceBatch
+        self, task_instance_batch: Batch
     ) -> None:
-        self._task_instance_batches.pop(
-            (task_instance_batch.array_id, task_instance_batch.batch_number)
-        )
-        # record batch info in db
+
         task_instance_batch.prepare_task_instance_batch_for_launch()
 
         # build worker node command
         command = self.cluster_interface.build_worker_node_command(
             task_instance_id=None,
             array_id=task_instance_batch.array_id,
+            batch_id=task_instance_batch.batch_id,
             batch_number=task_instance_batch.batch_number,
         )
         distributor_commands: List[DistributorCommand] = []
@@ -332,7 +314,7 @@ class DistributorService:
                 distributor_commands.append(distributor_command)
 
         else:
-            # if successful log a transition to launched
+
             launch_command = DistributorCommand(
                 task_instance_batch.transition_to_launched, self._next_report_increment
             )
@@ -383,13 +365,38 @@ class DistributorService:
                 distributor_id, self._next_report_increment
             )
 
-    def triage_error(self, task_instance: DistributorTaskInstance) -> None:
-        r_value, r_msg = self.cluster_interface.get_remote_exit_info(
-            task_instance.distributor_id
-        )
-        task_instance.transition_to_error(r_msg, r_value)
+    def triage_error(self, task_instances: set[DistributorTaskInstance]) -> None:
+        """
+        We can potentially have two cases of task instances in Triaging:
+        1) Task instance was lost from squeue. Distributor does not log a heartbeat,
+              active swarm moves to triaging. We want to get the error message and log it,
+              move to an appropriate error state e.g. Z, U,
+        2) Task instance is still in squeue, but distributor dies so can't log heartbeats.
+              a) If new distributor instance picks up the launched TI before it misses a heartbeat
+                    - no problem. New distributor puts it in the L register,
+                        logs a heartbeat next round
+              b) New distributor instance does not pick up the launched TI in time. Misses a heartbeat
+                    - swarm will move it into Triaging state. Ideal behavior is to move back to launched
+                    - Can use presence/lack of in sacct call to determine whether a TI gets moved
+                        to an error state or back to launched
+        """
+        for task_instance in task_instances:
+            try:
+                r_value, r_msg = self.cluster_interface.get_remote_exit_info(
+                    task_instance.distributor_id
+                )
+                task_instance.transition_to_error(r_msg, r_value)
+            except RemoteExitInfoNotAvailable:
+                # The most likely cause is that the job is still active, no db entry yet.
+                # Move back to launched? Assume that it's lively?
+                # TODO: check that get_remote_exit_info in jobmon_slurm works as expected.
+                task_instance.transition_to_launched(
+                    distributor_id=task_instance.distributor_id,
+                    next_report_increment=self._next_report_increment
+                )
 
     def kill_self(self, task_instance: DistributorTaskInstance) -> None:
+        """Cancel a running task instance that is no longer logging heartbeats."""
         self.cluster_interface.terminate_task_instances([task_instance.distributor_id])
         task_instance.transition_to_error(
             "Task instance was self-killed.", TaskInstanceStatus.ERROR_FATAL
@@ -430,30 +437,21 @@ class DistributorService:
             )
         self._last_heartbeat_time = time.time()
 
-    def _initialize_signal_handlers(self) -> None:
-        def handle_sighup(signal: int, frame: Any) -> None:
-            raise DistributorInterruptedError("Got signal SIGHUP.")
-
-        def handle_sigterm(signal: int, frame: Any) -> None:
-            raise DistributorInterruptedError("Got signal SIGTERM.")
-
-        def handle_sigint(signal: int, frame: Any) -> None:
-            pass
-
-        signal.signal(signal.SIGTERM, handle_sigterm)
-        signal.signal(signal.SIGHUP, handle_sighup)
-        signal.signal(signal.SIGINT, handle_sigint)
+    def log_heartbeat(self):
+        self.requester.send_request(f'/distributor_instance/{self._distributor_instance_id}/heartbeat',
+                                    {}, 'post')
 
     def refresh_status_from_db(self, status: str) -> None:
         """Got to DB to check the list tis status."""
+        active_task_instance_ids = {
+            task_instance.task_instance_id
+            for task_instance in self._task_instance_status_map[status]
+        }
         message = {
-            "task_instance_ids": [
-                task_instance.task_instance_id
-                for task_instance in self._task_instance_status_map[status]
-            ],
+            "task_instance_ids": list(active_task_instance_ids),
             "status": status,
         }
-        app_route = f"/workflow_run/{self.workflow_run.workflow_run_id}/sync_status"
+        app_route = f"/distributor_instance/{self._distributor_instance_id}/sync_status"
         return_code, result = self.requester.send_request(
             app_route=app_route, message=message, request_type="post"
         )
@@ -463,64 +461,156 @@ class DistributorService:
             )
 
         # mutate the statuses and update the status map
-        status_updates: Dict[str, List[int]] = result["status_updates"]
-        for new_status, task_instance_ids in status_updates.items():
-            for task_instance_id in task_instance_ids:
-                try:
-                    task_instance = self._task_instances[task_instance_id]
+        status_updates: List[tuple[int, str]] = result["status_updates"]
+        new_task_instance_ids = []
+        for task_instance_id, new_status in status_updates:
+            # Discard is safe, no KeyError if task instance ID is not present
+            active_task_instance_ids.discard(task_instance_id)
+            try:
+                task_instance = self._task_instances[task_instance_id]
+            except KeyError:
+                new_task_instance_ids.append(task_instance_id)
+            else:
+                # remove from old status set
+                previous_status = task_instance.status
+                self._task_instance_status_map[previous_status].remove(
+                    task_instance
+                )
 
-                except KeyError:
-                    task_instance = DistributorTaskInstance(
-                        task_instance_id,
-                        self.workflow_run.workflow_run_id,
-                        new_status,
-                        self.requester,
-                    )
+                # change to new status and move to new set
+                task_instance.status = new_status
+
+                try:
                     self._task_instance_status_map[task_instance.status].add(
                         task_instance
                     )
-                    self._task_instances[task_instance.task_instance_id] = task_instance
+                except KeyError:
+                    # If the task instance is in a terminal state, e.g. D, E, etc.,
+                    # expire it from the distributor
+                    if task_instance_id in self._task_instances:
+                        self._task_instances.pop(task_instance_id)
 
-                else:
-                    # remove from old status set
-                    previous_status = task_instance.status
-                    self._task_instance_status_map[previous_status].remove(
-                        task_instance
-                    )
+        if any(new_task_instance_ids):
 
-                    # change to new status and move to new set
-                    task_instance.status = new_status
+            self._distributor_commands = it.chain(
+                # TODO: Put this at the front of the end of the queue?
+                # TODO: won't be evaluated until subsequent process_status call
+                self._distributor_commands,
+                self._generate_add_task_instance_callables(new_task_instance_ids, status)
+            )
 
-                    try:
-                        self._task_instance_status_map[task_instance.status].add(
-                            task_instance
-                        )
-                    except KeyError:
-                        # If the task instance is in a terminal state, e.g. D, E, etc.,
-                        # expire it from the distributor
-                        continue
+        # Purge remaining task instances that belong to inactive WFRs
+        for task_instance_id in active_task_instance_ids:
+            task_instance = self._task_instances.pop(task_instance_id)
+            # Assumes that task instance status attribute is set properly
+            # Could lead to a memory leak if a task instance's status and the register it's in
+            # are not consistent
+            # Alternative: For safety, just loop through all registers and try a discard
+            if task_instance.status in self._task_instance_status_map:
+                self._task_instance_status_map[task_instance.status].discard(task_instance)
+
+    def _generate_add_task_instance_callables(
+        self, new_task_instance_ids: list[int], status: str, chunk_size: int = 50
+    ) -> Generator:
+        # Chain together, naive chunking
+        for chunk_number in range(len(new_task_instance_ids) % chunk_size):
+            start_idx = chunk_number * chunk_size
+            end_idx = start_idx + chunk_size
+            yield DistributorCommand(
+                self._add_task_instances,
+                new_task_instance_ids[start_idx:end_idx],
+                status
+            )
+
+    def _add_task_instances(self, task_instance_ids: list[int], status: str):
+        # Fetch metadata and create new task instances
+
+        task_instance_ids = list(set(task_instance_ids) - set(self._task_instances.keys()))
+
+        if not task_instance_ids:
+            return
+        _, resp = self.requester.send_request(
+            app_route='/task_instance/get_task_instance_metadata',
+            message={'task_instance_ids': task_instance_ids},
+            request_type='post'
+        )
+
+        for task_instance_id, batch_id, distributor_id, cluster_id, workflow_run_id \
+                in resp['task_instance_metadata']:
+            if task_instance_id not in self._task_instances \
+                    and status in self._task_instance_status_map:
+
+                task_instance = DistributorTaskInstance(
+                    task_instance_id=task_instance_id,
+                    batch_id=batch_id,
+                    cluster_id=cluster_id,
+                    workflow_run_id=workflow_run_id,
+                    status=status,
+                    requester=self.requester
+                )
+                self._task_instances[task_instance_id] = task_instance
+                self._task_instance_status_map[status].add(task_instance)
+
+    def expunge(self):
+        # TODO: Call this in an independent timing loop somewhere
+        # Acts as a pseudo reaper. Multiple distributor instances might try to update the same
+        # expired instance, but shouldn't be a concern - one will win, rest will fail
+        self.requester.send_request(
+            '/distributor_instance/expunge',
+            {},
+            'put'
+        )
+
+    def _not_expunged(self) -> bool:
+        pass
+
+    def _create_batches(
+        self, queued_task_instances: Set[DistributorTaskInstance]
+    ) -> Set[Batch]:
+        """Only needed in Q state. Once in launched/running/triaging/etc.,
+        batches are not needed. Monitoring done at task instance level
+        """
+        batch_ids = {ti.batch_id for ti in queued_task_instances}
+        batch_map = self._get_batches(batch_ids)
+
+        for task_instance in queued_task_instances:
+            batch = batch_map[task_instance.batch_id]
+            batch.add_task_instance(task_instance)
+
+        return set(batch_map.values())
+
+    def _get_batches(self, batch_ids: set[int]) -> Dict[int, Batch]:
+        # Consider chunking
+        if not any(batch_ids):
+            return {}
+
+        batch_map = {}
+        _, batches = self.requester.send_request(
+            app_route="/batch/get_batches",
+            message={'batch_ids': batch_ids},
+            request_type='get'
+        )
+        for batch_id, task_resources_id, array_id, array_name in batches:
+            new_batch = Batch(
+                batch_id=batch_id,
+                task_resources_id=task_resources_id,
+                array_id=array_id,
+                array_name=array_name,
+                requester=self.requester
+            )
+            batch_map[batch_id] = new_batch
+        return batch_map
 
     def _check_queued_for_work(self) -> Generator[DistributorCommand, None, None]:
-        queued_task_instances = list(
-            self._task_instance_status_map[TaskInstanceStatus.QUEUED]
-        )
-        queued_task_instances.sort()
-        chunk_size = 500
-        while queued_task_instances:
-            ti_list = queued_task_instances[:chunk_size]
-            queued_task_instances = queued_task_instances[chunk_size:]
-            yield DistributorCommand(self.instantiate_task_instances, ti_list)
 
-    def _check_instantiated_for_work(self) -> Generator[DistributorCommand, None, None]:
-        # compute the task_instances that can be launched
-        instantiated_task_instances = list(
-            self._task_instance_status_map[TaskInstanceStatus.INSTANTIATED]
-        )
-        task_instance_batches = set(
-            [task_instance.batch for task_instance in instantiated_task_instances]
-        )
+        queued_task_instances = self._task_instance_status_map[TaskInstanceStatus.QUEUED]
 
-        for batch in task_instance_batches:
+        # Create batches on queued TIs
+        # TODO: needs to be distributor command? To log HBs?
+        # Could consider consolidating creating a batch and launching it, but would require
+        # multiple trips to server for batch metadata
+        batches = self._create_batches(queued_task_instances)
+        for batch in batches:
             yield DistributorCommand(self.launch_task_instance_batch, batch)
 
     def _check_triaging_for_work(self) -> Generator[DistributorCommand, None, None]:
@@ -532,8 +622,8 @@ class DistributorService:
         triaging_task_instances = self._task_instance_status_map[
             TaskInstanceStatus.TRIAGING
         ]
-        for task_instance in triaging_task_instances:
-            yield DistributorCommand(self.triage_error, task_instance)
+
+        yield DistributorCommand(self.triage_error, triaging_task_instances)
 
     def _check_kill_self_for_work(self) -> Generator[DistributorCommand, None, None]:
         """Handle TIs in KILL_SELF state.

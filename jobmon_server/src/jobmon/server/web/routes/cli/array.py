@@ -4,9 +4,7 @@ from typing import Any
 from flask import jsonify, request
 from sqlalchemy import select
 
-from jobmon.server.web.models.array import Array
-from jobmon.server.web.models.task import Task
-from jobmon.server.web.models.task_instance import TaskInstance
+from jobmon.server.web.models.api import Array, Task, TaskInstance
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.cli import blueprint
 

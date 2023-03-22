@@ -11,18 +11,47 @@ import structlog
 
 from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition
-from jobmon.core.serializers import SerializeTaskInstanceBatch
 from jobmon.server.web._compat import add_time
-from jobmon.server.web.models.array import Array
-from jobmon.server.web.models.task import Task
-from jobmon.server.web.models.task_instance import TaskInstance
-from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
+from jobmon.server.web.models.api import (
+    Batch,
+    Task,
+    TaskInstance,
+    TaskInstanceErrorLog,
+    WorkflowRun,
+)
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
 from jobmon.server.web.server_side_exception import ServerError
 
 
 logger = structlog.get_logger(__name__)
+
+
+
+@blueprint.route("/task_instance/get_task_instance_metadata", methods=["POST"])
+def get_task_instance_metadata():
+
+    data = cast(Dict, request.get_json())
+    task_instance_ids = data.get("task_instance_ids")
+
+    select_stmt = select(
+        TaskInstance.id,
+        TaskInstance.batch_id,
+        TaskInstance.distributor_id,
+        Batch.cluster_id,
+        TaskInstance.workflow_run_id,
+    ).where(
+        TaskInstance.batch_id == Batch.id,
+        TaskInstance.id.in_(task_instance_ids)
+    )
+
+    session = SessionLocal()
+    with session.begin():
+        task_instances = session.execute(select_stmt).all()
+
+    resp = jsonify(task_instance_metadata=list(map(tuple, task_instances)))
+    resp.status_code = StatusCodes.OK
+    return resp
 
 
 @blueprint.route("/task_instance/<task_instance_id>/log_running", methods=["POST"])
@@ -439,103 +468,6 @@ def log_unknown_error(task_instance_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/task_instance/instantiate_task_instances", methods=["POST"])
-def instantiate_task_instances() -> Any:
-    """Sync status of given task intance IDs."""
-    data = cast(Dict, request.get_json())
-    task_instance_ids_list = tuple([int(tid) for tid in data["task_instance_ids"]])
-
-    session = SessionLocal()
-    with session.begin():
-        # update the task table where FSM allows it
-        task_update = (
-            update(Task)
-            .where(
-                Task.id.in_(
-                    select(Task.id)
-                    .join(TaskInstance, TaskInstance.task_id == Task.id)
-                    .where(
-                        TaskInstance.id.in_(task_instance_ids_list),
-                        (Task.status == constants.TaskStatus.QUEUED),
-                    )
-                )
-            )
-            .values(status=constants.TaskStatus.INSTANTIATING, status_date=func.now())
-            .execution_options(synchronize_session=False)
-        )
-        session.execute(task_update)
-
-        # then propagate back into task instance where a change was made
-        task_instance_update = (
-            update(TaskInstance)
-            .where(
-                TaskInstance.id.in_(
-                    select(TaskInstance.id)
-                    .join(Task, TaskInstance.task_id == Task.id)
-                    .where(
-                        # a successful transition
-                        (Task.status == constants.TaskStatus.INSTANTIATING),
-                        # and part of the current set
-                        TaskInstance.id.in_(task_instance_ids_list),
-                    )
-                )
-            )
-            .values(
-                status=constants.TaskInstanceStatus.INSTANTIATED, status_date=func.now()
-            )
-            .execution_options(synchronize_session=False)
-        )
-        session.execute(task_instance_update)
-
-    with session.begin():
-        instantiated_batches_query = (
-            select(
-                TaskInstance.array_id,
-                Array.name,
-                TaskInstance.array_batch_num,
-                TaskInstance.task_resources_id,
-                func.group_concat(TaskInstance.id),
-            )
-            .where(
-                TaskInstance.id.in_(task_instance_ids_list)
-                & (TaskInstance.status == constants.TaskInstanceStatus.INSTANTIATED)
-                & (TaskInstance.array_id == Array.id)
-            )
-            .group_by(
-                TaskInstance.array_id,
-                TaskInstance.array_batch_num,
-                TaskInstance.task_resources_id,
-                Array.name,
-            )
-        )
-        result = session.execute(instantiated_batches_query)
-        serialized_batches = []
-        for (
-            array_id,
-            array_name,
-            array_batch_num,
-            task_resources_id,
-            task_instance_ids,
-        ) in result:
-            task_instance_ids = [
-                int(task_instance_id)
-                for task_instance_id in task_instance_ids.split(",")
-            ]
-            serialized_batches.append(
-                SerializeTaskInstanceBatch.to_wire(
-                    array_id=array_id,
-                    array_name=array_name,
-                    array_batch_num=array_batch_num,
-                    task_resources_id=task_resources_id,
-                    task_instance_ids=task_instance_ids,
-                )
-            )
-
-    resp = jsonify(task_instance_batches=serialized_batches)
-    resp.status_code = StatusCodes.OK
-    return resp
-
-
 # ############################ HELPER FUNCTIONS ###############################
 def _update_task_instance_state(task_instance: TaskInstance, status_id: str) -> Any:
     """Advance the states of task_instance and it's associated Task.
@@ -576,6 +508,7 @@ def _update_task_instance_state(task_instance: TaskInstance, status_id: str) -> 
             f"transitioning task. Server Error in {request.path}",
             status_code=500,
         ) from e
+
     return response
 
 

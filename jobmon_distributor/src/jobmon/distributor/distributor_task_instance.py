@@ -9,7 +9,7 @@ from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import http_request_ok, Requester
 
 if TYPE_CHECKING:
-    from jobmon.distributor.task_instance_batch import TaskInstanceBatch
+    from jobmon.client.distributor.batch import Batch
 
 
 logger = logging.getLogger(__name__)
@@ -21,9 +21,12 @@ class DistributorTaskInstance:
     def __init__(
         self,
         task_instance_id: int,
+        batch_id: int,
+        cluster_id: int,
         workflow_run_id: int,
         status: str,
         requester: Requester,
+        distributor_id: Optional[str] = None
     ) -> None:
         """Initialization of distributor task instance.
 
@@ -35,11 +38,16 @@ class DistributorTaskInstance:
                 the JSM. default is shared requester
         """
         self.task_instance_id = task_instance_id
+        self.batch_id = batch_id
+        self.cluster_id = cluster_id,
         self.workflow_run_id = workflow_run_id
         self.status = status
+        self.distributor_id = distributor_id
 
         self.error_state = ""
         self.error_msg = ""
+
+        self._batch = None
 
         self.requester = requester
 
@@ -118,6 +126,7 @@ class DistributorTaskInstance:
                 f"request through route {app_route}. Expected "
                 f"code 200. Response content: {response}"
             )
+        self.status = TaskInstanceStatus.NO_DISTRIBUTOR_ID
 
     def _transition_to_error(self, error_message: str, error_state: str) -> None:
         """Transitions the TaskInstance to the specified error state."""
@@ -150,6 +159,7 @@ class DistributorTaskInstance:
             )
 
         self.error_state = error_state
+        self.status = error_state
 
     def transition_to_unknown_error(
         self, error_message: str, error_state: str

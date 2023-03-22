@@ -12,6 +12,8 @@ from jobmon.core.exceptions import (
     WorkflowAlreadyExists,
     NodeDependencyNotExistError,
 )
+from jobmon.server.web.models.api import TaskStatus, TaskInstanceStatus, \
+    WorkflowAttribute, WorkflowAttributeType
 
 
 def test_wfargs_update(tool):
@@ -106,8 +108,6 @@ def test_attempt_resume_on_complete_workflow(tool):
 
 def test_resume_with_old_and_new_workflow_attributes(tool, db_engine):
     """Should allow a resume, and should not fail on duplicate workflow_attribute keys"""
-    from jobmon.server.web.models.workflow_attribute import WorkflowAttribute
-    from jobmon.server.web.models.workflow_attribute_type import WorkflowAttributeType
 
     # Create identical dags
     t1 = tool.active_task_templates["phase_1"].create_task(arg="sleep 1")
@@ -234,8 +234,6 @@ def test_empty_workflow(tool):
 
 def test_workflow_attribute(db_engine, tool, client_env, task_template):
     """Test the workflow attributes feature"""
-    from jobmon.server.web.models.workflow_attribute import WorkflowAttribute
-    from jobmon.server.web.models.workflow_attribute_type import WorkflowAttributeType
 
     wf1 = tool.create_workflow(
         name="test_wf_attributes",
@@ -401,10 +399,6 @@ def test_workflow_validation(tool, task_template, caplog):
 
 def test_workflow_get_errors(tool, task_template, db_engine):
     """test that num attempts gets reset on a resume."""
-
-    from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
-    from jobmon.server.web.models.task_status import TaskStatus
-    from jobmon.server.web.models.workflow_run_status import WorkflowRunStatus
 
     # setup workflow 1
     workflow1 = tool.create_workflow(name="test_workflow_get_errors")

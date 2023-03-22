@@ -38,6 +38,7 @@ class WorkerNodeFactory:
         array_step_id = self._worker_node_interface.array_step_id
 
         # Fetch from the database
+        # TODO: Search by batch_id
         app_route = (
             f"/get_array_task_instance_id/{array_id}/{batch_number}/{array_step_id}"
         )

@@ -2,9 +2,6 @@ import pytest
 
 from jobmon.core.constants import WorkflowRunStatus
 from jobmon.client.workflow_run import WorkflowRunFactory
-from jobmon.server.web.models import load_model
-
-load_model()
 
 """These are test cases to test if the routes are working.
 Further tests in test_workflow_reaper to verify the logic.

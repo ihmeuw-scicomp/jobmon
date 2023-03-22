@@ -7,8 +7,7 @@ import sqlalchemy
 from sqlalchemy import select
 import structlog
 
-from jobmon.server.web.models.task_template import TaskTemplate
-from jobmon.server.web.models.tool_version import ToolVersion
+from jobmon.server.web.models.api import TaskTemplate, ToolVersion
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage
