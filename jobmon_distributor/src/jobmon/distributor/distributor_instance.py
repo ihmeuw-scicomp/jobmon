@@ -426,15 +426,11 @@ class DistributorInstance:
             "task_instance_ids": task_instance_ids_to_heartbeat,
         }
         app_route = "/task_instance/log_report_by/batch"
-        return_code, result = self.requester.send_request(
-            app_route="/task_instance/log_report_by/batch",
+        _ = self.requester.send_request(
+            app_route=app_route,
             message=message,
             request_type="post",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"{app_route} Returned={return_code}. Message={message}"
-            )
         self._last_heartbeat_time = time.time()
 
     def log_heartbeat(self):
