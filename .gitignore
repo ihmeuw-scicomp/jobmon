@@ -1,0 +1,40 @@
+# python compiled files
+*.pyc
+
+# editor files
+*.sublime*
+
+# log files
+*.log
+
+# Python egg metadata, regenerated from source files by setuptools.
+# and other build artifacts
+*/*/*.egg-info/*
+/jobmon_*/build
+/dist
+/jobmon_*/LICENSE
+dist
+
+# Ignore test artifacts
+.coverage
+.coverage.*
+out
+
+# ignore cache directories
+*__pycache__*
+.pytest_cache
+.mypy_cache
+
+# Ignore mac files
+._*
+.DS_Store
+
+# ignore nox envs
+.nox/
+
+# ignore auto generated docs
+docsource/api
+
+# ignore ide settings
+.idea/
+
