@@ -1,6 +1,5 @@
 
-      && (Query(`client_jobmon_version=3.2.1`))
-n compiled files
+# python compiled files
 *.pyc
 
 # editor files

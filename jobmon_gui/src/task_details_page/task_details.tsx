@@ -5,6 +5,9 @@ import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import TaskInstanceTable from './task_instance_table';
 import NodeLists from './node_list';
 import TaskFSM from './task_fsm';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faLightbulb } from '@fortawesome/free-solid-svg-icons';
+import { OverlayTrigger, Popover } from 'react-bootstrap';
 
 function getTaskDetails(setTaskStatus, setWorkflowId, taskId) {
     // Returns task status and workflow ID
@@ -77,15 +80,39 @@ function TaskDetails() {
                 <Breadcrumb.Item active>Task ID {taskId}</Breadcrumb.Item>
             </Breadcrumb>
             <div>
-                <header className="App-header">
-                    <p>Task ID: {taskId}</p>
+                <header className="div-level-2 header-1 ">
+                    <p className='color-dark'>Task ID: {taskId}</p>
+                    <p className="color-dark">
+                        Task Finite State Machine&nbsp;
+                        <OverlayTrigger
+                            placement="right"
+                            trigger={["hover", "focus"]}
+                            overlay={(
+                                <Popover id="task_count">
+                                    <p><b>Registering:</b> Task is bound to the database.</p>
+                                    <p><b>Queued:</b> Task's dependencies have successfully completed, task can be run when the scheduler is ready.</p>
+                                    <p><b>Instantiating:</b> A task instance is preparing to be launched/submitted.</p>
+                                    <p><b>Launched:</b> Task instance submitted to the cluster normally.</p>
+                                    <p><b>Running:</b> Task is running on the specified distributor.</p>
+                                    <p><b>Error Recoverable:</b> Task has errored out but has more attempts so it will be retried.</p>
+                                    <p><b>Adjusting Resources:</b> Task errored with a resource error, the resources will be adjusted before retrying.</p>
+                                    <p><b>Error Fatal:</b> Task errored out and has used all of the attempts, therefore has failed for this WorkflowRun. It can be resumed in a new WFR.</p>
+                                    <p><b>Done:</b> Task ran successfully to completion; it has a TaskInstance that successfully completed.</p>
+                                </Popover>
+                            )}
+                        >
+                            <span><FontAwesomeIcon icon={faLightbulb} /></span>
+                        </OverlayTrigger>
+                    </p>
                 </header>
             </div>
-            <div className="div-level-2">
-                <TaskFSM taskStatus={task_status} />
-            </div>
-            <div className="div-level-2">
-                <NodeLists upstreamTasks={upstream_tasks} downstreamTasks={downtream_tasks} />
+            <div className='row pt-2 mx-0 px-0'>
+                <div className="col-3">
+                    <NodeLists upstreamTasks={upstream_tasks} downstreamTasks={downtream_tasks} />
+                </div>
+                <div className="col-9">
+                    <TaskFSM taskStatus={task_status} />
+                </div>
             </div>
             <div id="wftable" className="div-level-2" >
                 <TaskInstanceTable taskInstanceData={ti_details} />

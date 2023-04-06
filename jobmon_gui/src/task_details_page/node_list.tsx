@@ -7,9 +7,9 @@ import ListGroup from 'react-bootstrap/ListGroup';
 
 export default function NodeLists({ upstreamTasks, downstreamTasks }) {
     return (
-        <div>
-            <h2>Dependencies</h2>
-            <div className="card-columns d-flex justify-content-center">
+        <div className='div-level-2 pl-5 pt-2'>
+            <p className='font-weight-bold'>Dependencies</p>
+            <div className="card-columns d-flex justify-content-center flex-column">
                 <Card className="dependency-list-scroll">
                     <Card.Header className="dependency-header">Upstream Task IDs</Card.Header>
                     <ListGroup variant="flush">

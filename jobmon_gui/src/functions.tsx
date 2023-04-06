@@ -69,7 +69,7 @@ export const init_apm = (pageloadname) => {
 }
 
 export const safe_rum_transaction = (apm) => {
-    if (apm !== null && apm !== undefined){
+    if (apm !== null && apm != undefined){
         return apm.getCurrentTransaction();
     }
     else {
@@ -84,7 +84,7 @@ export const safe_rum_add_label = (rum_obj, key, value) => {
 }
 
 export const safe_rum_start_span = (apm, name, type) => {
-    if (apm !== null && apm !== undefined){
+    if (apm !== null && apm != undefined){
         return apm.startSpan(name, type);
     }else{
         return null;
@@ -92,7 +92,7 @@ export const safe_rum_start_span = (apm, name, type) => {
 }
 
 export const safe_rum_unit_end = (rum_obj) => {
-    if (rum_obj != null && rum_obj !== undefined){
+    if (rum_obj != null && rum_obj != undefined){
         return rum_obj.end();
     }
 }

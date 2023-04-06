@@ -24,18 +24,15 @@ export default function Usage({ taskTemplateName, taskTemplateVersionId, usageIn
 
     return (
         <div>
-            <header className="App-header">
-                <h3>Resource Usage Summary</h3>
-            </header>
-            <div className="container">
+            <div className="container w-100 mt-5">
                 <p>
-                    <b>TaskTemplate Name:</b> {taskTemplateName} <br></br>
-                    <b>TaskTemplate Version ID:</b> {taskTemplateVersionId} <br></br>
-                    <b>Number of Tasks in Summary Calulation:</b> {usageInfo[0]}</p>
+                    <b className='font-weight-bold'>TaskTemplate Name:</b> {taskTemplateName} <br></br>
+                    <b className='font-weight-bold'>TaskTemplate Version ID:</b> {taskTemplateVersionId} <br></br>
+                    <b className='font-weight-bold'>Number of Tasks in Summary Calulation:</b> {usageInfo[0]}</p>
                 <div className="card-columns d-flex justify-content-center">
                     <div className="card">
                         <div className="card-block">
-                            <div className="card-header">Memory</div>
+                            <div className="card-header font-weight-bold">Memory</div>
                             <div className="card-body">
                                 <p className="card-text">
                                     Minimum: {formatBytes(usageInfo[1])}<br></br>
@@ -48,7 +45,7 @@ export default function Usage({ taskTemplateName, taskTemplateVersionId, usageIn
                     </div>
                     <div className="card">
                         <div className="card-block">
-                            <div className="card-header">Runtime (Seconds)</div>
+                            <div className="card-header font-weight-bold">Runtime (Seconds)</div>
                             <div className="card-body">
                                 <p className="card-text">
                                     Minimum: {formatNumber(usageInfo[4])}<br></br>
