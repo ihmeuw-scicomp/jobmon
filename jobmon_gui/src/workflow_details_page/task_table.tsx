@@ -9,6 +9,15 @@ import 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit.min.c
 
 import { convertDate, convertDatePST } from '../functions'
 import '../jobmon_gui.css';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
+
+const customCaret = (order, column) => {
+    if (!order) return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretUp} /></span>);
+    else if (order === 'asc') return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretUp} /></span>);
+    else if (order === 'desc') return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretDown} /></span>);
+    return null;
+}
 
 export default function TaskTable({ taskData, loading }) {
     const { ExportCSVButton } = CSVExport;
@@ -19,6 +28,7 @@ export default function TaskTable({ taskData, loading }) {
             dataField: "task_id",
             text: "Task ID",
             sort: true,
+            sortCaret: customCaret,
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The ID column in TASK table. Unique identifier.");
@@ -41,6 +51,8 @@ export default function TaskTable({ taskData, loading }) {
             dataField: "task_name",
             text: "Task Name",
             sort: true,
+            sortCaret: customCaret,
+
             style: { overflowWrap: 'break-word' },
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
@@ -56,6 +68,7 @@ export default function TaskTable({ taskData, loading }) {
             dataField: "task_status",
             text: "Status",
             sort: true,
+            sortCaret: customCaret,
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The STATUS column in TASK table. The current status of the task.");
@@ -70,6 +83,7 @@ export default function TaskTable({ taskData, loading }) {
             dataField: "task_command",
             text: "Command",
             sort: true,
+            sortCaret: customCaret,
             style: { overflowWrap: 'break-word' },
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
@@ -85,6 +99,7 @@ export default function TaskTable({ taskData, loading }) {
             dataField: "task_num_attempts",
             text: "Num Attempts",
             sort: true,
+            sortCaret: customCaret,
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The NUM_ATTEMPTS column in TASK table. The number of attempts the jobmon has tried for this task.");
@@ -99,6 +114,7 @@ export default function TaskTable({ taskData, loading }) {
             dataField: "task_max_attempts",
             text: "Max Attempts",
             sort: true,
+            sortCaret: customCaret,
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The MAX_ATTEMPTS column in TASK table. The max number of attempts the jobmon will retry this task.");
@@ -113,6 +129,7 @@ export default function TaskTable({ taskData, loading }) {
             dataField: "task_status_date",
             text: "Status Date",
             sort: true,
+            sortCaret: customCaret,
             sortValue: (cell, row) => convertDate(cell).getTime(),
             formatter: (cell, row, rowIndex) => convertDatePST(cell),
             headerEvents: {
@@ -148,10 +165,11 @@ export default function TaskTable({ taskData, loading }) {
                 >
                     {
                         props => (
+                            <>
                             <div>
-                                <ExportCSVButton {...props.csvProps} className="btn btn-dark">Export CSV</ExportCSVButton>
-                                <hr />
-                                <span className="span-helper"><i>{helper}</i></span>
+                                <ExportCSVButton {...props.csvProps} className="btn btn-custom">Export CSV</ExportCSVButton>
+                                </div><div className=''>
+                                    <p className="span-helper"><i>{helper}</i></p>
                                 <br/>
                                 <BootstrapTable
                                     keyField="task_id"
@@ -161,8 +179,9 @@ export default function TaskTable({ taskData, loading }) {
                                     filter={filterFactory()}
                                     striped
                                     pagination={taskData.length === 0 ? undefined : paginationFactory({ sizePerPage: 10 })}
-                                />
+                                    />
                             </div>
+                            </>
                         )
                     }
                 </ToolkitProvider>

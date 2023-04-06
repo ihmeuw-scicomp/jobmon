@@ -38,7 +38,7 @@ export default function JobmonProgressBar({tasks, pending, scheduled, running, d
                                             <td>{fatal}</td>
                                         </tr>
                                         <tr>
-                                            <th> Total:</th>
+                                            <th className='bg-dark text-light'> Total:</th>
                                             <td>{tasks}</td>
                                         </tr>
                                     </table>
@@ -58,11 +58,11 @@ export default function JobmonProgressBar({tasks, pending, scheduled, running, d
                         >
 
             <ProgressBar>
-                 <ProgressBar className="pending-progress-bar" striped max={tasks} now={pending} key={1} isChild={true} label={((pending / tasks) * 100).toFixed(1) + "%"} />
-                 <ProgressBar className="scheduled-progress-bar" striped max={tasks} now={scheduled} key={2} isChild={true} label={((scheduled / tasks) * 100).toFixed(1) + "%"} />
-                 <ProgressBar className="running-progress-bar" striped max={tasks} now={running} key={3} isChild={true} label={((running / tasks) * 100).toFixed(1) + "%"} />
-                 <ProgressBar className="done-progress-bar" striped max={tasks} now={done} key={4} isChild={true} label={((done / tasks) * 100).toFixed(1) + "%"} />
-                 <ProgressBar className="fatal-progress-bar" striped max={tasks} now={fatal} key={5} isChild={true} label={((fatal / tasks) * 100).toFixed(1) + "%"}/>
+                 <ProgressBar className="pending-progress-bar" max={tasks} now={pending} key={1} isChild={true} label={((pending / tasks) * 100).toFixed(1) + "%"} />
+                 <ProgressBar className="scheduled-progress-bar" max={tasks} now={scheduled} key={2} isChild={true} label={((scheduled / tasks) * 100).toFixed(1) + "%"} />
+                 <ProgressBar className="running-progress-bar" max={tasks} now={running} key={3} isChild={true} label={((running / tasks) * 100).toFixed(1) + "%"} />
+                 <ProgressBar className="done-progress-bar" max={tasks} now={done} key={4} isChild={true} label={((done / tasks) * 100).toFixed(1) + "%"} />
+                 <ProgressBar className="fatal-progress-bar" max={tasks} now={fatal} key={5} isChild={true} label={((fatal / tasks) * 100).toFixed(1) + "%"}/>
             </ProgressBar>
             </OverlayTrigger>
 
@@ -134,38 +134,38 @@ export default function JobmonProgressBar({tasks, pending, scheduled, running, d
                                 <Popover id="task-count">
                                     <table id="tt-tasks">
                                         <tr>
-                                            <th className="scheduled">Scheduled:</th>
-                                            <td>{scheduled}</td>
+                                            <th className="scheduled text-light px-2 rounded">Scheduled:</th>
+                                            <td className='pl-2'>{scheduled}</td>
                                         </tr>
                                         <tr>
-                                            <th className="pending"> Pending:</th>
+                                            <th className="pending text-light px-2 rounded"> Pending:</th>
                                             <td>{pending}</td>
                                         </tr>
                                         <tr>
-                                            <th className="running">Running:</th>
+                                            <th className="running text-light px-2 rounded">Running:</th>
                                             <td>{running}</td>
                                         </tr>
                                         <tr>
-                                            <th className="done">Done:</th>
+                                            <th className="done text-light px-2 rounded">Done:</th>
                                             <td>{done}</td>
                                         </tr>
                                         <tr>
-                                            <th className="fatal">Fatal:</th>
+                                            <th className="fatal text-light px-2 rounded">Fatal:</th>
                                             <td>{fatal}</td>
                                         </tr>
                                         <tr>
-                                            <th> Total:</th>
-                                            <td>{tasks}</td>
+                                            <th className='bg-dark text-light px-2 rounded'> Total:</th>
+                                            <td className='pl-2'>{tasks}</td>
                                         </tr>
                                     </table>
                                     <hr />
                                     <table id="tt-stats">
                                         <tr>
-                                            <th># Attempts:</th>
+                                            <th className='font-weight-bold'># Attempts:</th>
                                             <td>{num_attempts_avg} ({num_attempts_min} - {num_attempts_max})</td>
                                         </tr>
                                         <tr>
-                                            <th>Concurrency Limit:</th>
+                                            <th className='font-weight-bold'>Concurrency Limit:</th>
                                             <td>{maxc.toLocaleString()}</td>
                                         </tr>
                                     </table>

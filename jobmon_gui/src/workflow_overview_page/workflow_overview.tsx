@@ -13,6 +13,8 @@ import axios from 'axios';
 import JobmonWFTable from './wf_table.tsx';
 import '../jobmon_gui.css';
 import { init_apm, safe_rum_add_label, safe_rum_transaction, safe_rum_start_span, safe_rum_unit_end } from '../functions';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCircle } from '@fortawesome/free-solid-svg-icons';
 
 function App() {
   const apm: any = init_apm("workflow_overview_page");
@@ -78,12 +80,26 @@ function App() {
       params: params,
     };
     let workflow_status_url = process.env.REACT_APP_BASE_URL + "/workflow_overview_viz";
+    const workflow_status_renders = {
+      "PENDING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-pp" /> </label><label className="label-left font-weight-300">PENDING  </label></div >),
+      "SCHEDULED": (<div><label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-ss" /> </label><label className="label-left font-weight-300">SCHEDULED  </label></div>),
+      "RUNNING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-rr" /> </label><label className="label-left font-weight-300">RUNNING  </label></div >),
+      "FAILED": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-ff" /> </label><label className="label-left font-weight-300">FAILED  </label></div >),
+      "DONE": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-dd" /> </label><label className="label-left font-weight-300">PENDING  </label></div >)
+    }
     const fetchData = async () => {
       const result: any = await axios(
         workflow_status_url,
         request
       );
       let wfs = result.data.workflows;
+      wfs.forEach((workflow) => {
+        if (workflow.wf_status in workflow_status_renders) {
+          workflow.wf_status = workflow_status_renders[workflow.wf_status]
+        } else {
+          workflow.wf_status = (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-pp" /> </label><label className="label-left font-weight-300">{workflow.wf_status} </label></div >)
+        }
+      })
       setWorkflows(wfs);
     };
     fetchData();
@@ -109,64 +125,65 @@ function App() {
     <div id="div-main" className="App">
       <div id="div-header" className="div-level-2">
         <header className="App-header">
-          <p>Jobmon GUI</p>
         </header>
-        <hr className="hr-1" />
       </div>
 
       <div className="div-level-2">
         <form>
           <Row className="mb-3">
-            <Form.Group as={Col} controlId="username">
-              <Form.Label>Username</Form.Label>
+            <Form.Group as={Col} controlId="formGridEmail">
+              <Form.Label><span className='m-2'> Username</span></Form.Label>
               <Form.Control type="text" placeholder="Username" defaultValue={user} {...register("user_input")} />
             </Form.Group>
+            <Form.Group as={Col} controlId="formGridEmail">
+              <Form.Label><span className='m-2'> Workflow Args</span></Form.Label>
+              <Form.Control type="text" placeholder="Workflow Args" defaultValue={wf_args} {...register("wf_args_input")} />
+            </Form.Group>
+          </Row>
+          <Row className='mb-3'>
 
-            <Form.Group as={Col} controlId="tool">
-              <Form.Label>Tool</Form.Label>
+            <Form.Group as={Col} controlId="formGridPassword">
+              <Form.Label><span className='m-2'> Tool</span></Form.Label>
               <Form.Control type="text" placeholder="Tool" defaultValue={tool} {...register("tool_input")} />
             </Form.Group>
-
-            <Form.Group as={Col} controlId="workflowName">
-              <Form.Label>Workflow Name</Form.Label>
-              <Form.Control type="text" placeholder="Workflow Name" defaultValue={wf_name} {...register("wf_name_input")} />
+            <Form.Group as={Col} controlId="formGridPassword">
+              <Form.Label><span className='m-2'> Date Workflow Was Submitted - On or After Date</span></Form.Label>
+              <Form.Control type="date" defaultValue={date_submitted} {...register("date_submitted_input")} />
             </Form.Group>
           </Row>
 
           <Row className="mb-3">
-            <Form.Group as={Col} controlId="workflowArgs">
-              <Form.Label>Workflow Args</Form.Label>
-              <Form.Control type="text" placeholder="Workflow Args" defaultValue={wf_args} {...register("wf_args_input")} />
+            <Form.Group as={Col} controlId="formGridPassword">
+              <Form.Label><span className='m-2'> Workflow Name</span></Form.Label>
+              <Form.Control type="text" placeholder="Workflow Name" defaultValue={wf_name} {...register("wf_name_input")} />
             </Form.Group>
 
-            <Form.Group as={Col} controlId="dateSubmitted">
-              <Form.Label>Date Workflow Was Submitted - On or After Date</Form.Label>
-              <Form.Control type="date" defaultValue={date_submitted} {...register("date_submitted_input")} />
-            </Form.Group>
-
-            <Form.Group as={Col} controlId="status">
-              <Form.Label>Workflow Status</Form.Label>
-              <Form.Control as="select" defaultValue={undefined} {...register("status")} >
-                <option>{undefined}</option>
-                <option value="A">Aborted</option>
-                <option value="D">Done</option>
-                <option value="F">Failed</option>
-                <option value="G">Registering</option>
-                <option value="H">Halted</option>
-                <option value="I">Instantiating</option>
-                <option value="O">Launched</option>
-                <option value="Q">Queued</option>
-                <option value="R">Running</option>
-              </Form.Control>
+			<Form.Group as={Col} controlId="status">
+			  <Form.Label>Workflow Status</Form.Label>
+			  <Form.Control as="select" defaultValue={undefined} {...register("status")} >
+				<option>{undefined}</option>
+				<option value="A">Aborted</option>
+				<option value="D">Done</option>
+				<option value="F">Failed</option>
+				<option value="G">Registering</option>
+				<option value="H">Halted</option>
+				<option value="I">Instantiating</option>
+				<option value="O">Launched</option>
+				<option value="Q">Queued</option>
+				<option value="R">Running</option>
+			  </Form.Control>
             </Form.Group>
           </Row>
 
-          <Button variant="primary" type="submit" className="btn btn-dark" onClick={onSubmit}>
-            Submit
-          </Button>
+          <Row className="mb-3">
+            <Col className='mt-4'>
+              <Button variant="primary" type="submit" className="btn btn-custom mx-40p" onClick={onSubmit}>
+                Submit
+              </Button>
+            </Col>
+          </Row>
         </form>
       </div>
-      <hr />
       <div id="wftable" className="div-level-2">
 
         <JobmonWFTable allData={workflows} />

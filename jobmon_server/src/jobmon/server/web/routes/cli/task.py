@@ -495,25 +495,18 @@ def get_task_details(task_id: int) -> Any:
     """Get information about TaskInstances associated with specific Task ID."""
     session = SessionLocal()
     with session.begin():
-        query = (
-            select(
-                TaskInstance.id,
-                TaskInstanceStatus.label,
-                TaskInstance.stdout,
-                TaskInstance.stderr,
-                TaskInstance.distributor_id,
-                TaskInstance.nodename,
-                TaskInstanceErrorLog.description,
-            )
-            .outerjoin_from(
-                TaskInstance,
-                TaskInstanceErrorLog,
-                TaskInstance.id == TaskInstanceErrorLog.task_instance_id,
-            )
-            .where(
-                TaskInstance.task_id == task_id,
-                TaskInstance.status == TaskInstanceStatus.id,
-            )
+        query = select(
+            TaskInstance.id,
+            TaskInstanceStatus.label,
+            TaskInstance.stdout,
+            TaskInstance.stderr,
+            TaskInstance.stdout_log,
+            TaskInstance.stderr_log,
+            TaskInstance.distributor_id,
+            TaskInstance.nodename,
+        ).where(
+            TaskInstance.task_id == task_id,
+            TaskInstance.status == TaskInstanceStatus.id,
         )
         rows = session.execute(query).all()
 
@@ -522,9 +515,10 @@ def get_task_details(task_id: int) -> Any:
         "ti_status",
         "ti_stdout",
         "ti_stderr",
+        "ti_stdout_log",
+        "ti_stderr_log",
         "ti_distributor_id",
         "ti_nodename",
-        "ti_error_log_description",
     )
     result = [dict(zip(column_names, row)) for row in rows]
     resp = jsonify(taskinstances=result)
