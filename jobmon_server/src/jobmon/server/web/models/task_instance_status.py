@@ -12,7 +12,6 @@ class TaskInstanceStatus(Base):
     __tablename__ = "task_instance_status"
 
     QUEUED = Statuses.QUEUED
-    INSTANTIATED = Statuses.INSTANTIATED
     NO_DISTRIBUTOR_ID = Statuses.NO_DISTRIBUTOR_ID
     LAUNCHED = Statuses.LAUNCHED
     RUNNING = Statuses.RUNNING
@@ -46,12 +45,6 @@ def add_task_instance_statuses(session: Session) -> None:
             label="ERROR_FATAL",
             description="Task instance killed itself as part of a cold workflow resume, "
             "and cannot be retried.",
-        ),
-        TaskInstanceStatus(
-            id="I",
-            label="INSTANTIATED",
-            description="Task instance is created within Jobmon, but not queued for "
-            "submission to the cluster.",
         ),
         TaskInstanceStatus(
             id="K",

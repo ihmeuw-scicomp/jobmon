@@ -15,18 +15,11 @@ class Batch(Base):
 
     __tablename__ = "batch"
 
-    # def to_wire_as_requested_by_distributor(self) -> tuple:
-    #     """Serialize cluster object."""
-    #     return SerializeBatch.to_wire(
-    #         self.id,
-    #         self.cluster_id,
-    #         self.task_resources_id,
-    #         self.array.name,
-    #     )
-
     id = Column(Integer, primary_key=True)
     cluster_id = Column(Integer, ForeignKey("cluster.id"))
     task_resources_id = Column(Integer, ForeignKey("task_resources.id"))
     distributor_instance_id = Column(Integer, ForeignKey("distributor_instance.id"))
     workflow_run_id = Column(Integer, ForeignKey("workflow_run.id"))
     array_id = Column(Integer, ForeignKey("array.id"), default=None)
+
+    task_resources = relationship("TaskResources", foreign_keys=[task_resources_id])

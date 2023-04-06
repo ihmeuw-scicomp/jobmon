@@ -41,7 +41,7 @@ class TaskInstance(Base):
 
     def to_wire_as_worker_node_task_instance(self) -> Tuple:
         """Serialize task instance object."""
-        requested_resources = json.loads(self.task_resources.requested_resources)
+        requested_resources = json.loads(self.batch.task_resources.requested_resources)
         return SerializeTaskInstance.to_wire_worker_node(
             self.id,
             self.status,
@@ -212,14 +212,6 @@ class TaskInstance(Base):
         TaskInstanceStatus.KILL_SELF,
     ]
 
-    active_statuses = [
-        TaskInstanceStatus.QUEUED,
-        TaskInstanceStatus.LAUNCHED,
-        TaskInstanceStatus.RUNNING,
-        TaskInstanceStatus.KILL_SELF,
-        TaskInstanceStatus.TRIAGING
-    ]
-
     def transition(self, new_state: str) -> None:
         """Transition the TaskInstance status."""
         # if the transition is timely, move to new state. Otherwise do nothing
@@ -249,12 +241,6 @@ class TaskInstance(Base):
                 # if the task instance is F, the task status should be F too
                 self.task.transition(TaskStatus.ERROR_RECOVERABLE)
                 self.task.transition(TaskStatus.ERROR_FATAL)
-
-            if new_state not in self.__class__.active_statuses:
-                # TODO: Validate this is a DB-level transaction, not python
-                # Assumption: all transitions to terminal states are done using the ORM.
-                # AFAIK this assumption is currently true
-                self.batch.c.completed_task_instances = self.batch.c.completed_task_instances + 1
 
     def _validate_transition(self, new_state: str) -> None:
         """Ensure the TaskInstance status transition is valid."""

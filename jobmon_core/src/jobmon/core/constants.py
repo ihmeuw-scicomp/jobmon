@@ -22,7 +22,6 @@ class TaskInstanceStatus:
     DONE = "D"
     ERROR = "E"
     ERROR_FATAL = "F"
-    INSTANTIATED = "I"
     KILL_SELF = "K"
     LAUNCHED = "O"
     QUEUED = "Q"

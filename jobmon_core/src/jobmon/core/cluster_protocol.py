@@ -169,14 +169,14 @@ class ClusterDistributor(Protocol):
         self,
         task_instance_id: Optional[int] = None,
         array_id: Optional[int] = None,
-        batch_number: Optional[int] = None,
+        batch_id: Optional[int] = None,
     ) -> str:
         """Build a command that can be executed by the worker_node.
 
         Args:
             task_instance_id: id for the given instance of this task
             array_id: id for the array if using an array strategy
-            batch_number: if array strategy is used, the submission counter index to use
+            batch_id: the batch ID to launch
 
         Returns:
             (str) unwrappable command
@@ -186,22 +186,21 @@ class ClusterDistributor(Protocol):
             wrapped_cmd.extend(
                 ["worker_node_job", "--task_instance_id", str(task_instance_id)]
             )
-        elif array_id is not None and batch_number is not None:
-            # TODO: Update the worker node command to accept batch_id instead of batch number
+        elif array_id is not None and batch_id is not None:
+            # TODO: Update the worker node CLI to accept batch_id instead of batch number
             wrapped_cmd.extend(
                 [
                     "worker_node_array",
                     "--array_id",
                     str(array_id),
-                    "--batch_number",
-                    str(batch_number),
+                    "--batch_id",
+                    str(batch_id),
                 ]
             )
         else:
             raise ValueError(
                 "Must specify either task_instance_id or array_id and batch_number. Got "
-                f"task_instance_id={task_instance_id}, array_id={array_id}, "
-                f"batch_number={batch_number}"
+                f"{task_instance_id=}, {array_id=}, {batch_id=}"
             )
         wrapped_cmd.extend(
             [
