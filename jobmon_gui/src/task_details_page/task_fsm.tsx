@@ -186,35 +186,8 @@ function TaskFSM({ taskStatus }) {
     ];
     return (
         <div>
-            <div style={{ display: "flex" }}>
-                <header className="header-1">
-                    <p>
-                        Task Finite State Machine&nbsp;
-                        <OverlayTrigger
-                            placement="right"
-                            trigger={["hover", "focus"]}
-                            overlay={(
-                                <Popover id="task_count">
-                                    <p><b>Registering:</b> Task is bound to the database.</p>
-                                    <p><b>Queued:</b> Task's dependencies have successfully completed, task can be run when the scheduler is ready.</p>
-                                    <p><b>Instantiating:</b> A task instance is preparing to be launched/submitted.</p>
-                                    <p><b>Launched:</b> Task instance submitted to the cluster normally.</p>
-                                    <p><b>Running:</b> Task is running on the specified distributor.</p>
-                                    <p><b>Error Recoverable:</b> Task has errored out but has more attempts so it will be retried.</p>
-                                    <p><b>Adjusting Resources:</b> Task errored with a resource error, the resources will be adjusted before retrying.</p>
-                                    <p><b>Error Fatal:</b> Task errored out and has used all of the attempts, therefore has failed for this WorkflowRun. It can be resumed in a new WFR.</p>
-                                    <p><b>Done:</b> Task ran successfully to completion; it has a TaskInstance that successfully completed.</p>
-                                </Popover>
-                            )}
-                        >
-                            <span><FontAwesomeIcon icon={faLightbulb} /></span>
-                        </OverlayTrigger>
-                    </p>
-                </header>
-            </div>
-
-            <div style={{ height: 400 }}>
-                <ReactFlow nodes={nodes} edges={edges}>
+            <div style={{ height: 400, width: "90%" }}>
+                <ReactFlow nodes={nodes} edges={edges} fitView>
                     <Background />
                     <Controls />
                     <MiniMap zoomable pannable />

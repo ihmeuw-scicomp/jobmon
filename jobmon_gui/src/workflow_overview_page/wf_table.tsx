@@ -6,7 +6,7 @@ import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
 import ToolkitProvider, { CSVExport } from 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSquare } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCircle, faSquare } from '@fortawesome/free-solid-svg-icons';
 import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import Spinner from 'react-bootstrap/Spinner';
 import { Link } from "react-router-dom";
@@ -16,6 +16,13 @@ import { convertDate, convertDatePST } from '../functions'
 import JobmonProgressBar from '../progress_bar.tsx';
 
 const DEBUG = false
+
+const customCaret = (order, column) => {
+    if (!order) return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretUp} /></span>);
+    else if (order === 'asc') return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretUp} /></span>);
+    else if (order === 'desc') return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretDown} /></span>);
+    return null;
+}
 
 // Get task status count for specified workflows
 function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_ids, wf_ids: number[]) {
@@ -82,6 +89,8 @@ export default function JobmonWFTable({ allData }) {
             dataField: "wf_id",
             text: "Workflow ID",
             sort: true,
+            sortCaret: customCaret,
+
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The ID column in WORKFLOW table. Unique identifier.");
@@ -103,6 +112,8 @@ export default function JobmonWFTable({ allData }) {
             dataField: "wf_tool",
             text: "Tool",
             sort: true,
+            sortCaret: customCaret,
+
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The NAME column in TOOL table. The name of the tool used to create the workflow.");
@@ -117,6 +128,8 @@ export default function JobmonWFTable({ allData }) {
             dataField: "wf_name",
             text: "Workflow Name",
             sort: true,
+            sortCaret: customCaret,
+
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The NAME column in WORKFLOW table. The user assigned name of the workflow.");
@@ -131,6 +144,7 @@ export default function JobmonWFTable({ allData }) {
             dataField: "wf_args",
             text: "Workflow Args",
             sort: true,
+            sortCaret: customCaret,
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The WORKFLOW_ARGS column in WORKFLOW table. The value of workflow_args used to create the workflow.");
@@ -145,6 +159,8 @@ export default function JobmonWFTable({ allData }) {
             dataField: "wf_submitted_date",
             text: "Date Submitted",
             sort: true,
+            sortCaret: customCaret,
+
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The CREATED_DATE column in WORKFLOW table in PST. The time stamp that the workflow was created.");
@@ -160,6 +176,8 @@ export default function JobmonWFTable({ allData }) {
             dataField: "wf_status_date",
             text: "Status Date",
             sort: true,
+            sortCaret: customCaret,
+
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The STATUS_DATE column in WORKFLOW table in PST. The time stamp that the workflow status was last updated.");
@@ -175,6 +193,8 @@ export default function JobmonWFTable({ allData }) {
             dataField: "wf_status",
             text: "Workflow Status",
             sort: true,
+            sortCaret: customCaret,
+
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The STATUS column in WORKFLOW table. The current status of the workflow.");
@@ -188,6 +208,8 @@ export default function JobmonWFTable({ allData }) {
             dataField: "wfr_count",
             text: "Number of WorkflowRuns",
             sort: true,
+            sortCaret: customCaret,
+
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The number of runs of the workflow.");
@@ -283,37 +305,63 @@ export default function JobmonWFTable({ allData }) {
                 {
                     props => (
                         <div>
-                            <div style={{ display: "flex" }}>
+                            <div>
                                 <OverlayTrigger
+                                    placement='bottom'
                                     trigger={["hover", "focus"]}
-                                    placement="bottom-start"
                                     overlay={(
                                         <Popover>
-                                            Pending: Tasks that are queued in Jobmon.<br></br>
-                                            Scheduled: Tasks that are submitted to the cluster and were queued by the cluster scheduler.<br></br>
-                                            Running: Tasks that are running on cluster nodes.<br></br>
-                                            Fatal: Tasks that did not finish because of an error.<br></br>
-                                            Done: Tasks that completed successfully.<br></br>
+                                            <FontAwesomeIcon icon={faCircle} className="bar-pp" />
+                                                <span className='font-weight-bold'>Pending:</span>
+                                                Tasks that are queued in Jobmon. <br />
+                                            <FontAwesomeIcon icon={faCircle} className="bar-ss" />
+                                                <span className='font-weight-bold'>Scheduled:</span>
+                                                Tasks that are submitted to the cluster and were queued by the cluster scheduler.<br />
+                                            <FontAwesomeIcon icon={faCircle} className="bar-rr" />
+                                                <span className='font-weight-bold'>Running:</span>
+                                                Tasks that are running on cluster nodes. <br />
+                                            <FontAwesomeIcon icon={faCircle} className="bar-ff" />
+                                                <span className='font-weight-bold'>Fatal:</span>
+                                                Tasks that did not finish because of an error. <br />
+                                            <FontAwesomeIcon icon={faCircle} className="bar-aa" />
+                                                <span className='font-weight-bold'>Aborted:</span>
+                                                Workflow encountered an error before a WorkflowRun was created. <br />
+                                            <FontAwesomeIcon icon={faCircle} className="bar-dd" />
+                                                <span className='font-weight-bold'>Done:</span>
+                                                Tasks that completed successfully.
                                         </Popover>
                                     )}>
                                     <div id="legend" className="legend">
-                                        <form>
-                                            <label className="label-middle"><FontAwesomeIcon icon={faSquare} className="bar-pp" /> </label>
-                                            <label className="label-left">Pending  </label>
-                                            <label className="label-middle"><FontAwesomeIcon icon={faSquare} className="bar-ss" /> </label>
-                                            <label className="label-left">Scheduled  </label>
-                                            <label className="label-middle"><FontAwesomeIcon icon={faSquare} className="bar-rr" /> </label>
-                                            <label className="label-left">Running  </label>
-                                            <label className="label-middle"><FontAwesomeIcon icon={faSquare} className="bar-ff" /> </label>
-                                            <label className="label-left">Fatal  </label>
-                                            <label className="label-middle"><FontAwesomeIcon icon={faSquare} className="bar-dd" /> </label>
-                                            <label className="label-left" >Done  </label>
+                                        <form className='d-flex justify-content-around w-100 mx-auto py-3'>
+                                            <div>
+                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-pp" /> </label>
+                                                <label className="label-left">Pending  </label>
+                                            </div>
+                                            <div>
+                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-ss" /> </label>
+                                                <label className="label-left">Scheduled  </label>
+                                            </div>
+                                            <div>
+                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-rr" /> </label>
+                                                <label className="label-left">Running  </label>
+                                            </div>
+                                            <div>
+                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-ff" /> </label>
+                                                <label className="label-left">Fatal  </label>
+                                            </div>
+                                            <div>
+                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-aa" /> </label>
+                                                <label className="label-left">Aborted  </label>
+                                            </div>
+                                            <div>
+                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-dd" /> </label>
+                                                <label className="label-left" >Done  </label>
+                                            </div>
                                         </form>
                                     </div>
                                 </OverlayTrigger>
-                                <ExportCSVButton {...props.csvProps} className="btn btn-dark">Export CSV</ExportCSVButton>
                             </div>
-                            <hr />
+                            <ExportCSVButton {...props.csvProps} className="btn btn-custom mb-2 ml-2">Export CSV</ExportCSVButton>
                             <span className="span-helper"><i>{helper}</i></span>
                             <br/>
                             <BootstrapTable
