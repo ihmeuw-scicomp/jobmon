@@ -85,7 +85,7 @@ function App() {
       "SCHEDULED": (<div><label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-ss" /> </label><label className="label-left font-weight-300">SCHEDULED  </label></div>),
       "RUNNING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-rr" /> </label><label className="label-left font-weight-300">RUNNING  </label></div >),
       "FAILED": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-ff" /> </label><label className="label-left font-weight-300">FAILED  </label></div >),
-      "DONE": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-dd" /> </label><label className="label-left font-weight-300">PENDING  </label></div >)
+      "DONE": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-dd" /> </label><label className="label-left font-weight-300">DONE  </label></div >)
     }
     const fetchData = async () => {
       const result: any = await axios(
