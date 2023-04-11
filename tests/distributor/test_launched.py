@@ -17,95 +17,30 @@ from jobmon.core.constants import TaskInstanceStatus
 from jobmon.server.web.models.api import TaskInstance
 
 
-@pytest.mark.skip("TODO")
-def test_instantiate_job(tool, db_engine, task_template):
-    """tests that a task can be instantiated and run and log done"""
+def test_launch_jobs(db_engine, distributor_crud, initialize_distributor, requester_in_memory):
+    """tests that a task can be launched and log done"""
 
     # create the workflow and bind to database
-    t1 = task_template.create_task(arg="echo 1", cluster_name="sequential")
-    t2 = task_template.create_task(arg="echo 2", cluster_name="sequential")
-    workflow = tool.create_workflow(name="test_instantiate_queued_jobs_on_sequential")
-    workflow.add_tasks([t1, t2])
-    workflow.bind()
-    workflow._bind_tasks()
-    factory = WorkflowRunFactory(workflow.workflow_id)
-    wfr = factory.create_workflow_run()
+    database_ids = distributor_crud()
+    distributor_id = database_ids['distributor_ids'][0]
+    distributor = initialize_distributor(distributor_id)
+    task_instance_ids = database_ids['task_instance_ids']
 
-    # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
-    )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    # Launch task instances
+    launch_batch_generator = distributor._check_queued_for_work()
+    launch_batch_tasks = [func for func in launch_batch_generator]
+    assert len(launch_batch_tasks) == 2
+    # Launch the batches and check statuses
 
-    # test that we can launch via the normal job pathway
-    distributor_service = DistributorService(
-        SequentialDistributor("sequential"),
-        requester=workflow.requester,
-        raise_on_error=True,
-    )
-    distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor.process_status(TaskInstanceStatus.QUEUED, 10_000)
 
-    # Check that batches have the correct submission name
-    instantiated_task_instances = list(
-        distributor_service._task_instance_status_map[TaskInstanceStatus.INSTANTIATED]
-    )
-    assert [
-        ti.submission_name == "simple_template" for ti in instantiated_task_instances
-    ]
-
-    # check the job turned into I
     with Session(bind=db_engine) as session:
-        select_stmt = (
-            select(TaskInstance)
-            .where(TaskInstance.task_id.in_([t1.task_id, t2.task_id]))
-            .order_by(TaskInstance.id)
-        )
-        task_instances = session.execute(select_stmt).scalars().all()
-        session.commit()
+        # Assert all tasks are done - worker node moves immediately to DONE
+        task_instance_statuses = session.execute(
+            select(TaskInstance.status).where(TaskInstance.id.in_(task_instance_ids))
+        ).scalars().all()
 
-        assert len(task_instances) == 2
-        assert task_instances[0].status == "I"
-        assert task_instances[1].status == "I"
-
-    # Queued status should have turned into Instantiated status as well.
-    assert (
-        len(distributor_service._task_instance_status_map[TaskInstanceStatus.QUEUED])
-        == 0
-    )
-    assert (
-        len(
-            distributor_service._task_instance_status_map[
-                TaskInstanceStatus.INSTANTIATED
-            ]
-        )
-        == 2
-    )
-    assert (
-        len(distributor_service._task_instance_status_map[TaskInstanceStatus.LAUNCHED])
-        == 0
-    )
-
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
-
-    # Once processed from INSTANTIATED, the sequential (being a single process), would
-    # carry it all the way through to D
-    with Session(bind=db_engine) as session:
-        select_stmt = (
-            select(TaskInstance)
-            .where(TaskInstance.task_id.in_([t1.task_id, t2.task_id]))
-            .order_by(TaskInstance.id)
-        )
-        task_instances = session.execute(select_stmt).scalars().all()
-        session.commit()
-
-        assert len(task_instances) == 2
-        assert task_instances[0].status == "D"
-        assert task_instances[1].status == "D"
+        assert task_instance_statuses == [TaskInstanceStatus.DONE] * 3
 
 
 @pytest.mark.skip("TODO")

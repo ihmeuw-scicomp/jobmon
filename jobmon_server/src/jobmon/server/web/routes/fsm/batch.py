@@ -228,7 +228,7 @@ def log_array_distributor_id(batch_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/batch/get_batches", methods=["GET"])
+@blueprint.route("/batch/get_batches", methods=["POST"])
 def get_batches():
     data = cast(Dict, request.get_json())
     batch_ids = data["batch_ids"]
@@ -236,11 +236,9 @@ def get_batches():
     select_stmt = select(
         Batch.id, Batch.task_resources_id, Batch.array_id, Array.name
     ).where(Batch.array_id == Array.id, Batch.id.in_(batch_ids))
-
     session = SessionLocal()
     with session.begin():
-        batches = session.execute(select_stmt).scalars()
-
-    resp = jsonify(batches=batches)
+        batches = session.execute(select_stmt).all()
+    resp = jsonify(batches=[tuple(batch) for batch in batches])
     resp.status_code = StatusCodes.OK
     return resp

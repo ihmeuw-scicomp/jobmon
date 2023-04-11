@@ -9,10 +9,11 @@ import nox
 from nox.sessions import Session
 
 
-src_locations = ["jobmon_client/src", "jobmon_core/src", "jobmon_server/src"]
+src_locations = ["jobmon_client/src", "jobmon_core/src",
+                 "jobmon_server/src", "jobmon_distributor/src"]
 test_locations = ["tests"]
 
-python = "3.8"
+python = "3.10"
 
 
 @nox.session(python=python, venv_backend="conda")
@@ -23,6 +24,7 @@ def tests(session: Session) -> None:
     session.install("-e", "./jobmon_core")
     session.install("-e", "./jobmon_client")
     session.install("-e", "./jobmon_server")
+    session.install("-e", "./jobmon_distributor")
 
     args = session.posargs or test_locations
 
@@ -77,6 +79,7 @@ def typecheck(session: Session) -> None:
     session.install("-e", "./jobmon_core")
     session.install("-e", "./jobmon_client")
     session.install("-e", "./jobmon_server")
+    session.install("-e", "./jobmon_distributor")
 
     session.run("mypy", "--explicit-package-bases", *args)
 
@@ -102,6 +105,7 @@ def docs(session: Session) -> None:
     session.install("./jobmon_core")
     session.install("./jobmon_client")
     session.install("./jobmon_server")
+    session.install("-e", "./jobmon_distributor")
     install_path = (
         Path(session.virtualenv.location)
         / "lib"
