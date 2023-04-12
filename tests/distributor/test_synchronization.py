@@ -125,3 +125,9 @@ def test_expiring_workflow_runs(requester_in_memory, requester_no_retry,
     assert len(distributor._batches) == 1
     assert len(distributor._task_instances) == 1
     assert len(distributor._task_instance_status_map[TaskInstanceStatus.QUEUED]) == 1
+
+    # Check that a subsequent sync call does not reload the expired instances
+    distributor.refresh_status_from_db(TaskInstanceStatus.QUEUED)
+    assert len(distributor._batches) == 1
+    assert len(distributor._task_instances) == 1
+    assert len(distributor._task_instance_status_map[TaskInstanceStatus.QUEUED]) == 1
