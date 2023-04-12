@@ -580,7 +580,7 @@ def task_details_by_wf_id(workflow_id: int) -> Any:
 
     result = [dict(zip(column_names, row)) for row in rows]
     for r in result:
-        r["task_status"] = TStatus.LABEL_DICT[r["task_status"]]
+        r["task_status"] = _cli_label_mapping[r["task_status"]]
 
     res = jsonify(tasks=result)
     res.return_code = StatusCodes.OK
