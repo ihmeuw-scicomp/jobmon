@@ -1,10 +1,10 @@
-from jobmon.distributor.distributor_instance import DistributorInstance as ClientDistributor
+from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
 from jobmon.server.web.models.api import (
     Batch as ServerBatch,
     TaskInstance,
+    WorkflowRun
 )
 
-import pytest
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
@@ -93,4 +93,35 @@ def test_distributor_reassignment(
 
     assert len(distributor_2._task_instances) == 3
     assert len(distributor_2._task_instance_status_map["Q"]) == 3
-    
+
+
+def test_expiring_workflow_runs(requester_in_memory, requester_no_retry,
+                                db_engine, distributor_crud, initialize_distributor):
+
+    database_ids = distributor_crud()
+    distributor = initialize_distributor(database_ids['distributor_ids'][0])
+
+    # Update workflowrun 1 to an aborted state, mimic client setting a stop signal
+    with Session(bind=db_engine) as session:
+        update_stmt = (
+            update(WorkflowRun)
+            .where(WorkflowRun.id == database_ids['workflow_run_ids'][0])
+            .values(status=WorkflowRunStatus.ABORTED)
+        )
+        session.execute(update_stmt)
+        session.commit()
+
+    # We should have two batches and 3 task instances in memory
+    queued_tis = distributor._task_instance_status_map[TaskInstanceStatus.QUEUED]
+    distributor._create_batches(queued_tis)
+    assert len(distributor._batches) == 2
+    assert len(distributor._task_instances) == 3
+
+    # Call for a refresh and check consistency
+    distributor.expire_inactive_task_instances()
+
+    # Batch 1 was associated with the first workflow run. So it, and associated tasks,
+    # should not be in the distributor's memory space
+    assert len(distributor._batches) == 1
+    assert len(distributor._task_instances) == 1
+    assert len(distributor._task_instance_status_map[TaskInstanceStatus.QUEUED]) == 1

@@ -321,6 +321,8 @@ class DistributorInstance:
             distributor_commands.append(log_distributor_ids_command)
 
         finally:
+            # Remove batch from registry
+            self._batches.pop(task_instance_batch.batch_id)
             self._distributor_commands = it.chain(
                 distributor_commands, self._distributor_commands
             )
@@ -487,25 +489,26 @@ class DistributorInstance:
 
     def expire_inactive_task_instances(self):
         """Purge remaining task instances that belong to inactive WFRs."""
+        # TODO: Call this in the main run loop independently
         # Alternative: workflow reaper updated to move task instances in reaped WFRs to
         # terminal states
-        # TODO: implement this route
         _, resp = self.requester.send_request(
-            app_route=f"/distributor_instance/{self.distributor_instance_id}/expire_batches",
-            message={},
-            request_type='get'
+            app_route=f"/batch/get_expired_batches",
+            message={'batch_ids': list(self._batches.keys())},
+            request_type='post'
         )
 
-        inactive_task_instance_ids = resp['task_instance_ids']
-
-        for task_instance_id in inactive_task_instance_ids:
-            task_instance = self._task_instances.pop(task_instance_id)
+        inactive_batch_ids = resp['inactive_batch_ids']
+        for batch_id in inactive_batch_ids:
+            batch = self._batches.pop(batch_id)
             # Assumes that task instance status attribute is set properly
             # Could lead to a memory leak if a task instance's status and the register it's in
             # are not consistent
             # Alternative: For safety, just loop through all registers and try a discard
-            if task_instance.status in self._task_instance_status_map:
-                self._task_instance_status_map[task_instance.status].discard(task_instance)
+            for task_instance in batch.task_instances:
+                self._task_instances.pop(task_instance.task_instance_id)
+                if task_instance.status in self._task_instance_status_map:
+                    self._task_instance_status_map[task_instance.status].discard(task_instance)
 
     def _generate_add_task_instance_callables(
         self, new_task_instance_ids: list[int], status: str, chunk_size: int = 50
@@ -575,6 +578,8 @@ class DistributorInstance:
             batch = batch_map[task_instance.batch_id]
             batch.add_task_instance(task_instance)
 
+        # Register the batches with the instance
+        self._batches.update(batch_map)
         return set(batch_map.values())
 
     def _get_batches(self, batch_ids: set[int]) -> Dict[int, Batch]:

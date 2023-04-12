@@ -113,10 +113,10 @@ def distributor_crud(db_engine):
 @pytest.fixture
 def initialize_distributor(requester_no_retry):
 
-    def _initialize(distributor_id):
+    def _initialize(distributor_id, cluster='dummy'):
         # Initialize a distributor object
 
-        distributor = ClientDistributor(cluster_name='dummy', requester=requester_no_retry,
+        distributor = ClientDistributor(cluster_name=cluster, requester=requester_no_retry,
                                         raise_on_error=True)
         distributor._distributor_instance_id = distributor_id
 
