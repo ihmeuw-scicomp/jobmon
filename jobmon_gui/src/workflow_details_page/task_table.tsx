@@ -27,7 +27,7 @@ export default function TaskTable({ taskData, loading }) {
         "PENDING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-pp" /> </label><label className="label-left">PENDING  </label></div >),
         "SCHEDULED": (<div><label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-ss" /> </label><label className="label-left">SCHEDULED  </label></div>),
         "RUNNING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-rr" /> </label><label className="label-left">RUNNING  </label></div >),
-        "FAILED": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-ff" /> </label><label className="label-left">FAILED  </label></div >),
+        "FATAL": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-ff" /> </label><label className="label-left">FATAL  </label></div >),
         "DONE": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-dd" /> </label><label className="label-left">DONE  </label></div >)
     }
 
