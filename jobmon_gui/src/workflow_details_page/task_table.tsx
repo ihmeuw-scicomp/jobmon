@@ -10,7 +10,7 @@ import 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit.min.c
 import { convertDate, convertDatePST } from '../functions'
 import '../jobmon_gui.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faCircle } from '@fortawesome/free-solid-svg-icons';
 
 const customCaret = (order, column) => {
     if (!order) return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretUp} /></span>);
@@ -22,6 +22,14 @@ const customCaret = (order, column) => {
 export default function TaskTable({ taskData, loading }) {
     const { ExportCSVButton } = CSVExport;
     const [helper, setHelper] = useState("");
+
+    const workflow_status_renders = {
+        "PENDING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-pp" /> </label><label className="label-left">PENDING  </label></div >),
+        "SCHEDULED": (<div><label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-ss" /> </label><label className="label-left">SCHEDULED  </label></div>),
+        "RUNNING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-rr" /> </label><label className="label-left">RUNNING  </label></div >),
+        "FAILED": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-ff" /> </label><label className="label-left">FAILED  </label></div >),
+        "DONE": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-dd" /> </label><label className="label-left">DONE  </label></div >)
+    }
 
     const columns = [
         {
@@ -77,7 +85,8 @@ export default function TaskTable({ taskData, loading }) {
                         setHelper("");
                     }
             },
-            filter: textFilter()
+            filter: textFilter(),
+            formatter: (cell, row, rowIndex) => workflow_status_renders[cell]
         },
         {
             dataField: "task_command",

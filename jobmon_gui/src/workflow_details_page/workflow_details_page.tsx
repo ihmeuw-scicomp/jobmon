@@ -121,14 +121,6 @@ function WorkflowDetails({ subpage }) {
         return () => clearInterval(interval);
     }, [wfDict, params.workflowId]);
 
-    const workflow_status_renders = {
-        "PENDING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-pp" /> </label><label className="label-left">PENDING  </label></div >),
-        "SCHEDULED": (<div><label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-ss" /> </label><label className="label-left">SCHEDULED  </label></div>),
-        "RUNNING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-rr" /> </label><label className="label-left">RUNNING  </label></div >),
-        "FAILED": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-ff" /> </label><label className="label-left">FAILED  </label></div >),
-        "DONE": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-dd" /> </label><label className="label-left">DONE  </label></div >)
-    }
-
     // Get information to populate the Tasks table
     useEffect(() => {
         if (task_template_name === null || task_template_name === "") {
@@ -142,9 +134,6 @@ function WorkflowDetails({ subpage }) {
                 { params: { tt_name: task_template_name } }
             );
             let tasks = result.data.tasks;
-            tasks.forEach((task) => {
-                task.task_status = workflow_status_renders[task.task_status]
-            })
             setTasks(tasks);
             setTaskLoading(false);
         };
