@@ -37,11 +37,9 @@ def queue_task_batch() -> Any:
     workflow_run_id = int(data["workflow_run_id"])
     array_id = int(data["array_id"])
     cluster_id = int(data["cluster_id"])
-    distributor_instance_id = data["distributor_instance_id"]
 
-    if distributor_instance_id is None:
-        # Fetch a random active distributor instance id if not known
-        distributor_instance_id = _get_active_distributor_instance_id(cluster_id)
+    # Fetch an active distributor instance id if not known
+    distributor_instance_id = _get_active_distributor_instance_id(cluster_id, workflow_run_id)
 
     session = SessionLocal()
     with session.begin():

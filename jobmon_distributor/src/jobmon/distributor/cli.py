@@ -4,7 +4,7 @@ from typing import Optional
 
 from jobmon.core.cli import CLI
 from jobmon.core.cluster import Cluster
-from jobmon.distributor.api import DistributorService
+from jobmon.distributor.api import DistributorInstance
 
 
 class DistributorCLI(CLI):
@@ -22,10 +22,10 @@ class DistributorCLI(CLI):
     @staticmethod
     def run_distributor(args: argparse.Namespace) -> None:
         """Configuration for the jobmon worker node."""
-        cluster = Cluster.get_cluster(args.cluster_name)
-        cluster_interface = cluster.get_distributor()
-        distributor_service = DistributorService(cluster_interface)
-        distributor_service.set_workflow_run(args.workflow_run_id)
+        distributor_service = DistributorInstance(
+            cluster_name=args.cluster_name,
+            workflow_run_id=args.workflow_run_id,
+            )
         distributor_service.run()
 
     def _add_distributor_parser(self) -> None:
@@ -37,11 +37,13 @@ class DistributorCLI(CLI):
             help="cluster_name to distribute jobs onto.",
             required=True,
         )
+        # TODO: Enforce that helm does not provide this argument
         distributor_parser.add_argument(
             "--workflow_run_id",
             type=int,
             help="workflow_run_id to distribute jobs for.",
-            required=True,
+            required=False,
+            default=None,
         )
 
 

@@ -24,7 +24,7 @@ from jobmon.server.web.models.api import (
     TaskStatus
 )
 from jobmon.server.web.models.distributor_instance import \
-    add_distributor_instances_with_associations
+    add_distributor_instance
 from jobmon.worker_node.cli import WorkerNodeCLI
 
 
@@ -580,15 +580,6 @@ def test_resume_from_workflow_id(tool, task_template):
 def test_batch_reassignment(tool, task_template, db_engine, requester_in_memory):
     workflow = tool.create_workflow()
 
-    # Manually instantiate a distributor to associate with this WFR
-    with Session(bind=db_engine) as session:
-        # Use the sequential cluster ID - known from test setup
-        distributor1 = add_distributor_instances_with_associations(
-            cluster_ids=[2], session=session
-        )
-        distributor1_id = distributor1.id
-        session.commit()
-
     t1 = task_template.create_task(arg="sleep 1")
     t2 = task_template.create_task(arg="sleep 2")
 
@@ -599,9 +590,17 @@ def test_batch_reassignment(tool, task_template, db_engine, requester_in_memory)
     wfr = factory.create_workflow_run()
     swarm = SwarmWorkflowRun(
         workflow_run_id=wfr.workflow_run_id,
-        distributor_instance_id=distributor1_id,
     )
     swarm.from_workflow(workflow)
+
+    # Manually instantiate a distributor to associate with this WFR
+    with Session(bind=db_engine) as session:
+        # Use the sequential cluster ID - known from test setup
+        distributor1 = add_distributor_instance(
+            cluster_id=2, session=session
+        )
+        distributor1_id = distributor1.id
+        session.commit()
 
     # Queue both active tasks - should belong in 1 batch
     swarm.queue_task_batch(list(swarm.tasks.values()))
@@ -615,8 +614,8 @@ def test_batch_reassignment(tool, task_template, db_engine, requester_in_memory)
         ).scalar()
         distributor1.expunge()
 
-        distributor2 = add_distributor_instances_with_associations(
-            cluster_ids=[2], session=session
+        distributor2 = add_distributor_instance(
+            cluster_id=2, session=session
         )
         distributor2_id = distributor2.id
         session.commit()

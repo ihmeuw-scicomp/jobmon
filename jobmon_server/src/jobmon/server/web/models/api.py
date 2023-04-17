@@ -6,9 +6,6 @@ from jobmon.server.web.models.cluster import Cluster
 from jobmon.server.web.models.cluster_type import ClusterType
 from jobmon.server.web.models.dag import Dag
 from jobmon.server.web.models.distributor_instance import DistributorInstance
-from jobmon.server.web.models.distributor_instance_cluster import (
-    DistributorInstanceCluster,
-)
 from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.node_arg import NodeArg

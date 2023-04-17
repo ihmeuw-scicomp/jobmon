@@ -612,7 +612,8 @@ def get_filepaths(
 
 
 def resume_workflow_from_id(
-    workflow_id: int, cluster_name: str, reset_if_running: bool = True, log: bool = True
+    workflow_id: int, cluster_name: str, reset_if_running: bool = True,
+    remote_distributor: bool = False, log: bool = True
 ) -> None:
     """Given a workflow ID, resume the workflow.
 
@@ -633,7 +634,8 @@ def resume_workflow_from_id(
 
     # Create swarm
     swarm = SwarmWorkflowRun(
-        workflow_run_id=new_wfr.workflow_run_id, status=new_wfr.status
+        workflow_run_id=new_wfr.workflow_run_id, status=new_wfr.status,
+        remote_distributor=remote_distributor
     )
     swarm.from_workflow_id(workflow_id)
 

@@ -1,6 +1,7 @@
 """The overarching framework to create tasks and dependencies within."""
 from __future__ import annotations
 
+from contextlib import nullcontext
 import hashlib
 import logging
 import logging.config
@@ -472,6 +473,7 @@ class Workflow(object):
         seconds_until_timeout: int = 36000,
         resume: bool = False,
         reset_running_jobs: bool = True,
+        remote_distributor: bool = False,
         distributor_startup_timeout: int = 180,
         resume_timeout: int = 300,
         configure_logging: bool = False,
@@ -489,6 +491,8 @@ class Workflow(object):
                 it is not set to resume and an identical workflow already
                 exists, the workflow will error out
             reset_running_jobs: whether or not to reset running jobs upon resume
+            remote_distributor: whether to connect to a remote distributor instance or create
+                a local one specific to the workflow run
             distributor_startup_timeout: amount of time to wait for the distributor process to
                 start up
             resume_timeout: seconds to wait for a workflow to become resumable before giving up
@@ -549,9 +553,13 @@ class Workflow(object):
 
         # start distributor
         cluster_name = list(self._clusters.keys())[0]
-        with DistributorContext(
-            cluster_name, wfr.workflow_run_id, distributor_startup_timeout
-        ) as distributor:
+        if remote_distributor:
+            context = nullcontext()
+        else:
+            context = DistributorContext(
+                cluster_name, wfr.workflow_run_id, distributor_startup_timeout
+            )
+        with context as distributor:
             # set up swarm and initial DAG
             swarm = SwarmWorkflowRun(
                 workflow_run_id=wfr.workflow_run_id,
@@ -559,9 +567,9 @@ class Workflow(object):
                 requester=self.requester,
                 fail_fast=fail_fast,
                 status=wfr.status,
+                remote_distributor=remote_distributor,
             )
             swarm.from_workflow(self)
-            self._num_previously_completed = swarm.num_previously_complete
 
             try:
                 swarm.run(distributor.alive, seconds_until_timeout)
@@ -582,7 +590,6 @@ class Workflow(object):
                 # update workflow tasks with final status
                 for task in self.tasks.values():
                     task.final_status = swarm.tasks[task.task_id].status
-                self._num_newly_completed = num_new_completed
 
         self.last_workflow_run_id = wfr.workflow_run_id
 

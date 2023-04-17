@@ -17,14 +17,13 @@ from typing import (
     Union,
 )
 
-from jobmon.core.cluster_protocol import ClusterDistributor
 from jobmon.core.cluster import Cluster
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import (
     DistributorInterruptedError, InvalidResponse, RemoteExitInfoNotAvailable
 )
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 from jobmon.distributor.batch import Batch
 from jobmon.distributor.distributor_command import DistributorCommand
 from jobmon.distributor.distributor_task_instance import DistributorTaskInstance
@@ -41,6 +40,7 @@ class DistributorInstance:
         task_instance_heartbeat_interval: Optional[int] = None,
         heartbeat_report_by_buffer: Optional[float] = None,
         distributor_poll_interval: Optional[int] = None,
+        workflow_run_id: Optional[int] = None,
         raise_on_error: bool = False,
     ) -> None:
         """Initialization of DistributorService."""
@@ -74,9 +74,15 @@ class DistributorInstance:
         self.raise_on_error = raise_on_error
         self._distributor_instance_id = None
 
+        # Optionally allow the distributor to only scan for tasks from a single workflowrun.
+        # Necessary for cluster protocols that execute in the same memory space, e.g.
+        # sequential or multiprocess builtins.
+        self._workflow_run_id = workflow_run_id
+
         # Store allowed cluster distributor objects
         cluster = Cluster.get_cluster(cluster_name)
         self._cluster_interface = cluster.get_distributor()
+        self._cluster_id = cluster.id
 
         # indexing of task instance by associated id
         self._task_instances: Dict[int, DistributorTaskInstance] = {}
@@ -100,7 +106,7 @@ class DistributorInstance:
             TaskInstanceStatus.KILL_SELF: self._check_kill_self_for_work,
         }
 
-        # syncronization timings
+        # synchronization timings
         self._last_heartbeat_time = time.time()
 
         # web service API
@@ -139,17 +145,14 @@ class DistributorInstance:
     def register(self) -> None:
         """Register this DistributorInstance with the database. Get an ID"""
         app_route = "/distributor_instance/register"
-        return_code, result = self.requester.send_request(
+        params = {"cluster_id": self._cluster_id}
+        if self._workflow_run_id:
+            params.update({'workflow_run_id': self._workflow_run_id})
+        _, result = self.requester.send_request(
             app_route=app_route,
-            message={"cluster_id": self._cluster_interface.cluster_id},
+            message=params,
             request_type="post",
         )
-        if not http_request_ok(return_code):
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {result}"
-            )
         self._distributor_instance_id = result["distributor_instance_id"]
 
     def run(self) -> None:
@@ -443,6 +446,8 @@ class DistributorInstance:
             "task_instance_ids": list(active_task_instance_ids),
             "status": status,
         }
+        if self._workflow_run_id:
+            message['workflow_run_id'] = self._workflow_run_id
         app_route = f"/distributor_instance/{self._distributor_instance_id}/sync_status"
         return_code, result = self.requester.send_request(
             app_route=app_route, message=message, request_type="post"

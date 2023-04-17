@@ -84,7 +84,7 @@ class WorkflowRun:
         fail_after_n_executions: int = 1_000_000_000,
         status: Optional[str] = None,
         requester: Optional[Requester] = None,
-        distributor_instance_id: Optional[int] = None,
+        remote_distributor: bool = False,
     ) -> None:
         """Initialization of the swarm WorkflowRun."""
         self.workflow_run_id = workflow_run_id
@@ -131,9 +131,10 @@ class WorkflowRun:
         if requester is None:
             requester = Requester.from_defaults()
         self.requester = requester
-        # This attribute can optionally be set if the distributor ID is known
-        # Will be the case for testing, or for sequential/multiprocess workflow runs
-        self.distributor_instance_id = distributor_instance_id
+
+        # Determines whether a local distributor is actively managing this swarm or if it's
+        # managed by a remote distributor instance
+        self.remote_distributor = remote_distributor
 
         # This signal is set if the workflow run receives a resume
         self._terminated = False
@@ -141,7 +142,7 @@ class WorkflowRun:
         self.initialized = False  # Need to call from_workflow or from_workflow_id
 
         # Keep a registry of tracked batch IDs
-        self._active_batch_ids = []
+        self._active_batch_ids: list[int] = []
 
     @property
     def status(self) -> Optional[str]:
@@ -687,9 +688,9 @@ class WorkflowRun:
         self._log_heartbeat()
         self._task_status_updates(full_sync=full_sync)
         self._synchronize_max_concurrently_running()
-        # If connected to a remote distributor (i.e. no attribute set),
+        # If connected to a remote distributor,
         # we'll need to periodically check for liveliness and reassign the batches
-        if not self.distributor_instance_id:
+        if self.remote_distributor:
             self._reassign_distributor_instances()
 
     def _reassign_distributor_instances(self):
@@ -699,7 +700,7 @@ class WorkflowRun:
             return
 
         self.requester.send_request(
-            app_route='/workflow_run/reassign_active_batches',
+            app_route=f'/workflow_run/{self.workflow_run_id}/reassign_active_batches',
             message={"batch_ids": self._active_batch_ids},
             request_type='post'
         )
@@ -907,6 +908,9 @@ class WorkflowRun:
         if not task_resources.is_bound:
             task_resources.bind()
 
+        # TODO: if remote_distributor is False, swarm should be able to infer the distributor
+        #  instance once and cache so each queue call doesn't have to query for eligible
+        #  instances
         app_route = f"/batch/queue_task_batch"
         return_code, response = self.requester.send_request(
             app_route=app_route,
@@ -916,7 +920,6 @@ class WorkflowRun:
                 "workflow_run_id": self.workflow_run_id,
                 "cluster_id": first_task.cluster.id,
                 "array_id": first_task.array_id,
-                "distributor_instance_id": self.distributor_instance_id
             },
             request_type="post",
         )

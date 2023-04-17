@@ -61,12 +61,6 @@ class Batch:
         return_code, response = self.requester.send_request(
             app_route=app_route, message={}, request_type="post"
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
 
         self._requested_resources: Dict[str, Any] = ast.literal_eval(
             str(response["requested_resources"])
@@ -79,6 +73,15 @@ class Batch:
             task_instance.array_step_id = array_step_id
 
         self.load_requested_resources()
+
+    def set_distributor_ids(self, distributor_id_map: dict) -> None:
+        """Set the distributor_ids on the task instances in the array.
+
+        Args:
+            distributor_id_map: map of array_step_id to distributor_id
+        """
+        for ti in self.task_instances:
+            ti.distributor_id = distributor_id_map[ti.array_step_id]
 
     def transition_to_launched(self, next_report_by: float) -> None:
         """Transition all associated task instances to LAUNCHED state."""

@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from jobmon.server.web.models.api import Cluster, DistributorInstance, DistributorInstanceCluster
+from jobmon.server.web.models.api import Cluster, DistributorInstance
 
 
 def test_distributor_registration(requester_in_memory, requester_no_retry, db_engine):
@@ -19,17 +19,13 @@ def test_distributor_registration(requester_in_memory, requester_no_retry, db_en
     assert rc == 200
     distributor_instance_id = resp['distributor_instance_id']
 
-    # Check that the distributorinstancecluster table is also populated
+    # Check that workflowrun attribute is None
     with Session(bind=db_engine) as session:
-        registered_clusters = session.execute(
-            select(
-                DistributorInstanceCluster
-            ).where(
-                DistributorInstanceCluster.distributor_instance_id == distributor_instance_id
-            )
-        ).scalars().all()
-        assert len(registered_clusters) == 3
-        assert {cluster.cluster_id for cluster in registered_clusters} == {1, 2, 3}
+        instance = session.execute(
+            select(DistributorInstance)
+            .where(DistributorInstance.id == distributor_instance_id)
+        ).one()
+        assert instance.workflow_run_id is None
 
 
 def test_heartbeat(requester_in_memory, requester_no_retry, db_engine):
