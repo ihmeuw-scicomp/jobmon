@@ -130,15 +130,6 @@ export default function TaskInstanceTable({ taskInstanceData }) {
             sort: true,
             sortCaret: customCaret,
             style: { overflowWrap: 'break-word' },
-        },
-        {
-            dataField: "ti_error_log_description",
-            text: "Error Log",
-            sort: true,
-            sortCaret: customCaret,
-            style: { overflowWrap: 'break-word' },
-            headerStyle: { width: "30%" },
-
         }
     ]
 
