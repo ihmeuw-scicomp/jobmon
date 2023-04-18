@@ -7,7 +7,6 @@ from flask import jsonify, request
 from sqlalchemy import func, select
 import structlog
 
-from jobmon.core.constants import WorkflowRunStatus
 from jobmon.server.web.models.api import (
     Batch,
     DistributorInstance,

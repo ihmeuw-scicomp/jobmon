@@ -15,12 +15,14 @@ from jobmon.server.web.models.api import (
     TaskInstance,
     TaskStatus,
     TaskResources,
+    WorkflowRun,
 )
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
 from jobmon.server.web.routes.fsm.distributor_instance import (
     _get_active_distributor_instance_id,
 )
+from jobmon.server.web.server_side_exception import InvalidUsage
 
 
 logger = structlog.get_logger(__name__)
@@ -240,5 +242,41 @@ def get_batches():
     with session.begin():
         batches = session.execute(select_stmt).all()
     resp = jsonify(batches=[tuple(batch) for batch in batches])
+    resp.status_code = StatusCodes.OK
+    return resp
+
+
+@blueprint.route(
+    "/batch/get_expired_batches",
+    methods=["POST"]
+)
+def get_expired_batches() -> Any:
+    """Return a set of expired batches from the provided set of ids.
+
+    Batches associated with inactive workflow runs will be removed from
+    consideration in the distributor instance, no need to monitor for status"""
+
+    try:
+        data = cast(Dict, request.get_json())
+        batch_ids = data["batch_ids"]
+    except Exception as e:
+        raise InvalidUsage(
+            f"{str(e)} in request to {request.path}", status_code=400
+        ) from e
+
+    select_stmt = (
+        select(Batch.id)
+        .where(
+            Batch.workflow_run_id == WorkflowRun.id,
+            WorkflowRun.status.not_in(WorkflowRun.active_states),
+            Batch.id.in_(batch_ids)
+        )
+    )
+
+    session = SessionLocal()
+    with session.begin():
+        inactive_batch_ids = session.execute(select_stmt).scalars().all()
+
+    resp = jsonify(inactive_batch_ids=inactive_batch_ids)
     resp.status_code = StatusCodes.OK
     return resp
