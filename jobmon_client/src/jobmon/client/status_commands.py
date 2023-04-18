@@ -639,10 +639,7 @@ def resume_workflow_from_id(
     )
     swarm.from_workflow_id(workflow_id)
 
-    with DistributorContext(
-        workflow_run_id=new_wfr.workflow_run_id, cluster_name=cluster_name, timeout=180
-    ) as distributor:
-        swarm.run(distributor_alive_callable=distributor.alive)
+    swarm.run(distributor_alive_callable=distributor.alive)
 
     # Check on the swarm status - raise an error if != "D"
     if swarm.status == WorkflowRunStatus.DONE:

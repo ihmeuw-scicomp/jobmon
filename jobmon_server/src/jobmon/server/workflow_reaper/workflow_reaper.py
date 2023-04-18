@@ -160,7 +160,10 @@ class WorkflowReaper(object):
     def _halted_state(self) -> Optional[str]:
         """Check if a workflow_run needs to be transitioned to terminated state."""
         # Get workflow_runs in H and C state
-        workflow_runs = self._get_lost_workflow_runs(["C", "H"])
+        workflow_runs = self._get_lost_workflow_runs([
+            WorkflowRunStatus.COLD_RESUME,
+            WorkflowRunStatus.HOT_RESUME
+        ])
 
         # Transition workflows to HALTED
         target_status = WorkflowRunStatus.TERMINATED
@@ -182,7 +185,7 @@ class WorkflowReaper(object):
 
     def _error_state(self) -> Optional[str]:
         """Get lost workflows and register them as error."""
-        workflow_runs = self._get_lost_workflow_runs(["R"])
+        workflow_runs = self._get_lost_workflow_runs([WorkflowRunStatus.RUNNING])
 
         # Transitions workflow to FAILED state and workflow run to ERROR
         target_status = WorkflowRunStatus.ERROR
@@ -209,7 +212,7 @@ class WorkflowReaper(object):
         lost wfr in L state and set it to A
         """
         # Get all lost wfr in L
-        workflow_runs = self._get_lost_workflow_runs(["L"])
+        workflow_runs = self._get_lost_workflow_runs([WorkflowRunStatus.LINKING])
 
         # Transitions workflow to A state and workflow run to A
         target_status = WorkflowRunStatus.ABORTED
