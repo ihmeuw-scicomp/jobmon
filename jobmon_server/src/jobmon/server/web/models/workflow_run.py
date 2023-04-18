@@ -59,15 +59,8 @@ class WorkflowRun(Base):
         # a workflow run is created normally. Something goes wrong while the
         # tasks are binding and the workflow run moves to error state
         (WorkflowRunStatus.LINKING, WorkflowRunStatus.ABORTED),
-        # a workflow run is bound and then moves to instantiating
-        (WorkflowRunStatus.BOUND, WorkflowRunStatus.INSTANTIATED),
-        # a workflow run moves from instantiating to launched
-        (WorkflowRunStatus.INSTANTIATED, WorkflowRunStatus.LAUNCHED),
-        # a workflow run moves from launched to running
-        (WorkflowRunStatus.LAUNCHED, WorkflowRunStatus.RUNNING),
-        # a workflow run can't be launched for some reason. TODO: implement triaging
-        (WorkflowRunStatus.INSTANTIATED, WorkflowRunStatus.ERROR),
-        (WorkflowRunStatus.LAUNCHED, WorkflowRunStatus.ERROR),
+        # a workflow run is bound and then moves to running
+        (WorkflowRunStatus.BOUND, WorkflowRunStatus.RUNNING),
         # a workflow run is bound and then an error occurs before it starts
         # running
         (WorkflowRunStatus.BOUND, WorkflowRunStatus.ERROR),
@@ -170,10 +163,6 @@ class WorkflowRun(Base):
                 self.workflow.transition(WorkflowStatus.HALTED)
             elif new_state in self.bound_error_states:
                 self.workflow.transition(WorkflowStatus.FAILED)
-            elif new_state == WorkflowRunStatus.INSTANTIATED:
-                self.workflow.transition(WorkflowStatus.INSTANTIATING)
-            elif new_state == WorkflowRunStatus.LAUNCHED:
-                self.workflow.transition(WorkflowStatus.LAUNCHED)
 
     def hot_reset(self) -> None:
         """Set Workflow Run to Hot Resume."""

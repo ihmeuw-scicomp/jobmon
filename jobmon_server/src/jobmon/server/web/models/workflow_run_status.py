@@ -22,8 +22,6 @@ class WorkflowRunStatus(Base):
     COLD_RESUME = Statuses.COLD_RESUME
     HOT_RESUME = Statuses.HOT_RESUME
     TERMINATED = Statuses.TERMINATED
-    INSTANTIATED = Statuses.INSTANTIATED
-    LAUNCHED = Statuses.LAUNCHED
 
     id = Column(String(1), primary_key=True)
     label = Column(String(150), nullable=False)
@@ -69,20 +67,9 @@ def add_workflow_run_statuses(session: Session) -> None:
             "they will continue running.",
         ),
         WorkflowRunStatus(
-            id="I",
-            label="INSTANTIATED",
-            description="Scheduler is instantiating a WorkflowRun on the distributor.",
-        ),
-        WorkflowRunStatus(
             id="L",
             label="LINKING",
             description="WorkflowRun completed successfully, updating the Workflow.",
-        ),
-        WorkflowRunStatus(
-            id="O",
-            label="LAUNCHED",
-            description="Instantiation complete. Distributor is controlling Tasks or waiting "
-            "for scheduling loop.",
         ),
         WorkflowRunStatus(
             id="R", label="RUNNING", description="WorkflowRun is currently running."

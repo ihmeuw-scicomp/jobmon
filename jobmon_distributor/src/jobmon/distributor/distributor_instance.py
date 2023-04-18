@@ -115,9 +115,6 @@ class DistributorInstance:
         else:
             self.requester = requester
 
-        # TODO: prior distributor transitions WFR to instantiated, prevent reaping
-        #  check if still necessary
-
     @property
     def _next_report_increment(self) -> float:
         return self._heartbeat_report_by_buffer * self._task_instance_heartbeat_interval
