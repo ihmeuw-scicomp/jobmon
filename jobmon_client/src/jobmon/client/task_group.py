@@ -2,31 +2,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from typing import Dict, Iterable, Iterator, List, Optional, Set, Union
-
-
-class Task:
-
-    def __init__(self, labels: Dict):
-        self.labels = labels
-        self.upstream_tasks: Set[Task] = set()
-        self.dowstream_tasks: Set[Task] = set()
-
-    def add_label(self, label_name, label_value):
-        self.labels[label_name] = label_value
-
-    def add_upstream(self, task: Task):
-        self.upstream_tasks.add(task)
-
-    def add_upstreams(self, tasks: List[Task]):
-        for task in tasks:
-            self.add_upstream(task)
-
-    def add_downstream(self, task: Task):
-        self.dowstream_tasks.add(task)
-
-    def add_downstreams(self, tasks: List[Task]):
-        for task in tasks:
-            self.add_downstream(task)
+from jobmon.client.task import Task
 
 
 def get_label_map(
