@@ -5,10 +5,11 @@
   "main": "dist/index.tsx",
   "module": "dist/index.tsx",
   "files": [ "dist", "README.md" ],
-    "repository": {
+  "repository": {
     "type": "git",
     "url": "git+https://github.com/ihmeuw-scicomp/jobmon.git"
   },
+  "types": "dist/index.d.ts",
   "dependencies": {
     "@babel/polyfill": "^7.12.1",
     "@elastic/apm-rum": "5.12.0",

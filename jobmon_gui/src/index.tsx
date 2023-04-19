@@ -14,7 +14,6 @@ import PluginManager from "./plugins/PluginManager";
 
 // Create a new instance of the plugin manager
 const pluginManager = new PluginManager();
-export { App }
 
 const root = ReactDOM.createRoot(
     document.getElementById('root') as HTMLElement
@@ -44,3 +43,5 @@ root.render(
     </Routes>
   </HashRouter>
 );
+
+export { App };
