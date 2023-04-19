@@ -811,3 +811,26 @@ def test_task_details_by_wf_id(client_env, db_engine):
     assert tasks[0]["task_command"] == "echo 1"
     assert tasks[0]["task_name"] == "tt_test_arg-1"
     assert tasks[0]["task_status"] == "REGISTERING"
+
+
+def test_workflow_details_viz(client_env, db_engine):
+    t = Tool(name="task_detail_tool")
+    wf = t.create_workflow(name="i_am_another_fake_wf_vv")
+    tt1 = t.get_task_template(
+        template_name="tt_test", command_template="echo {arg}", node_args=["arg"]
+    )
+    t1 = tt1.create_task(
+        arg=1,
+        cluster_name="sequential",
+        compute_resources={"queue": "null.q", "num_cores": 2},
+    )
+    wf.add_tasks([t1])
+    wf.bind()
+    wf._bind_tasks()
+    app_route = f"/workflow_details_viz/{wf.workflow_id}"
+    return_code, msg = wf.requester.send_request(
+        app_route=app_route, message={}, request_type="get"
+    )
+    assert return_code == 200
+    assert msg[0]["wf_status"] == "G"
+    assert msg[0]["wf_status_desc"] == "Workflow is being validated."

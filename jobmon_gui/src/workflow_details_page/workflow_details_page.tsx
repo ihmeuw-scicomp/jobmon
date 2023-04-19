@@ -17,6 +17,7 @@ import JobmonProgressBar from '../progress_bar.tsx';
 import Tasks from './tasks';
 import Usage from './usage';
 import Errors from './errors';
+import WFHeader from "./wf_header"
 import { init_apm, convertDatePST, safe_rum_add_label, safe_rum_transaction } from '../functions';
 
 function getAsyncWFdetail(setWFDict, wf_id: string) {
@@ -29,7 +30,7 @@ function getAsyncWFdetail(setWFDict, wf_id: string) {
     return fetchData
 }
 
-function getWorkflowAttributes(wf_id: string, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate) {
+function getWorkflowAttributes(wf_id: string, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc) {
     const url = process.env.REACT_APP_BASE_URL + "/workflow_details_viz/" + wf_id;
     const fetchData = async () => {
         const result: any = await axios.get(url);
@@ -37,6 +38,8 @@ function getWorkflowAttributes(wf_id: string, setWFTool, setWFName, setWFArgs, s
         setWFTool(data["tool_name"]);
         setWFName(data["wf_name"]);
         setWFArgs(data["wf_args"]);
+        setWFStatus(data["wf_status"]);
+        setWFStatusDesc("Workflow Status: " + data["wf_status"] + " -- " + data["wf_status_desc"])
         setWFSubmitted(convertDatePST(data["wf_created_date"]));
         setWFStatusDate(convertDatePST(data["wf_status_date"]));
     };
@@ -86,6 +89,8 @@ function WorkflowDetails({ subpage }) {
     const [errorLogs, setErrorLogs] = useState([]);
     const [error_loading, setErrorLoading] = useState(false);
     const [task_loading, setTaskLoading] = useState(false);
+    const [wf_status, setWFStatus] = useState([]);
+    const [wf_status_desc, setWFStatusDesc] = useState([]);
     const [wf_tool, setWFTool] = useState([]);
     const [wf_name, setWFName] = useState([]);
     const [wf_args, setWFArgs] = useState([]);
@@ -97,7 +102,7 @@ function WorkflowDetails({ subpage }) {
     //***********************hooks******************************
     useEffect(() => {
         if (typeof params.workflowId !== 'undefined') {
-            getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate)();
+            getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatusDesc)();
         }
     }, [params.workflowId]);
     useEffect(() => {
@@ -189,9 +194,11 @@ function WorkflowDetails({ subpage }) {
                 <Breadcrumb.Item active>Workflow ID {workflowId} </Breadcrumb.Item>
             </Breadcrumb>
             <div className='d-flex justify-content-start pt-3'>
-                <header className="App-header">
-                    <p>Workflow ID: {workflowId} </p>
-                </header>
+                <WFHeader
+                      wf_id={workflowId}
+                      wf_status={wf_status}
+                      wf_status_desc={wf_status_desc}
+                 />
                 <div>
                     <DropdownButton variant="dark" menuVariant="dark" title="Details" className="mt-2">
                         <Dropdown.Item variant="dark">
