@@ -2,6 +2,13 @@
   "name": "jobmon_gui",
   "version": "0.1.0",
   "private": true,
+  "main": "dist/index.tsx",
+  "module": "dist/index.tsx",
+  "files": [ "dist", "README.md" ],
+    "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ihmeuw-scicomp/jobmon.git"
+  },
   "dependencies": {
     "@babel/polyfill": "^7.12.1",
     "@elastic/apm-rum": "5.12.0",
