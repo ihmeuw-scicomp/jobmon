@@ -9,6 +9,7 @@
     "type": "git",
     "url": "git+https://github.com/ihmeuw-scicomp/jobmon.git"
   },
+  "type": "module",
   "types": "dist/index.d.ts",
   "dependencies": {
     "@babel/polyfill": "^7.12.1",
