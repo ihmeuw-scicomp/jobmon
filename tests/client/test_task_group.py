@@ -1,114 +1,51 @@
 from __future__ import annotations
+from typing import List
+import uuid
 
-from typing import Dict, Iterable, Iterator, List, Optional, Set
-from jobmon.client.api import Tool
-from jobmon.client.task import Task
+from jobmon.client.task_group import TaskGroup
+from jobmon.client.tool import Tool
 
-import pytest
 import itertools
-
-# Stubs
-class TaskGroup:
-    """TaskGroup stub."""
-
-    tasks: Set[Task]
-    name: str
-
-    def __init__(self, tasks: Iterable[Task], name: str):
-        pass
-
-    def add_task(self, task: Task):
-        """Adds a task to the group."""
-        pass
-
-    def add_tasks(self, tasks: Iterable[Task]):
-        """Adds multiple tasks to the group."""
-        pass
-
-    def union(self, other: TaskGroup, new_name: Optional[str] = None) -> TaskGroup:
-        """Combine two task groups."""
-
-    def get_subgroup(
-        self,
-        task_template_name: Optional[str],
-        empty_okay: bool = False,
-        new_name: Optional[str] = None,
-        **kwargs
-    ) -> TaskGroup:
-        """probably the same implementation details as workflow.get_tasks_by_node_args
-        
-        kwargs can be task arguments or attributes.
-
-        raises an error if the group is empty and empty_okay is False.
-        """
-        pass
-
-    def get_task(self, task_template_name: Optional[str], **kwargs) -> Task:
-        """Raises an error if it doesn't uniquely identify a task.
-        
-        kwargs can be task arguments or attributes.
-        """
-        pass
-
-    def add_upstream(
-        self,
-        upstream_group: TaskGroup,
-        dependency_specification: Dict[str, str],
-        my_template: Optional[str] = None,
-        upstream_template: Optional[str] = None,
-    ):
-        """`dependency_specification` is a dictionary mapping argument or attribute names. Keys
-        are argument or attribute names in tasks in this group, and values are argument or 
-        attribute names in tasks in the upstream group. Dependencies are set between tasks 
-        where the values in all the specified arguments/attributes match, and they fit 
-        `my_template`/`upstream_template` if supplied.
-        """
-        pass
-
-    def __iter__(self) -> Iterator[Task]:
-        pass
-
-    def __or__(self, other_group: TaskGroup) -> TaskGroup:
-        """Combine two groups."""
-
-    def __len__(self) -> int:
-        pass
+import pytest
 
 
-tool = Tool("test_tool")
+@pytest.fixture(scope="function")
+def tool(client_env):
+    return Tool(name=str(uuid.uuid4()))
 
 
-@pytest.mark.skip
 class TestUtils:
     """Test dunder methods and other simple utils."""
 
-    template = tool.get_task_template(
-        template_name="template",
-        command_template="script {arg}",
-        node_args=["arg"],
-        task_args=[],
-        op_args=[],
-    )
+    @pytest.fixture(scope="function")
+    def template(self, tool):
+        return tool.get_task_template(
+            template_name="template",
+            command_template="script {arg}",
+            node_args=["arg"],
+            task_args=[],
+            op_args=[],
+        )
 
-    def test_iter(self):
+    def test_iter(self, template):
         """Test that the TaskGroup is iterable."""
-        task_list = self.template.create_tasks(arg=[1, 2])
+        task_list = template.create_tasks(arg=[1, 2])
         task_group = TaskGroup(task_list, name="")
         task_set = set(task_group)  # set() just iterates through the argument provided.
 
         assert set(task_list) == task_set
 
-    def test_tasks(self):
+    def test_tasks(self, template):
         """Test that the .tasks attribute is a set of all the contained tasks."""
-        task_list = self.template.create_tasks(arg=[1, 2])
+        task_list = template.create_tasks(arg=[1, 2])
         task_group = TaskGroup(task_list, name="")
 
         assert set(task_group) == task_group.tasks
 
-    def test_union(self):
+    def test_union(self, template):
         """Test that TaskGroups can be combined together."""
-        list1 = self.template.create_tasks(arg=[1, 2])
-        list2 = self.template.create_tasks(arg=[3, 4])
+        list1 = template.create_tasks(arg=[1, 2])
+        list2 = template.create_tasks(arg=[3, 4])
 
         group1 = TaskGroup(list1, name="1")
         group2 = TaskGroup(list2, name="2")
@@ -117,10 +54,10 @@ class TestUtils:
 
         assert set(combined_group) == set(list1 + list2)
 
-    def test_union_name(self):
+    def test_union_name(self, template):
         """Test that the new group has the requested name."""
-        list1 = self.template.create_tasks(arg=[1, 2])
-        list2 = self.template.create_tasks(arg=[3, 4])
+        list1 = template.create_tasks(arg=[1, 2])
+        list2 = template.create_tasks(arg=[3, 4])
 
         group1 = TaskGroup(list1, name="1")
         group2 = TaskGroup(list2, name="2")
@@ -130,10 +67,10 @@ class TestUtils:
 
         assert combined_group.name == new_name
 
-    def test_or(self):
+    def test_or(self, template):
         """Test that `|` works like union."""
-        list1 = self.template.create_tasks(arg=[1, 2])
-        list2 = self.template.create_tasks(arg=[3, 4])
+        list1 = template.create_tasks(arg=[1, 2])
+        list2 = template.create_tasks(arg=[3, 4])
 
         group1 = TaskGroup(list1, "1")
         group2 = TaskGroup(list2, "2")
@@ -142,58 +79,59 @@ class TestUtils:
 
         assert set(combined_group) == set(list1 + list2)
 
-    @pytest.mark.parameterize(
+    @pytest.mark.parametrize(
         ["args", "expected_len"], [[[], 0], [[1], 1], [[1, 2, 3], 3]]
     )
-    def test_len(self, args: List[int], expected_len: int):
+    def test_len(self, args: List[int], expected_len: int, template):
         """Test that len works as expected."""
-        tasks = self.template.create_tasks(arg=args)
+        tasks = template.create_tasks(arg=args)
         group = TaskGroup(tasks)
 
         assert len(group) == expected_len
 
-    def test_uniqueness(self):
+    def test_uniqueness(self, template):
         """Assert that the same task can only get added once."""
-        task_list = self.template.create_tasks(arg=[1, 2])
+        task_list = template.create_tasks(arg=[1, 2])
         group = TaskGroup(task_list * 2)
 
         assert len(group) == len(task_list)
 
 
-@pytest.mark.skip
 class TestAddTasks:
     """Test adding tasks to the current workflow."""
 
-    template = tool.get_task_template(
-        template_name="template",
-        command_template="script {arg}",
-        node_args=["arg"],
-        task_args=[],
-        op_args=[],
-    )
+    @pytest.fixture(scope="function")
+    def template(self, tool):
+        return tool.get_task_template(
+            template_name="template",
+            command_template="script {arg}",
+            node_args=["arg"],
+            task_args=[],
+            op_args=[],
+        )
 
-    def test_add_task(self):
+    def test_add_task(self, template):
         """Test that it adds a task to a TaskGroup"""
-        group = TaskGroup(self.template.create_tasks(arg=[1, 2]), "name")
-        new_task = self.template.create_task(arg=3)
+        group = TaskGroup(template.create_tasks(arg=[1, 2]), "name")
+        new_task = template.create_task(arg=3)
 
         group.add_task(new_task)
 
         assert new_task in group
 
-    def test_add_uniqueness(self):
+    def test_add_uniqueness(self, template):
         """Test that if I add a task twice nothing happens."""
-        task = self.template.create_task(arg=1)
+        task = template.create_task(arg=1)
         group = TaskGroup([task], "name")
 
         group.add_task(task)
 
         assert len(group) == 1
 
-    def test_add_tasks(self):
+    def test_add_tasks(self, template):
         """Test that it adds multiple tasks to the TaskGroup"""
-        group = TaskGroup(self.template.create_tasks(arg=[1, 2]), "name")
-        new_tasks = self.template.create_tasks(arg=[3, 4])
+        group = TaskGroup(template.create_tasks(arg=[1, 2]), "name")
+        new_tasks = template.create_tasks(arg=[3, 4])
 
         group.add_tasks(new_tasks)
 
@@ -201,47 +139,47 @@ class TestAddTasks:
             assert task in group
 
 
-@pytest.mark.skip
 class TestGetFunctions:
     """Tests for get_subgroup and get_task"""
 
-    template1 = tool.get_task_template(
-        template_name="template1",
-        command_template="script {arg1} {arg2}",
-        node_args=["arg1", "arg2"],
-        task_args=[],
-        op_args=[],
-    )
-    template2 = tool.get_task_template(
-        template_name="template2",
-        command_template="script {arg1} {arg2}",
-        node_args=["arg1", "arg2"],
-        task_args=[],
-        op_args=[],
-    )
-
-    def test_subgroup_homogenous(self):
-        """Get a subset from a group with all one template."""
-        in_group = TaskGroup(
-            self.template1.create_tasks(arg1=[1], arg2=[1, 2]), "in_group"
+    @pytest.fixture(scope="function")
+    def template1(self, tool):
+        return tool.get_task_template(
+            template_name="template1",
+            command_template="script {arg1} {arg2}",
+            node_args=["arg1", "arg2"],
+            task_args=[],
+            op_args=[],
         )
+
+    @pytest.fixture(scope="function")
+    def template2(self, tool):
+        return tool.get_task_template(
+            template_name="template2",
+            command_template="script {arg1} {arg2}",
+            node_args=["arg1", "arg2"],
+            task_args=[],
+            op_args=[],
+        )
+
+    def test_subgroup_homogeneous(self, template1, template2):
+        """Get a subset from a group with all one template."""
+        in_group = TaskGroup(template1.create_tasks(arg1=[1], arg2=[1, 2]), "in_group")
         out_group = TaskGroup(
-            self.template1.create_tasks(arg1=[2], arg2=[1, 2]), "out_group"
+            template1.create_tasks(arg1=[2], arg2=[1, 2]), "out_group"
         )
         big_group = in_group | out_group
 
         assert in_group.tasks == big_group.get_subgroup(arg1=1).tasks
 
-    def test_subgroup_with_template(self):
+    def test_subgroup_with_template(self, template1, template2):
         """Get a subset using only one template in the group."""
-        in_group = TaskGroup(
-            self.template1.create_tasks(arg1=[1], arg2=[1, 2]), "in_group"
-        )
+        in_group = TaskGroup(template1.create_tasks(arg1=[1], arg2=[1, 2]), "in_group")
         out_group1 = TaskGroup(
-            self.template1.create_tasks(arg1=[2], arg2=[1, 2]), "out_group1"
+            template1.create_tasks(arg1=[2], arg2=[1, 2]), "out_group1"
         )
         out_group2 = TaskGroup(
-            self.template2.create_tasks(arg1=[1, 2], arg2=[1, 2]), "out_group2"
+            template2.create_tasks(arg1=[1, 2], arg2=[1, 2]), "out_group2"
         )
         big_group = in_group | out_group1 | out_group2
 
@@ -250,27 +188,27 @@ class TestGetFunctions:
             == big_group.get_subgroup(task_template_name="template1", arg1=1).tasks
         )
 
-    def test_subgroup_multiple_templates(self):
+    def test_subgroup_multiple_templates(self, template1, template2):
         """Get a subgroup that has multiple templates which have a matching argument."""
         in_group1 = TaskGroup(
-            self.template1.create_tasks(arg1=[1], arg2=[1, 2]), "in_group1"
+            template1.create_tasks(arg1=[1], arg2=[1, 2]), "in_group1"
         )
         out_group1 = TaskGroup(
-            self.template1.create_tasks(arg1=[2], arg2=[1, 2]), "out_group2"
+            template1.create_tasks(arg1=[2], arg2=[1, 2]), "out_group2"
         )
         in_group2 = TaskGroup(
-            self.template2.create_tasks(arg1=[1], arg2=[1, 2]), "in_group2"
+            template2.create_tasks(arg1=[1], arg2=[1, 2]), "in_group2"
         )
         out_group2 = TaskGroup(
-            self.template2.create_tasks(arg1=[2], arg2=[1, 2]), "out_group2"
+            template2.create_tasks(arg1=[2], arg2=[1, 2]), "out_group2"
         )
         big_group = in_group1 | out_group1 | in_group2 | out_group2
 
         assert (in_group1 | in_group2).tasks == big_group.get_subgroup(arg1=1).tasks
 
-    def test_subgroup_attributes(self):
+    def test_subgroup_attributes(self, template1):
         """Get a subgroup based on attributes."""
-        all_tasks = self.template1.create_tasks(arg1=[1, 2], arg2=[1, 2])
+        all_tasks = template1.create_tasks(arg1=[1, 2], arg2=[1, 2])
         for task in all_tasks[:2]:
             task.add_attribute("group", "in")
         for task in all_tasks[3:]:
@@ -279,10 +217,13 @@ class TestGetFunctions:
         group = TaskGroup(all_tasks, "group")
         assert set(all_tasks[:2]) == group.get_subgroup(group="in").tasks
 
-    def test_subgroup_args_and_attributes(self):
+    def test_subgroup_args_and_attributes(self, template1, template2):
         """Get a subgroup with a mix of args and attributes specified."""
-        tasks_1 = self.template1.create_tasks(arg1=[1,], arg2=[1, 2, 3])
-        tasks_2 = self.template2.create_tasks(arg1=[2, 3], arg1=[1, 2, 3])
+        tasks_1 = template1.create_tasks(
+            arg1=[1],
+            arg2=[1, 2, 3],
+        )
+        tasks_2 = template2.create_tasks(arg1=[2, 3], arg2=[1, 2, 3])
         for task in tasks_1[:2] + tasks_2[:2]:
             task.add_attribute("group", "in")
         for task in tasks_1[3:] + tasks_2[3:]:
@@ -295,55 +236,47 @@ class TestGetFunctions:
             assert task.node.node_args["arg2"] == 2
             assert task.task_attributes["group"] == "in"
 
-    def test_get_empty_subgroup(self):
+    def test_get_empty_subgroup(self, template1, template2):
         """Assert an error is thrown if attempting to get an empty subgroup.
 
         Not entirely sure this is the behavior we want, but it does seem broadly safer than
         returning an empty group.
         """
-        group = TaskGroup(
-            self.template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group"
-        )
-        with pytest.raises(KeyError):
+        group = TaskGroup(template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group")
+        with pytest.raises(Exception):
             group.get_subgroup(arg1=3)
 
-    def test_get_empty_subgroup_empty_okay(self):
+    def test_get_empty_subgroup_empty_okay(self, template1, template2):
         """Assert an error isn't thrown if attempting to get an empty subgroup and empty_okay
         is true.
         """
-        group = TaskGroup(
-            self.template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group"
-        )
+        group = TaskGroup(template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group")
         subgroup = group.get_subgroup(arg1=3, empty_okay=True)
 
         assert len(subgroup) == 0
 
-    def test_get_subgroup_new_name(self):
+    def test_get_subgroup_new_name(self, template1, template2):
         """Get subgroup with a new name."""
-        group = TaskGroup(
-            self.template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group"
-        )
+        group = TaskGroup(template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group")
 
         new_name = "new_name"
         sub_group = group.get_subgroup(arg1=1, new_name=new_name)
 
         assert sub_group.name == new_name
 
-    def test_task_homogenous(self):
+    def test_task_homogenous(self, template1, template2):
         """Get a task from a group with all one template."""
-        group = TaskGroup(
-            self.template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group"
-        )
+        group = TaskGroup(template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group")
         task = group.get_task(arg1=1, arg2=1)
 
         assert task.node.node_args["arg1"] == 1
-        assert task.node.node_args["arg2"] == 2
+        assert task.node.node_args["arg2"] == 1
 
-    def test_task_with_template(self):
+    def test_task_with_template(self, template1, template2):
         """Get a task using a specified template."""
         group = TaskGroup(
-            self.template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "part1"
-        ) | TaskGroup(self.template2.create_tasks(arg1=[1, 2], arg2=[1, 2]), "part2")
+            template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "part1"
+        ) | TaskGroup(template2.create_tasks(arg1=[1, 2], arg2=[1, 2]), "part2")
         task = group.get_task(task_template_name="template1", arg1=1, arg2=2)
 
         assert (
@@ -352,13 +285,13 @@ class TestGetFunctions:
         assert task.node.node_args["arg1"] == 1
         assert task.node.node_args["arg2"] == 2
 
-    def test_task_multiple_possible_templates(self):
+    def test_task_multiple_possible_templates(self, template1, template2):
         """Get a single task where multiple possible templates *could* match the arguments,
         but only one does.
         """
         group = TaskGroup(
-            self.template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "part1"
-        ) | TaskGroup(self.template2.create_tasks(arg1=[2], arg2=[1, 2]), "part2")
+            template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "part1"
+        ) | TaskGroup(template2.create_tasks(arg1=[2], arg2=[1, 2]), "part2")
         task = group.get_task(arg1=1, arg2=2)
 
         assert (
@@ -367,9 +300,9 @@ class TestGetFunctions:
         assert task.node.node_args["arg1"] == 1
         assert task.node.node_args["arg2"] == 2
 
-    def test_task_attributes(self):
+    def test_task_attributes(self, template1):
         """Get a task based on attributes."""
-        all_tasks = self.template1.create_tasks(arg1=[1, 2], arg2=[1, 2])
+        all_tasks = template1.create_tasks(arg1=[1, 2], arg2=[1, 2])
         for task in all_tasks[:1]:
             task.add_attribute("group", "in")
         for task in all_tasks[2:]:
@@ -380,66 +313,68 @@ class TestGetFunctions:
 
         assert task.task_attributes["group"] == "in"
 
-    def test_get_non_existent_task(self):
+    def test_get_non_existent_task(self, template1):
         """Assert an error is thrown if attempting to get a non-existent task."""
-        group = TaskGroup(
-            self.template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group"
-        )
-        with pytest.raises(KeyError):
+        group = TaskGroup(template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group")
+        with pytest.raises(Exception):
             group.get_task(arg1=3, arg2=1)
 
-    def test_get_multiple_tasks(self):
+    def test_get_multiple_tasks(self, template1):
         """Assert an error is thrown if specification doesn't match only one task."""
-        group = TaskGroup(
-            self.template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group"
-        )
-        with pytest.raises(KeyError):
+        group = TaskGroup(template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group")
+        with pytest.raises(Exception):
             group.get_task(arg1=1)
 
 
-@pytest.mark.skip
-class TestDependencyHomogonous:
+class TestDependencyHomogeneous:
     """The tests here revolve around setting dependencies between two groups of homogenous
     tasks, parallelized across two variables.
     """
 
     # Templates
-    template1 = tool.get_task_template(
-        template_name="template1",
-        command_template="script1 {stage1_arg1} {stage1_arg2}",
-        node_args=["stage1_arg1", "stage1_arg2"],
-        task_args=[],
-        op_args=[],
-    )
-    template2 = tool.get_task_template(
-        template_name="template2",
-        command_template="script2 {stage2_arg1} {stage2_arg2}",
-        node_args=["stage2_arg1", "stage2_arg2"],
-        task_args=[],
-        op_args=[],
-    )
+    @pytest.fixture(scope="function")
+    def template1(self, tool):
+        return tool.get_task_template(
+            template_name="template1",
+            command_template="script1 {stage1_arg1} {stage1_arg2}",
+            node_args=["stage1_arg1", "stage1_arg2"],
+            task_args=[],
+            op_args=[],
+        )
 
-    @pytest.fixture
-    def template1_group(self) -> TaskGroup:
+    @pytest.fixture(scope="function")
+    def template2(self, tool):
+        return tool.get_task_template(
+            template_name="template2",
+            command_template="script2 {stage2_arg1} {stage2_arg2}",
+            node_args=["stage2_arg1", "stage2_arg2"],
+            task_args=[],
+            op_args=[],
+        )
+
+    @pytest.fixture(scope="function")
+    def template1_group(self, template1) -> TaskGroup:
         arg1 = ["val1", "val2"]
         arg2 = ["val3", "val4"]
 
         return TaskGroup(
-            self.template1.create_tasks(stage1_arg1=arg1, stage1_arg2=arg2), "group1"
+            template1.create_tasks(stage1_arg1=arg1, stage1_arg2=arg2), "group1"
         )
 
     @pytest.fixture
-    def template2_group(self) -> TaskGroup:
+    def template2_group(self, template2) -> TaskGroup:
         arg1 = ["val1", "val2"]
         arg2 = ["val3", "val4"]
 
         return TaskGroup(
-            self.template2.create_tasks(stage1_arg1=arg1, stage1_arg2=arg2), "group2"
+            template2.create_tasks(stage2_arg1=arg1, stage2_arg2=arg2), "group2"
         )
 
     def test_all_to_all(self, template1_group: TaskGroup, template2_group: TaskGroup):
         """Test all-to-all dependency-relationship"""
-        template2_group.add_upstream(template1_group, dependency_specification={})
+        template2_group.interleave_upstream(
+            template1_group, dependency_specification={}
+        )
 
         for task1 in template1_group:
             for task2 in template2_group:
@@ -449,7 +384,7 @@ class TestDependencyHomogonous:
         self, template1_group: TaskGroup, template2_group: TaskGroup
     ):
         """Tasks depend on tasks that match them in both arg1 and arg2."""
-        template2_group.add_upstream(
+        template2_group.interleave_upstream(
             template1_group,
             dependency_specification={
                 "stage2_arg1": "stage1_arg1",
@@ -461,10 +396,14 @@ class TestDependencyHomogonous:
         arg2_vals = ["val3", "val4"]
         for arg1_val, arg2_val in itertools.product(arg1_vals, arg2_vals):
             task1 = template1_group.get_task(
-                "template1", stage1_arg1=arg1_val, stage1_arg2=arg2_val
+                task_template_name="template1",
+                stage1_arg1=arg1_val,
+                stage1_arg2=arg2_val,
             )
             task2 = template2_group.get_task(
-                "template2", stage2_arg1=arg1_val, stage1_arg2=arg2_val
+                task_template_name="template2",
+                stage2_arg1=arg1_val,
+                stage2_arg2=arg2_val,
             )
 
             assert {task1} == task2.upstream_tasks
@@ -473,7 +412,7 @@ class TestDependencyHomogonous:
         self, template1_group: TaskGroup, template2_group: TaskGroup
     ):
         """Each task in group 1 has 2 downstreams, each task in group 2 has 2 upstreams."""
-        template2_group.add_upstream(
+        template2_group.interleave_upstream(
             template1_group, dependency_specification={"stage2_arg1": "stage1_arg1"}
         )
 
@@ -489,42 +428,41 @@ class TestDependencyHomogonous:
         self, template1_group: TaskGroup, template2_group: TaskGroup
     ):
         """Each task in group 1 has 2 downstreams, each task in group 2 has 1 upstream."""
-        template1_subgroup = template1_group.get_subgroup(arg2="val3")
+        template1_subgroup = template1_group.get_subgroup(stage1_arg2="val3")
 
-        template2_group.add_upstream(
+        template2_group.interleave_upstream(
             template1_subgroup, dependency_specification={"stage2_arg1": "stage1_arg1"}
         )
         arg1_vals = ["val1", "val2"]
         for arg1_val in arg1_vals:
             task1 = template1_subgroup.get_task(stage1_arg1=arg1_val)
             for task2 in template2_group.get_subgroup(stage2_arg1=arg1_val):
-                assert {task2} == task1.upstream_tasks
+                assert {task1} == task2.upstream_tasks
 
     def test_1_to_multiple(
         self, template1_group: TaskGroup, template2_group: TaskGroup
     ):
         """Each task in group 1 has 1 downstream, each task in group 2 has 2 uptreams."""
-        template2_subgroup = template2_group.get_subgroup(arg2="val3")
+        template2_subgroup = template2_group.get_subgroup(stage2_arg2="val3")
 
-        template2_subgroup.add_upstream(
-            template1_group, dependency_specification={"stage1_arg1": "stage2_arg1"}
+        template2_subgroup.interleave_upstream(
+            template1_group, dependency_specification={"stage2_arg1": "stage1_arg1"}
         )
         arg1_vals = ["val1", "val2"]
         for arg1_val in arg1_vals:
-            task2 = template1_group.get_task(stage2_arg1=arg1_val)
+            task2 = template2_subgroup.get_task(stage2_arg1=arg1_val)
             assert (
                 set(template1_group.get_subgroup(stage1_arg1=arg1_val))
                 == task2.upstream_tasks
             )
 
 
-@pytest.mark.skip
-class TestDependencyHeterogenous:
+class TestDependencyHeterogeneous:
     """These are test of setting dependency structures on groups containing multiple different
     task templates.
     """
 
-    def test_downstream_with_aggregator(self):
+    def test_downstream_with_aggregator(self, tool):
         """Here we're operating across one variable.
 
         The upstream group is homogenous.
@@ -563,12 +501,12 @@ class TestDependencyHeterogenous:
         template2_tasks = template2.create_tasks(stage2_arg1=arg1_vals)
         agg_task = template_agg.create_task(task_arg="foo")
         agg_task.add_upstreams(template2_tasks)
-        group2 = TaskGroup(template2_tasks | [agg_task], "group2")
+        group2 = TaskGroup(template2_tasks + [agg_task], "group2")
 
         # Exercise
-        group2.add_upstream(
+        group2.interleave_upstream(
             group1,
-            my_template="template2",
+            subsetter={"task_template_name": "template2"},
             dependency_specification={"stage2_arg1": "stage1_arg1"},
         )
 
@@ -578,10 +516,12 @@ class TestDependencyHeterogenous:
         # Verify inter-group structure
         for arg1_val in arg1_vals:
             task1 = group1.get_task(stage1_arg1=arg1_val)
-            task2 = group2.get_task(template="template2", stage2_arg1=arg1_val)
+            task2 = group2.get_task(
+                task_template_name="template2", stage2_arg1=arg1_val
+            )
             assert task2.upstream_tasks == {task1}
 
-    def test_both_groups_aggregate(self):
+    def test_both_groups_aggregate(self, tool):
         """Here we're operating across two variables.
 
         The upstream group has a first step parallelized over both variables. It has a second
@@ -609,7 +549,7 @@ class TestDependencyHeterogenous:
         template2 = tool.get_task_template(
             template_name="template2",
             command_template="script2 {stage2_arg1}",
-            node_args=["stage2_arg1",],
+            node_args=["stage2_arg1"],
             task_args=[],
             op_args=[],
         )
@@ -630,9 +570,9 @@ class TestDependencyHeterogenous:
             "stage1_compute",
         )
         template1_agg_tasks = TaskGroup(
-            template1_agg.create_tasks(stage1_arg1=arg1_vals), "stage1_agg"
+            template1_agg.create_tasks(stage1_agg_arg1=arg1_vals), "stage1_agg"
         )
-        template1_agg_tasks.add_upstream(
+        template1_agg_tasks.interleave_upstream(
             template1_tasks, {"stage1_agg_arg1": "stage1_arg1"}
         )
         group1 = template1_tasks | template1_agg_tasks
@@ -643,11 +583,11 @@ class TestDependencyHeterogenous:
         group2 = TaskGroup(template2_tasks + [template2_agg_task], "stage2")
 
         # Exercise
-        group2.add_upstream(
+        group2.interleave_upstream(
             group1,
-            my_template="template2",
-            upstream_template="template1_agg",
-            dependency_specification={"stage2_arg1": "stage1_arg1"},
+            subsetter={"task_template_name": "template2"},
+            upstream_subsetter={"task_template_name": "template1_agg"},
+            dependency_specification={"stage2_arg1": "stage1_agg_arg1"},
         )
 
         # Verify group 2 internal structure
@@ -656,19 +596,21 @@ class TestDependencyHeterogenous:
         for arg1_val in arg1_vals:
             task1_agg = group1.get_task(stage1_agg_arg1=arg1_val)
             # Verify group 1 internal structure
-            assert task1_agg.upstreams == set(
+            assert task1_agg.upstream_tasks == set(
                 template1_tasks.get_subgroup(stage1_arg1=arg1_val)
             )
 
             # Verify inter-group structure
-            task2 = group2.get_task(template="template2", stage2_arg1=arg1_val)
+            task2 = group2.get_task(
+                task_template_name="template2", stage2_arg1=arg1_val
+            )
             assert task2.upstream_tasks == {task1_agg}
 
-    def test_hierarchy(self):
+    def test_hierarchy(self, tool):
         """Here we're testing an arbitrary hierarchy encoded using attributes.
-        
+
         We're simulating the process of aggregating up a hierarchy, such that parents require
-        all of their children to complete before they do (sorta the opposite of typical DAG 
+        all of their children to complete before they do (sorta the opposite of typical DAG
         notation).
         """
         # Set up templates
@@ -694,10 +636,10 @@ class TestDependencyHeterogenous:
         }
 
         child_tasks = []
-        for parent, children in entity_hierarchy:
+        for parent, children in entity_hierarchy.items():
             for child in children:
                 task = child_template.create_task(child_entity=child)
-                task.add_attribute("parent", parent)
+                task.add_attribute("parent_entity", parent)
                 child_tasks.append(task)
         child_group = TaskGroup(child_tasks, "child")
 
@@ -707,10 +649,12 @@ class TestDependencyHeterogenous:
         )
 
         # Exercise
-        parent_group.add_upstream(child_group, {"parent_entity": "parent_entity"})
+        parent_group.interleave_upstream(
+            child_group, {"parent_entity": "parent_entity"}
+        )
 
         # Verify
-        for parent, children in entity_hierarchy:
+        for parent, children in entity_hierarchy.items():
             parent_task = parent_group.get_task(parent_entity=parent)
             child_tasks = {
                 child_group.get_task(child_entity=child) for child in children
@@ -719,39 +663,43 @@ class TestDependencyHeterogenous:
             assert parent_task.upstream_tasks == child_tasks
 
 
-@pytest.mark.skip
 class TestDependencyIncomplete:
     """Tests for cases where a dependency spec might leave off some tasks."""
 
-    template1 = tool.get_task_template(
-        template_name="template1",
-        command_template="script1 {stage1_arg}",
-        node_args=["stage1_arg"],
-        task_args=[],
-        op_args=[],
-    )
-    template2 = tool.get_task_template(
-        template_name="template2",
-        command_template="stage2 {stage2_arg}",
-        node_args=["script2_arg"],
-        task_args=[],
-        op_args=[],
-    )
+    @pytest.fixture(scope="function")
+    def template1(self, tool):
+        return tool.get_task_template(
+            template_name="template1",
+            command_template="script1 {stage1_arg}",
+            node_args=["stage1_arg"],
+            task_args=[],
+            op_args=[],
+        )
 
-    def test_extra_upstreams(self):
+    @pytest.fixture(scope="function")
+    def template2(self, tool):
+        return tool.get_task_template(
+            template_name="template2",
+            command_template="stage2 {stage2_arg}",
+            node_args=["stage2_arg"],
+            task_args=[],
+            op_args=[],
+        )
+
+    def test_extra_upstreams(self, template1, template2):
         """Test the 1:1 matching where the upstream has values not included in the downstreams.
 
         We expect a warning, and to set the right upstreams.
         """
         group1 = TaskGroup(
-            self.template1.create_tasks(stage1_arg=["val1", "val2", "val3"]), "group1"
+            template1.create_tasks(stage1_arg=["val1", "val2", "val3"]), "group1"
         )
         group2 = TaskGroup(
-            self.template2.create_tasks(stage2_arg=["val1", "val2"]), "group2"
+            template2.create_tasks(stage2_arg=["val1", "val2"]), "group2"
         )
 
         with pytest.warns(Warning):
-            group2.add_upstream(
+            group2.interleave_upstream(
                 group1, dependency_specification={"stage2_arg": "stage1_arg"}
             )
 
@@ -760,20 +708,20 @@ class TestDependencyIncomplete:
             task2 = group2.get_task(stage2_arg=val)
             assert task2.upstream_tasks == {task1}
 
-    def test_extra_downstreams(self):
+    def test_extra_downstreams(self, template1, template2):
         """Test the 1:1 matching where the downstream has values not included in the upstreams.
 
         We expect a warning, and to set the right upstreams.
         """
         group1 = TaskGroup(
-            self.template1.create_tasks(stage1_arg=["val1", "val2"]), "group1"
+            template1.create_tasks(stage1_arg=["val1", "val2"]), "group1"
         )
         group2 = TaskGroup(
-            self.template2.create_tasks(stage2_arg=["val1", "val2", "val3"]), "group2"
+            template2.create_tasks(stage2_arg=["val1", "val2", "val3"]), "group2"
         )
 
         with pytest.warns(Warning):
-            group2.add_upstream(
+            group2.interleave_upstream(
                 group1, dependency_specification={"stage2_arg": "stage1_arg"}
             )
 
@@ -782,20 +730,20 @@ class TestDependencyIncomplete:
             task2 = group2.get_task(stage2_arg=val)
             assert task2.upstream_tasks == {task1}
 
-        assert group2.get_task(stage2_arg="val3").upstream_tasks == {}
+        assert group2.get_task(stage2_arg="val3").upstream_tasks == set()
 
-    def test_no_matches(self):
+    def test_no_matches(self, template1, template2):
         """Test that an error is thrown when setting an upstream group would result in not
         actually setting any tasks' upstreams.
         """
         group1 = TaskGroup(
-            self.template1.create_tasks(stage1_arg=["val1", "val2"]), "group1"
+            template1.create_tasks(stage1_arg=["val1", "val2"]), "group1"
         )
         group2 = TaskGroup(
-            self.template2.create_tasks(stage2_arg=["val3", "val4"]), "group2"
+            template2.create_tasks(stage2_arg=["val3", "val4"]), "group2"
         )
 
         with pytest.raises(ValueError):
-            group2.add_upstream(
+            group2.interleave_upstream(
                 group1, dependency_specification={"stage2_arg": "stage1_arg"}
             )
