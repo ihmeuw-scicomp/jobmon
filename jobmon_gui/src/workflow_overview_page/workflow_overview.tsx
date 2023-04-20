@@ -13,8 +13,7 @@ import axios from 'axios';
 import JobmonWFTable from './wf_table.tsx';
 import '../jobmon_gui.css';
 import { init_apm, safe_rum_add_label, safe_rum_transaction, safe_rum_start_span, safe_rum_unit_end } from '../functions';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCircle } from '@fortawesome/free-solid-svg-icons';
+import { FaCircle } from "react-icons/fa";
 
 function App() {
   const apm: any = init_apm("workflow_overview_page");
@@ -81,11 +80,11 @@ function App() {
     };
     let workflow_status_url = process.env.REACT_APP_BASE_URL + "/workflow_overview_viz";
     const workflow_status_renders = {
-      "PENDING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-pp" /> </label><label className="label-left font-weight-300">PENDING  </label></div >),
-      "SCHEDULED": (<div><label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-ss" /> </label><label className="label-left font-weight-300">SCHEDULED  </label></div>),
-      "RUNNING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-rr" /> </label><label className="label-left font-weight-300">RUNNING  </label></div >),
-      "FAILED": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-ff" /> </label><label className="label-left font-weight-300">FAILED  </label></div >),
-      "DONE": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-dd" /> </label><label className="label-left font-weight-300">DONE  </label></div >)
+      "PENDING": (<div>< label className="label-middle" > <FaCircle className="bar-pp" /> </label><label className="label-left font-weight-300">PENDING  </label></div >),
+      "SCHEDULED": (<div><label className="label-middle"><FaCircle className="bar-ss" /> </label><label className="label-left font-weight-300">SCHEDULED  </label></div>),
+      "RUNNING": (<div>< label className="label-middle" > <FaCircle className="bar-rr" /> </label><label className="label-left font-weight-300">RUNNING  </label></div >),
+      "FAILED": (<div>< label className="label-middle" > <FaCircle className="bar-ff" /> </label><label className="label-left font-weight-300">FAILED  </label></div >),
+      "DONE": (<div>< label className="label-middle" > <FaCircle className="bar-dd" /> </label><label className="label-left font-weight-300">DONE  </label></div >)
     }
     const fetchData = async () => {
       const result: any = await axios(
@@ -97,7 +96,7 @@ function App() {
         if (workflow.wf_status in workflow_status_renders) {
           workflow.wf_status = workflow_status_renders[workflow.wf_status]
         } else {
-          workflow.wf_status = (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-pp" /> </label><label className="label-left font-weight-300">{workflow.wf_status} </label></div >)
+          workflow.wf_status = (<div>< label className="label-middle" > <FaCircle className="bar-pp" /> </label><label className="label-left font-weight-300">{workflow.wf_status} </label></div >)
         }
       })
       setWorkflows(wfs);

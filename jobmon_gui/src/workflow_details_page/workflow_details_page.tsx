@@ -8,8 +8,7 @@ import Dropdown from 'react-bootstrap/Dropdown';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCircle, faLightbulb } from '@fortawesome/free-solid-svg-icons';
+import { FaLightbulb } from "react-icons/fa";
 
 
 // @ts-ignore
@@ -39,7 +38,7 @@ function getWorkflowAttributes(wf_id: string, setWFTool, setWFName, setWFArgs, s
         setWFName(data["wf_name"]);
         setWFArgs(data["wf_args"]);
         setWFStatus(data["wf_status"]);
-        setWFStatusDesc("Workflow Status: " + data["wf_status"] + " -- " + data["wf_status_desc"])
+        setWFStatusDesc(data["wf_status"] + " -- " + data["wf_status_desc"])
         setWFSubmitted(convertDatePST(data["wf_created_date"]));
         setWFStatusDate(convertDatePST(data["wf_status_date"]));
     };
@@ -102,7 +101,7 @@ function WorkflowDetails({ subpage }) {
     //***********************hooks******************************
     useEffect(() => {
         if (typeof params.workflowId !== 'undefined') {
-            getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatusDesc)();
+            getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc)();
         }
     }, [params.workflowId]);
     useEffect(() => {
@@ -120,6 +119,7 @@ function WorkflowDetails({ subpage }) {
                     //only query server when wf is unfinised
                     getAsyncWFdetail(setWFDict, params.workflowId)();
                     getAsyncTTdetail(setTTDict, params.workflowId, setTTLoaded)();
+                    getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc)();
                 }
             }
         }, 60000);
@@ -198,19 +198,14 @@ function WorkflowDetails({ subpage }) {
                       wf_id={workflowId}
                       wf_status={wf_status}
                       wf_status_desc={wf_status_desc}
+                      wf_tool={wf_tool}
+                      wf_name={wf_name}
+                      wf_args={wf_args}
+                      wf_submitted_date={wf_submitted_date}
+                      wf_status_date={wf_status_date}
                  />
-                <div>
-                    <DropdownButton variant="dark" menuVariant="dark" title="Details" className="mt-2">
-                        <Dropdown.Item variant="dark">
-                            <p><b>Workflow Tool:</b> {wf_tool}</p>
-                            <p><b>Workflow Name:</b> {wf_name}</p>
-                            <p><b>Workflow Args:</b> {wf_args}</p>
-                            <p><b>Workflow Submitted Date:</b> {wf_submitted_date}</p>
-                            <p><b>Workflow Status Date:</b> {wf_status_date}</p>
-                        </Dropdown.Item>
-                    </DropdownButton>
-                </div>
             </div>
+
             <div id="wf_progress" className="div-level-2">
                 <JobmonProgressBar
                     tasks={wfDict.tasks}
@@ -240,7 +235,7 @@ function WorkflowDetails({ subpage }) {
                                 </Popover>
                             )}
                         >
-                            <span><FontAwesomeIcon icon={faLightbulb} /></span>
+                            <span><FaLightbulb/></span>
                         </OverlayTrigger>
                     </p>
                     {tt_id === "" &&

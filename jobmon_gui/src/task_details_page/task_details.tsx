@@ -5,8 +5,7 @@ import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import TaskInstanceTable from './task_instance_table';
 import NodeLists from './node_list';
 import TaskFSM from './task_fsm';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLightbulb } from '@fortawesome/free-solid-svg-icons';
+import { FaLightbulb } from "react-icons/fa";
 import { OverlayTrigger, Popover } from 'react-bootstrap';
 
 function getTaskDetails(setTaskStatus, setWorkflowId, taskId) {
@@ -101,7 +100,7 @@ function TaskDetails() {
                                 </Popover>
                             )}
                         >
-                            <span><FontAwesomeIcon icon={faLightbulb} /></span>
+                            <span><FaLightbulb /></span>
                         </OverlayTrigger>
                     </p>
                 </header>

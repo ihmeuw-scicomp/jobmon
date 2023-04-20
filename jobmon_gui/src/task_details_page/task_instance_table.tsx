@@ -4,15 +4,14 @@ import BootstrapTable, { ColumnDescription }  from "react-bootstrap-table-next";
 import paginationFactory from "react-bootstrap-table2-paginator";
 import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faLightbulb } from '@fortawesome/free-solid-svg-icons';
+import { FaCaretDown, FaCaretUp, FaLightbulb } from "react-icons/fa";
 import CustomModal from '../Modal';
 import { sanitize } from 'dompurify';
 
 const customCaret = (order, column) => {
-    if (!order) return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretUp} /></span>);
-    else if (order === 'asc') return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretUp} /></span>);
-    else if (order === 'desc') return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretDown} /></span>);
+    if (!order) return (<span><FaCaretUp style={{ marginLeft: "5px" }} /></span>);
+    else if (order === 'asc') return (<span><FaCaretUp style={{ marginLeft: "5px" }} /></span>);
+    else if (order === 'desc') return (<span><FaCaretDown style={{ marginLeft: "5px" }} /></span>);
     return null;
 }
 
@@ -161,7 +160,7 @@ export default function TaskInstanceTable({ taskInstanceData }) {
                                 </Popover>
                             )}
                         >
-                            <span><FontAwesomeIcon icon={faLightbulb} /></span>
+                            <span><FaLightbulb /></span>
                         </OverlayTrigger>
                     </p>
                 </header>
