@@ -15,8 +15,9 @@ def get_label_map(
 
     for task in tasks:
         for label in labels:
-            val = task.labels[label]
-            label_map[label][val].add(task)
+            if label in task.labels:
+                val = task.labels[label]
+                label_map[label][val].add(task)
 
     return dict(label_map)
 
@@ -41,10 +42,11 @@ def subset_by_label(
         if not isinstance(values, Iterable):
             iter_values = [values]
 
-        # Iterate over all values and increment the number of matches for matching tasks
-        for val in iter_values:
-            for match in label_map[label][val]:
-                num_matches[match] += 1
+        if label in label_map:
+            # Iterate over all values and increment the number of matches for matching tasks
+            for val in iter_values:
+                for match in label_map[label][val]:
+                    num_matches[match] += 1
 
     # Create a set of all tasks that have a number of matches equal to the number of labels in
     # the subsetter
@@ -162,8 +164,9 @@ class TaskGroup:
         for task in tasks:
             matches = upstream_tasks.copy()
             for key, upstream_key in dependency_specification.items():
-                label_value = task.labels[key]
-                matches.intersection(upstream_label_map[upstream_key][label_value])
+                if key in task.labels:
+                    label_value = task.labels[key]
+                    matches.intersection(upstream_label_map[upstream_key][label_value])
             task.add_upstreams(list(matches))
 
     def interleave_downstream(
