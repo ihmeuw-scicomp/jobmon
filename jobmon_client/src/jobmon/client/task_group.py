@@ -166,7 +166,7 @@ class TaskGroup:
             for key, upstream_key in dependency_specification.items():
                 if key in task.labels:
                     label_value = task.labels[key]
-                    matches.intersection(upstream_label_map[upstream_key][label_value])
+                    matches.intersection_update(upstream_label_map[upstream_key][label_value])
             task.add_upstreams(list(matches))
 
     def interleave_downstream(
