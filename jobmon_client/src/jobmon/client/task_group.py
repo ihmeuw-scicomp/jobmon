@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
+import warnings
 
 from typing import Dict, Iterable, Iterator, List, Optional, Set, Union
 from jobmon.client.task import Task
@@ -161,13 +162,39 @@ class TaskGroup:
             upstream_tasks, list(dependency_specification.values())
         )
 
+        matched_upstreams = set()
+        matched_downstreams = set()
         for task in tasks:
             matches = upstream_tasks.copy()
             for key, upstream_key in dependency_specification.items():
-                if key in task.labels:
+                if key in task.labels and upstream_key in upstream_label_map:
                     label_value = task.labels[key]
-                    matches.intersection_update(upstream_label_map[upstream_key][label_value])
-            task.add_upstreams(list(matches))
+                    matches.intersection_update(
+                        upstream_label_map[upstream_key][label_value]
+                    )
+            if matches:
+                matched_upstreams.update(matches)
+                matched_downstreams.add(task)
+                task.add_upstreams(list(matches))
+
+        if not matched_downstreams:
+            raise ValueError("No dependencies were created. Check your key pairings.")
+
+        if matched_upstreams != upstream_tasks:
+            warnings.warn(
+                (
+                    "Some upstream tasks don't have associated downstream tasks: "
+                    f"{[task.name for task in upstream_tasks - matched_upstreams]}"
+                )
+            )
+
+        if matched_downstreams != tasks:
+            warnings.warn(
+                (
+                    "Some downstream tasks don't have associated upstream tasks: "
+                    f"{[task.name for task in tasks - matched_downstreams]}"
+                )
+            )
 
     def interleave_downstream(
         self,

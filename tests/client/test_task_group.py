@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import List
 import uuid
+import warnings
 
 from jobmon.client.task_group import TaskGroup
 from jobmon.client.tool import Tool
@@ -744,6 +745,20 @@ class TestDependencyIncomplete:
         )
 
         with pytest.raises(ValueError):
+            group2.interleave_upstream(
+                group1, dependency_specification={"stage2_arg": "stage1_arg"}
+            )
+
+    def test_no_warning(sefl, template1, template2):
+        """Double check that warning doesn't get raised if it shouldn't."""
+        group1 = TaskGroup(
+            template1.create_tasks(stage1_arg=["val1", "val2"]), "group1"
+        )
+        group2 = TaskGroup(
+            template2.create_tasks(stage2_arg=["val1", "val2"]), "group2"
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
             group2.interleave_upstream(
                 group1, dependency_specification={"stage2_arg": "stage1_arg"}
             )
