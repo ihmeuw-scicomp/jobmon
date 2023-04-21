@@ -6,12 +6,12 @@ from jobmon.client.task import Task
 
 
 def get_label_map(
-    tasks: Set[Task],
-    labels: List[str]
+    tasks: Set[Task], labels: List[str]
 ) -> Dict[str, Dict[Union[str, int], Set[Task]]]:
     """Build up a mapping of tasks by label."""
-    label_map: Dict[str, Dict[Union[str, int], Set[Task]]] \
-        = defaultdict(lambda: defaultdict(set))
+    label_map: Dict[str, Dict[Union[str, int], Set[Task]]] = defaultdict(
+        lambda: defaultdict(set)
+    )
 
     for task in tasks:
         for label in labels:
@@ -49,7 +49,8 @@ def subset_by_label(
     # Create a set of all tasks that have a number of matches equal to the number of labels in
     # the subsetter
     all_matches = set(
-        task for task, matches in num_matches.items()
+        task
+        for task, matches in num_matches.items()
         if matches == len(subsetter.keys())
     )
     return all_matches
@@ -93,10 +94,7 @@ class TaskGroup:
         return subset_by_label(label_map, kwargs)
 
     def get_subgroup(
-        self,
-        empty_okay: bool = False,
-        new_name: str = "",
-        **kwargs
+        self, empty_okay: bool = False, new_name: str = "", **kwargs
     ) -> TaskGroup:
         """probably the same implementation details as workflow.get_tasks_by_node_args
 
