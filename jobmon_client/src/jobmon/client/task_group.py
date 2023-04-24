@@ -40,8 +40,10 @@ def subset_by_label(
         # convert it to a list with a single element
         if isinstance(values, str):
             iter_values: List[Union[str, int]] = [values]
-        if not isinstance(values, Iterable):
+        elif not isinstance(values, Iterable):
             iter_values = [values]
+        else:
+            iter_values = list(values)
 
         if label in label_map:
             # Iterate over all values and increment the number of matches for matching tasks

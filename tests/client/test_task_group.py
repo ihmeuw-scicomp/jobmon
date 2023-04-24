@@ -218,6 +218,15 @@ class TestGetFunctions:
         group = TaskGroup(all_tasks, "group")
         assert set(all_tasks[:2]) == group.get_subgroup(group="in").tasks
 
+    def test_subgroup_multiple_values(self, template1):
+        """Get a subgroup with multiple values for a label."""
+        in_tasks = template1.create_tasks(arg1=[1, 2], arg2=[1, 2])
+        out_tasks = template1.create_tasks(arg1=[3], arg2=[1, 2])
+
+        group = TaskGroup(in_tasks + out_tasks)
+
+        assert set(in_tasks) == group.get_subgroup(arg1=[1, 2]).tasks
+
     def test_subgroup_args_and_attributes(self, template1, template2):
         """Get a subgroup with a mix of args and attributes specified."""
         tasks_1 = template1.create_tasks(
