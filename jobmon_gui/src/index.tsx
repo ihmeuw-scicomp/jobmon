@@ -1,15 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
-import App from './workflow_overview_page/workflow_overview';
-import reportWebVitals from './reportWebVitals';
+import App from './components/workflow_overview_page/workflow_overview';
 import {
   HashRouter,
   Routes,
   Route,
 } from "react-router-dom";
-import WorkflowDetails from './workflow_details_page/workflow_details_page'
-import TaskDetails from './task_details_page/task_details';
+import WorkflowDetails from './components/workflow_details_page/workflow_details_page'
+import TaskDetails from './components/task_details_page/task_details';
 
 const root = ReactDOM.createRoot(
     document.getElementById('root') as HTMLElement
@@ -37,7 +36,4 @@ root.render(
   </HashRouter>
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();
+export * from './components';
