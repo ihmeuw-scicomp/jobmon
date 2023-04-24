@@ -89,7 +89,8 @@ class TaskGroup:
         else:
             tasks = self.tasks
         for label_name, label_value in label_dict.items():
-            [task.add_attribute(label_name, label_value) for task in tasks]
+            for task in tasks:
+                task.add_attribute(label_name, label_value)
 
     def union(self, other: TaskGroup, new_name: str = "") -> TaskGroup:
         """Combine two task groups."""
