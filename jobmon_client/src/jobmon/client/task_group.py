@@ -119,7 +119,10 @@ class TaskGroup:
         """
         tasks = list(self.get_subset(**kwargs))
 
-        if len(tasks) != 1:
+        if len(tasks) == 0:
+            raise ValueError("No matching tasks in this TaskGroup.")
+
+        if len(tasks) > 1:
             raise ValueError("Provided labels do not uniquely identify a task.")
 
         return tasks[0]
