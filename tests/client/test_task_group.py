@@ -335,6 +335,24 @@ class TestGetFunctions:
         with pytest.raises(Exception):
             group.get_task(arg1=1)
 
+    def test_get_unused_label(self, template1):
+        """Assert we don't get any tasks if we ask for a label that isn't on any of them."""
+        group = TaskGroup(template1.create_tasks(arg1=[1, 2], arg2=[1, 2]), "group")
+        subgroup = group.get_subgroup(bad_arg="bad_val", empty_okay=True)
+        assert len(subgroup) == 0
+
+    def test_get_partially_used_label(self, template1, template2):
+        """Assert we don't get tasks that don't have the label."""
+        in_tasks = template1.create_tasks(arg1=[1, 2], arg2=[1, 2])
+        out_tasks = template2.create_tasks(arg1=[1, 2], arg2=[1, 2])
+
+        for task in in_tasks:
+            task.add_attribute("group", "in")
+
+        task_group = TaskGroup(in_tasks + out_tasks)
+
+        in_group = task_group.get_subgroup(arg1=[1,2], group="in")
+        assert in_group.tasks == set(in_tasks)
 
 class TestDependencyHomogeneous:
     """The tests here revolve around setting dependencies between two groups of homogenous
@@ -758,7 +776,7 @@ class TestDependencyIncomplete:
                 group1, dependency_specification={"stage2_arg": "stage1_arg"}
             )
 
-    def test_no_warning(sefl, template1, template2):
+    def test_no_warning(self, template1, template2):
         """Double check that warning doesn't get raised if it shouldn't."""
         group1 = TaskGroup(
             template1.create_tasks(stage1_arg=["val1", "val2"]), "group1"
@@ -771,3 +789,36 @@ class TestDependencyIncomplete:
             group2.interleave_upstream(
                 group1, dependency_specification={"stage2_arg": "stage1_arg"}
             )
+
+    def test_unused_label(self, template1, template2):
+        """Test that no upstreams get set for an unused label."""
+        group1 = TaskGroup(
+            template1.create_tasks(stage1_arg=["val1", "val2"]), "group1"
+        )
+        group2 = TaskGroup(
+            template2.create_tasks(stage2_arg=["val1", "val2"]), "group2"
+        )
+        with pytest.raises(ValueError):
+            group2.interleave_upstream(
+                group1, dependency_specification={"stage2_arg": "bad_arg"}
+            )
+
+    def test_partially_used_label(self, template1, template2):
+        """Test that upstreams don't include tasks without the label."""
+        task_1_1 = template1.create_task(stage1_arg="val1")
+        task_1_1.add_attribute("group", "in")
+        task_1_2 = template1.create_task(stage1_arg="val2")
+        group1 = TaskGroup([task_1_1, task_1_2])
+
+        task_2_1 = template2.create_task(stage2_arg="val3")
+        task_2_1.add_attribute("group", "in")
+        task_2_2 = template2.create_task(stage2_arg="val4")
+        group2 = TaskGroup([task_2_1, task_2_2])
+
+        group2.interleave_upstream(
+            group1, dependency_specification={"group":"group"}
+        )
+
+        assert task_2_1.upstream_tasks == {task_1_1}
+        assert task_2_2.upstream_tasks == set()
+

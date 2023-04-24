@@ -177,6 +177,8 @@ class TaskGroup:
                     matches.intersection_update(
                         upstream_label_map[upstream_key][label_value]
                     )
+                else:
+                    matches = set()
             if matches:
                 matched_upstreams.update(matches)
                 matched_downstreams.add(task)
