@@ -512,6 +512,55 @@ class TestDependencyHomogeneous:
                 == task2.upstream_tasks
             )
 
+    def test_upstream_subsetter(
+        self, template1_group: TaskGroup, template2_group: TaskGroup
+    ):
+        """Assert that we can set dependencies on only the upstream subset."""
+        template2_group.interleave_upstream(
+            template1_group, 
+            dependency_specification = {"stage2_arg1": "stage1_arg1"}, 
+            upstream_subsetter = {"stage1_arg2": "val3"},
+        )
+        arg1_vals = ["val1", "val2"]
+        for arg1_val in arg1_vals:
+            task1 = template1_group.get_task(stage1_arg1=arg1_val, stage1_arg2="val3")
+            for task2 in template2_group.get_subgroup(stage2_arg1=arg1_val):
+                assert task2.upstream_tasks == {task1}
+
+    def test_downstream_subsetter(
+        self, template1_group: TaskGroup, template2_group: TaskGroup
+    ):
+        """Assert that we can set dependencies on only the downstream subset."""
+        template2_group.interleave_upstream(
+            template1_group, 
+            dependency_specification = {"stage2_arg1": "stage1_arg1"}, 
+            subsetter = {"stage2_arg2": "val3"},
+        )
+        arg1_vals = ["val1", "val2"]
+        for arg1_val in arg1_vals:
+            task2 = template2_group.get_task(stage2_arg1=arg1_val, stage2_arg2="val3")
+            assert (
+                set(template1_group.get_subgroup(stage1_arg1=arg1_val))
+                == task2.upstream_tasks
+            )
+
+    def test_upstream_and_downstream_subsetter(
+        self, template1_group: TaskGroup, template2_group: TaskGroup
+    ):
+        """Assert that we can set dependencies on only a downstream and an upstream subset."""        
+        template2_group.interleave_upstream(
+            template1_group, 
+            dependency_specification = {"stage2_arg1": "stage1_arg1"}, 
+            subsetter = {"stage2_arg2": "val3"},
+            upstream_subsetter = {"stage1_arg2": "val4"},
+        )
+        arg1_vals = ["val1", "val2"]
+        for arg1_val in arg1_vals:
+            task1 = template1_group.get_task(stage1_arg1=arg1_val, stage1_arg2="val4")
+            task2 = template2_group.get_task(stage2_arg1=arg1_val, stage2_arg2="val3")
+            assert task2.upstream_tasks == {task1}
+        
+        
 
 class TestDependencyHeterogeneous:
     """These are test of setting dependency structures on groups containing multiple different
