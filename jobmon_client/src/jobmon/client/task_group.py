@@ -213,7 +213,7 @@ class TaskGroup:
         subsetter: Optional[Dict] = None,
         upstream_subsetter: Optional[Dict] = None,
     ):
-        pass
+        raise NotImplementedError
 
     def __iter__(self) -> Iterator[Task]:
         for task in self.tasks:
