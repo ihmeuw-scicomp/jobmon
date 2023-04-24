@@ -351,13 +351,10 @@ class TestGetFunctions:
 
         task_group = TaskGroup(in_tasks + out_tasks)
 
-        in_group = task_group.get_subgroup(arg1=[1,2], group="in")
+        in_group = task_group.get_subgroup(arg1=[1, 2], group="in")
         assert in_group.tasks == set(in_tasks)
 
-    @pytest.mark.parametrize(
-        "subsetter", 
-        [{"arg1": 1}, {"arg1": [1,2], "arg2": 1}]
-    )
+    @pytest.mark.parametrize("subsetter", [{"arg1": 1}, {"arg1": [1, 2], "arg2": 1}])
     def test_add_label(self, subsetter, template1):
         group = TaskGroup(template1.create_tasks(arg1=[1, 2], arg2=[1, 2]))
         group.add_labels({"new_label": "value"}, subsetter)
@@ -517,9 +514,9 @@ class TestDependencyHomogeneous:
     ):
         """Assert that we can set dependencies on only the upstream subset."""
         template2_group.interleave_upstream(
-            template1_group, 
-            dependency_specification = {"stage2_arg1": "stage1_arg1"}, 
-            upstream_subsetter = {"stage1_arg2": "val3"},
+            template1_group,
+            dependency_specification={"stage2_arg1": "stage1_arg1"},
+            upstream_subsetter={"stage1_arg2": "val3"},
         )
         arg1_vals = ["val1", "val2"]
         for arg1_val in arg1_vals:
@@ -532,9 +529,9 @@ class TestDependencyHomogeneous:
     ):
         """Assert that we can set dependencies on only the downstream subset."""
         template2_group.interleave_upstream(
-            template1_group, 
-            dependency_specification = {"stage2_arg1": "stage1_arg1"}, 
-            subsetter = {"stage2_arg2": "val3"},
+            template1_group,
+            dependency_specification={"stage2_arg1": "stage1_arg1"},
+            subsetter={"stage2_arg2": "val3"},
         )
         arg1_vals = ["val1", "val2"]
         for arg1_val in arg1_vals:
@@ -547,20 +544,19 @@ class TestDependencyHomogeneous:
     def test_upstream_and_downstream_subsetter(
         self, template1_group: TaskGroup, template2_group: TaskGroup
     ):
-        """Assert that we can set dependencies on only a downstream and an upstream subset."""        
+        """Assert that we can set dependencies on only a downstream and an upstream subset."""
         template2_group.interleave_upstream(
-            template1_group, 
-            dependency_specification = {"stage2_arg1": "stage1_arg1"}, 
-            subsetter = {"stage2_arg2": "val3"},
-            upstream_subsetter = {"stage1_arg2": "val4"},
+            template1_group,
+            dependency_specification={"stage2_arg1": "stage1_arg1"},
+            subsetter={"stage2_arg2": "val3"},
+            upstream_subsetter={"stage1_arg2": "val4"},
         )
         arg1_vals = ["val1", "val2"]
         for arg1_val in arg1_vals:
             task1 = template1_group.get_task(stage1_arg1=arg1_val, stage1_arg2="val4")
             task2 = template2_group.get_task(stage2_arg1=arg1_val, stage2_arg2="val3")
             assert task2.upstream_tasks == {task1}
-        
-        
+
 
 class TestDependencyHeterogeneous:
     """These are test of setting dependency structures on groups containing multiple different
@@ -892,10 +888,7 @@ class TestDependencyIncomplete:
         task_2_2 = template2.create_task(stage2_arg="val4")
         group2 = TaskGroup([task_2_1, task_2_2])
 
-        group2.interleave_upstream(
-            group1, dependency_specification={"group":"group"}
-        )
+        group2.interleave_upstream(group1, dependency_specification={"group": "group"})
 
         assert task_2_1.upstream_tasks == {task_1_1}
         assert task_2_2.upstream_tasks == set()
-
