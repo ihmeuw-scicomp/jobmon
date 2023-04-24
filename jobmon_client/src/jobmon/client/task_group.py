@@ -84,10 +84,12 @@ class TaskGroup:
     def add_labels(self, label_dict: Dict, subsetter: Optional[Dict] = None):
         if subsetter is not None:
             tasks = self.get_subset(**subsetter)
+            if not tasks:
+                raise ValueError("No matching tasks in this TaskGroup.")
         else:
             tasks = self.tasks
         for label_name, label_value in label_dict.items():
-            [task.add_label(label_name, label_value) for task in tasks]
+            [task.add_attribute(label_name, label_value) for task in tasks]
 
     def union(self, other: TaskGroup, new_name: str = "") -> TaskGroup:
         """Combine two task groups."""

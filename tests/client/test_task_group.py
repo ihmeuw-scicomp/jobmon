@@ -354,6 +354,34 @@ class TestGetFunctions:
         in_group = task_group.get_subgroup(arg1=[1,2], group="in")
         assert in_group.tasks == set(in_tasks)
 
+    @pytest.mark.parametrize(
+        "subsetter", 
+        [{"arg1": 1}, {"arg1": [1,2], "arg2": 1}]
+    )
+    def test_add_label(self, subsetter, template1):
+        group = TaskGroup(template1.create_tasks(arg1=[1, 2], arg2=[1, 2]))
+        group.add_labels({"new_label": "value"}, subsetter)
+
+        expected = group.get_subgroup(**subsetter).tasks
+        actual = group.get_subgroup(new_label="value").tasks
+
+        assert expected == actual
+
+    def test_add_label_all(self, template1):
+        """Adds the label to all tasks."""
+        group = TaskGroup(template1.create_tasks(arg1=[1, 2], arg2=[1, 2]))
+        group.add_labels({"new_label": "value"})
+
+        for task in group:
+            assert task.labels["new_label"] == "value"
+
+    def test_add_label_bad_subsetter(self, template1):
+        """Assert an error gets raised if the subsetter doesn't describe any tasks."""
+        group = TaskGroup(template1.create_tasks(arg1=[1, 2], arg2=[1, 2]))
+        with pytest.raises(Exception):
+            group.add_labels({"new_label": "value"}, {"bad": "terrible"})
+
+
 class TestDependencyHomogeneous:
     """The tests here revolve around setting dependencies between two groups of homogenous
     tasks, parallelized across two variables.
