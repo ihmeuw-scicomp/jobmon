@@ -41,6 +41,47 @@ ul {
     margin: 0 5%;
 }
 
+/* Style of icons of the workflow status indicator. */
+.icon-rr{
+  color: var(--color-running);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.icon-dd{
+  color: var(--color-done);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.icon-aa{
+  color: var(--color-aborted);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.icon-ff{
+  color: var(--color-fatal);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.icon-pp{
+  color: var(--color-pending);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.icon-ss{
+  color: var(--color-scheduled);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.header-popover {
+    max-width: 600px;
+}
+
 ::placeholder{
     color: #8E93A0;
 }

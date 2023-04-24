@@ -9,13 +9,12 @@ import 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit.min.c
 
 import { convertDate, convertDatePST } from '../functions'
 import '../jobmon_gui.css';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCircle } from '@fortawesome/free-solid-svg-icons';
+import { FaCaretDown, FaCaretUp, FaCircle } from "react-icons/fa";
 
 const customCaret = (order, column) => {
-    if (!order) return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretUp} /></span>);
-    else if (order === 'asc') return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretUp} /></span>);
-    else if (order === 'desc') return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretDown} /></span>);
+    if (!order) return (<span><FaCaretUp style={{ marginLeft: "5px" }} /></span>);
+    else if (order === 'asc') return (<span><FaCaretUp style={{ marginLeft: "5px" }} /></span>);
+    else if (order === 'desc') return (<span><FaCaretDown style={{ marginLeft: "5px" }} /></span>);
     return null;
 }
 
@@ -24,11 +23,11 @@ export default function TaskTable({ taskData, loading }) {
     const [helper, setHelper] = useState("");
 
     const workflow_status_renders = {
-        "PENDING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-pp" /> </label><label className="label-left">PENDING  </label></div >),
-        "SCHEDULED": (<div><label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-ss" /> </label><label className="label-left">SCHEDULED  </label></div>),
-        "RUNNING": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-rr" /> </label><label className="label-left">RUNNING  </label></div >),
-        "FATAL": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-ff" /> </label><label className="label-left">FATAL  </label></div >),
-        "DONE": (<div>< label className="label-middle" > <FontAwesomeIcon icon={faCircle} className="bar-dd" /> </label><label className="label-left">DONE  </label></div >)
+        "PENDING": (<div>< label className="label-middle" > <FaCircle className="bar-pp" /> </label><label className="label-left">PENDING  </label></div >),
+        "SCHEDULED": (<div><label className="label-middle"><FaCircle className="bar-ss" /> </label><label className="label-left">SCHEDULED  </label></div>),
+        "RUNNING": (<div>< label className="label-middle" > <FaCircle className="bar-rr" /> </label><label className="label-left">RUNNING  </label></div >),
+        "FATAL": (<div>< label className="label-middle" > <FaCircle className="bar-ff" /> </label><label className="label-left">FATAL  </label></div >),
+        "DONE": (<div>< label className="label-middle" > <FaCircle className="bar-dd" /> </label><label className="label-left">DONE  </label></div >)
     }
 
     const columns = [

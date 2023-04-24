@@ -7,10 +7,8 @@ import ReactFlow, {
     Node,
     Position
 } from 'reactflow';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
-import { faLightbulb } from '@fortawesome/free-solid-svg-icons';
 
 import 'reactflow/dist/style.css';
 

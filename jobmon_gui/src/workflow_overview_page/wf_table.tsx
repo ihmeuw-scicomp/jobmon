@@ -5,12 +5,11 @@ import paginationFactory from "react-bootstrap-table2-paginator";
 import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
 import ToolkitProvider, { CSVExport } from 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCircle, faSquare } from '@fortawesome/free-solid-svg-icons';
 import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import Spinner from 'react-bootstrap/Spinner';
 import { Link } from "react-router-dom";
-import { convertDate, convertDatePST } from '../functions'
+import { convertDate, convertDatePST } from '../functions';
+import { FaCaretDown, FaCaretUp, FaCircle } from "react-icons/fa";
 
 // @ts-ignore
 import JobmonProgressBar from '../progress_bar.tsx';
@@ -18,9 +17,9 @@ import JobmonProgressBar from '../progress_bar.tsx';
 const DEBUG = false
 
 const customCaret = (order, column) => {
-    if (!order) return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretUp} /></span>);
-    else if (order === 'asc') return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretUp} /></span>);
-    else if (order === 'desc') return (<span>&nbsp;&nbsp;<FontAwesomeIcon icon={faCaretDown} /></span>);
+    if (!order) return (<span><FaCaretUp style={{ marginLeft: "5px" }} /></span>);
+    else if (order === 'asc') return (<span><FaCaretUp style={{ marginLeft: "5px" }} /></span>);
+    else if (order === 'desc') return (<span><FaCaretDown style={{ marginLeft: "5px" }} /></span>);
     return null;
 }
 
@@ -311,22 +310,22 @@ export default function JobmonWFTable({ allData }) {
                                     trigger={["hover", "focus"]}
                                     overlay={(
                                         <Popover>
-                                            <FontAwesomeIcon icon={faCircle} className="bar-pp" />
+                                            <FaCircle className="bar-pp" />
                                                 <span className='font-weight-bold'>Pending:</span>
                                                 Tasks that are queued in Jobmon. <br />
-                                            <FontAwesomeIcon icon={faCircle} className="bar-ss" />
+                                            <FaCircle className="bar-ss" />
                                                 <span className='font-weight-bold'>Scheduled:</span>
                                                 Tasks that are submitted to the cluster and were queued by the cluster scheduler.<br />
-                                            <FontAwesomeIcon icon={faCircle} className="bar-rr" />
+                                            <FaCircle className="bar-rr" />
                                                 <span className='font-weight-bold'>Running:</span>
                                                 Tasks that are running on cluster nodes. <br />
-                                            <FontAwesomeIcon icon={faCircle} className="bar-ff" />
+                                            <FaCircle className="bar-ff" />
                                                 <span className='font-weight-bold'>Fatal:</span>
                                                 Tasks that did not finish because of an error. <br />
-                                            <FontAwesomeIcon icon={faCircle} className="bar-aa" />
+                                            <FaCircle className="bar-aa" />
                                                 <span className='font-weight-bold'>Aborted:</span>
                                                 Workflow encountered an error before a WorkflowRun was created. <br />
-                                            <FontAwesomeIcon icon={faCircle} className="bar-dd" />
+                                            <FaCircle className="bar-dd" />
                                                 <span className='font-weight-bold'>Done:</span>
                                                 Tasks that completed successfully.
                                         </Popover>
@@ -334,27 +333,27 @@ export default function JobmonWFTable({ allData }) {
                                     <div id="legend" className="legend">
                                         <form className='d-flex justify-content-around w-100 mx-auto py-3'>
                                             <div>
-                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-pp" /> </label>
+                                                <label className="label-middle"><FaCircle className="bar-pp" /> </label>
                                                 <label className="label-left">Pending  </label>
                                             </div>
                                             <div>
-                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-ss" /> </label>
+                                                <label className="label-middle"><FaCircle className="bar-ss" /> </label>
                                                 <label className="label-left">Scheduled  </label>
                                             </div>
                                             <div>
-                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-rr" /> </label>
+                                                <label className="label-middle"><FaCircle className="bar-rr" /> </label>
                                                 <label className="label-left">Running  </label>
                                             </div>
                                             <div>
-                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-ff" /> </label>
+                                                <label className="label-middle"><FaCircle className="bar-ff" /> </label>
                                                 <label className="label-left">Fatal  </label>
                                             </div>
                                             <div>
-                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-aa" /> </label>
+                                                <label className="label-middle"><FaCircle className="bar-aa" /> </label>
                                                 <label className="label-left">Aborted  </label>
                                             </div>
                                             <div>
-                                                <label className="label-middle"><FontAwesomeIcon icon={faCircle} className="bar-dd" /> </label>
+                                                <label className="label-middle"><FaCircle className="bar-dd" /> </label>
                                                 <label className="label-left" >Done  </label>
                                             </div>
                                         </form>
