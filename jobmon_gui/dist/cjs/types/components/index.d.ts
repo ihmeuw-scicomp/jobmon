@@ -1,1 +1,0 @@
-export { default as App } from "./workflow_overview_page";
