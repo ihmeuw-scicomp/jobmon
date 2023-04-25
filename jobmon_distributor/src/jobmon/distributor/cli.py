@@ -26,6 +26,7 @@ class DistributorCLI(CLI):
             cluster_name=args.cluster_name,
             workflow_run_id=args.workflow_run_id,
             )
+        distributor_service.register()
         distributor_service.run()
 
     def _add_distributor_parser(self) -> None:

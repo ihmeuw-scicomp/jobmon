@@ -496,13 +496,16 @@ class WorkflowRun:
                         seconds_until_timeout=seconds_until_timeout,
                         distributor_alive_callable=context.alive,
                     )
-                    total_elapsed_time, time_since_last_full_sync = self._swarm_loop_execution(
+                    elapsed_time, time_since_last_full_sync = self._swarm_loop_execution(
                         time_since_last_full_sync=time_since_last_full_sync,
+                        remote_distributor=remote_distributor
                     )
                     # if fail fast and any error
                     if self.fail_fast and self._task_status_map[TaskStatus.ERROR_FATAL]:
                         logger.info("Failing after first failure, as requested")
                         break
+
+                    total_elapsed_time += elapsed_time
                 # user interrupt
                 except KeyboardInterrupt:
                     logger.warning("Keyboard interrupt raised")
@@ -538,6 +541,7 @@ class WorkflowRun:
     def _swarm_loop_execution(
         self,
         time_since_last_full_sync: float,
+        remote_distributor: bool,
     ) -> Tuple[float, float]:
 
         # If the workflow run status was updated asynchronously, terminate
@@ -568,10 +572,10 @@ class WorkflowRun:
         # then synchronize state
         if time_since_last_full_sync > self.wedged_workflow_sync_interval:
             time_since_last_full_sync = 0.0
-            self.synchronize_state(full_sync=True)
+            self.synchronize_state(full_sync=True, remote_distributor=remote_distributor)
         else:
             time_since_last_full_sync += loop_elapsed
-            self.synchronize_state()
+            self.synchronize_state(remote_distributor=remote_distributor)
 
         elapsed_time = time.time() - loop_start
         return elapsed_time, time_since_last_full_sync
@@ -711,14 +715,16 @@ class WorkflowRun:
                 # stop processing commands if we are out of commands
                 keep_processing = False
 
-    def synchronize_state(self, full_sync: bool = False) -> None:
+    def synchronize_state(
+        self, full_sync: bool = False, remote_distributor: bool = False
+    ) -> None:
         self._set_status_for_triaging()
         self._log_heartbeat()
         self._task_status_updates(full_sync=full_sync)
         self._synchronize_max_concurrently_running()
         # If connected to a remote distributor,
         # we'll need to periodically check for liveliness and reassign the batches
-        if self.remote_distributor:
+        if remote_distributor:
             self._reassign_distributor_instances()
 
     def _reassign_distributor_instances(self):

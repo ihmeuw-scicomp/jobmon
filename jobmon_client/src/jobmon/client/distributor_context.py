@@ -14,7 +14,7 @@ from jobmon.core.exceptions import (
 
 
 class DistributorContext:
-    def __init__(self, cluster_name: str, workflow_run_id: int, timeout: int,
+    def __init__(self, cluster_name: str, timeout: int, workflow_run_id: Optional[int] = None,
                  logger: Optional[logging.Logger] = None) -> None:
         """Initialization of the DistributorContext."""
         self._cluster_name = cluster_name
@@ -44,9 +44,13 @@ class DistributorContext:
             "start",
             "--cluster_name",
             self._cluster_name,
-            "--workflow_run_id",
-            str(self._workflow_run_id),
         ]
+
+        if self._workflow_run_id is not None:
+            cmd.extend([
+                "--workflow_run_id",
+                str(self._workflow_run_id),
+            ])
         self.process = Popen(
             cmd,
             stderr=PIPE,
@@ -56,11 +60,11 @@ class DistributorContext:
 
         # check if stderr contains "ALIVE"
         assert self.process.stderr is not None  # keep mypy happy on optional type
-        stderr_val = self.process.stderr.read(5)
-        if stderr_val != "ALIVE":
+        stderr_val = self.process.stderr.read(50)
+        if stderr_val[:5] != "ALIVE":
             err = self._shutdown()
             raise DistributorStartupTimeout(
-                f"Distributor process did not start, stderr='{err}'"
+                f"Distributor process did not start, stderr='{stderr_val}'"
             )
         return self
 
@@ -97,8 +101,6 @@ class DistributorContext:
                 pass
             self.process.kill()
             self.process.wait()
-
-        distributor.expunge()
 
         return err
 

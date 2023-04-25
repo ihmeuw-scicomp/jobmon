@@ -7,7 +7,6 @@ import pandas as pd
 
 from jobmon.client.logging import JobmonLoggerConfig
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
-from jobmon.client.workflow import DistributorContext
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import (
     ExecludeTTVs,
@@ -635,11 +634,10 @@ def resume_workflow_from_id(
     # Create swarm
     swarm = SwarmWorkflowRun(
         workflow_run_id=new_wfr.workflow_run_id, status=new_wfr.status,
-        remote_distributor=remote_distributor
     )
     swarm.from_workflow_id(workflow_id)
 
-    swarm.run(distributor_alive_callable=distributor.alive)
+    swarm.run(remote_distributor=remote_distributor, cluster_name=cluster_name)
 
     # Check on the swarm status - raise an error if != "D"
     if swarm.status == WorkflowRunStatus.DONE:

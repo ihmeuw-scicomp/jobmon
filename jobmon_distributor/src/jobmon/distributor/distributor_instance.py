@@ -144,8 +144,11 @@ class DistributorInstance:
 
     def register(self) -> None:
         """Register this DistributorInstance with the database. Get an ID"""
+        if self._distributor_instance_id is not None:
+            return
         app_route = "/distributor_instance/register"
-        params = {"cluster_id": self._cluster_id}
+        params = {"cluster_id": self._cluster_id,
+                  'next_report_increment': self._next_report_increment}
         if self._workflow_run_id:
             params.update({'workflow_run_id': self._workflow_run_id})
         _, result = self.requester.send_request(
@@ -172,7 +175,7 @@ class DistributorInstance:
                 TaskInstanceStatus.TRIAGING,
                 TaskInstanceStatus.KILL_SELF,
             ])
-            while self._not_expunged():
+            while self.keep_running():
 
                 self.log_task_instance_report_by_date()
 
@@ -220,6 +223,9 @@ class DistributorInstance:
         finally:
             # stop distributor
             self._cluster_interface.stop()
+
+            # TODO: Expunge current instance
+            # self.expunge_current_instance()
 
             # signal via pipe that we are shutdown
             sys.stderr.write("SHUTDOWN")
@@ -433,7 +439,7 @@ class DistributorInstance:
         self._last_heartbeat_time = time.time()
 
     def log_heartbeat(self):
-        self.requester.send_request(f'/distributor_instance/{self._distributor_instance_id}/heartbeat',
+        self.requester.send_request(f'/distributor_instance/{self.distributor_instance_id}/heartbeat',
                                     {}, 'post')
 
     def refresh_status_from_db(self, status: str) -> None:
@@ -448,7 +454,7 @@ class DistributorInstance:
         }
         if self._workflow_run_id:
             message['workflow_run_id'] = self._workflow_run_id
-        app_route = f"/distributor_instance/{self._distributor_instance_id}/sync_status"
+        app_route = f"/distributor_instance/{self.distributor_instance_id}/sync_status"
         return_code, result = self.requester.send_request(
             app_route=app_route, message=message, request_type="post"
         )
@@ -567,8 +573,9 @@ class DistributorInstance:
             'put'
         )
 
-    def _not_expunged(self) -> bool:
-        pass
+    def keep_running(self) -> bool:
+        # Is there any todo here, or just for unit testing?
+        return True
 
     def _create_batches(
         self, queued_task_instances: Set[DistributorTaskInstance]

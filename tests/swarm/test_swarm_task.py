@@ -26,10 +26,6 @@ def test_swarmtask_resources_integration(tool, task_template, db_engine):
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # Move workflow and wfr through Instantiating -> Launched
-    wfr._update_status(WorkflowRunStatus.INSTANTIATED)
-    wfr._update_status(WorkflowRunStatus.LAUNCHED)
-
     # swarm calls
     swarm = SwarmWorkflowRun(
         workflow_run_id=wfr.workflow_run_id,

@@ -467,7 +467,13 @@ class Workflow(object):
         swarm.from_workflow(self)
 
         try:
-            swarm.run(distributor.alive, seconds_until_timeout)
+            cluster_name = list(self._clusters.keys())[0]
+            swarm.run(
+                remote_distributor=remote_distributor,
+                seconds_until_timeout=seconds_until_timeout,
+                cluster_name=cluster_name,
+                distributor_startup_timeout=distributor_startup_timeout,
+            )
         finally:
             # figure out doneness
             num_new_completed = (

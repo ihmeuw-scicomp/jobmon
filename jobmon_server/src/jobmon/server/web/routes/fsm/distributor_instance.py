@@ -25,7 +25,7 @@ logger = structlog.get_logger(__name__)
 def register_distributor_instance() -> Any:
     """Record a batch number to associate sets of task instances with an array submission."""
     data = cast(Dict, request.get_json())
-    cluster_id = data["cluster_ids"]
+    cluster_id = data["cluster_id"]
     workflow_run_id = data.get("workflow_run_id")
     next_report = data["next_report_increment"]
 
@@ -129,7 +129,7 @@ def task_instances_status_check(distributor_instance_id: int) -> Any:
         ]
         if workflow_run_id is not None:
             # In the case of singleton distributors, query for a given ID
-            where_clause.append(WorkflowRun)
+            where_clause.append(WorkflowRun.id == workflow_run_id)
         else:
             # Filter out task instances belonging to inactive workflowruns.
             # Distributor service will decide what to do with newly inactive task instances
@@ -216,7 +216,6 @@ def _get_active_distributor_instance_id(
             )
         )
     )
-
 
     with session.begin():
         distributor_instance_ids = session.execute(select_stmt).scalars().all()

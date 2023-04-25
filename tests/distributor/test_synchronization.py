@@ -1,4 +1,5 @@
 from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
+from jobmon.distributor.distributor_instance import DistributorInstance
 from jobmon.server.web.models.api import (
     Batch as ServerBatch,
     TaskInstance,
@@ -131,3 +132,13 @@ def test_expiring_workflow_runs(requester_in_memory, requester_no_retry,
     assert len(distributor._batches) == 1
     assert len(distributor._task_instances) == 1
     assert len(distributor._task_instance_status_map[TaskInstanceStatus.QUEUED]) == 1
+
+
+def test_local_workflow_run(requester_in_memory, distributor_crud, initialize_distributor):
+    database_ids = distributor_crud()
+    distributor = initialize_distributor(database_ids['distributor_ids'][0],
+                                         workflow_run_id=database_ids['workflow_run_ids'][0])
+
+    # Only wfr1 task instances should be picked up
+    assert len(distributor._task_instances) == 2
+    assert set(distributor._task_instances.keys()) == set(database_ids['task_instance_ids'][:2])
