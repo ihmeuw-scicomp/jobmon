@@ -500,6 +500,11 @@ def get_task_details(task_id: int) -> Any:
             TaskInstance.stderr_log,
             TaskInstance.distributor_id,
             TaskInstance.nodename,
+            TaskInstanceErrorLog.description,
+        ).outerjoin_from(
+            TaskInstance,
+            TaskInstanceErrorLog,
+            TaskInstance.id == TaskInstanceErrorLog.task_instance_id,
         ).where(
             TaskInstance.task_id == task_id,
             TaskInstance.status == TaskInstanceStatus.id,
@@ -515,6 +520,7 @@ def get_task_details(task_id: int) -> Any:
         "ti_stderr_log",
         "ti_distributor_id",
         "ti_nodename",
+        "ti_error_log_description"
     )
     result = [dict(zip(column_names, row)) for row in rows]
     resp = jsonify(taskinstances=result)

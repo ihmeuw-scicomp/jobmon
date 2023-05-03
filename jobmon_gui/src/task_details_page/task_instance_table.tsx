@@ -19,10 +19,11 @@ export default function TaskInstanceTable({ taskInstanceData }) {
     const [showStdoutModal, setShowStdoutModal] = useState(false)
     const [showStderrModal, setShowStderrModal] = useState(false)
 
+    // ti_stderr_log is pulled from task_instance.stderr_log, ti_error_log_description is pulled from task_instance_error_log.description
     const [rowDetail, setRowDetail] = useState({
         'ti_id': '', 'ti_status': '', 'ti_stdout': '',
         'ti_stderr': '', 'ti_stdout_log': '', 'ti_stderr_log': '',
-        'ti_distributor_id': '', 'ti_nodename': '',
+        'ti_distributor_id': '', 'ti_nodename': '', 'ti_error_log_description': '',
     });
 
     const htmlFormatter = cell => {
@@ -59,7 +60,8 @@ export default function TaskInstanceTable({ taskInstanceData }) {
                 "ti_distributor_id": e.ti_distributor_id,
                 "ti_nodename": e.ti_nodename,
                 "ti_stdout_log": e.ti_stdout_log,
-                "ti_stderr_log": e.ti_stderr_log
+                "ti_stderr_log": e.ti_stderr_log,
+                "ti_error_log_description": e.ti_error_log_description
             })
 
         }
@@ -210,7 +212,9 @@ export default function TaskInstanceTable({ taskInstanceData }) {
                         {rowDetail.ti_stderr}<br></br>
                         <br></br>
                         <b>Standard Error Log:</b> <br></br>
-                        {rowDetail.ti_stderr_log}
+                        {rowDetail.ti_stderr_log}<br></br>
+                        <br></br>
+                        {rowDetail.ti_error_log_description}
                     </p>
                 }
                 showModal={showStderrModal}
