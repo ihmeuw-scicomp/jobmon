@@ -246,19 +246,17 @@ def get_task_dependencies(task_id: int) -> Any:
         up_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.UP)
         down_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.DOWN)
         up_task_dict = _get_tasks_from_nodes(workflow_id, list(up_nodes), [], session)
-        down_task_dict = _get_tasks_from_nodes(
-            workflow_id, list(down_nodes), [], session
-        )
+        down_task_dict = _get_tasks_from_nodes(workflow_id, list(down_nodes), [], session)
     # return a "standard" json format so that it can be reused by future GUI
     up = (
         []
         if up_task_dict is None or len(up_task_dict) == 0
-        else [[{"id": k, "status": up_task_dict[k]}] for k in up_task_dict]
+        else [[{"id": k, "status": up_task_dict[k][0], "name": up_task_dict[k][1]}] for k in up_task_dict]
     )
     down = (
         []
         if down_task_dict is None or len(down_task_dict) == 0
-        else [[{"id": k, "status": down_task_dict[k]}] for k in down_task_dict]
+        else [[{"id": k, "status": down_task_dict[k][0], "name": down_task_dict[k][1]}] for k in down_task_dict]
     )
     resp = jsonify({"up": up, "down": down})
     resp.status_code = 200
@@ -447,7 +445,7 @@ def _get_tasks_from_nodes(
     if not nodes:
         return {}
 
-    select_stmt = select(Task.id, Task.status).where(
+    select_stmt = select(Task.id, Task.status, Task.name).where(
         Task.workflow_id == workflow_id, Task.node_id.in_(list(nodes))
     )
 
@@ -456,10 +454,10 @@ def _get_tasks_from_nodes(
     for r in result:
         # When task_status not specified, return the full subdag
         if not task_status:
-            task_dict[r[0]] = r[1]
+            task_dict[r[0]] = [r[1], r[2]]
         else:
             if r[1] in task_status:
-                task_dict[r[0]] = r[1]
+                task_dict[r[0]] = [r[1], r[2]]
     return task_dict
 
 
@@ -532,6 +530,9 @@ def get_task_details_viz(task_id: int) -> Any:
         query = select(
             Task.status,
             Task.workflow_id,
+            Task.name,
+            Task.command,
+            Task.status_date,
         ).where(
             Task.id == task_id,
         )
@@ -540,6 +541,9 @@ def get_task_details_viz(task_id: int) -> Any:
     column_names = (
         "task_status",
         "workflow_id",
+        "task_name",
+        "task_command",
+        "task_status_date",
     )
     result = [dict(zip(column_names, row)) for row in rows]
     resp = jsonify(task_details=result)
