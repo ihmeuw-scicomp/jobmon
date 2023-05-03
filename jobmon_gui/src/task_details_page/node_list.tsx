@@ -18,7 +18,7 @@ export default function NodeLists({ upstreamTasks, downstreamTasks }) {
                                 <ListGroup.Item className="dependency-list-group-item">
                                     <Link
                                         to={{ pathname: `/task_details/${d["id"]}` }}
-                                        key={d["id"]}>{d["id"]}
+                                        key={d["id"]}>{d["name"]}
                                     </Link>
                                 </ListGroup.Item>
                             ))
@@ -33,7 +33,7 @@ export default function NodeLists({ upstreamTasks, downstreamTasks }) {
                                 <ListGroup.Item className="dependency-list-group-item">
                                     <Link
                                         to={{ pathname: `/task_details/${d["id"]}` }}
-                                        key={d["id"]}>{d["id"]}
+                                        key={d["id"]}>{d["name"]}
                                     </Link>
                                 </ListGroup.Item>
                             ))

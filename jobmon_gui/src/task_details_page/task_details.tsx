@@ -7,8 +7,9 @@ import NodeLists from './node_list';
 import TaskFSM from './task_fsm';
 import { FaLightbulb } from "react-icons/fa";
 import { OverlayTrigger, Popover } from 'react-bootstrap';
+import { convertDatePST } from '../functions'
 
-function getTaskDetails(setTaskStatus, setWorkflowId, taskId) {
+function getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId) {
     // Returns task status and workflow ID
     const url = process.env.REACT_APP_BASE_URL + "/task/get_task_details_viz/" + taskId;
     const fetchData = async () => {
@@ -16,6 +17,9 @@ function getTaskDetails(setTaskStatus, setWorkflowId, taskId) {
         const data = result.data.task_details[0]
         setTaskStatus(data.task_status)
         setWorkflowId(data.workflow_id)
+        setTaskName(data.task_name)
+        setTaskCommand(data.task_command)
+        setTaskStatusDate(convertDatePST(data.task_status_date))
         
     };
     return fetchData
@@ -50,21 +54,24 @@ function TaskDetails() {
     const [upstream_tasks, setUpstreamTasks] = useState([])
     const [downtream_tasks, setDownstreamTasks] = useState([])
     const [task_status, setTaskStatus] = useState("")
-    const [workflow_id, setWorkflowId] = useState([])
+    const [workflow_id, setWorkflowId] = useState("")
+    const [task_name, setTaskName] = useState("")
+    const [task_command, setTaskCommand] = useState("")
+    const [task_status_date, setTaskStatusDate] = useState("")
 
 
     //***********************hooks******************************
     useEffect(() => {
         getTIDetails(setTIDetails, taskId)();
         getTaskDependencies(setUpstreamTasks, setDownstreamTasks, taskId)();
-        getTaskDetails(setTaskStatus, setWorkflowId, taskId)();
+        getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId)();
     }, [taskId]);
 
     // Update task status and table every 60 seconds if task is not in terminal state
         useEffect(() => {
         const interval = setInterval(() => {
             if (task_status !== "D" && task_status !== "F" ) {
-                getTaskDetails(setTaskStatus, setWorkflowId, taskId)();
+                getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId)();
                 getTIDetails(setTIDetails, taskId)();
             }
         }, 60000);
@@ -80,7 +87,22 @@ function TaskDetails() {
             </Breadcrumb>
             <div>
                 <header className="div-level-2 header-1 ">
-                    <p className='color-dark'>Task ID: {taskId}</p>
+                    <p className='color-dark'>
+                        Task Name: {task_name}&nbsp;
+                        <OverlayTrigger
+                            placement="right"
+                            trigger={["hover", "focus"]}
+                            overlay={(
+                                <Popover id="task_count">
+                                    <p><b>Task ID:</b> {taskId}</p>
+                                    <p><b>Task Command:</b> {task_command}</p>
+                                    <p><b>Task Status Date:</b> {task_status_date} </p>
+                                </Popover>
+                            )}
+                        >
+                            <span><FaLightbulb /></span>
+                        </OverlayTrigger>
+                    </p>
                     <p className="color-dark">
                         Task Finite State Machine&nbsp;
                         <OverlayTrigger
