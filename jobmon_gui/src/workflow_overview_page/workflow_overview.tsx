@@ -134,43 +134,43 @@ function App() {
               <Form.Label><span className='m-2'> Username</span></Form.Label>
               <Form.Control type="text" placeholder="Username" defaultValue={user} {...register("user_input")} />
             </Form.Group>
+
             <Form.Group as={Col} controlId="formGridEmail">
               <Form.Label><span className='m-2'> Workflow Args</span></Form.Label>
               <Form.Control type="text" placeholder="Workflow Args" defaultValue={wf_args} {...register("wf_args_input")} />
             </Form.Group>
-          </Row>
-          <Row className='mb-3'>
 
             <Form.Group as={Col} controlId="formGridPassword">
               <Form.Label><span className='m-2'> Tool</span></Form.Label>
               <Form.Control type="text" placeholder="Tool" defaultValue={tool} {...register("tool_input")} />
             </Form.Group>
+          </Row>
+
+          <Row className="mb-3">
             <Form.Group as={Col} controlId="formGridPassword">
               <Form.Label><span className='m-2'> Date Workflow Was Submitted - On or After Date</span></Form.Label>
               <Form.Control type="date" defaultValue={date_submitted} {...register("date_submitted_input")} />
             </Form.Group>
-          </Row>
 
-          <Row className="mb-3">
             <Form.Group as={Col} controlId="formGridPassword">
               <Form.Label><span className='m-2'> Workflow Name</span></Form.Label>
               <Form.Control type="text" placeholder="Workflow Name" defaultValue={wf_name} {...register("wf_name_input")} />
             </Form.Group>
 
-			<Form.Group as={Col} controlId="status">
-			  <Form.Label>Workflow Status</Form.Label>
-			  <Form.Control as="select" defaultValue={undefined} {...register("status")} >
-				<option>{undefined}</option>
-				<option value="A">Aborted</option>
-				<option value="D">Done</option>
-				<option value="F">Failed</option>
-				<option value="G">Registering</option>
-				<option value="H">Halted</option>
-				<option value="I">Instantiating</option>
-				<option value="O">Launched</option>
-				<option value="Q">Queued</option>
-				<option value="R">Running</option>
-			  </Form.Control>
+            <Form.Group as={Col} controlId="status">
+              <Form.Label>Workflow Status</Form.Label>
+              <Form.Control as="select" defaultValue={undefined} {...register("status")} >
+                <option>{undefined}</option>
+                <option value="A">Aborted</option>
+                <option value="D">Done</option>
+                <option value="F">Failed</option>
+                <option value="G">Registering</option>
+                <option value="H">Halted</option>
+                <option value="I">Instantiating</option>
+                <option value="O">Launched</option>
+                <option value="Q">Queued</option>
+                <option value="R">Running</option>
+              </Form.Control>
             </Form.Group>
           </Row>
 
