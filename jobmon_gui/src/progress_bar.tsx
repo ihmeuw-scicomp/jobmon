@@ -9,6 +9,10 @@ export default function JobmonProgressBar({tasks, pending, scheduled, running, d
     num_attempts_avg = parseFloat(num_attempts_avg).toFixed(1);
     // style can be striped or animated; others will be treated as default
     // FIXME: reduce code duplication through better use of variables with flow control
+    const INT_32_MAX = 2147483647
+    if (maxc === INT_32_MAX) {
+        maxc = "No Limit"
+    }
     if (style === "striped") {
         return (
             <OverlayTrigger
