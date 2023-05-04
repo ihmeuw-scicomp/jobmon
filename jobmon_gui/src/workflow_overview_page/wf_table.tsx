@@ -89,7 +89,6 @@ export default function JobmonWFTable({ allData }) {
             text: "Workflow ID",
             sort: true,
             sortCaret: customCaret,
-
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The ID column in WORKFLOW table. Unique identifier.");
@@ -144,6 +143,7 @@ export default function JobmonWFTable({ allData }) {
             text: "Workflow Args",
             sort: true,
             sortCaret: customCaret,
+            headerStyle: { width: "15%" },
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The WORKFLOW_ARGS column in WORKFLOW table. The value of workflow_args used to create the workflow.");
@@ -193,7 +193,6 @@ export default function JobmonWFTable({ allData }) {
             text: "Workflow Status",
             sort: true,
             sortCaret: customCaret,
-
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The STATUS column in WORKFLOW table. The current status of the workflow.");
@@ -208,7 +207,6 @@ export default function JobmonWFTable({ allData }) {
             text: "Number of WorkflowRuns",
             sort: true,
             sortCaret: customCaret,
-
             headerEvents: {
                     onMouseEnter: (e, column, columnIndex) => {
                         setHelper("The number of runs of the workflow.");

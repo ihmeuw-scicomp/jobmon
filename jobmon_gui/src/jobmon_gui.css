@@ -505,8 +505,8 @@ h-1rem{
 
 .table td {
     vertical-align: middle;
-    padding-top: 40px;
-    padding-bottom: 40px;
+    padding-top: 10px;
+    padding-bottom: 10px;
 
     color: #303030;
     font-weight: 300;
