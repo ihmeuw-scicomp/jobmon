@@ -465,6 +465,7 @@ class Workflow(object):
             status=wfr.status,
         )
         swarm.from_workflow(self)
+        self._num_previously_completed = swarm.num_previously_complete
 
         try:
             cluster_name = list(self._clusters.keys())[0]
@@ -491,6 +492,7 @@ class Workflow(object):
             # update workflow tasks with final status
             for task in self.tasks.values():
                 task.final_status = swarm.tasks[task.task_id].status
+            self._num_newly_completed = num_new_completed
 
         self.last_workflow_run_id = wfr.workflow_run_id
 

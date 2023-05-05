@@ -171,11 +171,14 @@ def task_instances_status_check(distributor_instance_id: int) -> Any:
     return resp
 
 
+@blueprint.route("/distributor_instance/<cluster_id>/get_active_distributor_instance_id")
 @blueprint.route(
     "/distributor_instance/<cluster_id>/<workflow_run_id>/get_active_distributor_instance_id",
     methods=["GET"]
 )
-def get_active_distributor_instance_id(cluster_id: int, workflow_run_id: int) -> Any:
+def get_active_distributor_instance_id(
+    cluster_id: int, workflow_run_id: Optional[int] = None
+) -> Any:
 
     active_id = _get_active_distributor_instance_id(cluster_id, workflow_run_id)
     resp = jsonify(distributor_instance_id=active_id)
@@ -188,20 +191,21 @@ def _get_active_distributor_instance_id(
 ):
 
     # First try to select a workflowrun-specific distributor instance, if there is one
-    local_distributor_instance_query = select(
-        DistributorInstance.id
-    ).where(
-        DistributorInstance.workflow_run_id == workflow_run_id
-    )
     session = SessionLocal()
-    with session.begin():
-        distributor_instance_id = session.execute(
-            local_distributor_instance_query).scalar()
-        if distributor_instance_id is not None:
-            # Should be a unique distributor for this workflow run, so return early
-            return distributor_instance_id
+    if workflow_run_id:
+        local_distributor_instance_query = select(
+            DistributorInstance.id
+        ).where(
+            DistributorInstance.workflow_run_id == workflow_run_id
+        )
+        with session.begin():
+            distributor_instance_id = session.execute(
+                local_distributor_instance_query).scalar()
+            if distributor_instance_id is not None:
+                # Should be a unique distributor for this workflow run, so return early
+                return distributor_instance_id
 
-    # If no local distributor was found, search for an eligible distributor instance
+    # If no local distributor was found, search for any eligible distributor instance
     select_stmt = (
         select(
             DistributorInstance.id,
@@ -210,10 +214,6 @@ def _get_active_distributor_instance_id(
             DistributorInstance.expunged.is_(False),
             DistributorInstance.report_by_date >= func.now(),
             DistributorInstance.cluster_id == cluster_id,
-            (
-                (DistributorInstance.workflow_run_id == None) |
-                (DistributorInstance.workflow_run_id == workflow_run_id)
-            )
         )
     )
 

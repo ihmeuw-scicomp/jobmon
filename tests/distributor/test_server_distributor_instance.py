@@ -24,7 +24,7 @@ def test_distributor_registration(requester_in_memory, requester_no_retry, db_en
         instance = session.execute(
             select(DistributorInstance)
             .where(DistributorInstance.id == distributor_instance_id)
-        ).one()
+        ).scalar()
         assert instance.workflow_run_id is None
 
 
@@ -84,8 +84,7 @@ def test_distributor_instance_selection(requester_in_memory, requester_no_retry)
         request_type="put"
     )
 
-    # Looking for instances belonging to cluster 100 should
-    # always return one of instance 1 or 2
+    # Get an instance ID, check that it is eligible
     for _ in range(4):
         _, resp = requester_no_retry.send_request(
             "/distributor_instance/100/get_active_distributor_instance_id",
