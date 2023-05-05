@@ -74,7 +74,7 @@ def test_blocking_update_timeout(tool, task_template, remote_sequential_distribu
     assert expected_msg == str(error.value)
 
 
-def test_sync_statuses(client_env, tool, task_template, remote_sequential_distributor):
+def test_sync_statuses(client_env, tool, task_template, db_engine):
     """this test executes a single task workflow where the task fails. It
     is testing to confirm that the status updates are propagated into the
     swarm objects"""
@@ -102,8 +102,16 @@ def test_sync_statuses(client_env, tool, task_template, remote_sequential_distri
 
     # distribute the task
     swarm.set_initial_fringe()
-    swarm.process_commands()
-    time.sleep(2)
+    swarm._update_status(WorkflowRunStatus.RUNNING)
+
+    # Mock a task instance that is queued and moves to failed
+    with Session(bind=db_engine) as session:
+        session.execute(
+            update(Task)
+            .where(Task.id == task.task_id)
+            .values(status=TaskStatus.ERROR_FATAL)
+        )
+        session.commit()
 
     swarm.synchronize_state(full_sync=True, remote_distributor=True)
     assert len(swarm.failed_tasks) == 1
@@ -409,7 +417,7 @@ def test_callable_fails_bad_filepath(tool, task_template):
         swarm.set_initial_fringe()
 
 
-def test_swarm_fails(tool):
+def test_swarm_fails(client_env, tool):
     """Test the swarm exits on error appropriately."""
 
     workflow = tool.create_workflow(name="test_propagate_result")
@@ -426,15 +434,13 @@ def test_swarm_fails(tool):
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # run the distributor
-    with DistributorContext("sequential", wfr.workflow_run_id, 180) as distributor:
-        # swarm calls
-        swarm = SwarmWorkflowRun(
-            workflow_run_id=wfr.workflow_run_id,
-            requester=workflow.requester,
-        )
-        swarm.from_workflow(workflow)
-        swarm.run(distributor.alive)
+    # swarm calls
+    swarm = SwarmWorkflowRun(
+        workflow_run_id=wfr.workflow_run_id,
+        requester=workflow.requester,
+    )
+    swarm.from_workflow(workflow)
+    swarm.run(cluster_name='sequential', remote_distributor=False)
 
     assert swarm.status == WorkflowRunStatus.ERROR
     assert len(swarm.done_tasks) == 1

@@ -124,12 +124,9 @@ def initialize_distributor(requester_no_retry):
 
         distributor.refresh_status_from_db(status="Q")
 
-        # Should have appended a "make task instances" function to the distributor command chain
-        try:
-            command = next(distributor._distributor_commands)
-            command()
-        except StopIteration:
-            pass
+        # Should have appended a "make task instances" function to the command chain
+        # Process all work to ensure we have a set of task instances available in memory
+        distributor.process_work()
         return distributor
 
     return _initialize

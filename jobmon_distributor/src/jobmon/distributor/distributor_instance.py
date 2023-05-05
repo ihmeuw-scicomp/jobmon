@@ -176,7 +176,6 @@ class DistributorInstance:
                 TaskInstanceStatus.KILL_SELF,
             ])
             while self.keep_running():
-
                 self.log_task_instance_report_by_date()
 
                 # loop through all statuses and do as much work as we can till the heartbeat
@@ -198,14 +197,14 @@ class DistributorInstance:
                     time_till_next_heartbeat -= refresh_time - start_time
 
                     if status in self._command_generator_map.keys():
-                        # process any work
-                        self.process_status(status, time_till_next_heartbeat)
-                        # how long the full status took
-                        end_time = time.time()
-                        time_till_next_heartbeat -= end_time - refresh_time
+                        # for eligible statuses, check if there is work to be added to the
+                        # work queue.
+                        self.generate_work(status=status)
 
-                    else:
-                        end_time = refresh_time
+                    self.process_work(timeout=time_till_next_heartbeat)
+                    # how long the full status took
+                    end_time = time.time()
+                    time_till_next_heartbeat -= end_time - refresh_time
 
                     logger.info(
                         f"Status processing for status={status} took "
@@ -231,19 +230,22 @@ class DistributorInstance:
             sys.stderr.write("SHUTDOWN")
             sys.stderr.flush()
 
-    def process_status(self, status: str, timeout: Union[int, float] = -1) -> None:
-        """Processes commands until all work is done or timeout is reached.
-
-        Args:
-            status: which status to process work for.
-            timeout: time until we stop processing. -1 means process till no more work
-        """
-        start = time.time()
-
+    def generate_work(self, status: str) -> None:
+        """Given a status, add new work to be done to the work queue."""
         # generate new distributor commands from this status
         command_generator_callable = self._command_generator_map[status]
         command_generator = command_generator_callable()
-        self._distributor_commands = it.chain(command_generator)
+        self._distributor_commands = it.chain(
+            self._distributor_commands, command_generator
+        )
+
+    def process_work(self, timeout: Union[int, float] = 30) -> None:
+        """Processes commands until all work is done or timeout is reached.
+
+        Args:
+            timeout: time until we stop processing. -1 means process till no more work
+        """
+        start = time.time()
 
         # this way we always process at least 1 command
         keep_iterating = True
@@ -254,23 +256,12 @@ class DistributorInstance:
                 distributor_command = next(self._distributor_commands)
                 distributor_command(self.raise_on_error)
 
-                # if we need a status sync close the main generator. we will process remaining
-                # transactions, but nothing new from the generator
+                # if we need a status sync, stop iterating and yield control back to the
+                # main run loop. The next process_work call will resume from the next item
                 if not ((time.time() - start) < timeout or timeout == -1):
-                    command_generator.close()
-
+                    keep_iterating = False
             except StopIteration:
-                # stop processing commands if we are out of commands
                 keep_iterating = False
-
-        # update the state map
-        task_instances = self._task_instance_status_map.pop(status)
-        self._task_instance_status_map[status] = set()
-        for task_instance in task_instances:
-            if task_instance.status in self._task_instance_status_map:
-                self._task_instance_status_map[task_instance.status].add(task_instance)
-            else:
-                self._task_instances.pop(task_instance.task_instance_id)
 
     def launch_task_instance_batch(
         self, task_instance_batch: Batch
@@ -461,6 +452,8 @@ class DistributorInstance:
 
         # mutate the statuses and update the status map
         status_updates: List[tuple[int, str]] = result["status_updates"]
+        if len(status_updates) > 0:
+            sys.stdout.write(f"Found {len(status_updates)} tasks to be updated")
         new_task_instance_ids = []
         for task_instance_id, new_status in status_updates:
             # Discard is safe, no KeyError if task instance ID is not present
@@ -468,13 +461,15 @@ class DistributorInstance:
             try:
                 task_instance = self._task_instances[task_instance_id]
             except KeyError:
+                sys.stdout.write(f"New {task_instance_id=}")
                 new_task_instance_ids.append(task_instance_id)
             else:
-                # remove from old status set
-                previous_status = task_instance.status
-                self._task_instance_status_map[previous_status].remove(
-                    task_instance
-                )
+                # Loop through all possible registers and try a discard. This prevents problems
+                # from task instances that have a mismatch between the in-memory state and the
+                # register they belong to. Performance shouldn't be a problem since there are
+                # only a set amount of active states.
+                for status, registry in self._task_instance_status_map.items():
+                    registry.discard(task_instance)
 
                 # change to new status and move to new set
                 task_instance.status = new_status
@@ -487,10 +482,11 @@ class DistributorInstance:
                     # If the task instance is in a terminal state, e.g. D, E, etc.,
                     # expire it from the distributor
                     if task_instance_id in self._task_instances:
+                        sys.stdout.write(f"Removing {task_instance_id=} from map, map length = {len(self._task_instances)}")
                         self._task_instances.pop(task_instance_id)
 
         if any(new_task_instance_ids):
-
+            sys.stdout.write(f"Adding {len(new_task_instance_ids)} to memory")
             self._distributor_commands = it.chain(
                 # TODO: Put this at the front of the end of the queue?
                 # TODO: won't be evaluated until subsequent process_status call
@@ -523,7 +519,7 @@ class DistributorInstance:
 
     def _generate_add_task_instance_callables(
         self, new_task_instance_ids: list[int], status: str, chunk_size: int = 50
-    ) -> Generator:
+    ) -> Generator[DistributorCommand]:
         # Chain together, naive chunking
         for chunk_number in range(len(new_task_instance_ids) % chunk_size):
             start_idx = chunk_number * chunk_size
@@ -537,7 +533,7 @@ class DistributorInstance:
     def _add_task_instances(self, task_instance_ids: list[int], status: str):
         # Fetch metadata and create new task instances
 
-        task_instance_ids = list(set(task_instance_ids) - set(self._task_instances.keys()))
+        task_instance_ids = list(set(task_instance_ids) - self._task_instances.keys())
 
         if not task_instance_ids:
             return

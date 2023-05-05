@@ -60,11 +60,11 @@ class DistributorContext:
 
         # check if stderr contains "ALIVE"
         assert self.process.stderr is not None  # keep mypy happy on optional type
-        stderr_val = self.process.stderr.read(50)
-        if stderr_val[:5] != "ALIVE":
+        stderr_val = self.process.stderr.read(5)
+        if stderr_val != "ALIVE":
             err = self._shutdown()
             raise DistributorStartupTimeout(
-                f"Distributor process did not start, stderr='{stderr_val}'"
+                f"Distributor process did not start, stderr='{err} + {stderr_val}'"
             )
         return self
 

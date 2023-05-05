@@ -678,7 +678,6 @@ class WorkflowRun:
 
                     # set final array capacity
                     array_capacity_lookup[array_id] = array_capacity
-
                     yield SwarmCommand(self.queue_task_batch, current_batch)
 
                 # no room. keep track for next time method is called
@@ -696,7 +695,6 @@ class WorkflowRun:
             timeout: time until we stop processing. -1 means process till no more work
         """
         swarm_commands = self.get_swarm_commands()
-
         # this way we always process at least 1 command
         loop_start = time.time()
         keep_processing = True

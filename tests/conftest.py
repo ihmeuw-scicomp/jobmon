@@ -300,8 +300,9 @@ def remote_sequential_distributor(web_server_process):
     process = subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
     )
-    yield process
-
-    # Clean up the subprocess
-    process.terminate()
-    process.wait()
+    try:
+        yield process
+    finally:
+        # Clean up the subprocess
+        process.terminate()
+        process.wait()
