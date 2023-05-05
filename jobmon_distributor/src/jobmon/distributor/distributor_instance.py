@@ -452,8 +452,6 @@ class DistributorInstance:
 
         # mutate the statuses and update the status map
         status_updates: List[tuple[int, str]] = result["status_updates"]
-        if len(status_updates) > 0:
-            sys.stdout.write(f"Found {len(status_updates)} tasks to be updated")
         new_task_instance_ids = []
         for task_instance_id, new_status in status_updates:
             # Discard is safe, no KeyError if task instance ID is not present
@@ -461,7 +459,6 @@ class DistributorInstance:
             try:
                 task_instance = self._task_instances[task_instance_id]
             except KeyError:
-                sys.stdout.write(f"New {task_instance_id=}")
                 new_task_instance_ids.append(task_instance_id)
             else:
                 # Loop through all possible registers and try a discard. This prevents problems
@@ -482,11 +479,9 @@ class DistributorInstance:
                     # If the task instance is in a terminal state, e.g. D, E, etc.,
                     # expire it from the distributor
                     if task_instance_id in self._task_instances:
-                        sys.stdout.write(f"Removing {task_instance_id=} from map, map length = {len(self._task_instances)}")
                         self._task_instances.pop(task_instance_id)
 
         if any(new_task_instance_ids):
-            sys.stdout.write(f"Adding {len(new_task_instance_ids)} to memory")
             self._distributor_commands = it.chain(
                 # TODO: Put this at the front of the end of the queue?
                 # TODO: won't be evaluated until subsequent process_status call
