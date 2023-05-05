@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import '../jobmon_gui.css';
-import { useParams, Link, Outlet } from 'react-router-dom';
+import { useParams, Link, Outlet, useNavigate } from 'react-router-dom';
 import { useForm } from "react-hook-form";
 import axios from 'axios';
 import DropdownButton from 'react-bootstrap/DropdownButton';
@@ -186,11 +186,12 @@ function WorkflowDetails({ subpage }) {
         setTaskTemplateVersionId(tt_version_id);
     }
 
+    const navigate = useNavigate();
     //********************html page*************************************
     return (
         <div>
             <Breadcrumb>
-                <Breadcrumb.Item><Link to="/">Home</Link></Breadcrumb.Item>
+                <Breadcrumb.Item><button className="breadcrumb-button" onClick={() => navigate(-1)}>Home</button></Breadcrumb.Item>
                 <Breadcrumb.Item active>Workflow ID {workflowId} </Breadcrumb.Item>
             </Breadcrumb>
             <div className='d-flex justify-content-start pt-3'>
