@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 from collections import deque
+from contextlib import nullcontext
 from datetime import datetime
 import logging
 import time
@@ -14,11 +15,13 @@ from typing import (
     List,
     Optional,
     Set,
+    Tuple,
     TYPE_CHECKING,
     Union,
 )
 
 from jobmon.client.array import Array
+from jobmon.client.distributor_context import DistributorContext
 from jobmon.client.swarm.swarm_array import SwarmArray
 from jobmon.client.swarm.swarm_task import SwarmTask
 from jobmon.client.task_resources import TaskResources
@@ -84,7 +87,6 @@ class WorkflowRun:
         fail_after_n_executions: int = 1_000_000_000,
         status: Optional[str] = None,
         requester: Optional[Requester] = None,
-        distributor_instance_id: Optional[int] = None,
     ) -> None:
         """Initialization of the swarm WorkflowRun."""
         self.workflow_run_id = workflow_run_id
@@ -131,9 +133,6 @@ class WorkflowRun:
         if requester is None:
             requester = Requester.from_defaults()
         self.requester = requester
-        # This attribute can optionally be set if the distributor ID is known
-        # Will be the case for testing, or for sequential/multiprocess workflow runs
-        self.distributor_instance_id = distributor_instance_id
 
         # This signal is set if the workflow run receives a resume
         self._terminated = False
@@ -141,7 +140,13 @@ class WorkflowRun:
         self.initialized = False  # Need to call from_workflow or from_workflow_id
 
         # Keep a registry of tracked batch IDs
-        self._active_batch_ids = []
+        self._active_batch_ids: list[int] = []
+
+        # Marker of states that should indicate exit of the swarm
+        self.terminating_states = [
+            WorkflowRunStatus.COLD_RESUME,
+            WorkflowRunStatus.HOT_RESUME,
+        ]
 
     @property
     def status(self) -> Optional[str]:
@@ -432,9 +437,11 @@ class WorkflowRun:
 
     def run(
         self,
-        distributor_alive_callable: Callable[..., bool],
         seconds_until_timeout: int = 36000,
         initialize: bool = True,
+        remote_distributor: bool = False,
+        cluster_name: str = '',
+        distributor_startup_timeout: int = 180,
     ) -> None:
         """Take a concrete DAG and queue al the Tasks that are not DONE.
 
@@ -458,121 +465,147 @@ class WorkflowRun:
             seconds_until_timeout: how long to block while waiting for the next task to finish
                 before raising an error.
             initialize: whether to initialize (update WorkflowRun to RUNNING and set fringe)
-
+            remote_distributor: whether to connect to a remote distributor or create a local
+                one
+            cluster_name: the cluster to run against, if creating a local distributor
+            distributor_startup_timeout: how long to wait for a local distributor to register
+                before raising an error
         Return:
             None
         """
-        try:
-            if initialize:
-                logger.info(f"Executing Workflow Run {self.workflow_run_id}")
-                self.set_initial_fringe()
-                self._update_status(WorkflowRunStatus.RUNNING)
-
-            time_since_last_full_sync = 0.0
-            total_elapsed_time = 0.0
-            terminating_states = [
-                WorkflowRunStatus.COLD_RESUME,
-                WorkflowRunStatus.HOT_RESUME,
-            ]
-
-            while self.active_tasks:
-                # Expire the swarm after the requested number of seconds
-                if total_elapsed_time > seconds_until_timeout:
-                    raise RuntimeError(
-                        f"Not all tasks completed within the given workflow timeout length "
-                        f"({seconds_until_timeout} seconds). Submitted tasks will still run, "
-                        f"but the workflow will need to be restarted."
-                    )
-
-                # check that the distributor is still alive
-                if not distributor_alive_callable():
-                    raise DistributorNotAlive(
-                        "Distributor process unexpectedly stopped. Workflow will error."
-                    )
-
-                # If the workflow run status was updated asynchronously, terminate
-                # all active task instances and error out.
-                if self.status in terminating_states:
-                    logger.warning(
-                        f"Workflow Run set to {self.status}. Attempting graceful shutdown."
-                    )
-                    # Active task instances will be set to "K", the processing loop then
-                    # keeps running until all of the states are appropriately set.
-                    self._terminate_task_instances()
-
-                # if fail fast and any error
-                if self.fail_fast and self._task_status_map[TaskStatus.ERROR_FATAL]:
-                    logger.info("Failing after first failure, as requested")
-                    break
-
-                # fail during test path
-                if self._n_executions >= self._val_fail_after_n_executions:
-                    raise WorkflowTestError(
-                        f"WorkflowRun asked to fail after {self._n_executions} "
-                        "executions. Failing now"
-                    )
-
-                # process any commands that we can in the time allotted
-                loop_start = time.time()
-                time_till_next_heartbeat = self._workflow_run_heartbeat_interval - (
-                    loop_start - self._last_heartbeat_time
-                )
-                if self.status == WorkflowRunStatus.RUNNING:
-                    self.process_commands(timeout=time_till_next_heartbeat)
-
-                # take a break if needed
-                loop_elapsed = time.time() - loop_start
-                if loop_elapsed < time_till_next_heartbeat:
-                    sleep_time = time_till_next_heartbeat - loop_elapsed
-                    time.sleep(sleep_time)
-                    loop_elapsed += sleep_time
-
-                # then synchronize state
-                if time_since_last_full_sync > self.wedged_workflow_sync_interval:
-                    time_since_last_full_sync = 0.0
-                    self.synchronize_state(full_sync=True)
-                else:
-                    time_since_last_full_sync += loop_elapsed
-                    self.synchronize_state()
-
-                total_elapsed_time += time.time() - loop_start
-
-        # user interrupt
-        except KeyboardInterrupt:
-            logger.warning("Keyboard interrupt raised")
-            confirm = input("Are you sure you want to exit (y/n): ")
-            confirm = confirm.lower().strip()
-
-            if confirm == "y":
-                self._update_status(WorkflowRunStatus.STOPPED)
-                raise
-            else:
-                logger.info("Continuing jobmon...")
-                seconds_until_timeout = int(seconds_until_timeout - loop_elapsed)
-                self.run(
-                    distributor_alive_callable, seconds_until_timeout, initialize=False
-                )
-
-        # unexpected errors. raise
-        except Exception as e:
-            try:
-                self._update_status(WorkflowRunStatus.ERROR)
-            except TransitionError as trans:
-                logger.warning(trans)
-            raise e
-
-        # no more active tasks
+        if not remote_distributor:
+            context = DistributorContext(cluster_name=cluster_name,
+                                         workflow_run_id=self.workflow_run_id,
+                                         timeout=distributor_startup_timeout,
+                                         logger=logger)
         else:
+            context = nullcontext()
+            context.alive = lambda: True
+        if initialize:
+            logger.info(f"Executing Workflow Run {self.workflow_run_id}")
+            self.set_initial_fringe()
+            self._update_status(WorkflowRunStatus.RUNNING)
+
+        time_since_last_full_sync = 0.0
+        total_elapsed_time = 0.0
+        with context:
+            while self.active_tasks:
+                try:
+                    self._check_execution_continuation(
+                        total_elapsed_time=total_elapsed_time,
+                        seconds_until_timeout=seconds_until_timeout,
+                        distributor_alive_callable=context.alive,
+                    )
+                    elapsed_time, time_since_last_full_sync = self._swarm_loop_execution(
+                        time_since_last_full_sync=time_since_last_full_sync,
+                        remote_distributor=remote_distributor
+                    )
+                    # if fail fast and any error
+                    if self.fail_fast and self._task_status_map[TaskStatus.ERROR_FATAL]:
+                        logger.info("Failing after first failure, as requested")
+                        break
+
+                    total_elapsed_time += elapsed_time
+                # user interrupt
+                except KeyboardInterrupt:
+                    logger.warning("Keyboard interrupt raised")
+                    confirm = input("Are you sure you want to exit (y/n): ")
+                    confirm = confirm.lower().strip()
+
+                    if confirm == "y":
+                        self._update_status(WorkflowRunStatus.STOPPED)
+                        raise
+                    else:
+                        logger.info("Continuing jobmon...")
+
+                # unexpected errors. raise
+                except Exception as e:
+                    try:
+                        self._update_status(WorkflowRunStatus.ERROR)
+                    except TransitionError as trans:
+                        logger.warning(trans)
+                    raise e
+
+            # no more active tasks, loop terminated without an exception raised
             # check if done
             if len(self.tasks) == len(self._task_status_map[TaskStatus.DONE]):
                 logger.info("All tasks are done")
                 self._update_status(WorkflowRunStatus.DONE)
 
             else:
-                if self.status in terminating_states:
+                if self.status in self.terminating_states:
                     self._update_status(WorkflowRunStatus.TERMINATED)
                 else:
                     self._update_status(WorkflowRunStatus.ERROR)
+
+    def _swarm_loop_execution(
+        self,
+        time_since_last_full_sync: float,
+        remote_distributor: bool,
+    ) -> Tuple[float, float]:
+
+        # If the workflow run status was updated asynchronously, terminate
+        # all active task instances and error out.
+        if self.status in self.terminating_states:
+            logger.warning(
+                f"Workflow Run set to {self.status}. Attempting graceful shutdown."
+            )
+            # Active task instances will be set to "K", the processing loop then
+            # keeps running until all of the states are appropriately set.
+            self._terminate_task_instances()
+
+        # process any commands that we can in the time allotted
+        loop_start = time.time()
+        time_till_next_heartbeat = self._workflow_run_heartbeat_interval - (
+                loop_start - self._last_heartbeat_time
+        )
+        if self.status == WorkflowRunStatus.RUNNING:
+            self.process_commands(timeout=time_till_next_heartbeat)
+
+        # take a break if needed
+        loop_elapsed = time.time() - loop_start
+        if loop_elapsed < time_till_next_heartbeat:
+            sleep_time = time_till_next_heartbeat - loop_elapsed
+            time.sleep(sleep_time)
+            loop_elapsed += sleep_time
+
+        # then synchronize state
+        if time_since_last_full_sync > self.wedged_workflow_sync_interval:
+            time_since_last_full_sync = 0.0
+            self.synchronize_state(full_sync=True, remote_distributor=remote_distributor)
+        else:
+            time_since_last_full_sync += loop_elapsed
+            self.synchronize_state(remote_distributor=remote_distributor)
+
+        elapsed_time = time.time() - loop_start
+        return elapsed_time, time_since_last_full_sync
+
+    def _check_execution_continuation(
+        self, total_elapsed_time: float, seconds_until_timeout: int,
+        distributor_alive_callable: Callable,
+    ):
+        # fail during test path
+        if self._n_executions >= self._val_fail_after_n_executions:
+            raise WorkflowTestError(
+                f"WorkflowRun asked to fail after {self._n_executions} "
+                "executions. Failing now"
+            )
+
+        # Expire the swarm after the requested number of seconds
+        if total_elapsed_time > seconds_until_timeout:
+            raise RuntimeError(
+                f"Not all tasks completed within the given "
+                f"workflow timeout length "
+                f"({seconds_until_timeout} seconds). "
+                f"Submitted tasks will still run, "
+                f"but the workflow will need to be restarted."
+            )
+
+        # check that the distributor is still alive
+        if not distributor_alive_callable:
+            raise DistributorNotAlive(
+                "Distributor process unexpectedly stopped. Workflow will error."
+            )
 
     def set_initial_fringe(self) -> None:
         """Set initial fringe."""
@@ -645,7 +678,6 @@ class WorkflowRun:
 
                     # set final array capacity
                     array_capacity_lookup[array_id] = array_capacity
-
                     yield SwarmCommand(self.queue_task_batch, current_batch)
 
                 # no room. keep track for next time method is called
@@ -663,7 +695,6 @@ class WorkflowRun:
             timeout: time until we stop processing. -1 means process till no more work
         """
         swarm_commands = self.get_swarm_commands()
-
         # this way we always process at least 1 command
         loop_start = time.time()
         keep_processing = True
@@ -682,14 +713,16 @@ class WorkflowRun:
                 # stop processing commands if we are out of commands
                 keep_processing = False
 
-    def synchronize_state(self, full_sync: bool = False) -> None:
+    def synchronize_state(
+        self, full_sync: bool = False, remote_distributor: bool = False
+    ) -> None:
         self._set_status_for_triaging()
         self._log_heartbeat()
         self._task_status_updates(full_sync=full_sync)
         self._synchronize_max_concurrently_running()
-        # If connected to a remote distributor (i.e. no attribute set),
+        # If connected to a remote distributor,
         # we'll need to periodically check for liveliness and reassign the batches
-        if not self.distributor_instance_id:
+        if remote_distributor:
             self._reassign_distributor_instances()
 
     def _reassign_distributor_instances(self):
@@ -699,7 +732,7 @@ class WorkflowRun:
             return
 
         self.requester.send_request(
-            app_route='/workflow_run/reassign_active_batches',
+            app_route=f'/workflow_run/{self.workflow_run_id}/reassign_active_batches',
             message={"batch_ids": self._active_batch_ids},
             request_type='post'
         )
@@ -907,6 +940,9 @@ class WorkflowRun:
         if not task_resources.is_bound:
             task_resources.bind()
 
+        # TODO: if remote_distributor is False, swarm should be able to infer the distributor
+        #  instance once and cache so each queue call doesn't have to query for eligible
+        #  instances
         app_route = f"/batch/queue_task_batch"
         return_code, response = self.requester.send_request(
             app_route=app_route,
@@ -916,7 +952,6 @@ class WorkflowRun:
                 "workflow_run_id": self.workflow_run_id,
                 "cluster_id": first_task.cluster.id,
                 "array_id": first_task.array_id,
-                "distributor_instance_id": self.distributor_instance_id
             },
             request_type="post",
         )

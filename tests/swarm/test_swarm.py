@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from jobmon.plugins.dummy import DummyDistributor
 from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
-from jobmon.client.workflow import DistributorContext
+from jobmon.client.distributor_context import DistributorContext
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import WorkflowRunStatus, TaskInstanceStatus
 from jobmon.core.exceptions import CallableReturnedInvalidObject
@@ -24,7 +24,7 @@ from jobmon.server.web.models.api import (
     TaskStatus
 )
 from jobmon.server.web.models.distributor_instance import \
-    add_distributor_instances_with_associations
+    add_distributor_instance
 from jobmon.worker_node.cli import WorkerNodeCLI
 
 
@@ -40,7 +40,7 @@ class MockDistributorProc:
         return True
 
 
-def test_blocking_update_timeout(tool, task_template):
+def test_blocking_update_timeout(tool, task_template, remote_sequential_distributor):
     """This test runs a 1 task workflow and confirms that the workflow_run
     will timeout with an appropriate error message if timeout is set
     """
@@ -50,14 +50,11 @@ def test_blocking_update_timeout(tool, task_template):
     workflow.add_tasks([task])
     workflow.bind()
     workflow._bind_tasks()
-    workflow._distributor_proc = MockDistributorProc()
     factory = WorkflowRunFactory(workflow.workflow_id)
     wfr = factory.create_workflow_run()
 
     # Move workflow and wfr through Bound -> Instantiating -> Launched
     wfr._update_status(WorkflowRunStatus.BOUND)
-    wfr._update_status(WorkflowRunStatus.INSTANTIATED)
-    wfr._update_status(WorkflowRunStatus.LAUNCHED)
 
     # swarm calls
     swarm = SwarmWorkflowRun(
@@ -67,7 +64,7 @@ def test_blocking_update_timeout(tool, task_template):
     swarm.from_workflow(workflow)
 
     with pytest.raises(RuntimeError) as error:
-        swarm.run(lambda: True, seconds_until_timeout=2)
+        swarm.run(seconds_until_timeout=2, remote_distributor=True,)
 
     expected_msg = (
         "Not all tasks completed within the given workflow "
@@ -77,7 +74,7 @@ def test_blocking_update_timeout(tool, task_template):
     assert expected_msg == str(error.value)
 
 
-def test_sync_statuses(client_env, tool, task_template):
+def test_sync_statuses(client_env, tool, task_template, db_engine):
     """this test executes a single task workflow where the task fails. It
     is testing to confirm that the status updates are propagated into the
     swarm objects"""
@@ -92,14 +89,6 @@ def test_sync_statuses(client_env, tool, task_template):
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # move workflow to launched state
-    distributor_service = DistributorService(
-        SequentialDistributor("sequential"),
-        workflow.requester,
-    )
-    distributor_service.set_workflow_run(wfr.workflow_run_id)
-    wfr._update_status(WorkflowRunStatus.LAUNCHED)
-
     # swarm calls
     swarm = SwarmWorkflowRun(
         workflow_run_id=wfr.workflow_run_id,
@@ -113,14 +102,18 @@ def test_sync_statuses(client_env, tool, task_template):
 
     # distribute the task
     swarm.set_initial_fringe()
-    swarm.process_commands()
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
-    time.sleep(2)
+    swarm._update_status(WorkflowRunStatus.RUNNING)
 
-    swarm.synchronize_state(full_sync=True)
+    # Mock a task instance that is queued and moves to failed
+    with Session(bind=db_engine) as session:
+        session.execute(
+            update(Task)
+            .where(Task.id == task.task_id)
+            .values(status=TaskStatus.ERROR_FATAL)
+        )
+        session.commit()
+
+    swarm.synchronize_state(full_sync=True, remote_distributor=True)
     assert len(swarm.failed_tasks) == 1
     assert len(swarm.done_tasks) == 0
 
@@ -368,11 +361,8 @@ def test_callable_returns_valid_object(tool, task_template):
     swarm.from_workflow(workflow)
 
     # swarm calls
-    with DistributorContext("sequential", wfr.workflow_run_id, 180) as distributor:
-        try:
-            swarm.run(distributor.alive, seconds_until_timeout=1)
-        except RuntimeError:
-            pass
+    swarm.run(seconds_until_timeout=1)
+
     assert swarm.tasks[task.task_id].current_task_resources.id is not None
 
 
@@ -427,7 +417,7 @@ def test_callable_fails_bad_filepath(tool, task_template):
         swarm.set_initial_fringe()
 
 
-def test_swarm_fails(tool):
+def test_swarm_fails(client_env, tool):
     """Test the swarm exits on error appropriately."""
 
     workflow = tool.create_workflow(name="test_propagate_result")
@@ -444,15 +434,13 @@ def test_swarm_fails(tool):
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # run the distributor
-    with DistributorContext("sequential", wfr.workflow_run_id, 180) as distributor:
-        # swarm calls
-        swarm = SwarmWorkflowRun(
-            workflow_run_id=wfr.workflow_run_id,
-            requester=workflow.requester,
-        )
-        swarm.from_workflow(workflow)
-        swarm.run(distributor.alive)
+    # swarm calls
+    swarm = SwarmWorkflowRun(
+        workflow_run_id=wfr.workflow_run_id,
+        requester=workflow.requester,
+    )
+    swarm.from_workflow(workflow)
+    swarm.run(cluster_name='sequential', remote_distributor=False)
 
     assert swarm.status == WorkflowRunStatus.ERROR
     assert len(swarm.done_tasks) == 1
@@ -580,15 +568,6 @@ def test_resume_from_workflow_id(tool, task_template):
 def test_batch_reassignment(tool, task_template, db_engine, requester_in_memory):
     workflow = tool.create_workflow()
 
-    # Manually instantiate a distributor to associate with this WFR
-    with Session(bind=db_engine) as session:
-        # Use the sequential cluster ID - known from test setup
-        distributor1 = add_distributor_instances_with_associations(
-            cluster_ids=[2], session=session
-        )
-        distributor1_id = distributor1.id
-        session.commit()
-
     t1 = task_template.create_task(arg="sleep 1")
     t2 = task_template.create_task(arg="sleep 2")
 
@@ -599,9 +578,17 @@ def test_batch_reassignment(tool, task_template, db_engine, requester_in_memory)
     wfr = factory.create_workflow_run()
     swarm = SwarmWorkflowRun(
         workflow_run_id=wfr.workflow_run_id,
-        distributor_instance_id=distributor1_id,
     )
     swarm.from_workflow(workflow)
+
+    # Manually instantiate a distributor to associate with this WFR
+    with Session(bind=db_engine) as session:
+        # Use the sequential cluster ID - known from test setup
+        distributor1 = add_distributor_instance(
+            cluster_id=2, session=session
+        )
+        distributor1_id = distributor1.id
+        session.commit()
 
     # Queue both active tasks - should belong in 1 batch
     swarm.queue_task_batch(list(swarm.tasks.values()))
@@ -615,8 +602,8 @@ def test_batch_reassignment(tool, task_template, db_engine, requester_in_memory)
         ).scalar()
         distributor1.expunge()
 
-        distributor2 = add_distributor_instances_with_associations(
-            cluster_ids=[2], session=session
+        distributor2 = add_distributor_instance(
+            cluster_id=2, session=session
         )
         distributor2_id = distributor2.id
         session.commit()

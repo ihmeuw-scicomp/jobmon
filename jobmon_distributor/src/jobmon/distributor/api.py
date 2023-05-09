@@ -1,3 +1,3 @@
-from jobmon.distributor.distributor_service import (
-    DistributorService,
+from jobmon.distributor.distributor_instance import (
+    DistributorInstance,
 )

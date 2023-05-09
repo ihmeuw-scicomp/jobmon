@@ -31,9 +31,6 @@ class Cluster(Base):
     # ORM relationships
     cluster_type = relationship("ClusterType", back_populates="clusters")
     queues = relationship("Queue", back_populates="cluster")
-    distributor_clusters = relationship(
-        "DistributorInstanceCluster", back_populates="clusters"
-    )
 
 
 def add_clusters(session: Session) -> None:

@@ -63,17 +63,10 @@ class Workflow(Base):
         (WorkflowStatus.FAILED, WorkflowStatus.REGISTERING),
         # new workflow run created that resumes old suspended workflow run
         (WorkflowStatus.HALTED, WorkflowStatus.REGISTERING),
-        # Workflow is instantiating
-        (WorkflowStatus.QUEUED, WorkflowStatus.INSTANTIATING),
-        # Workflow fails before it's instantiated
+        # Workflow begins to run. normal happy path
+        (WorkflowStatus.QUEUED, WorkflowStatus.RUNNING),
+        # Workflow fails before it's able to start the swarm
         (WorkflowStatus.QUEUED, WorkflowStatus.FAILED),
-        # workflow is launched. normal happy path
-        (WorkflowStatus.INSTANTIATING, WorkflowStatus.LAUNCHED),
-        # workflow can't launch for some reason. TODO: Implement triaging
-        (WorkflowStatus.INSTANTIATING, WorkflowStatus.FAILED),
-        (WorkflowStatus.LAUNCHED, WorkflowStatus.FAILED),
-        # workflow runs. normal happy path
-        (WorkflowStatus.LAUNCHED, WorkflowStatus.RUNNING),
         # workflow run was running and then got moved to a resume state
         (WorkflowStatus.RUNNING, WorkflowStatus.HALTED),
         # workflow run was bound, and then got moved to a resume state

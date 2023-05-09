@@ -6,6 +6,7 @@ from jobmon.core.constants import TaskInstanceStatus, TaskStatus
 from jobmon.server.web.models.api import (
     Array,
     Batch as ServerBatch,
+    Cluster,
     DistributorInstance as ServerDistributorInstance,
     Task,
     TaskInstance,
@@ -113,21 +114,19 @@ def distributor_crud(db_engine):
 @pytest.fixture
 def initialize_distributor(requester_no_retry):
 
-    def _initialize(distributor_id, cluster='dummy'):
+    def _initialize(distributor_id, cluster='dummy', workflow_run_id=None):
         # Initialize a distributor object
 
         distributor = ClientDistributor(cluster_name=cluster, requester=requester_no_retry,
+                                        workflow_run_id=workflow_run_id,
                                         raise_on_error=True)
         distributor._distributor_instance_id = distributor_id
 
         distributor.refresh_status_from_db(status="Q")
 
-        # Should have appended a "make task instances" function to the distributor command chain
-        try:
-            command = next(distributor._distributor_commands)
-            command()
-        except StopIteration:
-            pass
+        # Should have appended a "make task instances" function to the command chain
+        # Process all work to ensure we have a set of task instances available in memory
+        distributor.process_work()
         return distributor
 
     return _initialize

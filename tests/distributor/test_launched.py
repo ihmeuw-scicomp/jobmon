@@ -32,7 +32,8 @@ def test_launch_jobs(db_engine, distributor_crud, initialize_distributor, reques
     assert len(launch_batch_tasks) == 2
     # Launch the batches and check statuses
 
-    distributor.process_status(TaskInstanceStatus.QUEUED, 10_000)
+    distributor.generate_work(TaskInstanceStatus.QUEUED)
+    distributor.process_work(10_000)
 
     with Session(bind=db_engine) as session:
         # Assert all tasks are done - worker node moves immediately to DONE

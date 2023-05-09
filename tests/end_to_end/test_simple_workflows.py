@@ -78,7 +78,7 @@ remote_sleep_and_write = os.path.abspath(
 )
 
 
-def test_one_task(tool, task_template):
+def test_one_task(tool, task_template, client_env):
     """create a 1 task workflow and confirm it works end to end"""
 
     workflow = tool.create_workflow(name="test_one_task")

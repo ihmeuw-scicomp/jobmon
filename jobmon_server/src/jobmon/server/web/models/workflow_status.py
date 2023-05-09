@@ -18,8 +18,6 @@ class WorkflowStatus(Base):
     HALTED = Statuses.HALTED
     FAILED = Statuses.FAILED
     DONE = Statuses.DONE
-    INSTANTIATING = Statuses.INSTANTIATING
-    LAUNCHED = Statuses.LAUNCHED
 
     id = Column(String(1), primary_key=True)
     label = Column(String(150), nullable=False)
@@ -53,17 +51,6 @@ def add_workflow_statuses(session: Session) -> None:
             label="HALTED",
             description="Resume was set and Workflow is shut down or the controller died "
             "and therefore Workflow was reaped.",
-        ),
-        WorkflowStatus(
-            id="I",
-            label="INSTANTIATING",
-            description="Jobmon Scheduler is creating a Workflow on the distributor.",
-        ),
-        WorkflowStatus(
-            id="O",
-            label="LAUNCHED",
-            description="Workflow has been created. Distributor is now controlling tasks, "
-            "or waiting for scheduling loop.",
         ),
         WorkflowStatus(
             id="Q",

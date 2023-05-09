@@ -73,8 +73,6 @@ class WorkflowRunStatus:
     COLD_RESUME = "C"
     HOT_RESUME = "H"
     TERMINATED = "T"
-    INSTANTIATED = "I"
-    LAUNCHED = "O"
 
 
 class WorkflowStatus:
@@ -83,8 +81,6 @@ class WorkflowStatus:
     REGISTERING = "G"
     QUEUED = "Q"
     ABORTED = "A"
-    INSTANTIATING = "I"
-    LAUNCHED = "O"
     RUNNING = "R"
     DONE = "D"
     HALTED = "H"

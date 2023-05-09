@@ -167,8 +167,6 @@ def test_cold_resume(tool):
         requester=workflow1.requester,
         raise_on_error=True,
     )
-    distributor_service.set_workflow_run(wfr1.workflow_run_id)
-    distributor_service.workflow_run.transition_to_launched()
     swarm._update_status(WorkflowRunStatus.RUNNING)
     distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
     distributor_service.process_status(TaskInstanceStatus.QUEUED)

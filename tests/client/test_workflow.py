@@ -84,8 +84,6 @@ def test_attempt_resume_on_complete_workflow(tool):
     wfr1 = WorkflowRun(wf1.workflow_id)
     wfr1.bind()
     wfr1._update_status(WorkflowRunStatus.BOUND)
-    wfr1._update_status(WorkflowRunStatus.INSTANTIATED)
-    wfr1._update_status(WorkflowRunStatus.LAUNCHED)
     wfr1._update_status(WorkflowRunStatus.RUNNING)
     wfr1._update_status(WorkflowRunStatus.DONE)
 
@@ -128,8 +126,6 @@ def test_resume_with_old_and_new_workflow_attributes(tool, db_engine):
     factory1 = WorkflowRunFactory(wf1.workflow_id)
     wfr1 = factory1.create_workflow_run()
     wfr1._update_status(WorkflowRunStatus.BOUND)
-    wfr1._update_status(WorkflowRunStatus.INSTANTIATED)
-    wfr1._update_status(WorkflowRunStatus.LAUNCHED)
     wfr1._update_status(WorkflowRunStatus.RUNNING)
     wfr1._update_status(WorkflowRunStatus.ERROR)
 

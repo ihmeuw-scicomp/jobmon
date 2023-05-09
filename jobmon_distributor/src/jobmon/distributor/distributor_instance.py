@@ -17,14 +17,13 @@ from typing import (
     Union,
 )
 
-from jobmon.core.cluster_protocol import ClusterDistributor
 from jobmon.core.cluster import Cluster
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import (
     DistributorInterruptedError, InvalidResponse, RemoteExitInfoNotAvailable
 )
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 from jobmon.distributor.batch import Batch
 from jobmon.distributor.distributor_command import DistributorCommand
 from jobmon.distributor.distributor_task_instance import DistributorTaskInstance
@@ -41,6 +40,7 @@ class DistributorInstance:
         task_instance_heartbeat_interval: Optional[int] = None,
         heartbeat_report_by_buffer: Optional[float] = None,
         distributor_poll_interval: Optional[int] = None,
+        workflow_run_id: Optional[int] = None,
         raise_on_error: bool = False,
     ) -> None:
         """Initialization of DistributorService."""
@@ -74,9 +74,15 @@ class DistributorInstance:
         self.raise_on_error = raise_on_error
         self._distributor_instance_id = None
 
+        # Optionally allow the distributor to only scan for tasks from a single workflowrun.
+        # Necessary for cluster protocols that execute in the same memory space, e.g.
+        # sequential or multiprocess builtins.
+        self._workflow_run_id = workflow_run_id
+
         # Store allowed cluster distributor objects
         cluster = Cluster.get_cluster(cluster_name)
         self._cluster_interface = cluster.get_distributor()
+        self._cluster_id = cluster.id
 
         # indexing of task instance by associated id
         self._task_instances: Dict[int, DistributorTaskInstance] = {}
@@ -100,7 +106,7 @@ class DistributorInstance:
             TaskInstanceStatus.KILL_SELF: self._check_kill_self_for_work,
         }
 
-        # syncronization timings
+        # synchronization timings
         self._last_heartbeat_time = time.time()
 
         # web service API
@@ -138,18 +144,18 @@ class DistributorInstance:
 
     def register(self) -> None:
         """Register this DistributorInstance with the database. Get an ID"""
+        if self._distributor_instance_id is not None:
+            return
         app_route = "/distributor_instance/register"
-        return_code, result = self.requester.send_request(
+        params = {"cluster_id": self._cluster_id,
+                  'next_report_increment': self._next_report_increment}
+        if self._workflow_run_id:
+            params.update({'workflow_run_id': self._workflow_run_id})
+        _, result = self.requester.send_request(
             app_route=app_route,
-            message={"cluster_id": self._cluster_interface.cluster_id},
+            message=params,
             request_type="post",
         )
-        if not http_request_ok(return_code):
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {result}"
-            )
         self._distributor_instance_id = result["distributor_instance_id"]
 
     def run(self) -> None:
@@ -169,8 +175,7 @@ class DistributorInstance:
                 TaskInstanceStatus.TRIAGING,
                 TaskInstanceStatus.KILL_SELF,
             ])
-            while self._not_expunged():
-
+            while self.keep_running():
                 self.log_task_instance_report_by_date()
 
                 # loop through all statuses and do as much work as we can till the heartbeat
@@ -192,14 +197,14 @@ class DistributorInstance:
                     time_till_next_heartbeat -= refresh_time - start_time
 
                     if status in self._command_generator_map.keys():
-                        # process any work
-                        self.process_status(status, time_till_next_heartbeat)
-                        # how long the full status took
-                        end_time = time.time()
-                        time_till_next_heartbeat -= end_time - refresh_time
+                        # for eligible statuses, check if there is work to be added to the
+                        # work queue.
+                        self.generate_work(status=status)
 
-                    else:
-                        end_time = refresh_time
+                    self.process_work(timeout=time_till_next_heartbeat)
+                    # how long the full status took
+                    end_time = time.time()
+                    time_till_next_heartbeat -= end_time - refresh_time
 
                     logger.info(
                         f"Status processing for status={status} took "
@@ -218,23 +223,29 @@ class DistributorInstance:
             # stop distributor
             self._cluster_interface.stop()
 
+            # TODO: Expunge current instance
+            # self.expunge_current_instance()
+
             # signal via pipe that we are shutdown
             sys.stderr.write("SHUTDOWN")
             sys.stderr.flush()
 
-    def process_status(self, status: str, timeout: Union[int, float] = -1) -> None:
-        """Processes commands until all work is done or timeout is reached.
-
-        Args:
-            status: which status to process work for.
-            timeout: time until we stop processing. -1 means process till no more work
-        """
-        start = time.time()
-
+    def generate_work(self, status: str) -> None:
+        """Given a status, add new work to be done to the work queue."""
         # generate new distributor commands from this status
         command_generator_callable = self._command_generator_map[status]
         command_generator = command_generator_callable()
-        self._distributor_commands = it.chain(command_generator)
+        self._distributor_commands = it.chain(
+            self._distributor_commands, command_generator
+        )
+
+    def process_work(self, timeout: Union[int, float] = 30) -> None:
+        """Processes commands until all work is done or timeout is reached.
+
+        Args:
+            timeout: time until we stop processing. -1 means process till no more work
+        """
+        start = time.time()
 
         # this way we always process at least 1 command
         keep_iterating = True
@@ -245,23 +256,12 @@ class DistributorInstance:
                 distributor_command = next(self._distributor_commands)
                 distributor_command(self.raise_on_error)
 
-                # if we need a status sync close the main generator. we will process remaining
-                # transactions, but nothing new from the generator
+                # if we need a status sync, stop iterating and yield control back to the
+                # main run loop. The next process_work call will resume from the next item
                 if not ((time.time() - start) < timeout or timeout == -1):
-                    command_generator.close()
-
+                    keep_iterating = False
             except StopIteration:
-                # stop processing commands if we are out of commands
                 keep_iterating = False
-
-        # update the state map
-        task_instances = self._task_instance_status_map.pop(status)
-        self._task_instance_status_map[status] = set()
-        for task_instance in task_instances:
-            if task_instance.status in self._task_instance_status_map:
-                self._task_instance_status_map[task_instance.status].add(task_instance)
-            else:
-                self._task_instances.pop(task_instance.task_instance_id)
 
     def launch_task_instance_batch(
         self, task_instance_batch: Batch
@@ -430,7 +430,7 @@ class DistributorInstance:
         self._last_heartbeat_time = time.time()
 
     def log_heartbeat(self):
-        self.requester.send_request(f'/distributor_instance/{self._distributor_instance_id}/heartbeat',
+        self.requester.send_request(f'/distributor_instance/{self.distributor_instance_id}/heartbeat',
                                     {}, 'post')
 
     def refresh_status_from_db(self, status: str) -> None:
@@ -443,7 +443,9 @@ class DistributorInstance:
             "task_instance_ids": list(active_task_instance_ids),
             "status": status,
         }
-        app_route = f"/distributor_instance/{self._distributor_instance_id}/sync_status"
+        if self._workflow_run_id:
+            message['workflow_run_id'] = self._workflow_run_id
+        app_route = f"/distributor_instance/{self.distributor_instance_id}/sync_status"
         return_code, result = self.requester.send_request(
             app_route=app_route, message=message, request_type="post"
         )
@@ -459,11 +461,12 @@ class DistributorInstance:
             except KeyError:
                 new_task_instance_ids.append(task_instance_id)
             else:
-                # remove from old status set
-                previous_status = task_instance.status
-                self._task_instance_status_map[previous_status].remove(
-                    task_instance
-                )
+                # Loop through all possible registers and try a discard. This prevents problems
+                # from task instances that have a mismatch between the in-memory state and the
+                # register they belong to. Performance shouldn't be a problem since there are
+                # only a set amount of active states.
+                for status, registry in self._task_instance_status_map.items():
+                    registry.discard(task_instance)
 
                 # change to new status and move to new set
                 task_instance.status = new_status
@@ -479,7 +482,6 @@ class DistributorInstance:
                         self._task_instances.pop(task_instance_id)
 
         if any(new_task_instance_ids):
-
             self._distributor_commands = it.chain(
                 # TODO: Put this at the front of the end of the queue?
                 # TODO: won't be evaluated until subsequent process_status call
@@ -512,7 +514,7 @@ class DistributorInstance:
 
     def _generate_add_task_instance_callables(
         self, new_task_instance_ids: list[int], status: str, chunk_size: int = 50
-    ) -> Generator:
+    ) -> Generator[DistributorCommand]:
         # Chain together, naive chunking
         for chunk_number in range(len(new_task_instance_ids) % chunk_size):
             start_idx = chunk_number * chunk_size
@@ -526,7 +528,7 @@ class DistributorInstance:
     def _add_task_instances(self, task_instance_ids: list[int], status: str):
         # Fetch metadata and create new task instances
 
-        task_instance_ids = list(set(task_instance_ids) - set(self._task_instances.keys()))
+        task_instance_ids = list(set(task_instance_ids) - self._task_instances.keys())
 
         if not task_instance_ids:
             return
@@ -562,8 +564,9 @@ class DistributorInstance:
             'put'
         )
 
-    def _not_expunged(self) -> bool:
-        pass
+    def keep_running(self) -> bool:
+        # Is there any todo here, or just for unit testing?
+        return True
 
     def _create_batches(
         self, queued_task_instances: Set[DistributorTaskInstance]

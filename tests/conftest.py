@@ -5,6 +5,7 @@ import platform
 import requests
 import signal
 import socket
+import subprocess
 import sys
 from time import sleep
 from types import TracebackType
@@ -274,3 +275,34 @@ def task_template(tool):
 @pytest.fixture
 def array_template(tool):
     return tool.active_task_templates["array_template"]
+
+
+@pytest.fixture(scope='session')
+def remote_sequential_distributor(web_server_process):
+
+    cmd = [
+        sys.executable,
+        "-m",  # safest way to find the entrypoint
+        "jobmon.distributor.cli",
+        "start",
+        "--cluster_name",
+        "sequential"
+    ]
+
+    env = os.environ.copy()
+    env.update(
+        {"JOBMON__HTTP__SERVICE_URL":
+            f'http://{web_server_process["JOBMON_HOST"]}:'
+            f'{web_server_process["JOBMON_PORT"]}'
+        }
+    )
+
+    process = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env
+    )
+    try:
+        yield process
+    finally:
+        # Clean up the subprocess
+        process.terminate()
+        process.wait()

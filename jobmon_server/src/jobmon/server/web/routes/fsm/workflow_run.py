@@ -286,8 +286,8 @@ def set_status_for_triaging(workflow_run_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/workflow_run/reassign_active_batches", methods=["POST"])
-def reassign_active_batches():
+@blueprint.route("/workflow_run/<workflow_run_id>/reassign_active_batches", methods=["POST"])
+def reassign_active_batches(workflow_run_id: int):
 
     data = cast(Dict, request.get_json())
     batch_ids = data.get("batch_ids")
@@ -296,6 +296,7 @@ def reassign_active_batches():
         Batch.id.in_(batch_ids),
         Batch.distributor_instance_id == DistributorInstance.id,
         DistributorInstance.expunged == True,
+        Batch.workflow_run_id == workflow_run_id,
     )
     session = SessionLocal()
 
@@ -311,7 +312,8 @@ def reassign_active_batches():
         # Since this route is called at the workflow run level (for now), should be a safe
         # assumption
         new_distributor_instance_id = _get_active_distributor_instance_id(
-            inactive_batches[0].cluster_id
+            cluster_id=inactive_batches[0].cluster_id,
+            workflow_run_id=workflow_run_id
         )
 
         update_stmt = (

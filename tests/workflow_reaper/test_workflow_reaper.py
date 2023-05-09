@@ -65,8 +65,6 @@ def test_error_state(
     )
     wfr1.bind()
     wfr1._update_status(WorkflowRunStatus.BOUND)
-    wfr1._update_status(WorkflowRunStatus.INSTANTIATED)
-    wfr1._update_status(WorkflowRunStatus.LAUNCHED)
     wfr1._update_status(WorkflowRunStatus.RUNNING)
 
     # Create a second workflow with one task. Don't log a heartbeat so that it can die
@@ -82,8 +80,6 @@ def test_error_state(
     )
     wfr2.bind()
     wfr2._update_status(WorkflowRunStatus.BOUND)
-    wfr2._update_status(WorkflowRunStatus.INSTANTIATED)
-    wfr2._update_status(WorkflowRunStatus.LAUNCHED)
     wfr2._update_status(WorkflowRunStatus.RUNNING)
 
     def mock_slack_notifier(msg: str):
@@ -137,8 +133,6 @@ def test_halted_state(db_engine, requester_no_retry, tool, sleepy_task_template)
     wfr1 = WorkflowRun(workflow_id=workflow1.workflow_id, requester=workflow1.requester)
     wfr1.bind()
     wfr1._update_status(WorkflowRunStatus.BOUND)
-    wfr1._update_status(WorkflowRunStatus.INSTANTIATED)
-    wfr1._update_status(WorkflowRunStatus.LAUNCHED)
     wfr1._update_status(WorkflowRunStatus.RUNNING)
 
     # Create second WorkflowRun and transition to C status
@@ -157,8 +151,6 @@ def test_halted_state(db_engine, requester_no_retry, tool, sleepy_task_template)
     )
     wfr2.bind()
     wfr2._update_status(WorkflowRunStatus.BOUND)
-    wfr2._update_status(WorkflowRunStatus.INSTANTIATED)
-    wfr2._update_status(WorkflowRunStatus.LAUNCHED)
     wfr2._update_status(WorkflowRunStatus.RUNNING)
     wfr2._update_status(WorkflowRunStatus.COLD_RESUME)
 
@@ -178,8 +170,6 @@ def test_halted_state(db_engine, requester_no_retry, tool, sleepy_task_template)
     )
     wfr3.bind()
     wfr3._update_status(WorkflowRunStatus.BOUND)
-    wfr3._update_status(WorkflowRunStatus.INSTANTIATED)
-    wfr3._update_status(WorkflowRunStatus.LAUNCHED)
     wfr3._update_status(WorkflowRunStatus.RUNNING)
     wfr3._update_status(WorkflowRunStatus.HOT_RESUME)
 

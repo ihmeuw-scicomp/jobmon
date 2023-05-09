@@ -1,17 +1,12 @@
 """The overarching framework to create tasks and dependencies within."""
 from __future__ import annotations
 
+from contextlib import nullcontext
 import hashlib
 import logging
 import logging.config
-import os
-from subprocess import PIPE, Popen, TimeoutExpired
-import sys
-from types import TracebackType
 from typing import Any, Dict, List, Optional, Sequence, TYPE_CHECKING, Union
 import uuid
-
-import psutil
 
 from jobmon.client.array import Array
 from jobmon.client.dag import Dag
@@ -29,7 +24,6 @@ from jobmon.core.constants import (
     WorkflowStatus,
 )
 from jobmon.core.exceptions import (
-    DistributorStartupTimeout,
     DuplicateNodeArgsError,
     InvalidResponse,
     WorkflowAlreadyComplete,
@@ -42,94 +36,6 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-
-
-class DistributorContext:
-    def __init__(self, cluster_name: str, workflow_run_id: int, timeout: int) -> None:
-        """Initialization of the DistributorContext."""
-        self._cluster_name = cluster_name
-        self._workflow_run_id = workflow_run_id
-        self._timeout = timeout
-
-    def __enter__(self) -> DistributorContext:
-        """Starts the Distributor Process."""
-        logger.info("Starting Distributor Process")
-
-        # construct env
-        env = os.environ.copy()
-        entry_point = self.derive_jobmon_command_from_env()
-        if entry_point is not None:
-            env["JOBMON__DISTRIBUTOR__WORKER_NODE_ENTRY_POINT"] = f'"{entry_point}"'
-
-        # Start the distributor. Write stderr to a file.
-        cmd = [
-            sys.executable,
-            "-m",  # safest way to find the entrypoint
-            "jobmon.distributor.cli",
-            "start",
-            "--cluster_name",
-            self._cluster_name,
-            "--workflow_run_id",
-            str(self._workflow_run_id),
-        ]
-        self.process = Popen(
-            cmd,
-            stderr=PIPE,
-            universal_newlines=True,
-            env=env,
-        )
-
-        # check if stderr contains "ALIVE"
-        assert self.process.stderr is not None  # keep mypy happy on optional type
-        stderr_val = self.process.stderr.read(5)
-        if stderr_val != "ALIVE":
-            err = self._shutdown()
-            raise DistributorStartupTimeout(
-                f"Distributor process did not start, stderr='{err}'"
-            )
-        return self
-
-    def __exit__(
-        self,
-        exc_type: Optional[BaseException],
-        exc_value: Optional[BaseException],
-        exc_traceback: Optional[TracebackType],
-    ) -> None:
-        """Stops the Distributor Process."""
-        logger.info("Stopping Distributor Process")
-        err = self._shutdown()
-        logger.info(f"Got {err} from Distributor Process")
-
-    def alive(self) -> bool:
-        self.process.poll()
-        return self.process.returncode is None
-
-    def _shutdown(self) -> str:
-        self.process.terminate()
-        try:
-            _, err = self.process.communicate(timeout=self._timeout)
-        except TimeoutExpired:
-            err = ""
-
-        if "SHUTDOWN" not in err:
-            try:
-                parent = psutil.Process(self.process.pid)
-                for child in parent.children(recursive=True):
-                    child.kill()
-            except psutil.NoSuchProcess:
-                pass
-            self.process.kill()
-            self.process.wait()
-
-        return err
-
-    @staticmethod
-    def derive_jobmon_command_from_env() -> Optional[str]:
-        """If a singularity path is provided, use it when running the worker node."""
-        singularity_img_path = os.environ.get("IMGPATH", None)
-        if singularity_img_path:
-            return f"singularity run --app jobmon_command {singularity_img_path}"
-        return None
 
 
 class Workflow(object):
@@ -472,6 +378,7 @@ class Workflow(object):
         seconds_until_timeout: int = 36000,
         resume: bool = False,
         reset_running_jobs: bool = True,
+        remote_distributor: bool = False,
         distributor_startup_timeout: int = 180,
         resume_timeout: int = 300,
         configure_logging: bool = False,
@@ -489,6 +396,8 @@ class Workflow(object):
                 it is not set to resume and an identical workflow already
                 exists, the workflow will error out
             reset_running_jobs: whether or not to reset running jobs upon resume
+            remote_distributor: whether to connect to a remote distributor instance or create
+                a local one specific to the workflow run
             distributor_startup_timeout: amount of time to wait for the distributor process to
                 start up
             resume_timeout: seconds to wait for a workflow to become resumable before giving up
@@ -547,42 +456,43 @@ class Workflow(object):
         wfr._update_status(WorkflowRunStatus.BOUND)
         logger.info(f"WorkflowRun ID {wfr.workflow_run_id} assigned")
 
-        # start distributor
-        cluster_name = list(self._clusters.keys())[0]
-        with DistributorContext(
-            cluster_name, wfr.workflow_run_id, distributor_startup_timeout
-        ) as distributor:
-            # set up swarm and initial DAG
-            swarm = SwarmWorkflowRun(
-                workflow_run_id=wfr.workflow_run_id,
-                fail_after_n_executions=self._fail_after_n_executions,
-                requester=self.requester,
-                fail_fast=fail_fast,
-                status=wfr.status,
+        # set up swarm and initial DAG
+        swarm = SwarmWorkflowRun(
+            workflow_run_id=wfr.workflow_run_id,
+            fail_after_n_executions=self._fail_after_n_executions,
+            requester=self.requester,
+            fail_fast=fail_fast,
+            status=wfr.status,
+        )
+        swarm.from_workflow(self)
+        self._num_previously_completed = swarm.num_previously_complete
+
+        try:
+            cluster_name = list(self._clusters.keys())[0]
+            swarm.run(
+                remote_distributor=remote_distributor,
+                seconds_until_timeout=seconds_until_timeout,
+                cluster_name=cluster_name,
+                distributor_startup_timeout=distributor_startup_timeout,
             )
-            swarm.from_workflow(self)
-            self._num_previously_completed = swarm.num_previously_complete
-
-            try:
-                swarm.run(distributor.alive, seconds_until_timeout)
-            finally:
-                # figure out doneness
-                num_new_completed = (
-                    len(swarm.done_tasks) - swarm.num_previously_complete
+        finally:
+            # figure out doneness
+            num_new_completed = (
+                len(swarm.done_tasks) - swarm.num_previously_complete
+            )
+            if swarm.status != WorkflowRunStatus.DONE:
+                logger.info(
+                    f"WorkflowRun execution ended, num failed {len(swarm.failed_tasks)}"
                 )
-                if swarm.status != WorkflowRunStatus.DONE:
-                    logger.info(
-                        f"WorkflowRun execution ended, num failed {len(swarm.failed_tasks)}"
-                    )
-                else:
-                    logger.info(
-                        f"WorkflowRun execute finished successfully, {num_new_completed} tasks"
-                    )
+            else:
+                logger.info(
+                    f"WorkflowRun execute finished successfully, {num_new_completed} tasks"
+                )
 
-                # update workflow tasks with final status
-                for task in self.tasks.values():
-                    task.final_status = swarm.tasks[task.task_id].status
-                self._num_newly_completed = num_new_completed
+            # update workflow tasks with final status
+            for task in self.tasks.values():
+                task.final_status = swarm.tasks[task.task_id].status
+            self._num_newly_completed = num_new_completed
 
         self.last_workflow_run_id = wfr.workflow_run_id
 
