@@ -393,7 +393,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             )
             .select_from(join_table)
             .where(Task.workflow_id == workflow_id)
-            .order_by(Task.submitted_date)
+            .order_by(Task.id)
         )
         # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
         # the optimizer may choose a suboptimal execution plan for large datasets.

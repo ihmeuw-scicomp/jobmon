@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import moment from 'moment';
 import BootstrapTable from "react-bootstrap-table-next";
 import filterFactory, { textFilter, dateFilter } from 'react-bootstrap-table2-filter';
 import { sanitize } from 'dompurify';
@@ -9,7 +8,7 @@ import { HashLink } from 'react-router-hash-link';
 
 
 import '../jobmon_gui.css';
-import { convertDate, convertDatePST, safe_rum_start_span, safe_rum_unit_end } from '../functions';
+import { convertDatePST, safe_rum_start_span, safe_rum_unit_end } from '../functions';
 import CustomModal from '../Modal';
 
 export default function Errors({ errorLogs, tt_name, loading, apm }) {
@@ -23,13 +22,6 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
     const [helper, setHelper] = useState("");
     const [showModal, setShowModal] = useState(false)
     const [justRecentErrors, setRecentErrors] = useState(false)
-
-
-    function getTimeSince(date: string) {
-        let date_obj = convertDate(date);
-        const dateTimeAgo = moment(date_obj).fromNow();
-        return dateTimeAgo;
-    }
 
     function handleToggle() {
         setRecentErrors(!justRecentErrors)
@@ -45,7 +37,7 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
 
                 let date_display = `
             <div class="error-time">
-            <span>${e.error_time}</span>
+            <span>${convertDatePST(e.error_time)}</span>
             </div>
             `;
                 let error_display = `

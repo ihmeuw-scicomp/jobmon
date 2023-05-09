@@ -7,8 +7,6 @@ import ReactFlow, {
     Node,
     Position
 } from 'reactflow';
-import { OverlayTrigger } from "react-bootstrap";
-import Popover from 'react-bootstrap/Popover';
 
 import 'reactflow/dist/style.css';
 
