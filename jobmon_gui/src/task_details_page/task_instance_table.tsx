@@ -87,6 +87,7 @@ export default function TaskInstanceTable({ taskInstanceData }) {
             sort: true,
             sortCaret: customCaret,
             headerStyle: { width: "10%" },
+            style: { overflowWrap: 'break-word' },
         },
         {
             dataField: "ti_stderr",
