@@ -119,6 +119,10 @@ function App() {
     setStatus(d["status"])
   });
 
+  const handleClear = handleSubmit((d) => {
+    navigate('/?user=' + "&tool=" + "&wf_name=" + "&wf_args=" + "&date_submitted=" + "&status=");
+    navigate(0)
+  });
   //********************html page*************************************
   return (
     <div id="div-main" className="App">
@@ -174,13 +178,12 @@ function App() {
             </Form.Group>
           </Row>
 
-          <Row className="mb-3">
-            <Col className='mt-4'>
-              <Button variant="primary" type="submit" className="btn btn-custom mx-40p" onClick={onSubmit}>
-                Submit
-              </Button>
-            </Col>
-          </Row>
+          <div className="text-center">
+            <div className="btn-toolbar d-inline-block">
+              <button type="submit" className="btn btn-custom mr-1" onClick={onSubmit}>Submit</button>
+              <button type="submit" className="btn btn-custom mr-1" onClick={handleClear}>Clear All</button>
+            </div>
+          </div>
         </form>
       </div>
       <div id="wftable" className="div-level-2">

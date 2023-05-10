@@ -670,3 +670,11 @@ input:focus + .slider {
     text-overflow: ellipsis;
     height: 40px;
 }
+
+.breadcrumb-button {
+    background: none!important;
+    border: none;
+    padding: 0!important;
+    color: #007bff;
+    cursor: pointer;
+}

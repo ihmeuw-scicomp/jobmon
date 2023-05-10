@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import TaskInstanceTable from './task_instance_table';
 import NodeLists from './node_list';
@@ -78,11 +78,12 @@ function TaskDetails() {
         return () => clearInterval(interval);
     }, [taskId, task_status]);
 
+    const navigate = useNavigate()
     return (
         <div>
             <Breadcrumb>
-                <Breadcrumb.Item><Link to="/">Home</Link></Breadcrumb.Item>
-                <Breadcrumb.Item><Link to={{ pathname: `/workflow/${workflow_id}/tasks` }}>Workflow ID {workflow_id}</Link></Breadcrumb.Item>
+                <Breadcrumb.Item><button className="breadcrumb-button" onClick={() => navigate(-2)}>Home</button></Breadcrumb.Item>
+                 <Breadcrumb.Item><Link to={{ pathname: `/workflow/${workflow_id}/tasks` }}>Workflow ID {workflow_id}</Link></Breadcrumb.Item>
                 <Breadcrumb.Item active>Task ID {taskId}</Breadcrumb.Item>
             </Breadcrumb>
             <div>
