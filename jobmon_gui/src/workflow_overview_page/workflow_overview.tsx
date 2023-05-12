@@ -87,9 +87,15 @@ function App() {
       "DONE": (<div>< label className="label-middle" > <FaCircle className="bar-dd" /> </label><label className="label-left font-weight-300">DONE  </label></div >)
     }
     const fetchData = async () => {
-      const result: any = await axios(
-        workflow_status_url,
-        request
+      const result: any = await axios({
+            method: 'get',
+            url: workflow_status_url,
+            params: params,
+            data: null,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'}
+          }
       );
       let wfs = result.data.workflows;
       wfs.forEach((workflow) => {

@@ -43,7 +43,17 @@ function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_i
 
         //don't query empty list
         if (unfinished_wf_ids.length > 0) {
-            const result = await axios.get(url, { params: { workflow_ids: unfinished_wf_ids } });
+            const result = await axios({
+                method: 'get',
+                url: url,
+                data: null,
+                params: { workflow_ids: unfinished_wf_ids },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+              }
+            )
             // have to convert the unknown type to any to operate
             let temp_data: any = result.data;
 
