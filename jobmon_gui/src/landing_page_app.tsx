@@ -63,9 +63,14 @@ function App() {
     };
     let workflow_status_url = process.env.REACT_APP_BASE_URL + "/workflow_overview_viz";
     const fetchData = async () => {
-      const result: any = await axios(
-        workflow_status_url,
-        request
+      const result: any = await axios({
+        method: 'get',
+        url: workflow_status_url,
+        params: params,
+        headers: {'Content-Type': 'application/json'}
+      }
+//         workflow_status_url,
+//         request
       );
       let wfs = result.data.workflows;
       setWorkflows(wfs);
