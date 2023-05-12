@@ -66,6 +66,7 @@ function App() {
       const result: any = await axios({
         method: 'get',
         url: workflow_status_url,
+        data: null,
         params: params,
         headers: {
             'Content-Type': 'application/json',

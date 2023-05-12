@@ -91,6 +91,7 @@ function App() {
         method: 'get',
         url: workflow_status_url,
         params: params,
+        data: null,
         headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json'}
