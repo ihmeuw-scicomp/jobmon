@@ -21,7 +21,17 @@ function getAsyncWFdetail(setWFDict, wf_id: string) {
     const url = process.env.REACT_APP_BASE_URL + "/workflow_status_viz";
     const wf_ids = [wf_id];
     const fetchData = async () => {
-        const result: any = await axios.get(url, { params: { workflow_ids: wf_ids } });
+        const result: any = await axios({
+            method: 'get',
+            url: url,
+            data: null,
+            params: { workflow_ids: wf_ids },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+          }
+        )
         setWFDict(result.data[wf_id]);
     };
     return fetchData
@@ -30,7 +40,16 @@ function getAsyncWFdetail(setWFDict, wf_id: string) {
 function getWorkflowAttributes(wf_id: string, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc) {
     const url = process.env.REACT_APP_BASE_URL + "/workflow_details_viz/" + wf_id;
     const fetchData = async () => {
-        const result: any = await axios.get(url);
+        const result: any = await axios({
+            method: 'get',
+            url: url,
+            data: null,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+          }
+        )
         const data = result.data[0]
         setWFTool(data["tool_name"]);
         setWFName(data["wf_name"]);
@@ -46,7 +65,16 @@ function getWorkflowAttributes(wf_id: string, setWFTool, setWFName, setWFArgs, s
 function getAsyncTTdetail(setTTDict, wf_id: string, setTTLoaded) {
     const url = process.env.REACT_APP_BASE_URL + "/workflow_tt_status_viz/" + wf_id;
     const fetchData = async () => {
-        const result: any = await axios.get(url);
+        const result: any = await axios({
+            method: 'get',
+            url: url,
+            data: null,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+          }
+        )
         let return_array: any = [];
         for (let t in result.data) {
             return_array.push(result.data[t]);
@@ -61,7 +89,16 @@ function getAsyncErrorLogs(setErrorLogs, wf_id: string, setErrorLoading, tt_id?:
     setErrorLoading(true);
     const url = process.env.REACT_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
     const fetchData = async () => {
-        const result: any = await axios.get(url);
+        const result: any = await axios({
+            method: 'get',
+            url: url,
+            data: null,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+          }
+        )
         setErrorLogs(result.data);
         setErrorLoading(false);
     };
@@ -132,10 +169,17 @@ function WorkflowDetails({ subpage }) {
         setTaskLoading(true);
         let task_table_url = process.env.REACT_APP_BASE_URL + "/task_table_viz/" + workflowId;
         const fetchData = async () => {
-            const result: any = await axios.get(
-                task_table_url,
-                { params: { tt_name: task_template_name } }
-            );
+            const result: any = await axios({
+                method: 'get',
+                url: task_table_url,
+                data: null,
+                params: { tt_name: task_template_name },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+              }
+            )
             let tasks = result.data.tasks;
             setTasks(tasks);
             setTaskLoading(false);
@@ -163,6 +207,10 @@ function WorkflowDetails({ subpage }) {
                     task_template_version_id: task_template_version_id,
                     workflows: [workflowId],
                     viz: true
+                },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
             })
             let usage = result.data;

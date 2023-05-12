@@ -88,16 +88,14 @@ function App() {
     }
     const fetchData = async () => {
       const result: any = await axios({
-        method: 'get',
-        url: workflow_status_url,
-        params: params,
-        data: null,
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'}
-      }
-//         workflow_status_url,
-//         request
+            method: 'get',
+            url: workflow_status_url,
+            params: params,
+            data: null,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'}
+          }
       );
       let wfs = result.data.workflows;
       wfs.forEach((workflow) => {
