@@ -50,7 +50,9 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
                     "task_instance_id": e.task_instance_id,
                     "brief": error_display,
                     "date": date_display,
-                    "time": e.error_time
+                    "time": e.error_time,
+                    "error": e.error,
+                    "task_instance_stderr_log": e.task_instance_stderr_log
                 })
             }
         }
@@ -111,9 +113,8 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
             },
             events: {
                 onClick: (e, column, columnIndex, row, rowIndex) => {
-                    console.log(rowIndex);
                     setShowModal(true)
-                    setErrorDetail(errorLogs[rowIndex]);
+                    setErrorDetail(row);
                 }
             }
         }
