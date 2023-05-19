@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useForm } from "react-hook-form";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import Button from 'react-bootstrap/Button';
 import Form from 'react-bootstrap/Form';
 import Row from 'react-bootstrap/Row';
 import Col from 'react-bootstrap/Col';
@@ -75,9 +74,6 @@ function App() {
     params.append("wf_args", wf_args)
     params.append("date_submitted", date_submitted)
     params.append("status", status)
-    const request = {
-      params: params,
-    };
     let workflow_status_url = process.env.REACT_APP_BASE_URL + "/workflow_overview_viz";
     const workflow_status_renders = {
       "PENDING": (<div>< label className="label-middle" > <FaCircle className="bar-pp" /> </label><label className="label-left font-weight-300">PENDING  </label></div >),
@@ -126,7 +122,7 @@ function App() {
   });
 
   const handleClear = handleSubmit((d) => {
-    navigate('/?user=' + "&tool=" + "&wf_name=" + "&wf_args=" + "&date_submitted=" + "&status=");
+    navigate("/?user=&tool=&wf_name=&wf_args=&date_submitted=&status=");
     navigate(0)
   });
   //********************html page*************************************
