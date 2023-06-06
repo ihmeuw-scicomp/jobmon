@@ -246,17 +246,25 @@ def get_task_dependencies(task_id: int) -> Any:
         up_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.UP)
         down_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.DOWN)
         up_task_dict = _get_tasks_from_nodes(workflow_id, list(up_nodes), [], session)
-        down_task_dict = _get_tasks_from_nodes(workflow_id, list(down_nodes), [], session)
+        down_task_dict = _get_tasks_from_nodes(
+            workflow_id, list(down_nodes), [], session
+        )
     # return a "standard" json format so that it can be reused by future GUI
     up = (
         []
         if up_task_dict is None or len(up_task_dict) == 0
-        else [[{"id": k, "status": up_task_dict[k][0], "name": up_task_dict[k][1]}] for k in up_task_dict]
+        else [
+            [{"id": k, "status": up_task_dict[k][0], "name": up_task_dict[k][1]}]
+            for k in up_task_dict
+        ]
     )
     down = (
         []
         if down_task_dict is None or len(down_task_dict) == 0
-        else [[{"id": k, "status": down_task_dict[k][0], "name": down_task_dict[k][1]}] for k in down_task_dict]
+        else [
+            [{"id": k, "status": down_task_dict[k][0], "name": down_task_dict[k][1]}]
+            for k in down_task_dict
+        ]
     )
     resp = jsonify({"up": up, "down": down})
     resp.status_code = 200
@@ -491,23 +499,27 @@ def get_task_details(task_id: int) -> Any:
     """Get information about TaskInstances associated with specific Task ID."""
     session = SessionLocal()
     with session.begin():
-        query = select(
-            TaskInstance.id,
-            TaskInstanceStatus.label,
-            TaskInstance.stdout,
-            TaskInstance.stderr,
-            TaskInstance.stdout_log,
-            TaskInstance.stderr_log,
-            TaskInstance.distributor_id,
-            TaskInstance.nodename,
-            TaskInstanceErrorLog.description,
-        ).outerjoin_from(
-            TaskInstance,
-            TaskInstanceErrorLog,
-            TaskInstance.id == TaskInstanceErrorLog.task_instance_id,
-        ).where(
-            TaskInstance.task_id == task_id,
-            TaskInstance.status == TaskInstanceStatus.id,
+        query = (
+            select(
+                TaskInstance.id,
+                TaskInstanceStatus.label,
+                TaskInstance.stdout,
+                TaskInstance.stderr,
+                TaskInstance.stdout_log,
+                TaskInstance.stderr_log,
+                TaskInstance.distributor_id,
+                TaskInstance.nodename,
+                TaskInstanceErrorLog.description,
+            )
+            .outerjoin_from(
+                TaskInstance,
+                TaskInstanceErrorLog,
+                TaskInstance.id == TaskInstanceErrorLog.task_instance_id,
+            )
+            .where(
+                TaskInstance.task_id == task_id,
+                TaskInstance.status == TaskInstanceStatus.id,
+            )
         )
         rows = session.execute(query).all()
 
@@ -520,7 +532,7 @@ def get_task_details(task_id: int) -> Any:
         "ti_stderr_log",
         "ti_distributor_id",
         "ti_nodename",
-        "ti_error_log_description"
+        "ti_error_log_description",
     )
     result = [dict(zip(column_names, row)) for row in rows]
     resp = jsonify(taskinstances=result)

@@ -8,7 +8,6 @@ import pandas as pd
 from sqlalchemy import func, select, text, update
 import structlog
 
-from jobmon.core.constants import TaskStatus as TStatus
 from jobmon.core.constants import WorkflowStatus as Statuses
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.task import Task
