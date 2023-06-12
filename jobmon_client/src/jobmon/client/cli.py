@@ -460,7 +460,6 @@ class ClientCLI(CLI):
             "-p",
             "--partial_reset",
             help="Set to indicate Done tasks will not be reset",
-            type=bool,
             required=False,
             action="store_true",
         )

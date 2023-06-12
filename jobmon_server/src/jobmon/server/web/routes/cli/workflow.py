@@ -183,8 +183,9 @@ def get_workflow_run_for_workflow_reset(workflow_id: int, username: str) -> Any:
     with session.begin():
         query_filter = [
             WorkflowRun.workflow_id == workflow_id,
+            WorkflowRun.status == "E",
         ]
-        sql = (select(WorkflowRun).where(*query_filter)).order_by(
+        sql = (select(WorkflowRun.id, WorkflowRun.user).where(*query_filter)).order_by(
             WorkflowRun.created_date.desc()
         )
         rows = session.execute(sql).all()
