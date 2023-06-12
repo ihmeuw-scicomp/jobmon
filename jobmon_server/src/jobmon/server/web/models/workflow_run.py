@@ -1,4 +1,5 @@
 """Workflow run database table."""
+import datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import relationship
@@ -119,6 +120,17 @@ class WorkflowRun(Base):
     def is_active(self) -> bool:
         """Statuses where Workflow Run is active (bound or running)."""
         return self.status in [WorkflowRunStatus.BOUND, WorkflowRunStatus.RUNNING]
+
+    def terminable(self, current_time: datetime.datetime) -> bool:
+        """Whether a workflowrun can be terminated.
+
+        A workflowrun can be terminated if it is in Cold/Hot resume state and has missed
+        the last reporting heartbeat.
+        """
+        return (
+            (self.heartbeat_date <= current_time) and
+            (self.status in (WorkflowRunStatus.COLD_RESUME, WorkflowRunStatus.HOT_RESUME))
+        )
 
     def heartbeat(
         self,
