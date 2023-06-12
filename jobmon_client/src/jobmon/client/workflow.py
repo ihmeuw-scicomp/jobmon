@@ -530,7 +530,7 @@ class Workflow(object):
         logger.info("Adding task metadata to database")
         # Need to wait for resume signal to be sent before resetting tasks, in case of a resume
         factory = WorkflowRunFactory(self.workflow_id)
-        if resume:
+        if not self._newly_created and resume:
             factory.set_workflow_resume(
                 reset_running_jobs=reset_running_jobs, resume_timeout=resume_timeout
             )
