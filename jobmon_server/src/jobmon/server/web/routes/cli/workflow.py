@@ -442,6 +442,7 @@ def workflows_by_user_form() -> Any:
     tool = arguments.get("tool")
     wf_name = arguments.get("wf_name")
     wf_args = arguments.get("wf_args")
+    wf_attribute = arguments.get("wf_attribute")
     date_submitted = arguments.get("date_submitted")
     status = arguments.get("status")
 
@@ -461,6 +462,9 @@ def workflows_by_user_form() -> Any:
         if wf_args:
             where_clauses.append("workflow.workflow_args = :wf_args")
             substitution_dict["wf_args"] = wf_args
+        if wf_attribute:
+            where_clauses.append("workflow_attribute.value = :wf_attribute")
+            substitution_dict["wf_attribute"] = wf_attribute
         if date_submitted:
             where_clauses.append("workflow.created_date >= :date_submitted")
             substitution_dict["date_submitted"] = date_submitted
@@ -491,12 +495,13 @@ def workflows_by_user_form() -> Any:
                     WHERE
                         task.workflow_id IN (
                             SELECT
-                                workflow_id
+                                workflow_run.workflow_id
                             FROM
                                 workflow
                                 JOIN tool_version on workflow.tool_version_id = tool_version.id
                                 JOIN tool on tool.id = tool_version.tool_id
                                 JOIN workflow_run on workflow.id = workflow_run.workflow_id
+                                LEFT JOIN workflow_attribute on workflow.id = workflow_attribute.workflow_id
                             WHERE
                                 {inner_where_clause}
                         )

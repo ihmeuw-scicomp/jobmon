@@ -831,6 +831,29 @@ def test_workflow_details_viz(client_env, db_engine):
     return_code, msg = wf.requester.send_request(
         app_route=app_route, message={}, request_type="get"
     )
+    breakpoint()
     assert return_code == 200
     assert msg[0]["wf_status"] == "G"
     assert msg[0]["wf_status_desc"] == "Workflow is being validated."
+
+def test_workflow_overview_viz(client_env, db_engine):
+    tool_name = "task_detail_tool"
+    t = Tool(name=tool_name)
+    wf = t.create_workflow(name="another_fake_wf", workflow_attributes={"test_attribute": "test"})
+    tt1 = t.get_task_template(
+        template_name="tt_test", command_template="echo {arg}", node_args=["arg"]
+    )
+    t1 = tt1.create_task(
+        arg=1,
+        cluster_name="sequential",
+        compute_resources={"queue": "null.q", "num_cores": 2},
+    )
+    wf.add_tasks([t1])
+    wf.run()
+    app_route = f"/workflow_overview_viz"
+    return_code, msg = wf.requester.send_request(
+        app_route=app_route, message={"tool": "task_detail_tool", "attribute": "test"}, request_type="get"
+    )
+
+    assert return_code == 200
+    assert msg["workflows"][0]["wf_tool"] == tool_name
