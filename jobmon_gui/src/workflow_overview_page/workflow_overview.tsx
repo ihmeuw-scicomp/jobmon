@@ -21,6 +21,7 @@ function App() {
   const [tool, setTool] = useState('');
   const [wf_name, setWFName] = useState('');
   const [wf_args, setWFArgs] = useState('');
+  const [wf_attribute, setWFAttribute] = useState('');
   const [date_submitted, setDateSubmitted] = useState('');
   const [status, setStatus] = useState('');
   const [workflows, setWorkflows] = useState([]);
@@ -36,6 +37,7 @@ function App() {
     let url_tool = searchParams.get("tool");
     let url_wf_name = searchParams.get("wf_name");
     let url_wf_args = searchParams.get("wf_args");
+    let url_wf_attribute = searchParams.get("wf_attribute")
     let url_date_submitted = searchParams.get("date_submitted");
     let url_status = searchParams.get("status");
     if (url_user !== null && url_user !== "" && url_user !== undefined) {
@@ -49,6 +51,9 @@ function App() {
     }
     if (url_wf_args !== null && url_wf_args !== "" && url_wf_args !== undefined) {
       setWFArgs(url_wf_args)
+    }
+    if (url_wf_attribute !== null && url_wf_attribute !== "" && url_wf_attribute !== undefined) {
+      setWFAttribute(url_wf_attribute)
     }
     if (url_date_submitted !== null && url_date_submitted !== "" && url_date_submitted !== undefined) {
       setDateSubmitted(url_date_submitted)
@@ -72,6 +77,7 @@ function App() {
     params.append("tool", tool)
     params.append("wf_name", wf_name)
     params.append("wf_args", wf_args)
+    params.append("wf_attribute", wf_attribute)
     params.append("date_submitted", date_submitted)
     params.append("status", status)
     let workflow_status_url = process.env.REACT_APP_BASE_URL + "/workflow_overview_viz";
@@ -105,24 +111,25 @@ function App() {
     };
     fetchData();
     safe_rum_unit_end(rum_s1);
-  }, [user, tool, wf_name, wf_args, date_submitted, status]);
+  }, [user, tool, wf_name, wf_args, wf_attribute, date_submitted, status]);
 
 
   //*******************event handling****************************
   // user form
   const { register, handleSubmit } = useForm();
   const onSubmit = handleSubmit((d) => {
-    navigate('/?user=' + d["user_input"] + "&tool=" + d["tool_input"] + "&wf_name=" + d["wf_name_input"] + "&wf_args=" + d["wf_args_input"] + "&date_submitted=" + d["date_submitted_input"] + "&status=" + d["status"]);
+    navigate('/?user=' + d["user_input"] + "&tool=" + d["tool_input"] + "&wf_name=" + d["wf_name_input"] + "&wf_args=" + d["wf_args_input"] + "&wf_attribute=" + d["wf_attribute_input"] + "&date_submitted=" + d["date_submitted_input"] + "&status=" + d["status"]);
     setUser(d["user_input"]);
     setTool(d["tool_input"])
     setWFName(d["wf_name_input"])
     setWFArgs(d["wf_args_input"])
+    setWFAttribute(d["wf_attribute_input"])
     setDateSubmitted(d["date_submitted_input"])
     setStatus(d["status"])
   });
 
   const handleClear = handleSubmit((d) => {
-    navigate("/?user=&tool=&wf_name=&wf_args=&date_submitted=&status=");
+    navigate("/?user=&tool=&wf_name=&wf_args=&wf_attribute=&date_submitted=&status=");
     navigate(0)
   });
   //********************html page*************************************
@@ -144,6 +151,11 @@ function App() {
             <Form.Group as={Col} controlId="formGridEmail">
               <Form.Label><span className='m-2'> Workflow Args</span></Form.Label>
               <Form.Control type="text" placeholder="Workflow Args" defaultValue={wf_args} {...register("wf_args_input")} />
+            </Form.Group>
+
+            <Form.Group as={Col} controlId="formGridEmail">
+              <Form.Label><span className='m-2'> Workflow Attribute</span></Form.Label>
+              <Form.Control type="text" placeholder="Workflow Attribute" defaultValue={wf_attribute} {...register("wf_attribute_input")} />
             </Form.Group>
 
             <Form.Group as={Col} controlId="formGridPassword">
