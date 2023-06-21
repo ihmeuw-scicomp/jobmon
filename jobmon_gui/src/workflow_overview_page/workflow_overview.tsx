@@ -154,8 +154,8 @@ function App() {
             </Form.Group>
 
             <Form.Group as={Col} controlId="formWFAttribute">
-              <Form.Label><span className='m-2'> Workflow Attribute</span></Form.Label>
-              <Form.Control type="text" placeholder="Workflow Attribute" defaultValue={wf_attribute} {...register("wf_attribute_input")} />
+              <Form.Label><span className='m-2'> Workflow Attribute Value</span></Form.Label>
+              <Form.Control type="text" placeholder="Workflow Attribute Value" defaultValue={wf_attribute} {...register("wf_attribute_input")} />
             </Form.Group>
 
             <Form.Group as={Col} controlId="formTool">
