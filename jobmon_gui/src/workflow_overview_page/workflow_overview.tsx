@@ -143,34 +143,34 @@ function App() {
       <div className="div-level-2">
         <form>
           <Row className="mb-3">
-            <Form.Group as={Col} controlId="formGridEmail">
+            <Form.Group as={Col} controlId="formUsername">
               <Form.Label><span className='m-2'> Username</span></Form.Label>
               <Form.Control type="text" placeholder="Username" defaultValue={user} {...register("user_input")} />
             </Form.Group>
 
-            <Form.Group as={Col} controlId="formGridEmail">
+            <Form.Group as={Col} controlId="formWFArgs">
               <Form.Label><span className='m-2'> Workflow Args</span></Form.Label>
               <Form.Control type="text" placeholder="Workflow Args" defaultValue={wf_args} {...register("wf_args_input")} />
             </Form.Group>
 
-            <Form.Group as={Col} controlId="formGridEmail">
+            <Form.Group as={Col} controlId="formWFAttribute">
               <Form.Label><span className='m-2'> Workflow Attribute</span></Form.Label>
               <Form.Control type="text" placeholder="Workflow Attribute" defaultValue={wf_attribute} {...register("wf_attribute_input")} />
             </Form.Group>
 
-            <Form.Group as={Col} controlId="formGridPassword">
+            <Form.Group as={Col} controlId="formTool">
               <Form.Label><span className='m-2'> Tool</span></Form.Label>
               <Form.Control type="text" placeholder="Tool" defaultValue={tool} {...register("tool_input")} />
             </Form.Group>
           </Row>
 
           <Row className="mb-3">
-            <Form.Group as={Col} controlId="formGridPassword">
+            <Form.Group as={Col} controlId="formWFDate">
               <Form.Label><span className='m-2'> Date Workflow Was Submitted - On or After Date</span></Form.Label>
               <Form.Control type="date" defaultValue={date_submitted} {...register("date_submitted_input")} />
             </Form.Group>
 
-            <Form.Group as={Col} controlId="formGridPassword">
+            <Form.Group as={Col} controlId="formWFName">
               <Form.Label><span className='m-2'> Workflow Name</span></Form.Label>
               <Form.Control type="text" placeholder="Workflow Name" defaultValue={wf_name} {...register("wf_name_input")} />
             </Form.Group>
