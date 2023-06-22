@@ -441,13 +441,18 @@ class WorkerNodeTaskInstance:
         poll_interval: float = 1.0,
     ) -> str:
         mem_buffer = ""
+        output_block = b''
         while not async_stream.at_eof():
-            output_block = await async_stream.read(100)
-            output_block_str = output_block.decode()
-            output_stream.write(output_block_str)
-            output_stream.flush()
-            mem_buffer += output_block_str
-            mem_buffer = mem_buffer[-10000:]
+            output_block += await async_stream.read(64)
+            try:
+                output_block_str = output_block.decode()
+                output_stream.write(output_block_str)
+                output_stream.flush()
+                mem_buffer += output_block_str
+                mem_buffer = mem_buffer[-10000:]
+                output_block = b''
+            except UnicodeDecodeError:
+                pass
         return mem_buffer
 
     async def _process_poller(self, process: asyncio.subprocess.Process) -> int:
