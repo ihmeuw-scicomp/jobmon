@@ -203,14 +203,24 @@ def get_workflow_run_for_workflow_reset(workflow_id: int, username: str) -> Any:
 def reset_workflow(workflow_id: int) -> Any:
     """Update the workflow's status, all its tasks' statuses to 'G'."""
     session = SessionLocal()
+    data = request.get_json()
+    partial_reset = data.get("partial_reset", False)
     with session.begin():
-        update_stmt = (
-            update(Workflow)
-            .where(Workflow.id == workflow_id)
-            .values(status="G", status_date=func.now())
-        )
-        session.execute(update_stmt)
-        update_filter = [Task.workflow_id == workflow_id, Task.status != "G"]
+
+        current_time = session.query(func.now()).scalar()
+
+        workflow_query = select(Workflow).where(Workflow.id == workflow_id)
+        workflow = session.execute(workflow_query).scalars().one_or_none()
+        workflow.reset(current_time=current_time)
+        session.flush()
+
+        # Update task statuses associated with the workflow
+        # Default behavior is a full workflow reset, all tasks to registered state
+        # User can optionally request only a partial reset if they want to resume this workflow
+        invalid_statuses = ["G"]
+        if partial_reset:
+            invalid_statuses.append("D")
+        update_filter = [Task.workflow_id == workflow_id, Task.status.notin_(invalid_statuses)]
         update_stmt = (
             update(Task)
             .where(*update_filter)
