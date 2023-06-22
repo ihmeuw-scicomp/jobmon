@@ -507,7 +507,7 @@ def test_swarm_terminate(tool):
     assert len(swarm.ready_to_run) == 0
 
 
-def test_resume_from_workflow_id(tool, task_template):
+def test_build_swarm_from_workflow_id(tool, task_template):
     workflow = tool.create_workflow()
 
     # Create a small example DAG.
@@ -574,3 +574,6 @@ def test_resume_from_workflow_id(tool, task_template):
     resume_swarm.set_initial_fringe()
     assert len(resume_swarm.ready_to_run) == 1
     assert resume_swarm.ready_to_run[0] == st3
+
+    # Run a full sync, test that no keyerrors are raised
+    resume_swarm._task_status_updates(full_sync=True)

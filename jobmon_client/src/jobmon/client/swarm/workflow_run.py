@@ -855,6 +855,7 @@ class WorkflowRun:
 
         new_status_tasks: Set[SwarmTask] = set()
         for current_status, task_ids in response["tasks_by_status"].items():
+            task_ids = set(task_ids).intersection(self.tasks)
             for task_id in task_ids:
                 task = self.tasks[task_id]
                 if current_status != task.status:
