@@ -414,6 +414,10 @@ class WorkerNodeTaskInstance:
             # otherwise raise the error cause we are in trouble
             else:
                 raise e
+        except Exception as e:
+            msg = f"jobmon error. worker_node failed with jobmon exception: {e}"
+            logger.error(msg)
+            self.log_error(TaskInstanceStatus.ERROR_FATAL, msg)
 
         # normal happy path
         else:
