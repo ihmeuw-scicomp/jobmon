@@ -855,7 +855,7 @@ def test_task_details_by_wf_id(client_env, db_engine):
     assert len(tasks) == 1
     assert tasks[0]["task_command"] == "echo 1"
     assert tasks[0]["task_name"] == "tt_test_arg-1"
-    assert tasks[0]["task_status"] == "REGISTERING"
+    assert tasks[0]["task_status"] == "PENDING"
 
 
 def test_workflow_details_viz(client_env, db_engine):
@@ -876,10 +876,10 @@ def test_workflow_details_viz(client_env, db_engine):
     return_code, msg = wf.requester.send_request(
         app_route=app_route, message={}, request_type="get"
     )
-    breakpoint()
     assert return_code == 200
     assert msg[0]["wf_status"] == "G"
     assert msg[0]["wf_status_desc"] == "Workflow is being validated."
+
 
 def test_workflow_overview_viz(client_env, db_engine):
     tool_name = "task_detail_tool"
