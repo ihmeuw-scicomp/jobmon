@@ -10,12 +10,16 @@ import {
 } from "react-router-dom";
 import WorkflowDetails from './workflow_details_page/workflow_details_page'
 import TaskDetails from './task_details_page/task_details';
+import Help from './help_page/help';
+import { LeftHandNavBar } from "bifrost";
 
+const ihme_deployment = true
 const root = ReactDOM.createRoot(
     document.getElementById('root') as HTMLElement
 );
 root.render(
   <HashRouter>
+    {process.env.REACT_APP_DEPLOYMENT_TYPE === "ihme" && <LeftHandNavBar/>}
     <Routes>
       <Route path="workflow">
         <Route path=":workflowId/tasks" element={<WorkflowDetails subpage="tasks" />} />
@@ -23,6 +27,7 @@ root.render(
         <Route path=":workflowId/errors" element={<WorkflowDetails subpage="errors" />} />
       </Route>
       <Route path="task_details/:taskId" element={<TaskDetails />}></Route>
+      <Route path="help" element={<Help />}></Route>
       <Route path="/" element={<App />} />
       <Route
         path="*"
