@@ -344,6 +344,16 @@ class Task:
             )
         return self._workflow
 
+    @property
+    def labels(self) -> Dict[str, Any]:
+        """Return the label map for the Task."""
+        return dict(
+            **self.task_attributes,
+            **self.task_args,
+            **self.node.node_args,
+            task_template_name=self.node.task_template_version.task_template.template_name,
+        )
+
     @workflow.setter
     def workflow(self, val: Workflow) -> None:
         self._workflow = val

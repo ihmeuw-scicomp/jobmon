@@ -429,3 +429,24 @@ def test_default_max_attemps(db_engine, client_env, tool):
     # test wf always have a default max attempts so existing code works
     wf5 = tool.create_workflow(default_max_attempts=None)
     assert wf5.default_max_attempts == tool.default_max_attempts is not None
+
+
+def test_labels(tool):
+    """Assert that labels contains all node args, task args and attributes."""
+    tt = tool.get_task_template(
+        template_name="test_tt1",
+        command_template="true|| abc {arg1} {arg2}",
+        node_args=["arg1"],
+        task_args=["arg2"],
+    )
+
+    task = tt.create_task(
+        name="task1",
+        arg1="arg1_1",
+        arg2="arg2_1",
+    )
+    task.add_attribute("attribute", "value")
+
+    expected_labels = {"arg1": "arg1_1", "arg2": "arg2_1", "attribute": "value"}
+
+    assert task.labels == expected_labels
