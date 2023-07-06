@@ -385,7 +385,6 @@ def test_worker_node_add_attributes(tool, db_engine):
 
 
 class UnicodeInstance(WorkerNodeTaskInstance):
-
     def __init__(self, command):
         self._command = command
         self.last_heartbeat_time = time.time()

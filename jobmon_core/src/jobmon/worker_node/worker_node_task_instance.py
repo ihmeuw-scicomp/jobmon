@@ -441,7 +441,7 @@ class WorkerNodeTaskInstance:
         poll_interval: float = 1.0,
     ) -> str:
         mem_buffer = ""
-        output_block = b''
+        output_block = b""
         while not async_stream.at_eof():
             output_block += await async_stream.read(64)
             try:
@@ -450,7 +450,7 @@ class WorkerNodeTaskInstance:
                 output_stream.flush()
                 mem_buffer += output_block_str
                 mem_buffer = mem_buffer[-10000:]
-                output_block = b''
+                output_block = b""
             except UnicodeDecodeError:
                 pass
         return mem_buffer

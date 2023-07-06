@@ -127,9 +127,8 @@ class WorkflowRun(Base):
         A workflowrun can be terminated if it is in Cold/Hot resume state and has missed
         the last reporting heartbeat.
         """
-        return (
-            (self.heartbeat_date <= current_time) and
-            (self.status in (WorkflowRunStatus.COLD_RESUME, WorkflowRunStatus.HOT_RESUME))
+        return (self.heartbeat_date <= current_time) and (
+            self.status in (WorkflowRunStatus.COLD_RESUME, WorkflowRunStatus.HOT_RESUME)
         )
 
     def heartbeat(

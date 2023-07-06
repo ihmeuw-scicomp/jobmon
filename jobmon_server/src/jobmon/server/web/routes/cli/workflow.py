@@ -206,7 +206,6 @@ def reset_workflow(workflow_id: int) -> Any:
     data = request.get_json()
     partial_reset = data.get("partial_reset", False)
     with session.begin():
-
         current_time = session.query(func.now()).scalar()
 
         workflow_query = select(Workflow).where(Workflow.id == workflow_id)
@@ -220,7 +219,10 @@ def reset_workflow(workflow_id: int) -> Any:
         invalid_statuses = ["G"]
         if partial_reset:
             invalid_statuses.append("D")
-        update_filter = [Task.workflow_id == workflow_id, Task.status.notin_(invalid_statuses)]
+        update_filter = [
+            Task.workflow_id == workflow_id,
+            Task.status.notin_(invalid_statuses),
+        ]
         update_stmt = (
             update(Task)
             .where(*update_filter)
