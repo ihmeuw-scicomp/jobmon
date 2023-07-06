@@ -180,8 +180,8 @@ class ClientCLI(CLI):
         from jobmon.client.status_commands import workflow_reset
 
         response = workflow_reset(
-            workflow_id=args.workflow_id,
-            partial_reset=args.partial_reset)
+            workflow_id=args.workflow_id, partial_reset=args.partial_reset
+        )
         print(f"Response is: {response}")
 
     @staticmethod

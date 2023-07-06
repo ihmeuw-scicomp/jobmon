@@ -91,7 +91,7 @@ class WorkflowRunFactory:
     def create_workflow_run(
         self,
         workflow_run_heartbeat_interval: Optional[int] = None,
-        heartbeat_report_by_buffer: Optional[float] = None
+        heartbeat_report_by_buffer: Optional[float] = None,
     ) -> WorkflowRun:
         """Workflow should at least have signalled for a resume at this point."""
         # create workflow run
@@ -99,7 +99,7 @@ class WorkflowRunFactory:
             workflow_id=self.workflow_id,
             requester=self.requester,
             workflow_run_heartbeat_interval=workflow_run_heartbeat_interval,
-            heartbeat_report_by_buffer=heartbeat_report_by_buffer
+            heartbeat_report_by_buffer=heartbeat_report_by_buffer,
         )
         client_wfr.bind()
 

@@ -6,7 +6,10 @@ import pandas as pd
 from jobmon.client.api import Tool
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import (
-    MaxConcurrentlyRunning, TaskStatus, WorkflowRunStatus, WorkflowStatus
+    MaxConcurrentlyRunning,
+    TaskStatus,
+    WorkflowRunStatus,
+    WorkflowStatus,
 )
 from jobmon.server.web.models import load_model
 from jobmon.server.web.models.task import Task
@@ -330,25 +333,35 @@ def test_reset_workflow(db_engine, tool, web_server_in_memory):
 
     app_route = f"/workflow/{wf.workflow_id}/reset"
     return_code, msg = wf.requester.send_request(
-        app_route=app_route, message={'partial_reset': True}, request_type="put"
+        app_route=app_route, message={"partial_reset": True}, request_type="put"
     )
     assert return_code == 200
 
     with Session(bind=db_engine) as session:
-        wf_status = session.execute(
-            select(Workflow.status).where(Workflow.id == wf.workflow_id)
-        ).scalars().all()
+        wf_status = (
+            session.execute(
+                select(Workflow.status).where(Workflow.id == wf.workflow_id)
+            )
+            .scalars()
+            .all()
+        )
         assert set(wf_status) == {WorkflowStatus.REGISTERING}
 
-        task_statuses = session.execute(
-            select(Task.status).where(Task.workflow_id == wf.workflow_id)
-        ).scalars().all()
+        task_statuses = (
+            session.execute(
+                select(Task.status).where(Task.workflow_id == wf.workflow_id)
+            )
+            .scalars()
+            .all()
+        )
         # With a partial reset, the done task should remain in that state
         assert set(task_statuses) == {TaskStatus.REGISTERING, TaskStatus.DONE}
 
     # Check that the workflow is resumable
     return_code, response = wf.requester.send_request(
-        app_route=f"/workflow/{wf.workflow_id}/is_resumable", message={}, request_type="get"
+        app_route=f"/workflow/{wf.workflow_id}/is_resumable",
+        message={},
+        request_type="get",
     )
 
     workflow_is_resumable = bool(response.get("workflow_is_resumable"))
@@ -356,14 +369,17 @@ def test_reset_workflow(db_engine, tool, web_server_in_memory):
 
     # Signal for a full reset
     _ = wf.requester.send_request(
-        app_route=app_route, message={'partial_reset': False}, request_type="put"
+        app_route=app_route, message={"partial_reset": False}, request_type="put"
     )
 
     with Session(bind=db_engine) as session:
-
-        task_statuses = session.execute(
-            select(Task.status).where(Task.workflow_id == wf.workflow_id)
-        ).scalars().all()
+        task_statuses = (
+            session.execute(
+                select(Task.status).where(Task.workflow_id == wf.workflow_id)
+            )
+            .scalars()
+            .all()
+        )
         # With a full reset, all tasks should be registering
         assert set(task_statuses) == {TaskStatus.REGISTERING}
 
@@ -884,7 +900,9 @@ def test_workflow_details_viz(client_env, db_engine):
 def test_workflow_overview_viz(client_env, db_engine):
     tool_name = "task_detail_tool"
     t = Tool(name=tool_name)
-    wf = t.create_workflow(name="another_fake_wf", workflow_attributes={"test_attribute": "test"})
+    wf = t.create_workflow(
+        name="another_fake_wf", workflow_attributes={"test_attribute": "test"}
+    )
     tt1 = t.get_task_template(
         template_name="tt_test", command_template="echo {arg}", node_args=["arg"]
     )
@@ -897,7 +915,9 @@ def test_workflow_overview_viz(client_env, db_engine):
     wf.run()
     app_route = f"/workflow_overview_viz"
     return_code, msg = wf.requester.send_request(
-        app_route=app_route, message={"tool": "task_detail_tool", "attribute": "test"}, request_type="get"
+        app_route=app_route,
+        message={"tool": "task_detail_tool", "attribute": "test"},
+        request_type="get",
     )
 
     assert return_code == 200
