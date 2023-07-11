@@ -9,4 +9,4 @@ Submitting a ticket is always a good way to get your Jobmon problems addressed o
 You can submit a new ticket [here](https://helpdesk.ihme.washington.edu/tickets/)
 
 ## Documentation
-You can see the Jobmon documentation [here](https://scicomp-docs.ihme.washington.edu/jobmon/current/quickstart.html)
+You can view the Jobmon documentation [here](https://scicomp-docs.ihme.washington.edu/jobmon/current/quickstart.html)
