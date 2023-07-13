@@ -409,6 +409,8 @@ def get_workflow_status_viz() -> Any:
             ).where(Task.workflow_id == wf_id)
             attempts = session.execute(sql).all()
 
+        logger.debug(f"Attempts: {attempts}")
+        logger.debug(f"num_attempts_avg: {float(attempts[0]['mean'])}")
         return_dic[int(wf_id)] = {
             "id": int(wf_id),
             "tasks": 0,
