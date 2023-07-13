@@ -407,10 +407,8 @@ def get_workflow_status_viz() -> Any:
                 func.max(Task.num_attempts).label("max"),
                 func.avg(Task.num_attempts).label("mean"),
             ).where(Task.workflow_id == wf_id)
-            attempts = session.execute(sql).all()
+            attempts = session.execute(sql).first()
 
-        logger.debug(f"Attempts: {attempts}")
-        logger.debug(f"num_attempts_avg: {float(attempts[0]['mean'])}")
         return_dic[int(wf_id)] = {
             "id": int(wf_id),
             "tasks": 0,
@@ -420,9 +418,9 @@ def get_workflow_status_viz() -> Any:
             "DONE": 0,
             "FATAL": 0,
             "MAXC": 0,
-            "num_attempts_avg": float(attempts[0]["mean"]),
-            "num_attempts_min": int(attempts[0]["min"]),
-            "num_attempts_max": int(attempts[0]["max"]),
+            "num_attempts_avg": float(attempts.mean),
+            "num_attempts_min": int(attempts.min),
+            "num_attempts_max": int(attempts.max),
         }
 
     with session.begin():

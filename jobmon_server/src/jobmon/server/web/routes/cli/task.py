@@ -378,7 +378,11 @@ def _get_tasks_recursive(
 
 def _get_dag_and_wf_id(task_id: int, session: Session) -> tuple:
     select_stmt = (
-        select(Workflow.dag_id, Task.workflow_id, Task.node_id)
+        select(
+            Workflow.dag_id.label("dag_id"),
+            Task.workflow_id.label("workflow_id"),
+            Task.node_id.label("node_id")
+        )
         .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
         .where(Task.id == task_id)
     )
@@ -386,7 +390,7 @@ def _get_dag_and_wf_id(task_id: int, session: Session) -> tuple:
 
     if row is None:
         return None, None, None
-    return int(row.dag_id), int(row["workflow_id"]), int(row["node_id"])
+    return int(row.dag_id), int(row.workflow_id), int(row.node_id)
 
 
 def _get_node_dependencies(
