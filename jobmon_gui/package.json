@@ -13,7 +13,7 @@
     "@types/react": "^18.0.9",
     "@types/react-dom": "^18.0.4",
     "axios": "^0.23.0",
-    "bifrost": "git+ssh://git@stash.ihme.washington.edu:7999/scic/bifrost.git#feature/GBDSCI-5311-create-a-left-hand-nav-bar-component-in-bifrost",
+    "bifrost": "git+ssh://git@stash.ihme.washington.edu:7999/scic/bifrost.git#main",
     "bootstrap": "^4.6.1",
     "dompurify": "2.4.1",
     "fortawesome": "0.0.1-security",
