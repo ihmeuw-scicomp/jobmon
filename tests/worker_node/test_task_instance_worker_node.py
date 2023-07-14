@@ -5,7 +5,7 @@ import time
 from typing import Dict
 
 from unittest.mock import patch
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from jobmon.client.workflow_run import WorkflowRunFactory
@@ -221,12 +221,14 @@ def test_ti_kill_self_state(db_engine, tool):
         # set task to kill self state. next heartbeat will fail and cause death
         with Session(bind=db_engine) as session:
             session.execute(
-                """
-                UPDATE task_instance
-                SET status = '{}'
-                WHERE task_instance.task_id = {}
-                """.format(
-                    TaskInstanceStatus.KILL_SELF, task_a.task_id
+                text(
+                    """
+                    UPDATE task_instance
+                    SET status = '{}'
+                    WHERE task_instance.task_id = {}
+                    """.format(
+                        TaskInstanceStatus.KILL_SELF, task_a.task_id
+                    )
                 )
             )
             session.commit()
@@ -292,7 +294,7 @@ def test_limited_error_log(tool, db_engine):
             "AND t2.workflow_run_id=t3.id "
             "AND t3.workflow_id={}".format(wf.workflow_id)
         )
-        res = session.execute(query).fetchone()
+        res = session.execute(text(query)).fetchone()
 
     error = res[0]
     assert error == (("a" * 2**10 + "\n") * (2**8))[-10000:]
@@ -379,7 +381,7 @@ def test_worker_node_add_attributes(tool, db_engine):
     # check db
     with Session(bind=db_engine) as session:
         query = "SELECT * FROM task_attribute where task_id = {}".format(task.task_id)
-        for row in session.execute(query).fetchall():
+        for row in session.execute(text(query)).fetchall():
             _, _, val = row
             assert val in ["1", "zzz"]
 

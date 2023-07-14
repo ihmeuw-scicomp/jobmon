@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 import getpass
 import pandas as pd
 
@@ -490,7 +490,7 @@ def test_get_array_task_instances(db_engine, tool):
                     SET stdout="/cool/filepath.o",
                     stderr="/cool/filepath.e"
                 """
-        session.execute(query)
+        session.execute(text(query))
         session.commit()
     app_route = f"/array/{wf.workflow_id}/get_array_tasks"
     return_code, msg = wf.requester.send_request(
@@ -716,11 +716,13 @@ def test_get_workflow_tt_status_viz(client_env, db_engine):
     # set one task to F to test TT with more than one task status
     with Session(bind=db_engine) as session:
         session.execute(
-            f"""
-            UPDATE task
-            SET status="F"
-            WHERE id={t2.task_id}
-            """
+            text(
+                f"""
+                UPDATE task
+                SET status="F"
+                WHERE id={t2.task_id}
+                """
+            )
         )
         session.commit()
     app_route = f"/workflow_tt_status_viz/{wf.workflow_id}"
@@ -777,9 +779,11 @@ def test_get_workflow_tt_status_viz(client_env, db_engine):
     # test 3.0 records
     with Session(bind=db_engine) as session:
         session.execute(
-            """
-            DELETE FROM array
-            """
+            text(
+                """
+                DELETE FROM array
+                """
+            )
         )
         session.commit()
     app_route = f"/workflow_tt_status_viz/{wf.workflow_id}"

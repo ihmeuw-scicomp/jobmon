@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from jobmon.client.task import Task
@@ -181,33 +181,41 @@ def test_get_errors(db_engine, tool):
     with Session(bind=db_engine) as session:
         # fake workflow run
         session.execute(
-            """
-            UPDATE workflow_run
-            SET status ='{s}'
-            WHERE id={wfr_id}""".format(
-                s=WorkflowRunStatus.RUNNING, wfr_id=wfr_1.workflow_run_id
+            text(
+                """
+                UPDATE workflow_run
+                SET status ='{s}'
+                WHERE id={wfr_id}""".format(
+                    s=WorkflowRunStatus.RUNNING, wfr_id=wfr_1.workflow_run_id
+                )
             )
         )
         session.execute(
-            """
-            INSERT INTO task_instance (workflow_run_id, task_id, status)
-            VALUES ({wfr_id}, {t_id}, '{s}')
-            """.format(
-                wfr_id=wfr_1.workflow_run_id,
-                t_id=task_a.task_id,
-                s=TaskInstanceStatus.LAUNCHED,
+            text(
+                """
+                INSERT INTO task_instance (workflow_run_id, task_id, status)
+                VALUES ({wfr_id}, {t_id}, '{s}')
+                """.format(
+                    wfr_id=wfr_1.workflow_run_id,
+                    t_id=task_a.task_id,
+                    s=TaskInstanceStatus.LAUNCHED,
+                )
             )
         )
         ti = session.execute(
-            "SELECT id from task_instance where task_id={}".format(task_a.task_id)
+            text(
+                "SELECT id from task_instance where task_id={}".format(task_a.task_id)
+            )
         ).fetchone()
         ti_id = ti[0]
         session.execute(
-            """
-            UPDATE task
-            SET status ='{s}'
-            WHERE id={t_id}""".format(
-                s=TaskStatus.INSTANTIATING, t_id=task_a.task_id
+            text(
+                """
+                UPDATE task
+                SET status ='{s}'
+                WHERE id={t_id}""".format(
+                    s=TaskStatus.INSTANTIATING, t_id=task_a.task_id
+                )
             )
         )
         session.commit()
@@ -261,11 +269,13 @@ def test_reset_attempts_on_resume(db_engine, tool):
     # now set everything to error fail
     with Session(bind=db_engine) as session:
         session.execute(
-            """
-            UPDATE task
-            SET status='{s}', num_attempts=3, max_attempts=3
-            WHERE task.id={task_id}""".format(
-                s=TaskStatus.ERROR_FATAL, task_id=task_a.task_id
+            text(
+                """
+                UPDATE task
+                SET status='{s}', num_attempts=3, max_attempts=3
+                WHERE task.id={task_id}""".format(
+                    s=TaskStatus.ERROR_FATAL, task_id=task_a.task_id
+                )
             )
         )
 
@@ -338,13 +348,13 @@ def test_binding_tasks(db_engine, client_env, tool):
     assert task1.task_id is not None
     with Session(bind=db_engine) as session:
         # verify attribute
-        mysql = f"select value from task_attribute where task_id={task1.task_id}"
-        rows = session.execute(mysql).fetchall()
+        mysql = f"SELECT value FROM task_attribute WHERE task_id={task1.task_id}"
+        rows = session.execute(text(mysql)).fetchall()
         assert len(rows[0]) == 1
         assert rows[0][0] == "a"
         # verify args
-        mysql = f"select val from task_arg where task_id={task1.task_id}"
-        rows = session.execute(mysql).fetchall()
+        mysql = f"SELECT val FROM task_arg WHERE task_id={task1.task_id}"
+        rows = session.execute(text(mysql)).fetchall()
         print(f"!!!!!!!!!!!!!{rows}")
         result_set = {rows[0][0], rows[1][0]}
         assert result_set == {"def", "ghi"}
