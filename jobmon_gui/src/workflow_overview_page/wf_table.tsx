@@ -378,7 +378,7 @@ export default function JobmonWFTable({ allData }) {
                                 expandRow={expandRow}
                                 headerClasses="thead-dark"
                                 striped
-                                pagination={allData.length === 0 ? undefined : paginationFactory({ sizePerPage: 10 })}
+                                pagination={allData.length === 0 ? undefined : paginationFactory({ sizePerPage: 50 })}
                             />
                         </div>
                     )

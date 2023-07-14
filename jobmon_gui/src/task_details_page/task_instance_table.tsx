@@ -5,6 +5,7 @@ import paginationFactory from "react-bootstrap-table2-paginator";
 import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
 import { FaCaretDown, FaCaretUp, FaLightbulb } from "react-icons/fa";
+import { HiInformationCircle } from "react-icons/hi";
 import CustomModal from '../Modal';
 import { sanitize } from 'dompurify';
 
@@ -18,6 +19,7 @@ const customCaret = (order, column) => {
 export default function TaskInstanceTable({ taskInstanceData }) {
     const [showStdoutModal, setShowStdoutModal] = useState(false)
     const [showStderrModal, setShowStderrModal] = useState(false)
+    const [showTIStatusModal, setShowTIStatusModal] = useState(false)
 
     // ti_stderr_log is pulled from task_instance.stderr_log, ti_error_log_description is pulled from task_instance_error_log.description
     const [rowDetail, setRowDetail] = useState({
@@ -142,29 +144,9 @@ export default function TaskInstanceTable({ taskInstanceData }) {
                 <header className="header-1">
                     <p className='color-dark'>
                         Task Instances&nbsp;
-                        <OverlayTrigger
-                            placement="right"
-                            trigger={["hover", "focus"]}
-                            overlay={(
-                                <Popover id="task_instance_explanation" className='ti-popover-body'>
-                                    <p><b>Submitted to Batch Distributor:</b> TaskInstance registered in the Jobmon database.</p>
-                                    <p><b>Done:</b> TaskInstance finished successfully.</p>
-                                    <p><b>Error:</b> TaskInstance stopped with an application error (non-zero return code).</p>
-                                    <p><b>Error Fatal:</b> TaskInstance killed itself as part of a cold workflow resume, and cannot be retried.</p>
-                                    <p><b>Instantiated:</b> TaskInstance is created within Jobmon, but not queued for submission to the cluster.</p>
-                                    <p><b>Kill Self:</b> TaskInstance has been ordered to kill itself if it is still alive, as part of a cold workflow resume.</p>
-                                    <p><b>Launched:</b> TaskInstance submitted to the cluster normally, part of a Job Array.</p>
-                                    <p><b>Queued:</b> TaskInstance is queued for submission to the cluster.</p>
-                                    <p><b>Running:</b> TaskInstance has started running normally.</p>
-                                    <p><b>Triaging:</b> TaskInstance has errored, Jobmon is determining the category of error.</p>
-                                    <p><b>Unknown Error:</b> TaskInstance stopped reporting that it was alive for an unknown reason.</p>
-                                    <p><b>No Distributor ID:</b> TaskInstance submission within Jobmon failed – did not receive a job number from the cluster.</p>
-                                    <p><b>Resource Error:</b> TaskInstance died because of insufficient resource request, i.e. insufficient memory or runtime.</p>
-                                </Popover>
-                            )}
-                        >
-                            <span><FaLightbulb /></span>
-                        </OverlayTrigger>
+                        <span>
+                            <HiInformationCircle onClick={() => setShowTIStatusModal(true)} />
+                        </span>
                     </p>
                 </header>
             </div>
@@ -220,6 +202,33 @@ export default function TaskInstanceTable({ taskInstanceData }) {
                 }
                 showModal={showStderrModal}
                 setShowModal={setShowStderrModal}
+
+            />
+
+            <CustomModal
+                className="task_instance_status_modal"
+                headerContent={
+                    <h5> Task Instance Statuses</h5>
+                }
+                bodyContent={
+                    <p>
+                        <b>Submitted to Batch Distributor:</b> TaskInstance registered in the Jobmon database.<br/>
+                        <b>Done:</b> TaskInstance finished successfully.<br/>
+                        <b>Error:</b> TaskInstance stopped with an application error (non-zero return code).<br/>
+                        <b>Error Fatal:</b> TaskInstance killed itself as part of a cold workflow resume, and cannot be retried.<br/>
+                        <b>Instantiated:</b> TaskInstance is created within Jobmon, but not queued for submission to the cluster.<br/>
+                        <b>Kill Self:</b> TaskInstance has been ordered to kill itself if it is still alive, as part of a cold workflow resume.<br/>
+                        <b>Launched:</b> TaskInstance submitted to the cluster normally, part of a Job Array.<br/>
+                        <b>Queued:</b> TaskInstance is queued for submission to the cluster.<br/>
+                        <b>Running:</b> TaskInstance has started running normally.<br/>
+                        <b>Triaging:</b> TaskInstance has errored, Jobmon is determining the category of error.<br/>
+                        <b>Unknown Error:</b> TaskInstance stopped reporting that it was alive for an unknown reason.<br/>
+                        <b>No Distributor ID:</b> TaskInstance submission within Jobmon failed – did not receive a job number from the cluster.<br/>
+                        <b>Resource Error:</b> TaskInstance died because of insufficient resource request, i.e. insufficient memory or runtime.<br/>
+                    </p>
+                }
+                showModal={showTIStatusModal}
+                setShowModal={setShowTIStatusModal}
 
             />
         </div>
