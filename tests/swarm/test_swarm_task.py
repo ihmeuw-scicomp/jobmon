@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from jobmon.core.constants import WorkflowRunStatus
@@ -55,7 +56,7 @@ def test_swarmtask_resources_integration(tool, task_template, db_engine):
             SET status = :status
             WHERE id = :id
         """
-        session.execute(sql, {"status": "A", "id": swarmtask.task_id})
+        session.execute(text(sql), {"status": "A", "id": swarmtask.task_id})
         session.commit()
 
     # Call adjust.

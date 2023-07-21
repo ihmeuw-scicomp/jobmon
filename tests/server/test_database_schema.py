@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 
@@ -6,14 +7,16 @@ def test_arg_name_collation(web_server_in_memory):
     app, engine = web_server_in_memory
     with Session(bind=engine) as session:
         result = session.execute(
-            """
-            INSERT INTO arg(name)
-            VALUES
-                ('r'),
-                ('R'),
-                ('test_case'),
-                ('TEST_CASE');
-            """
+            text(
+                """
+                INSERT INTO arg(name)
+                VALUES
+                    ('r'),
+                    ('R'),
+                    ('test_case'),
+                    ('TEST_CASE');
+                """
+            )
         )
         session.commit()
         assert result.rowcount == 4

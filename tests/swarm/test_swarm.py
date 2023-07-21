@@ -4,7 +4,7 @@ import os
 import time
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import text, update
 from sqlalchemy.orm import Session
 
 from jobmon.plugins.dummy import DummyDistributor
@@ -239,14 +239,14 @@ def test_wedged_dag(db_engine, tool, task_template, requester_no_retry):
             SET status = 'O'
             WHERE id = :workflow_run_id
         """
-        session.execute(sql, {"workflow_run_id": wfr.workflow_run_id})
+        session.execute(text(sql), {"workflow_run_id": wfr.workflow_run_id})
 
         sql = """
             UPDATE workflow
             SET status = 'O'
             WHERE id = :workflow_id
         """
-        session.execute(sql, {"workflow_id": workflow.workflow_id})
+        session.execute(text(sql), {"workflow_id": workflow.workflow_id})
         session.commit()
     # now run wedged dag route. make sure task 2 is now in done state
     with pytest.raises(RuntimeError):

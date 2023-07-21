@@ -4,7 +4,7 @@ import os
 from typing import Any
 
 from flask import current_app, jsonify
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy import orm
 from structlog import get_logger
 
@@ -58,5 +58,5 @@ def test_route() -> None:
     """Test route to force a 500 error."""
     session = SessionLocal()
     with session.begin():
-        session.execute("SELECT * FROM blip_bloop_table").all()
+        session.execute(text("SELECT * FROM blip_bloop_table")).all()
         session.commit()

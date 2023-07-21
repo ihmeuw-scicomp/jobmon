@@ -1,7 +1,7 @@
 from typing import Dict
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 
@@ -251,7 +251,7 @@ def test_job_submit_raises_error(db_engine, tool):
         SELECT task_instance.status
         FROM task_instance
         WHERE task_id = :task_id"""
-        res = session.execute(sql, {"task_id": task1.task_id}).fetchone()
+        res = session.execute(text(sql), {"task_id": task1.task_id}).fetchone()
         session.commit()
     assert res[0] == "W"
 
