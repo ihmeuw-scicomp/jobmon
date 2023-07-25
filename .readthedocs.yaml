@@ -11,3 +11,10 @@ build:
 
 sphinx:
    configuration: docsource/conf.py
+
+python:
+  install:
+    - method: pip
+      path: ./jobmon_client
+      extra_requirements:
+        - docs
