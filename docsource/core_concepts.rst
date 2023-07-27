@@ -29,7 +29,7 @@ multiple Task Instances, one for the original execution and one for each retry.
 
 DAGs, Nodes, and Tasks
 ======================
-These concepts are inter-related and there are unavoidable "forward references".
+These concepts are interrelated and there are unavoidable "forward references".
 They are introduced in order below, and then tied
 together with an example.
 
