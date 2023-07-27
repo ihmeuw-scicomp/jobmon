@@ -15,5 +15,7 @@ sphinx:
 python:
   install:
     - method: pip
+      path: ./jobmon_core
+    - method: pip
       path: ./jobmon_client
   system_packages: true
