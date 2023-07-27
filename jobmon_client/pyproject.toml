@@ -12,7 +12,7 @@ classifiers = [
     "Programming Language :: Python :: 3.7",
 ]
 dependencies = [
-    'jobmon_core==3.2.2',
+    'jobmon_core',
     'numpy',
     'pandas',
     'pyyaml',
