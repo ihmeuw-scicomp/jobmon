@@ -163,7 +163,74 @@ How to Run a Workflow Locally
 *****************************
 The only special configuration for running locally is that you must set the
 `executor_class` as either `SequentialExecutor` or `MultiprocessingExecutor` in your Workflow
-Object and Task Objects
+Object and Task Objects.
+
+You may also want to run your local workflow against a local web server and database, rather than against a centrally
+deployed and managed web server. To instantiate a local web server, you should first install the jobmon[server]
+dependencies using `pip install jobmon[server]`, as well as ensure sqlite is installed on your machine.
+
+Then, you can use the following script to create and run a web server. This script will create a Flask server on your
+machine's localhost and run it in development mode, as well as create a SQlite database and initialize it with the
+expected schema. Note that this web server will not handle high-volume concurrency well, but that's unlikely to be a
+bottleneck for small local workflows.
+
+.. code-block:: python
+
+    import os
+
+    import socket
+    import sys
+
+    from jobmon.server.web.api import get_app, JobmonConfig
+    from jobmon.server.web.models import init_db
+    from sqlalchemy import create_engine
+
+    # Setup local Jobmon web service
+    class WebServerProcess:
+        """Context manager creates the Jobmon web server in a process and tears it down on exit."""
+
+        def __init__(self, filepath: str) -> None:
+            """Initializes the web server process.
+            Runs on
+            Args:
+                filepath: path to the SQLlite database file backing up the service.
+            """
+            if sys.platform == "darwin":
+                self.web_host = "127.0.0.1"
+            else:
+                self.web_host = socket.getfqdn()
+            self.web_port = 10_000 + os.getpid() % 30_000
+            self.filepath = filepath
+
+        def start_web_service(self):
+            """Starts the web service process."""
+            database_uri = f"sqlite:///{self.filepath}"
+            if not os.path.exists(self.filepath):
+                open(self.filepath, 'a').close()  # Make an empty database file
+                init_db(create_engine(database_uri))
+
+            config = JobmonConfig(
+                dict_config={"db": {"sqlalchemy_database_uri": database_uri}}
+            )
+            app = get_app(config)
+            config.set(
+                "http",
+                "service_url",
+                f"http://{self.web_host}:{self.web_port}",
+            )
+            config.write()
+
+            # Run the app
+            with app.app_context():
+                app.run(host="0.0.0.0", port=self.web_port)
+
+
+    def start_web_service(filepath='/path/to/sqlite/file.db'):
+        server = WebServerProcess(filepath=filepath)
+        server.start_web_service()
+
+This script will also configure your client automatically so the next workflow you run will point to the local web
+server. Note that running the web server is a blocking process, so you might need to background the process.
 
 See the Quickstart docs to get started creating a workflow with tasks to run.
 
