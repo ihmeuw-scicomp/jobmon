@@ -42,8 +42,9 @@ extensions = [
     'sphinx.ext.graphviz',
     'sphinx.ext.autosectionlabel',
     'sphinx_tabs.tabs',
-    'sphinx.ext.apidoc',
+    'autoapi.extension'
 ]
+autoapi_dirs = ['../.']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

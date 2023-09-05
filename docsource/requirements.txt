@@ -2,3 +2,4 @@ sphinx
 sphinx_autodoc_typehints
 sphinx_autodoc_defaultargs
 sphinx_tabs
+sphinx-autoapi
