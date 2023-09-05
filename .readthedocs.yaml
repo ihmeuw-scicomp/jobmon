@@ -8,11 +8,6 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.10"
-#  jobs:
-#    pre_build:
-#      - sphinx-apidoc -o docsource/api --implicit-namespaces ./jobmon_core
-#      - sphinx-apidoc -o docsource/api --implicit-namespaces ./jobmon_client
-#      - sphinx-apidoc -o docsource/api --implicit-namespaces ./jobmon_server
 
 sphinx:
    configuration: docsource/conf.py
