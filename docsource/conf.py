@@ -44,7 +44,7 @@ extensions = [
     'sphinx_tabs.tabs',
     'autoapi.extension'
 ]
-autoapi_dirs = ['../.']
+autoapi_dirs = ['../jobmon_core', '../jobmon_client', '../jobmon_server']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
