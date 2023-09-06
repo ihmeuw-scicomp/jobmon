@@ -5,6 +5,7 @@ from typing import Any, cast, Dict
 from flask import jsonify, request
 import sqlalchemy
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError, IntegrityError
 from sqlalchemy.orm import Session
 import structlog
 
@@ -77,14 +78,24 @@ def get_task_template_versions(task_template_id: int) -> Any:
 
 
 def _add_or_get_arg(name: str, session: Session) -> Arg:
-    try:
-        with session.begin_nested():
-            arg = Arg(name=name)
-            session.add(arg)
-    except sqlalchemy.exc.IntegrityError:
-        with session.begin_nested():
-            select_stmt = select(Arg).where(Arg.name == name)
-            arg = session.execute(select_stmt).scalars().one()
+    retries = 0
+    while retries <= 5:
+        try:
+            with session.begin():
+                arg = Arg(name=name)
+                session.add(arg)
+                break  # Successfully added, break the loop
+        except IntegrityError:
+            with session.begin():
+                select_stmt = select(Arg).where(Arg.name == name)
+                arg = session.execute(select_stmt).scalars().one()
+                break  # Successfully retrieved, break the loop
+        except OperationalError as e:
+            if 'Deadlock' in str(e):
+                retries += 1
+                continue  # Deadlock detected, retrying
+            else:
+                raise  # For other OperationalErrors, propagate the exception
     return arg
 
 
@@ -107,25 +118,24 @@ def add_task_template_version(task_template_id: int) -> Any:
         ) from e
 
     session = SessionLocal()
-    with session.begin():
-        # populate the argument table
-        arg_mapping_dct: dict = {
-            constants.ArgType.NODE_ARG: [],
-            constants.ArgType.TASK_ARG: [],
-            constants.ArgType.OP_ARG: [],
-        }
-        for arg_name in node_args:
-            arg_mapping_dct[constants.ArgType.NODE_ARG].append(
-                _add_or_get_arg(arg_name, session)
-            )
-        for arg_name in task_args:
-            arg_mapping_dct[constants.ArgType.TASK_ARG].append(
-                _add_or_get_arg(arg_name, session)
-            )
-        for arg_name in op_args:
-            arg_mapping_dct[constants.ArgType.OP_ARG].append(
-                _add_or_get_arg(arg_name, session)
-            )
+    # populate the argument table
+    arg_mapping_dct: dict = {
+        constants.ArgType.NODE_ARG: [],
+        constants.ArgType.TASK_ARG: [],
+        constants.ArgType.OP_ARG: [],
+    }
+    for arg_name in node_args:
+        arg_mapping_dct[constants.ArgType.NODE_ARG].append(
+            _add_or_get_arg(arg_name, session)
+        )
+    for arg_name in task_args:
+        arg_mapping_dct[constants.ArgType.TASK_ARG].append(
+            _add_or_get_arg(arg_name, session)
+        )
+    for arg_name in op_args:
+        arg_mapping_dct[constants.ArgType.OP_ARG].append(
+            _add_or_get_arg(arg_name, session)
+        )
 
     try:
         with session.begin():
