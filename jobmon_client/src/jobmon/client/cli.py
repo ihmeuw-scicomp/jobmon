@@ -179,7 +179,9 @@ class ClientCLI(CLI):
         """Manually reset a workflow."""
         from jobmon.client.status_commands import workflow_reset
 
-        response = workflow_reset(args.workflow_id)
+        response = workflow_reset(
+            workflow_id=args.workflow_id, partial_reset=args.partial_reset
+        )
         print(f"Response is: {response}")
 
     @staticmethod
@@ -453,6 +455,13 @@ class ClientCLI(CLI):
         workflow_reset_parser.set_defaults(func=self.workflow_reset)
         workflow_reset_parser.add_argument(
             "-w", "--workflow_id", help="workflow_id to reset", required=True, type=int
+        )
+        workflow_reset_parser.add_argument(
+            "-p",
+            "--partial_reset",
+            help="Set to indicate Done tasks will not be reset",
+            required=False,
+            action="store_true",
         )
 
     def _add_create_resource_yaml_subparser(self) -> None:

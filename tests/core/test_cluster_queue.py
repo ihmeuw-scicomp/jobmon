@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from jobmon.core.requester import Requester
@@ -12,61 +13,73 @@ def test_cluster_queue(db_engine, client_env):
     with Session(bind=db_engine) as session:
         # fake a new cluster_type zzzzCLUSTER_TYPE
         session.execute(
-            """
-            INSERT INTO cluster_type (name)
-            VALUES ('{n}')""".format(
-                n="zzzzCLUSTER_TYPE"
+            text(
+                """
+                INSERT INTO cluster_type (name)
+                VALUES ('{n}')""".format(
+                    n="zzzzCLUSTER_TYPE"
+                )
             )
         )
         session.commit()
         # fake 3 new cluster zzzzCLUSTER1, zzzzCLUSTER2, and zzzz我的新集群3 under zzzzCLUSTER_TYPE;
         # and to test out Unicode charset briefly.
         session.execute(
-            """
-            INSERT INTO cluster (name, cluster_type_id)
-            SELECT '{n}', id
-            FROM cluster_type
-            WHERE name = '{ct_name}'""".format(
-                n="zzzzCLUSTER1", ct_name="zzzzCLUSTER_TYPE"
+            text(
+                """
+                INSERT INTO cluster (name, cluster_type_id)
+                SELECT '{n}', id
+                FROM cluster_type
+                WHERE name = '{ct_name}'""".format(
+                    n="zzzzCLUSTER1", ct_name="zzzzCLUSTER_TYPE"
+                )
             )
         )
         session.execute(
-            """
-            INSERT INTO cluster (name, cluster_type_id)
-            SELECT '{n}', id
-            FROM cluster_type
-            WHERE name = '{ct_name}'""".format(
-                n="zzzzCLUSTER2", ct_name="zzzzCLUSTER_TYPE"
+            text(
+                """
+                INSERT INTO cluster (name, cluster_type_id)
+                SELECT '{n}', id
+                FROM cluster_type
+                WHERE name = '{ct_name}'""".format(
+                    n="zzzzCLUSTER2", ct_name="zzzzCLUSTER_TYPE"
+                )
             )
         )
         session.execute(
-            """
-            INSERT INTO cluster (name, cluster_type_id)
-            SELECT '{n}', id
-            FROM cluster_type
-            WHERE name = '{ct_name}'""".format(
-                n="zzzz我的新集群3", ct_name="zzzzCLUSTER_TYPE"
+            text(
+                """
+                INSERT INTO cluster (name, cluster_type_id)
+                SELECT '{n}', id
+                FROM cluster_type
+                WHERE name = '{ct_name}'""".format(
+                    n="zzzz我的新集群3", ct_name="zzzzCLUSTER_TYPE"
+                )
             )
         )
         session.commit()
 
         # fake 2 new queues for zzzzCluster2
         session.execute(
-            """
-            INSERT INTO `queue`(`name`, `cluster_id`, `parameters`)
-            SELECT 'all.q', c.id, "{{'cust': 'param 1'}}" AS `parameters`
-            FROM cluster c
-            WHERE c.name = '{n}'""".format(
-                n="zzzzCLUSTER2"
+            text(
+                """
+                INSERT INTO `queue`(`name`, `cluster_id`, `parameters`)
+                SELECT 'all.q', c.id, "{{'cust': 'param 1'}}" AS `parameters`
+                FROM cluster c
+                WHERE c.name = '{n}'""".format(
+                    n="zzzzCLUSTER2"
+                )
             )
         )
         session.execute(
-            """
-            INSERT INTO `queue`(`name`, `cluster_id`, `parameters`)
-            SELECT 'long.q', c.id, "{{'cust': 'param 2'}}" AS `parameters`
-            FROM cluster c
-            WHERE c.name = '{n}'""".format(
-                n="zzzzCLUSTER2"
+            text(
+                """
+                INSERT INTO `queue`(`name`, `cluster_id`, `parameters`)
+                SELECT 'long.q', c.id, "{{'cust': 'param 2'}}" AS `parameters`
+                FROM cluster c
+                WHERE c.name = '{n}'""".format(
+                    n="zzzzCLUSTER2"
+                )
             )
         )
         session.commit()

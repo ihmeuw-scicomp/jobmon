@@ -59,7 +59,6 @@ class Task(Base):
     resource_scales = Column(String(1000), default=None)
     fallback_queues = Column(String(1000), default=None)
     status = Column(String(1), ForeignKey("task_status.id"))
-    submitted_date = Column(DateTime)
     status_date = Column(DateTime, default=func.now(), index=True)
 
     # ORM relationships

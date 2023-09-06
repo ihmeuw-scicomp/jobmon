@@ -3,7 +3,7 @@ from http import HTTPStatus as StatusCodes
 from typing import Any
 
 from flask import jsonify, request
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 import structlog
 
 from jobmon.core.exceptions import InvalidStateTransition
@@ -192,12 +192,12 @@ def reap_workflow_run(workflow_run_id: int) -> Any:
                     SET status="{target_wfr_status}"
                     WHERE id={wfr_id}
                 """
-        session.execute(query1)
+        session.execute(text(query1))
         query2 = f"""UPDATE workflow
                      SET status="{target_wf_status}"
                      WHERE id={wf_id}
                 """
-        session.execute(query2)
+        session.execute(text(query2))
         session.commit()
 
     resp = jsonify(status=target_wfr_status)

@@ -92,7 +92,7 @@ export const safe_rum_start_span = (apm, name, type) => {
 }
 
 export const safe_rum_unit_end = (rum_obj) => {
-    if (rum_obj != null && rum_obj !== undefined){
+    if (rum_obj !== null && rum_obj !== undefined){
         return rum_obj.end();
     }
 }

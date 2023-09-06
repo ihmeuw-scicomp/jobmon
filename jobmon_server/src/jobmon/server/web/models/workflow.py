@@ -1,4 +1,5 @@
 """Workflow Database Table."""
+import datetime
 from typing import Tuple
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, VARCHAR
@@ -135,6 +136,18 @@ class Workflow(Base):
             return current_wfr[0]
         else:
             return ()
+
+    def reset(self, current_time: datetime.datetime) -> None:
+        """Set a workflow to a resumable state."""
+        # Terminate the first existing workflowrun that is in cold resume state
+        for workflow_run in self.workflow_runs:
+            if workflow_run.terminable(current_time=current_time):
+                workflow_run.transition(WorkflowRunStatus.TERMINATED)
+                break
+
+        # Bypass the FSM, since we should be able to reset workflows in weird states.
+        self.status = WorkflowStatus.REGISTERING
+        self.status_date = func.now()
 
     def resume(self, reset_running_jobs: bool) -> None:
         """Resume a workflow."""

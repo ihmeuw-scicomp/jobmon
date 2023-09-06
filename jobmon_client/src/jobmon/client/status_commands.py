@@ -416,7 +416,9 @@ def get_task_dependencies(task_id: int, requester: Optional[Requester] = None) -
     return res
 
 
-def workflow_reset(workflow_id: int, requester: Optional[Requester] = None) -> str:
+def workflow_reset(
+    workflow_id: int, partial_reset: bool = False, requester: Optional[Requester] = None
+) -> str:
     """Workflow reset.
 
     Return:
@@ -424,6 +426,7 @@ def workflow_reset(workflow_id: int, requester: Optional[Requester] = None) -> s
 
     Args:
         workflow_id: the workflow id to be reset.
+        partial_reset: if False, tasks in D state will be reset as well
         requester: http server interface.
     """
     if requester is None:
@@ -436,16 +439,13 @@ def workflow_reset(workflow_id: int, requester: Optional[Requester] = None) -> s
         message={},
         request_type="get",
     )
-    if rc != 200:
-        raise AssertionError(f"Server return HTTP error code: {rc}")
     if res["workflow_run_id"]:
+        # Terminate a workflow's active workflowruns. Should go to a terminated state
         rc, _ = requester.send_request(
             app_route=f"/workflow/{workflow_id}/reset",
-            message={},
+            message={"partial_reset": partial_reset},
             request_type="put",
         )
-        if rc != 200:
-            raise AssertionError(f"Server return HTTP error code: {rc}")
         wr_return = f"Workflow {workflow_id} has been reset."
     else:
         wr_return = (

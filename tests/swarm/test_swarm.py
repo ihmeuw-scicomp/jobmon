@@ -4,7 +4,7 @@ import os
 import time
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import text, update
 from sqlalchemy.orm import Session
 
 from jobmon.plugins.dummy import DummyDistributor
@@ -239,14 +239,14 @@ def test_wedged_dag(db_engine, tool, task_template, requester_no_retry):
             SET status = 'O'
             WHERE id = :workflow_run_id
         """
-        session.execute(sql, {"workflow_run_id": wfr.workflow_run_id})
+        session.execute(text(sql), {"workflow_run_id": wfr.workflow_run_id})
 
         sql = """
             UPDATE workflow
             SET status = 'O'
             WHERE id = :workflow_id
         """
-        session.execute(sql, {"workflow_id": workflow.workflow_id})
+        session.execute(text(sql), {"workflow_id": workflow.workflow_id})
         session.commit()
     # now run wedged dag route. make sure task 2 is now in done state
     with pytest.raises(RuntimeError):
@@ -507,7 +507,7 @@ def test_swarm_terminate(tool):
     assert len(swarm.ready_to_run) == 0
 
 
-def test_resume_from_workflow_id(tool, task_template):
+def test_build_swarm_from_workflow_id(tool, task_template):
     workflow = tool.create_workflow()
 
     # Create a small example DAG.
@@ -574,3 +574,6 @@ def test_resume_from_workflow_id(tool, task_template):
     resume_swarm.set_initial_fringe()
     assert len(resume_swarm.ready_to_run) == 1
     assert resume_swarm.ready_to_run[0] == st3
+
+    # Run a full sync, test that no keyerrors are raised
+    resume_swarm._task_status_updates(full_sync=True)

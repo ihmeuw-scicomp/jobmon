@@ -293,9 +293,169 @@ workflow_status
 Jobmon Statuses
 ###############
 
-The status codes and descriptions are in the following tables in the databse:
+Workflow Statuses
+*****************
+.. list-table::
+   :widths: 10 35 50
+   :header-rows: 1
 
-1. workflow_status
-#. workflow_run_status
-#. task_status
-#. task_instance_status
+   * - ID
+     - Label
+     - Description
+   * - A
+     - ABORTED
+     - Workflow encountered an error before a WorkflowRun was created.
+   * - D
+     - DONE
+     - Workflow has completed, it finished successfully.
+   * - F
+     - FAILED
+     - Workflow unsuccessful in one or more WorkflowRuns, no runs finished successfully as DONE.
+   * - G
+     - REGISTERING
+     - Workflow is being validated.
+   * - H
+     - HALTED
+     - Resume was set and Workflow is shut down or the controller died and therefore Workflow was reaped.
+   * - I
+     - INSTANTIATING
+     - Jobmon Scheduler is creating a Workflow on the distributor.
+   * - O
+     - LAUNCHED
+     - Workflow has been created. Distributor is now controlling tasks, or waiting for scheduling loop.
+   * - Q
+     - QUEUED
+     - Jobmon client has updated the Jobmon database, and signalled Scheduler to create Workflow.
+   * - R
+     - RUNNING
+     - Workflow has a WorkflowRun that is running.
+
+WorkflowRun Statuses
+********************
+.. list-table::
+   :widths: 10 35 50
+   :header-rows: 1
+
+   * - ID
+     - Label
+     - Description
+   * - A
+     - ABORTED
+     - WorkflowRun encountered problems while binding so it stopped.
+   * - B
+     - BOUND
+     - WorkflowRun has been bound to the database.
+   * - C
+     - COLD_RESUME
+     - WorkflowRun is set to resume as soon all existing tasks are killed.
+   * - D
+     - DONE
+     - WorkflowRun is Done, it successfully completed.
+   * - E
+     - ERROR
+     - WorkflowRun did not complete successfully, either some Tasks failed or (rarely) an internal Jobmon error.
+   * - G
+     - REGISTERING
+     - WorkflowRun has been validated.
+   * - H
+     - HOT_RESUME
+     - WorkflowRun was set to hot-resume while tasks are still running, they will continue running.
+   * - I
+     - INSTANTIATED
+     - Scheduler is instantiating a WorkflowRun on the distributor.
+   * - O
+     - LAUNCHED
+     - Instantiation complete. Distributor is controlling Tasks or waiting for scheduling loop.
+   * - R
+     - RUNNING
+     - WorkflowRun is currently running.
+   * - S
+     - STOPPED
+     - WorkflowRun was deliberately stopped, probably due to keyboard interrupt from user.
+   * - T
+     - TERMINATED
+     - This WorkflowRun is being replaced by a new WorkflowRun created to pick up remaining Tasks, this WorkflowRun is terminating.
+
+Task Statuses
+*************
+.. list-table::
+   :widths: 10 35 50
+   :header-rows: 1
+
+   * - ID
+     - Label
+     - Description
+   * - A
+     - ADJUSTING_RESOURCES
+     - Task errored with a resource error, the resources will be adjusted before retrying.
+   * - D
+     - DONE
+     - Task is Done, it ran successfully to completion; it has a TaskInstance that successfully completed.
+   * - E
+     - ERROR_RECOVERABLE
+     - Task has errored out but has more attempts so it will be retried.
+   * - F
+     - ERROR_FATAL
+     - Task errored out and has used all of the attempts, therefore has failed for this WorkflowRun. It can be resumed in a new WorkflowRun.
+   * - G
+     - REGISTERED
+     - Task is bound to the database.
+   * - I
+     - INSTANTIATED
+     - Task is created within Jobmon.
+   * - Q
+     - QUEUED_FOR_INSTANTIATION
+     - Task's dependencies have successfully completed, task can be run when the scheduler is ready.
+   * - R
+     - RUNNING
+     - Task is running on the specified distributor.
+
+TaskInstance Statuses
+*********************
+.. list-table::
+   :widths: 10 35 50
+   :header-rows: 1
+
+   * - ID
+     - Label
+     - Description
+   * - B
+     - SUBMITTED_TO_BATCH_DISTRIBUTOR
+     - TaskInstance registered in the Jobmon database.
+   * - D
+     - DONE
+     - TaskInstance finished successfully.
+   * - E
+     - ERROR
+     - TaskInstance stopped with an application error (non-zero return code).
+   * - F
+     - ERROR_FATAL
+     - TaskInstance killed itself as part of a cold workflow resume, and cannot be retried.
+   * - I
+     - INSTANTIATED
+     - TaskInstance is created within Jobmon, but not queued for submission to the cluster.
+   * - K
+     - KILL_SELF
+     - TaskInstance has been ordered to kill itself if it is still alive, as part of a cold workflow resume.
+   * - O
+     - LAUNCHED
+     - TaskInstance submitted to the cluster normally, part of a Job Array.
+   * - Q
+     - QUEUED
+     - TaskInstance is queued for submission to the cluster.
+   * - R
+     - RUNNING
+     - TaskInstance has started running normally.
+   * - T
+     - TRIAGING
+     - TaskInstance has errored, Jobmon is determining the category of error.
+   * - U
+     - UNKNOWN_ERROR
+     - TaskInstance stopped reporting that it was alive for an unknown reason.
+   * - W
+     - NO_DISTRIBUTOR_ID
+     - TaskInstance submission within Jobmon failed – did not receive a distributor_id from the cluster.
+   * - Z
+     - RESOURCE_ERROR
+     - TaskInstance died because of insufficient resource request, e.g. insufficient memory or runtime.
+

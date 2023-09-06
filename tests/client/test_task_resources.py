@@ -1,5 +1,6 @@
 from contextlib import nullcontext
 import pytest
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from jobmon.client.task_resources import TaskResources
@@ -63,7 +64,7 @@ def test_task_resource_bind(db_engine, tool, task_template):
         JOIN task_resources tr ON tr.id = t.task_resources_id
         WHERE t.id IN {tuple(set([t.task_id for t in [t1, t2, t3]]))}
         """
-        res = session.execute(q).fetchall()
+        res = session.execute(text(q)).fetchall()
         session.commit()
         assert len(res) == 1
 

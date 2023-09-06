@@ -1,5 +1,6 @@
 import pytest
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from jobmon.client.array import Array
@@ -80,7 +81,7 @@ def test_array_bind(db_engine, client_env, task_template_dummy, tool):
             wf.arrays["dummy_template"].array_id
         )
 
-        array_db = session.execute(array_stmt).fetchone()
+        array_db = session.execute(text(array_stmt)).fetchone()
         session.commit()
 
         assert array_db.workflow_id == wf.workflow_id
@@ -98,7 +99,7 @@ def test_array_bind(db_engine, client_env, task_template_dummy, tool):
         """.format(
             list(wf.arrays["dummy_template"].tasks.values())[0].task_id
         )
-        task = session.execute(task_query).fetchone()
+        task = session.execute(text(task_query)).fetchone()
 
         assert task.array_id == wf.arrays["dummy_template"].array_id
 
@@ -168,7 +169,7 @@ def test_create_tasks(db_engine, client_env, tool):
         JOIN node_arg na ON na.arg_id = arg.id
         WHERE arg.name IN ('narg1', 'narg2')
         """
-        res = session.execute(q).fetchall()
+        res = session.execute(text(q)).fetchall()
         session.commit()
 
         assert len(res) == 18  # 2 args per node * 9 nodes
@@ -181,7 +182,7 @@ def test_create_tasks(db_engine, client_env, tool):
         FROM arg
         JOIN task_arg ta ON ta.arg_id = arg.id
         WHERE arg.name IN ('task_arg')"""
-        task_args = session.execute(task_q).fetchall()
+        task_args = session.execute(text(task_q)).fetchall()
         session.commit()
 
         assert len(task_args) == 9  # 9 unique tasks, 1 task_arg each

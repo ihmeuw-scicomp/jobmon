@@ -1,5 +1,6 @@
 from unittest.mock import patch, PropertyMock
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from jobmon.client.tool import Tool
@@ -29,7 +30,7 @@ def test_resource_usage(db_engine, client_env):
         UPDATE task_instance
         SET nodename = 'SequentialNode', wallclock = 12, maxpss = 1234
         WHERE task_id = :task_id"""
-        session.execute(sql, {"task_id": task.task_id})
+        session.execute(text(sql), {"task_id": task.task_id})
         session.commit()
     with patch(
         "jobmon.core.constants.ExecludeTTVs.EXECLUDE_TTVS", new_callable=PropertyMock
@@ -101,19 +102,19 @@ def test_tt_resource_usage(db_engine, client_env):
         UPDATE task_instance
         SET wallclock = 10, maxrss = 300
         WHERE task_id = {task_1.task_id}"""
-        session.execute(query_1)
+        session.execute(text(query_1))
 
         query_2 = f"""
         UPDATE task_instance
         SET wallclock = 20, maxrss = 600
         WHERE task_id = {task_2.task_id}"""
-        session.execute(query_2)
+        session.execute(text(query_2))
 
         query_3 = f"""
         UPDATE task_instance
         SET wallclock = 30, maxrss = 900
         WHERE task_id = {task_3.task_id}"""
-        session.execute(query_3)
+        session.execute(text(query_3))
         session.commit()
 
     with patch(
@@ -443,19 +444,19 @@ def test_tt_resource_usage_with_0(db_engine, client_env):
         UPDATE task_instance
         SET wallclock = 10, maxrss = 100
         WHERE task_id = {task_1.task_id}"""
-        session.execute(query_1)
+        session.execute(text(query_1))
 
         query_2 = f"""
         UPDATE task_instance
         SET wallclock = 0, maxrss = 0
         WHERE task_id = {task_2.task_id}"""
-        session.execute(query_2)
+        session.execute(text(query_2))
 
         query_3 = f"""
         UPDATE task_instance
         SET wallclock = 20, maxrss = 200
         WHERE task_id = {task_3.task_id}"""
-        session.execute(query_3)
+        session.execute(text(query_3))
         session.commit()
 
     with patch(
@@ -518,7 +519,7 @@ def test_max_mem(db_engine, client_env):
             UPDATE task_instance
             SET maxpss = null, maxrss=null
             WHERE task_id = {task_1.task_id}"""
-        session.execute(query_1)
+        session.execute(text(query_1))
         session.commit()
     resources = template.resource_usage()
     assert resources["max_mem"] == "0B"
@@ -529,7 +530,7 @@ def test_max_mem(db_engine, client_env):
                 UPDATE task_instance
                 SET maxrss=null
                 WHERE task_id = {task_1.task_id}"""
-        session.execute(query_1)
+        session.execute(text(query_1))
         session.commit()
     resources = template.resource_usage()
     assert resources["max_mem"] == "0B"
@@ -539,7 +540,7 @@ def test_max_mem(db_engine, client_env):
                 UPDATE task_instance
                 SET maxrss=1
                 WHERE task_id = {task_1.task_id}"""
-        session.execute(query_1)
+        session.execute(text(query_1))
         session.commit()
     resources = template.resource_usage()
     assert resources["max_mem"] == "1B"
@@ -549,7 +550,7 @@ def test_max_mem(db_engine, client_env):
                 UPDATE task_instance
                 SET maxrss= -1
                 WHERE task_id = {task_1.task_id}"""
-        session.execute(query_1)
+        session.execute(text(query_1))
         session.commit()
     resources = template.resource_usage()
     assert resources["max_mem"] == "0B"

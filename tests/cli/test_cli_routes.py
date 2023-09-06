@@ -1,11 +1,19 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import select, text, update
 import getpass
 import pandas as pd
 
 from jobmon.client.api import Tool
 from jobmon.client.workflow_run import WorkflowRunFactory
-from jobmon.core.constants import MaxConcurrentlyRunning, WorkflowRunStatus
+from jobmon.core.constants import (
+    MaxConcurrentlyRunning,
+    TaskStatus,
+    WorkflowRunStatus,
+    WorkflowStatus,
+)
 from jobmon.server.web.models import load_model
+from jobmon.server.web.models.task import Task
+from jobmon.server.web.models.workflow import Workflow
 
 load_model()
 
@@ -263,7 +271,7 @@ def test_get_workflow_user_validation(db_engine, tool):
     assert msg["validation"] is True
 
 
-def test_get_workflow_run_for_workflow_reset(db_engine, tool):
+def test_get_workflow_run_for_workflow_reset(db_engine, tool, web_server_in_memory):
     t = tool
     wf = t.create_workflow(name="i_am_a_fake_wf")
     tt1 = t.get_task_template(
@@ -293,7 +301,7 @@ def test_get_workflow_run_for_workflow_reset(db_engine, tool):
     assert msg["workflow_run_id"] is None
 
 
-def test_reset_workflow(db_engine, tool):
+def test_reset_workflow(db_engine, tool, web_server_in_memory):
     t = tool
     wf = t.create_workflow(name="i_am_a_fake_wf")
     tt1 = t.get_task_template(
@@ -313,14 +321,67 @@ def test_reset_workflow(db_engine, tool):
     wf.bind()
     wf._bind_tasks()
     factory = WorkflowRunFactory(wf.workflow_id)
-    wfr = factory.create_workflow_run()
+    wfr = factory.create_workflow_run(workflow_run_heartbeat_interval=0)
     wfr._update_status(WorkflowRunStatus.BOUND)
+    wfr._update_status(WorkflowRunStatus.COLD_RESUME)
+
+    # Transition task1 to done
+    with Session(bind=db_engine) as session:
+        update_query = update(Task).where(Task.id == t1.task_id).values(status="D")
+        session.execute(update_query)
+        session.commit()
 
     app_route = f"/workflow/{wf.workflow_id}/reset"
     return_code, msg = wf.requester.send_request(
-        app_route=app_route, message={}, request_type="put"
+        app_route=app_route, message={"partial_reset": True}, request_type="put"
     )
     assert return_code == 200
+
+    with Session(bind=db_engine) as session:
+        wf_status = (
+            session.execute(
+                select(Workflow.status).where(Workflow.id == wf.workflow_id)
+            )
+            .scalars()
+            .all()
+        )
+        assert set(wf_status) == {WorkflowStatus.REGISTERING}
+
+        task_statuses = (
+            session.execute(
+                select(Task.status).where(Task.workflow_id == wf.workflow_id)
+            )
+            .scalars()
+            .all()
+        )
+        # With a partial reset, the done task should remain in that state
+        assert set(task_statuses) == {TaskStatus.REGISTERING, TaskStatus.DONE}
+
+    # Check that the workflow is resumable
+    return_code, response = wf.requester.send_request(
+        app_route=f"/workflow/{wf.workflow_id}/is_resumable",
+        message={},
+        request_type="get",
+    )
+
+    workflow_is_resumable = bool(response.get("workflow_is_resumable"))
+    assert workflow_is_resumable
+
+    # Signal for a full reset
+    _ = wf.requester.send_request(
+        app_route=app_route, message={"partial_reset": False}, request_type="put"
+    )
+
+    with Session(bind=db_engine) as session:
+        task_statuses = (
+            session.execute(
+                select(Task.status).where(Task.workflow_id == wf.workflow_id)
+            )
+            .scalars()
+            .all()
+        )
+        # With a full reset, all tasks should be registering
+        assert set(task_statuses) == {TaskStatus.REGISTERING}
 
 
 def test_get_workflow_status(db_engine, tool):
@@ -429,7 +490,7 @@ def test_get_array_task_instances(db_engine, tool):
                     SET stdout="/cool/filepath.o",
                     stderr="/cool/filepath.e"
                 """
-        session.execute(query)
+        session.execute(text(query))
         session.commit()
     app_route = f"/array/{wf.workflow_id}/get_array_tasks"
     return_code, msg = wf.requester.send_request(
@@ -655,11 +716,13 @@ def test_get_workflow_tt_status_viz(client_env, db_engine):
     # set one task to F to test TT with more than one task status
     with Session(bind=db_engine) as session:
         session.execute(
-            f"""
-            UPDATE task
-            SET status="F"
-            WHERE id={t2.task_id}
-            """
+            text(
+                f"""
+                UPDATE task
+                SET status="F"
+                WHERE id={t2.task_id}
+                """
+            )
         )
         session.commit()
     app_route = f"/workflow_tt_status_viz/{wf.workflow_id}"
@@ -716,9 +779,11 @@ def test_get_workflow_tt_status_viz(client_env, db_engine):
     # test 3.0 records
     with Session(bind=db_engine) as session:
         session.execute(
-            """
-            DELETE FROM array
-            """
+            text(
+                """
+                DELETE FROM array
+                """
+            )
         )
         session.commit()
     app_route = f"/workflow_tt_status_viz/{wf.workflow_id}"
@@ -810,4 +875,54 @@ def test_task_details_by_wf_id(client_env, db_engine):
     assert len(tasks) == 1
     assert tasks[0]["task_command"] == "echo 1"
     assert tasks[0]["task_name"] == "tt_test_arg-1"
-    assert tasks[0]["task_status"] == "REGISTERING"
+    assert tasks[0]["task_status"] == "PENDING"
+
+
+def test_workflow_details_viz(client_env, db_engine):
+    t = Tool(name="task_detail_tool")
+    wf = t.create_workflow(name="i_am_another_fake_wf_vv")
+    tt1 = t.get_task_template(
+        template_name="tt_test", command_template="echo {arg}", node_args=["arg"]
+    )
+    t1 = tt1.create_task(
+        arg=1,
+        cluster_name="sequential",
+        compute_resources={"queue": "null.q", "num_cores": 2},
+    )
+    wf.add_tasks([t1])
+    wf.bind()
+    wf._bind_tasks()
+    app_route = f"/workflow_details_viz/{wf.workflow_id}"
+    return_code, msg = wf.requester.send_request(
+        app_route=app_route, message={}, request_type="get"
+    )
+    assert return_code == 200
+    assert msg[0]["wf_status"] == "G"
+    assert msg[0]["wf_status_desc"] == "Workflow is being validated."
+
+
+def test_workflow_overview_viz(client_env, db_engine):
+    tool_name = "task_detail_tool"
+    t = Tool(name=tool_name)
+    wf = t.create_workflow(
+        name="another_fake_wf", workflow_attributes={"test_attribute": "test"}
+    )
+    tt1 = t.get_task_template(
+        template_name="tt_test", command_template="echo {arg}", node_args=["arg"]
+    )
+    t1 = tt1.create_task(
+        arg=1,
+        cluster_name="sequential",
+        compute_resources={"queue": "null.q", "num_cores": 2},
+    )
+    wf.add_tasks([t1])
+    wf.run()
+    app_route = f"/workflow_overview_viz"
+    return_code, msg = wf.requester.send_request(
+        app_route=app_route,
+        message={"tool": "task_detail_tool", "attribute": "test"},
+        request_type="get",
+    )
+
+    assert return_code == 200
+    assert msg["workflows"][0]["wf_tool"] == tool_name
