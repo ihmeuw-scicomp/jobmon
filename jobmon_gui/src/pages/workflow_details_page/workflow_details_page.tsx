@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import '../jobmon_gui.css';
+import '../../css/jobmon_gui.css';
 import { useParams, Link, Outlet, useNavigate } from 'react-router-dom';
 import { useForm } from "react-hook-form";
 import axios from 'axios';
@@ -10,12 +10,13 @@ import { FaLightbulb } from "react-icons/fa";
 
 
 // @ts-ignore
-import JobmonProgressBar from '../progress_bar.tsx';
+import JobmonProgressBar from '../../components/JobmonProgressBar.tsx';
 import Tasks from './tasks';
 import Usage from './usage';
 import Errors from './errors';
 import WFHeader from "./wf_header"
-import { init_apm, convertDatePST, safe_rum_add_label, safe_rum_transaction } from '../functions';
+import { convertDatePST } from '../../utilities/formatters';
+import { init_apm, safe_rum_add_label, safe_rum_transaction } from '../../utilities/rum';
 
 function getAsyncWFdetail(setWFDict, wf_id: string) {
     const url = process.env.REACT_APP_BASE_URL + "/workflow_status_viz";

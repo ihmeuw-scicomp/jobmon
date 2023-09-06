@@ -1,16 +1,16 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
-import App from './workflow_overview_page/workflow_overview';
-import reportWebVitals from './reportWebVitals';
+import './css/index.css';
+import App from './pages/workflow_overview_page/workflow_overview';
 import {
   HashRouter,
   Routes,
   Route,
 } from "react-router-dom";
-import WorkflowDetails from './workflow_details_page/workflow_details_page'
-import TaskDetails from './task_details_page/task_details';
-import Help from './help_page/help';
+import WorkflowDetails from './pages/workflow_details_page/workflow_details_page'
+import TaskDetails from './pages/task_details_page/task_details';
+import Help from './pages/help_page/help';
+import JobmonAtIHME from './pages/jobmon_at_ihme_page/jobmon_at_ihme'
 import { LeftHandNavBar } from "bifrost";
 
 const ihme_deployment = true
@@ -28,6 +28,7 @@ root.render(
       </Route>
       <Route path="task_details/:taskId" element={<TaskDetails />}></Route>
       <Route path="help" element={<Help />}></Route>
+      <Route path="jobmon_at_ihme" element={<JobmonAtIHME />}></Route>
       <Route path="/" element={<App />} />
       <Route
         path="*"
@@ -41,8 +42,3 @@ root.render(
     </Routes>
   </HashRouter>
 );
-
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-reportWebVitals();

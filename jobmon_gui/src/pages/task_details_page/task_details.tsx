@@ -7,9 +7,9 @@ import NodeLists from './node_list';
 import TaskFSM from './task_fsm';
 import { FaLightbulb } from "react-icons/fa";
 import { OverlayTrigger, Popover } from 'react-bootstrap';
-import { convertDatePST } from '../functions'
+import { convertDatePST } from '../../utilities/formatters'
 import { HiInformationCircle } from "react-icons/hi";
-import CustomModal from '../Modal';
+import CustomModal from '../../components/Modal';
 
 function getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId) {
     // Returns task status and workflow ID

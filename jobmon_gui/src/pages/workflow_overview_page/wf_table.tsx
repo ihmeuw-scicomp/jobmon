@@ -8,11 +8,11 @@ import ToolkitProvider, { CSVExport } from 'react-bootstrap-table2-toolkit/dist/
 import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import Spinner from 'react-bootstrap/Spinner';
 import { Link } from "react-router-dom";
-import { convertDate, convertDatePST } from '../functions';
+import { convertDate, convertDatePST } from '../../utilities/formatters';
 import { FaCaretDown, FaCaretUp, FaCircle } from "react-icons/fa";
 
 // @ts-ignore
-import JobmonProgressBar from '../progress_bar.tsx';
+import JobmonProgressBar from '../../components/JobmonProgressBar.tsx';
 
 const DEBUG = false
 

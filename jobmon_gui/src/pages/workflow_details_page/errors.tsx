@@ -7,9 +7,10 @@ import 'react-bootstrap-table2-paginator/dist/react-bootstrap-table2-paginator.m
 import { HashLink } from 'react-router-hash-link';
 
 
-import '../jobmon_gui.css';
-import { convertDatePST, safe_rum_start_span, safe_rum_unit_end } from '../functions';
-import CustomModal from '../Modal';
+import '../../css/jobmon_gui.css';
+import { convertDatePST } from '../../utilities/formatters';
+import { safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum';
+import CustomModal from '../../components/Modal';
 
 export default function Errors({ errorLogs, tt_name, loading, apm }) {
     const s: any = safe_rum_start_span(apm, "errors", "custom");

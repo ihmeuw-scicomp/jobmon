@@ -10,8 +10,8 @@ import axios from 'axios';
 
 // @ts-ignore
 import JobmonWFTable from './wf_table.tsx';
-import '../jobmon_gui.css';
-import { init_apm, safe_rum_add_label, safe_rum_transaction, safe_rum_start_span, safe_rum_unit_end } from '../functions';
+import '../../css/jobmon_gui.css';
+import { init_apm, safe_rum_add_label, safe_rum_transaction, safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum';
 import { FaCircle } from "react-icons/fa";
 
 function App() {
