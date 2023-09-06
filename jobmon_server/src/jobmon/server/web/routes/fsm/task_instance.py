@@ -451,7 +451,7 @@ def instantiate_task_instances() -> Any:
 
         # update the task table where FSM allows it
         sub_query = (
-            select([Task.id])
+            select(Task.id)
             .join(TaskInstance, TaskInstance.task_id == Task.id)
             .where(
                 and_(
@@ -462,7 +462,7 @@ def instantiate_task_instances() -> Any:
         ).alias('derived_table')
         task_update = (
             update(Task)
-            .where(Task.id.in_(select([sub_query.c.id])))
+            .where(Task.id.in_(select(sub_query.c.id)))
             .values(status=constants.TaskStatus.INSTANTIATING, status_date=func.now())
             .execution_options(synchronize_session=False)
         )
@@ -483,7 +483,7 @@ def instantiate_task_instances() -> Any:
         ).alias('derived_table')
         task_instance_update = (
             update(TaskInstance)
-            .where(TaskInstance.id.in_(select([sub_query.c.id])))
+            .where(TaskInstance.id.in_(select(sub_query.c.id)))
             .values(
                 status=constants.TaskInstanceStatus.INSTANTIATED, status_date=func.now()
             )
