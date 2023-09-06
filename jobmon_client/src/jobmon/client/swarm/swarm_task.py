@@ -37,8 +37,8 @@ class SwarmTask(object):
             task_resources: callable to be executed when Task is ready to be run and
                 resources can be assigned.
             cluster: The name of the cluster that the user wants to run their tasks on.
-            resource_scales: The rate at which a user wants to scale their requested resources
-                after failure.
+            resource_scales: Specifies how much a user wants to scale their requested
+                resources after failure.
             fallback_queues: A list of queues that users want to try if their original queue
                 isn't able to handle their adjusted resources.
             compute_resources_callable: callable compute resources.

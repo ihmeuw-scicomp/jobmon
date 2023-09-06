@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -6,7 +7,15 @@ from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 
 
-def test_swarmtask_resources_integration(tool, task_template, db_engine):
+@pytest.mark.parametrize(
+    "scales",
+    [
+        {"cores": 0.5},
+        {"cores": iter([15])},
+        {"cores": lambda x: x + 5},
+    ],
+)
+def test_swarmtask_resources_integration(scales, tool, task_template, db_engine):
     """Check that taskresources defined in task are passed to swarmtask appropriately"""
 
     workflow = tool.create_workflow(default_cluster_name="multiprocess")
@@ -15,7 +24,7 @@ def test_swarmtask_resources_integration(tool, task_template, db_engine):
     task = task_template.create_task(
         arg="echo qux",
         compute_resources={"cores": 10, "queue": "null.q"},
-        resource_scales={"cores": 0.5},
+        resource_scales=scales,
         cluster_name="multiprocess",
     )
 
