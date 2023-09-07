@@ -126,20 +126,28 @@ class TaskResources:
         # Only cores, memory, and runtime get scaled
         for resource, scaler in resource_scales.items():
             if resource in existing_resources.keys():
-                if callable(scaler):
-                    resource_updates[resource] = scaler(existing_resources[resource])
-                elif isinstance(scaler, Iterator):
-                    resource_updates[resource] = next(scaler)
-                elif isinstance(scaler, numbers.Number):
-                    resource_updates[resource] = self.scale_val(
+                if isinstance(scaler, numbers.Number):
+                    new_resource_value = self.scale_val(
                         existing_resources[resource], scaler
                     )
+                elif callable(scaler):
+                    new_resource_value = scaler(existing_resources[resource])
+                elif isinstance(scaler, Iterator):
+                    new_resource_value = next(scaler)
                 else:
                     raise ValueError(
                         "Keys in the resource_scales dictionary must be either numeric "
-                        f"values or Python Callables; found {scaler}, type {type(scaler)} "
-                        "instead."
+                        f"values, Iterators, or Python Callables; found {scaler}, type "
+                        f"{type(scaler)} instead."
                     )
+                if not isinstance(new_resource_value, numbers.Number):
+                    raise ValueError(
+                        "Attemping to update resource to a non-numeric value, "
+                        f"{new_resource_value}. If passing an Iterator, elements must be "
+                        "numeric values. If passing a Callable, return value must be a "
+                        "numeric value."
+                    )
+                resource_updates[resource] = new_resource_value
 
         scaled_resources = dict(existing_resources, **resource_updates)
 

@@ -322,11 +322,14 @@ class WorkflowRun:
                 resource_scales = ast.literal_eval(resource_scales)
                 for resource, scaler in resource_scales.items():
                     if not isinstance(scaler, numbers.Number):
-                        raise ValueError(
-                            "Cannot run CLI resume on non-numeric custom resource scales: "
-                            f"found {resource} scaler {scaler} in resource scales retrieved "
-                            "from the Jobmon DB."
-                        )
+                        if isinstance(scaler, list):
+                            resource_scales[resource] = iter(scaler)
+                        else:
+                            raise ValueError(
+                                "Cannot run CLI resume on non-numeric custom resource "
+                                "scales: found {resource} scaler {scaler} in resource "
+                                "scales retrieved from the Jobmon DB."
+                            )
                 fallback_queues = ast.literal_eval(fallback_queues)
                 requested_resources = ast.literal_eval(requested_resources)
                 # Construct a queue, a cluster, and a task resources object
