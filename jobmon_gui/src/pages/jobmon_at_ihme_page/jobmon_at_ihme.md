@@ -54,13 +54,7 @@ You can set your queue to all.q, long.q, or d.q on both the production and test 
 
 ## Jobmon Database
 The Jobmon database is hosted in Azure, the database information (read-only) is as follows:
-```
-Host: scicomp-mysql-mysql-p01.database.azure.com
-Username: read_only
-Password: docker
-Database: docker
-Port: 3306
-```
+
 
 Please note to access the Jobmon database you need to switch your VPN to "All Internet Traffic" in your Big-IP Edge Client.
 
