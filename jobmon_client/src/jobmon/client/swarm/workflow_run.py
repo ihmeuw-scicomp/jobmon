@@ -327,7 +327,7 @@ class WorkflowRun:
                         else:
                             raise ValueError(
                                 "Cannot run CLI resume on non-numeric custom resource "
-                                "scales: found {resource} scaler {scaler} in resource "
+                                f"scales: found {resource} scaler {scaler} in resource "
                                 "scales retrieved from the Jobmon DB."
                             )
                 fallback_queues = ast.literal_eval(fallback_queues)
