@@ -738,7 +738,9 @@ class Workflow(object):
                     # list.
                     elif isinstance(scaler, Iterator):
                         serializable_resource_scales[resource] = list(
-                            itertools.islice(copy.deepcopy(scaler), task.max_attempts - 1)
+                            itertools.islice(
+                                copy.deepcopy(scaler), task.max_attempts - 1
+                            )
                         )
 
                 task_metadata[task_hash] = [

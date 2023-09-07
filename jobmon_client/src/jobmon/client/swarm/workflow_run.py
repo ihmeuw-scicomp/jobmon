@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import ast
 from collections import deque
-import copy
 from datetime import datetime
 import logging
 import numbers
