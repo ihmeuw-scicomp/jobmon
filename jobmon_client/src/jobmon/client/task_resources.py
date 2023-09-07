@@ -102,7 +102,7 @@ class TaskResources:
 
     def adjust_resources(
         self: TaskResources,
-        resource_scales: Optional[Dict[str, Union[float, Callable, Iterator[float]]]],
+        resource_scales: Dict[str, Union[float, Callable, Iterator[float]]],
         fallback_queues: Optional[List[ClusterQueue]] = None,
     ) -> TaskResources:
         """Adjust TaskResources after a resource error, returning a new object if it changed.
