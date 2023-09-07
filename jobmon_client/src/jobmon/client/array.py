@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import copy
 from http import HTTPStatus as StatusCodes
 from itertools import product
 import logging
@@ -262,7 +263,7 @@ class Array:
                 node=node,
                 task_args=self.task_args,
                 op_args=self.op_args,
-                resource_scales=resource_scales,
+                resource_scales=copy.deepcopy(resource_scales),
                 max_attempts=max_attempts,
                 upstream_tasks=upstream_tasks,
                 task_attributes=task_attributes,

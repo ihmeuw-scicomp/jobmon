@@ -1,6 +1,7 @@
 """A framework that many tasks have in common while varying by a declared set of arguments."""
 from __future__ import annotations
 
+import copy
 import hashlib
 from http import HTTPStatus as StatusCodes
 import logging
@@ -609,7 +610,7 @@ class TaskTemplate:
             op_args=op_args,
             compute_resources=compute_resources,
             compute_resources_callable=compute_resources_callable,
-            resource_scales=resource_scales,
+            resource_scales=copy.deepcopy(resource_scales),
             cluster_name=cluster_name,
             name=name,
             max_attempts=max_attempts,

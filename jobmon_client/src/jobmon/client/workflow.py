@@ -731,14 +731,14 @@ class Workflow(object):
                 for resource, scaler in task.resource_scales.items():
                     # We can't serialize a callable, so use the function name instead.
                     if callable(scaler):
-                        serializable_resource_scales[resource] = (
-                            getattr(scaler, "__name__", "Unknown Callable")
+                        serializable_resource_scales[resource] = getattr(
+                            scaler, "__name__", "Unknown Callable"
                         )
-                    # We can't serialize an iterator, so take the relevant elements as a 
-                    # list. 
+                    # We can't serialize an iterator, so take the relevant elements as a
+                    # list.
                     elif isinstance(scaler, Iterator):
                         serializable_resource_scales[resource] = list(
-                            itertools.islice(scaler, task.max_attempts)
+                            itertools.islice(copy.deepcopy(scaler), task.max_attempts - 1)
                         )
 
                 task_metadata[task_hash] = [
