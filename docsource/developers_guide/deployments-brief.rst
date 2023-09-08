@@ -48,7 +48,7 @@ Database
 Jobmon uses one mysql database. All database access is via services running in Kubernetes.
 The database server can be deployed anywhere. Ours is deployed in Azure.
 
-.. image:: diagrams/erd.png
+.. image:: diagrams/erd.svg
 
 
 Critical Database Config Values
