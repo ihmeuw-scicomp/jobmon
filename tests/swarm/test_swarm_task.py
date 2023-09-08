@@ -11,8 +11,8 @@ from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
     "scales",
     [
         {"cores": 0.5},
-        {"cores": iter([15])},
-        {"cores": lambda x: x + 5},
+        {"cores": iter([12, 18])},
+        {"cores": lambda x: x * 1.5},
     ],
 )
 def test_swarmtask_resources_integration(scales, tool, task_template, db_engine):
@@ -23,7 +23,7 @@ def test_swarmtask_resources_integration(scales, tool, task_template, db_engine)
     # Create tasks
     task = task_template.create_task(
         arg="echo qux",
-        compute_resources={"cores": 10, "queue": "null.q"},
+        compute_resources={"cores": 8, "queue": "null.q"},
         resource_scales=scales,
         cluster_name="multiprocess",
     )
@@ -50,7 +50,7 @@ def test_swarmtask_resources_integration(scales, tool, task_template, db_engine)
     swarmtask = swarm.tasks[task.task_id]
     initial_resources = swarmtask.current_task_resources
     assert initial_resources.requested_resources == {
-        "cores": 10,
+        "cores": 8,
     }
 
     # Queue the task. TRs should then be validated
@@ -73,5 +73,13 @@ def test_swarmtask_resources_integration(scales, tool, task_template, db_engine)
     scaled_params = swarmtask.current_task_resources
     assert id(scaled_params) != id(initial_resources)
     assert scaled_params.requested_resources == {
-        "cores": 15,
+        "cores": 12,
+    }
+
+    # Call adjust a second time.
+    swarm._set_adjusted_task_resources(swarmtask)
+    scaled_params = swarmtask.current_task_resources
+    assert id(scaled_params) != id(initial_resources)
+    assert scaled_params.requested_resources == {
+        "cores": 18,
     }

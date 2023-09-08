@@ -8,7 +8,7 @@ import logging
 from typing import Any, Callable, Dict, Iterator, List, Optional, TYPE_CHECKING, Union
 
 from jobmon.client.node import Node
-from jobmon.client.task import Task
+from jobmon.client.task import Task, validate_task_resource_scales
 from jobmon.client.task_template_version import TaskTemplateVersion
 from jobmon.core.constants import MaxConcurrentlyRunning
 from jobmon.core.exceptions import InvalidResponse
@@ -244,6 +244,9 @@ class Array:
         if upstream_tasks is None:
             # If not specified, defined from the array upstreams
             upstream_tasks = self.upstream_tasks
+
+        # resource scales validation
+        validate_task_resource_scales(resource_scales=resource_scales)
 
         # Expand the node_args
         if not set(node_kwargs.keys()).issuperset(self.task_template_version.node_args):

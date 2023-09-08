@@ -21,7 +21,7 @@ import yaml
 
 from jobmon.client.array import Array
 from jobmon.client.node import Node
-from jobmon.client.task import Task
+from jobmon.client.task import Task, validate_task_resource_scales
 from jobmon.client.task_template_version import TaskTemplateVersion
 from jobmon.core.constants import ExecludeTTVs, MaxConcurrentlyRunning
 from jobmon.core.exceptions import InvalidResponse
@@ -592,6 +592,9 @@ class TaskTemplate:
                 f"{self.active_task_template_version.template_args}, got {set(kwargs.keys())}"
             )
 
+        # resource scales validation
+        validate_task_resource_scales(resource_scales=resource_scales)
+
         node_args = self.active_task_template_version.filter_kwargs(
             "node_args", **kwargs
         )
@@ -666,6 +669,9 @@ class TaskTemplate:
                 f"Missing op_args for this array. Task Template requires op_args="
                 f"{self.active_task_template_version.op_args}, got {set(kwargs.keys())}."
             )
+
+        # resource scales validation
+        validate_task_resource_scales(resource_scales=resource_scales)
 
         # Split node, task, and op_args
         node_args = self.active_task_template_version.filter_kwargs(

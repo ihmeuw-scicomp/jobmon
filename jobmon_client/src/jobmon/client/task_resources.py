@@ -102,7 +102,9 @@ class TaskResources:
 
     def adjust_resources(
         self: TaskResources,
-        resource_scales: Dict[str, Union[float, Callable, Iterator[float]]],
+        resource_scales: Dict[
+            str, Union[numbers.Number, Callable, Iterator[numbers.Number]]
+        ],
         fallback_queues: Optional[List[ClusterQueue]] = None,
     ) -> TaskResources:
         """Adjust TaskResources after a resource error, returning a new object if it changed.
@@ -133,7 +135,14 @@ class TaskResources:
                 elif callable(scaler):
                     new_resource_value = scaler(existing_resources[resource])
                 elif isinstance(scaler, Iterator):
-                    new_resource_value = next(scaler)
+                    try:
+                        new_resource_value = next(scaler)
+                    except StopIteration:
+                        logger.warning(
+                            "Not enough elements left in Iterator, re-using previous value "
+                            f"for {resource}: {existing_resources[resource]}"
+                        )
+                        new_resource_value = existing_resources[resource]
                 else:
                     raise ValueError(
                         "Keys in the resource_scales dictionary must be either numeric "
