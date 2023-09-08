@@ -2,6 +2,13 @@ import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import '../../css/jobmon_gui.css'
 
+const replacements = {
+    "JOBMON_DB_HOST": process.env.JOBMON_DB_HOST,
+    "JOBMON_DB_USER": process.env.JOBMON_DB_USER,
+    "JOBMON_DB_PASSWORD": process.env.JOBMON_DB_PASSWORD,
+    "JOBMON_DB_DATABASE": process.env.JOBMON_DB_DATABASE,
+    "JOBMON_DB_PORT": process.env.JOBMON_DB_PORT,
+}
 export default function JobmonAtIHME(){
     const [text, setText] = useState('')
     let markdown;
@@ -12,7 +19,8 @@ export default function JobmonAtIHME(){
           markdown = response.text()
           return markdown
         })
-        .then(text => setText(text.replace(/MY_VARIABLE/g, `${process.env.MY_VARIABLE}`)))
+        .then(text => setText(text.replace(/JOBMON_DB_HOST|JOBMON_DB_USER|JOBMON_DB_PASSWORD|JOBMON_DB_DATABASE|JOBMON_DB_PORT/g,
+        matched => replacements[matched])))
     },[])
 
     return(
