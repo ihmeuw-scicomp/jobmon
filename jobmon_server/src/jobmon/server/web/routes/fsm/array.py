@@ -1,4 +1,5 @@
 """Routes for Arrays."""
+from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
@@ -131,13 +132,14 @@ def record_array_batch_num(array_id: int) -> Any:
 
     with session.begin():
         tasks_by_status_query = (
-            select(Task.status, func.group_concat(Task.id))
+            select(Task.status, Task.id)
             .where(Task.id.in_(task_ids))
-            .group_by(Task.status)
+            .order_by(Task.status)  # This line is optional but helps in organizing the result
         )
-        result_dict = {}
+
+        result_dict = defaultdict(list)
         for row in session.execute(tasks_by_status_query):
-            result_dict[row[0]] = [int(i) for i in row[1].split(",")]
+            result_dict[row[0]].append(row[1])
 
     resp = jsonify(tasks_by_status=result_dict)
     resp.status_code = StatusCodes.OK

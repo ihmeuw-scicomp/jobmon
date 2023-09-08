@@ -91,7 +91,8 @@ class WebServerProcess:
         while not status == 200 and count < max_tries:
             try:
                 count += 1
-                r = requests.get(f"http://{self.web_host}:{self.web_port}/health")
+                r = requests.get(f"http://{self.web_host}:{self.web_port}/health",
+                                 headers={'Content-Type': 'application/json'})
                 status = r.status_code
             except Exception as e:
                 # Connection failures land here

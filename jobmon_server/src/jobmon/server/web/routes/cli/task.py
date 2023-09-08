@@ -1,11 +1,12 @@
 """Routes for Tasks."""
+from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 import json
 from typing import Any, cast, Dict, List, Set
 
 from flask import jsonify, request
 import pandas as pd
-from sqlalchemy import func, select, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 import structlog
 
@@ -145,25 +146,36 @@ def get_task_subdag() -> Any:
             select(
                 Task.workflow_id.label("workflow_id"),
                 Workflow.dag_id.label("dag_id"),
-                func.group_concat(Task.node_id).label("node_ids"),
+                Task.node_id.label("node_id")
             )
             .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
             .where(Task.id.in_(task_ids))
-            .group_by(Task.workflow_id, Workflow.dag_id)
         )
-        result = session.execute(select_stmt).one_or_none()
 
-        if not result:
-            # return empty values when task_id does not exist or db out of consistency
+        # Initialize defaultdict to store information
+        grouped_data = defaultdict(
+            lambda: {'workflow_id': None, 'dag_id': None, 'node_ids': []}
+        )
+
+        for row in session.execute(select_stmt):
+            key = (row.workflow_id, row.dag_id)  # Assuming this combination is unique for each group
+            grouped_data[key]['workflow_id'] = row.workflow_id
+            grouped_data[key]['dag_id'] = row.dag_id
+            grouped_data[key]['node_ids'].append(row.node_id)
+
+        # If we find no results, we handle it here
+        if not grouped_data:
             resp = jsonify(workflow_id=None, sub_task=None)
             resp.status_code = StatusCodes.OK
             return resp
 
         # Since we have validated all the tasks belong to the same wf in status_command before
         # this call, assume they all belong to the same wf.
-        workflow_id = result.workflow_id
-        dag_id = result.dag_id
-        node_ids = [int(node_id) for node_id in result.node_ids.split(",")]
+        some_key = next(iter(grouped_data))
+        workflow_id, dag_id = some_key
+        node_ids = [int(node_id) for node_id in grouped_data[some_key]['node_ids']]
+
+        # Continue with your current processing logic
         sub_dag_tree = _get_subdag(node_ids, dag_id, session)
         sub_task_tree = _get_tasks_from_nodes(
             workflow_id, sub_dag_tree, task_status, session
