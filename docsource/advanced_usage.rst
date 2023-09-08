@@ -183,8 +183,8 @@ For example::
 
     # The Task will time out and get killed by the cluster. After a few minutes Jobmon
     # will notice that it has disappeared and ask Slurm for an exit status. Slurm will
-    # show a resource kill. Jobmon will scale the memory and runtime by the default 50% and
-    # retry the job at which point it will succeed.
+    # show a resource kill. Jobmon will use the runtime values passed in the
+    # resource_scales dictionary, and on the third attempt will run for 120s.
 
     user = getpass.getuser()
 
@@ -203,15 +203,15 @@ For example::
     retry_task = retry_tt.create_task(
                         arg="sleep 110"
                         name="retry_task",
-                        # job should succeed on second try. The runtime will 135 seconds on the retry
-                        max_attempts=2,
+                        # job should succeed on third try. The runtime will be 120 seconds on the retry
+                        max_attempts=3,
                         compute_resources={
                             'cores': 1,
                             'runtime': '90s',
                             'memory': '1Gb',
                             'queue': 'all.q',
                             'project': 'proj_scicomp'},
-                        resource_scales={"runtime": iter([90, 120])},
+                        resource_scales={"runtime": iter([100, 120])},
                         cluster_name="slurm"
                     )
 
