@@ -173,7 +173,7 @@ The most basic version of resource scaling is cumulative multiplication by a sca
 you can also use some more bespoke resource scalers. You can pass a Callable that will be
 applied to the existing resource value, or an Iterator that yields numeric values. Any
 Callable should take a single numeric value as its sole argument and return only a single
-numeric value.Any Iterable can be easily converted to an Iterator by using the iter()
+numeric value. Any Iterable can be easily converted to an Iterator by using the iter()
 built-in (e.g. iter([80, 160, 190])).
 
 For example::
