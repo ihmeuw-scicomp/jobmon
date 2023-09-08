@@ -3,6 +3,7 @@ import glob
 import os
 from pathlib import Path
 import shutil
+import tempfile
 
 
 import nox
@@ -85,43 +86,42 @@ def typecheck(session: Session) -> None:
 def docs(session: Session) -> None:
     """Build the documentation."""
     # environment variables used in build script
-    web_service_fqdn = \
-        os.environ.get("WEB_SERVICE_FQDN") if "WEB_SERVICE_FQDN" in os.environ else "TBD"
-    web_service_port = \
-        os.environ.get("WEB_SERVICE_PORT") if "WEB_SERVICE_PORT" in os.environ else "TBD"
+    web_service_fqdn = os.environ.get("WEB_SERVICE_FQDN", "TBD")
+    web_service_port = os.environ.get("WEB_SERVICE_PORT", "TBD")
 
-    session.conda_install("graphviz")
+    session.conda_install("graphviz", "mysqlclient")
     session.install(
         "sphinx",
         "sphinx-autodoc-typehints",
         "sphinx_rtd_theme",
         "sphinx_tabs",
+        "sphinx_autoapi"
     )
 
-    # combine source into one directory by installing
+    # # combine source into one directory by installing
     session.install("./jobmon_core")
     session.install("./jobmon_client")
     session.install("./jobmon_server")
-    install_path = (
-        Path(session.virtualenv.location)
-        / "lib"
-        / f"python{session.python}"
-        / "site-packages"
-        / "jobmon"
-    )
+    # install_path = (
+    #     Path(session.virtualenv.location)
+    #     / "lib"
+    #     / f"python{session.python}"
+    #     / "site-packages"
+    #     / "jobmon"
+    # )
 
-    # generate api docs
-    autodoc_output = 'docsource/api'
-    if os.path.exists(autodoc_output):
-        shutil.rmtree(autodoc_output)
-    session.run(
-        'sphinx-apidoc',
-        # output dir
-        '-o', autodoc_output,
-        "--implicit-namespaces",
-        # source dir
-        str(install_path),
-    )
+    # # generate api docs
+    # autodoc_output = 'docsource/api'
+    # if os.path.exists(autodoc_output):
+    #     shutil.rmtree(autodoc_output)
+    # session.run(
+    #     'sphinx-apidoc',
+    #     # output dir
+    #     '-o', autodoc_output,
+    #     "--implicit-namespaces",
+    #     # source dir
+    #     str(install_path),
+    # )
 
     # generate html
     html_output = "out/_html"
@@ -134,6 +134,36 @@ def docs(session: Session) -> None:
             "WEB_SERVICE_PORT": web_service_port
         }
     )
+
+
+@nox.session(python=python, venv_backend="conda")
+def schema_diagram(session: Session) -> None:
+    session.install("-e", "./jobmon_server")
+    outpath = Path(__file__).parent / "docsource" / "developers_guide" / "diagrams" / "erd.svg"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        session.chdir(tmpdir)
+        session.run(
+            "jobmon_server", "init_db",
+            env={"JOBMON__DB__SQLALCHEMY_DATABASE_URI": "sqlite:///jobmon.db"}
+        )
+        session.run("docker", "pull", "schemacrawler/schemacrawler", external=True)
+        session.run(
+            "docker",
+            "run",
+            "--mount", f"type=bind,source={tmpdir},target=/home/schcrwlr/share",
+            "--rm", "-it", "schemacrawler/schemacrawler",
+            "/opt/schemacrawler/bin/schemacrawler.sh",
+            "--server=sqlite",
+            "--database=share/jobmon.db",
+            "--info-level=standard",
+            "--portable-names",
+            "--command", "schema",
+            "--output-format=svg",
+            "--output-file=share/erd.svg",
+            "--title", "Jobmon Database",
+            external=True
+        )
+        session.run("cp", "erd.svg", str(outpath))
 
 
 @nox.session(python=python, venv_backend="conda")

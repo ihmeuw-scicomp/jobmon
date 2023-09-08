@@ -46,26 +46,10 @@ For example, the jobmon reapers helm chart only defines a single reaper that is 
 Database
 ########
 Jobmon uses one mysql database. All database access is via services running in Kubernetes.
-The database server runs on a virtual machine outside of Kubernetes, inside a docker container.
-Nothing else runs on that virtual machine.
-Therefore Mysql can be configured to use 80% of the memory for its buffers, and use all of the threads.
-There can be several databases in the same database server, although that is not typical.
-The data itself is stored in a filesystem that is mounted
+The database server can be deployed anywhere. Ours is deployed in Azure.
 
-A new release of Jobmon will use the existing Jobmon database unless the new release has a
-backwards-incompatible (breaking) change. A breaking change is a schema change where existing
-queries no longer work:
+.. image:: diagrams/erd.png
 
-#. Changing a table name
-#. Changing a column name
-#. Deleting a table or column
-
-When adding a new column or table, it might be necessary to manually insert values for existing
-rows.
-
-The data is mounted on a persistent storage volume, mounted to that container.
-It is persistent and therefore is not deleted when the container is stopped, or if the images
-are pruned.
 
 Critical Database Config Values
 *******************************
@@ -75,8 +59,6 @@ or after maintenance.
   +-------------------------+----------------------------+
   + Setting                 +  Value                     +
   +=========================+============================+
-  + INNODB_BUFFER_POOL_SIZE +  80% of RAM                +
-  +-------------------------+----------------------------+
   + WAIT_TIMEOUT            +  600                       +
   +-------------------------+----------------------------+
   + THREAD_POOL_SIZE        +  Set automatically on boot +
@@ -85,11 +67,6 @@ or after maintenance.
 There are two places that WAIT_TIMEOUT is configured. One is as a global
 variable, which can be set by:
 ``SET GLOBAL wait_timeout=600;``
-
-There is a different timeout for X. The effect is X still believes that the database
-session is active, but the database server has closed the connection.
-The symptom is "MySQL has gone away" errors in the server.
-
 
 Using mysqldump to copy a database
 **********************************
