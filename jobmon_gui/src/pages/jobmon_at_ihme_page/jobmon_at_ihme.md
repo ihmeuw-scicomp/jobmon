@@ -52,11 +52,6 @@ make sure  that you set your ``cluster_name`` to ``slurm_stage`` in Jobmon.
 
 You can set your queue to all.q, long.q, or d.q on both the production and test slurm clusters.
 
-## Jobmon Database
-The Jobmon database is hosted in Azure, the database information (read-only) is as follows:
-
-
-Please note to access the Jobmon database you need to switch your VPN to "All Internet Traffic" in your Big-IP Edge Client.
 
 ## Jobmon Learning
 For a deeper dive in to Jobmon, check out some of our courses:
@@ -69,3 +64,19 @@ Check [IHME Learn](https://ihme.brightspace.com>) to see if there are any upcomi
 ## Jobmon GUI
 You can view all your workflows, monitor their progress, and dive into the details
 of their tasks using the [Jobmon GUI](https://jobmon-gui.ihme.washington.edu)
+
+## Jobmon Database
+The Jobmon database is hosted in Azure, the database information (read-only) is as follows:
+
+```shell
+Host: JOBMON_DB_HOST
+Username: JOBMON_DB_USER
+Password: JOBMON_DB_PASSWORD
+Database: JOBMON_DB_DATABASE
+Port: JOBMON_DB_PORT
+```
+
+Please note to access the Jobmon database you need to switch your VPN to "All Internet Traffic" in your Big-IP Edge Client.
+
+### Jobmon ERD
+![Jobmon ERD](jobmon_erd.svg)

@@ -678,3 +678,9 @@ input:focus + .slider {
     color: #007bff;
     cursor: pointer;
 }
+
+/* styles.css or inline styles */
+.markdown-container img {
+  width: 1250px; /* Adjust the width as needed */
+  height: auto; /* Allows the SVG to maintain its aspect ratio */
+}
