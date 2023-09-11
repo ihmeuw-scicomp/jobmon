@@ -182,7 +182,12 @@ class Tool:
                 Must specify default_cluster_name when this option is used.
             default_resource_scales: dictionary of default resource scales to adjust task
                 resources with. Can be overridden at task level.
-                dict of {resource_name: scale_value}.
+                dict of {resource_name: scale_factor}. Scale factor can be a numeric value, a
+                Callable that will be applied to the existing resources, or an Iterator. Any
+                Callable should take a single numeric value as its sole argument. Any
+                Iterator should only yield numeric values. Any Iterable can be easily
+                converted to an Iterator by using the iter() built-in (e.g. iter([80, 160,
+                190])).
             yaml_file: path to YAML file that contains user-specified compute resources.
             max_attempts: max_attempts for the tt
         """

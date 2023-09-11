@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import copy
 from http import HTTPStatus as StatusCodes
 from itertools import product
 import logging
 from typing import Any, Callable, Dict, Iterator, List, Optional, TYPE_CHECKING, Union
 
 from jobmon.client.node import Node
-from jobmon.client.task import Task
+from jobmon.client.task import Task, validate_task_resource_scales
 from jobmon.client.task_template_version import TaskTemplateVersion
 from jobmon.core.constants import MaxConcurrentlyRunning
 from jobmon.core.exceptions import InvalidResponse
@@ -244,6 +245,9 @@ class Array:
             # If not specified, defined from the array upstreams
             upstream_tasks = self.upstream_tasks
 
+        # resource scales validation
+        validate_task_resource_scales(resource_scales=resource_scales)
+
         # Expand the node_args
         if not set(node_kwargs.keys()).issuperset(self.task_template_version.node_args):
             raise ValueError(
@@ -262,7 +266,7 @@ class Array:
                 node=node,
                 task_args=self.task_args,
                 op_args=self.op_args,
-                resource_scales=resource_scales,
+                resource_scales=copy.deepcopy(resource_scales),
                 max_attempts=max_attempts,
                 upstream_tasks=upstream_tasks,
                 task_attributes=task_attributes,

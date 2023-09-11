@@ -6,8 +6,9 @@ from http import HTTPStatus as StatusCodes
 import json
 import logging
 from math import ceil
+import numbers
 import re
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
 from jobmon.client.units import MemUnit, TimeUnit
 from jobmon.core.cluster_protocol import ClusterQueue
@@ -101,13 +102,20 @@ class TaskResources:
 
     def adjust_resources(
         self: TaskResources,
-        resource_scales: Dict[str, float],
+        resource_scales: Dict[
+            str, Union[numbers.Number, Callable, Iterator[numbers.Number]]
+        ],
         fallback_queues: Optional[List[ClusterQueue]] = None,
     ) -> TaskResources:
         """Adjust TaskResources after a resource error, returning a new object if it changed.
 
         Args:
             resource_scales: Specifies how much to scale the failed Task's resources by.
+                Scale factor can be a numeric value, a Callable that will be applied
+                to the existing resources, or an Iterator. Any Callable should take
+                a single numeric value as its sole argument. Any Iterator should only yield
+                numeric values. Any Iterable can be easily converted to an Iterator by using
+                the iter() built-in (e.g. iter([80, 160, 190])).
             fallback_queues: list of queues that users specify. If their jobs exceed the
                 resources of a given queue, Jobmon will try to run their jobs on the fallback
                 queues.
@@ -118,11 +126,37 @@ class TaskResources:
         resource_updates: Dict[str, Any] = {}
 
         # Only cores, memory, and runtime get scaled
-        for resource, scaling_factor in resource_scales.items():
+        for resource, scaler in resource_scales.items():
             if resource in existing_resources.keys():
-                resource_updates[resource] = self.scale_val(
-                    existing_resources[resource], scaling_factor
-                )
+                if isinstance(scaler, numbers.Number):
+                    new_resource_value = self.scale_val(
+                        existing_resources[resource], scaler
+                    )
+                elif callable(scaler):
+                    new_resource_value = scaler(existing_resources[resource])
+                elif isinstance(scaler, Iterator):
+                    try:
+                        new_resource_value = next(scaler)
+                    except StopIteration:
+                        logger.warning(
+                            "Not enough elements left in Iterator, re-using previous value "
+                            f"for {resource}: {existing_resources[resource]}"
+                        )
+                        new_resource_value = existing_resources[resource]
+                else:
+                    raise ValueError(
+                        "Keys in the resource_scales dictionary must be either numeric "
+                        f"values, Iterators, or Python Callables; found {scaler}, type "
+                        f"{type(scaler)} instead."
+                    )
+                if not isinstance(new_resource_value, numbers.Number):
+                    raise ValueError(
+                        "Attemping to update resource to a non-numeric value, "
+                        f"{new_resource_value}. If passing an Iterator, elements must be "
+                        "numeric values. If passing a Callable, return value must be a "
+                        "numeric value."
+                    )
+                resource_updates[resource] = new_resource_value
 
         scaled_resources = dict(existing_resources, **resource_updates)
 

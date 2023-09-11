@@ -5,6 +5,7 @@ import ast
 from collections import deque
 from datetime import datetime
 import logging
+import numbers
 import time
 from typing import (
     Any,
@@ -319,6 +320,16 @@ class WorkflowRun:
                 # Convert datatypes as appropriate
                 task_id = int(task_id)
                 resource_scales = ast.literal_eval(resource_scales)
+                for resource, scaler in resource_scales.items():
+                    if not isinstance(scaler, numbers.Number):
+                        if isinstance(scaler, list):
+                            resource_scales[resource] = iter(scaler)
+                        else:
+                            raise ValueError(
+                                "Cannot run CLI resume on non-numeric custom resource "
+                                f"scales: found {resource} scaler {scaler} in resource "
+                                "scales retrieved from the Jobmon DB."
+                            )
                 fallback_queues = ast.literal_eval(fallback_queues)
                 requested_resources = ast.literal_eval(requested_resources)
                 # Construct a queue, a cluster, and a task resources object

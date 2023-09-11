@@ -447,9 +447,7 @@ def test_workflow_get_errors(tool, task_template, db_engine):
             )
         )
         ti = session.execute(
-            text(
-                "SELECT id from task_instance where task_id={}".format(task_a.task_id)
-            )
+            text("SELECT id from task_instance where task_id={}".format(task_a.task_id))
         ).fetchone()
         ti_id_a = ti[0]
         session.execute(
@@ -474,9 +472,7 @@ def test_workflow_get_errors(tool, task_template, db_engine):
             )
         )
         ti = session.execute(
-            text(
-                "SELECT id FROM task_instance WHERE task_id={}".format(task_b.task_id)
-            )
+            text("SELECT id FROM task_instance WHERE task_id={}".format(task_b.task_id))
         ).fetchone()
         ti_id_b = ti[0]
         session.execute(

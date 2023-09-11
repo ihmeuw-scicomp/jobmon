@@ -166,6 +166,58 @@ For example::
 
     my_wf.run()
 
+Custom Resource Scales
+**********************
+
+The most basic version of resource scaling is cumulative multiplication by a scaling factor,
+but you can also use some more bespoke resource scalers. You can pass a Callable that will be
+applied to the existing resource value, or an Iterator that yields numeric values. Any
+Callable should take a single numeric value as its sole argument and return only a single
+numeric value. Any Iterable can be easily converted to an Iterator by using the iter()
+built-in (e.g. iter([80, 160, 190])).
+
+For example::
+
+    import getpass
+    from jobmon.client.tool import Tool
+
+    # The Task will time out and get killed by the cluster. After a few minutes Jobmon
+    # will notice that it has disappeared and ask Slurm for an exit status. Slurm will
+    # show a resource kill. Jobmon will use the runtime values passed in the
+    # resource_scales dictionary, and on the third attempt will run for 120s.
+
+    user = getpass.getuser()
+
+    tool = Tool(name=resource_resume_tutorial)
+
+    wf = tool.create_workflow(name=resource_resume_wf, workflow_args="wf_with_resource_retries")
+
+    retry_tt = tool.get_task_template(
+        template_name="resource_retry_tutorial_template",
+        command_template="{arg}",
+        node_args=["arg"],
+        task_args=[],
+        op_args=[]
+    )
+
+    retry_task = retry_tt.create_task(
+                        arg="sleep 110"
+                        name="retry_task",
+                        # job should succeed on third try. The runtime will be 120 seconds on the retry
+                        max_attempts=3,
+                        compute_resources={
+                            'cores': 1,
+                            'runtime': '90s',
+                            'memory': '1Gb',
+                            'queue': 'all.q',
+                            'project': 'proj_scicomp'},
+                        resource_scales={"runtime": iter([100, 120])},
+                        cluster_name="slurm"
+                    )
+
+    wf.add_task(retry_task)
+
+    my_wf.run()
 
 .. _jobmon-resume-label:
 

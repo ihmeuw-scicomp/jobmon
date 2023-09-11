@@ -1,6 +1,7 @@
 """A framework that many tasks have in common while varying by a declared set of arguments."""
 from __future__ import annotations
 
+import copy
 import hashlib
 from http import HTTPStatus as StatusCodes
 import logging
@@ -20,7 +21,7 @@ import yaml
 
 from jobmon.client.array import Array
 from jobmon.client.node import Node
-from jobmon.client.task import Task
+from jobmon.client.task import Task, validate_task_resource_scales
 from jobmon.client.task_template_version import TaskTemplateVersion
 from jobmon.core.constants import ExecludeTTVs, MaxConcurrentlyRunning
 from jobmon.core.exceptions import InvalidResponse
@@ -487,7 +488,12 @@ class TaskTemplate:
                 Must specify default_cluster_name when this option is used.
             default_resource_scales: dictionary of default resource scales to adjust task
                 resources with. Can be overridden at task level.
-                dict of {resource_name: scale_value}.
+                dict of {resource_name: scale_factor}. Scale factor can be a numeric value, a
+                Callable that will be applied to the existing resources, or an Iterator. Any
+                Callable should take a single numeric value as its sole argument. Any
+                Iterator should only yield numeric values. Any Iterable can be easily
+                converted to an Iterator by using the iter() built-in (e.g. iter([80, 160,
+                190])).
             default_max_attempts: default max_attempts associated with this template on.
         """
         if default_compute_resources is not None and not default_cluster_name:
@@ -552,8 +558,12 @@ class TaskTemplate:
                 with. Can be overridden at task template or task level.
                 dict of {resource_name: resource_value}
             compute_resources_callable: compute resources generating callable.
-            resource_scales (dict): how much users want to scale their resource request if the
-                the initial request fails.
+            resource_scales (dict): How much users want to scale their resource request if the
+                the initial request fails. Scale factor can be a numeric value, a Callable
+                that will be applied to the existing resources, or an Iterator. Any Callable
+                should take a single numeric value as its sole argument. Any Iterator should
+                only yield numeric values. Any Iterable can be easily converted to an
+                Iterator by using the iter() built-in (e.g. iter([80, 160, 190])).
 
             **kwargs: values for each argument specified in command_template
 
@@ -582,6 +592,9 @@ class TaskTemplate:
                 f"{self.active_task_template_version.template_args}, got {set(kwargs.keys())}"
             )
 
+        # resource scales validation
+        validate_task_resource_scales(resource_scales=resource_scales)
+
         node_args = self.active_task_template_version.filter_kwargs(
             "node_args", **kwargs
         )
@@ -600,7 +613,7 @@ class TaskTemplate:
             op_args=op_args,
             compute_resources=compute_resources,
             compute_resources_callable=compute_resources_callable,
-            resource_scales=resource_scales,
+            resource_scales=copy.deepcopy(resource_scales),
             cluster_name=cluster_name,
             name=name,
             max_attempts=max_attempts,
@@ -634,7 +647,7 @@ class TaskTemplate:
             compute_resources_callable: a function that can dynamically generate resources on
                 retries, if different from the task template callable.
             resource_scales: Parameters for how aggressive we will rescale tasks that
-                are resource killed
+                are resource killed.
             cluster_name: The cluster the array will run on
             **kwargs: task, node, and op_args as defined in the command template. If you
                 provide node_args as an iterable, they will be expanded.
@@ -656,6 +669,9 @@ class TaskTemplate:
                 f"Missing op_args for this array. Task Template requires op_args="
                 f"{self.active_task_template_version.op_args}, got {set(kwargs.keys())}."
             )
+
+        # resource scales validation
+        validate_task_resource_scales(resource_scales=resource_scales)
 
         # Split node, task, and op_args
         node_args = self.active_task_template_version.filter_kwargs(

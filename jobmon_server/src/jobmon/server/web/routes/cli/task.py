@@ -393,7 +393,7 @@ def _get_dag_and_wf_id(task_id: int, session: Session) -> tuple:
         select(
             Workflow.dag_id.label("dag_id"),
             Task.workflow_id.label("workflow_id"),
-            Task.node_id.label("node_id")
+            Task.node_id.label("node_id"),
         )
         .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
         .where(Task.id == task_id)
