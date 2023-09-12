@@ -5,7 +5,7 @@ from elasticapm.contrib.flask import ElasticAPM
 from flask import Flask, jsonify, request
 from MySQLdb import OperationalError
 import structlog
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, UnsupportedMediaType
 
 
 from jobmon.server.web.routes import SessionLocal
@@ -94,7 +94,7 @@ def add_hooks_and_handlers(app: Flask, apm: Optional[ElasticAPM] = None) -> Flas
 
         try:
             data = cast(Dict, request.get_json())
-        except BadRequest:
+        except (BadRequest, UnsupportedMediaType):
             # Some get requests come without any json data.
             # All requests issued by Jobmon's requester automatically come with an empty dict;
             # however, if we call raw get requests outside of Jobmon we should handle it
