@@ -491,14 +491,11 @@ def instantiate_task_instances() -> Any:
         )
         session.execute(task_instance_update)
 
-    # fetch rows individually without group_concat
-    grouped_data: DefaultDict = defaultdict(
-        lambda: {"task_instance_ids": [],
-                 "array_id": None,
-                 "array_name": None,
-                 "task_resources_id": None}
-    )
     with session.begin():
+        # fetch rows individually without group_concat
+        # Key is a tuple of array_id, array_name, array_batch_num, task_resources_id
+        # Values are task instances in this batch
+        grouped_data: DefaultDict = defaultdict(list)
         instantiated_batches_query = (
             select(
                 TaskInstance.array_id,
@@ -516,28 +513,22 @@ def instantiate_task_instances() -> Any:
         )
 
         # Collect the rows into the defaultdict
-        for (
-            array_id,
-            array_name,
-            array_batch_num,
-            task_resources_id,
-            task_instance_id,
-        ) in session.execute(instantiated_batches_query):
-            grouped_data[array_batch_num]["task_instance_ids"].append(int(task_instance_id))
-            grouped_data[array_batch_num]["array_id"] = array_id
-            grouped_data[array_batch_num]["array_name"] = array_name
-            grouped_data[array_batch_num]["task_resources_id"] = task_resources_id
+        for array_id, array_name, array_batch_num, task_resources_id, task_instance_id \
+                in result:
+            key = (array_id, array_batch_num, array_name, task_resources_id)
+            grouped_data[key].append(int(task_instance_id))
 
     # Serialize the grouped data
     serialized_batches = []
-    for array_batch_num, data in grouped_data.items():
+    for key, task_instance_ids in grouped_data.items():
+        array_id, array_batch_num, array_name, task_resources_id = key
         serialized_batches.append(
             SerializeTaskInstanceBatch.to_wire(
-                array_id=data["array_id"],
-                array_name=data["array_name"],
+                array_id=array_id,
+                array_name=array_name,
                 array_batch_num=array_batch_num,
-                task_resources_id=data["task_resources_id"],
-                task_instance_ids=data["task_instance_ids"],
+                task_resources_id=task_resources_id,
+                task_instance_ids=task_instance_ids,
             )
         )
 
