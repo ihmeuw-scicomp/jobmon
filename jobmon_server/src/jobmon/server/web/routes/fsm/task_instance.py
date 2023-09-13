@@ -514,7 +514,7 @@ def instantiate_task_instances() -> Any:
 
         # Collect the rows into the defaultdict
         for array_id, array_name, array_batch_num, task_resources_id, task_instance_id \
-                in result:
+                in session.execute(instantiated_batches_query):
             key = (array_id, array_batch_num, array_name, task_resources_id)
             grouped_data[key].append(int(task_instance_id))
 
