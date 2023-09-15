@@ -10,15 +10,6 @@ To use either of the clusters with Jobmon users need to install their Jobmon plu
 wants to use Slurm with Jobmon, they would need to have the core Jobmon software and the
 Jobmon Slurm plugin installed.
 
-Users can either:
-1. install Jobmon core and the plugins individually using "pip," or
-2. install Jobmon core and the Slurm plugin together with a single conda command.
-
-## Conda install
-To install core Jobmon and both plugins using conda:
-```shell
-    conda install ihme_jobmon -k --channel https://artifactory.ihme.washington.edu/artifactory/api/conda/conda-scicomp --channel conda-forge
-```
 ##  pip install
 To install just core jobmon (no cluster plugins) via pip:
 ```shell

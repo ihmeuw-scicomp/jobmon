@@ -684,3 +684,9 @@ input:focus + .slider {
   width: 1250px; /* Adjust the width as needed */
   height: auto; /* Allows the SVG to maintain its aspect ratio */
 }
+
+.markdown-container {
+    margin-left: 75px;
+    margin-right: 75px;
+    margin-top: 25px;
+}
