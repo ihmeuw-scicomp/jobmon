@@ -4,8 +4,6 @@ import { Modal, Button } from 'react-bootstrap';
 
 export default function CustomModal({headerContent, bodyContent, showModal, setShowModal, className = ''}) {
 
-
-
     return (
         <Modal
             size="xl"

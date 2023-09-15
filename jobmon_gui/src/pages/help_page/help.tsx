@@ -15,7 +15,7 @@ export default function Help(){
     },[])
 
     return(
-        <div>
+        <div className="markdown-container">
             <ReactMarkdown>{text}</ReactMarkdown>
         </div>
     )

@@ -1,4 +1,4 @@
-import "../jobmon_gui.css";
+import "../../css/jobmon_gui.css";
 
 import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
@@ -9,7 +9,7 @@ import { AiFillSchedule, AiFillCheckCircle} from "react-icons/ai";
 import { TbHandStop } from "react-icons/tb";
 import {HiRocketLaunch} from "react-icons/hi2";
 
-export default function WFHeader({ wf_id, wf_status, wf_status_desc, wf_tool, wf_name, wf_args, wf_submitted_date, wf_status_date }) {
+export default function WFHeader({ wf_id, wf_status, wf_status_desc, wf_tool, wf_name, wf_args, wf_submitted_date, wf_status_date, wf_elapsed_time }) {
 
   return (
      <header className="App-header">
@@ -25,6 +25,7 @@ export default function WFHeader({ wf_id, wf_status, wf_status_desc, wf_tool, wf
                         <p><b>Workflow Args:</b> {wf_args}</p>
                         <p><b>Workflow Submitted Date:</b> {wf_submitted_date}</p>
                         <p><b>Workflow Status Date:</b> {wf_status_date}</p>
+                        <p><b>Workflow Elapsed Time:</b> {wf_elapsed_time}</p>
               </Popover>
             )}
           >

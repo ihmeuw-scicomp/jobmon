@@ -7,7 +7,9 @@ import NodeLists from './node_list';
 import TaskFSM from './task_fsm';
 import { FaLightbulb } from "react-icons/fa";
 import { OverlayTrigger, Popover } from 'react-bootstrap';
-import { convertDatePST } from '../functions'
+import { convertDatePST } from '../../utilities/formatters'
+import { HiInformationCircle } from "react-icons/hi";
+import CustomModal from '../../components/Modal';
 
 function getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId) {
     // Returns task status and workflow ID
@@ -85,6 +87,8 @@ function TaskDetails() {
     const [task_name, setTaskName] = useState("")
     const [task_command, setTaskCommand] = useState("")
     const [task_status_date, setTaskStatusDate] = useState("")
+    const [showTaskInfo, setShowTaskInfo] = useState(false)
+    const [showTaskFSM, setShowTaskFSM] = useState(false)
 
 
     //***********************hooks******************************
@@ -117,41 +121,15 @@ function TaskDetails() {
                 <header className="div-level-2 header-1 ">
                     <p className='color-dark'>
                         Task Name: {task_name}&nbsp;
-                        <OverlayTrigger
-                            placement="right"
-                            trigger={["hover", "focus"]}
-                            overlay={(
-                                <Popover id="task_count">
-                                    <p><b>Task ID:</b> {taskId}</p>
-                                    <p><b>Task Command:</b> {task_command}</p>
-                                    <p><b>Task Status Date:</b> {task_status_date} </p>
-                                </Popover>
-                            )}
-                        >
-                            <span><FaLightbulb /></span>
-                        </OverlayTrigger>
+                        <span>
+                            <HiInformationCircle onClick={() => setShowTaskInfo(true)} />
+                        </span>
                     </p>
                     <p className="color-dark">
                         Task Finite State Machine&nbsp;
-                        <OverlayTrigger
-                            placement="right"
-                            trigger={["hover", "focus"]}
-                            overlay={(
-                                <Popover id="task_count">
-                                    <p><b>Registering:</b> Task is bound to the database.</p>
-                                    <p><b>Queued:</b> Task's dependencies have successfully completed, task can be run when the scheduler is ready.</p>
-                                    <p><b>Instantiating:</b> A task instance is preparing to be launched/submitted.</p>
-                                    <p><b>Launched:</b> Task instance submitted to the cluster normally.</p>
-                                    <p><b>Running:</b> Task is running on the specified distributor.</p>
-                                    <p><b>Error Recoverable:</b> Task has errored out but has more attempts so it will be retried.</p>
-                                    <p><b>Adjusting Resources:</b> Task errored with a resource error, the resources will be adjusted before retrying.</p>
-                                    <p><b>Error Fatal:</b> Task errored out and has used all of the attempts, therefore has failed for this WorkflowRun. It can be resumed in a new WFR.</p>
-                                    <p><b>Done:</b> Task ran successfully to completion; it has a TaskInstance that successfully completed.</p>
-                                </Popover>
-                            )}
-                        >
-                            <span><FaLightbulb /></span>
-                        </OverlayTrigger>
+                        <span>
+                            <HiInformationCircle onClick={() => setShowTaskFSM(true)} />
+                        </span>
                     </p>
                 </header>
             </div>
@@ -166,8 +144,44 @@ function TaskDetails() {
             <div id="wftable" className="div-level-2" >
                 <TaskInstanceTable taskInstanceData={ti_details} />
             </div>
+                <CustomModal
+                    className="task_info_modal"
+                    headerContent={
+                        <h5> Task Information</h5>
+                    }
+                    bodyContent={
+                        <p>
+                            <b>Task ID:</b> {taskId}<br/>
+                            <b>Task Command:</b> {task_command}<br/>
+                            <b>Task Status Date:</b> {task_status_date}<br/>
+                        </p>
+                    }
+                    showModal={showTaskInfo}
+                    setShowModal={setShowTaskInfo}
+                />
+                <CustomModal
+                    className="task_info_modal"
+                    headerContent={
+                        <h5> Task Finite State Machine</h5>
+                    }
+                    bodyContent={
+                        <p>
+                            <b>Registering:</b> Task is bound to the database.<br/>
+                            <b>Queued:</b> Task's dependencies have successfully completed, task can be run when the scheduler is ready.<br/>
+                            <b>Instantiating:</b> A task instance is preparing to be launched/submitted.<br/>
+                            <b>Launched:</b> Task instance submitted to the cluster normally.<br/>
+                            <b>Running:</b> Task is running on the specified distributor.<br/>
+                            <b>Error Recoverable:</b> Task has errored out but has more attempts so it will be retried.<br/>
+                            <b>Adjusting Resources:</b> Task errored with a resource error, the resources will be adjusted before retrying.<br/>
+                            <b>Error Fatal:</b> Task errored out and has used all of the attempts, therefore has failed for this WorkflowRun. <br/>
+                            It can be resumed in a new WFR.<br/>
+                            <b>Done:</b> Task ran successfully to completion; it has a TaskInstance that successfully completed.<br/>
+                        </p>
+                    }
+                    showModal={showTaskFSM}
+                    setShowModal={setShowTaskFSM}
+                />
         </div>
-
     );
 
 }
