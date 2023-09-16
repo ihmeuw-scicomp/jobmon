@@ -518,7 +518,7 @@ def workflows_by_user_form() -> Any:
                                 {inner_where_clause}
                         )
                     GROUP BY
-                        workflow_id
+                        workflow_id, queue_id
                 ) workflow_queue on workflow.id = workflow_queue.workflow_id
                 JOIN queue on queue.id = workflow_queue.queue_id
                 JOIN workflow_run on workflow.id = workflow_run.workflow_id
