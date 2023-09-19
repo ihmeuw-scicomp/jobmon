@@ -245,8 +245,9 @@ class Array:
             # If not specified, defined from the array upstreams
             upstream_tasks = self.upstream_tasks
 
-        # resource scales validation
-        validate_task_resource_scales(resource_scales=resource_scales)
+        # validate non-empty resource_scale dicts
+        if resource_scales:
+            validate_task_resource_scales(resource_scales=resource_scales)
 
         # Expand the node_args
         if not set(node_kwargs.keys()).issuperset(self.task_template_version.node_args):
