@@ -592,8 +592,9 @@ class TaskTemplate:
                 f"{self.active_task_template_version.template_args}, got {set(kwargs.keys())}"
             )
 
-        # resource scales validation
-        validate_task_resource_scales(resource_scales=resource_scales)
+        # validate non-empty resource_scale dicts
+        if resource_scales:
+            validate_task_resource_scales(resource_scales=resource_scales)
 
         node_args = self.active_task_template_version.filter_kwargs(
             "node_args", **kwargs
@@ -670,8 +671,9 @@ class TaskTemplate:
                 f"{self.active_task_template_version.op_args}, got {set(kwargs.keys())}."
             )
 
-        # resource scales validation
-        validate_task_resource_scales(resource_scales=resource_scales)
+        # validate non-empty resource_scale dicts
+        if resource_scales:
+            validate_task_resource_scales(resource_scales=resource_scales)
 
         # Split node, task, and op_args
         node_args = self.active_task_template_version.filter_kwargs(
