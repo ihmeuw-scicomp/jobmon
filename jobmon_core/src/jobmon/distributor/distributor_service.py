@@ -31,7 +31,6 @@ from jobmon.distributor.distributor_command import DistributorCommand
 from jobmon.distributor.distributor_task_instance import DistributorTaskInstance
 from jobmon.distributor.distributor_workflow_run import DistributorWorkflowRun
 from jobmon.distributor.task_instance_batch import TaskInstanceBatch
-import tenacity
 
 
 logger = logging.getLogger(__name__)
@@ -421,16 +420,16 @@ class DistributorService:
                                  for i in range(0, len(task_instance_ids_to_heartbeat), chunk_size)]
 
         # Send heartbeat for each batch
-        asyncio.run(self._log_task_instance_report_by_date(task_instance_batches))
+        asyncio.run(self._log_heartbeats(task_instance_batches))
 
-    async def _log_task_instance_report_by_date(
+    async def _log_heartbeats(
         self, task_instance_batches: List[List[int]]
     ) -> None:
         """Create a task for each batch of task instances to send heartbeat."""
         async with aiohttp.ClientSession() as session:
             heartbeat_tasks = [
                 asyncio.create_task(
-                    self._log_task_instance_report_by_date_batch(session, batch)
+                    self._log_heartbeat_by_batch(session, batch)
                 )
                 for batch in task_instance_batches
             ]
@@ -438,7 +437,7 @@ class DistributorService:
 
         self._last_heartbeat_time = time.time()
 
-    async def _log_task_instance_report_by_date_batch(
+    async def _log_heartbeat_by_batch(
         self, session: aiohttp.ClientSession, task_instance_ids_to_heartbeat: List[int]
     ) -> None:
         """Send heartbeat for a batch of task instances."""
@@ -478,9 +477,9 @@ class DistributorService:
 
             max_attempts -= 1
             await asyncio.sleep(wait_time)
-            wait_time *= 2
+            wait_time *= wait_time
 
-        if max_attempts == 0 and not http_request_ok(return_code):
+        if not http_request_ok(return_code):
             raise InvalidResponse(
                 f"Unexpected status code {return_code} from POST "
                 f"request through route {app_route}. Expected "
