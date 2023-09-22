@@ -414,19 +414,24 @@ class DistributorService:
                     task_instance_launched.task_instance_id
                 )
 
-        # Create batches of task instance IDs
-        chunk_size = 500
-        task_instance_batches = [task_instance_ids_to_heartbeat[i:i + chunk_size]
-                                 for i in range(0, len(task_instance_ids_to_heartbeat), chunk_size)]
+        if any(task_instance_ids_to_heartbeat):
+            # Create batches of task instance IDs
+            chunk_size = 500
+            task_instance_batches = [
+                task_instance_ids_to_heartbeat[i:i + chunk_size]
+                for i in range(0, len(task_instance_ids_to_heartbeat), chunk_size)
+            ]
 
-        # Send heartbeat for each batch
-        asyncio.run(self._log_heartbeats(task_instance_batches))
+            # Send heartbeat for each batch
+            asyncio.run(self._log_heartbeats(task_instance_batches))
+
+        self._last_heartbeat_time = time.time()
 
     async def _log_heartbeats(
         self, task_instance_batches: List[List[int]]
     ) -> None:
         """Create a task for each batch of task instances to send heartbeat."""
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(self.requester.url) as session:
             heartbeat_tasks = [
                 asyncio.create_task(
                     self._log_heartbeat_by_batch(session, batch)
@@ -435,8 +440,6 @@ class DistributorService:
             ]
             await asyncio.gather(*heartbeat_tasks)
 
-        self._last_heartbeat_time = time.time()
-
     async def _log_heartbeat_by_batch(
         self, session: aiohttp.ClientSession, task_instance_ids_to_heartbeat: List[int]
     ) -> None:
@@ -444,7 +447,6 @@ class DistributorService:
         message: Dict = {
             "next_report_increment": self._next_report_increment,
             "task_instance_ids": task_instance_ids_to_heartbeat,
-            "client_jobmon_version": __version__,
         }
         app_route = "/task_instance/log_report_by/batch"
 
@@ -455,12 +457,13 @@ class DistributorService:
 
         while max_attempts > 0:
             async with session.post(
-                f"{self.requester.url}{app_route}",
+                app_route,
                 json=message,
+                params={"client_jobmon_version": __version__},
                 headers={"Content-Type": "application/json"},
             ) as response:
                 return_code = response.status
-                response = await response.json()
+                response = await response.text()
 
             if 499 < return_code < 600:
                 logger.warning(
