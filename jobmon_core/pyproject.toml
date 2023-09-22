@@ -12,6 +12,7 @@ classifiers = [
     "Programming Language :: Python :: 3.7",
 ]
 dependencies = [
+    'aiohttp',
     'configparser',
     'psutil',
     'requests',

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import itertools as it
 import logging
 import signal
@@ -18,6 +19,8 @@ from typing import (
     Union,
 )
 
+import aiohttp
+from jobmon.core import __version__
 from jobmon.core.cluster_protocol import ClusterDistributor
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus
@@ -28,6 +31,7 @@ from jobmon.distributor.distributor_command import DistributorCommand
 from jobmon.distributor.distributor_task_instance import DistributorTaskInstance
 from jobmon.distributor.distributor_workflow_run import DistributorWorkflowRun
 from jobmon.distributor.task_instance_batch import TaskInstanceBatch
+import tenacity
 
 
 logger = logging.getLogger(__name__)
@@ -411,24 +415,77 @@ class DistributorService:
                     task_instance_launched.task_instance_id
                 )
 
-        logger.debug(
-            f"Logging heartbeat for task_instance {task_instance_ids_to_heartbeat}"
-        )
+        # Create batches of task instance IDs
+        chunk_size = 500
+        task_instance_batches = [task_instance_ids_to_heartbeat[i:i + chunk_size]
+                                 for i in range(0, len(task_instance_ids_to_heartbeat), chunk_size)]
+
+        # Send heartbeat for each batch
+        asyncio.run(self._log_task_instance_report_by_date(task_instance_batches))
+
+    async def _log_task_instance_report_by_date(
+        self, task_instance_batches: List[List[int]]
+    ) -> None:
+        """Create a task for each batch of task instances to send heartbeat."""
+        async with aiohttp.ClientSession() as session:
+            heartbeat_tasks = [
+                asyncio.create_task(
+                    self._log_task_instance_report_by_date_batch(session, batch)
+                )
+                for batch in task_instance_batches
+            ]
+            await asyncio.gather(*heartbeat_tasks)
+
+        self._last_heartbeat_time = time.time()
+
+    async def _log_task_instance_report_by_date_batch(
+        self, session: aiohttp.ClientSession, task_instance_ids_to_heartbeat: List[int]
+    ) -> None:
+        """Send heartbeat for a batch of task instances."""
         message: Dict = {
             "next_report_increment": self._next_report_increment,
             "task_instance_ids": task_instance_ids_to_heartbeat,
+            "client_jobmon_version": __version__,
         }
         app_route = "/task_instance/log_report_by/batch"
-        return_code, result = self.requester.send_request(
-            app_route="/task_instance/log_report_by/batch",
-            message=message,
-            request_type="post",
-        )
-        if http_request_ok(return_code) is False:
+
+        # Super basic retrying logic, to avoid fussing with tenacity logic.
+        # TODO: Factor out into an asynchronous requester
+
+        max_attempts, wait_time = 10, 1.5
+
+        while max_attempts > 0:
+            async with session.post(
+                f"{self.requester.url}{app_route}",
+                json=message,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                return_code = response.status
+                response = await response.json()
+
+            if 499 < return_code < 600:
+                logger.warning(
+                    f"Got HTTP status_code={return_code} from server. "
+                    f"app_route: {app_route}."
+                )
+            elif return_code == 423:
+                logger.info(
+                    f"Got HTTP status_code=423 from server. app_route: {app_route}. "
+                    f"Retrying as per design."
+                )
+            else:
+                break
+
+            max_attempts -= 1
+            await asyncio.sleep(wait_time)
+            wait_time *= 2
+
+        if max_attempts == 0 and not http_request_ok(return_code):
             raise InvalidResponse(
-                f"{app_route} Returned={return_code}. Message={message}"
+                f"Unexpected status code {return_code} from POST "
+                f"request through route {app_route}. Expected "
+                f"code 200. Response content: {response}"
             )
-        self._last_heartbeat_time = time.time()
 
     def _initialize_signal_handlers(self) -> None:
         def handle_sighup(signal: int, frame: Any) -> None:
