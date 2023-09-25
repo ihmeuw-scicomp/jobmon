@@ -161,6 +161,8 @@ class TaskInstance(Base):
         (TaskInstanceStatus.TRIAGING, TaskInstanceStatus.ERROR_FATAL),
         # task instance error after transitioning from kill_self
         (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.ERROR_FATAL),
+        # test
+        (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.ERROR),
     ]
 
     untimely_transitions = [
