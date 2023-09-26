@@ -7,6 +7,7 @@ from typing import Any, Dict, Tuple, Type
 
 import requests
 import tenacity
+import urllib3
 
 from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
@@ -28,13 +29,12 @@ class Requester(object):
     JobStateManager or requests job status from the JobQueryServer.
     """
 
-    def __init__(
-        self, url: str, max_retries: int = 10, stop_after_delay: int = 120
+    def __init__(self, url: str, request_timeout: int = 20, retries_timeout: int = 300
     ) -> None:
         """Initialize the Requester object with the url to make requests to."""
         self.url = url
-        self.max_retries = max_retries
-        self.stop_after_delay = stop_after_delay
+        self.request_timeout = request_timeout
+        self.retries_timeout = retries_timeout
         self.server_structlog_context: Dict[str, str] = {}
 
     @classmethod
@@ -42,10 +42,10 @@ class Requester(object):
         """Instantiate a requester from default config values."""
         config = JobmonConfig()
         service_url = config.get("http", "service_url")
-        max_retries = config.get_int("http", "max_retries")
-        stop_after_delay = config.get_int("http", "stop_after_delay")
+        request_timeout = config.get("http", "request_timeout")
+        retries_timeout = config.get_int("http", "retries_timeout")
 
-        return cls(service_url, max_retries, stop_after_delay)
+        return cls(service_url, request_timeout, retries_timeout)
 
     def add_server_structlog_context(self, **kwargs: Any) -> None:
         """Add the structlogging context if it has been provided."""
@@ -165,12 +165,15 @@ class Requester(object):
 
         # so we can access it in tests
         self._retry = tenacity.Retrying(
-            stop=tenacity.stop_after_delay(self.stop_after_delay),
-            wait=tenacity.wait_exponential(self.max_retries),
+            wait=tenacity.wait_exponential_jitter(multiplier=1, max=self.retries_timeout),
             retry=(
                 tenacity.retry_if_result(is_5XX)
                 | tenacity.retry_if_result(is_423)
                 | tenacity.retry_if_exception_type(requests.ConnectionError)
+                | tenacity.retry_if_exception_type(TimeoutError)
+                | tenacity.retry_if_exception_type(requests.adapters.MaxRetryError)
+                | tenacity.retry_if_exception_type(urllib3.exceptions.NewConnectionError)
+                | tenacity.retry_if_exception_type(urllib3.exceptions.MaxRetryError)
             ),
             retry_error_callback=raise_if_exceed_retry,
         )
@@ -202,6 +205,7 @@ class Requester(object):
                 params=params,
                 json=message,
                 headers={"Content-Type": "application/json"},
+                timeout=self.request_timeout,
             )
         elif request_type == "get":
             params = message.copy()
@@ -211,6 +215,7 @@ class Requester(object):
                 params=params,
                 data=json.dumps(self.server_structlog_context),
                 headers={"Content-Type": "application/json"},
+                timeout=self.request_timeout,
             )
         elif request_type == "put":
             params = {"client_jobmon_version": __version__}
@@ -219,6 +224,7 @@ class Requester(object):
                 params=params,
                 json=message,
                 headers={"Content-Type": "application/json"},
+                timeout=self.request_timeout,
             )
         else:
             raise ValueError(
