@@ -42,7 +42,7 @@ class Requester(object):
         """Instantiate a requester from default config values."""
         config = JobmonConfig()
         service_url = config.get("http", "service_url")
-        request_timeout = config.get("http", "request_timeout")
+        request_timeout = config.get_int("http", "request_timeout")
         retries_timeout = config.get_int("http", "retries_timeout")
 
         return cls(service_url, request_timeout, retries_timeout)
@@ -165,7 +165,7 @@ class Requester(object):
 
         # so we can access it in tests
         self._retry = tenacity.Retrying(
-            wait=tenacity.wait_exponential_jitter(multiplier=1, max=self.retries_timeout),
+            wait=tenacity.wait_exponential_jitter(initial=1, max=self.retries_timeout, exp_base=2, jitter=1),
             retry=(
                 tenacity.retry_if_result(is_5XX)
                 | tenacity.retry_if_result(is_423)
