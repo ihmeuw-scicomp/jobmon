@@ -1,7 +1,7 @@
 import React from 'react';
 import MemoryHistogram from './memory_histogram';
 import RuntimeHistogram from './runtime_histogram';
-import { formatBytes, formatNumber, bytes_to_gib } from '../../utilities/formatters'
+import { formatBytes, formatNumber, bytes_to_gib, convertTime } from '../../utilities/formatters'
 import { safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum'
 
 export default function Usage({ taskTemplateName, taskTemplateVersionId, usageInfo, apm}) {
@@ -21,13 +21,17 @@ export default function Usage({ taskTemplateName, taskTemplateVersionId, usageIn
         }
     }
 
+    function formatRuntime(runtime) {
+        const formatted_runtime = convertTime(formatNumber(runtime), false)
+        return `${formatted_runtime.d} days ${formatted_runtime.h} hours ${formatted_runtime.m} minutes ${formatted_runtime.s} seconds`
+    }
     return (
         <div>
             <div className="container w-100 mt-5">
                 <p>
                     <b className='font-weight-bold'>TaskTemplate Name:</b> {taskTemplateName} <br></br>
                     <b className='font-weight-bold'>TaskTemplate Version ID:</b> {taskTemplateVersionId} <br></br>
-                    <b className='font-weight-bold'>Number of Tasks in Summary Calulation:</b> {usageInfo[0]}</p>
+                    <b className='font-weight-bold'>Number of Tasks in Summary Calculation:</b> {usageInfo[0]}</p>
                 <div className="card-columns d-flex justify-content-center">
                     <div className="card">
                         <div className="card-block">
@@ -47,10 +51,10 @@ export default function Usage({ taskTemplateName, taskTemplateVersionId, usageIn
                             <div className="card-header font-weight-bold">Runtime (Seconds)</div>
                             <div className="card-body">
                                 <p className="card-text">
-                                    Minimum: {formatNumber(usageInfo[4])}<br></br>
-                                    Maximum: {formatNumber(usageInfo[5])}<br></br>
-                                    Mean: {formatNumber(usageInfo[6])}<br></br>
-                                    Median: {formatNumber(usageInfo[8])}<br></br>
+                                    Minimum: {formatRuntime(usageInfo[4])}<br></br>
+                                    Maximum: {formatRuntime(usageInfo[5])}<br></br>
+                                    Mean: {formatRuntime(usageInfo[6])}<br></br>
+                                    Median: {formatRuntime(usageInfo[8])}<br></br>
                                 </p>
                             </div>
                         </div>
