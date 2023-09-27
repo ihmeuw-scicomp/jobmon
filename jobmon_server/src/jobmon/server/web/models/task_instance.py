@@ -123,6 +123,9 @@ class TaskInstance(Base):
         (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.RUNNING),
         # task instance disappeared from distributor heartbeat and never logged
         # running. The distributor has no accounting of why it died
+        (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.UNKNOWN_ERROR),
+        # Heartbeat never logged for a task instance in launched, either the distributor
+        # is failing to log heartbeats or the worker node failed to start up.
         (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.NO_HEARTBEAT),
         # task instance disappeared from distributor heartbeat and never logged
         # running. The distributor discovered a resource error exit status.
@@ -177,6 +180,8 @@ class TaskInstance(Base):
         # finishes with an application error. We can't update state because
         # the task may already be running again due to a race with the JIF
         (TaskInstanceStatus.ERROR, TaskInstanceStatus.UNKNOWN_ERROR),
+        # Both the worker node and the distributor try to move a task instance into Error
+        (TaskInstanceStatus.ERROR, TaskInstanceStatus.ERROR),
         # task instance stops logging heartbeats and reconciler can't find exit
         # status. Worker tries to finish gracefully but reconciler won the race
         (TaskInstanceStatus.UNKNOWN_ERROR, TaskInstanceStatus.DONE),
@@ -212,8 +217,6 @@ class TaskInstance(Base):
         TaskInstanceStatus.ERROR,
         TaskInstanceStatus.UNKNOWN_ERROR,
         TaskInstanceStatus.RESOURCE_ERROR,
-        TaskInstanceStatus.KILL_SELF,
-        TaskInstanceStatus.NO_HEARTBEAT,
     ]
 
     def transition(self, new_state: str) -> None:

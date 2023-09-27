@@ -423,7 +423,7 @@ class DistributorService:
         ERROR state allows for a retry, so that a new task instance can attempt to run.
         """
         task_instance.transition_to_error(
-            "Task instance never reported a heartbeat after scheduling.",
+            "Task instance never reported a heartbeat after scheduling. Will retry",
             TaskInstanceStatus.ERROR,
         )
 
