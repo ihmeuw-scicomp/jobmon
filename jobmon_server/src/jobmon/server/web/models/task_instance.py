@@ -123,7 +123,7 @@ class TaskInstance(Base):
         (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.RUNNING),
         # task instance disappeared from distributor heartbeat and never logged
         # running. The distributor has no accounting of why it died
-        (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.UNKNOWN_ERROR),
+        (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.NO_HEARTBEAT),
         # task instance disappeared from distributor heartbeat and never logged
         # running. The distributor discovered a resource error exit status.
         # This seems unlikely but is valid for the purposes of the FSM
@@ -161,8 +161,8 @@ class TaskInstance(Base):
         (TaskInstanceStatus.TRIAGING, TaskInstanceStatus.ERROR_FATAL),
         # task instance error after transitioning from kill_self
         (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.ERROR_FATAL),
-        # test
-        (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.ERROR),
+        # transition to a recoverable error after failing to log a heartbeat in launched
+        (TaskInstanceStatus.NO_HEARTBEAT, TaskInstanceStatus.ERROR),
     ]
 
     untimely_transitions = [
@@ -213,6 +213,7 @@ class TaskInstance(Base):
         TaskInstanceStatus.UNKNOWN_ERROR,
         TaskInstanceStatus.RESOURCE_ERROR,
         TaskInstanceStatus.KILL_SELF,
+        TaskInstanceStatus.NO_HEARTBEAT,
     ]
 
     def transition(self, new_state: str) -> None:

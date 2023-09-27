@@ -91,6 +91,7 @@ class DistributorService:
             TaskInstanceStatus.RUNNING: set(),
             TaskInstanceStatus.TRIAGING: set(),
             TaskInstanceStatus.KILL_SELF: set(),
+            TaskInstanceStatus.NO_HEARTBEAT: set(),
         }
         # order through which we processes work
         gen_map: Dict[str, Callable[..., Generator[DistributorCommand, None, None]]] = {
@@ -98,6 +99,7 @@ class DistributorService:
             TaskInstanceStatus.INSTANTIATED: self._check_instantiated_for_work,
             TaskInstanceStatus.TRIAGING: self._check_triaging_for_work,
             TaskInstanceStatus.KILL_SELF: self._check_kill_self_for_work,
+            TaskInstanceStatus.NO_HEARTBEAT: self._check_no_heartbeat_for_work,
         }
         self._command_generator_map = gen_map
 
@@ -141,6 +143,7 @@ class DistributorService:
                 TaskInstanceStatus.RUNNING,
                 TaskInstanceStatus.TRIAGING,
                 TaskInstanceStatus.KILL_SELF,
+                TaskInstanceStatus.NO_HEARTBEAT
             ]
             while True:
                 # loop through all statuses and do as much work as we can till the heartbeat
@@ -387,15 +390,41 @@ class DistributorService:
             )
 
     def triage_error(self, task_instance: DistributorTaskInstance) -> None:
+        """
+        Triage a running task instance that has missed a heartbeat.
+
+        Allowed transitions are (R, U, Z, F)
+        """
         r_value, r_msg = self.cluster_interface.get_remote_exit_info(
             task_instance.distributor_id
         )
         task_instance.transition_to_error(r_msg, r_value)
 
     def kill_self(self, task_instance: DistributorTaskInstance) -> None:
+        """
+        Terminate a task instance that has received a Kill Self signal.
+
+        This signal is sent from a cold workflow resume, and transitions the task instance
+        to an ERROR_FATAL state with no retries.
+        """
         self.cluster_interface.terminate_task_instances([task_instance.distributor_id])
         task_instance.transition_to_error(
             "Task instance was self-killed.", TaskInstanceStatus.ERROR_FATAL
+        )
+
+    def no_heartbeat_error(self, task_instance: DistributorTaskInstance) -> None:
+        """
+        Move a task instance in NO_HEARTBEAT state to a recoverable error state.
+
+        This signal is sent from the swarm in the event a task instance in LAUNCHED state
+        fails to log a heartbeat, either due to the distributor failing to log a heartbeat
+        batch or due to the worker node failing to start up properly.
+
+        ERROR state allows for a retry, so that a new task instance can attempt to run.
+        """
+        task_instance.transition_to_error(
+            "Task instance never reported a heartbeat after scheduling.",
+            TaskInstanceStatus.ERROR,
         )
 
     def log_task_instance_report_by_date(self) -> None:
@@ -606,3 +635,15 @@ class DistributorService:
 
         for task_instance in kill_self_task_instances:
             yield DistributorCommand(self.kill_self, task_instance)
+
+    def _check_no_heartbeat_for_work(self) -> Generator[DistributorCommand, None, None]:
+        """Handle TIs in NO_HEARTBEAT state.
+
+        For TaskInstances with NO_HEARTBEAT status, move to an error recoverable state
+        """
+        no_heartbeat_task_instances = self._task_instance_status_map[
+            TaskInstanceStatus.NO_HEARTBEAT
+        ]
+
+        for task_instance in no_heartbeat_task_instances:
+            yield DistributorCommand(self.no_heartbeat_error, task_instance)
