@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import logging
-
 from jobmon.core.constants import WorkflowRunStatus
 from jobmon.core.exceptions import InvalidResponse
+from jobmon.core.logger import JOBMON_SYSLOG_DISTRIBUTOR_TAG, jobmon_logger
 from jobmon.core.requester import http_request_ok, Requester
 
-logger = logging.getLogger(__name__)
+logger = jobmon_logger(__name__, JOBMON_SYSLOG_DISTRIBUTOR_TAG)
 
 
 class DistributorWorkflowRun:

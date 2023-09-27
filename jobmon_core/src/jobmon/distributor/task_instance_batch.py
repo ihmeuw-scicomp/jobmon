@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import logging
 from typing import Any, Dict, Set, TYPE_CHECKING
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import InvalidResponse
+from jobmon.core.logger import JOBMON_SYSLOG_DISTRIBUTOR_TAG, jobmon_logger
 from jobmon.core.requester import http_request_ok, Requester
 
 if TYPE_CHECKING:
@@ -15,8 +15,7 @@ if TYPE_CHECKING:
     )
 
 
-logger = logging.getLogger(__name__)
-
+logger = jobmon_logger(__name__, JOBMON_SYSLOG_DISTRIBUTOR_TAG)
 
 class TaskInstanceBatch:
     def __init__(

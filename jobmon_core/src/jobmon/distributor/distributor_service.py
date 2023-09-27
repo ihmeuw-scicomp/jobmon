@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import itertools as it
-import logging
 import signal
 import sys
 import time
@@ -25,6 +24,7 @@ from jobmon.core.cluster_protocol import ClusterDistributor
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import DistributorInterruptedError, InvalidResponse
+from jobmon.core.logger import JOBMON_SYSLOG_DISTRIBUTOR_TAG, jobmon_logger
 from jobmon.core.requester import http_request_ok, Requester
 from jobmon.core.serializers import SerializeTaskInstanceBatch
 from jobmon.distributor.distributor_command import DistributorCommand
@@ -33,7 +33,7 @@ from jobmon.distributor.distributor_workflow_run import DistributorWorkflowRun
 from jobmon.distributor.task_instance_batch import TaskInstanceBatch
 
 
-logger = logging.getLogger(__name__)
+logger = jobmon_logger(__name__, JOBMON_SYSLOG_DISTRIBUTOR_TAG)
 
 
 class DistributorService:

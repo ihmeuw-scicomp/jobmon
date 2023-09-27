@@ -3,8 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
+from jobmon.core.logger import JOBMON_SYSLOG_DISTRIBUTOR_TAG, jobmon_logger
+
 logger = logging.getLogger(__name__)
 
+logger = jobmon_logger(__name__, JOBMON_SYSLOG_DISTRIBUTOR_TAG)
 
 class DistributorCommand:
     def __init__(self, func: Callable[..., None], *args: Any, **kwargs: Any) -> None:

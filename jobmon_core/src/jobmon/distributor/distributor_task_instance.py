@@ -6,13 +6,14 @@ from typing import List, Set, Tuple, TYPE_CHECKING
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import InvalidResponse
+from jobmon.core.logger import JOBMON_SYSLOG_DISTRIBUTOR_TAG, jobmon_logger
 from jobmon.core.requester import http_request_ok, Requester
 
 if TYPE_CHECKING:
     from jobmon.distributor.task_instance_batch import TaskInstanceBatch
 
 
-logger = logging.getLogger(__name__)
+logger = jobmon_logger(__name__, JOBMON_SYSLOG_DISTRIBUTOR_TAG)
 
 
 class DistributorTaskInstance:
