@@ -17,6 +17,7 @@ class TaskInstanceStatus(Base):
     LAUNCHED = Statuses.LAUNCHED
     RUNNING = Statuses.RUNNING
     TRIAGING = Statuses.TRIAGING
+    NO_HEARTBEAT = Statuses.NO_HEARTBEAT
     RESOURCE_ERROR = Statuses.RESOURCE_ERROR
     UNKNOWN_ERROR = Statuses.UNKNOWN_ERROR
     ERROR = Statuses.ERROR
@@ -92,6 +93,13 @@ def add_task_instance_statuses(session: Session) -> None:
             label="NO_DISTRIBUTOR_ID",
             description="Task instance submission within Jobmon failed – "
             "did not receive a distributor_id from the cluster.",
+        ),
+        TaskInstanceStatus(
+            id="X",
+            label="NO_HEARTBEAT",
+            description="Task instance never logged a heartbeat in launched state. "
+            "Either the distributor failed to log a heartbeat or the worker node failed "
+            "to start up."
         ),
         TaskInstanceStatus(
             id="Z",

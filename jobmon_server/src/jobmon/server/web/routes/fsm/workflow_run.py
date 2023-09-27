@@ -318,7 +318,7 @@ def set_status_for_triaging(workflow_run_id: int) -> Any:
                         TaskInstance.status == constants.TaskInstanceStatus.RUNNING,
                         constants.TaskInstanceStatus.TRIAGING,
                     ),
-                    else_=constants.TaskInstanceStatus.KILL_SELF,
+                    else_=constants.TaskInstanceStatus.NO_HEARTBEAT,
                 )
             )
             .execution_options(synchronize_session=False)

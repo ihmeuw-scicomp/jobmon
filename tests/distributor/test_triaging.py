@@ -112,9 +112,9 @@ def test_set_status_for_triaging(tool, db_engine, task_template):
         session.commit()
 
         assert len(task_instances) == len(tis)
-        assert task_instances[0].status == TaskInstanceStatus.KILL_SELF
+        assert task_instances[0].status == TaskInstanceStatus.NO_HEARTBEAT
         assert task_instances[1].status == TaskInstanceStatus.TRIAGING
-        assert task_instances[2].status == TaskInstanceStatus.KILL_SELF
+        assert task_instances[2].status == TaskInstanceStatus.NO_HEARTBEAT
 
     distributor.stop()
 
