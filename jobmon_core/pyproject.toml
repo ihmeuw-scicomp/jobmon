@@ -16,7 +16,7 @@ dependencies = [
     'configparser',
     'psutil',
     'requests',
-    'tenacity',
+    'tenacity>=8.1',
     'typing_extensions; python_version<"3.8"',
 ]
 dynamic = ["version"]
