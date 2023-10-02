@@ -7,6 +7,7 @@ import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
 import { FaLightbulb } from "react-icons/fa";
+import humanizeDuration from 'humanize-duration';
 
 
 // @ts-ignore
@@ -15,7 +16,7 @@ import Tasks from './tasks';
 import Usage from './usage';
 import Errors from './errors';
 import WFHeader from "./wf_header"
-import { convertDatePST, msToTime } from '../../utilities/formatters';
+import { convertDatePST } from '../../utilities/formatters';
 import { init_apm, safe_rum_add_label, safe_rum_transaction } from '../../utilities/rum';
 
 function getAsyncWFdetail(setWFDict, wf_id: string) {
@@ -70,9 +71,7 @@ function getWorkflowAttributes(
         setWFStatusDesc(data["wf_status"] + " -- " + data["wf_status_desc"])
         setWFSubmitted(convertDatePST(data["wf_created_date"]));
         setWFStatusDate(convertDatePST(data["wf_status_date"]));
-        const elapsed_time = msToTime(new Date().getTime() - new Date(data["wf_status_date"]).getTime())
-        setWFElapsedTime(`${elapsed_time.d} days ${elapsed_time.h} hours ${elapsed_time.m} minutes ${elapsed_time.s} seconds`);
-        setJobmonVersion(data["wfr_jobmon_version"]);
+        setWFElapsedTime(humanizeDuration(new Date().getTime() - new Date(data["wf_status_date"]).getTime()))
     };
     return fetchData
 }
