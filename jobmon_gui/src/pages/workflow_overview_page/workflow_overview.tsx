@@ -201,9 +201,8 @@ function App() {
         </form>
       </div>
       <div id="wftable" className="div-level-2">
-
-        <JobmonWFTable allData={workflows} />
-
+        {workflows.length !== 0 && <JobmonWFTable allData={workflows} />}
+        {workflows.length === 0 && "No workflows found for specifed filters."}
       </div>
     </div>
   );
