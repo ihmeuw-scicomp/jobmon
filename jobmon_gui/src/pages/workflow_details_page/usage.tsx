@@ -1,8 +1,9 @@
 import React from 'react';
 import MemoryHistogram from './memory_histogram';
 import RuntimeHistogram from './runtime_histogram';
-import { formatBytes, formatNumber, bytes_to_gib, convertTime } from '../../utilities/formatters'
+import { formatBytes, bytes_to_gib } from '../../utilities/formatters'
 import { safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum'
+import humanizeDuration from 'humanize-duration';
 
 export default function Usage({ taskTemplateName, taskTemplateVersionId, usageInfo, apm}) {
     const s: any = safe_rum_start_span(apm, "resource_usage", "custom");
@@ -21,10 +22,6 @@ export default function Usage({ taskTemplateName, taskTemplateVersionId, usageIn
         }
     }
 
-    function formatRuntime(runtime) {
-        const formatted_runtime = convertTime(formatNumber(runtime), false)
-        return `${formatted_runtime.d} days ${formatted_runtime.h} hours ${formatted_runtime.m} minutes ${formatted_runtime.s} seconds`
-    }
     return (
         <div>
             <div className="container w-100 mt-5">
@@ -51,10 +48,10 @@ export default function Usage({ taskTemplateName, taskTemplateVersionId, usageIn
                             <div className="card-header font-weight-bold">Runtime (Seconds)</div>
                             <div className="card-body">
                                 <p className="card-text">
-                                    Minimum: {formatRuntime(usageInfo[4])}<br></br>
-                                    Maximum: {formatRuntime(usageInfo[5])}<br></br>
-                                    Mean: {formatRuntime(usageInfo[6])}<br></br>
-                                    Median: {formatRuntime(usageInfo[8])}<br></br>
+                                    Minimum: {humanizeDuration(usageInfo[4] * 1000)}<br></br>
+                                    Maximum: {humanizeDuration(usageInfo[5] * 1000)}<br></br>
+                                    Mean: {humanizeDuration(usageInfo[6] * 1000)}<br></br>
+                                    Median: {humanizeDuration(usageInfo[8] * 1000)}<br></br>
                                 </p>
                             </div>
                         </div>

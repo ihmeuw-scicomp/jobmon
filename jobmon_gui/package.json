@@ -17,6 +17,7 @@
     "bootstrap": "^4.6.1",
     "dompurify": "2.4.1",
     "fortawesome": "0.0.1-security",
+    "humanize-duration": "^3.30.0",
     "moment": "2.29.4",
     "plotly.js": "^2.16.1",
     "plotly.js-dist": "^2.16.1",
