@@ -616,11 +616,13 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
             Tool.name,
             Workflow.status,
             WorkflowStatus.description,
+            WorkflowRun.jobmon_version,
         ).where(
             Workflow.id == workflow_id,
             Workflow.tool_version_id == ToolVersion.id,
             ToolVersion.tool_id == Tool.id,
             WorkflowStatus.id == Workflow.status,
+            WorkflowRun.workflow_id == Workflow.id,
         )
         rows = session.execute(sql).all()
 
@@ -632,6 +634,7 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
         "tool_name",
         "wf_status",
         "wf_status_desc",
+        "wfr_jobmon_version",
     )
 
     result = [dict(zip(column_names, row)) for row in rows]
