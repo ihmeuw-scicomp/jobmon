@@ -1,11 +1,12 @@
 """Routes for Tasks."""
+from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 import json
 from typing import Any, cast, Dict, List, Set
 
 from flask import jsonify, request
 import pandas as pd
-from sqlalchemy import func, select, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 import structlog
 
@@ -145,25 +146,36 @@ def get_task_subdag() -> Any:
             select(
                 Task.workflow_id.label("workflow_id"),
                 Workflow.dag_id.label("dag_id"),
-                func.group_concat(Task.node_id).label("node_ids"),
+                Task.node_id.label("node_id")
             )
             .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
             .where(Task.id.in_(task_ids))
-            .group_by(Task.workflow_id, Workflow.dag_id)
         )
-        result = session.execute(select_stmt).one_or_none()
 
-        if not result:
-            # return empty values when task_id does not exist or db out of consistency
+        # Initialize defaultdict to store information
+        grouped_data = defaultdict(
+            lambda: {'workflow_id': None, 'dag_id': None, 'node_ids': []}
+        )
+
+        for row in session.execute(select_stmt):
+            key = (row.workflow_id, row.dag_id)  # Assuming this combination is unique for each group
+            grouped_data[key]['workflow_id'] = row.workflow_id
+            grouped_data[key]['dag_id'] = row.dag_id
+            grouped_data[key]['node_ids'].append(row.node_id)
+
+        # If we find no results, we handle it here
+        if not grouped_data:
             resp = jsonify(workflow_id=None, sub_task=None)
             resp.status_code = StatusCodes.OK
             return resp
 
         # Since we have validated all the tasks belong to the same wf in status_command before
         # this call, assume they all belong to the same wf.
-        workflow_id = result.workflow_id
-        dag_id = result.dag_id
-        node_ids = [int(node_id) for node_id in result.node_ids.split(",")]
+        some_key = next(iter(grouped_data))
+        workflow_id, dag_id = some_key
+        node_ids = [int(node_id) for node_id in grouped_data[some_key]['node_ids']]
+
+        # Continue with your current processing logic
         sub_dag_tree = _get_subdag(node_ids, dag_id, session)
         sub_task_tree = _get_tasks_from_nodes(
             workflow_id, sub_dag_tree, task_status, session
@@ -253,12 +265,18 @@ def get_task_dependencies(task_id: int) -> Any:
     up = (
         []
         if up_task_dict is None or len(up_task_dict) == 0
-        else [[{"id": k, "status": up_task_dict[k]}] for k in up_task_dict]
+        else [
+            [{"id": k, "status": up_task_dict[k][0], "name": up_task_dict[k][1]}]
+            for k in up_task_dict
+        ]
     )
     down = (
         []
         if down_task_dict is None or len(down_task_dict) == 0
-        else [[{"id": k, "status": down_task_dict[k]}] for k in down_task_dict]
+        else [
+            [{"id": k, "status": down_task_dict[k][0], "name": down_task_dict[k][1]}]
+            for k in down_task_dict
+        ]
     )
     resp = jsonify({"up": up, "down": down})
     resp.status_code = 200
@@ -372,7 +390,11 @@ def _get_tasks_recursive(
 
 def _get_dag_and_wf_id(task_id: int, session: Session) -> tuple:
     select_stmt = (
-        select(Workflow.dag_id, Task.workflow_id, Task.node_id)
+        select(
+            Workflow.dag_id.label("dag_id"),
+            Task.workflow_id.label("workflow_id"),
+            Task.node_id.label("node_id"),
+        )
         .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
         .where(Task.id == task_id)
     )
@@ -380,7 +402,7 @@ def _get_dag_and_wf_id(task_id: int, session: Session) -> tuple:
 
     if row is None:
         return None, None, None
-    return int(row.dag_id), int(row["workflow_id"]), int(row["node_id"])
+    return int(row.dag_id), int(row.workflow_id), int(row.node_id)
 
 
 def _get_node_dependencies(
@@ -447,7 +469,7 @@ def _get_tasks_from_nodes(
     if not nodes:
         return {}
 
-    select_stmt = select(Task.id, Task.status).where(
+    select_stmt = select(Task.id, Task.status, Task.name).where(
         Task.workflow_id == workflow_id, Task.node_id.in_(list(nodes))
     )
 
@@ -456,10 +478,10 @@ def _get_tasks_from_nodes(
     for r in result:
         # When task_status not specified, return the full subdag
         if not task_status:
-            task_dict[r[0]] = r[1]
+            task_dict[r[0]] = [r[1], r[2]]
         else:
             if r[1] in task_status:
-                task_dict[r[0]] = r[1]
+                task_dict[r[0]] = [r[1], r[2]]
     return task_dict
 
 
@@ -499,6 +521,8 @@ def get_task_details(task_id: int) -> Any:
                 TaskInstanceStatus.label,
                 TaskInstance.stdout,
                 TaskInstance.stderr,
+                TaskInstance.stdout_log,
+                TaskInstance.stderr_log,
                 TaskInstance.distributor_id,
                 TaskInstance.nodename,
                 TaskInstanceErrorLog.description,
@@ -520,6 +544,8 @@ def get_task_details(task_id: int) -> Any:
         "ti_status",
         "ti_stdout",
         "ti_stderr",
+        "ti_stdout_log",
+        "ti_stderr_log",
         "ti_distributor_id",
         "ti_nodename",
         "ti_error_log_description",
@@ -538,6 +564,9 @@ def get_task_details_viz(task_id: int) -> Any:
         query = select(
             Task.status,
             Task.workflow_id,
+            Task.name,
+            Task.command,
+            Task.status_date,
         ).where(
             Task.id == task_id,
         )
@@ -546,6 +575,9 @@ def get_task_details_viz(task_id: int) -> Any:
     column_names = (
         "task_status",
         "workflow_id",
+        "task_name",
+        "task_command",
+        "task_status_date",
     )
     result = [dict(zip(column_names, row)) for row in rows]
     resp = jsonify(task_details=result)

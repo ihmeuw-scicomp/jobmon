@@ -1,44 +1,66 @@
 import React, { useEffect, useState } from 'react';
-import '../jobmon_gui.css';
-import { useParams, Link, Outlet } from 'react-router-dom';
+import '../../css/jobmon_gui.css';
+import { useParams, Link, Outlet, useNavigate } from 'react-router-dom';
 import { useForm } from "react-hook-form";
 import axios from 'axios';
-import DropdownButton from 'react-bootstrap/DropdownButton';
-import Dropdown from 'react-bootstrap/Dropdown';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLightbulb } from '@fortawesome/free-solid-svg-icons';
+import { FaLightbulb } from "react-icons/fa";
 
 
 // @ts-ignore
-import JobmonProgressBar from '../progress_bar.tsx';
+import JobmonProgressBar from '../../components/JobmonProgressBar.tsx';
 import Tasks from './tasks';
 import Usage from './usage';
 import Errors from './errors';
-import { init_apm, convertDatePST, safe_rum_add_label, safe_rum_transaction } from '../functions';
+import WFHeader from "./wf_header"
+import { convertDatePST, msToTime } from '../../utilities/formatters';
+import { init_apm, safe_rum_add_label, safe_rum_transaction } from '../../utilities/rum';
 
 function getAsyncWFdetail(setWFDict, wf_id: string) {
     const url = process.env.REACT_APP_BASE_URL + "/workflow_status_viz";
     const wf_ids = [wf_id];
     const fetchData = async () => {
-        const result: any = await axios.get(url, { params: { workflow_ids: wf_ids } });
+        const result: any = await axios({
+            method: 'get',
+            url: url,
+            data: null,
+            params: { workflow_ids: wf_ids },
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+          }
+        )
         setWFDict(result.data[wf_id]);
     };
     return fetchData
 }
 
-function getWorkflowAttributes(wf_id: string, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate) {
+function getWorkflowAttributes(wf_id: string, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime) {
     const url = process.env.REACT_APP_BASE_URL + "/workflow_details_viz/" + wf_id;
     const fetchData = async () => {
-        const result: any = await axios.get(url);
+        const result: any = await axios({
+            method: 'get',
+            url: url,
+            data: null,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+          }
+        )
         const data = result.data[0]
         setWFTool(data["tool_name"]);
         setWFName(data["wf_name"]);
         setWFArgs(data["wf_args"]);
+        setWFStatus(data["wf_status"]);
+        setWFStatusDesc(data["wf_status"] + " -- " + data["wf_status_desc"])
         setWFSubmitted(convertDatePST(data["wf_created_date"]));
         setWFStatusDate(convertDatePST(data["wf_status_date"]));
+        const elapsed_time = msToTime(new Date().getTime() - new Date(data["wf_status_date"]).getTime())
+        setWFElapsedTime(`${elapsed_time.d} days ${elapsed_time.h} hours ${elapsed_time.m} minutes ${elapsed_time.s} seconds`);
     };
     return fetchData
 }
@@ -46,7 +68,16 @@ function getWorkflowAttributes(wf_id: string, setWFTool, setWFName, setWFArgs, s
 function getAsyncTTdetail(setTTDict, wf_id: string, setTTLoaded) {
     const url = process.env.REACT_APP_BASE_URL + "/workflow_tt_status_viz/" + wf_id;
     const fetchData = async () => {
-        const result: any = await axios.get(url);
+        const result: any = await axios({
+            method: 'get',
+            url: url,
+            data: null,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+          }
+        )
         let return_array: any = [];
         for (let t in result.data) {
             return_array.push(result.data[t]);
@@ -61,7 +92,16 @@ function getAsyncErrorLogs(setErrorLogs, wf_id: string, setErrorLoading, tt_id?:
     setErrorLoading(true);
     const url = process.env.REACT_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
     const fetchData = async () => {
-        const result: any = await axios.get(url);
+        const result: any = await axios({
+            method: 'get',
+            url: url,
+            data: null,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+          }
+        )
         setErrorLogs(result.data);
         setErrorLoading(false);
     };
@@ -86,18 +126,21 @@ function WorkflowDetails({ subpage }) {
     const [errorLogs, setErrorLogs] = useState([]);
     const [error_loading, setErrorLoading] = useState(false);
     const [task_loading, setTaskLoading] = useState(false);
+    const [wf_status, setWFStatus] = useState([]);
+    const [wf_status_desc, setWFStatusDesc] = useState([]);
     const [wf_tool, setWFTool] = useState([]);
     const [wf_name, setWFName] = useState([]);
     const [wf_args, setWFArgs] = useState([]);
     const [wf_submitted_date, setWFSubmitted] = useState([]);
     const [wf_status_date, setWFStatusDate] = useState([]);
+    const [wf_elapsed_time, setWFElapsedTime] = useState([])
     // only show the loading circle the first time
     const [tt_loaded, setTTLoaded] = useState(false);
 
     //***********************hooks******************************
     useEffect(() => {
         if (typeof params.workflowId !== 'undefined') {
-            getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate)();
+            getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime)();
         }
     }, [params.workflowId]);
     useEffect(() => {
@@ -106,7 +149,7 @@ function WorkflowDetails({ subpage }) {
             getAsyncTTdetail(setTTDict, params.workflowId, setTTLoaded)();
             safe_rum_add_label(rum_t, "wf_id", params.workflowId);
         }
-    }, []);
+    }, [params.workflowId]);
     // Update the progress bar every 60 seconds
     useEffect(() => {
         const interval = setInterval(() => {
@@ -115,11 +158,12 @@ function WorkflowDetails({ subpage }) {
                     //only query server when wf is unfinised
                     getAsyncWFdetail(setWFDict, params.workflowId)();
                     getAsyncTTdetail(setTTDict, params.workflowId, setTTLoaded)();
+                    getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime)();
                 }
             }
         }, 60000);
         return () => clearInterval(interval);
-    }, [wfDict]);
+    }, [wfDict, params.workflowId]);
 
     // Get information to populate the Tasks table
     useEffect(() => {
@@ -129,21 +173,28 @@ function WorkflowDetails({ subpage }) {
         setTaskLoading(true);
         let task_table_url = process.env.REACT_APP_BASE_URL + "/task_table_viz/" + workflowId;
         const fetchData = async () => {
-            const result: any = await axios.get(
-                task_table_url,
-                { params: { tt_name: task_template_name } }
-            );
+            const result: any = await axios({
+                method: 'get',
+                url: task_table_url,
+                data: null,
+                params: { tt_name: task_template_name },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+              }
+            )
             let tasks = result.data.tasks;
             setTasks(tasks);
             setTaskLoading(false);
         };
         fetchData();
-    }, [task_template_name]);
+    }, [task_template_name, workflowId]);
     useEffect(() => {
         if (typeof params.workflowId !== 'undefined' && tt_id !== 'undefined' && tt_id !== '') {
             getAsyncErrorLogs(setErrorLogs, params.workflowId, setErrorLoading, tt_id)();
         }
-    }, [tt_id]);
+    }, [tt_id, params.workflowId]);
 
     // Get resource usage information
     useEffect(() => {
@@ -161,12 +212,16 @@ function WorkflowDetails({ subpage }) {
                     workflows: [workflowId],
                     viz: true
                 },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
             })
             let usage = result.data;
             setUsageInfo(usage);
         };
         fetchData();
-    }, [task_template_version_id]);
+    }, [task_template_version_id, workflowId]);
 
     //*******************event handling****************************
     // TaskTemplate name form
@@ -181,29 +236,28 @@ function WorkflowDetails({ subpage }) {
         setTaskTemplateVersionId(tt_version_id);
     }
 
+    const navigate = useNavigate();
     //********************html page*************************************
     return (
         <div>
             <Breadcrumb>
-                <Breadcrumb.Item><Link to="/">Home</Link></Breadcrumb.Item>
+                <Breadcrumb.Item><button className="breadcrumb-button" onClick={() => navigate(-1)}>Home</button></Breadcrumb.Item>
                 <Breadcrumb.Item active>Workflow ID {workflowId} </Breadcrumb.Item>
             </Breadcrumb>
-            <div style={{ display: "flex" }}>
-                <header className="App-header">
-                    <p>Workflow ID: {workflowId} </p>
-                </header>
-                <div>
-                    <DropdownButton variant="dark" menuVariant="dark" title="Details" className="mt-2">
-                        <Dropdown.Item variant="dark">
-                            <p><b>Workflow Tool:</b> {wf_tool}</p>
-                            <p><b>Workflow Name:</b> {wf_name}</p>
-                            <p><b>Workflow Args:</b> {wf_args}</p>
-                            <p><b>Workflow Submitted Date:</b> {wf_submitted_date}</p>
-                            <p><b>Workflow Status Date:</b> {wf_status_date}</p>
-                        </Dropdown.Item>
-                    </DropdownButton>
-                </div>
+            <div className='d-flex justify-content-start pt-3'>
+                <WFHeader
+                      wf_id={workflowId}
+                      wf_status={wf_status}
+                      wf_status_desc={wf_status_desc}
+                      wf_tool={wf_tool}
+                      wf_name={wf_name}
+                      wf_args={wf_args}
+                      wf_submitted_date={wf_submitted_date}
+                      wf_status_date={wf_status_date}
+                      wf_elapsed_time={wf_elapsed_time}
+                 />
             </div>
+
             <div id="wf_progress" className="div-level-2">
                 <JobmonProgressBar
                     tasks={wfDict.tasks}
@@ -218,12 +272,11 @@ function WorkflowDetails({ subpage }) {
                     maxc={wfDict.MAXC}
                     placement="bottom"
                 />
-                <hr className="hr-1" />
             </div>
 
             <div id="tt_title" className="div-level-2">
-                <header className="header-1">
-                    <p>
+                <header className="header-1 d-flex align-items-center">
+                    <p className='mr-5'>
                         Task Templates&nbsp;
                         <OverlayTrigger
                             placement="right"
@@ -234,7 +287,7 @@ function WorkflowDetails({ subpage }) {
                                 </Popover>
                             )}
                         >
-                            <span><FontAwesomeIcon icon={faLightbulb} /></span>
+                            <span><FaLightbulb/></span>
                         </OverlayTrigger>
                     </p>
                     {tt_id === "" &&
@@ -244,7 +297,6 @@ function WorkflowDetails({ subpage }) {
                     }
 
                 </header>
-                <hr className="hr-3" />
             </div>
 
             <div id="tt_progress" className="div-scroll">
@@ -292,7 +344,7 @@ function WorkflowDetails({ subpage }) {
             <div id="tt_search" className="div-level-2">
                 <hr className="hr-2" />
                 <div className="div-full">
-                    <ul className="nav nav-tabs">
+                    <ul className="nav nav-pills">
                         <li className="nav-item">
                             <Link
                                 className={`nav-link ${subpage === "tasks" ? "active" : ""}`}

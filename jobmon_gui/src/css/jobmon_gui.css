@@ -7,7 +7,8 @@
     --color-bg: #f0f0f0;
     --color-title: #36486b;
     --color-link: #61dafb;
-    --color-text: #36486b;
+    --color-text: #4E606D;
+    --color-text-dark: #303030;
     --color-text-light: #5e5b50;
     --color-highlight-1: #27a3c9;
     --color-highlight-2: #eaece5;
@@ -17,6 +18,7 @@
     --color-pending: #e69f00;
     --color-scheduled: #f0e442;
     --color-fatal: #d55e00;
+    --color-aborted: #785abd;
     --color-done: #009e73;
 
     --color-bar-text: white;
@@ -26,13 +28,68 @@
     --color-popover-text: #383e47;
 }
 
+ul {
+    list-style-type: none
+}
+
 /* "Jobmon GUI" header specifications */
 .App-header {
     padding: 1px;
     text-align: center;
-    font-size: calc(20px + 2vmin);
+    font-size: calc(20px + 1vmin);
     color: var(--color-title);
-    width: 90%
+    margin: 0 5%;
+}
+
+/* Style of icons of the workflow status indicator. */
+.icon-rr{
+  color: var(--color-running);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.icon-dd{
+  color: var(--color-done);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.icon-aa{
+  color: var(--color-aborted);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.icon-ff{
+  color: var(--color-fatal);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.icon-pp{
+  color: var(--color-pending);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.icon-ss{
+  color: var(--color-scheduled);
+  font-size: calc(30px + 1vmin);
+  margin-right: 15px;
+}
+
+.header-popover {
+    max-width: 600px;
+}
+
+::placeholder{
+    color: #8E93A0;
+}
+
+.text-custom{
+    color: #36486b;
+    font-size: large;
+    text-align: center;
 }
 
 /* first level title */
@@ -41,6 +98,17 @@
     font-size: calc(16px + 1vmin);
     color: var(--color-title);
     width: 90%
+}
+
+.btn-custom {
+    background-color: #4E606D;
+    border: none;
+    color: white;
+}
+
+.mx-40p{
+    margin-left: 40%;
+    margin-right: 40%;
 }
 
 /* Table row expansion */
@@ -61,6 +129,7 @@
     color: var(--color-running);
     font-size: 15px;
     text-align: center;
+    margin-right: 5px;
 }
 
 /* Color of "Pending" square and text size in Task status key. */
@@ -68,6 +137,7 @@
     color: var(--color-pending);
     font-size: 15px;
     text-align: center;
+    margin-right: 5px;
 }
 
 /* Color of "Scheduled" square and text size in Task status key. */
@@ -75,6 +145,7 @@
     color: var(--color-scheduled);
     font-size: 15px;
     text-align: center;
+    margin-right: 5px;
 }
 
 /* Color of "Scheduled" square and text size in Task status key. */
@@ -82,23 +153,40 @@
     color: var(--color-scheduled);
     font-size: 15px;
     text-align: center;
+    margin-right: 5px;
 }
 
 /* Color of "Done" square and text size in Task status key. */
 .bar-dd{
     color: var(--color-done);
     font-size: 15px;
+    margin-right: 5px;
 }
 
 /* Color of "Fatal" square and text size in Task status key. */
 .bar-ff{
     color: var(--color-fatal);
     font-size: 15px;
+    margin-right: 5px;
+}
+
+/* Color of "Aborted" square and text size in Workflow status key. */
+.bar-aa{
+    color: var(--color-aborted);
+    font-size: 15px;
+    margin-right: 5px;
+}
+
+.popover{
+    background-color: #f0f0f0;
+    padding: 20px;
 }
 
 /* Size and position of the landing page legend. */
 .legend {
-    width: 90%;
+    width: 80%;
+    padding: 0 10%;
+    display: flex;
 }
 
 /* Size and position of the main table. */
@@ -113,8 +201,11 @@
 .tt-container {
     width: 98%;
     height: 55px;
-    margin: 4px;
-    padding: 15px 2px 2px 2px;
+    margin: 10px;
+    padding: 15px 10px 10px 40px;
+    background-color: #eeeeee;
+    border-radius: 8px;
+
 }
 
 .tt-container:hover {
@@ -131,11 +222,15 @@
 }
 
 #tt_progress ul {
-   margin-block-end: 6px;
+   padding: 0;
 }
 
 #tt_progress .tt-name {
-   color: #007bff;
+   color: #303030;
+}
+
+.progress{
+    height: 1.3rem;
 }
 
 /* flex div */
@@ -145,7 +240,7 @@
 
 /* space occupier */
 .div-full {
-    width: 100%;
+    width: fit-content;
 }
 
 /* Size and position of the main table. */
@@ -155,6 +250,10 @@
     margin-right: 5%;
     max-height: 300px;
     overflow-y: auto;
+}
+
+.color-dark {
+    color: var(--color-text-dark);
 }
 
 /* Word wrap for task instance error log */
@@ -174,7 +273,13 @@
     float:left;
     width: 33%;
     overflow-wrap: break-word;
+}
 
+.float_bar{
+    float:left;
+    width: fit-content;
+    overflow-wrap: break-word;
+    padding-right: 2rem;
 }
 
 /* Take the right 2/3 of the display*/
@@ -190,6 +295,10 @@
    float: right;
    width: 67%;
    text-align: left;
+}
+
+h-1rem{
+    height: 1rem;
 }
 /* Line beneath "Jobmon GUI" title. */
 .hr-1 {
@@ -334,10 +443,12 @@
 /* a span above tables to show helper texts */
 .span-helper {
     color:grey;
-    text-align:left;
     font-size:10px;
     padding: 5px;
+    width: 100%;
+    height: 1rem;
 }
+
 
 /* table with solid boarder for error logs */
 .table-solid {
@@ -388,9 +499,26 @@
     padding: 0.25rem 1.25rem;
 }
 
+.table th {
+    font-weight: lighter;
+}
+
+.table td {
+    vertical-align: middle;
+    padding-top: 10px;
+    padding-bottom: 10px;
+
+    color: #303030;
+    font-weight: 300;
+}
+
+.bg-grey{
+    background-color: #dbdbdb;
+}
+
 #task-count, #task_count {
    margin: 2px;
-   padding: 4px;
+   padding: 15px;
    border: 1px solid gray;
 }
 
@@ -407,10 +535,6 @@
 }
 #tt-tasks td, #tt-stats td {
    text-align: right;
-}
-
-.ti-popover-body {
-    max-width: 1000px;
 }
 
 #tt_search .error-log {
@@ -436,61 +560,133 @@ body .error-log-modal .modal-dialog {
    font-size: 11px;
 }
 
+.font-weight-300{
+    font-weight: 300 !important;
+}
+
 .toggle-switch {
-   position: relative;
-   display: inline-block;
-   width: 45px;
-   height: 25px;
+  position: relative;
+  display: inline-block;
+  width: 45px;
+  height: 25px;
 }
 
 /* Hide default HTML checkbox */
 .toggle-switch input {
-   opacity: 0;
-   width: 0;
-   height: 0;
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
 
 /* The slider */
 .toggle-slider {
-   position: absolute;
-   cursor: pointer;
-   top: 0;
-   left: 0;
-   right: 0;
-   bottom: 0;
-   background-color: #ccc;
-   -webkit-transition: .4s;
-   transition: .4s;
-   border-radius: 34px;
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  -webkit-transition: .4s;
+  transition: .4s;
+  border-radius: 34px;
 }
 
 .toggle-slider::before {
-   position: absolute;
-   content: "";
-   height: 90%;
-   width: 49%;
-   left: 1%;
-   bottom: 5%;
-   background-color: white;
-   -webkit-transition: .4s;
-   transition: .4s;
-   border-radius: 50%;
+  position: absolute;
+  content: "";
+  height: 90%;
+  width: 49%;
+  left: 1%;
+  bottom: 5%;
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+  border-radius: 50%;
 }
 
+.nav-pills{
+    border: #4E606D 1px solid;
+    border-radius: .25rem;
+}
+
+.nav-link{
+    color: #4E606D;
+}
+
+.nav-pills .nav-link.active {
+    background-color: #4E606D;
+}
+
+
 /* input:checked + .slider {
-   background-color: #2196F3;
+  background-color: #2196F3;
 }
 
 input:focus + .slider {
-   box-shadow: 0 0 1px #2196F3;
+  box-shadow: 0 0 1px #2196F3;
 } */
 
 .toggle-slider.active {
-   background-color: #2196F3;
+  background-color: #2196F3;
+  
 }
 
 .toggle-slider.active::before {
-   -webkit-transform: translateX(100%);
-   -ms-transform: translateX(100%);
-   transform: translateX(100%);
+  -webkit-transform: translateX(100%);
+  -ms-transform: translateX(100%);
+  transform: translateX(100%);
+}
+
+
+.page-item.active .page-link {
+    background-color: var(--color-text);
+    border: 1px solid var(--color-text);
+}
+
+.btn-secondary{
+    background-color: var(--color-text);
+    border: 1px solid var(--color-text);
+
+}
+
+.updatemenu-item-rect {
+    fill: var(--color-text) !important;
+}
+
+
+.updatemenu-item-text{
+    fill: white !important;
+}
+
+.updatemenu-header-arrow {
+    fill: white !important;
+}
+
+.ti-logs {
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 40px;
+}
+
+.breadcrumb-button {
+    background: none!important;
+    border: none;
+    padding: 0!important;
+    color: #007bff;
+    cursor: pointer;
+}
+
+/* styles.css or inline styles */
+.markdown-container img {
+  width: 1250px; /* Adjust the width as needed */
+  height: auto; /* Allows the SVG to maintain its aspect ratio */
+}
+
+.markdown-container {
+    margin-left: 75px;
+    margin-right: 75px;
+    margin-top: 25px;
 }

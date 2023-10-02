@@ -5,12 +5,13 @@ import time
 from typing import Dict
 
 from unittest.mock import patch
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.core.cluster import Cluster
+from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.dummy import DummyDistributor
@@ -220,12 +221,14 @@ def test_ti_kill_self_state(db_engine, tool):
         # set task to kill self state. next heartbeat will fail and cause death
         with Session(bind=db_engine) as session:
             session.execute(
-                """
-                UPDATE task_instance
-                SET status = '{}'
-                WHERE task_instance.task_id = {}
-                """.format(
-                    TaskInstanceStatus.KILL_SELF, task_a.task_id
+                text(
+                    """
+                    UPDATE task_instance
+                    SET status = '{}'
+                    WHERE task_instance.task_id = {}
+                    """.format(
+                        TaskInstanceStatus.KILL_SELF, task_a.task_id
+                    )
                 )
             )
             session.commit()
@@ -291,7 +294,7 @@ def test_limited_error_log(tool, db_engine):
             "AND t2.workflow_run_id=t3.id "
             "AND t3.workflow_id={}".format(wf.workflow_id)
         )
-        res = session.execute(query).fetchone()
+        res = session.execute(text(query)).fetchone()
 
     error = res[0]
     assert error == (("a" * 2**10 + "\n") * (2**8))[-10000:]
@@ -378,6 +381,51 @@ def test_worker_node_add_attributes(tool, db_engine):
     # check db
     with Session(bind=db_engine) as session:
         query = "SELECT * FROM task_attribute where task_id = {}".format(task.task_id)
-        for row in session.execute(query).fetchall():
+        for row in session.execute(text(query)).fetchall():
             _, _, val = row
             assert val in ["1", "zzz"]
+
+
+class UnicodeInstance(WorkerNodeTaskInstance):
+    def __init__(self, command):
+        self._command = command
+        self.last_heartbeat_time = time.time()
+
+        # config
+        config = JobmonConfig()
+        self._task_instance_heartbeat_interval = config.get_int(
+            "heartbeat", "task_instance_interval"
+        )
+        self._heartbeat_report_by_buffer = config.get_float(
+            "heartbeat", "report_by_buffer"
+        )
+        self._command_interrupt_timeout = config.get_int(
+            "worker_node", "command_interrupt_timeout"
+        )
+
+    @property
+    def stderr(self):
+        return "/dev/null"
+
+    @property
+    def stdout(self):
+        return "/dev/null"
+
+    @property
+    def status(self):
+        return "R"
+
+    @property
+    def command_add_env(self):
+        return {}
+
+    def log_running(self):
+        pass
+
+
+def test_unicode():
+    """This test forces the _communicate method to use the try: except block."""
+    ti = UnicodeInstance(
+        r"echo -n -e '\xe2\x94\x80\xe2\x94\x80 Attaching packages \xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80\xe2\x94\x80'"
+    )
+    asyncio.run(ti._run_cmd())

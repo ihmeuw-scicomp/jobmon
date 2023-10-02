@@ -1,4 +1,5 @@
 """Routes for WorkflowRuns."""
+from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict, List
 
@@ -263,17 +264,17 @@ def task_instances_status_check(workflow_run_id: int) -> Any:
         else:
             where_clause.append(TaskInstance.status == status)
 
+        return_dict: Dict[str, List[int]] = defaultdict(list)
         select_stmt = (
-            select(TaskInstance.status, func.group_concat(TaskInstance.id))
+            select(TaskInstance.status, TaskInstance.id)
             .where(*where_clause)
-            .group_by(TaskInstance.status)
+            .order_by(TaskInstance.status)  # Optional, but helps organize the result
         )
 
-        return_dict: Dict[str, List[int]] = {}
         for row in session.execute(select_stmt):
-            return_dict[row[0]] = [int(tid) for tid in row[1].split(",")]
+            return_dict[row[0]].append(int(row[1]))
 
-    resp = jsonify(status_updates=return_dict, time=str_time)
+    resp = jsonify(status_updates=dict(return_dict), time=str_time)
     resp.status_code = StatusCodes.OK
     return resp
 
@@ -317,7 +318,7 @@ def set_status_for_triaging(workflow_run_id: int) -> Any:
                         TaskInstance.status == constants.TaskInstanceStatus.RUNNING,
                         constants.TaskInstanceStatus.TRIAGING,
                     ),
-                    else_=constants.TaskInstanceStatus.KILL_SELF,
+                    else_=constants.TaskInstanceStatus.NO_HEARTBEAT,
                 )
             )
             .execution_options(synchronize_session=False)

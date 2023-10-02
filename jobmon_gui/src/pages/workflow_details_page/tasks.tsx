@@ -1,20 +1,19 @@
 import React from 'react';
-import { faSearch } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import TaskTable from './task_table';
+import { FaSearch } from "react-icons/fa";
 
-import { safe_rum_start_span, safe_rum_unit_end } from '../functions'
+import { safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum'
 
 export default function Tasks({ tasks, onSubmit, register, loading, apm }) {
     const s: any = safe_rum_start_span(apm, "tasks", "custom");
     return (
         <div>
             <br></br>
-            <div className="div_floatleft">
-                <form onSubmit={onSubmit}>
-                    <label className="label-left">TaskTemplate Name:&nbsp;&nbsp;  </label>
+            <div className="float_bar">
+                <form className='d-flex align-items-center' onSubmit={onSubmit}>
+                    <label className="label-left text-custom">Task Template Name:&nbsp;&nbsp;  </label>
                     <input id="task_template_Name" type="text" {...register("task_template_name")} required />
-                    <label className="label-right"><FontAwesomeIcon icon={faSearch} onClick={onSubmit} /> </label>
+                    <FaSearch style={{ color: "36486b", marginLeft: "2px" }} onClick={onSubmit} />
                 </form>
             </div>
             <TaskTable taskData={tasks} loading={loading} />

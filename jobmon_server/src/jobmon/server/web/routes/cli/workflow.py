@@ -8,7 +8,6 @@ import pandas as pd
 from sqlalchemy import func, select, text, update
 import structlog
 
-from jobmon.core.constants import TaskStatus as TStatus
 from jobmon.core.constants import WorkflowStatus as Statuses
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.task import Task
@@ -204,14 +203,26 @@ def get_workflow_run_for_workflow_reset(workflow_id: int, username: str) -> Any:
 def reset_workflow(workflow_id: int) -> Any:
     """Update the workflow's status, all its tasks' statuses to 'G'."""
     session = SessionLocal()
+    data = request.get_json()
+    partial_reset = data.get("partial_reset", False)
     with session.begin():
-        update_stmt = (
-            update(Workflow)
-            .where(Workflow.id == workflow_id)
-            .values(status="G", status_date=func.now())
-        )
-        session.execute(update_stmt)
-        update_filter = [Task.workflow_id == workflow_id, Task.status != "G"]
+        current_time = session.query(func.now()).scalar()
+
+        workflow_query = select(Workflow).where(Workflow.id == workflow_id)
+        workflow = session.execute(workflow_query).scalars().one_or_none()
+        workflow.reset(current_time=current_time)
+        session.flush()
+
+        # Update task statuses associated with the workflow
+        # Default behavior is a full workflow reset, all tasks to registered state
+        # User can optionally request only a partial reset if they want to resume this workflow
+        invalid_statuses = ["G"]
+        if partial_reset:
+            invalid_statuses.append("D")
+        update_filter = [
+            Task.workflow_id == workflow_id,
+            Task.status.notin_(invalid_statuses),
+        ]
         update_stmt = (
             update(Task)
             .where(*update_filter)
@@ -396,7 +407,7 @@ def get_workflow_status_viz() -> Any:
                 func.max(Task.num_attempts).label("max"),
                 func.avg(Task.num_attempts).label("mean"),
             ).where(Task.workflow_id == wf_id)
-            attempts = session.execute(sql).all()
+            attempts = session.execute(sql).first()
 
         return_dic[int(wf_id)] = {
             "id": int(wf_id),
@@ -407,9 +418,9 @@ def get_workflow_status_viz() -> Any:
             "DONE": 0,
             "FATAL": 0,
             "MAXC": 0,
-            "num_attempts_avg": float(attempts[0]["mean"]),
-            "num_attempts_min": int(attempts[0]["min"]),
-            "num_attempts_max": int(attempts[0]["max"]),
+            "num_attempts_avg": float(attempts.mean),
+            "num_attempts_min": int(attempts.min),
+            "num_attempts_max": int(attempts.max),
         }
 
     with session.begin():
@@ -443,6 +454,7 @@ def workflows_by_user_form() -> Any:
     tool = arguments.get("tool")
     wf_name = arguments.get("wf_name")
     wf_args = arguments.get("wf_args")
+    wf_attribute = arguments.get("wf_attribute")
     date_submitted = arguments.get("date_submitted")
     status = arguments.get("status")
 
@@ -462,6 +474,9 @@ def workflows_by_user_form() -> Any:
         if wf_args:
             where_clauses.append("workflow.workflow_args = :wf_args")
             substitution_dict["wf_args"] = wf_args
+        if wf_attribute:
+            where_clauses.append("workflow_attribute.value = :wf_attribute")
+            substitution_dict["wf_attribute"] = wf_attribute
         if date_submitted:
             where_clauses.append("workflow.created_date >= :date_submitted")
             substitution_dict["date_submitted"] = date_submitted
@@ -492,17 +507,18 @@ def workflows_by_user_form() -> Any:
                     WHERE
                         task.workflow_id IN (
                             SELECT
-                                workflow_id
+                                workflow_run.workflow_id
                             FROM
                                 workflow
                                 JOIN tool_version on workflow.tool_version_id = tool_version.id
                                 JOIN tool on tool.id = tool_version.tool_id
                                 JOIN workflow_run on workflow.id = workflow_run.workflow_id
+                                LEFT JOIN workflow_attribute on workflow.id = workflow_attribute.workflow_id
                             WHERE
                                 {inner_where_clause}
                         )
                     GROUP BY
-                        workflow_id
+                        workflow_id, queue_id
                 ) workflow_queue on workflow.id = workflow_queue.workflow_id
                 JOIN queue on queue.id = workflow_queue.queue_id
                 JOIN workflow_run on workflow.id = workflow_run.workflow_id
@@ -580,7 +596,7 @@ def task_details_by_wf_id(workflow_id: int) -> Any:
 
     result = [dict(zip(column_names, row)) for row in rows]
     for r in result:
-        r["task_status"] = TStatus.LABEL_DICT[r["task_status"]]
+        r["task_status"] = _cli_label_mapping[r["task_status"]]
 
     res = jsonify(tasks=result)
     res.return_code = StatusCodes.OK
@@ -598,10 +614,13 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
             Workflow.created_date,
             Workflow.status_date,
             Tool.name,
+            Workflow.status,
+            WorkflowStatus.description,
         ).where(
             Workflow.id == workflow_id,
             Workflow.tool_version_id == ToolVersion.id,
             ToolVersion.tool_id == Tool.id,
+            WorkflowStatus.id == Workflow.status,
         )
         rows = session.execute(sql).all()
 
@@ -611,6 +630,8 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
         "wf_created_date",
         "wf_status_date",
         "tool_name",
+        "wf_status",
+        "wf_status_desc",
     )
 
     result = [dict(zip(column_names, row)) for row in rows]

@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from jobmon.server.web.models import load_model
@@ -339,7 +339,7 @@ def test_inconsistent_status(db_engine, tool):
                      SET status="F" 
                      WHERE id in ({workflows[0].workflow_id}, {workflows[1].workflow_id})
                 """
-        session.execute(query1)
+        session.execute(text(query1))
         session.commit()
 
     # make sure it starts with 0

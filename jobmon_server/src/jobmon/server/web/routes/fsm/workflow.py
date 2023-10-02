@@ -1,4 +1,5 @@
 """Routes for Workflows."""
+from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict, List, Tuple
 
@@ -358,14 +359,13 @@ def task_status_updates(workflow_id: int) -> Any:
         db_time = session.execute(select(func.now())).scalar()
         str_time = db_time.strftime("%Y-%m-%d %H:%M:%S")
 
-        tasks_by_status_query = (
-            select(Task.status, func.group_concat(Task.id))
-            .where(*filter_criteria)
-            .group_by(Task.status)
-        )
-        result_dict = {}
-        for row in session.execute(tasks_by_status_query):
-            result_dict[row[0]] = [int(i) for i in row[1].split(",")]
+    # Prepare and execute your query without GROUP_CONCAT
+    tasks_by_status_query = select(Task.status, Task.id).where(*filter_criteria)
+
+    # Fetch the rows
+    result_dict = defaultdict(list)
+    for row in session.execute(tasks_by_status_query):
+        result_dict[row.status].append(row.id)
 
     resp = jsonify(tasks_by_status=result_dict, time=str_time)
     resp.status_code = StatusCodes.OK

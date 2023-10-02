@@ -7,7 +7,18 @@ from __future__ import annotations
 import hashlib
 from http import HTTPStatus as StatusCodes
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING, Union
+import numbers
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    TYPE_CHECKING,
+    Union,
+)
 
 from jobmon.client.node import Node
 from jobmon.client.task_resources import TaskResources
@@ -24,6 +35,21 @@ if TYPE_CHECKING:
     from jobmon.client.workflow import Workflow
 
 logger = logging.getLogger(__name__)
+
+
+def validate_task_resource_scales(resource_scales: Dict[str, Any]) -> None:
+    """Validate resource scales are expected types."""
+    for scaler in resource_scales.values():
+        if not (
+            isinstance(scaler, numbers.Number)
+            or callable(scaler)
+            or isinstance(scaler, Iterator)
+        ):
+            raise ValueError(
+                "Keys in the resource_scales dictionary must be either numeric "
+                f"values, Iterators, or Python Callables; found {scaler}, type "
+                f"{type(scaler)} instead."
+            )
 
 
 class Task:

@@ -31,6 +31,7 @@ class TaskInstanceStatus:
 
     UNKNOWN_ERROR = "U"
     NO_DISTRIBUTOR_ID = "W"
+    NO_HEARTBEAT = "X"
     RESOURCE_ERROR = "Z"
 
 

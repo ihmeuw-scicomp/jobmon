@@ -1,35 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import moment from 'moment';
 import BootstrapTable from "react-bootstrap-table-next";
-import filterFactory, { textFilter } from 'react-bootstrap-table2-filter';
+import filterFactory, { textFilter, dateFilter } from 'react-bootstrap-table2-filter';
 import { sanitize } from 'dompurify';
 import paginationFactory from "react-bootstrap-table2-paginator";
 import 'react-bootstrap-table2-paginator/dist/react-bootstrap-table2-paginator.min.css';
 import { HashLink } from 'react-router-hash-link';
 
 
-import '../jobmon_gui.css';
-import { convertDate, convertDatePST, safe_rum_start_span, safe_rum_unit_end } from '../functions';
-import CustomModal from '../Modal';
+import '../../css/jobmon_gui.css';
+import { convertDatePST } from '../../utilities/formatters';
+import { safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum';
+import CustomModal from '../../components/Modal';
 
 export default function Errors({ errorLogs, tt_name, loading, apm }) {
     const s: any = safe_rum_start_span(apm, "errors", "custom");
 
     const [errorDetail, setErrorDetail] = useState({
         'error': '', 'error_time': '', 'task_id': '',
-        'task_instance_err_id': '', 'task_instance_id': '', 'time_since': ''
+        'task_instance_err_id': '', 'task_instance_id': '', 'time_since': '',
+        'task_instance_stderr_log': ''
     });
     const [helper, setHelper] = useState("");
     const [showModal, setShowModal] = useState(false)
     const [justRecentErrors, setRecentErrors] = useState(false)
-
-    //FIXME: time is in UTC but shows as if locally:
-    // an error happening now shows: in 8 hours
-    function getTimeSince(date: string) {
-        let date_obj = convertDate(date);
-        const dateTimeAgo = moment(date_obj).fromNow();
-        return dateTimeAgo;
-    }
 
     function handleToggle() {
         setRecentErrors(!justRecentErrors)
@@ -46,7 +39,6 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
                 let date_display = `
             <div class="error-time">
             <span>${convertDatePST(e.error_time)}</span>
-            <span class="error-time-since">${getTimeSince(e.error_time)}</span>
             </div>
             `;
                 let error_display = `
@@ -59,7 +51,9 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
                     "task_instance_id": e.task_instance_id,
                     "brief": error_display,
                     "date": date_display,
-                    "time": e.error_time
+                    "time": e.error_time,
+                    "error": e.error,
+                    "task_instance_stderr_log": e.task_instance_stderr_log
                 })
             }
         }
@@ -77,13 +71,11 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
             dataField: "id",
             text: "Error Index",
             hidden: true,
-            sort: true
         },
         {
             dataField: "task_id",
             text: "Task ID",
             headerStyle: { width: "10%" },
-            sort: true
         },
         {
             dataField: "task_instance_id",
@@ -102,12 +94,14 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
             dataField: "date",
             text: "Error Date",
             formatter: htmlFormatter,
-            sort: true
+            headerStyle: { width: "20%" },
+            filter: dateFilter()
+
         },
 
         {
             dataField: "brief",
-            text: "",
+            text: "Error Log",
             filter: textFilter(),
             formatter: htmlFormatter,
             headerEvents: {
@@ -120,9 +114,8 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
             },
             events: {
                 onClick: (e, column, columnIndex, row, rowIndex) => {
-                    console.log(rowIndex);
                     setShowModal(true)
-                    setErrorDetail(errorLogs[rowIndex]);
+                    setErrorDetail(row);
                 }
             }
         }
@@ -133,7 +126,8 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
         // clean the error log detail display (right side) when task template changes
         let temp = {
             'error': '', 'error_time': '', 'task_id': '',
-            'task_instance_err_id': '', 'task_instance_id': '', 'time_since': ''
+            'task_instance_err_id': '', 'task_instance_id': '', 'time_since': '',
+            'task_instance_stderr_log': ''
         };
         setErrorDetail(temp);
     }, [errorLogs]);
@@ -188,7 +182,9 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
                 }
                 bodyContent={
                     <p>
-                        {errorDetail.error}
+                        {errorDetail.error}<br></br>
+                        <br></br>
+                        {errorDetail.task_instance_stderr_log}
                     </p>
                 }
                 showModal={showModal}

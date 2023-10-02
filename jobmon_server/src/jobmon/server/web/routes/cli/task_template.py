@@ -393,7 +393,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             )
             .select_from(join_table)
             .where(Task.workflow_id == workflow_id)
-            .order_by(Task.submitted_date)
+            .order_by(Task.id)
         )
         # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
         # the optimizer may choose a suboptimal execution plan for large datasets.
@@ -497,6 +497,7 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 TaskInstanceErrorLog.id,
                 TaskInstanceErrorLog.error_time,
                 TaskInstanceErrorLog.description,
+                TaskInstance.stderr_log,
             )
             .where(*query_filter)
             .order_by(TaskInstanceErrorLog.id.desc())
@@ -517,6 +518,7 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 "task_instance_err_id": r[2],
                 "error_time": r[3],
                 "error": r[4],
+                "task_instance_stderr_log": r[5],
             }
         )
 
@@ -527,6 +529,7 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         "task_id": pl.Int32,
         "task_instance_err_id": pl.Int32,
         "task_instance_id": pl.Int32,
+        "task_instance_stderr_log": pl.Utf8,
     }
 
     errors_df = pl.DataFrame(return_list, schema=error_schema)

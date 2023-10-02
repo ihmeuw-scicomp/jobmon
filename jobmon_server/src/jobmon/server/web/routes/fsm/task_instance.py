@@ -1,10 +1,11 @@
 """Routes for TaskInstances."""
+from collections import defaultdict
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict, Optional
+from typing import Any, cast, DefaultDict, Dict, List, Optional, Union
 
 from flask import jsonify, request
 import sqlalchemy
-from sqlalchemy import select, update
+from sqlalchemy import select, update, and_
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 import structlog
@@ -53,6 +54,8 @@ def log_running(task_instance_id: int) -> Any:
                 logger.warning(e)
             elif task_instance.status == constants.TaskInstanceStatus.KILL_SELF:
                 task_instance.transition(constants.TaskInstanceStatus.ERROR_FATAL)
+            elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
+                task_instance.transition(constants.TaskInstanceStatus.ERROR)
             else:
                 # Tried to move to an illegal state
                 logger.error(e)
@@ -447,39 +450,42 @@ def instantiate_task_instances() -> Any:
 
     session = SessionLocal()
     with session.begin():
+
         # update the task table where FSM allows it
-        task_update = (
-            update(Task)
+        sub_query = (
+            select(Task.id)
+            .join(TaskInstance, TaskInstance.task_id == Task.id)
             .where(
-                Task.id.in_(
-                    select(Task.id)
-                    .join(TaskInstance, TaskInstance.task_id == Task.id)
-                    .where(
-                        TaskInstance.id.in_(task_instance_ids_list),
-                        (Task.status == constants.TaskStatus.QUEUED),
-                    )
+                and_(
+                    TaskInstance.id.in_(task_instance_ids_list),
+                    Task.status == constants.TaskStatus.QUEUED,
                 )
             )
+        ).alias('derived_table')
+        task_update = (
+            update(Task)
+            .where(Task.id.in_(select(sub_query.c.id)))
             .values(status=constants.TaskStatus.INSTANTIATING, status_date=func.now())
             .execution_options(synchronize_session=False)
         )
         session.execute(task_update)
 
         # then propagate back into task instance where a change was made
-        task_instance_update = (
-            update(TaskInstance)
+        sub_query = (
+            select(TaskInstance.id)
+            .join(Task, TaskInstance.task_id == Task.id)
             .where(
-                TaskInstance.id.in_(
-                    select(TaskInstance.id)
-                    .join(Task, TaskInstance.task_id == Task.id)
-                    .where(
-                        # a successful transition
-                        (Task.status == constants.TaskStatus.INSTANTIATING),
-                        # and part of the current set
-                        TaskInstance.id.in_(task_instance_ids_list),
-                    )
+                and_(
+                    # a successful transition
+                    (Task.status == constants.TaskStatus.INSTANTIATING),
+                    # and part of the current set
+                    TaskInstance.id.in_(task_instance_ids_list),
                 )
             )
+        ).alias('derived_table')
+        task_instance_update = (
+            update(TaskInstance)
+            .where(TaskInstance.id.in_(select(sub_query.c.id)))
             .values(
                 status=constants.TaskInstanceStatus.INSTANTIATED, status_date=func.now()
             )
@@ -488,48 +494,45 @@ def instantiate_task_instances() -> Any:
         session.execute(task_instance_update)
 
     with session.begin():
+        # fetch rows individually without group_concat
+        # Key is a tuple of array_id, array_name, array_batch_num, task_resources_id
+        # Values are task instances in this batch
+        grouped_data: DefaultDict = defaultdict(list)
         instantiated_batches_query = (
             select(
                 TaskInstance.array_id,
                 Array.name,
                 TaskInstance.array_batch_num,
                 TaskInstance.task_resources_id,
-                func.group_concat(TaskInstance.id),
+                TaskInstance.id,
             )
             .where(
                 TaskInstance.id.in_(task_instance_ids_list)
                 & (TaskInstance.status == constants.TaskInstanceStatus.INSTANTIATED)
                 & (TaskInstance.array_id == Array.id)
             )
-            .group_by(
-                TaskInstance.array_id,
-                TaskInstance.array_batch_num,
-                TaskInstance.task_resources_id,
-                Array.name,
+            # Optionally, add an order_by clause here to make the rows easier to work with
+        )
+
+        # Collect the rows into the defaultdict
+        for array_id, array_name, array_batch_num, task_resources_id, task_instance_id \
+                in session.execute(instantiated_batches_query):
+            key = (array_id, array_batch_num, array_name, task_resources_id)
+            grouped_data[key].append(int(task_instance_id))
+
+    # Serialize the grouped data
+    serialized_batches = []
+    for key, task_instance_ids in grouped_data.items():
+        array_id, array_batch_num, array_name, task_resources_id = key
+        serialized_batches.append(
+            SerializeTaskInstanceBatch.to_wire(
+                array_id=array_id,
+                array_name=array_name,
+                array_batch_num=array_batch_num,
+                task_resources_id=task_resources_id,
+                task_instance_ids=task_instance_ids,
             )
         )
-        result = session.execute(instantiated_batches_query)
-        serialized_batches = []
-        for (
-            array_id,
-            array_name,
-            array_batch_num,
-            task_resources_id,
-            task_instance_ids,
-        ) in result:
-            task_instance_ids = [
-                int(task_instance_id)
-                for task_instance_id in task_instance_ids.split(",")
-            ]
-            serialized_batches.append(
-                SerializeTaskInstanceBatch.to_wire(
-                    array_id=array_id,
-                    array_name=array_name,
-                    array_batch_num=array_batch_num,
-                    task_resources_id=task_resources_id,
-                    task_instance_ids=task_instance_ids,
-                )
-            )
 
     resp = jsonify(task_instance_batches=serialized_batches)
     resp.status_code = StatusCodes.OK

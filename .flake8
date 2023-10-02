@@ -1,0 +1,52 @@
+[flake8]
+# ANN   : flake8-annotations warnings
+# B,B9  : flake8-bugbear
+# BLK   : black
+# C     : mccabe checks code complexity
+# D     : flake8-docstrings warnings
+# DAR   : darglint warnings
+# F     : pyflakes errors
+# I     : import-order warnings
+# W,E   : pycodestyle (pep8) warnings and errors
+select = ANN,B,B9,BLK,I,C,D,DAR,E,F,W
+max-complexity = 10
+ignore =
+    # Missing type annotation for self
+    ANN101,
+    # Dynamically typed expressions (typing.Any) are disallowed
+    ANN401,
+    # Function is too complex, this will eventually go away
+    C901,
+    # Missing docstring in public module
+    D100,
+    # Missing docstring in public package
+    D104,
+    # Line break before binary operator, ignore 503 and use 504
+    W503,
+    D101,
+    D102
+extend-ignore =
+    # See https://github.com/PyCQA/pycodestyle/issues/373
+    E203
+
+per-file-ignores =
+    jobmon_client/src/jobmon/_client_version.py:BLK100
+    jobmon_client/src/jobmon/client/api.py:F401
+    jobmon_core/src/jobmon/_core_version.py:BLK100
+    jobmon_core/src/jobmon/distributor/api.py:F401
+    jobmon_server/src/jobmon/_server_version.py:BLK100
+    jobmon_server/src/jobmon/server/workflow_reaper/api.py:F401
+    jobmon_server/src/jobmon/server/web/routes/cli/__init__.py:F401, E402
+    jobmon_server/src/jobmon/server/web/routes/fsm/__init__.py:F401, E402, I202
+    jobmon_server/src/jobmon/server/web/routes/reaper/__init__.py:F401, E402
+
+max-line-length = 95
+
+# import order
+import-order-style = google
+
+# docstrings
+docstring-convention = google
+
+# local
+application-import-names = jobmon

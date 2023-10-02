@@ -1,14 +1,16 @@
 """The overarching framework to create tasks and dependencies within."""
 from __future__ import annotations
 
+import copy
 import hashlib
+import itertools
 import logging
 import logging.config
 import os
 from subprocess import PIPE, Popen, TimeoutExpired
 import sys
 from types import TracebackType
-from typing import Any, Dict, List, Optional, Sequence, TYPE_CHECKING, Union
+from typing import Any, Dict, Iterator, List, Optional, Sequence, TYPE_CHECKING, Union
 import uuid
 
 import psutil
@@ -530,7 +532,7 @@ class Workflow(object):
         logger.info("Adding task metadata to database")
         # Need to wait for resume signal to be sent before resetting tasks, in case of a resume
         factory = WorkflowRunFactory(self.workflow_id)
-        if resume:
+        if not self._newly_created and resume:
             factory.set_workflow_resume(
                 reset_running_jobs=reset_running_jobs, resume_timeout=resume_timeout
             )
@@ -725,6 +727,22 @@ class Workflow(object):
                 # get task resources id
                 self._set_original_task_resources(task)
 
+                serializable_resource_scales = copy.copy(task.resource_scales)
+                for resource, scaler in task.resource_scales.items():
+                    # We can't serialize a callable, so use the function name instead.
+                    if callable(scaler):
+                        serializable_resource_scales[resource] = getattr(
+                            scaler, "__name__", "Unknown Callable"
+                        )
+                    # We can't serialize an iterator, so take the relevant elements as a
+                    # list.
+                    elif isinstance(scaler, Iterator):
+                        serializable_resource_scales[resource] = list(
+                            itertools.islice(
+                                copy.deepcopy(scaler), task.max_attempts - 1
+                            )
+                        )
+
                 task_metadata[task_hash] = [
                     task.node.node_id,
                     str(task.task_args_hash),
@@ -734,7 +752,7 @@ class Workflow(object):
                     task.command,
                     task.max_attempts,
                     reset_if_running,
-                    task.resource_scales,
+                    serializable_resource_scales,
                     task.fallback_queues,
                 ]
 

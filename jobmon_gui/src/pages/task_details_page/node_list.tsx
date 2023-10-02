@@ -7,9 +7,9 @@ import ListGroup from 'react-bootstrap/ListGroup';
 
 export default function NodeLists({ upstreamTasks, downstreamTasks }) {
     return (
-        <div>
-            <h2>Dependencies</h2>
-            <div className="card-columns d-flex justify-content-center">
+        <div className='div-level-2 pl-5 pt-2'>
+            <p className='font-weight-bold'>Dependencies</p>
+            <div className="card-columns d-flex justify-content-center flex-column">
                 <Card className="dependency-list-scroll">
                     <Card.Header className="dependency-header">Upstream Task IDs</Card.Header>
                     <ListGroup variant="flush">
@@ -18,7 +18,7 @@ export default function NodeLists({ upstreamTasks, downstreamTasks }) {
                                 <ListGroup.Item className="dependency-list-group-item">
                                     <Link
                                         to={{ pathname: `/task_details/${d["id"]}` }}
-                                        key={d["id"]}>{d["id"]}
+                                        key={d["id"]}>{d["name"]}
                                     </Link>
                                 </ListGroup.Item>
                             ))
@@ -33,7 +33,7 @@ export default function NodeLists({ upstreamTasks, downstreamTasks }) {
                                 <ListGroup.Item className="dependency-list-group-item">
                                     <Link
                                         to={{ pathname: `/task_details/${d["id"]}` }}
-                                        key={d["id"]}>{d["id"]}
+                                        key={d["id"]}>{d["name"]}
                                     </Link>
                                 </ListGroup.Item>
                             ))

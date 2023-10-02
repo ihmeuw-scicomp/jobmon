@@ -15,6 +15,7 @@ sphinx:
 python:
   install:
     - method: pip
+      path: ./jobmon_core
+    - method: pip
       path: ./jobmon_client
-      extra_requirements:
-        - docs
+    - requirements: docsource/requirements.txt

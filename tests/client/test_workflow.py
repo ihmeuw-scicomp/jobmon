@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from jobmon.client.tool import Tool
@@ -418,60 +419,70 @@ def test_workflow_get_errors(tool, task_template, db_engine):
     workflow1._bind_tasks()
     wfr_1 = WorkflowRunFactory(workflow1.workflow_id).create_workflow_run()
 
-    # for an just initialized task, get_errors() should be None
+    # for a just initialized task, get_errors() should be None
     assert task_a.get_errors() is None
 
     # now set everything to error fail
     with Session(bind=db_engine) as session:
         # fake workflow run
         session.execute(
-            """
-            UPDATE workflow_run
-            SET status ='{s}'
-            WHERE id={wfr_id}""".format(
-                s=WorkflowRunStatus.RUNNING, wfr_id=wfr_1.workflow_run_id
+            text(
+                """
+                UPDATE workflow_run
+                SET status ='{s}'
+                WHERE id={wfr_id}""".format(
+                    s=WorkflowRunStatus.RUNNING, wfr_id=wfr_1.workflow_run_id
+                )
             )
         )
         session.execute(
-            """
-            INSERT INTO task_instance (workflow_run_id, task_id, status)
-            VALUES ({wfr_id}, {t_id}, '{s}')""".format(
-                wfr_id=wfr_1.workflow_run_id,
-                t_id=task_a.task_id,
-                s=TaskInstanceStatus.LAUNCHED,
+            text(
+                """
+                INSERT INTO task_instance (workflow_run_id, task_id, status)
+                VALUES ({wfr_id}, {t_id}, '{s}')""".format(
+                    wfr_id=wfr_1.workflow_run_id,
+                    t_id=task_a.task_id,
+                    s=TaskInstanceStatus.LAUNCHED,
+                )
             )
         )
         ti = session.execute(
-            "SELECT id from task_instance where task_id={}".format(task_a.task_id)
+            text("SELECT id from task_instance where task_id={}".format(task_a.task_id))
         ).fetchone()
         ti_id_a = ti[0]
         session.execute(
-            """
-            UPDATE task
-            SET status ='{s}'
-            WHERE id={t_id}""".format(
-                s=TaskStatus.INSTANTIATING, t_id=task_a.task_id
+            text(
+                """
+                UPDATE task
+                SET status ='{s}'
+                WHERE id={t_id}""".format(
+                    s=TaskStatus.INSTANTIATING, t_id=task_a.task_id
+                )
             )
         )
         session.execute(
-            """
-            INSERT INTO task_instance (workflow_run_id, task_id, status)
-            VALUES ({wfr_id}, {t_id}, '{s}')""".format(
-                wfr_id=wfr_1.workflow_run_id,
-                t_id=task_b.task_id,
-                s=TaskInstanceStatus.LAUNCHED,
+            text(
+                """
+                INSERT INTO task_instance (workflow_run_id, task_id, status)
+                VALUES ({wfr_id}, {t_id}, '{s}')""".format(
+                    wfr_id=wfr_1.workflow_run_id,
+                    t_id=task_b.task_id,
+                    s=TaskInstanceStatus.LAUNCHED,
+                )
             )
         )
         ti = session.execute(
-            "SELECT id from task_instance where task_id={}".format(task_b.task_id)
+            text("SELECT id FROM task_instance WHERE task_id={}".format(task_b.task_id))
         ).fetchone()
         ti_id_b = ti[0]
         session.execute(
-            """
-            UPDATE task
-            SET status ='{s}'
-            WHERE id={t_id}""".format(
-                s=TaskStatus.INSTANTIATING, t_id=task_b.task_id
+            text(
+                """
+                UPDATE task
+                SET status ='{s}'
+                WHERE id={t_id}""".format(
+                    s=TaskStatus.INSTANTIATING, t_id=task_b.task_id
+                )
             )
         )
         session.commit()
@@ -521,7 +532,7 @@ def test_workflow_get_errors(tool, task_template, db_engine):
     assert err_1st_b["description"] == "cla cla cla"
 
 
-def test_currency_limit(client_env, db_engine):
+def test_concurrency_limit(client_env, db_engine):
     """The max_concurrently_running should be the biggest of wf and its arrays' size."""
 
     # no array
@@ -556,13 +567,13 @@ def test_currency_limit(client_env, db_engine):
         SELECT max_concurrently_running 
         FROM workflow
         WHERE id={workflow1.workflow_id}"""
-        r = session.execute(sql).fetchone()
+        r = session.execute(text(sql)).fetchone()
         assert r[0] == MaxConcurrentlyRunning.MAXCONCURRENTLYRUNNING
         sql = f"""
         SELECT max_concurrently_running 
         FROM array 
         WHERE workflow_id={workflow1.workflow_id}"""
-        r = session.execute(sql).fetchone()
+        r = session.execute(text(sql)).fetchone()
         assert r[0] == MaxConcurrentlyRunning.MAXCONCURRENTLYRUNNING
 
     # array
@@ -594,13 +605,13 @@ def test_currency_limit(client_env, db_engine):
             SELECT max_concurrently_running 
             FROM workflow
             WHERE id={workflow2.workflow_id}"""
-        r = session.execute(sql).fetchone()
+        r = session.execute(text(sql)).fetchone()
         assert r[0] == MaxConcurrentlyRunning.MAXCONCURRENTLYRUNNING
         sql = f"""
                 SELECT max_concurrently_running 
                 FROM array 
                 WHERE workflow_id={workflow2.workflow_id}"""
-        r = session.execute(sql).fetchone()
+        r = session.execute(text(sql)).fetchone()
         assert r[0] == MaxConcurrentlyRunning.MAXCONCURRENTLYRUNNING
 
     # array level user setting
@@ -641,13 +652,13 @@ def test_currency_limit(client_env, db_engine):
                 SELECT max_concurrently_running 
                 FROM workflow
                 WHERE id={workflow3.workflow_id}"""
-        r = session.execute(sql).fetchone()
+        r = session.execute(text(sql)).fetchone()
         assert r[0] == MaxConcurrentlyRunning.MAXCONCURRENTLYRUNNING
         sql = f"""
                         SELECT max_concurrently_running 
                         FROM array 
                         WHERE workflow_id={workflow3.workflow_id}"""
-        rows = session.execute(sql).fetchall()
+        rows = session.execute(text(sql)).fetchall()
         for r in rows:
             assert r[0] in [20, 40]
 
@@ -674,11 +685,11 @@ def test_currency_limit(client_env, db_engine):
                 SELECT max_concurrently_running 
                 FROM workflow
                 WHERE id={workflow4.workflow_id}"""
-        r = session.execute(sql).fetchone()
+        r = session.execute(text(sql)).fetchone()
         assert r[0] == 23
         sql = f"""
                         SELECT max_concurrently_running 
                         FROM array 
                         WHERE workflow_id={workflow4.workflow_id}"""
-        r = session.execute(sql).fetchone()
+        r = session.execute(text(sql)).fetchone()
         assert r[0] == MaxConcurrentlyRunning.MAXCONCURRENTLYRUNNING

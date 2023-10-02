@@ -9,7 +9,7 @@ import pandas as pd
 
 import pytest
 from unittest.mock import patch, PropertyMock
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
 
@@ -717,13 +717,13 @@ def test_get_yaml_data(db_engine, client_env):
                     UPDATE task_instance
                     SET wallclock = 10, maxrss = 400
                     WHERE task_id = {t1.task_id}"""
-        session.execute(query_1)
+        session.execute(text(query_1))
 
         query_2 = f"""
                     UPDATE task_instance
                     SET wallclock = 20, maxrss = 600
                     WHERE task_id = {t2.task_id}"""
-        session.execute(query_2)
+        session.execute(text(query_2))
         session.commit()
 
     with patch(
@@ -866,7 +866,7 @@ def test_get_filepaths(db_engine, tool):
                             SET stdout="/cool/filepath.o",
                             stderr="/cool/filepath.e"
                         """
-        session.execute(query)
+        session.execute(text(query))
         session.commit()
 
     df_cli = get_filepaths(workflow_id=wf.workflow_id, array_name=array.name)
