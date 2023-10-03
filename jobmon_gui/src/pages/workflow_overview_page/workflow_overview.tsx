@@ -30,7 +30,6 @@ function App() {
 
 
   //***********************hooks*****************************
-
   //page loading hook
   useEffect(() => {
     let url_user = searchParams.get("user");
@@ -202,7 +201,7 @@ function App() {
       </div>
       <div id="wftable" className="div-level-2">
         {workflows.length !== 0 && <JobmonWFTable allData={workflows} />}
-        {workflows.length === 0 && "No workflows found for specifed filters."}
+        {workflows.length === 0 && "No workflows found for specified filters."}
       </div>
     </div>
   );
