@@ -22,6 +22,7 @@ function App() {
   const [wf_name, setWFName] = useState('');
   const [wf_args, setWFArgs] = useState('');
   const [wf_attribute, setWFAttribute] = useState('');
+  const [wf_id, setWFID] = useState('')
   const [date_submitted, setDateSubmitted] = useState('');
   const [status, setStatus] = useState('');
   const [workflows, setWorkflows] = useState([]);
@@ -37,6 +38,7 @@ function App() {
     let url_wf_name = searchParams.get("wf_name");
     let url_wf_args = searchParams.get("wf_args");
     let url_wf_attribute = searchParams.get("wf_attribute")
+    let url_wf_id = searchParams.get("wf_id")
     let url_date_submitted = searchParams.get("date_submitted");
     let url_status = searchParams.get("status");
     if (url_user !== null && url_user !== "" && url_user !== undefined) {
@@ -53,6 +55,9 @@ function App() {
     }
     if (url_wf_attribute !== null && url_wf_attribute !== "" && url_wf_attribute !== undefined) {
       setWFAttribute(url_wf_attribute)
+    }
+    if (url_wf_id !== null && url_wf_id !== "" && url_wf_id !== undefined) {
+      setWFID(url_wf_id)
     }
     if (url_date_submitted !== null && url_date_submitted !== "" && url_date_submitted !== undefined) {
       setDateSubmitted(url_date_submitted)
@@ -77,6 +82,7 @@ function App() {
     params.append("wf_name", wf_name)
     params.append("wf_args", wf_args)
     params.append("wf_attribute", wf_attribute)
+    params.append("wf_id", wf_id)
     params.append("date_submitted", date_submitted)
     params.append("status", status)
     let workflow_status_url = process.env.REACT_APP_BASE_URL + "/workflow_overview_viz";
@@ -110,25 +116,26 @@ function App() {
     };
     fetchData();
     safe_rum_unit_end(rum_s1);
-  }, [user, tool, wf_name, wf_args, wf_attribute, date_submitted, status]);
+  }, [user, tool, wf_name, wf_args, wf_attribute, date_submitted, status, wf_id]);
 
 
   //*******************event handling****************************
   // user form
   const { register, handleSubmit } = useForm();
   const onSubmit = handleSubmit((d) => {
-    navigate('/?user=' + d["user_input"] + "&tool=" + d["tool_input"] + "&wf_name=" + d["wf_name_input"] + "&wf_args=" + d["wf_args_input"] + "&wf_attribute=" + d["wf_attribute_input"] + "&date_submitted=" + d["date_submitted_input"] + "&status=" + d["status"]);
+    navigate('/?user=' + d["user_input"] + "&tool=" + d["tool_input"] + "&wf_name=" + d["wf_name_input"] + "&wf_args=" + d["wf_args_input"] + "&wf_attribute=" + d["wf_attribute_input"] + "&wf_id" + d["wf_id"] + "&date_submitted=" + d["date_submitted_input"] + "&status=" + d["status"]);
     setUser(d["user_input"]);
     setTool(d["tool_input"])
     setWFName(d["wf_name_input"])
     setWFArgs(d["wf_args_input"])
     setWFAttribute(d["wf_attribute_input"])
+    setWFID(d["wf_id"])
     setDateSubmitted(d["date_submitted_input"])
     setStatus(d["status"])
   });
 
   const handleClear = handleSubmit((d) => {
-    navigate("/?user=&tool=&wf_name=&wf_args=&wf_attribute=&date_submitted=&status=");
+    navigate("/?user=&tool=&wf_name=&wf_args=&wf_attribute=&wf_id=&date_submitted=&status=");
     navigate(0)
   });
   //********************html page*************************************
@@ -165,7 +172,7 @@ function App() {
 
           <Row className="mb-3">
             <Form.Group as={Col} controlId="formWFDate">
-              <Form.Label><span className='m-2'> Date Workflow Was Submitted - On or After Date</span></Form.Label>
+              <Form.Label><span className='m-2'> Submitted Workflow Date - On or After</span></Form.Label>
               <Form.Control type="date" defaultValue={date_submitted} {...register("date_submitted_input")} />
             </Form.Group>
 
@@ -189,6 +196,11 @@ function App() {
                 <option value="R">Running</option>
               </Form.Control>
             </Form.Group>
+
+            <Form.Group as={Col} controlId="formWFID">
+              <Form.Label><span className='m-2'> Workflow ID</span></Form.Label>
+              <Form.Control type="text" placeholder="Workflow ID" defaultValue={wf_id} {...register("wf_id")} />
+            </Form.Group>
           </Row>
 
           <div className="text-center">
@@ -201,7 +213,7 @@ function App() {
       </div>
       <div id="wftable" className="div-level-2">
         {workflows.length !== 0 && <JobmonWFTable allData={workflows} />}
-        {workflows.length === 0 && "No workflows found for specified filters."}
+        {workflows.length === 0 && <p>No workflows found for specified filters.</p>}
       </div>
     </div>
   );
