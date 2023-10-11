@@ -123,7 +123,7 @@ function App() {
   // user form
   const { register, handleSubmit } = useForm();
   const onSubmit = handleSubmit((d) => {
-    navigate('/?user=' + d["user_input"] + "&tool=" + d["tool_input"] + "&wf_name=" + d["wf_name_input"] + "&wf_args=" + d["wf_args_input"] + "&wf_attribute=" + d["wf_attribute_input"] + "&wf_id" + d["wf_id"] + "&date_submitted=" + d["date_submitted_input"] + "&status=" + d["status"]);
+    navigate('/?user=' + d["user_input"] + "&tool=" + d["tool_input"] + "&wf_name=" + d["wf_name_input"] + "&wf_args=" + d["wf_args_input"] + "&wf_attribute=" + d["wf_attribute_input"] + "&wf_id=" + d["wf_id"] + "&date_submitted=" + d["date_submitted_input"] + "&status=" + d["status"]);
     setUser(d["user_input"]);
     setTool(d["tool_input"])
     setWFName(d["wf_name_input"])

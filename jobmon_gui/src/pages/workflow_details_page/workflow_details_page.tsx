@@ -72,6 +72,7 @@ function getWorkflowAttributes(
         setWFSubmitted(convertDatePST(data["wf_created_date"]));
         setWFStatusDate(convertDatePST(data["wf_status_date"]));
         setWFElapsedTime(humanizeDuration(new Date().getTime() - new Date(data["wf_status_date"]).getTime()))
+        setJobmonVersion(data["wfr_jobmon_version"]);
     };
     return fetchData
 }
