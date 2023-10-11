@@ -501,6 +501,7 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             )
             .where(*query_filter)
             .order_by(TaskInstanceErrorLog.id.desc())
+            .limit(2000)
         )
         # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
         # the optimizer may choose a suboptimal execution plan for large datasets.
