@@ -1,8 +1,6 @@
-"""Start up the flask services."""
 from importlib import import_module
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
-from elasticapm.contrib.flask import ElasticAPM
 from flask import Flask
 import sqlalchemy
 
@@ -12,86 +10,91 @@ from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 
 
 class AppFactory:
+    """Factory for creating Flask apps."""
+    # Class-level attributes for OTLP and SQLAlchemy instrumentation
+    otlp_api = None
+    _structlog_configured = False
+
     def __init__(
-        self,
-        config: Optional[JobmonConfig] = None,
-        sqlalchemy_database_uri: str = "",
-        use_apm: Optional[bool] = None,
-        apm_server_url: str = "",
-        apm_server_name: str = "",
-        apm_server_port: Optional[int] = None,
+        self, sqlalchemy_database_uri: str = "", use_otlp: bool = False
     ) -> None:
-        """Initialization of the App Factory."""
-        if config is None:
-            config = JobmonConfig()
-        # configuration for sqlalchemy
-        if not sqlalchemy_database_uri:
-            sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")
+        """Initialize the AppFactory object with the SQLAlchemy database URI.
+        
+        Args:
+            sqlalchemy_database_uri: The SQLAlchemy database URI.
+            use_otlp: Whether to use OTLP instrumentation.
+        """
+        if use_otlp and AppFactory.otlp_api is None:
+            self._init_otlp()
+
+        if not AppFactory._structlog_configured:
+            self._init_logging()
+
+        # Create SQLAlchemy engine
         self.engine = sqlalchemy.create_engine(
             sqlalchemy_database_uri, pool_recycle=200, future=True
         )
-
-        if use_apm is None:
-            use_apm = config.get_boolean("web", "use_apm")
-        self.use_apm = use_apm
-
-        if self.use_apm and not apm_server_url:
-            apm_server_url = config.get("web", "apm_server_url")
-        self.apm_server_url = apm_server_url
-
-        if self.use_apm and not apm_server_name:
-            apm_server_name = config.get("web", "apm_server_name")
-        self.apm_server_name = apm_server_name
-
-        if self.use_apm and apm_server_port is None:
-            apm_server_port = config.get_int("web", "apm_server_port")
-        self.apm_server_port = apm_server_port
-
-        # bind the engine to the session factory before importing the blueprint
         session_factory.configure(bind=self.engine)
 
-        # in memory db must be created in same thread as app
-        if str(self.engine.url) == "sqlite://":
-            from jobmon.server.web.models import init_db
+    @classmethod
+    def from_defaults(cls) -> "AppFactory":
+        """Create an AppFactory from the default configuration."""
+        config = JobmonConfig()
+        return cls(
+            config.get("web", "sqlalchemy_database_uri"),
+            config.get_boolean("web", "use_otlp"),
+        )
 
-            init_db(self.engine)
+    @classmethod
+    def _init_otlp(cls) -> None:
+        from jobmon.core.otlp import OtlpAPI
 
-    @property
-    def flask_config(self) -> Dict[str, Any]:
-        flask_config = {}
-        if self.use_apm:
-            flask_config["ELASTIC_APM"] = {
-                # Set the required service name. Allowed characters:
-                # a-z, A-Z, 0-9, -, _, and space
-                "SERVICE_NAME": self.apm_server_name,
-                # Set the custom APM Server URL (default: http://0.0.0.0:8200)
-                "SERVER_URL": f"http://{self.apm_server_url}:{self.apm_server_port}",
-                # Set the service environment
-                "ENVIRONMENT": "development",
-                "DEBUG": True,
-            }
-        return flask_config
+        cls.otlp_api = OtlpAPI()
+        cls.otlp_api.instrument_sqlalchemy()
+
+    @classmethod
+    def _init_logging(cls) -> None:
+        from jobmon.server.web.log_config import configure_structlog
+
+        extra_processors = []
+        if cls.otlp_api:
+            def add_open_telemetry_spans(_, __, event_dict):
+                """Add OpenTelemetry spans to the log record."""
+                span, trace, parent_span = cls.otlp_api.get_span_details()
+
+                event_dict["span"] = {
+                    "span_id": span or None,
+                    "trace_id": trace or None,
+                    "parent_span_id": parent_span or None
+                }
+                return event_dict
+
+            extra_processors.append(add_open_telemetry_spans)
+        configure_structlog(extra_processors)
+        cls._structlog_configured = True
 
     def get_app(
-        self, blueprints: List = ["fsm", "cli", "reaper"], url_prefix: str = "/"
+        self, blueprints: Optional[List[str]] = None, url_prefix: str = "/"
     ) -> Flask:
-        """Create a Flask app."""
+        """Create and configure the Flask app.
+        
+        Args:
+            blueprints: The blueprints to register with the app.
+            url_prefix: The URL prefix for the app.
+        """
+        if blueprints is None:
+            blueprints = ["fsm", "cli", "reaper"]
         app = Flask(__name__)
         app.config["CORS_HEADERS"] = "Content-Type"
-        app.config.from_mapping(self.flask_config)
 
-        if self.use_apm:
-            apm = ElasticAPM(app)
-        else:
-            apm = None
-
-        # register the blueprints we want. they make use of a scoped session attached
-        # to the global session factory
+        # Register the blueprints
         for blueprint in blueprints:
             mod = import_module(f"jobmon.server.web.routes.{blueprint}")
             app.register_blueprint(getattr(mod, "blueprint"), url_prefix=url_prefix)
 
-        # add request logging hooks
-        add_hooks_and_handlers(app, apm)
+        if self.otlp_api:
+            self.otlp_api.instrument_app(app)
+
+        add_hooks_and_handlers(app)
 
         return app

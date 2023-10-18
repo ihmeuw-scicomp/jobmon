@@ -1,98 +1,111 @@
 import time
-from unittest import mock
-
 import pytest
-from tenacity import stop_after_attempt
+from unittest import mock
 from requests import ConnectionError
-
+import requests
+from tenacity import stop_after_attempt
 from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 
 
-def test_server_502(client_env):
-    """
-    GBDSCI-1553
+@pytest.mark.parametrize(
+    "initial_responses, final_response, expected_attempts, expected_exception, expected_msg",
+    [
+        ([(502, b"Some error message...")] * 2, (200, {"time": "2019-02-21 17:40:07"}), 3, None, None),
+        ([(502, b"Some error message...")] * 2, (502, b"Some error message..."), 3, RuntimeError, "Status code was 502")
+    ]
+)
+def test_retries(client_env, mocker, initial_responses, final_response, expected_attempts, expected_exception, expected_msg):
+    responses = initial_responses + [final_response]
 
-    We should be able to automatically retry if server returns 5XX
-    status code. If we exceed retry budget, we should raise informative error
-    """
+    mock_content = mocker.patch("jobmon.core.requester.get_content", side_effect=responses)
+    requester = Requester(client_env, retries_attempts=3)
 
-    err_response = (
-        502,
-        b"<html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body "
-        b'bgcolor="white">\r\n<center><h1>502 Bad Gateway</h1></center>\r\n'
-        b"<hr><center>nginx/1.13.12</center>\r\n</body>\r\n</html>\r\n",
-    )
-    good_response = (200, {"time": "2019-02-21 17:40:07"})
+    if expected_exception:
+        with pytest.raises(expected_exception, match=expected_msg):
+            requester.send_request("/time", {}, "get")
+    else:
+        requester.send_request("/time", {}, "get")
 
-    test_requester = Requester(client_env)
-
-    # mock requester.get_content to return 2 502s then 200
-    with mock.patch("jobmon.core.requester.get_content") as m:
-        # Docs: If side_effect is an iterable then each call to the mock
-        # will return the next value from the iterable
-        m.side_effect = [err_response] * 2 + [good_response] + [err_response] * 2
-
-        test_requester.send_request("/time", {}, "get")  # fails at first
-
-        # should have retried twice + one success
-        retrier = test_requester._retry
-        assert retrier.statistics["attempt_number"] == 3
-
-        # if we end up stopping we should get an error
-        with pytest.raises(RuntimeError, match="Status code was 502"):
-            retrier.stop = stop_after_attempt(1)
-            retrier.__call__(test_requester._send_request, "/time", {}, "get")
+    # Instead of using the _retry attribute, check how many times the mocked method was called
+    assert mock_content.call_count == expected_attempts
 
 
-def test_connection_retry(client_env):
-    """
-    GBDSCI-3411
-
-    We should automatically retry connection errors, not fail on first failure.
-    """
-
+def test_connection_retry(client_env, mocker):
+    """Test if connection retry occurs after a ConnectionError and succeeds after a given time."""
     class RequesterMock(Requester):
-        """
-        Mock requester class to raise ConnectionErrors on first 2 attempts, then succeed
-        """
-
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.time = time.time()
-
-        def _send_request(self, *args, **kwargs):
+                
+        def _send_request(self, app_route, message, request_type):
             current_time = time.time()
             if current_time - self.time < 5:
-                # If <5 seconds has elapsed, raise an error. Retry will catch it
                 raise ConnectionError
             else:
                 self.time = current_time
-                return super()._send_request(*args, **kwargs)
+                return super()._send_request(app_route, message, request_type)
 
-    with pytest.raises(ConnectionError):
-        # Set low backoff and max time limits, to force max retries error
-        failed_requester = RequesterMock(client_env, max_retries=1, stop_after_delay=2)
-        failed_requester.send_request("/time", {}, "get")
-
-    # Use defaults of 10 second backoff, 2 min max wait
     good_requester = RequesterMock(client_env)
-    rc, resp = good_requester.send_request(
-        "/time", {}, "get"
-    )  # No connectionerror raised
+    start_time = time.time()
+    rc, resp = good_requester.send_request("/time", {}, "get")
+    elapsed_time = time.time() - start_time
+
     assert rc == 200
-    retrier = good_requester._retry
-    assert retrier.statistics["attempt_number"] > 1
+    assert elapsed_time >= 5  # Ensure the time taken indicates retries were attempted.
 
 
-def test_fail_fast(client_env):
-    """
-    Use the client-env requestor that has max-retries == 0.
-    """
-
+def test_fail_fast(client_env, mocker):
+    mock_content = mocker.patch("jobmon.core.requester.get_content", side_effect=[(404, "Not Found")])
     requester = Requester.from_defaults()
+    
     with pytest.raises(InvalidResponse) as exc:
         requester.send_request("/no-route-should-fail", {}, "get")
-        assert "Unexpected status code 404" in str(exc.value)
-    tries = requester._retry.statistics["attempt_number"]
-    assert tries == 1
+
+    assert "Unexpected status code 404" in str(exc.value)
+    assert mock_content.call_count == 1
+
+
+def test_tracing_enabled(client_env, mocker):
+    """Validate that when the use_otlp flag is enabled, traces are captured."""
+    mock_tracer = mocker.Mock()
+    mock_tracer.start_as_current_span.return_value = mocker.MagicMock(
+        __enter__=mocker.Mock(return_value=...), 
+        __exit__=mocker.Mock(return_value=None)
+    )
+    mocker.patch('jobmon.core.otlp.OtlpAPI.get_tracer', return_value=mock_tracer)
+
+    requester = Requester(client_env, use_otlp=True)
+    requester.send_request("/time", {}, "get")
+
+    mock_tracer.start_as_current_span.assert_called_once()
+
+
+def test_non_tenacious_request(client_env, mocker):
+    mock_content = mocker.patch("jobmon.core.requester.get_content", side_effect=[(500, "Server Error")])
+    requester = Requester(client_env)
+
+    with pytest.raises(InvalidResponse) as exc:
+        requester.send_request("/some_route", {}, "get", tenacious=False)
+
+    assert "Unexpected status code 500" in str(exc.value)
+    assert mock_content.call_count == 1
+
+
+@pytest.mark.parametrize("tenacious, exception_type", [(False, TimeoutError), (True, RuntimeError)])
+def test_connection_timeout(client_env, mocker, tenacious, exception_type):
+    mocker.patch("requests.get", side_effect=TimeoutError)
+
+    # Adjust the retries_timeout for the requester
+    requester = Requester(client_env, request_timeout=1, retries_timeout=10)
+
+    mock_send_request = mocker.patch.object(Requester, "_send_request", side_effect=requester._send_request)
+
+    if tenacious:
+        with pytest.raises(exception_type, match="Exceeded HTTP request retry budget"):
+            requester.send_request("/some_route", {}, "get", tenacious=True)
+        assert mock_send_request.call_count > 1
+    else:
+        with pytest.raises(exception_type):
+            requester.send_request("/some_route", {}, "get", tenacious=False)
+        assert mock_send_request.call_count == 1

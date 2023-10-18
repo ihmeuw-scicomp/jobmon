@@ -1,22 +1,16 @@
 """Configure Logging for structlogs, syslog, etc."""
 import logging.config
-from typing import Any, Dict, MutableMapping, Optional
+from typing import Any, Dict, List, MutableMapping, Optional
 
-from elasticapm.handlers.structlog import structlog_processor as elasticapm_processor
 import structlog
 
-from jobmon.server import __version__
+# from jobmon.server import __version__
 
 
-def _processor_add_version(
-    logger: logging.Logger, log_method: str, event_dict: MutableMapping[str, Any]
-) -> MutableMapping[str, Any]:
-    event_dict["jobmon_version"] = __version__
-    return event_dict
-
-
-def configure_structlog() -> None:
+def configure_structlog(extra_processors: List = None) -> None:
     """Configure logging format, handlers, etc."""
+    if extra_processors is None:
+        extra_processors = []
     structlog.configure(
         processors=[
             # bring in threadlocal context
@@ -29,15 +23,13 @@ def configure_structlog() -> None:
             # Adds level=info, debug, etc.
             structlog.stdlib.add_log_level,
             # add jobmon version to json object
-            _processor_add_version,
+            *extra_processors,
             # Performs the % string interpolation as expected
             structlog.stdlib.PositionalArgumentsFormatter(),
             # add datetime to our logs
             structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S"),
             # Include the stack when stack_info=True
             structlog.processors.StackInfoRenderer(),
-            # Adds transaction.id, trace.id, span.id for APM visualization
-            elasticapm_processor,
             # Include the exception when exc_info=True
             # e.g log.exception() or log.warning(exc_info=True)'s behavior
             structlog.processors.format_exc_info,

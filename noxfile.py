@@ -20,8 +20,8 @@ python = "3.8"
 def tests(session: Session) -> None:
     """Run the test suite."""
     session.conda_install("mysqlclient")
-    session.install("pytest", "pytest-xdist", "pytest-cov", "mock", "filelock")
-    session.install("-e", "./jobmon_core")
+    session.install("pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock")
+    session.install("-e", "./jobmon_core[otlp]")
     session.install("-e", "./jobmon_client")
     session.install("-e", "./jobmon_server")
 

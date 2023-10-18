@@ -13,7 +13,7 @@ classifiers = [
 ]
 dependencies = [
     'aiohttp',
-    'configparser',
+    'pyyaml',
     'psutil',
     'requests',
     'tenacity>=8.1',
@@ -25,6 +25,15 @@ dynamic = ["version"]
 jobmon_config = "jobmon.core.configuration:main"
 jobmon_distributor = "jobmon.distributor.cli:main"
 worker_node_entry_point = "jobmon.worker_node.cli:run"
+
+[project.optional-dependencies]
+otlp = [
+    'opentelemetry-api',
+    'opentelemetry-sdk',
+    'opentelemetry-instrumentation',
+    'opentelemetry-instrumentation-requests',
+    'opentelemetry-exporter-otlp'
+]
 
 [tool.setuptools]
 license-files = ["../LICENSE"]

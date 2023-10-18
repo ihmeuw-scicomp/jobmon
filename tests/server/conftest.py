@@ -2,17 +2,18 @@ import pytest
 
 
 @pytest.fixture(scope="function")
-def web_server_in_memory(sqlite_file, monkeypatch):
+def web_server_in_memory(tmp_path):
     """This sets up the JSM/JQS using the test_client which is a
     fake server
     """
-    from jobmon.server.web.app_factory import AppFactory
+    from jobmon.server.web.api import AppFactory
+    from jobmon.server.web.models import init_db
 
     # The create_app call sets up database connections
-    monkeypatch.setenv(
-        "JOBMON__FLASK__SQLALCHEMY_DATABASE_URI", f"sqlite:///{sqlite_file}"
-    )
-    app_factory = AppFactory()
+    d = tmp_path / "jobmon.db"
+    url = "sqlite:///" + str(d)
+    app_factory = AppFactory(url)
+    init_db(app_factory.engine)
     app = app_factory.get_app()
     app.config["TESTING"] = True
     with app.app_context():
@@ -45,15 +46,15 @@ def requester_in_memory(monkeypatch, web_server_in_memory):
 
     app, engine = web_server_in_memory
 
-    def get_in_mem(url, params, data, headers):
+    def get_in_mem(url, params, data, headers, **kwargs):
         url = "/" + url.split(":")[-1].split("/", 1)[1]
         return app.get(path=url, query_string=params, data=data, headers=headers)
 
-    def post_in_mem(url, params, json, headers):
+    def post_in_mem(url, params, json, headers, **kwargs):
         url = "/" + url.split(":")[-1].split("/", 1)[1]
         return app.post(url, query_string=params, json=json, headers=headers)
 
-    def put_in_mem(url, params, json, headers):
+    def put_in_mem(url, params, json, headers, **kwargs):
         url = "/" + url.split(":")[-1].split("/", 1)[1]
         return app.put(url, query_string=params, json=json, headers=headers)
 
