@@ -2,22 +2,10 @@ http:
   request_timeout: 20
   retries_timeout: 300
   retries_attempts: 10
-  use_otlp: false
-  service_url: "http://localhost:80"
 
-otlp:
-  span_exporter: "grpc_span"
-  log_exporter: "grpc_log"
-
-grpc_span:
-  endpoint: ""
-  module: "opentelemetry.exporter.otlp.proto.grpc.trace_exporter"
-  class: "OTLPSpanExporter"
-
-grpc_log:
-  endpoint: ""
-  module: "opentelemetry.exporter.otlp.proto.grpc._log_exporter"
-  class: "OTLPLogExporter"
+oltp:
+  web_enabled: false
+  http_enabled: false
 
 heartbeat:
   workflow_run_interval: 30
@@ -32,9 +20,3 @@ worker_node:
 
 web:
   sqlalchemy_database_uri: "sqlite://"
-  use_otlp: false
-
-reaper:
-  slack_api_url: "https://slack.com/apis/chat.postMessage"
-  slack_channel_default: "jobmon-alerts"
-  poll_interval_minutes: 5

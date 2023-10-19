@@ -271,7 +271,7 @@ def test_get_workflow_user_validation(db_engine, tool):
     assert msg["validation"] is True
 
 
-def test_get_workflow_run_for_workflow_reset(db_engine, tool, web_server_in_memory):
+def test_get_workflow_run_for_workflow_reset(db_engine, tool):
     t = tool
     wf = t.create_workflow(name="i_am_a_fake_wf")
     tt1 = t.get_task_template(
@@ -301,7 +301,7 @@ def test_get_workflow_run_for_workflow_reset(db_engine, tool, web_server_in_memo
     assert msg["workflow_run_id"] is None
 
 
-def test_reset_workflow(db_engine, tool, web_server_in_memory):
+def test_reset_workflow(db_engine, tool):
     t = tool
     wf = t.create_workflow(name="i_am_a_fake_wf")
     tt1 = t.get_task_template(

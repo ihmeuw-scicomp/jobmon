@@ -11,7 +11,7 @@ from jobmon.core.cluster_protocol import (
 )
 from jobmon.core.cluster_type import ClusterType
 from jobmon.core.exceptions import InvalidResponse
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeCluster, SerializeQueue
 
 
@@ -50,15 +50,9 @@ class Cluster:
     def bind(self) -> None:
         """Bind Cluster to the database, getting an id back."""
         app_route = f"/cluster/{self.cluster_name}"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route, message={}, request_type="get"
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected code "
-                f"200. Response content: {response}"
-            )
         cluster_kwargs = SerializeCluster.kwargs_from_wire(response["cluster"])
 
         self._cluster_id = cluster_kwargs["id"]
@@ -109,15 +103,9 @@ class Cluster:
         except KeyError:
             queue_class = self._cluster_type.cluster_queue_class
             app_route = f"/cluster/{self.id}/queue/{queue_name}"
-            return_code, response = self.requester.send_request(
+            _, response = self.requester.send_request(
                 app_route=app_route, message={}, request_type="get"
             )
-            if http_request_ok(return_code) is False:
-                raise InvalidResponse(
-                    f"Unexpected status code {return_code} from POST "
-                    f"request through route {app_route}. Expected code "
-                    f"200. Response content: {response}"
-                )
             queue_kwargs = SerializeQueue.kwargs_from_wire(response["queue"])
             queue = queue_class(**queue_kwargs)
             self.queues[queue_name] = queue

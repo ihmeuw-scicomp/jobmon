@@ -6,7 +6,7 @@ from typing import List, Set, Tuple, TYPE_CHECKING
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import InvalidResponse
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 
 if TYPE_CHECKING:
     from jobmon.distributor.task_instance_batch import TaskInstanceBatch
@@ -79,7 +79,7 @@ class DistributorTaskInstance:
         """
         self.distributor_id = distributor_id
         app_route = f"/task_instance/{self.task_instance_id}/log_distributor_id"
-        return_code, response = self.requester.send_request(
+        self.requester.send_request(
             app_route=app_route,
             message={
                 "distributor_id": str(distributor_id),
@@ -87,13 +87,6 @@ class DistributorTaskInstance:
             },
             request_type="post",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
-
         self.status = TaskInstanceStatus.LAUNCHED
 
     def transition_to_no_distributor_id(
@@ -107,17 +100,11 @@ class DistributorTaskInstance:
                 id.
         """
         app_route = f"/task_instance/{self.task_instance_id}/log_no_distributor_id"
-        return_code, response = self.requester.send_request(
+        self.requester.send_request(
             app_route=app_route,
             message={"no_id_err_msg": no_id_err_msg},
             request_type="post",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
 
     def _transition_to_error(self, error_message: str, error_state: str) -> None:
         """Transitions the TaskInstance to the specified error state."""
@@ -133,7 +120,7 @@ class DistributorTaskInstance:
         else:
             app_route = f"/task_instance/{self.task_instance_id}/log_known_error"
 
-        return_code, response = self.requester.send_request(
+        self.requester.send_request(
             app_route=app_route,
             message={
                 "error_state": error_state,
@@ -142,13 +129,6 @@ class DistributorTaskInstance:
             },
             request_type="post",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
-
         self.error_state = error_state
 
     def transition_to_unknown_error(

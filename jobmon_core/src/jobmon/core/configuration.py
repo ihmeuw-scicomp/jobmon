@@ -29,7 +29,7 @@ class JobmonConfig:
             self._filepath = filepath
         else:
             self._filepath = os.getenv("JOBMON__CONFIG_FILE", "")
-            
+
         with open(DEFAULTS_FILE, "r", encoding="utf-8") as f:
             self._config = yaml.safe_load(f)
 

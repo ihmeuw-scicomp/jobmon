@@ -6,7 +6,7 @@ from typing import Callable, List, Optional, Tuple
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import WorkflowRunStatus
 from jobmon.core.exceptions import ConfigError, InvalidResponse
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 from jobmon.server import __version__
 from jobmon.server.workflow_reaper.notifiers import SlackNotifier
 from jobmon.server.workflow_reaper.reaper_workflow_run import ReaperWorkflowRun
@@ -121,34 +121,22 @@ class WorkflowReaper(object):
             f"Checking the DB for workflow name and args of WF_ID: {workflow_id}"
         )
         app_route = f"/workflow/{workflow_id}/workflow_name_and_args"
-        return_code, result = self._requester.send_request(
+        _, result = self._requester.send_request(
             app_route=app_route,
             message={"workflow_id": workflow_id},
             request_type="get",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {result}"
-            )
         return result["workflow_name"], result["workflow_args"]
 
     def _get_lost_workflow_runs(self, status: List[str]) -> List[ReaperWorkflowRun]:
         """Return all workflows that are in a specific state."""
         logger.info(f"Checking the database for workflow runs of status: {status}")
         app_route = "/lost_workflow_run"
-        return_code, result = self._requester.send_request(
+        _, result = self._requester.send_request(
             app_route=app_route,
             message={"status": status, "version": self._version},
             request_type="get",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {result}"
-            )
         workflow_runs = []
         for wfr in result["workflow_runs"]:
             workflow_runs.append(ReaperWorkflowRun.from_wire(wfr, self._requester))
@@ -236,15 +224,9 @@ class WorkflowReaper(object):
         app_route = (
             f"/workflow/{WorkflowReaper._current_starting_row}/fix_status_inconsistency"
         )
-        return_code, result = self._requester.send_request(
+        _, result = self._requester.send_request(
             app_route=app_route,
             message={"increase_step": step_size},
             request_type="put",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {result}"
-            )
         WorkflowReaper._current_starting_row = int(result["wfid"])

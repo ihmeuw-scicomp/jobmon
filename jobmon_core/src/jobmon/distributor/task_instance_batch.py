@@ -7,7 +7,7 @@ from typing import Any, Dict, Set, TYPE_CHECKING
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import InvalidResponse
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 
 if TYPE_CHECKING:
     from jobmon.distributor.distributor_task_instance import (
@@ -54,16 +54,9 @@ class TaskInstanceBatch:
 
     def load_requested_resources(self) -> None:
         app_route = f"/task_resources/{self.task_resources_id}"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route, message={}, request_type="post"
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
-
         self._requested_resources: Dict[str, Any] = ast.literal_eval(
             str(response["requested_resources"])
         )
@@ -102,16 +95,10 @@ class TaskInstanceBatch:
             "next_report_increment": next_report_by,
         }
 
-        rc, resp = self.requester.send_request(
+        self.requester.send_request(
             app_route=app_route, message=data, request_type="post"
         )
 
-        if not http_request_ok(rc):
-            raise InvalidResponse(
-                f"Unexpected status code {rc} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {resp}"
-            )
         for ti in self.task_instances:
             ti.status = TaskInstanceStatus.LAUNCHED
 
@@ -119,16 +106,9 @@ class TaskInstanceBatch:
         """Log the distributor ID in the database for all task instances in the batch."""
         app_route = f"/array/{self.array_id}/log_distributor_id"
         data = {ti.task_instance_id: ti.distributor_id for ti in self.task_instances}
-        rc, resp = self.requester.send_request(
+        self.requester.send_request(
             app_route=app_route, message=data, request_type="post"
         )
-
-        if not http_request_ok(rc):
-            raise InvalidResponse(
-                f"Unexpected status code {rc} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {resp}"
-            )
 
     def __hash__(self) -> int:
         """Hash to encompass tool version id, workflow args, tasks and dag."""

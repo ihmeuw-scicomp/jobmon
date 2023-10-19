@@ -13,7 +13,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry import _logs
 from opentelemetry.sdk._logs import LoggerProvider
-from opentelemetry.sdk._logs.export import BatchLogRecordProcessor, SimpleLogRecordProcessor
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 
 
 from jobmon.core import __version__
@@ -154,7 +154,7 @@ class OtlpAPI:
             self._set_exporter(
                 log_kwargs,
                 _logs.get_logger_provider().add_log_record_processor,
-                SimpleLogRecordProcessor,
+                BatchLogRecordProcessor,
             )
 
     def _set_exporter(self, kwargs, add_processor_func, batch_processor):
