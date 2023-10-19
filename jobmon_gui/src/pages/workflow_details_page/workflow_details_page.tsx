@@ -7,6 +7,7 @@ import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
 import { FaLightbulb } from "react-icons/fa";
+import humanizeDuration from 'humanize-duration';
 
 
 // @ts-ignore
@@ -15,7 +16,7 @@ import Tasks from './tasks';
 import Usage from './usage';
 import Errors from './errors';
 import WFHeader from "./wf_header"
-import { convertDatePST, msToTime } from '../../utilities/formatters';
+import { convertDatePST } from '../../utilities/formatters';
 import { init_apm, safe_rum_add_label, safe_rum_transaction } from '../../utilities/rum';
 
 function getAsyncWFdetail(setWFDict, wf_id: string) {
@@ -38,7 +39,18 @@ function getAsyncWFdetail(setWFDict, wf_id: string) {
     return fetchData
 }
 
-function getWorkflowAttributes(wf_id: string, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime) {
+function getWorkflowAttributes(
+    wf_id: string,
+    setWFTool,
+    setWFName,
+    setWFArgs,
+    setWFSubmitted,
+    setWFStatusDate,
+    setWFStatus,
+    setWFStatusDesc,
+    setWFElapsedTime,
+    setJobmonVersion
+) {
     const url = process.env.REACT_APP_BASE_URL + "/workflow_details_viz/" + wf_id;
     const fetchData = async () => {
         const result: any = await axios({
@@ -59,8 +71,8 @@ function getWorkflowAttributes(wf_id: string, setWFTool, setWFName, setWFArgs, s
         setWFStatusDesc(data["wf_status"] + " -- " + data["wf_status_desc"])
         setWFSubmitted(convertDatePST(data["wf_created_date"]));
         setWFStatusDate(convertDatePST(data["wf_status_date"]));
-        const elapsed_time = msToTime(new Date().getTime() - new Date(data["wf_status_date"]).getTime())
-        setWFElapsedTime(`${elapsed_time.d} days ${elapsed_time.h} hours ${elapsed_time.m} minutes ${elapsed_time.s} seconds`);
+        setWFElapsedTime(humanizeDuration(new Date().getTime() - new Date(data["wf_status_date"]).getTime()))
+        setJobmonVersion(data["wfr_jobmon_version"]);
     };
     return fetchData
 }
@@ -134,13 +146,14 @@ function WorkflowDetails({ subpage }) {
     const [wf_submitted_date, setWFSubmitted] = useState([]);
     const [wf_status_date, setWFStatusDate] = useState([]);
     const [wf_elapsed_time, setWFElapsedTime] = useState([])
+    const [jobmon_version, setJobmonVersion] = useState([])
     // only show the loading circle the first time
     const [tt_loaded, setTTLoaded] = useState(false);
 
     //***********************hooks******************************
     useEffect(() => {
         if (typeof params.workflowId !== 'undefined') {
-            getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime)();
+            getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime, setJobmonVersion)();
         }
     }, [params.workflowId]);
     useEffect(() => {
@@ -158,7 +171,7 @@ function WorkflowDetails({ subpage }) {
                     //only query server when wf is unfinised
                     getAsyncWFdetail(setWFDict, params.workflowId)();
                     getAsyncTTdetail(setTTDict, params.workflowId, setTTLoaded)();
-                    getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime)();
+                    getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime, setJobmonVersion)();
                 }
             }
         }, 60000);
@@ -255,6 +268,7 @@ function WorkflowDetails({ subpage }) {
                       wf_submitted_date={wf_submitted_date}
                       wf_status_date={wf_status_date}
                       wf_elapsed_time={wf_elapsed_time}
+                      jobmon_version={jobmon_version}
                  />
             </div>
 

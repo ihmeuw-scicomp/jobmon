@@ -455,6 +455,7 @@ def workflows_by_user_form() -> Any:
     wf_name = arguments.get("wf_name")
     wf_args = arguments.get("wf_args")
     wf_attribute = arguments.get("wf_attribute")
+    wf_id = arguments.get("wf_id")
     date_submitted = arguments.get("date_submitted")
     status = arguments.get("status")
 
@@ -477,6 +478,9 @@ def workflows_by_user_form() -> Any:
         if wf_attribute:
             where_clauses.append("workflow_attribute.value = :wf_attribute")
             substitution_dict["wf_attribute"] = wf_attribute
+        if wf_id:
+            where_clauses.append("workflow.id = :wf_id")
+            substitution_dict["wf_id"] = wf_id
         if date_submitted:
             where_clauses.append("workflow.created_date >= :date_submitted")
             substitution_dict["date_submitted"] = date_submitted
@@ -616,11 +620,13 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
             Tool.name,
             Workflow.status,
             WorkflowStatus.description,
+            WorkflowRun.jobmon_version,
         ).where(
             Workflow.id == workflow_id,
             Workflow.tool_version_id == ToolVersion.id,
             ToolVersion.tool_id == Tool.id,
             WorkflowStatus.id == Workflow.status,
+            WorkflowRun.workflow_id == Workflow.id,
         )
         rows = session.execute(sql).all()
 
@@ -632,6 +638,7 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
         "tool_name",
         "wf_status",
         "wf_status_desc",
+        "wfr_jobmon_version",
     )
 
     result = [dict(zip(column_names, row)) for row in rows]

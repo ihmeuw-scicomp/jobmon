@@ -32,17 +32,3 @@ export const bytes_to_gib = (x) => {
     }
     return x
 }
-
-export const msToTime = (duration: number) => {
-    var days, hours, minutes, seconds, duration_hours, duration_minutes, duration_seconds;
-    duration_seconds = Math.floor(duration / 1000);
-    duration_minutes = Math.floor(duration_seconds / 60);
-    duration_hours = Math.floor(duration_minutes / 60);
-    days = Math.floor(duration_hours / 24);
-
-    seconds = duration_seconds % 60;
-    minutes = duration_minutes % 60;
-    hours = duration_hours % 24;
-
-    return { d: days, h: hours, m: minutes, s: seconds };
-}

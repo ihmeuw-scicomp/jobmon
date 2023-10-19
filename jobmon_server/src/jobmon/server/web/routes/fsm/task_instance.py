@@ -54,6 +54,8 @@ def log_running(task_instance_id: int) -> Any:
                 logger.warning(e)
             elif task_instance.status == constants.TaskInstanceStatus.KILL_SELF:
                 task_instance.transition(constants.TaskInstanceStatus.ERROR_FATAL)
+            elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
+                task_instance.transition(constants.TaskInstanceStatus.ERROR)
             else:
                 # Tried to move to an illegal state
                 logger.error(e)
