@@ -13,7 +13,7 @@ import urllib3
 
 from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
-from jobmon.core.exceptions import InvalidResponse
+from jobmon.core.exceptions import InvalidResponse, InvalidRequest
 
 logger = logging.getLogger(__name__)
 
@@ -102,62 +102,34 @@ class Requester(object):
         if not tenacious:
             return func
 
-        def should_retry(result):
-            """Return True if we should retry the request."""
-            # Handle exceptions
-            if isinstance(result, Exception):
-                exception = result
-                logger.warning(f"Exception occurred: {exception}")
+        def should_retry_exception(exception):
+            """Return True if we should retry on the given exception."""
+            logger.warning(f"Exception occurred: {exception}")
 
-                if isinstance(exception, InvalidResponse):
-                    # This exception is raised for certain client errors, so no retry.
-                    return False
+            # Do not retry for certain client errors.
+            if isinstance(exception, InvalidRequest):
+                return False
 
-                # Retry for other exceptions
-                if isinstance(
-                    exception,
-                    (
-                        TimeoutError,
-                        requests.ConnectionError,
-                        requests.adapters.MaxRetryError,
-                        urllib3.exceptions.NewConnectionError,
-                        urllib3.exceptions.MaxRetryError,
-                    ),
-                ):
-                    return True
-
-            else:  # Handle result status codes
-                status = result[0]
-                is_bad = 499 < status < 600 or status == 423
-                if is_bad:
-                    logger.warning(f"Retrying request due to status code {status}")
-                    return True
-
-            return False
+            # Retry for specific exceptions.
+            return isinstance(
+                exception,
+                (
+                    InvalidResponse,
+                    TimeoutError,
+                    requests.ConnectionError,
+                    requests.adapters.MaxRetryError,
+                    urllib3.exceptions.NewConnectionError,
+                    urllib3.exceptions.MaxRetryError,
+                ),
+            )
 
         def raise_if_exceed_retry(retry_state):
             """If we trigger retry error, raise informative RuntimeError."""
-
             # Check if the retry outcome is an exception
-            if retry_state.outcome.failed:
-                exception = retry_state.outcome.exception()
-                if isinstance(exception, TimeoutError):
-                    raise RuntimeError(
-                        "Exceeded HTTP request retry budget due to a timeout."
-                    )
-                else:
-                    # Handle other exceptions or enhance the message here if needed
-                    raise RuntimeError(
-                        f"Exceeded HTTP request retry budget due to: {exception}"
-                    )
-
-            # If it's not an exception, then handle the regular outcome
-            else:
-                status, content = retry_state.outcome.result()  # type: ignore
-                raise RuntimeError(
-                    f"Exceeded HTTP request retry budget. Status code was {status} "
-                    f"and content was {content}"
-                )
+            exception = retry_state.outcome.exception()
+            raise RuntimeError(
+                f"Exceeded HTTP request retry budget due to: {exception}"
+            ) from exception
 
         retrying = tenacity.retry(
             stop=(
@@ -165,7 +137,7 @@ class Requester(object):
                 | tenacity.stop_after_delay(self.retries_timeout)
             ),
             wait=tenacity.wait_exponential_jitter(initial=1, exp_base=2, jitter=1),
-            retry=tenacity.retry_if_result(should_retry),
+            retry=tenacity.retry_if_exception(should_retry_exception),
             retry_error_callback=raise_if_exceed_retry,
         )(func)
 
@@ -222,12 +194,20 @@ class Requester(object):
 
         status_code, content = get_content(response)
 
-        # Raise exceptions for conditions you're certain you don't want to retry
-        if 400 <= status_code < 500 and status_code != 423:
+        # Raise the InvalidResponse exception based on the logic from should_retry_result
+        if 499 < status_code < 600 or status_code == 423:
             raise InvalidResponse(
+                f"Request failed due to status code {status_code} from {request_type.upper()} "
+                f"request through route {app_route}. Response content: {content}"
+            )
+
+        # Keep the logic for other status codes that might be encountered but aren't in the retry condition.
+        if 400 <= status_code < 500:
+            raise InvalidRequest(
                 f"Client error with status code {status_code} from {request_type.upper()} "
                 f"request through route {app_route}. Response content: {content}"
             )
+
         return status_code, content
 
     def send_request(

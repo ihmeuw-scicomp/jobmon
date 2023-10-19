@@ -14,6 +14,11 @@ class InvalidResponse(Exception):
 
     pass
 
+class InvalidRequest(Exception):
+    """Invalid Request type Exception."""
+
+    pass
+
 
 class RemoteExitInfoNotAvailable(Exception):
     """Exception raised when Exit Info is not available for different executor types."""
