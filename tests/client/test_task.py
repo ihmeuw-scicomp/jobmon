@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from jobmon.client.task import Task
 from jobmon.client.workflow_run import WorkflowRun
 from jobmon.core.constants import WorkflowRunStatus, TaskStatus, TaskInstanceStatus
-from jobmon.core.exceptions import InvalidResponse
+from jobmon.core.exceptions import InvalidRequest, InvalidResponse
 from jobmon.server.web.models import load_model
 from jobmon.server.web.models import task
 from jobmon.server.web.models.task_attribute import TaskAttribute
@@ -309,10 +309,10 @@ def test_binding_length(db_engine, client_env, tool):
     wf = tool.create_workflow()
     wf.add_task(task1)
     wf.bind()
-    with pytest.raises(InvalidResponse) as resp:
+    with pytest.raises(InvalidRequest) as resp:
         wf._bind_tasks()
     exc_msg = resp.value.args[0]
-    assert "Unexpected status code 400" in exc_msg
+    assert "Client error with status code 400" in exc_msg
 
     # task2: super long attributes
     task2 = tt.create_task(
@@ -321,11 +321,11 @@ def test_binding_length(db_engine, client_env, tool):
     wf2 = tool.create_workflow()
     wf2.add_task(task2)
     wf2.bind()
-    with pytest.raises(InvalidResponse) as resp2:
+    with pytest.raises(InvalidRequest) as resp2:
         wf2._bind_tasks()
     exc_msg = resp2.value.args[0]
     assert "Task attributes are constrained to 255 characters" in exc_msg
-    assert "Unexpected status code 400" in exc_msg
+    assert "Client error with status code 400" in exc_msg
 
 
 def test_binding_tasks(db_engine, client_env, tool):

@@ -37,7 +37,7 @@ from jobmon.core.exceptions import (
     WorkflowAlreadyComplete,
     WorkflowAlreadyExists,
 )
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 
 if TYPE_CHECKING:
     from jobmon.client.tool import Tool
@@ -303,17 +303,11 @@ class Workflow(object):
                 this workflow.
         """
         app_route = f"/workflow/{self.workflow_id}/workflow_attributes"
-        return_code, response = self.requester.send_request(
+        self.requester.send_request(
             app_route=app_route,
             message={"workflow_attributes": workflow_attributes},
             request_type="put",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected code "
-                f"200. Response content: {response}"
-            )
 
     def add_task(self, task: Task) -> Task:
         """Add a task to the workflow to be executed.

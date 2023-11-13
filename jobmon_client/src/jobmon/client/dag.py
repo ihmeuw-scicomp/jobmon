@@ -10,7 +10,7 @@ from jobmon.core.exceptions import (
     InvalidResponse,
     NodeDependencyNotExistError,
 )
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 
 logger = logging.getLogger(__name__)
 
@@ -71,17 +71,11 @@ class Dag(object):
         self._bulk_bind_nodes(chunk_size)
 
         dag_hash = hash(self)
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route="/dag",
             message={"dag_hash": dag_hash},
             request_type="post",
         )
-        if http_request_ok(return_code) is False:
-            raise ValueError(
-                f"Unexpected status code {return_code} from POST request through "
-                f"route /dag/{dag_hash}. Expected code 200. Response "
-                f"content: {response}"
-            )
         dag_id = response["dag_id"]
 
         # no created date means bind edges
@@ -141,14 +135,7 @@ class Dag(object):
                 message={"nodes": nodes_to_send},
                 request_type="post",
             )
-            if http_request_ok(rc) is False:
-                raise InvalidResponse(
-                    f"Unexpected status code {rc} from post "
-                    f"request through route /nodes. Expected code "
-                    f"200. Response content: {response}"
-                )
-            else:
-                nodes_received.update(response["nodes"])
+            nodes_received.update(response["nodes"])
             chunk_number += 1
             chunk_boarder = get_chunk(total_nodes, chunk_number)
 
@@ -213,15 +200,9 @@ class Dag(object):
                 message["mark_created"] = True
 
             app_route = f"/dag/{dag_id}/edges"
-            return_code, response = self.requester.send_request(
+            self.requester.send_request(
                 app_route=app_route, message=message, request_type="post"
             )
-            if http_request_ok(return_code) is False:
-                raise ValueError(
-                    f"Unexpected status code {return_code} from POST request "
-                    f"through route {app_route}. Expected code 200. Response "
-                    f"content: {response}"
-                )
 
     def __hash__(self) -> int:
         """Determined by hashing all sorted node hashes and their downstream."""

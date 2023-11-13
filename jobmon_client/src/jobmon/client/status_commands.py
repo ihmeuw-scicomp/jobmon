@@ -16,7 +16,7 @@ from jobmon.core.constants import (
     WorkflowStatus,
 )
 from jobmon.core.exceptions import InvalidResponse, WorkflowRunStateError
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
 
 
@@ -595,18 +595,11 @@ def get_filepaths(
         requester = Requester.from_defaults()
 
     app_route = f"/array/{workflow_id}/get_array_tasks"
-    rc, resp = requester.send_request(
+    _, resp = requester.send_request(
         app_route=app_route,
         message={"array_name": array_name, "job_name": job_name, "limit": limit},
         request_type="get",
     )
-
-    if http_request_ok(rc) is False:
-        raise InvalidResponse(
-            f"Unexpected status code {rc} from POST "
-            f"request through route {app_route}. Expected "
-            f"code 200. Response content: {resp}"
-        )
 
     return resp["array_tasks"]
 

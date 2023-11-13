@@ -245,7 +245,7 @@ class DistributorService:
         self, task_instances: List[DistributorTaskInstance]
     ) -> None:
         app_route = "/task_instance/instantiate_task_instances"
-        return_code, result = self.requester.send_request(
+        _, result = self.requester.send_request(
             app_route=app_route,
             message={
                 "task_instance_ids": [
@@ -254,12 +254,6 @@ class DistributorService:
             },
             request_type="post",
         )
-        if not http_request_ok(return_code):
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {result}"
-            )
 
         # construct batch. associations are made inside batch init
         for batch in result["task_instance_batches"]:
@@ -542,13 +536,9 @@ class DistributorService:
             "status": status,
         }
         app_route = f"/workflow_run/{self.workflow_run.workflow_run_id}/sync_status"
-        return_code, result = self.requester.send_request(
+        _, result = self.requester.send_request(
             app_route=app_route, message=message, request_type="post"
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"{app_route} Returned={return_code}. Message={message}"
-            )
 
         # mutate the statuses and update the status map
         status_updates: Dict[str, List[int]] = result["status_updates"]

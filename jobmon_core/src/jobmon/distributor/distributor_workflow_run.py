@@ -3,8 +3,7 @@ from __future__ import annotations
 import logging
 
 from jobmon.core.constants import WorkflowRunStatus
-from jobmon.core.exceptions import InvalidResponse
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 
 logger = logging.getLogger(__name__)
 
@@ -27,17 +26,11 @@ class DistributorWorkflowRun:
     def _update_status(self, status: str) -> None:
         """Update the status of the workflow_run with whatever status is passed."""
         app_route = f"/workflow_run/{self.workflow_run_id}/update_status"
-        return_code, response = self.requester.send_request(
+        self.requester.send_request(
             app_route=app_route,
             message={"status": status},
             request_type="put",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
         self.status = status
 
     def transition_to_instantiated(self) -> None:

@@ -33,7 +33,7 @@ from jobmon.core.exceptions import (
     TransitionError,
     WorkflowTestError,
 )
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 
 # avoid circular imports on backrefs
 if TYPE_CHECKING:
@@ -748,22 +748,16 @@ class WorkflowRun:
 
     def _set_status_for_triaging(self) -> None:
         app_route = f"/workflow_run/{self.workflow_run_id}/set_status_for_triaging"
-        return_code, response = self.requester.send_request(
+        self.requester.send_request(
             app_route=app_route, message={}, request_type="post"
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
 
     def _log_heartbeat(self) -> None:
         next_report_increment = (
             self._workflow_run_heartbeat_interval * self._heartbeat_report_by_buffer
         )
         app_route = f"/workflow_run/{self.workflow_run_id}/log_heartbeat"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route,
             message={
                 "status": self._status,
@@ -771,29 +765,17 @@ class WorkflowRun:
             },
             request_type="post",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
         self._status = response["status"]
         self._last_heartbeat_time = time.time()
 
     def _update_status(self, status: str) -> None:
         """Update the status of the workflow_run with whatever status is passed."""
         app_route = f"/workflow_run/{self.workflow_run_id}/update_status"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route,
             message={"status": status},
             request_type="put",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
         self._status = response["status"]
         if self.status != status:
             raise TransitionError(
@@ -804,15 +786,9 @@ class WorkflowRun:
     def _terminate_task_instances(self) -> None:
         """Terminate the workflow run."""
         app_route = f"/workflow_run/{self.workflow_run_id}/terminate_task_instances"
-        return_code, response = self.requester.send_request(
+        self.requester.send_request(
             app_route=app_route, message={}, request_type="put"
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
         self._terminated = True
 
     def _set_fail_after_n_executions(self, n: int) -> None:
@@ -828,16 +804,9 @@ class WorkflowRun:
 
     def _get_current_time(self) -> datetime:
         app_route = "/time"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route, message={}, request_type="get"
         )
-
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
         return response["time"]
 
     def _task_status_updates(self, full_sync: bool = False) -> None:
@@ -851,17 +820,11 @@ class WorkflowRun:
             message = {"last_sync": str(self.last_sync)}
 
         app_route = f"/workflow/{self.workflow_id}/task_status_updates"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route,
             message=message,
             request_type="post",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
         self.last_sync = response["time"]
 
         new_status_tasks: Set[SwarmTask] = set()
@@ -876,16 +839,9 @@ class WorkflowRun:
 
     def _synchronize_max_concurrently_running(self) -> None:
         app_route = f"/workflow/{self.workflow_id}/get_max_concurrently_running"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route, message={}, request_type="get"
         )
-
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from GET "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
         self.max_concurrently_running = response["max_concurrently_running"]
 
     def queue_task_batch(self, tasks: List[SwarmTask]) -> None:
@@ -895,7 +851,7 @@ class WorkflowRun:
             task_resources.bind()
 
         app_route = f"/array/{first_task.array_id}/queue_task_batch"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route,
             message={
                 "task_ids": [task.task_id for task in tasks],
@@ -905,12 +861,6 @@ class WorkflowRun:
             },
             request_type="post",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
         updated_tasks = set()
         for status, task_ids in response["tasks_by_status"].items():
             for task_id in task_ids:

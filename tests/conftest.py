@@ -59,7 +59,7 @@ class WebServerProcess:
             init_db(create_engine(database_uri))
 
             config = JobmonConfig(
-                dict_config={"db": {"sqlalchemy_database_uri": database_uri}}
+                dict_config={"web": {"sqlalchemy_database_uri": database_uri}}
             )
             configure_logging(
                 loggers_dict={
@@ -163,67 +163,7 @@ def client_env(web_server_process, monkeypatch):
 
 @pytest.fixture(scope="function")
 def requester_no_retry(client_env):
-    return Requester(client_env, max_retries=0)
-
-
-@pytest.fixture(scope="function")
-def web_server_in_memory(sqlite_file, monkeypatch):
-    """This sets up the JSM/JQS using the test_client which is a
-    fake server
-    """
-    from jobmon.server.web.app_factory import AppFactory
-
-    # The create_app call sets up database connections
-    monkeypatch.setenv(
-        "JOBMON__FLASK__SQLALCHEMY_DATABASE_URI", f"sqlite:///{sqlite_file}"
-    )
-    app_factory = AppFactory()
-    app = app_factory.get_app()
-    app.config["TESTING"] = True
-    with app.app_context():
-        client = app.test_client()
-        yield client, app_factory.engine
-
-
-def get_test_content(response):
-    """The function called by the no_request_jsm_jqs to query the fake
-    test_client for a response
-    """
-    if "application/json" in response.headers.get("Content-Type"):
-        content = response.json
-    elif "text/html" in response.headers.get("Content-Type"):
-        content = response.data
-    else:
-        content = response.content
-    return response.status_code, content
-
-
-@pytest.fixture(scope="function")
-def requester_in_memory(monkeypatch, web_server_in_memory):
-    """This function monkeypatches the requests library to use the
-    test_client
-    """
-
-    monkeypatch.setenv("JOBMON__HTTP__SERVICE_URL", "1")
-
-    app, engine = web_server_in_memory
-
-    def get_in_mem(url, params, data, headers, timeout):
-        url = "/" + url.split(":")[-1].split("/", 1)[1]
-        return app.get(path=url, query_string=params, data=data, headers=headers, timeout=timeout)
-
-    def post_in_mem(url, params, json, headers, timeout):
-        url = "/" + url.split(":")[-1].split("/", 1)[1]
-        return app.post(url, query_string=params, json=json, headers=headers, timeout=timeout)
-
-    def put_in_mem(url, params, json, headers, timeout):
-        url = "/" + url.split(":")[-1].split("/", 1)[1]
-        return app.put(url, query_string=params, json=json, headers=headers, timeout=timeout)
-
-    monkeypatch.setattr(requests, "get", get_in_mem)
-    monkeypatch.setattr(requests, "post", post_in_mem)
-    monkeypatch.setattr(requests, "put", put_in_mem)
-    monkeypatch.setattr(requester, "get_content", get_test_content)
+    return Requester(client_env, retries_timeout=0)
 
 
 def get_task_template(tool, template_name):
