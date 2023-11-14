@@ -118,6 +118,7 @@ class Requester(object):
                     TimeoutError,
                     requests.ConnectionError,
                     requests.adapters.MaxRetryError,
+                    requests.exceptions.ReadTimeout,
                     urllib3.exceptions.NewConnectionError,
                     urllib3.exceptions.MaxRetryError,
                 ),
