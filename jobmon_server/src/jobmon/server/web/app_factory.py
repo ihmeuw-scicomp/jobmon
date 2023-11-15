@@ -42,7 +42,7 @@ class AppFactory:
         config = JobmonConfig()
         return cls(
             config.get("web", "sqlalchemy_database_uri"),
-            config.get_boolean("oltp", "web_enabled"),
+            config.get_boolean("otlp", "web_enabled"),
         )
 
     @classmethod
