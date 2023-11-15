@@ -66,7 +66,7 @@ class Requester(object):
         request_timeout = config.get_int("http", "request_timeout")
         retries_timeout = config.get_int("http", "retries_timeout")
         retries_attempts = config.get_int("http", "retries_attempts")
-        use_otlp = config.get_boolean("oltp", "http_enabled")
+        use_otlp = config.get_boolean("otlp", "http_enabled")
         return cls(
             service_url, request_timeout, retries_timeout, retries_attempts, use_otlp
         )
