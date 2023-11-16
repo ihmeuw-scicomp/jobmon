@@ -30,6 +30,7 @@ jobmon_server = "jobmon.server.cli:main"
 
 [project.optional-dependencies]
 otlp = [
+    'jobmon_core[otlp]',
     'opentelemetry-instrumentation-flask',
     'opentelemetry-instrumentation-sqlalchemy',
 ]
