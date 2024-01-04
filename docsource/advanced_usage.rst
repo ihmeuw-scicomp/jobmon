@@ -237,7 +237,7 @@ any tasks that are already Done. It will restart jobs that were in Error (maybe 
 that bug!) or are Registered. As always it only starts a job when all its upstreams are Done.
 In other words, it starts from first failure. Jobmon creates a new workflow run for an existing workflow.
 
-There are two ways to resume a Woerkflow –by ID or be recreting the workflow with the same workflow args.
+There are two ways to resume a Workflow – by ID or be recreating the workflow with the same workflow args.
 
 To resume by ID, you can either use the CLI function:
 ``jobmon workflow_resume -w <workflow_id> -c <cluster_name``
@@ -247,6 +247,10 @@ or the following code fragment::
     resume_factory.set_workflow_resume()
     resume_factory.reset_task_statuses()
     resume_wfr = resume_factory.create_workflow_run()
+
+Important caveat: if resuming a workflow by ID, you will not have the ability to change certain parameters that have been
+bound to the database, such as the workflow attributes or the compute resources. To run a workflow with updated resources,
+use the other resume path (recreate the workflow with the same workflow args). 
 
 To resume a Workflow programmatically, make sure that your previous workflow
 run process is dead (kill it using the Slurm scancel command).

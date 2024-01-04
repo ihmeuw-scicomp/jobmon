@@ -183,6 +183,9 @@ If cluster name is set on multiple Jobmon objects,
 Jobmon will use the standard hierarchy precedence:
 *Task -> TaskTemplate -> Workflow -> Tool.*
 
+Due to the order of operations in binding objects, cluster name *must* be set on the tool - otherwise, you may get an
+exception like this back: ```jobmon.core.exceptions.InvalidResponse: Unexpected status code 404 from POST request through route /cluster.```
+
 .. _jobmon-task-attribute-label:
 
 TaskAttribute
@@ -259,6 +262,10 @@ keyword argument "yaml_file" in the "get_task_template()" method.
 
 Users can specify the YAML file on a Tool by passing the file path to the YAML to the
 keyword argument "yaml_file" in the "set_default_compute_resources_from_yaml" method.
+
+If creating resources from a yaml file, note that resources
+for all task templates (by name) must be specified in the YAML file. It is not possible to specify resources
+for only a subset of task templates, default resources will not be used and an error will be raised instead.
 
 Default Resources
 *****************
