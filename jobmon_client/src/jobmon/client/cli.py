@@ -224,6 +224,7 @@ class ClientCLI(CLI):
             workflow_id=args.workflow_id,
             cluster_name=args.cluster_name,
             reset_if_running=args.reset_running_jobs,
+            timeout=args.timeout,
         )
 
     @staticmethod
@@ -592,6 +593,13 @@ class ClientCLI(CLI):
             help="whether to reset running jobs or not",
             required=False,
             action="store_true",
+        )
+        workflow_resume_parser.add_argument(
+            "-t",
+            "--timeout",
+            help="timeout for resume command",
+            required=False,
+            default=180,
         )
 
 
