@@ -16,13 +16,13 @@ The Jobmon Domain objects are split between the deployment units. For example, t
 Most of the network plumbing is provided by Flask and the tiangolo image. That image includes:
 
 - NGINX
-- uWSGI
+- gunicorn
 - Python 3.8
 - Flask
 
-For HTTP requests to the server, the client and worker_node both use the class jobmon.requestor
-The requestor uses the Python tenacity package for automatic retries to smooth over transient networking and
-load issues. The requestor distinguishes between 5xx errors (server errors) and 423 errors (retryable transactions).
+For HTTP requests to the server, the client and worker_node both use the class jobmon.core.requester
+The requester uses the Python tenacity package for automatic retries to smooth over transient networking and
+load issues. The requester distinguishes between 5xx errors (server errors) and 423 errors (retryable transactions).
 The latter can be caused by race conditions that were detected and raised by the database as deliberate design.
 
 Config
@@ -35,7 +35,7 @@ Jobmon takes configuration from four places, in order of priority:
 #. Values set in configuration files
 #. Default values in code
 
-This logic is handled by the jobmon.configuration.JobmonConfig class
+This logic is handled by the jobmon.core.configuration.JobmonConfig class
 
 
 Repositories

@@ -1,4 +1,6 @@
-from jobmon.client import tool
+from jobmon.client.api import Tool
+
+tool = Tool(tool_name='my_example_tool')
 
 example_task_template = tool.get_task_template(
     template_name="my_example_task_template",
