@@ -1,4 +1,5 @@
 """ClusterType table in the database."""
+
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import relationship, Session
 

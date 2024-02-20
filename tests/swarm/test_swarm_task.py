@@ -86,7 +86,9 @@ def test_swarmtask_resources_integration(scales, tool, task_template, db_engine)
 
 
 @pytest.mark.parametrize("scales", [None, {}])
-def test_swarmtask_resources_integration_no_scales(scales, tool, task_template, db_engine):
+def test_swarmtask_resources_integration_no_scales(
+    scales, tool, task_template, db_engine
+):
     """Check that empty resource_scales are a no-op."""
 
     workflow = tool.create_workflow(default_cluster_name="multiprocess")

@@ -1,4 +1,5 @@
 """Queue Table in the Database."""
+
 from sqlalchemy import Column, ForeignKey, Integer, select, String, UniqueConstraint
 from sqlalchemy.orm import relationship, Session
 

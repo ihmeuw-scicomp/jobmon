@@ -1,4 +1,5 @@
 """Task Attribute Type table."""
+
 from typing import Any, Dict
 
 from sqlalchemy import Column, Integer, String

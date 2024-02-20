@@ -1,4 +1,5 @@
 """SQLAlchemy database objects."""
+
 from importlib import import_module
 from pathlib import Path
 from pkgutil import iter_modules

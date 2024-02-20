@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from importlib import import_module
-from typing import List, Optional
+from typing import List, Optional, Type
 
 from flask import Flask
 import sqlalchemy
@@ -11,6 +13,7 @@ from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 
 class AppFactory:
     """Factory for creating Flask apps."""
+
     # Class-level attributes for OTLP and SQLAlchemy instrumentation
     otlp_api = None
     _structlog_configured = False
@@ -19,7 +22,7 @@ class AppFactory:
         self, sqlalchemy_database_uri: str = "", use_otlp: bool = False
     ) -> None:
         """Initialize the AppFactory object with the SQLAlchemy database URI.
-        
+
         Args:
             sqlalchemy_database_uri: The SQLAlchemy database URI.
             use_otlp: Whether to use OTLP instrumentation.
@@ -37,7 +40,7 @@ class AppFactory:
         session_factory.configure(bind=self.engine)
 
     @classmethod
-    def from_defaults(cls) -> "AppFactory":
+    def from_defaults(cls: Type[AppFactory]) -> AppFactory:
         """Create an AppFactory from the default configuration."""
         config = JobmonConfig()
         return cls(
@@ -46,26 +49,27 @@ class AppFactory:
         )
 
     @classmethod
-    def _init_otlp(cls) -> None:
+    def _init_otlp(cls: Type[AppFactory]) -> None:
         from jobmon.core.otlp import OtlpAPI
 
         cls.otlp_api = OtlpAPI()
         cls.otlp_api.instrument_sqlalchemy()
 
     @classmethod
-    def _init_logging(cls) -> None:
+    def _init_logging(cls: Type[AppFactory]) -> None:
         from jobmon.server.web.log_config import configure_structlog
 
         extra_processors = []
         if cls.otlp_api:
-            def add_open_telemetry_spans(_, __, event_dict):
+
+            def add_open_telemetry_spans(_: any, __: any, event_dict: dict) -> dict:
                 """Add OpenTelemetry spans to the log record."""
                 span, trace, parent_span = cls.otlp_api.get_span_details()
 
                 event_dict["span"] = {
                     "span_id": span or None,
                     "trace_id": trace or None,
-                    "parent_span_id": parent_span or None
+                    "parent_span_id": parent_span or None,
                 }
                 return event_dict
 
@@ -77,7 +81,7 @@ class AppFactory:
         self, blueprints: Optional[List[str]] = None, url_prefix: str = "/"
     ) -> Flask:
         """Create and configure the Flask app.
-        
+
         Args:
             blueprints: The blueprints to register with the app.
             url_prefix: The URL prefix for the app.

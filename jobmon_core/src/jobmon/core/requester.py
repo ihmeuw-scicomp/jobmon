@@ -1,11 +1,12 @@
 """Requester object to make HTTP requests to the Jobmon Flask services."""
+
 from __future__ import annotations
 
 import contextlib
 import functools
 import json
 import logging
-from typing import Any, Dict, Tuple, Type
+from typing import Any, Callable, Dict, Tuple, Type
 
 import requests
 import tenacity
@@ -13,7 +14,7 @@ import urllib3
 
 from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
-from jobmon.core.exceptions import InvalidResponse, InvalidRequest
+from jobmon.core.exceptions import InvalidRequest, InvalidResponse
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,7 @@ class Requester(object):
         self.server_structlog_context: Dict[str, str] = {}
 
     @classmethod
-    def _init_otlp(cls) -> None:
+    def _init_otlp(cls: Type[Requester]) -> None:
         from jobmon.core.otlp import OtlpAPI
 
         # setup connections to backend
@@ -77,7 +78,7 @@ class Requester(object):
             self.server_structlog_context[key] = value
 
     @contextlib.contextmanager
-    def tracing_span(self, app_route, request_type):
+    def tracing_span(self, app_route: str, request_type: str) -> Any:
         if self._otlp_api:
             tracer = self._otlp_api.get_tracer("requester")
             with tracer.start_as_current_span("send_request") as span:
@@ -87,9 +88,9 @@ class Requester(object):
         else:
             yield None
 
-    def _maybe_trace(self, func):
+    def _maybe_trace(self, func: Callable) -> Callable:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Callable:
             with self.tracing_span(
                 kwargs.get("app_route", "UNKNOWN"),
                 kwargs.get("request_type", "UNKNOWN"),
@@ -98,11 +99,11 @@ class Requester(object):
 
         return wrapper
 
-    def _maybe_retry(self, func, tenacious):
+    def _maybe_retry(self, func: Callable, tenacious: bool) -> Any:
         if not tenacious:
             return func
 
-        def should_retry_exception(exception):
+        def should_retry_exception(exception: Any) -> Any:
             """Return True if we should retry on the given exception."""
             logger.warning(f"Exception occurred: {exception}")
 
@@ -124,7 +125,7 @@ class Requester(object):
                 ),
             )
 
-        def raise_if_exceed_retry(retry_state):
+        def raise_if_exceed_retry(retry_state: tenacity.RetryCallState) -> Any:
             """If we trigger retry error, raise informative RuntimeError."""
             # Check if the retry outcome is an exception
             exception = retry_state.outcome.exception()
@@ -202,7 +203,8 @@ class Requester(object):
                 f"request through route {app_route}. Response content: {content}"
             )
 
-        # Keep the logic for other status codes that might be encountered but aren't in the retry condition.
+        # Keep the logic for other status codes that might be encountered but
+        # aren't in the retry condition.
         if 400 <= status_code < 500:
             raise InvalidRequest(
                 f"Client error with status code {status_code} from {request_type.upper()} "
@@ -216,7 +218,9 @@ class Requester(object):
     ) -> Tuple[int, Any]:
         """Send a request to the Jobmon server."""
 
-        def send_fn(app_route, message, request_type):
+        def send_fn(
+            app_route: str, message: dict, request_type: str
+        ) -> Tuple[int, Any]:
             return self._send_request(app_route, message, request_type)
 
         send_method = self._maybe_retry(send_fn, tenacious)

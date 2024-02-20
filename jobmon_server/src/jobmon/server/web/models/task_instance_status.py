@@ -1,4 +1,5 @@
 """Task Instance Status Table."""
+
 from sqlalchemy import Column, String
 from sqlalchemy.orm import Session
 
@@ -99,7 +100,7 @@ def add_task_instance_statuses(session: Session) -> None:
             label="NO_HEARTBEAT",
             description="Task instance never logged a heartbeat in launched state. "
             "Either the distributor failed to log a heartbeat or the worker node failed "
-            "to start up."
+            "to start up.",
         ),
         TaskInstanceStatus(
             id="Z",

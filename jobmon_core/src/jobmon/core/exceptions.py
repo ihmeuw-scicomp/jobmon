@@ -14,6 +14,7 @@ class InvalidResponse(Exception):
 
     pass
 
+
 class InvalidRequest(Exception):
     """Invalid Request type Exception."""
 

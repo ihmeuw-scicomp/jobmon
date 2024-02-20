@@ -1,11 +1,11 @@
 """Task Instance object from the distributor's perspective."""
+
 from __future__ import annotations
 
 import logging
 from typing import List, Set, Tuple, TYPE_CHECKING
 
 from jobmon.core.constants import TaskInstanceStatus
-from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 
 if TYPE_CHECKING:

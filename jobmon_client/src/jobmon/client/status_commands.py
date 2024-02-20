@@ -1,4 +1,5 @@
 """Commands to check for workflow and task status (from CLI)."""
+
 import getpass
 import logging
 from typing import Any, Dict, List, Optional, Union
@@ -15,7 +16,7 @@ from jobmon.core.constants import (
     WorkflowRunStatus,
     WorkflowStatus,
 )
-from jobmon.core.exceptions import InvalidResponse, WorkflowRunStateError
+from jobmon.core.exceptions import WorkflowRunStateError
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
 
@@ -635,7 +636,9 @@ def resume_workflow_from_id(
     swarm.from_workflow_id(workflow_id)
 
     with DistributorContext(
-        workflow_run_id=new_wfr.workflow_run_id, cluster_name=cluster_name, timeout=timeout
+        workflow_run_id=new_wfr.workflow_run_id,
+        cluster_name=cluster_name,
+        timeout=timeout,
     ) as distributor:
         swarm.run(distributor_alive_callable=distributor.alive)
 

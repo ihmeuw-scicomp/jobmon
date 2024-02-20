@@ -1,19 +1,21 @@
+from __future__ import annotations
+
 import getpass
 import logging
 import os
 import socket
 import sys
-from typing import List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple, Type
 
 from flask import Flask
-from opentelemetry import trace
-from opentelemetry.trace import Status, StatusCode, Tracer
-from opentelemetry.sdk import resources
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry import _logs
+from opentelemetry import trace
+from opentelemetry.sdk import resources
 from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace import Tracer
 
 
 from jobmon.core import __version__
@@ -21,9 +23,7 @@ from jobmon.core.configuration import JobmonConfig
 
 
 def get_resource(raise_on_error: bool) -> resources.Resource:
-    """
-    Gather data on the currently running process to define an opentelemetry
-    Resource.
+    """Gather data on the currently running process to define an opentelemetry resource.
 
     Args:
         raise_on_error: if True, will raise if an exception is encountered
@@ -94,7 +94,9 @@ class OtlpAPI:
         "formatters": {
             "otel_jobmon": {
                 "class": "jobmon.core.otlp.OpenTelemetryLogFormatter",
-                "format": "%(asctime)s [%(levelname)s] [trace_id=%(trace_id)s, span_id=%(span_id)s, parent_span_id=%(parent_span_id)s] - %(message)s",
+                "format": "%(asctime)s [%(levelname)s] [trace_id=%(trace_id)s,"
+                " span_id=%(span_id)s, parent_span_id=%(parent_span_id)s]"
+                " - %(message)s",
             }
         },
         "handlers": {
@@ -105,7 +107,7 @@ class OtlpAPI:
         },
     }
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls: Type[OtlpAPI], *args: Any, **kwargs: Any) -> OtlpAPI:
         if not cls._instance:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -122,7 +124,9 @@ class OtlpAPI:
 
         OtlpAPI._initialized = True
 
-    def _configure_resources(self, extra_detectors):
+    def _configure_resources(
+        self, extra_detectors: List[resources.ResourceDetector]
+    ) -> None:
         self._detectors = [
             _ProcessResourceDetector(),
             _HostResourceDetector(),
@@ -136,7 +140,7 @@ class OtlpAPI:
         trace.set_tracer_provider(TracerProvider(resource=resource_group))
         _logs.set_logger_provider(LoggerProvider(resource=resource_group))
 
-    def _configure_providers(self):
+    def _configure_providers(self) -> None:
         config = JobmonConfig()
 
         span_exporter = config.get("otlp", "span_exporter")
@@ -157,7 +161,9 @@ class OtlpAPI:
                 BatchLogRecordProcessor,
             )
 
-    def _set_exporter(self, kwargs, add_processor_func, batch_processor):
+    def _set_exporter(
+        self, kwargs: Any, add_processor_func: Callable, batch_processor: Any
+    ) -> None:
         module_name = kwargs["module"]
         class_name = kwargs["class"]
         module = __import__(module_name, fromlist=[class_name])
@@ -170,7 +176,7 @@ class OtlpAPI:
         add_processor_func(processor)
 
     @classmethod
-    def instrument_sqlalchemy(cls):
+    def instrument_sqlalchemy(cls: Type[OtlpAPI]) -> None:
         """Instrument SQLAlchemy."""
         if not cls._sqlalchemy_instrumented:
             from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
@@ -179,14 +185,14 @@ class OtlpAPI:
             cls._sqlalchemy_instrumented = True
 
     @classmethod
-    def instrument_app(cls, app: Flask):
+    def instrument_app(cls: Type[OtlpAPI], app: Flask) -> None:
         """Instrument Flask app."""
         from opentelemetry.instrumentation.flask import FlaskInstrumentor
 
         FlaskInstrumentor().instrument_app(app)
 
     @classmethod
-    def instrument_requests(cls):
+    def instrument_requests(cls: Type[OtlpAPI]) -> None:
         """Instrument requests."""
         if not cls._requests_instrumented:
             from opentelemetry.instrumentation.requests import RequestsInstrumentor
@@ -202,7 +208,7 @@ class OtlpAPI:
         """Get the logger provider."""
         return _logs.get_logger_provider()
 
-    def correlate_logger(self, logger_name: str, level=logging.INFO):
+    def correlate_logger(self, logger_name: str, level: int = logging.INFO) -> None:
         """Correlate a logger with the current span."""
         log_config = self._log_config.copy()
         log_config.update(
@@ -243,7 +249,7 @@ class OtlpAPI:
 class OpenTelemetryLogFormatter(logging.Formatter):
     """Formatter that adds OpenTelemetry spans to log records."""
 
-    def format(self, record):
+    def format(self, record: Any) -> Any:
         span_id, trace_id, parent_span_id = OtlpAPI.get_span_details()
         record.span_id = span_id
         record.trace_id = trace_id

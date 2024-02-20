@@ -1,11 +1,12 @@
 """Routes for TaskInstances."""
+
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, DefaultDict, Dict, List, Optional, Union
+from typing import Any, cast, DefaultDict, Dict, Optional
 
 from flask import jsonify, request
 import sqlalchemy
-from sqlalchemy import select, update, and_
+from sqlalchemy import and_, select, update
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 import structlog
@@ -450,7 +451,6 @@ def instantiate_task_instances() -> Any:
 
     session = SessionLocal()
     with session.begin():
-
         # update the task table where FSM allows it
         sub_query = (
             select(Task.id)
@@ -461,7 +461,7 @@ def instantiate_task_instances() -> Any:
                     Task.status == constants.TaskStatus.QUEUED,
                 )
             )
-        ).alias('derived_table')
+        ).alias("derived_table")
         task_update = (
             update(Task)
             .where(Task.id.in_(select(sub_query.c.id)))
@@ -482,7 +482,7 @@ def instantiate_task_instances() -> Any:
                     TaskInstance.id.in_(task_instance_ids_list),
                 )
             )
-        ).alias('derived_table')
+        ).alias("derived_table")
         task_instance_update = (
             update(TaskInstance)
             .where(TaskInstance.id.in_(select(sub_query.c.id)))
@@ -505,8 +505,7 @@ def instantiate_task_instances() -> Any:
                 TaskInstance.array_batch_num,
                 TaskInstance.task_resources_id,
                 TaskInstance.id,
-            )
-            .where(
+            ).where(
                 TaskInstance.id.in_(task_instance_ids_list)
                 & (TaskInstance.status == constants.TaskInstanceStatus.INSTANTIATED)
                 & (TaskInstance.array_id == Array.id)
@@ -515,8 +514,13 @@ def instantiate_task_instances() -> Any:
         )
 
         # Collect the rows into the defaultdict
-        for array_id, array_name, array_batch_num, task_resources_id, task_instance_id \
-                in session.execute(instantiated_batches_query):
+        for (
+            array_id,
+            array_name,
+            array_batch_num,
+            task_resources_id,
+            task_instance_id,
+        ) in session.execute(instantiated_batches_query):
             key = (array_id, array_batch_num, array_name, task_resources_id)
             grouped_data[key].append(int(task_instance_id))
 

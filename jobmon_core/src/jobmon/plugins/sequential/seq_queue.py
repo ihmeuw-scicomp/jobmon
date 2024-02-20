@@ -1,4 +1,5 @@
 """The client for the Sequential Executor."""
+
 from typing import Dict, List, Tuple, Union
 
 from jobmon.core.cluster_protocol import ClusterQueue

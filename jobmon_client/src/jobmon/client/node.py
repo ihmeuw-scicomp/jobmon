@@ -1,4 +1,5 @@
 """A node represents an individual task within a DAG."""
+
 from __future__ import annotations
 
 import hashlib

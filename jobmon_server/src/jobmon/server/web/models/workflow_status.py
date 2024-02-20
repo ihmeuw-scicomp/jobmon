@@ -1,4 +1,5 @@
 """Workflow status database table."""
+
 from sqlalchemy import Column, String
 from sqlalchemy.orm import Session
 

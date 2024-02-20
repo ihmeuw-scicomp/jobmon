@@ -1,4 +1,5 @@
 """Command line interface for Execution."""
+
 import argparse
 from typing import Optional
 

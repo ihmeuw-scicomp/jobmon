@@ -2,6 +2,7 @@
 
 TaskInstances will be created from it for every execution.
 """
+
 from __future__ import annotations
 
 import hashlib

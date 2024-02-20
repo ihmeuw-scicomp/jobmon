@@ -1,11 +1,12 @@
 """Routes for Tasks."""
+
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
 from flask import jsonify, request
 import sqlalchemy
 from sqlalchemy import select
-from sqlalchemy.exc import OperationalError, IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 import structlog
 
@@ -91,7 +92,7 @@ def _add_or_get_arg(name: str, session: Session) -> Arg:
                 arg = session.execute(select_stmt).scalars().one()
                 break  # Successfully retrieved, break the loop
         except OperationalError as e:
-            if 'Deadlock' in str(e):
+            if "Deadlock" in str(e):
                 retries += 1
                 continue  # Deadlock detected, retrying
             else:

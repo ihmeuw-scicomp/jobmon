@@ -1,4 +1,5 @@
 """Routes for Tasks."""
+
 from http import HTTPStatus as StatusCodes
 import json
 from typing import Any, cast, Dict, List, Set, Union
@@ -56,9 +57,9 @@ def bind_tasks_no_args() -> Any:
         prebound_tasks = session.execute(task_select_stmt).scalars().all()
 
         # Bind tasks not present in DB
-        tasks_to_add: List[
-            Dict
-        ] = []  # Container for tasks not yet bound to the database
+        tasks_to_add: List[Dict] = (
+            []
+        )  # Container for tasks not yet bound to the database
         present_tasks = {
             (task.node_id, task.task_args_hash): task for task in prebound_tasks
         }  # Dictionary mapping existing Tasks to the supplied arguments

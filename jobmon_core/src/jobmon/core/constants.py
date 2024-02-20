@@ -1,4 +1,5 @@
 """Constants declared for different statuses, types and codes throughout Jobmon."""
+
 from enum import Enum
 
 

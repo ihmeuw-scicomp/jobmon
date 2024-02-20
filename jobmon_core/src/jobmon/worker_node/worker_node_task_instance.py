@@ -13,7 +13,7 @@ from typing import Dict, Optional, TextIO
 from jobmon.core.cluster_protocol import ClusterWorkerNode
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus
-from jobmon.core.exceptions import InvalidResponse, ReturnCodes, TransitionError
+from jobmon.core.exceptions import ReturnCodes, TransitionError
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeTaskInstance
 

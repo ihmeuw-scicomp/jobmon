@@ -1,4 +1,5 @@
 """Task Template database table."""
+
 from sqlalchemy import Column, ForeignKey, Integer, UniqueConstraint, VARCHAR
 from sqlalchemy.orm import relationship
 

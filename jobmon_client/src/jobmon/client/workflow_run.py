@@ -1,4 +1,5 @@
 """The workflow run is an instance of a workflow."""
+
 from __future__ import annotations
 
 import getpass
@@ -8,7 +9,7 @@ from typing import Optional
 
 from jobmon.client import __version__
 from jobmon.core.configuration import JobmonConfig
-from jobmon.core.exceptions import InvalidResponse, WorkflowNotResumable
+from jobmon.core.exceptions import WorkflowNotResumable
 from jobmon.core.requester import Requester
 
 

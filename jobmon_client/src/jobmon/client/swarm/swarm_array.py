@@ -1,4 +1,5 @@
 """Array object used by swarm to create task instance batches."""
+
 from __future__ import annotations
 
 import logging

@@ -1,4 +1,5 @@
 """DAG Database Table."""
+
 from sqlalchemy import Column, DateTime, Integer, VARCHAR
 from sqlalchemy.orm import relationship
 

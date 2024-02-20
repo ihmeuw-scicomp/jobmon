@@ -20,6 +20,7 @@ from typing import (
 )
 
 import aiohttp
+
 from jobmon.core import __version__
 from jobmon.core.cluster_protocol import ClusterDistributor
 from jobmon.core.configuration import JobmonConfig
@@ -143,7 +144,7 @@ class DistributorService:
                 TaskInstanceStatus.RUNNING,
                 TaskInstanceStatus.TRIAGING,
                 TaskInstanceStatus.KILL_SELF,
-                TaskInstanceStatus.NO_HEARTBEAT
+                TaskInstanceStatus.NO_HEARTBEAT,
             ]
             while True:
                 # loop through all statuses and do as much work as we can till the heartbeat
@@ -275,9 +276,9 @@ class DistributorService:
                     task_resources_id=task_instance_batch_kwargs["task_resources_id"],
                     requester=self.requester,
                 )
-                self._task_instance_batches[
-                    (array_id, batch_number)
-                ] = task_instance_batch
+                self._task_instance_batches[(array_id, batch_number)] = (
+                    task_instance_batch
+                )
 
             for task_instance_id in task_instance_batch_kwargs["task_instance_ids"]:
                 task_instance = self._task_instances[task_instance_id]
@@ -384,8 +385,7 @@ class DistributorService:
             )
 
     def triage_error(self, task_instance: DistributorTaskInstance) -> None:
-        """
-        Triage a running task instance that has missed a heartbeat.
+        """Triage a running task instance that has missed a heartbeat.
 
         Allowed transitions are (R, U, Z, F)
         """
@@ -395,8 +395,7 @@ class DistributorService:
         task_instance.transition_to_error(r_msg, r_value)
 
     def kill_self(self, task_instance: DistributorTaskInstance) -> None:
-        """
-        Terminate a task instance that has received a Kill Self signal.
+        """Terminate a task instance that has received a Kill Self signal.
 
         This signal is sent from a cold workflow resume, and transitions the task instance
         to an ERROR_FATAL state with no retries.
@@ -407,8 +406,7 @@ class DistributorService:
         )
 
     def no_heartbeat_error(self, task_instance: DistributorTaskInstance) -> None:
-        """
-        Move a task instance in NO_HEARTBEAT state to a recoverable error state.
+        """Move a task instance in NO_HEARTBEAT state to a recoverable error state.
 
         This signal is sent from the swarm in the event a task instance in LAUNCHED state
         fails to log a heartbeat, either due to the distributor failing to log a heartbeat
@@ -441,7 +439,7 @@ class DistributorService:
             # Create batches of task instance IDs
             chunk_size = 500
             task_instance_batches = [
-                task_instance_ids_to_heartbeat[i:i + chunk_size]
+                task_instance_ids_to_heartbeat[i : i + chunk_size]
                 for i in range(0, len(task_instance_ids_to_heartbeat), chunk_size)
             ]
 
@@ -450,15 +448,11 @@ class DistributorService:
 
         self._last_heartbeat_time = time.time()
 
-    async def _log_heartbeats(
-        self, task_instance_batches: List[List[int]]
-    ) -> None:
+    async def _log_heartbeats(self, task_instance_batches: List[List[int]]) -> None:
         """Create a task for each batch of task instances to send heartbeat."""
         async with aiohttp.ClientSession(self.requester.url) as session:
             heartbeat_tasks = [
-                asyncio.create_task(
-                    self._log_heartbeat_by_batch(session, batch)
-                )
+                asyncio.create_task(self._log_heartbeat_by_batch(session, batch))
                 for batch in task_instance_batches
             ]
             await asyncio.gather(*heartbeat_tasks)

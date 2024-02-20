@@ -1,4 +1,5 @@
 """Task Instance Database Table."""
+
 import json
 from typing import Tuple
 

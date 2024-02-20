@@ -1,6 +1,7 @@
 """Configure Logging for structlogs, syslog, etc."""
+
 import logging.config
-from typing import Any, Dict, List, MutableMapping, Optional
+from typing import Dict, List, Optional
 
 import structlog
 
@@ -85,7 +86,7 @@ default_loggers: Dict = {
     "sqlalchemy": {
         "handlers": ["console_json"],
         "level": "WARN",
-    }
+    },
     # enable SQL debug
     # 'sqlalchemy.engine': {
     #     'level': 'INFO',

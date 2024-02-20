@@ -1,4 +1,5 @@
 """Set up server specific CLI config."""
+
 import argparse
 import logging
 import sys

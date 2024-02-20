@@ -46,12 +46,12 @@ def test_get_section(temp_yaml_file, monkeypatch):
     monkeypatch.setenv("JOBMON__HTTP__MISSING", "foo")
 
     config = JobmonConfig(filepath=str(temp_yaml_file))
-    
+
     section_data = config.get_section("http")
-    
+
     # Assert that the value from the environment variable is used
     assert section_data["request_timeout"] == "25"
-    
+
     # Assert other values remain unaffected
     assert section_data["retries_timeout"] == 300
 
@@ -67,20 +67,19 @@ def test_config_dictionary_override(monkeypatch):
     """
 
     # Mock the file reading operation to return the original_config_content
-    monkeypatch.setattr('builtins.open', mock_open(read_data=original_config_content))
+    monkeypatch.setattr("builtins.open", mock_open(read_data=original_config_content))
 
     # Now, let's pretend there's also an environment variable set:
     monkeypatch.setenv("JOBMON__HTTP__REQUEST_TIMEOUT", "25")
 
     # Initialize the config with a dictionary that overrides the request_timeout
-    overriding_dict = {
-        'http': {
-            'request_timeout': 30
-        }
-    }
+    overriding_dict = {"http": {"request_timeout": 30}}
 
     config = JobmonConfig(dict_config=overriding_dict)
 
-    assert config.get("http", "request_timeout") == 30  # It should respect the dict over env vars and file content.
-    assert config.get("http", "retries_timeout") == 300  # This should still come from the file as it wasn't overridden.
-
+    assert (
+        config.get("http", "request_timeout") == 30
+    )  # It should respect the dict over env vars and file content.
+    assert (
+        config.get("http", "retries_timeout") == 300
+    )  # This should still come from the file as it wasn't overridden.

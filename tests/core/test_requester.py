@@ -22,8 +22,10 @@ from jobmon.core.requester import Requester
             None,  # This won't be used since we've hit the retry limit
             3,
             RuntimeError,
-            ("Exceeded HTTP request retry budget due to: Request failed due to status code 502 "
-            "from GET request through route /time. Response content: b'Some error message..."),
+            (
+                "Exceeded HTTP request retry budget due to: Request failed due to status code 502 "
+                "from GET request through route /time. Response content: b'Some error message..."
+            ),
         ),
     ],
 )
@@ -87,8 +89,7 @@ def test_fail_fast(client_env, mocker):
 
     assert (
         "Client error with status code 404 from GET request through route "
-        "/no-route-should-fail. Response content: Not Found"
-        in str(exc.value)
+        "/no-route-should-fail. Response content: Not Found" in str(exc.value)
     )
     assert mock_content.call_count == 1
 
@@ -104,8 +105,7 @@ def test_non_tenacious_request(client_env, mocker):
 
     assert (
         "Request failed due to status code 500 from GET request through "
-        "route /test_bad. Response content: Server Error"
-        in str(exc.value)
+        "route /test_bad. Response content: Server Error" in str(exc.value)
     )
     assert mock_content.call_count == 1
 

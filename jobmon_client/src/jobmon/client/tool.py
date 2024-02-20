@@ -2,6 +2,7 @@
 
 The Tool may evolve over time.
 """
+
 from __future__ import annotations
 
 import getpass

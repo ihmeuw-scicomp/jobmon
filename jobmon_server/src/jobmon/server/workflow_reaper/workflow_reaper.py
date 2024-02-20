@@ -1,11 +1,12 @@
 """Service to monitor and reap dead workflows."""
+
 import logging
 from time import sleep
 from typing import Callable, List, Optional, Tuple
 
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import WorkflowRunStatus
-from jobmon.core.exceptions import ConfigError, InvalidResponse
+from jobmon.core.exceptions import ConfigError
 from jobmon.core.requester import Requester
 from jobmon.server import __version__
 from jobmon.server.workflow_reaper.notifiers import SlackNotifier

@@ -1,4 +1,5 @@
 """The DAG captures the interconnected graph of tasks and their dependencies."""
+
 import hashlib
 from http import HTTPStatus as StatusCodes
 import logging
