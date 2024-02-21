@@ -1,4 +1,5 @@
 """Task Arg table."""
+
 from sqlalchemy import Column, Integer, String
 
 

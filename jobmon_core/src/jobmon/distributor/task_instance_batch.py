@@ -6,7 +6,6 @@ import logging
 from typing import Any, Dict, Set, TYPE_CHECKING
 
 from jobmon.core.constants import TaskInstanceStatus
-from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 
 if TYPE_CHECKING:

@@ -1,4 +1,5 @@
 """Routes for TaskTemplate."""
+
 from http import HTTPStatus as StatusCodes
 import json
 from typing import Any, Dict, List

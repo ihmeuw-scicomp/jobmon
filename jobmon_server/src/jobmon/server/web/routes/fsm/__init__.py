@@ -1,4 +1,5 @@
 """Routes used to move through the finite state."""
+
 from typing import Optional
 
 from flask import Blueprint

@@ -1,4 +1,5 @@
 """Routes used by task instances on worker nodes."""
+
 from http import HTTPStatus as StatusCodes
 import os
 from typing import Any

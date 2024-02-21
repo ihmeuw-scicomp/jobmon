@@ -1,4 +1,5 @@
-from typing import Any, Dict, cast
+from typing import Any, cast, Dict
+
 from flask import Flask, jsonify, request
 import structlog
 from werkzeug.exceptions import BadRequest, UnsupportedMediaType

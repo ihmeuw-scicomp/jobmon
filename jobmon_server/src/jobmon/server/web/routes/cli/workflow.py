@@ -1,4 +1,5 @@
 """Routes for Workflow."""
+
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, Optional
 
@@ -507,28 +508,29 @@ def workflows_by_user_form() -> Any:
                         workflow_id
                     FROM
                         task
-                        JOIN task_resources on task_resources.id = task.task_resources_id
+                        JOIN task_resources ON task_resources.id = task.task_resources_id
                     WHERE
                         task.workflow_id IN (
                             SELECT
                                 workflow_run.workflow_id
                             FROM
                                 workflow
-                                JOIN tool_version on workflow.tool_version_id = tool_version.id
-                                JOIN tool on tool.id = tool_version.tool_id
-                                JOIN workflow_run on workflow.id = workflow_run.workflow_id
-                                LEFT JOIN workflow_attribute on workflow.id = workflow_attribute.workflow_id
+                                JOIN tool_version ON workflow.tool_version_id = tool_version.id
+                                JOIN tool ON tool.id = tool_version.tool_id
+                                JOIN workflow_run ON workflow.id = workflow_run.workflow_id
+                                LEFT JOIN workflow_attribute
+                                    ON workflow.id = workflow_attribute.workflow_id
                             WHERE
                                 {inner_where_clause}
                         )
                     GROUP BY
                         workflow_id, queue_id
-                ) workflow_queue on workflow.id = workflow_queue.workflow_id
-                JOIN queue on queue.id = workflow_queue.queue_id
-                JOIN workflow_run on workflow.id = workflow_run.workflow_id
-                JOIN tool_version on workflow.tool_version_id = tool_version.id
-                JOIN tool on tool.id = tool_version.tool_id
-                JOIN workflow_status on workflow.status = workflow_status.id
+                ) workflow_queue ON workflow.id = workflow_queue.workflow_id
+                JOIN queue ON queue.id = workflow_queue.queue_id
+                JOIN workflow_run ON workflow.id = workflow_run.workflow_id
+                JOIN tool_version ON workflow.tool_version_id = tool_version.id
+                JOIN tool ON tool.id = tool_version.tool_id
+                JOIN workflow_status ON workflow.status = workflow_status.id
             WHERE
                 cluster_id != 1
             GROUP BY

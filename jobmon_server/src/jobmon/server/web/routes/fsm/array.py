@@ -1,4 +1,5 @@
 """Routes for Arrays."""
+
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
@@ -134,7 +135,9 @@ def record_array_batch_num(array_id: int) -> Any:
         tasks_by_status_query = (
             select(Task.status, Task.id)
             .where(Task.id.in_(task_ids))
-            .order_by(Task.status)  # This line is optional but helps in organizing the result
+            .order_by(
+                Task.status
+            )  # This line is optional but helps in organizing the result
         )
 
         result_dict = defaultdict(list)

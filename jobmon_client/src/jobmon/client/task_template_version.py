@@ -1,4 +1,5 @@
 """Task Templates are versioned to recognize changes to args and command templates."""
+
 from __future__ import annotations
 
 import hashlib

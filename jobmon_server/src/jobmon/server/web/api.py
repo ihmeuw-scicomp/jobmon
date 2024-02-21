@@ -5,8 +5,8 @@ from flask import Flask
 
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.app_factory import AppFactory  # noqa F401
-from jobmon.server.web.log_config import configure_structlog # noqa F401
-from jobmon.server.web.log_config import configure_logging # noqa F401
+from jobmon.server.web.log_config import configure_structlog  # noqa F401
+from jobmon.server.web.log_config import configure_logging  # noqa F401
 
 
 def get_app(config: Optional[JobmonConfig] = None) -> Flask:
@@ -20,7 +20,7 @@ def get_app(config: Optional[JobmonConfig] = None) -> Flask:
     else:
         app_factory = AppFactory(
             config.get("web", "sqlalchemy_database_uri"),
-            config.get("otlp", "web_enabled")
+            config.get("otlp", "web_enabled"),
         )
     app = app_factory.get_app()
     return app

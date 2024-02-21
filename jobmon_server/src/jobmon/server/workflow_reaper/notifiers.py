@@ -1,4 +1,5 @@
 """Places to notify upon certain events (ex. slack to notify of unhealthy workflow)."""
+
 import logging
 from typing import Optional
 

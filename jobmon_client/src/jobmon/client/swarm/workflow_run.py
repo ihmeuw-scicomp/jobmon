@@ -1,4 +1,5 @@
 """Workflow Run is a distributor instance of a declared workflow."""
+
 from __future__ import annotations
 
 import ast
@@ -29,7 +30,6 @@ from jobmon.core.exceptions import (
     CallableReturnedInvalidObject,
     DistributorNotAlive,
     EmptyWorkflowError,
-    InvalidResponse,
     TransitionError,
     WorkflowTestError,
 )
@@ -786,9 +786,7 @@ class WorkflowRun:
     def _terminate_task_instances(self) -> None:
         """Terminate the workflow run."""
         app_route = f"/workflow_run/{self.workflow_run_id}/terminate_task_instances"
-        self.requester.send_request(
-            app_route=app_route, message={}, request_type="put"
-        )
+        self.requester.send_request(app_route=app_route, message={}, request_type="put")
         self._terminated = True
 
     def _set_fail_after_n_executions(self, n: int) -> None:

@@ -1,4 +1,5 @@
 """Routes used to move through the finite state."""
+
 from http import HTTPStatus as StatusCodes
 from typing import Any
 

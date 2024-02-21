@@ -1,4 +1,5 @@
 """Workflow Database Table."""
+
 import datetime
 from typing import Tuple
 

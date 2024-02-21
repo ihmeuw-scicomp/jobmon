@@ -1,10 +1,10 @@
 """Reaper Behavior for a given Workflow Run."""
+
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeWorkflowRun
 

@@ -1,4 +1,5 @@
 """Workflow Attribute Database Table."""
+
 from typing import Any, Dict
 
 from sqlalchemy import Column, ForeignKey, Integer, String

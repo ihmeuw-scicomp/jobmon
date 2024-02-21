@@ -1,8 +1,8 @@
 """Start up distributing process."""
+
 from typing import Optional
 
 from jobmon.core.cluster import Cluster
-from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 from jobmon.worker_node.worker_node_task_instance import WorkerNodeTaskInstance
 

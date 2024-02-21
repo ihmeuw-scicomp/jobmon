@@ -1,4 +1,5 @@
 """Start up workflow reaper service."""
+
 from typing import Callable, Optional
 
 

@@ -1,11 +1,13 @@
 """Parse configuration options and set them to be used throughout the Jobmon Architecture."""
+
 import argparse
 import importlib
 import os
-import pkgutil
-import yaml
 from pathlib import Path
+import pkgutil
 from typing import Any, Dict, Optional
+
+import yaml
 
 from jobmon.core.cli import CLI
 from jobmon.core.exceptions import ConfigError
@@ -21,6 +23,7 @@ class JobmonConfig:
 
     def __init__(self, filepath: str = "", dict_config: Optional[Dict] = None) -> None:
         """Jobmon config class.
+
         Args:
             filepath: where to read defaults from.
             dict_config: dictionary of values to override
@@ -40,7 +43,7 @@ class JobmonConfig:
 
         self._dict_config = dict_config
 
-    def _merge_dicts(self, base: Dict, override: Dict):
+    def _merge_dicts(self, base: Dict, override: Dict) -> Dict:
         """Utility function to merge two dictionaries."""
         for key, value in override.items():
             if isinstance(value, dict):
@@ -56,12 +59,12 @@ class JobmonConfig:
         # must have format JOBMON__{SECTION}__{KEY} (note double underscore)
         env_var = self._get_env_var_name(section, key)
         return os.environ.get(env_var)
-    
+
     def _interpolate_env_vars(self, value: Any) -> Any:
         if isinstance(value, str):
             return os.path.expandvars(value)
         return value
-    
+
     def _get_yaml_variable(self, section: str, key: str) -> Optional[str]:
         return self._config.get(section, {}).get(key)
 
@@ -92,9 +95,12 @@ class JobmonConfig:
             "found."
         )
 
-    def _handle_plugin_installation(self):
+    def _handle_plugin_installation(self) -> bool:
         """Handle plugin installation if configuration is not found."""
-        print("Jobmon client not configured. Attempting to install configuration from installer plugin.")
+        print(
+            "Jobmon client not configured. Attempting to install configuration "
+            "from installer plugin."
+        )
         plugins = [
             plugin_name
             for finder, plugin_name, ispkg in pkgutil.iter_modules()
@@ -136,11 +142,12 @@ class JobmonConfig:
                 raise e
 
     def get_section(self, section: str) -> Dict[str, Any]:
-        """
-        Returns a dictionary of all key-value pairs in the given section.
+        """Returns a dictionary of all key-value pairs in the given section.
+
         The order of precedence: dict_config > Environment Variable > YAML File.
         """
-        # Start with the section from the YAML file, or an empty dict if the section doesn't exist yet
+        # Start with the section from the YAML file, or an empty dict if the section
+        # doesn't exist yet.
         section_dict = self._config.get(section, {}).copy()
 
         # Overlay values from dict_config, if any
@@ -152,13 +159,16 @@ class JobmonConfig:
         for env_key in os.environ.keys():
             if env_key.startswith(prefix):
                 # Extract the original key name by removing the prefix
-                key = env_key[len(prefix):].lower()
+                key = env_key[len(prefix) :].lower()
                 section_dict[key] = os.environ[env_key]
 
         return section_dict
-    
+
     def get_boolean(self, section: str, key: str) -> bool:
-        """Get the configuration value for the section and key as bool. Raise if key not found."""
+        """Get the configuration value for the section and key as bool.
+
+        Raise if key not found.
+        """
         val = str(self.get(section, key)).lower().strip()
         if val in ("t", "true", "1", "yes"):
             return True
@@ -167,12 +177,15 @@ class JobmonConfig:
         else:
             raise ConfigError(
                 f'Failed to convert value to bool. Please check "{key}" key in "{section}" '
-                f'section or environment var "{self._get_env_var_name(section, key)}". Current '
-                f'value: "{val}".'
+                f'section or environment var "{self._get_env_var_name(section, key)}". '
+                f'Current value: "{val}".'
             )
 
     def get_int(self, section: str, key: str) -> int:
-        """Get the configuration value for the section and key as int. Raise if key not found."""
+        """Get the configuration value for the section and key as int.
+
+        Raise if key not found.
+        """
         val = self.get(section, key)
         try:
             return int(val)

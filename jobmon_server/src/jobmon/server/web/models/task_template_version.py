@@ -1,4 +1,5 @@
 """Database Table for Task Template Versions."""
+
 from typing import Dict, List
 
 from sqlalchemy import Column, ForeignKeyConstraint, Index, Integer, Text, VARCHAR

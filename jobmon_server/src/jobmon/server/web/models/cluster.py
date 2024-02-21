@@ -1,4 +1,5 @@
 """Cluster Table in the Database."""
+
 from typing import Tuple
 
 from sqlalchemy import Column, ForeignKey, Integer, select, String

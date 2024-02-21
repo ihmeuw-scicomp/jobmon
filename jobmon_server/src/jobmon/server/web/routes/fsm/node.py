@@ -1,4 +1,5 @@
 """Routes used by the main jobmon client."""
+
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 

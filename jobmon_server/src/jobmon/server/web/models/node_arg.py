@@ -1,4 +1,5 @@
 """Node arg db table."""
+
 from sqlalchemy import Column, Integer, String
 
 from jobmon.server.web.models import Base

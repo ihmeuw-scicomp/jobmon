@@ -1,4 +1,5 @@
 """Node Table in the Database."""
+
 from sqlalchemy import Column, Integer, UniqueConstraint, VARCHAR
 
 from jobmon.server.web.models import Base

@@ -1,4 +1,5 @@
 """Edge Database table."""
+
 from sqlalchemy import Column, Integer, Text
 
 from jobmon.server.web.models import Base

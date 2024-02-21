@@ -1,4 +1,5 @@
 """Cluster objects define where a user wants their tasks run. e.g. UGE, Azure, Seq."""
+
 from __future__ import annotations
 
 import logging
@@ -10,7 +11,6 @@ from jobmon.core.cluster_protocol import (
     ClusterWorkerNode,
 )
 from jobmon.core.cluster_type import ClusterType
-from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeCluster, SerializeQueue
 
