@@ -402,6 +402,16 @@ def get_tasks_from_workflow(workflow_id: int) -> Any:
 
     session = SessionLocal()
 
+    if max_task_id == 0:
+        # Performance suffers heavily if we do a search with WHERE task.id > 0
+        # Therefore, select the smallest task ID in the workflow and use that as the initial
+        # floor.
+        with session.begin():
+            min_task_id = session.execute(
+                select(func.min(Task.id)).where(Task.workflow_id == workflow_id)
+            ).scalar()
+            max_task_id = min_task_id - 1
+
     with session.begin():
         # Query task table
         query = (
