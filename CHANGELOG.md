@@ -11,16 +11,16 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [3.2.6] - TBD
 ### Added
-- Reaper "poll_interval_minutes" config key - default 5 minutes (PR #69).
-- Add workflow timeout to `resume_workflow` CLI (PR #73).
+- Reaper "poll_interval_minutes" config key - default 5 minutes (PR 69).
+- Add workflow timeout to `resume_workflow` CLI (PR 73).
 
 ### Changed
-- Updated developer documentation (PR #72).
-- When getting Tasks from Workflow, pre-query for initial Task ID. Performance optimization (PR #70).
+- Updated developer documentation (PR 72).
+- When getting Tasks from Workflow, pre-query for initial Task ID. Performance optimization (PR 70).
 
 ## [3.2.5] - 2023-11-14
 ### Changed
-- Added read timeout to the should_retry_exception() function (PR #68).
+- Added read timeout to the should_retry_exception() function (PR 68).
 
 ## [3.2.4] - 2023-09-19
 ### Fixed
