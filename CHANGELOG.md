@@ -8,15 +8,32 @@ All notable changes to Jobmon will be documented in this file.
 ### Fixed
 ### Deprecated
 ### Removed
+
+## [3.2.6] - TBD
+### Added
+- Reaper "poll_interval_minutes" config key - default 5 minutes (PR 69).
+- Add workflow timeout to `resume_workflow` CLI (PR 73).
+
+### Changed
+- Updated developer documentation (PR 72).
+- When getting Tasks from Workflow, pre-query for initial Task ID. Performance optimization (PR 70).
+
+## [3.2.5] - 2023-11-14
+### Changed
+- Added read timeout to the should_retry_exception() function (PR 68).
+
 ## [3.2.4] - 2023-09-19
 ### Fixed
 - Allow users to not specify default resource scales.
+
 ## [3.2.3] - 2023-09-19
 ### Added
 - Added an implementation for passing in iterators or callables for task resources, for more fine-grained scaling behavior.
+
 ## [3.2.2] - 2023-08-31
 ### Changed
 - Users are now able to log to LIMITED_USE directory.
+
 ## [3.2.1] - 2023-03-08
 Performance release.
 
