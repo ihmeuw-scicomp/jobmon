@@ -5,7 +5,7 @@ Monitoring and Debugging
 Graphical User Interface (GUI)
 ##############################
 The Jobmon GUI allows users to see the status of their workflows.
-In general any status qwery in the CLI is also available in the GUI
+In general any status query in the CLI is also available in the GUI
 and should be easier to find.
 
 The GUI is at: `<https://jobmon-gui.ihme.washington.edu>`_
@@ -100,6 +100,8 @@ Running Queries
 ***************
 If the command line status commands do not provide the information you need,
 you can query the Jobmon database.
+
+You can view the Jobmon database connection information here: `<https://jobmon-gui.ihme.washington.edu/#/jobmon_at_ihme>`_
 
 .. include:: database-ihme.rst
 
