@@ -207,7 +207,7 @@ class Dag(object):
 
     def __hash__(self) -> int:
         """Determined by hashing all sorted node hashes and their downstream."""
-        hash_value = hashlib.sha1()
+        hash_value = hashlib.sha256()
         if len(self.nodes) > 0:  # if the dag is empty, we want to skip this
             for node in sorted(self.nodes):
                 hash_value.update(str(hash(node)).encode("utf-8"))
