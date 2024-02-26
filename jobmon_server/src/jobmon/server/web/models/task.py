@@ -49,7 +49,7 @@ class Task(Base):
     id = Column(Integer, primary_key=True)
     workflow_id = Column(Integer, ForeignKey("workflow.id"))
     node_id = Column(Integer, ForeignKey("node.id"))
-    task_args_hash = Column(VARCHAR(50), index=True)
+    task_args_hash = Column(VARCHAR(255), index=True)
     array_id = Column(Integer, ForeignKey("array.id"), default=None)
     name = Column(String(255), index=True)
     command = Column(Text)

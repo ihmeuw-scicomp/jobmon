@@ -12,7 +12,7 @@ class Node(Base):
 
     id = Column(Integer, primary_key=True)
     task_template_version_id = Column(Integer, index=True)
-    node_args_hash = Column(VARCHAR(50))
+    node_args_hash = Column(VARCHAR(255))
 
     __table_args__ = (
         UniqueConstraint(
