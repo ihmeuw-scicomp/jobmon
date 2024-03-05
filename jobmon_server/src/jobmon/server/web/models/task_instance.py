@@ -33,6 +33,7 @@ class TaskInstance(Base):
             self.task.workflow_id,
             self.status,
             self.distributor_id,
+            self.cluster_id,
             self.task_resources_id,
             self.array_id,
             self.array_batch_num,
@@ -55,14 +56,14 @@ class TaskInstance(Base):
         )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    workflow_run_id: Mapped[int] = mapped_column(Integer, ForeignKey("workflow_run.id"))
-    array_id: Mapped[int] = mapped_column(Integer, ForeignKey("array.id"), default=None)
+    workflow_run_id: Mapped[int] = mapped_column(Integer, ForeignKey("workflow_run.id"), nullable=True)
+    array_id: Mapped[int] = mapped_column(Integer, ForeignKey("array.id"), default=None, nullable=True)
     task_id: Mapped[int] = mapped_column(Integer, ForeignKey("task.id"))
-    task_resources_id: Mapped[int] = mapped_column(Integer, ForeignKey("task_resources.id"), index=True)
-    array_batch_num: Mapped[int] = mapped_column(Integer, index=True)
-    array_step_id: Mapped[int] = mapped_column(Integer, index=True)
+    task_resources_id: Mapped[int] = mapped_column(Integer, ForeignKey("task_resources.id"), index=True, nullable=True)
+    array_batch_num: Mapped[int] = mapped_column(Integer, index=True, nullable=True)
+    array_step_id: Mapped[int] = mapped_column(Integer, index=True, nullable=True)
 
-    distributor_id: Mapped[str] = mapped_column(String(20), index=True)
+    distributor_id: Mapped[str] = mapped_column(String(20), index=True, nullable=True)
 
     # usage
     nodename = Column(String(150))

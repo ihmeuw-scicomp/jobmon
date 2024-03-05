@@ -48,8 +48,8 @@ class Workflow(Base):
         ForeignKey("workflow_status.id"),
         default=WorkflowStatus.REGISTERING,
     )
-    created_date: Mapped[DateTime] = mapped_column(default=None)
-    status_date = mapped_column(default=func.now())
+    created_date = mapped_column(DateTime, default=None)
+    status_date = mapped_column(DateTime, default=func.now())
 
     dag = relationship("Dag", back_populates="workflow", lazy=True)
     workflow_runs = relationship("WorkflowRun", back_populates="workflow", lazy=True)

@@ -51,7 +51,7 @@ class Task(Base):
     node_id = Column(Integer, ForeignKey("node.id"))
     task_args_hash = Column(VARCHAR(50), index=True)
     array_id = Column(Integer, ForeignKey("array.id"), default=None)
-    name: Mapped[str] = mapped_column(String(255), index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True, nullable=True)
     command: Mapped[str] = mapped_column(Text)
     task_resources_id = Column(Integer, ForeignKey("task_resources.id"), default=None)
     num_attempts: Mapped[int] = mapped_column(Integer, default=0)
