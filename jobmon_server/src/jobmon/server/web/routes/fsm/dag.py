@@ -84,9 +84,17 @@ def add_edges(dag_id: int) -> Any:
     session = SessionLocal()
     with session.begin():
         insert_stmt = insert(Edge).values(edges_to_add)
-        if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "mysql":
+        if (
+            SessionLocal
+            and SessionLocal.bind
+            and SessionLocal.bind.dialect.name == "mysql"
+        ):
             insert_stmt = insert_stmt.prefix_with("IGNORE")
-        if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "sqlite":
+        if (
+            SessionLocal
+            and SessionLocal.bind
+            and SessionLocal.bind.dialect.name == "sqlite"
+        ):
             insert_stmt = insert_stmt.prefix_with("OR IGNORE")
         session.execute(insert_stmt)
         session.flush()

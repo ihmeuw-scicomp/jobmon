@@ -57,7 +57,9 @@ def bind_tasks_no_args() -> Any:
         prebound_tasks = session.execute(task_select_stmt).scalars().all()
 
         # Bind tasks not present in DB
-        tasks_to_add: List[Any] = ([])  # Container for tasks not yet bound to the database
+        tasks_to_add: List[Any] = (
+            []
+        )  # Container for tasks not yet bound to the database
         present_tasks = {
             (task.node_id, task.task_args_hash): task for task in prebound_tasks
         }  # Dictionary mapping existing Tasks to the supplied arguments
@@ -173,11 +175,19 @@ def bind_task_args() -> Any:
         ]
         session = SessionLocal()
         try:
-            if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "mysql":
+            if (
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
+            ):
                 arg_insert_stmt = (
                     insert(TaskArg).values(task_arg_values).prefix_with("IGNORE")
                 )
-            elif SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "sqlite":
+            elif (
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "sqlite"
+            ):
                 arg_insert_stmt = (
                     sqlite_insert(TaskArg)
                     .values(task_arg_values)
@@ -186,7 +196,9 @@ def bind_task_args() -> Any:
             else:
                 raise ServerError(
                     "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                    + SessionLocal.bind.dialect.name if SessionLocal and SessionLocal.bind else "None"
+                    + SessionLocal.bind.dialect.name
+                    if SessionLocal and SessionLocal.bind
+                    else "None"
                 )
             with session.begin():
                 session.execute(arg_insert_stmt)
@@ -233,7 +245,11 @@ def bind_task_attributes() -> Any:
             # Insert and handle the conflicts
             if insert_values:
                 try:
-                    if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "mysql":
+                    if (
+                        SessionLocal
+                        and SessionLocal.bind
+                        and SessionLocal.bind.dialect.name == "mysql"
+                    ):
                         attr_insert_stmt = mysql_insert(TaskAttribute).values(
                             insert_values
                         )
@@ -242,7 +258,11 @@ def bind_task_attributes() -> Any:
                         )
                         session.execute(attr_insert_stmt)
 
-                    elif SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "sqlite":
+                    elif (
+                        SessionLocal
+                        and SessionLocal.bind
+                        and SessionLocal.bind.dialect.name == "sqlite"
+                    ):
                         for attr_to_add in insert_values:
                             attr_insert_stmt: sqlalchemy.dialects.sqlite.dml.Insert = (  # type: ignore
                                 sqlite_insert(TaskAttribute)
@@ -259,7 +279,9 @@ def bind_task_attributes() -> Any:
                     else:
                         raise ServerError(
                             "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                            + SessionLocal.bind.dialect.name if SessionLocal and SessionLocal.bind else "None"
+                            + SessionLocal.bind.dialect.name
+                            if SessionLocal and SessionLocal.bind
+                            else "None"
                         )
                 except (DataError, IntegrityError) as e:
                     # Attributes too long, message back
@@ -275,7 +297,7 @@ def bind_task_attributes() -> Any:
 
 
 def _add_or_get_attribute_types(
-        names: Union[List[str], Set[str]], session: Session
+    names: Union[List[str], Set[str]], session: Session
 ) -> Dict[str, int]:
     # Query for existing attribute types, to avoid integrity conflicts
     names = set(names)
@@ -283,7 +305,9 @@ def _add_or_get_attribute_types(
     existing_rows_select = select(TaskAttributeType).where(
         TaskAttributeType.name.in_(names)
     )
-    existing_rows_raw: ScalarResult[TaskAttributeType] = session.execute(existing_rows_select).scalars()
+    existing_rows_raw: ScalarResult[TaskAttributeType] = session.execute(
+        existing_rows_select
+    ).scalars()
     existing_rows = {attr.name: attr.id for attr in existing_rows_raw}
 
     existing_names = set(existing_rows.keys())
@@ -298,13 +322,21 @@ def _add_or_get_attribute_types(
     if any(new_names):
         new_attribute_types = [{"name": name} for name in new_names]
         try:
-            if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "mysql":
+            if (
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
+            ):
                 insert_stmt = (
                     insert(TaskAttributeType)
                     .values(new_attribute_types)
                     .prefix_with("IGNORE")
                 )
-            elif SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "sqlite":
+            elif (
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "sqlite"
+            ):
                 insert_stmt = (
                     sqlite_insert(TaskAttributeType)
                     .values(new_attribute_types)
@@ -313,7 +345,9 @@ def _add_or_get_attribute_types(
             else:
                 raise ServerError(
                     "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                    + SessionLocal.bind.dialect.name if SessionLocal and SessionLocal.bind else "None"
+                    + SessionLocal.bind.dialect.name
+                    if SessionLocal and SessionLocal.bind
+                    else "None"
                 )
             session.execute(insert_stmt)
 
@@ -332,8 +366,12 @@ def _add_or_get_attribute_types(
 
         # Update our return dict
         return_dict.update(
-            {attribute.name if attribute.name else "NA":
-             attribute.id if attribute.id else "-1" for attribute in new_attribute_type_ids}
+            {
+                attribute.name if attribute.name else "NA": (
+                    attribute.id if attribute.id else "-1"
+                )
+                for attribute in new_attribute_type_ids
+            }
         )
     return return_dict
 

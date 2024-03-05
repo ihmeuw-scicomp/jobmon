@@ -116,7 +116,7 @@ def get_requested_cores() -> Any:
             j_dir = json.loads(j_str)
             core = 1 if "num_cores" not in j_dir.keys() else int(j_dir["num_cores"])
             if r["id"] in result_dir.keys():  # type: ignore
-                result_dir[r["id"]].append(core)   # type: ignore
+                result_dir[r["id"]].append(core)  # type: ignore
             else:
                 result_dir[r["id"]] = [core]  # type: ignore
         for k in result_dir.keys():
@@ -158,13 +158,13 @@ def get_most_popular_queue() -> Any:
 
     rows_raw = session.execute(sql).all()
     column_names = ("id", "queue_id")
-    rows:  List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
+    rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
     # return a "standard" json format for cli routes
     queue_info = []
     if rows:
         result_dir: Dict = dict()
         for r in rows:
-            ttvi = r["id"]   # type: ignore
+            ttvi = r["id"]  # type: ignore
             q = r["queue_id"]  # type: ignore
             if ttvi in result_dir.keys():
                 if q in result_dir[ttvi].keys():
@@ -184,7 +184,9 @@ def get_most_popular_queue() -> Any:
             # get queue name; and return queue id with it
             with session:
                 query_filter = [Queue.id == popular_q]
-                sql1: Select[Tuple[Optional[str]]] = select(Queue.name).where(*query_filter)
+                sql1: Select[Tuple[Optional[str]]] = select(Queue.name).where(
+                    *query_filter
+                )
             popular_q_name = session.execute(sql1).one()[0]
             queue_info.append(
                 {"id": ttvi, "queue": popular_q_name, "queue_id": popular_q}
@@ -399,7 +401,11 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
         # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
         # the optimizer may choose a suboptimal execution plan for large datasets.
         # Has to be conditional since not all database engines support STRAIGHT_JOIN.
-        if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "mysql":
+        if (
+            SessionLocal
+            and SessionLocal.bind
+            and SessionLocal.bind.dialect.name == "mysql"
+        ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
         session.commit()
@@ -429,7 +435,11 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             .where(Task.workflow_id == workflow_id)
             .group_by(TaskTemplate.id)
         )
-        if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "mysql":
+        if (
+            SessionLocal
+            and SessionLocal.bind
+            and SessionLocal.bind.dialect.name == "mysql"
+        ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         attempts0 = session.execute(sql).all()
 
@@ -507,7 +517,11 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
         # the optimizer may choose a suboptimal execution plan for large datasets.
         # Has to be conditional since not all database engines support STRAIGHT_JOIN.
-        if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "mysql":
+        if (
+            SessionLocal
+            and SessionLocal.bind
+            and SessionLocal.bind.dialect.name == "mysql"
+        ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
         session.commit()

@@ -1,4 +1,5 @@
 """Routes for Workflow."""
+
 from datetime import datetime
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, Optional, Tuple
@@ -6,7 +7,15 @@ from typing import Any, Dict, Optional, Tuple
 from flask import jsonify, request
 from flask_cors import cross_origin
 import pandas as pd
-from sqlalchemy import func, select, text, update, Select, ColumnElement, BinaryExpression
+from sqlalchemy import (
+    func,
+    select,
+    text,
+    update,
+    Select,
+    ColumnElement,
+    BinaryExpression,
+)
 import structlog
 
 from jobmon.core.constants import WorkflowStatus as Statuses
@@ -282,11 +291,15 @@ def get_workflow_status() -> Any:
             Workflow.id.in_(workflow_request),  # type: ignore
             WorkflowStatus.id == Workflow.status,  # type: ignore
         ]
-        sql1: Select[Tuple[Optional[int], Optional[str], Optional[str], Optional[datetime]]] = (
+        sql1: Select[
+            Tuple[Optional[int], Optional[str], Optional[str], Optional[datetime]]
+        ] = (
             select(
                 Workflow.id, Workflow.name, WorkflowStatus.label, Workflow.created_date
             )
-        ).where(*query_filter)
+        ).where(
+            *query_filter
+        )
         rows1 = session.execute(sql1).all()
     row_map = dict()
     for r in rows1:
