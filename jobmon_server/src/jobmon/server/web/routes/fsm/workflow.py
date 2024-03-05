@@ -190,21 +190,21 @@ def _upsert_wf_attribute(
     with session.begin_nested():
         wf_attrib_id = _add_or_get_wf_attribute_type(name, session)
         if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "mysql":
-            insert_vals = mysql_insert(WorkflowAttribute).values(
+            insert_vals1 = mysql_insert(WorkflowAttribute).values(
                 workflow_id=workflow_id,
                 workflow_attribute_type_id=wf_attrib_id,
                 value=value,
             )
-            upsert_stmt = insert_vals.on_duplicate_key_update(
-                value=insert_vals.inserted.value
+            upsert_stmt = insert_vals1.on_duplicate_key_update(
+                value=insert_vals1.inserted.value
             )
         elif SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "sqlite":
-            insert_vals: sqlalchemy.dialects.sqlite.dml.Insert = sqlite_insert(WorkflowAttribute).values(
+            insert_vals2: sqlalchemy.dialects.sqlite.dml.Insert = sqlite_insert(WorkflowAttribute).values(
                 workflow_id=workflow_id,
                 workflow_attribute_type_id=wf_attrib_id,
                 value=value,
             )
-            upsert_stmt = insert_vals.on_conflict_do_update(
+            upsert_stmt: sqlalchemy.dialects.sqlite.dml.Insert = insert_vals2.on_conflict_do_update(  # type: ignore
                 index_elements=["workflow_id", "workflow_attribute_type_id"],
                 set_=dict(value=value),
             )
@@ -466,13 +466,13 @@ def get_tasks_from_workflow(workflow_id: int) -> Any:
         for queue_id in queue_map.keys():
             queue = session.get(Queue, queue_id)
             queue_name = queue.name if queue else None
-            cluster_name = queue.cluster.name if queue else None
+            cluster_name = queue.cluster.name if queue else None  # type: ignore
             for task_id in queue_map[queue_id]:
                 resp_dict[task_id].extend([cluster_name, queue_name])
 
         # get the max concurrency
         for array_id in array_map.keys():
-            array: any = session.get(Array, array_id)
+            array: Any = session.get(Array, array_id)
             max_concurrently_running = array.max_concurrently_running
             for task_id in array_map[array_id]:
                 resp_dict[task_id].append(max_concurrently_running)

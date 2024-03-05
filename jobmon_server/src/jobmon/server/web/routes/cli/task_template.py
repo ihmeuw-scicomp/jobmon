@@ -103,9 +103,9 @@ def get_requested_cores() -> Any:
         sql = select(TaskTemplateVersion.id, TaskResources.requested_resources).where(
             *query_filter
         )
-    rows = session.execute(sql).all()
+    rows_raw = session.execute(sql).all()
     column_names = ("id", "rr")
-    rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows]
+    rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
 
     core_info = []
     if rows:
@@ -118,7 +118,7 @@ def get_requested_cores() -> Any:
             if r["id"] in result_dir.keys():  # type: ignore
                 result_dir[r["id"]].append(core)   # type: ignore
             else:
-                result_dir[r["id"]] = [core]
+                result_dir[r["id"]] = [core]  # type: ignore
         for k in result_dir.keys():
             item_min = int(np.min(result_dir[k]))
             item_max = int(np.max(result_dir[k]))
@@ -156,9 +156,9 @@ def get_most_popular_queue() -> Any:
             *query_filter
         )
 
-    rows = session.execute(sql).all()
+    rows_raw = session.execute(sql).all()
     column_names = ("id", "queue_id")
-    rows:  List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows]
+    rows:  List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
     # return a "standard" json format for cli routes
     queue_info = []
     if rows:
@@ -236,10 +236,10 @@ def get_task_template_resource_usage() -> Any:
         sql = select(
             TaskInstance.wallclock, TaskInstance.maxrss, Node.id, Task.id
         ).where(*query_filter)
-        rows = session.execute(sql).all()
+        rows_raw = session.execute(sql).all()
         session.commit()
     column_names = ("r", "m", "node_id", "task_id")
-    rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows]
+    rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
     result = []
     if rows:
         for r in rows:
@@ -399,7 +399,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
         # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
         # the optimizer may choose a suboptimal execution plan for large datasets.
         # Has to be conditional since not all database engines support STRAIGHT_JOIN.
-        if SessionLocal and SessionLocal.bind.dialect.name == "mysql":
+        if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "mysql":
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
         session.commit()
@@ -429,7 +429,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             .where(Task.workflow_id == workflow_id)
             .group_by(TaskTemplate.id)
         )
-        if SessionLocal and SessionLocal.bind.dialect.name == "mysql":
+        if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "mysql":
             sql = sql.prefix_with("STRAIGHT_JOIN")
         attempts0 = session.execute(sql).all()
 
@@ -447,7 +447,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             pass
         else:
             attempt = attempts.get(task_template_id)
-            *_, min_, max_, mean = attempt
+            *_, min_, max_, mean = attempt if attempt else (None, None, None, None)
 
             return_dic[int(task_template_id)] = {
                 "id": int(task_template_id),
@@ -507,7 +507,7 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
         # the optimizer may choose a suboptimal execution plan for large datasets.
         # Has to be conditional since not all database engines support STRAIGHT_JOIN.
-        if SessionLocal and SessionLocal.bind.dialect.name == "mysql":
+        if SessionLocal and SessionLocal.bind and SessionLocal.bind.dialect.name == "mysql":
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
         session.commit()

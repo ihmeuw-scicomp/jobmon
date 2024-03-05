@@ -154,7 +154,8 @@ def get_task_subdag() -> Any:
         )
 
         # Initialize defaultdict to store information
-        grouped_data: Optional[Dict] = defaultdict(
+        grouped_data: Dict = dict()
+        grouped_data = defaultdict(
             lambda: {"workflow_id": None, "dag_id": None, "node_ids": []}
         )
 

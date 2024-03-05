@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional, Tuple
 from flask import jsonify, request
 from flask_cors import cross_origin
 import pandas as pd
-from sqlalchemy import func, select, text, update, Select, ColumnElement
+from sqlalchemy import func, select, text, update, Select, ColumnElement, BinaryExpression
 import structlog
 
 from jobmon.core.constants import WorkflowStatus as Statuses
@@ -278,10 +278,9 @@ def get_workflow_status() -> Any:
     # performance improvement two: split query
     session = SessionLocal()
     with session.begin():
-        if_id_in_request: ColumnElement[bool] = Workflow.id.in_(workflow_request)
         query_filter = [
-            if_id_in_request,
-            WorkflowStatus.id == Workflow.status,
+            Workflow.id.in_(workflow_request),  # type: ignore
+            WorkflowStatus.id == Workflow.status,  # type: ignore
         ]
         sql1: Select[Tuple[Optional[int], Optional[str], Optional[str], Optional[datetime]]] = (
             select(
@@ -297,17 +296,17 @@ def get_workflow_status() -> Any:
         query_filter = [
             Task.workflow_id.in_(workflow_request),
         ]
-        sql: Select[Tuple[Optional[int], int, Optional[str]]] = (
+        sql2: Select[Tuple[Optional[int], int, Optional[str]]] = (
             select(
                 Task.workflow_id,
                 func.count(Task.status),
                 Task.status,
             ).where(*query_filter)
         ).group_by(Task.workflow_id, Task.status)
-        rows2 = session.execute(sql).all()
+        rows2 = session.execute(sql2).all()
 
     res = []
-    for r in rows2:
+    for r in rows2:  # type: ignore
         d = dict()
         d["WF_ID"] = r[0]
         d["WF_NAME"] = row_map[r[0]][1]
@@ -421,9 +420,9 @@ def get_workflow_status_viz() -> Any:
             "DONE": 0,
             "FATAL": 0,
             "MAXC": 0,
-            "num_attempts_avg": float(attempts.mean),
-            "num_attempts_min": int(attempts.min),
-            "num_attempts_max": int(attempts.max),
+            "num_attempts_avg": float(attempts.mean),  # type: ignore
+            "num_attempts_min": int(attempts.min),  # type: ignore
+            "num_attempts_max": int(attempts.max),  # type: ignore
         }
 
     with session.begin():
