@@ -43,9 +43,9 @@ def add_nodes() -> Any:
                 for ttv, arghash in node_keys
             ]
         )
-        if SessionLocal.bind.dialect.name == "mysql":
+        if SessionLocal and SessionLocal and SessionLocal.bind.dialect.name == "mysql":
             node_insert_stmt = node_insert_stmt.prefix_with("IGNORE")
-        if SessionLocal.bind.dialect.name == "sqlite":
+        if SessionLocal and SessionLocal.bind.dialect.name == "sqlite":
             node_insert_stmt = node_insert_stmt.prefix_with("OR IGNORE")
 
         session.execute(node_insert_stmt)
@@ -85,9 +85,9 @@ def add_nodes() -> Any:
         # Bulk insert again with raw SQL
         if node_args_list:
             node_arg_insert_stmt = insert(NodeArg).values(node_args_list)
-            if SessionLocal.bind.dialect.name == "mysql":
+            if SessionLocal and SessionLocal.bind.dialect.name == "mysql":
                 node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("IGNORE")
-            if SessionLocal.bind.dialect.name == "sqlite":
+            if SessionLocal and SessionLocal.bind.dialect.name == "sqlite":
                 node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("OR IGNORE")
 
             session.execute(node_arg_insert_stmt)

@@ -480,7 +480,7 @@ class DistributorService:
                 headers={"Content-Type": "application/json"},
             ) as response:
                 return_code = response.status
-                response = await response.text()
+                response: str = await response.text()
 
             if 499 < return_code < 600:
                 logger.warning(

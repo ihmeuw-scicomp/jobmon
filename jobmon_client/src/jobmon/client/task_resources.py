@@ -137,7 +137,7 @@ class TaskResources:
                     new_resource_value = scaler(existing_resources[resource])
                 elif isinstance(scaler, Iterator):
                     try:
-                        new_resource_value = next(scaler)
+                        new_resource_value: numbers.Number = next(scaler)
                     except StopIteration:
                         logger.warning(
                             "Not enough elements left in Iterator, re-using previous value "

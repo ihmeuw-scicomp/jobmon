@@ -2,8 +2,9 @@
 
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, cast, Dict, List, Set, Union
+from typing import Any, cast, Dict, List, Set, Union, Optional
 
+import sqlalchemy
 from flask import jsonify, request
 from sqlalchemy import desc, insert, select, tuple_, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
@@ -94,7 +95,7 @@ def bind_tasks_no_args() -> Any:
 
             # If not, add the task
             else:
-                task = {
+                task: Dict = {
                     "workflow_id": workflow_id,
                     "node_id": node_id,
                     "task_args_hash": arg_hash,
@@ -143,7 +144,7 @@ def bind_tasks_no_args() -> Any:
         # Done here to prevent modifying tasks, and necessitating a refresh.
         return_tasks = {}
 
-        for task in prebound_tasks + new_tasks:
+        for task in prebound_tasks + new_tasks:  # type: ignore
             id_tuple = (task.node_id, task.task_args_hash)
             hashval = task_hash_lookup[id_tuple]
             return_tasks[hashval] = [task.id, task.status]
@@ -175,11 +176,11 @@ def bind_task_args() -> Any:
         ]
         session = SessionLocal()
         try:
-            if SessionLocal.bind.dialect.name == "mysql":
+            if SessionLocal and SessionLocal.bind.dialect.name == "mysql":
                 arg_insert_stmt = (
                     insert(TaskArg).values(task_arg_values).prefix_with("IGNORE")
                 )
-            elif SessionLocal.bind.dialect.name == "sqlite":
+            elif SessionLocal and SessionLocal.bind.dialect.name == "sqlite":
                 arg_insert_stmt = (
                     sqlite_insert(TaskArg)
                     .values(task_arg_values)
@@ -188,7 +189,7 @@ def bind_task_args() -> Any:
             else:
                 raise ServerError(
                     "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                    + SessionLocal.bind.dialect.name
+                    + SessionLocal.bind.dialect.name if SessionLocal else "None"
                 )
             with session.begin():
                 session.execute(arg_insert_stmt)
@@ -235,7 +236,7 @@ def bind_task_attributes() -> Any:
             # Insert and handle the conflicts
             if insert_values:
                 try:
-                    if SessionLocal.bind.dialect.name == "mysql":
+                    if SessionLocal and SessionLocal.bind.dialect.name == "mysql":
                         attr_insert_stmt = mysql_insert(TaskAttribute).values(
                             insert_values
                         )
@@ -244,9 +245,9 @@ def bind_task_attributes() -> Any:
                         )
                         session.execute(attr_insert_stmt)
 
-                    elif SessionLocal.bind.dialect.name == "sqlite":
+                    elif SessionLocal and SessionLocal.bind.dialect.name == "sqlite":
                         for attr_to_add in insert_values:
-                            attr_insert_stmt = (
+                            attr_insert_stmt: sqlalchemy.dialects.sqlite.dml.Insert = (
                                 sqlite_insert(TaskAttribute)
                                 .values(attr_to_add)
                                 .on_conflict_do_update(
@@ -261,7 +262,7 @@ def bind_task_attributes() -> Any:
                     else:
                         raise ServerError(
                             "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                            + SessionLocal.bind.dialect.name
+                            + SessionLocal.bind.dialect.name if SessionLocal else "None"
                         )
                 except (DataError, IntegrityError) as e:
                     # Attributes too long, message back
@@ -285,8 +286,8 @@ def _add_or_get_attribute_types(
     existing_rows_select = select(TaskAttributeType).where(
         TaskAttributeType.name.in_(names)
     )
-    existing_rows = session.execute(existing_rows_select).scalars()
-    existing_rows = {attr.name: attr.id for attr in existing_rows}
+    existing_rows_raw: Dict[Optional[str], Optional[int]] = session.execute(existing_rows_select).scalars()
+    existing_rows = {attr.name: attr.id for attr in existing_rows_raw}
 
     existing_names = set(existing_rows.keys())
 
@@ -300,13 +301,13 @@ def _add_or_get_attribute_types(
     if any(new_names):
         new_attribute_types = [{"name": name} for name in new_names]
         try:
-            if SessionLocal.bind.dialect.name == "mysql":
+            if SessionLocal and SessionLocal.bind.dialect.name == "mysql":
                 insert_stmt = (
                     insert(TaskAttributeType)
                     .values(new_attribute_types)
                     .prefix_with("IGNORE")
                 )
-            elif SessionLocal.bind.dialect.name == "sqlite":
+            elif SessionLocal and SessionLocal.bind.dialect.name == "sqlite":
                 insert_stmt = (
                     sqlite_insert(TaskAttributeType)
                     .values(new_attribute_types)
@@ -315,7 +316,7 @@ def _add_or_get_attribute_types(
             else:
                 raise ServerError(
                     "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                    + SessionLocal.bind.dialect.name
+                    + SessionLocal.bind.dialect.name if SessionLocal else "None"
                 )
             session.execute(insert_stmt)
 
@@ -415,7 +416,7 @@ def set_task_resume_state(workflow_id: int) -> Any:
         workflow = session.execute(
             select(Workflow).where(Workflow.id == workflow_id)
         ).scalar()
-        if not workflow.is_resumable:
+        if workflow and not workflow.is_resumable:
             err_msg = (
                 f"Workflow {workflow_id} is not resumable. Please "
                 f"set the appropriate resume state."

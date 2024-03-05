@@ -102,7 +102,7 @@ def bind_workflow() -> Any:
             logger.info("Created new workflow")
 
             # update attributes
-            if workflow_attributes:
+            if workflow_attributes and workflow and workflow.id:
                 _add_workflow_attributes(workflow.id, workflow_attributes, session)
                 session.flush()
             newly_created = True
@@ -118,7 +118,8 @@ def bind_workflow() -> Any:
                 logger.info("Upsert attributes for workflow")
                 if workflow_attributes:
                     for name, val in workflow_attributes.items():
-                        _upsert_wf_attribute(workflow.id, name, val, session)
+                        if workflow and workflow.id:
+                            _upsert_wf_attribute(workflow.id, name, val, session)
             newly_created = False
 
     resp = jsonify(
@@ -178,7 +179,7 @@ def _add_or_get_wf_attribute_type(name: str, session: Session) -> int:
             )
             wf_attrib_type = session.execute(select_stmt).scalars().one()
 
-    return wf_attrib_type.id
+    return wf_attrib_type.id if wf_attrib_type else None
 
 
 def _upsert_wf_attribute(
@@ -186,7 +187,7 @@ def _upsert_wf_attribute(
 ) -> None:
     with session.begin_nested():
         wf_attrib_id = _add_or_get_wf_attribute_type(name, session)
-        if SessionLocal.bind.dialect.name == "mysql":
+        if SessionLocal and SessionLocal.bind.dialect.name == "mysql":
             insert_vals = mysql_insert(WorkflowAttribute).values(
                 workflow_id=workflow_id,
                 workflow_attribute_type_id=wf_attrib_id,
@@ -195,8 +196,8 @@ def _upsert_wf_attribute(
             upsert_stmt = insert_vals.on_duplicate_key_update(
                 value=insert_vals.inserted.value
             )
-        elif SessionLocal.bind.dialect.name == "sqlite":
-            insert_vals = sqlite_insert(WorkflowAttribute).values(
+        elif SessionLocal and SessionLocal.bind.dialect.name == "sqlite":
+            insert_vals: sqlalchemy.dialects.sqlite.dml.Insert = sqlite_insert(WorkflowAttribute).values(
                 workflow_id=workflow_id,
                 workflow_attribute_type_id=wf_attrib_id,
                 value=value,
@@ -358,7 +359,7 @@ def task_status_updates(workflow_id: int) -> Any:
     session = SessionLocal()
     with session.begin():
         db_time = session.execute(select(func.now())).scalar()
-        str_time = db_time.strftime("%Y-%m-%d %H:%M:%S")
+        str_time = db_time.strftime("%Y-%m-%d %H:%M:%S") if db_time else None
 
     # Prepare and execute your query without GROUP_CONCAT
     tasks_by_status_query = select(Task.status, Task.id).where(*filter_criteria)
@@ -410,7 +411,7 @@ def get_tasks_from_workflow(workflow_id: int) -> Any:
             min_task_id = session.execute(
                 select(func.min(Task.id)).where(Task.workflow_id == workflow_id)
             ).scalar()
-            max_task_id = min_task_id - 1
+            max_task_id = min_task_id - 1 if min_task_id else 0
 
     with session.begin():
         # Query task table
@@ -462,14 +463,14 @@ def get_tasks_from_workflow(workflow_id: int) -> Any:
         # get the queue and cluster
         for queue_id in queue_map.keys():
             queue = session.get(Queue, queue_id)
-            queue_name = queue.name
-            cluster_name = queue.cluster.name
+            queue_name = queue.name if queue else None
+            cluster_name = queue.cluster.name if queue else None
             for task_id in queue_map[queue_id]:
                 resp_dict[task_id].extend([cluster_name, queue_name])
 
         # get the max concurrency
         for array_id in array_map.keys():
-            array = session.get(Array, array_id)
+            array: any = session.get(Array, array_id)
             max_concurrently_running = array.max_concurrently_running
             for task_id in array_map[array_id]:
                 resp_dict[task_id].append(max_concurrently_running)

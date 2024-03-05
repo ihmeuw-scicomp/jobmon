@@ -597,7 +597,7 @@ def _log_error(
     if nodename is not None:
         ti.nodename = nodename
     if distributor_id is not None:
-        ti.distributor_id = distributor_id
+        ti.distributor_id: str = distributor_id
 
     try:
         error = TaskInstanceErrorLog(task_instance_id=ti.id, description=error_msg)
