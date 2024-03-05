@@ -2,14 +2,14 @@
 
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from flask import jsonify, request
 from flask_cors import cross_origin
 import numpy as np
 import polars as pl
 import scipy.stats as st  # type:ignore
-from sqlalchemy import select, Select, Row
+from sqlalchemy import Row, Select, select
 from sqlalchemy.sql import func
 import structlog
 
@@ -250,7 +250,10 @@ def get_task_template_resource_usage() -> Any:
             if node_args:
                 session = SessionLocal()
                 with session.begin():
-                    node_f = [NodeArg.arg_id == Arg.id, NodeArg.node_id == r["node_id"]]  # type: ignore
+                    node_f = [
+                        NodeArg.arg_id == Arg.id,
+                        NodeArg.node_id == r["node_id"],
+                    ]  # type: ignore
                     node_s = select(Arg.name, NodeArg.val).where(*node_f)
                     node_rows = session.execute(node_s).all()
                     session.commit()

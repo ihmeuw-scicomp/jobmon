@@ -2,11 +2,10 @@
 
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, cast, Dict, List, Set, Union, Optional
+from typing import Any, cast, Dict, List, Set, Union
 
-import sqlalchemy
 from flask import jsonify, request
-from sqlalchemy import desc, insert, select, tuple_, update, ScalarResult
+from sqlalchemy import desc, insert, ScalarResult, select, tuple_, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import DataError, IntegrityError
@@ -264,7 +263,7 @@ def bind_task_attributes() -> Any:
                         and SessionLocal.bind.dialect.name == "sqlite"
                     ):
                         for attr_to_add in insert_values:
-                            attr_insert_stmt: sqlalchemy.dialects.sqlite.dml.Insert = (  # type: ignore
+                            attr_insert_stmt = (  # type: ignore
                                 sqlite_insert(TaskAttribute)
                                 .values(attr_to_add)
                                 .on_conflict_do_update(

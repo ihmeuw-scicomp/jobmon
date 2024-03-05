@@ -9,12 +9,10 @@ from flask_cors import cross_origin
 import pandas as pd
 from sqlalchemy import (
     func,
+    Select,
     select,
     text,
     update,
-    Select,
-    ColumnElement,
-    BinaryExpression,
 )
 import structlog
 

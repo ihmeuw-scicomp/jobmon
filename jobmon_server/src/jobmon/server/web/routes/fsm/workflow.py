@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict, List, Tuple, Optional
+from typing import Any, cast, Dict, List, Optional, Tuple
 
 from flask import jsonify, request
 import sqlalchemy
@@ -214,7 +214,7 @@ def _upsert_wf_attribute(
                 workflow_attribute_type_id=wf_attrib_id,
                 value=value,
             )
-            upsert_stmt: sqlalchemy.dialects.sqlite.dml.Insert = insert_vals2.on_conflict_do_update(  # type: ignore
+            upsert_stmt = insert_vals2.on_conflict_do_update(  # type: ignore
                 index_elements=["workflow_id", "workflow_attribute_type_id"],
                 set_=dict(value=value),
             )

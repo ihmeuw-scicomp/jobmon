@@ -1,10 +1,10 @@
 """Routes used to move through the finite state."""
 
 from http import HTTPStatus as StatusCodes
-from typing import Any, Tuple, Optional, Sequence
+from typing import Any, Optional, Sequence, Tuple
 
 from flask import jsonify, request
-from sqlalchemy import func, select, text, update, Select, Row
+from sqlalchemy import func, Row, Select, select, text, update
 import structlog
 
 from jobmon.core.exceptions import InvalidStateTransition
