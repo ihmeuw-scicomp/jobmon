@@ -1,7 +1,6 @@
 """Routes for Tasks."""
 
 from http import HTTPStatus as StatusCodes
-import json
 from typing import Any, cast, Dict, List, Set, Union
 
 from flask import jsonify, request
@@ -264,7 +263,7 @@ def bind_task_attributes() -> Any:
                     ):
                         for attr_to_add in insert_values:
                             attr_insert_stmt = (  # type: ignore
-                                sqlite_insert(TaskAttribute)
+                                sqlite_insert(TaskAttribute)  # type: ignore
                                 .values(attr_to_add)
                                 .on_conflict_do_update(
                                     index_elements=[
@@ -366,13 +365,14 @@ def _add_or_get_attribute_types(
         # Update our return dict
         return_dict.update(
             {
+                # Code to keep typechecker happy
                 attribute.name if attribute.name else "NA": (
-                    attribute.id if attribute.id else "-1"
+                    attribute.id if attribute.id else -1
                 )
                 for attribute in new_attribute_type_ids
             }
         )
-    return return_dict
+    return return_dict  # type: ignore
 
 
 @blueprint.route("/task/bind_resources", methods=["POST"])
@@ -382,10 +382,12 @@ def bind_task_resources() -> Any:
 
     session = SessionLocal()
     with session.begin():
+        tr_id = data.get("task_resources_type_id", None)
+        req_resc = data.get("requested_resources", None)
         new_resources = TaskResources(
             queue_id=data["queue_id"],
-            task_resources_type_id=data.get("task_resources_type_id", None),
-            requested_resources=json.dumps(data.get("requested_resources", None)),
+            task_resources_type_id=tr_id,  # type: ignore
+            requested_resources=req_resc,  # type: ignore
         )
         session.add(new_resources)
 
