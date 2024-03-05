@@ -62,7 +62,7 @@ class SerializeTaskInstance:
         workflow_run_id: int,
         workflow_id: int,
         status: str,
-        distributor_id: Union[int, None],
+        distributor_id: Union[str, None],
         cluster_id: Optional[int] = None,
         task_resources_id: Optional[int] = None,
         array_id: Optional[int] = None,

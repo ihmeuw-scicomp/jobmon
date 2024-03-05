@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy import CheckConstraint, create_engine, event, func, String, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 from sqlalchemy_utils import database_exists, drop_database
 import structlog
@@ -16,7 +16,8 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 # declarative registry for model elements
-Base: DeclarativeMeta = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 
 @event.listens_for(Base, "instrument_class", propagate=True)
