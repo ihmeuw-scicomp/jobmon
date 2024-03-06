@@ -40,6 +40,7 @@ class WorkflowRun(Base):
         String(1),
         ForeignKey("workflow_run_status.id"),
         default=WorkflowRunStatus.REGISTERED,
+        nullable=False,
     )
 
     created_date = Column(DateTime, default=func.now())

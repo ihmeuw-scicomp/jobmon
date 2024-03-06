@@ -12,7 +12,7 @@ class ClusterType(Base):
     __tablename__ = "cluster_type"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), unique=True)
+    name = Column(String(255), unique=True, nullable=False)
     logfile_templates = Column(String(500))
 
     # ORM relationships

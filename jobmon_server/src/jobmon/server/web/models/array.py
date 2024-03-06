@@ -22,7 +22,7 @@ class Array(Base):
         return serialized
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), index=True)
+    name = Column(String(255), index=True, nullable=False)
     task_template_version_id = Column(Integer, index=True)
     workflow_id = Column(Integer, index=True)
     max_concurrently_running = Column(Integer)

@@ -21,8 +21,8 @@ class TaskTemplate(Base):
         )
 
     id = Column(Integer, primary_key=True)
-    tool_version_id = Column(Integer, ForeignKey("tool_version.id"))
-    name = Column(VARCHAR(255))
+    tool_version_id = Column(Integer, ForeignKey("tool_version.id"), nullable=False)
+    name = Column(VARCHAR(255), nullable=False)
 
     # orm relationship
     tool_versions = relationship("ToolVersion", back_populates="task_templates")

@@ -11,8 +11,8 @@ class Node(Base):
     __tablename__ = "node"
 
     id = Column(Integer, primary_key=True)
-    task_template_version_id = Column(Integer, index=True)
-    node_args_hash = Column(VARCHAR(50))
+    task_template_version_id = Column(Integer, index=True, nullable=False)
+    node_args_hash = Column(VARCHAR(150), nullable=False)
 
     __table_args__ = (
         UniqueConstraint(

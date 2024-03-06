@@ -30,7 +30,7 @@ class TaskResources(Base):
 
     id = Column(Integer, primary_key=True)
     queue_id = Column(Integer, ForeignKey("queue.id"))
-    task_resources_type_id = Column(String(1), ForeignKey("task_resources_type.id"))
+    task_resources_type_id = Column(String(1), ForeignKey("task_resources_type.id"), nullable=False)
 
     requested_resources = Column(Text, default=None)
 

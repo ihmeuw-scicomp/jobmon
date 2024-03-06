@@ -22,7 +22,7 @@ existing_sqlalchemy_url = config.get_main_option("sqlalchemy.url")
 
 # If 'sqlalchemy.url' is not set, update it with the value from JobmonConfig
 if not existing_sqlalchemy_url:
-    sqlalchemy_database_uri = _CONFIG.get("web", "sqlalchemy_database_uri")
+    sqlalchemy_database_uri = _CONFIG.get("db", "sqlalchemy_database_uri")
     config.set_main_option("sqlalchemy.url", sqlalchemy_database_uri)
 
 

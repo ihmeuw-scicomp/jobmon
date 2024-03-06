@@ -25,8 +25,8 @@ class Cluster(Base):
         )
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), unique=True)
-    cluster_type_id = Column(Integer, ForeignKey("cluster_type.id"))
+    name = Column(String(255), unique=True, nullable=False)
+    cluster_type_id = Column(Integer, ForeignKey("cluster_type.id"), nullable=False)
     connection_parameters = Column(String(2500))
 
     # ORM relationships

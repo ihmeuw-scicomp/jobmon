@@ -18,9 +18,9 @@ class Queue(Base):
         return SerializeQueue.to_wire(self.id, self.name, self.parameters)
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(255))
-    cluster_id = Column(Integer, ForeignKey("cluster.id"))
-    parameters = Column(String(2500))
+    name = Column(String(255), nullable=False)
+    cluster_id = Column(Integer, ForeignKey("cluster.id"), nullable=False)
+    parameters = Column(String(2500), nullable=False)
 
     # ORM relationships
     cluster = relationship("Cluster", back_populates="queues")
