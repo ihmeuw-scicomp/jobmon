@@ -2,6 +2,7 @@
 
 from sqlalchemy import Column, DateTime, Integer, String, UniqueConstraint
 from sqlalchemy.sql import func
+from sqlalchemy.orm import Mapped, mapped_column
 
 from jobmon.core.serializers import SerializeDistributorArray
 from jobmon.server.web.models import Base
@@ -21,11 +22,11 @@ class Array(Base):
         )
         return serialized
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), index=True)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
     task_template_version_id = Column(Integer, index=True)
     workflow_id = Column(Integer, index=True)
-    max_concurrently_running = Column(Integer)
+    max_concurrently_running: Mapped[int] = mapped_column(Integer)
     created_date = Column(DateTime, default=func.now())
 
     __table_args__ = (
