@@ -1,8 +1,8 @@
 """Array Table for the Database."""
 
 from sqlalchemy import Column, DateTime, Integer, String, UniqueConstraint
-from sqlalchemy.sql import func
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import func
 
 from jobmon.core.serializers import SerializeDistributorArray
 from jobmon.server.web.models import Base

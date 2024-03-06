@@ -15,6 +15,7 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+
 # declarative registry for model elements
 class Base(DeclarativeBase):
     pass

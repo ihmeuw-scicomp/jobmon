@@ -1,6 +1,6 @@
 """Tool version db table."""
 
-from sqlalchemy import Column, ForeignKey, Integer
+from sqlalchemy import ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from jobmon.core.serializers import SerializeClientToolVersion

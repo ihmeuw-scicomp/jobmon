@@ -4,7 +4,7 @@ import datetime
 from typing import Tuple
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, VARCHAR
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import structlog
