@@ -1,6 +1,7 @@
 """Routes for Tasks."""
 
 from http import HTTPStatus as StatusCodes
+import json
 from typing import Any, cast, Dict, List, Set, Union
 
 from flask import jsonify, request
@@ -383,7 +384,7 @@ def bind_task_resources() -> Any:
     session = SessionLocal()
     with session.begin():
         tr_id = data.get("task_resources_type_id", None)
-        req_resc = data.get("requested_resources", None)
+        req_resc = json.dumps(data.get("requested_resources", None))
         new_resources = TaskResources(
             queue_id=data["queue_id"],
             task_resources_type_id=tr_id,  # type: ignore
