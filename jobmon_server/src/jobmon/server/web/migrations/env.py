@@ -1,13 +1,14 @@
+import logging
 from logging.config import fileConfig
 
 from alembic import context
-# from alembic.operations import Operations, MigrateOperation, CreateTableOp
 from sqlalchemy import engine_from_config, event, Index
 from sqlalchemy import pool
-# from sqlalchemy.schema import ForeignKeyConstraint
 
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.models import Base, load_model, add_string_length_constraint
+
+logger = logging.getLogger('alembic')
 
 
 _CONFIG = JobmonConfig()
@@ -18,12 +19,12 @@ config = context.config
 
 
 # Check if 'sqlalchemy.url' is already set in the Alembic configuration
-existing_sqlalchemy_url = config.get_main_option("sqlalchemy.url")
+sqlalchemy_url = config.get_main_option("sqlalchemy.url")
 
 # If 'sqlalchemy.url' is not set, update it with the value from JobmonConfig
-if not existing_sqlalchemy_url:
-    sqlalchemy_database_uri = _CONFIG.get("db", "sqlalchemy_database_uri")
-    config.set_main_option("sqlalchemy.url", sqlalchemy_database_uri)
+if not sqlalchemy_url:
+    sqlalchemy_url = _CONFIG.get("db", "sqlalchemy_database_uri")
+    config.set_main_option("sqlalchemy.url", sqlalchemy_url)
 
 
 # Interpret the config file for Python logging.
@@ -33,7 +34,8 @@ if config.config_file_name is not None:
 
 # for 'autogenerate' support
 # remove sqlite check constraints from the model before loading it
-if not _CONFIG.get("db", "sqlalchemy_database_uri").startswith("sqlite"):
+logger.info(sqlalchemy_url)
+if not sqlalchemy_url.startswith("sqlite"):
     event.remove(Base, "instrument_class", add_string_length_constraint)
 load_model()
 
