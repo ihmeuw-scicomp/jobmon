@@ -56,9 +56,7 @@ def bind_tasks_no_args() -> Any:
         prebound_tasks = session.execute(task_select_stmt).scalars().all()
 
         # Bind tasks not present in DB
-        tasks_to_add: List[Any] = (
-            []
-        )  # Container for tasks not yet bound to the database
+        tasks_to_add: List = []  # Container for tasks not yet bound to the database
         present_tasks = {
             (task.node_id, task.task_args_hash): task for task in prebound_tasks
         }  # Dictionary mapping existing Tasks to the supplied arguments
@@ -93,7 +91,7 @@ def bind_tasks_no_args() -> Any:
 
             # If not, add the task
             else:
-                task: Dict = {  # type: ignore
+                task = {  # type: ignore
                     "workflow_id": workflow_id,
                     "node_id": node_id,
                     "task_args_hash": arg_hash,
@@ -106,7 +104,7 @@ def bind_tasks_no_args() -> Any:
                     "resource_scales": str(resource_scales),
                     "fallback_queues": str(fallback_queues),
                 }
-            tasks_to_add.append(task)
+                tasks_to_add.append(task)
 
             task_hash_lookup[id_tuple] = hashval
 
