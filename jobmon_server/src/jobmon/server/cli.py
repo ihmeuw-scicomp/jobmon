@@ -22,6 +22,7 @@ class ServerCLI(CLI):
         self._add_workflow_reaper_subparser()
         self._add_init_db_subparser()
         self._add_terminate_db_subparser()
+        self._add_upgrade_db_subparser()
 
     def workflow_reaper(self, args: argparse.Namespace) -> None:
         """Workflow reaper entrypoint logic."""
@@ -43,29 +44,41 @@ class ServerCLI(CLI):
 
     def init_db(self, args: argparse.Namespace) -> None:
         """Entrypoint to initialize new Jobmon database."""
-        import sqlalchemy
         from jobmon.core.configuration import JobmonConfig
-        from jobmon.server.web.models import init_db
+        from jobmon.server.web.db_admin import init_db
 
+        # Load database URI from configuration or command line argument
         sqlalchemy_database_uri = args.sqlalchemy_database_uri
         if not sqlalchemy_database_uri:
             config = JobmonConfig()
             sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")
-        engine = sqlalchemy.create_engine(sqlalchemy_database_uri)
-        init_db(engine)
+
+        # Adjust the package path to where alembic.ini is located within your package
+        init_db(sqlalchemy_database_uri)
 
     def terminate_db(self, args: argparse.Namespace) -> None:
         """Entrypoint to terminate a Jobmon database."""
-        import sqlalchemy
         from jobmon.core.configuration import JobmonConfig
-        from jobmon.server.web.models import terminate_db
+        from jobmon.server.web.db_admin import terminate_db
 
         sqlalchemy_database_uri = args.sqlalchemy_database_uri
         if not sqlalchemy_database_uri:
             config = JobmonConfig()
             sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")
-        engine = sqlalchemy.create_engine(sqlalchemy_database_uri)
-        terminate_db(engine)
+
+        terminate_db(sqlalchemy_database_uri)
+
+    def upgrade_db(self, args: argparse.Namespace) -> None:
+        """Entrypoint to upgrade a Jobmon database."""
+        from jobmon.core.configuration import JobmonConfig
+        from jobmon.server.web.db_admin import apply_migrations
+
+        sqlalchemy_database_uri = args.sqlalchemy_database_uri
+        if not sqlalchemy_database_uri:
+            config = JobmonConfig()
+            sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")
+
+        apply_migrations(sqlalchemy_database_uri, args.revision)
 
     def _add_workflow_reaper_subparser(self) -> None:
         reaper_parser = self._subparsers.add_parser("workflow_reaper")
@@ -137,6 +150,23 @@ class ServerCLI(CLI):
             default="",
         )
 
+    def _add_upgrade_db_subparser(self) -> None:
+        upgrade_db_parser = self._subparsers.add_parser("upgrade_db")
+        upgrade_db_parser.set_defaults(func=self.upgrade_db)
+        upgrade_db_parser.add_argument(
+            "--sqlalchemy_database_uri",
+            type=str,
+            help="The connection string for sqlalchemy to use when running the server.",
+            required=False,
+            default="",
+        )
+        upgrade_db_parser.add_argument(
+            "--revision",
+            type=str,
+            help="The revision to upgrade the database to.",
+            required=False,
+            default="head",
+        )
 
 def main(argstr: Optional[str] = None) -> None:
     """Create CLI."""
