@@ -48,7 +48,7 @@ class TaskTemplateVersion(Base):
     id = Column(Integer, primary_key=True)
     task_template_id = Column(Integer)
     command_template = Column(Text)
-    arg_mapping_hash = Column(VARCHAR(255))
+    arg_mapping_hash = Column(VARCHAR(150))
 
     # orm relationship
     task_template = relationship(
