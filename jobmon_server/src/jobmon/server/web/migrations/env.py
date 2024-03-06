@@ -22,7 +22,7 @@ existing_sqlalchemy_url = config.get_main_option("sqlalchemy.url")
 
 # If 'sqlalchemy.url' is not set, update it with the value from JobmonConfig
 if not existing_sqlalchemy_url:
-    sqlalchemy_database_uri = _CONFIG.get("web", "sqlalchemy_database_uri")
+    sqlalchemy_database_uri = _CONFIG.get("db", "sqlalchemy_database_uri")
     config.set_main_option("sqlalchemy.url", sqlalchemy_database_uri)
 
 
@@ -33,7 +33,8 @@ if config.config_file_name is not None:
 
 # for 'autogenerate' support
 # remove sqlite check constraints from the model before loading it
-event.remove(Base, "instrument_class", add_string_length_constraint)
+if not _CONFIG.get("db", "sqlalchemy_database_uri").startswith("sqlite"):
+    event.remove(Base, "instrument_class", add_string_length_constraint)
 load_model()
 
 # swap foreign keys for indices
