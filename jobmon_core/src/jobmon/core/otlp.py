@@ -113,7 +113,7 @@ class OtlpAPI:
         return cls._instance
 
     def __init__(
-        self, extra_detectors: List[resources.ResourceDetector] = None
+        self, extra_detectors: List[resources.ResourceDetector] = []
     ) -> None:
         """Initialize the OtlpAPI object."""
         if OtlpAPI._initialized:
