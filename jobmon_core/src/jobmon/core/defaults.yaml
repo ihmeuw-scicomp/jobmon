@@ -13,7 +13,7 @@ heartbeat:
   task_instance_interval: 90
 
 reaper:
-  poll_interval_minutes = 5
+  poll_interval_minutes: 5
 
 distributor:
   poll_interval: 10

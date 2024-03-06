@@ -19,7 +19,7 @@ def get_app(config: Optional[JobmonConfig] = None) -> Flask:
         app_factory = AppFactory.from_defaults()
     else:
         app_factory = AppFactory(
-            config.get("web", "sqlalchemy_database_uri"),
+            config.get("db", "sqlalchemy_database_uri"),
             config.get("otlp", "web_enabled"),
         )
     app = app_factory.get_app()

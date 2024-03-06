@@ -24,6 +24,7 @@ def apply_migrations(sqlalchemy_database_uri: str, revision: str = "head") -> No
 def init_db(sqlalchemy_database_uri: str) -> None:
     """Create database and apply migrations."""
     # create a fresh database
+    load_metadata = False
     if not database_exists(sqlalchemy_database_uri):
         load_metadata = True
         create_database(sqlalchemy_database_uri)
