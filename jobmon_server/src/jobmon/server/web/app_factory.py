@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from importlib import import_module
-from typing import List, Optional, Type
+from typing import Any, List, Optional, Type
 
 from flask import Flask
 import sqlalchemy
@@ -9,6 +9,7 @@ import sqlalchemy
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web import session_factory
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
+from jobmon.server.web.server_side_exception import ServerError
 
 
 class AppFactory:
@@ -62,9 +63,12 @@ class AppFactory:
         extra_processors = []
         if cls.otlp_api:
 
-            def add_open_telemetry_spans(_: any, __: any, event_dict: dict) -> dict:
+            def add_open_telemetry_spans(_: Any, __: Any, event_dict: dict) -> dict:
                 """Add OpenTelemetry spans to the log record."""
-                span, trace, parent_span = cls.otlp_api.get_span_details()
+                if cls.otlp_api is not None:
+                    span, trace, parent_span = cls.otlp_api.get_span_details()
+                else:
+                    raise ServerError("otlp_api is None.")
 
                 event_dict["span"] = {
                     "span_id": span or None,

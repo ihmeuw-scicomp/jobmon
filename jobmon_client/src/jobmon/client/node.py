@@ -101,7 +101,9 @@ class Node:
         str_arg_ids = [str(arg) for arg in arg_ids]
 
         hash_value = int(
-            hashlib.sha256("".join(str_arg_ids + arg_values).encode("utf-8")).hexdigest(),
+            hashlib.sha256(
+                "".join(str_arg_ids + arg_values).encode("utf-8")
+            ).hexdigest(),
             16,
         )
         return hash_value
