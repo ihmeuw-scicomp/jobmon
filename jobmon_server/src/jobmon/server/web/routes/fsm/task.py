@@ -5,7 +5,7 @@ import json
 from typing import Any, cast, Dict, List, Set, Union
 
 from flask import jsonify, request
-from sqlalchemy import desc, insert, select, tuple_, update
+from sqlalchemy import desc, insert, ScalarResult, select, tuple_, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import DataError, IntegrityError
@@ -26,7 +26,6 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.routes import SessionLocal
 from jobmon.server.web.routes.fsm import blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
-
 
 logger = structlog.get_logger(__name__)
 
@@ -57,9 +56,7 @@ def bind_tasks_no_args() -> Any:
         prebound_tasks = session.execute(task_select_stmt).scalars().all()
 
         # Bind tasks not present in DB
-        tasks_to_add: List[Dict] = (
-            []
-        )  # Container for tasks not yet bound to the database
+        tasks_to_add: List = []  # Container for tasks not yet bound to the database
         present_tasks = {
             (task.node_id, task.task_args_hash): task for task in prebound_tasks
         }  # Dictionary mapping existing Tasks to the supplied arguments
@@ -94,7 +91,7 @@ def bind_tasks_no_args() -> Any:
 
             # If not, add the task
             else:
-                task = {
+                task = {  # type: ignore
                     "workflow_id": workflow_id,
                     "node_id": node_id,
                     "task_args_hash": arg_hash,
@@ -143,7 +140,7 @@ def bind_tasks_no_args() -> Any:
         # Done here to prevent modifying tasks, and necessitating a refresh.
         return_tasks = {}
 
-        for task in prebound_tasks + new_tasks:
+        for task in prebound_tasks + new_tasks:  # type: ignore
             id_tuple = (task.node_id, task.task_args_hash)
             hashval = task_hash_lookup[id_tuple]
             return_tasks[hashval] = [task.id, task.status]
@@ -175,11 +172,19 @@ def bind_task_args() -> Any:
         ]
         session = SessionLocal()
         try:
-            if SessionLocal.bind.dialect.name == "mysql":
+            if (
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
+            ):
                 arg_insert_stmt = (
                     insert(TaskArg).values(task_arg_values).prefix_with("IGNORE")
                 )
-            elif SessionLocal.bind.dialect.name == "sqlite":
+            elif (
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "sqlite"
+            ):
                 arg_insert_stmt = (
                     sqlite_insert(TaskArg)
                     .values(task_arg_values)
@@ -189,6 +194,8 @@ def bind_task_args() -> Any:
                 raise ServerError(
                     "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
                     + SessionLocal.bind.dialect.name
+                    if SessionLocal and SessionLocal.bind
+                    else "None"
                 )
             with session.begin():
                 session.execute(arg_insert_stmt)
@@ -235,7 +242,11 @@ def bind_task_attributes() -> Any:
             # Insert and handle the conflicts
             if insert_values:
                 try:
-                    if SessionLocal.bind.dialect.name == "mysql":
+                    if (
+                        SessionLocal
+                        and SessionLocal.bind
+                        and SessionLocal.bind.dialect.name == "mysql"
+                    ):
                         attr_insert_stmt = mysql_insert(TaskAttribute).values(
                             insert_values
                         )
@@ -244,10 +255,14 @@ def bind_task_attributes() -> Any:
                         )
                         session.execute(attr_insert_stmt)
 
-                    elif SessionLocal.bind.dialect.name == "sqlite":
+                    elif (
+                        SessionLocal
+                        and SessionLocal.bind
+                        and SessionLocal.bind.dialect.name == "sqlite"
+                    ):
                         for attr_to_add in insert_values:
-                            attr_insert_stmt = (
-                                sqlite_insert(TaskAttribute)
+                            attr_insert_stmt = (  # type: ignore
+                                sqlite_insert(TaskAttribute)  # type: ignore
                                 .values(attr_to_add)
                                 .on_conflict_do_update(
                                     index_elements=[
@@ -262,6 +277,8 @@ def bind_task_attributes() -> Any:
                         raise ServerError(
                             "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
                             + SessionLocal.bind.dialect.name
+                            if SessionLocal and SessionLocal.bind
+                            else "None"
                         )
                 except (DataError, IntegrityError) as e:
                     # Attributes too long, message back
@@ -285,28 +302,38 @@ def _add_or_get_attribute_types(
     existing_rows_select = select(TaskAttributeType).where(
         TaskAttributeType.name.in_(names)
     )
-    existing_rows = session.execute(existing_rows_select).scalars()
-    existing_rows = {attr.name: attr.id for attr in existing_rows}
+    existing_rows_raw: ScalarResult[TaskAttributeType] = session.execute(
+        existing_rows_select
+    ).scalars()
+    existing_rows = {attr.name: attr.id for attr in existing_rows_raw}
 
     existing_names = set(existing_rows.keys())
 
     # Insert the remaining names, found from the difference between old and new
     # Keep the IGNORE prefix in case other agents add attributes first, prevent errors
     # while trying to minimize collisions
-    new_names = names - existing_names
+    new_names = names - existing_names  # type: ignore
 
     # We'll eventually return the combination of existing + new attribute type ids
     return_dict = existing_rows
     if any(new_names):
         new_attribute_types = [{"name": name} for name in new_names]
         try:
-            if SessionLocal.bind.dialect.name == "mysql":
+            if (
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
+            ):
                 insert_stmt = (
                     insert(TaskAttributeType)
                     .values(new_attribute_types)
                     .prefix_with("IGNORE")
                 )
-            elif SessionLocal.bind.dialect.name == "sqlite":
+            elif (
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "sqlite"
+            ):
                 insert_stmt = (
                     sqlite_insert(TaskAttributeType)
                     .values(new_attribute_types)
@@ -316,6 +343,8 @@ def _add_or_get_attribute_types(
                 raise ServerError(
                     "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
                     + SessionLocal.bind.dialect.name
+                    if SessionLocal and SessionLocal.bind
+                    else "None"
                 )
             session.execute(insert_stmt)
 
@@ -334,9 +363,15 @@ def _add_or_get_attribute_types(
 
         # Update our return dict
         return_dict.update(
-            {attribute.name: attribute.id for attribute in new_attribute_type_ids}
+            {
+                # Code to keep typechecker happy
+                attribute.name if attribute.name else "NA": (  # type: ignore
+                    attribute.id if attribute.id else -1  # type: ignore
+                )
+                for attribute in new_attribute_type_ids
+            }
         )
-    return return_dict
+    return return_dict  # type: ignore
 
 
 @blueprint.route("/task/bind_resources", methods=["POST"])
@@ -346,10 +381,12 @@ def bind_task_resources() -> Any:
 
     session = SessionLocal()
     with session.begin():
+        tr_id = data.get("task_resources_type_id", None)
+        req_resc = json.dumps(data.get("requested_resources", None))
         new_resources = TaskResources(
             queue_id=data["queue_id"],
-            task_resources_type_id=data.get("task_resources_type_id", None),
-            requested_resources=json.dumps(data.get("requested_resources", None)),
+            task_resources_type_id=tr_id,  # type: ignore
+            requested_resources=req_resc,  # type: ignore
         )
         session.add(new_resources)
 
@@ -415,7 +452,7 @@ def set_task_resume_state(workflow_id: int) -> Any:
         workflow = session.execute(
             select(Workflow).where(Workflow.id == workflow_id)
         ).scalar()
-        if not workflow.is_resumable:
+        if workflow and not workflow.is_resumable:
             err_msg = (
                 f"Workflow {workflow_id} is not resumable. Please "
                 f"set the appropriate resume state."

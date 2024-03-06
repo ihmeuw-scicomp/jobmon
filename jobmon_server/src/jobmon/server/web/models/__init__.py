@@ -5,16 +5,18 @@ from pathlib import Path
 from pkgutil import iter_modules
 from typing import Any
 
-from sqlalchemy import CheckConstraint, event, func, String, create_engine
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import CheckConstraint, create_engine, event, func, String
+from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 import structlog
 
 
 logger = structlog.get_logger(__name__)
 
+
 # declarative registry for model elements
-Base: DeclarativeMeta = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 
 @event.listens_for(Base, "instrument_class", propagate=True)

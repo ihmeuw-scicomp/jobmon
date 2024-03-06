@@ -3,7 +3,7 @@
 from typing import Dict, List
 
 from sqlalchemy import Column, ForeignKeyConstraint, Index, Integer, Text, VARCHAR
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from jobmon.core.serializers import SerializeClientTaskTemplateVersion
 from jobmon.server.web.models import Base
@@ -45,10 +45,10 @@ class TaskTemplateVersion(Base):
             task_template_id=self.task_template.id,
         )
 
-    id = Column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     task_template_id = Column(Integer)
-    command_template = Column(Text)
-    arg_mapping_hash = Column(VARCHAR(50))
+    command_template: Mapped[str] = mapped_column(Text)
+    arg_mapping_hash = Column(VARCHAR(150))
 
     # orm relationship
     task_template = relationship(

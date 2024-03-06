@@ -10,7 +10,7 @@ from sqlalchemy import (
     Text,
     VARCHAR,
 )
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 import structlog
 
@@ -46,20 +46,20 @@ class Task(Base):
         serialized = SerializeSwarmTask.to_wire(task_id=self.id, status=self.status)
         return serialized
 
-    id = Column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     workflow_id = Column(Integer, ForeignKey("workflow.id"))
     node_id = Column(Integer, ForeignKey("node.id"))
-    task_args_hash = Column(VARCHAR(50), index=True)
+    task_args_hash = Column(VARCHAR(150), index=True)
     array_id = Column(Integer, ForeignKey("array.id"), default=None)
-    name = Column(String(255), index=True)
-    command = Column(Text)
+    name: Mapped[str] = mapped_column(String(255), index=True, nullable=True)
+    command: Mapped[str] = mapped_column(Text)
     task_resources_id = Column(Integer, ForeignKey("task_resources.id"), default=None)
-    num_attempts = Column(Integer, default=0)
-    max_attempts = Column(Integer, default=1)
+    num_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=1)
     resource_scales = Column(String(1000), default=None)
     fallback_queues = Column(String(1000), default=None)
-    status = Column(String(1), ForeignKey("task_status.id"))
-    status_date = Column(DateTime, default=func.now(), index=True)
+    status: Mapped[str] = mapped_column(String(1), ForeignKey("task_status.id"))
+    status_date = mapped_column(DateTime, default=func.now(), index=True)
 
     # ORM relationships
     task_instances = relationship("TaskInstance", back_populates="task")

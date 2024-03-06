@@ -2,14 +2,14 @@
 
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from flask import jsonify, request
 from flask_cors import cross_origin
 import numpy as np
 import polars as pl
 import scipy.stats as st  # type:ignore
-from sqlalchemy import select
+from sqlalchemy import Row, Select, select
 from sqlalchemy.sql import func
 import structlog
 
@@ -103,22 +103,22 @@ def get_requested_cores() -> Any:
         sql = select(TaskTemplateVersion.id, TaskResources.requested_resources).where(
             *query_filter
         )
-    rows = session.execute(sql).all()
+    rows_raw = session.execute(sql).all()
     column_names = ("id", "rr")
-    rows = [dict(zip(column_names, ti)) for ti in rows]
+    rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
 
     core_info = []
     if rows:
         result_dir: Dict = dict()
         for r in rows:
             # json loads hates single quotes
-            j_str = r["rr"].replace("'", '"')
+            j_str = r["rr"].replace("'", '"')  # type: ignore
             j_dir = json.loads(j_str)
             core = 1 if "num_cores" not in j_dir.keys() else int(j_dir["num_cores"])
-            if r["id"] in result_dir.keys():
-                result_dir[r["id"]].append(core)
+            if r["id"] in result_dir.keys():  # type: ignore
+                result_dir[r["id"]].append(core)  # type: ignore
             else:
-                result_dir[r["id"]] = [core]
+                result_dir[r["id"]] = [core]  # type: ignore
         for k in result_dir.keys():
             item_min = int(np.min(result_dir[k]))
             item_max = int(np.max(result_dir[k]))
@@ -156,16 +156,16 @@ def get_most_popular_queue() -> Any:
             *query_filter
         )
 
-    rows = session.execute(sql).all()
+    rows_raw = session.execute(sql).all()
     column_names = ("id", "queue_id")
-    rows = [dict(zip(column_names, ti)) for ti in rows]
+    rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
     # return a "standard" json format for cli routes
     queue_info = []
     if rows:
         result_dir: Dict = dict()
         for r in rows:
-            ttvi = r["id"]
-            q = r["queue_id"]
+            ttvi = r["id"]  # type: ignore
+            q = r["queue_id"]  # type: ignore
             if ttvi in result_dir.keys():
                 if q in result_dir[ttvi].keys():
                     result_dir[ttvi][q] += 1
@@ -184,8 +184,8 @@ def get_most_popular_queue() -> Any:
             # get queue name; and return queue id with it
             with session:
                 query_filter = [Queue.id == popular_q]
-                sql = select(Queue.name).where(*query_filter)
-            popular_q_name = session.execute(sql).one()[0]
+                sql1: Select[Tuple[str]] = select(Queue.name).where(*query_filter)
+            popular_q_name = session.execute(sql1).one()[0]
             queue_info.append(
                 {"id": ttvi, "queue": popular_q_name, "queue_id": popular_q}
             )
@@ -236,19 +236,22 @@ def get_task_template_resource_usage() -> Any:
         sql = select(
             TaskInstance.wallclock, TaskInstance.maxrss, Node.id, Task.id
         ).where(*query_filter)
-        rows = session.execute(sql).all()
+        rows_raw = session.execute(sql).all()
         session.commit()
     column_names = ("r", "m", "node_id", "task_id")
-    rows = [dict(zip(column_names, ti)) for ti in rows]
+    rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
     result = []
     if rows:
         for r in rows:
-            if r["r"] is None:
+            if r["r"] is None:  # type: ignore
                 r["r"] = 0
             if node_args:
                 session = SessionLocal()
                 with session.begin():
-                    node_f = [NodeArg.arg_id == Arg.id, NodeArg.node_id == r["node_id"]]
+                    node_f = [
+                        NodeArg.arg_id == Arg.id,
+                        NodeArg.node_id == r["node_id"],
+                    ]  # type: ignore
                     node_s = select(Arg.name, NodeArg.val).where(*node_f)
                     node_rows = session.execute(node_s).all()
                     session.commit()
@@ -270,8 +273,8 @@ def get_task_template_resource_usage() -> Any:
         runtimes = []
         mems = []
         for row in result:
-            runtimes.append(int(row["r"]))
-            mems.append(max(0, 0 if row["m"] is None else int(row["m"])))
+            runtimes.append(int(row["r"]))  # type: ignore
+            mems.append(max(0, 0 if row["m"] is None else int(row["m"])))  # type: ignore
 
         num_tasks = len(runtimes)
         # set 0 to NaN; thus, numpy ignores them
@@ -399,7 +402,11 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
         # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
         # the optimizer may choose a suboptimal execution plan for large datasets.
         # Has to be conditional since not all database engines support STRAIGHT_JOIN.
-        if SessionLocal.bind.dialect.name == "mysql":
+        if (
+            SessionLocal
+            and SessionLocal.bind
+            and SessionLocal.bind.dialect.name == "mysql"
+        ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
         session.commit()
@@ -429,11 +436,15 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             .where(Task.workflow_id == workflow_id)
             .group_by(TaskTemplate.id)
         )
-        if SessionLocal.bind.dialect.name == "mysql":
+        if (
+            SessionLocal
+            and SessionLocal.bind
+            and SessionLocal.bind.dialect.name == "mysql"
+        ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
-        attempts = session.execute(sql).all()
+        attempts0 = session.execute(sql).all()
 
-    attempts = {attempt[0]: attempt for attempt in attempts}
+    attempts: Dict[Any, Row[Any]] = {attempt[0]: attempt for attempt in attempts0}
 
     for r in rows:
         # Avoiding magic numbers
@@ -447,7 +458,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             pass
         else:
             attempt = attempts.get(task_template_id)
-            *_, min_, max_, mean = attempt
+            *_, min_, max_, mean = attempt if attempt else (None, None, None, None)
 
             return_dic[int(task_template_id)] = {
                 "id": int(task_template_id),
@@ -507,7 +518,11 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
         # the optimizer may choose a suboptimal execution plan for large datasets.
         # Has to be conditional since not all database engines support STRAIGHT_JOIN.
-        if SessionLocal.bind.dialect.name == "mysql":
+        if (
+            SessionLocal
+            and SessionLocal.bind
+            and SessionLocal.bind.dialect.name == "mysql"
+        ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
         session.commit()

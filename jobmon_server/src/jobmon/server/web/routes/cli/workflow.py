@@ -1,12 +1,19 @@
 """Routes for Workflow."""
 
+from datetime import datetime
 from http import HTTPStatus as StatusCodes
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from flask import jsonify, request
 from flask_cors import cross_origin
 import pandas as pd
-from sqlalchemy import func, select, text, update
+from sqlalchemy import (
+    func,
+    Select,
+    select,
+    text,
+    update,
+)
 import structlog
 
 from jobmon.core.constants import WorkflowStatus as Statuses
@@ -211,8 +218,9 @@ def reset_workflow(workflow_id: int) -> Any:
 
         workflow_query = select(Workflow).where(Workflow.id == workflow_id)
         workflow = session.execute(workflow_query).scalars().one_or_none()
-        workflow.reset(current_time=current_time)
-        session.flush()
+        if workflow:
+            workflow.reset(current_time=current_time)
+            session.flush()
 
         # Update task statuses associated with the workflow
         # Default behavior is a full workflow reset, all tasks to registered state
@@ -278,15 +286,19 @@ def get_workflow_status() -> Any:
     session = SessionLocal()
     with session.begin():
         query_filter = [
-            Workflow.id.in_(workflow_request),
-            WorkflowStatus.id == Workflow.status,
+            Workflow.id.in_(workflow_request),  # type: ignore
+            WorkflowStatus.id == Workflow.status,  # type: ignore
         ]
-        sql = (
+        sql1: Select[
+            Tuple[Optional[int], Optional[str], Optional[str], Optional[datetime]]
+        ] = (
             select(
                 Workflow.id, Workflow.name, WorkflowStatus.label, Workflow.created_date
             )
-        ).where(*query_filter)
-        rows1 = session.execute(sql).all()
+        ).where(
+            *query_filter
+        )
+        rows1 = session.execute(sql1).all()
     row_map = dict()
     for r in rows1:
         row_map[r[0]] = r
@@ -295,17 +307,17 @@ def get_workflow_status() -> Any:
         query_filter = [
             Task.workflow_id.in_(workflow_request),
         ]
-        sql = (
+        sql2: Select[Tuple[int, int, str]] = (
             select(
                 Task.workflow_id,
                 func.count(Task.status),
                 Task.status,
             ).where(*query_filter)
         ).group_by(Task.workflow_id, Task.status)
-        rows2 = session.execute(sql).all()
+        rows2 = session.execute(sql2).all()
 
     res = []
-    for r in rows2:
+    for r in rows2:  # type: ignore
         d = dict()
         d["WF_ID"] = r[0]
         d["WF_NAME"] = row_map[r[0]][1]
@@ -419,9 +431,9 @@ def get_workflow_status_viz() -> Any:
             "DONE": 0,
             "FATAL": 0,
             "MAXC": 0,
-            "num_attempts_avg": float(attempts.mean),
-            "num_attempts_min": int(attempts.min),
-            "num_attempts_max": int(attempts.max),
+            "num_attempts_avg": float(attempts.mean),  # type: ignore
+            "num_attempts_min": int(attempts.min),  # type: ignore
+            "num_attempts_max": int(attempts.max),  # type: ignore
         }
 
     with session.begin():

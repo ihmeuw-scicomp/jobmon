@@ -300,7 +300,7 @@ class TaskTemplateVersion:
         task_args = "".join(sorted(self.task_args))
         op_args = "".join(sorted(self.op_args))
         hashable = ",".join([node_args, task_args, op_args])
-        return int(hashlib.sha1(hashable.encode("utf-8")).hexdigest(), 16)
+        return int(hashlib.sha256(hashable.encode("utf-8")).hexdigest(), 16)
 
     def filter_kwargs(self, arg_type: str, **kwargs: str) -> Dict[str, Any]:
         """Return the set of kwargs that are of arg_type.
@@ -395,7 +395,7 @@ class TaskTemplateVersion:
 
     def __hash__(self) -> int:
         """Unique identifier for this object."""
-        hash_value = hashlib.sha1()
+        hash_value = hashlib.sha256()
         hash_value.update(bytes(str(self.arg_mapping_hash).encode("utf-8")))
         hash_value.update(bytes(str(self.command_template).encode("utf-8")))
         return int(hash_value.hexdigest(), 16)
