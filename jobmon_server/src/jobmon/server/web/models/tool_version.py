@@ -1,7 +1,7 @@
 """Tool version db table."""
 
 from sqlalchemy import Column, ForeignKey, Integer
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from jobmon.core.serializers import SerializeClientToolVersion
 from jobmon.server.web.models import Base
@@ -19,8 +19,8 @@ class ToolVersion(Base):
         )
         return serialized
 
-    id = Column(Integer, primary_key=True)
-    tool_id = Column(Integer, ForeignKey("tool.id"), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tool_id: Mapped[int] = mapped_column(Integer, ForeignKey("tool.id"), nullable=False)
 
     # ORM relationships
     tool = relationship("Tool", back_populates="tool_versions")
