@@ -1,7 +1,7 @@
 """Routes used to move through the finite state."""
 
 from http import HTTPStatus as StatusCodes
-from typing import Any, Optional, Sequence, Tuple
+from typing import Any, Sequence, Tuple
 
 from flask import jsonify, request
 from sqlalchemy import func, Row, Select, select, text, update
@@ -62,12 +62,10 @@ def fix_wf_inconsistency(workflow_id: int) -> Any:
             Workflow.status == "F",
             Workflow.id == Task.workflow_id,
         ]
-        sql: Select[Tuple[Optional[int], Optional[str]]] = select(
-            Workflow.id, Task.status
-        ).where(*query_filter)
-        rows1: Sequence[Row[Tuple[Optional[int], Optional[str]]]] = session.execute(
-            sql
-        ).all()
+        sql: Select[Tuple[int, str]] = select(Workflow.id, Task.status).where(
+            *query_filter
+        )
+        rows1: Sequence[Row[Tuple[int, str]]] = session.execute(sql).all()
         result_set = set([r[0] for r in rows1])
         for r in rows1:
             if r[1] != "D" and r[0] in result_set:

@@ -307,7 +307,7 @@ def get_workflow_status() -> Any:
         query_filter = [
             Task.workflow_id.in_(workflow_request),
         ]
-        sql2: Select[Tuple[Optional[int], int, Optional[str]]] = (
+        sql2: Select[Tuple[int, int, str]] = (
             select(
                 Task.workflow_id,
                 func.count(Task.status),

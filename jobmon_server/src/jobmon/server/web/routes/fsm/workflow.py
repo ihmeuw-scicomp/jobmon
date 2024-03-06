@@ -179,7 +179,7 @@ def _add_or_get_wf_attribute_type(name: str, session: Session) -> Optional[int]:
             )
             wf_attrib_type = session.execute(select_stmt).scalars().one()
     if wf_attrib_type:
-        return wf_attrib_type.id
+        return wf_attrib_type.id  # type: ignore
     else:
         raise ValueError(f"Could not find or create attribute type {name}")
 

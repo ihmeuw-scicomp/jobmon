@@ -2,7 +2,7 @@
 
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from flask import jsonify, request
 from flask_cors import cross_origin
@@ -184,9 +184,7 @@ def get_most_popular_queue() -> Any:
             # get queue name; and return queue id with it
             with session:
                 query_filter = [Queue.id == popular_q]
-                sql1: Select[Tuple[Optional[str]]] = select(Queue.name).where(
-                    *query_filter
-                )
+                sql1: Select[Tuple[str]] = select(Queue.name).where(*query_filter)
             popular_q_name = session.execute(sql1).one()[0]
             queue_info.append(
                 {"id": ttvi, "queue": popular_q_name, "queue_id": popular_q}

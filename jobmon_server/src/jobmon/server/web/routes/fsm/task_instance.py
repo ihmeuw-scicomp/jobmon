@@ -595,7 +595,7 @@ def _log_error(
     nodename: Optional[str] = None,
 ) -> Any:
     if nodename is not None:
-        ti.nodename = nodename
+        ti.nodename = nodename  # type: ignore
     if distributor_id is not None:
         ti.distributor_id = str(distributor_id)
 

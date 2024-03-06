@@ -480,7 +480,7 @@ class DistributorService:
                 headers={"Content-Type": "application/json"},
             ) as response:
                 return_code = response.status
-                response: str = await response.text()
+                response_text = await response.text()
 
             if 499 < return_code < 600:
                 logger.warning(
@@ -503,7 +503,7 @@ class DistributorService:
             raise InvalidResponse(
                 f"Unexpected status code {return_code} from POST "
                 f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
+                f"code 200. Response content: {response_text}"
             )
 
     def _initialize_signal_handlers(self) -> None:

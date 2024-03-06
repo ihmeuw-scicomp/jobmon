@@ -1,7 +1,7 @@
 """Task Resources Database Table."""
 
 from sqlalchemy import Column, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from jobmon.core.serializers import SerializeTaskResources
 from jobmon.server.web.models import Base
@@ -28,11 +28,13 @@ class TaskResources(Base):
         )
         return serialized
 
-    id = Column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     queue_id = Column(Integer, ForeignKey("queue.id"))
-    task_resources_type_id = Column(String(1), ForeignKey("task_resources_type.id"))
+    task_resources_type_id: Mapped[str] = mapped_column(
+        String(1), ForeignKey("task_resources_type.id")
+    )
 
-    requested_resources = Column(Text, default=None)
+    requested_resources: Mapped[str] = mapped_column(Text, default=None)
 
     # ORM relationships
     queue = relationship("Queue", foreign_keys=[queue_id])

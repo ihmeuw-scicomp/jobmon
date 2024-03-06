@@ -312,7 +312,7 @@ def _add_or_get_attribute_types(
     # Insert the remaining names, found from the difference between old and new
     # Keep the IGNORE prefix in case other agents add attributes first, prevent errors
     # while trying to minimize collisions
-    new_names = names - existing_names
+    new_names = names - existing_names  # type: ignore
 
     # We'll eventually return the combination of existing + new attribute type ids
     return_dict = existing_rows
@@ -365,8 +365,8 @@ def _add_or_get_attribute_types(
         return_dict.update(
             {
                 # Code to keep typechecker happy
-                attribute.name if attribute.name else "NA": (
-                    attribute.id if attribute.id else -1
+                attribute.name if attribute.name else "NA": (  # type: ignore
+                    attribute.id if attribute.id else -1  # type: ignore
                 )
                 for attribute in new_attribute_type_ids
             }
