@@ -168,6 +168,7 @@ class ServerCLI(CLI):
             default="head",
         )
 
+
 def main(argstr: Optional[str] = None) -> None:
     """Create CLI."""
     cli = ServerCLI()

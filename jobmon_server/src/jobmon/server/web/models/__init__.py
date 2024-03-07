@@ -31,11 +31,11 @@ def add_string_length_constraint(Base: DeclarativeMeta, cls_: Any) -> None:
             if length is not None:
                 constraint_name = f"ck_{table.name}_{column.name}_length"
                 logger.debug(
-                    f"adding check constraint {constraint_name} to {table.name}.{column.name} of len={length}"
+                    f"adding check constraint {constraint_name} to "
+                    f"{table.name}.{column.name} of len={length}"
                 )
                 check_constraint = CheckConstraint(
-                    func.length(column) <= length,
-                    name=constraint_name
+                    func.length(column) <= length, name=constraint_name
                 )
                 table.append_constraint(check_constraint)
 
@@ -49,7 +49,6 @@ def load_model() -> None:
 
 def load_metadata(sqlalchemy_database_uri: str) -> None:
     """Load metadata into a database."""
-
     # load metadata
     from jobmon.server.web import session_factory
     from jobmon.server.web.models.arg_type import add_arg_types

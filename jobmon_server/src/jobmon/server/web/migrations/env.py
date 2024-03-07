@@ -2,13 +2,14 @@ import logging
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, event, Index
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, event, Index, pool
+from sqlalchemy.schema import MetaData
+from sqlalchemy.sql.schema import ForeignKeyConstraint
 
 from jobmon.core.configuration import JobmonConfig
-from jobmon.server.web.models import Base, load_model, add_string_length_constraint
+from jobmon.server.web.models import add_string_length_constraint, Base, load_model
 
-logger = logging.getLogger('alembic')
+logger = logging.getLogger("alembic")
 
 
 _CONFIG = JobmonConfig()
@@ -39,24 +40,24 @@ if not sqlalchemy_url.startswith("sqlite"):
     event.remove(Base, "instrument_class", add_string_length_constraint)
 load_model()
 
+
 # swap foreign keys for indices
-def swap_foreign_keys_for_indices(metadata):
+def swap_foreign_keys_for_indices(metadata: MetaData) -> None:
     """Swap all foreign keys in metadata for indices."""
     for table in metadata.tables.values():
         for constraint in list(table.constraints):
             # Identify foreign key constraints
-            if constraint.__visit_name__ == 'foreign_key_constraint':
+            if isinstance(constraint, ForeignKeyConstraint):
                 # Create an index for each foreign key constraint
                 for column in constraint.columns:
                     index_name = f"ix_{table.name}_{column.name}"
                     # Check if index already exists to avoid duplication
                     if not any(index.name == index_name for index in table.indexes):
                         Index(index_name, column)
-                
+
                 # Remove the foreign key constraint from the table
                 table.constraints.remove(constraint)
-                # Also, remove from metadata's global constraint list if necessary
-                # This might require additional handling depending on SQLAlchemy version and use case
+
 
 swap_foreign_keys_for_indices(Base.metadata)
 target_metadata = Base.metadata
@@ -107,6 +108,7 @@ def run_migrations_online() -> None:
 
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()

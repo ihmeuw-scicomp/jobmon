@@ -1,7 +1,6 @@
-from pkg_resources import resource_filename
-
-from alembic.config import Config
 from alembic import command
+from alembic.config import Config
+from pkg_resources import resource_filename
 from sqlalchemy_utils import create_database, database_exists, drop_database
 
 
@@ -24,17 +23,19 @@ def apply_migrations(sqlalchemy_database_uri: str, revision: str = "head") -> No
 def init_db(sqlalchemy_database_uri: str) -> None:
     """Create database and apply migrations."""
     # create a fresh database
-    load_metadata = False
+    add_metadata = False
     if not database_exists(sqlalchemy_database_uri):
-        load_metadata = True
+        add_metadata = True
         create_database(sqlalchemy_database_uri)
 
     apply_migrations(sqlalchemy_database_uri)
 
     # load metadata if db is new
-    if load_metadata:
+    if add_metadata:
         from jobmon.server.web.models import load_metadata
+
         load_metadata(sqlalchemy_database_uri)
+
 
 def terminate_db(sqlalchemy_database_uri: str) -> None:
     """Terminate/drop a database."""
