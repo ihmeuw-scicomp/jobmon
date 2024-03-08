@@ -65,7 +65,7 @@ class TaskTemplateVersion(Base):
             "command_template",
             "arg_mapping_hash",
             unique=True,
-            mysql_length={'command_template': 617},
+            mysql_length={"command_template": 617},
         ),
         Index("ix_task_template_id", "task_template_id"),
         ForeignKeyConstraint(

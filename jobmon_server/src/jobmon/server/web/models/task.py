@@ -58,7 +58,9 @@ class Task(Base):
     max_attempts: Mapped[int] = mapped_column(Integer, default=1)
     resource_scales = Column(String(1000), default=None)
     fallback_queues = Column(String(1000), default=None)
-    status: Mapped[str] = mapped_column(String(1), ForeignKey("task_status.id"), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(1), ForeignKey("task_status.id"), nullable=False
+    )
     status_date = mapped_column(DateTime, default=func.now(), index=True)
 
     # ORM relationships
