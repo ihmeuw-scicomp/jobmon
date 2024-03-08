@@ -28,7 +28,7 @@ class WorkflowRunStatus(Base):
 
     id = Column(String(1), primary_key=True)
     label = Column(String(150), nullable=False)
-    description = Column(String(150))
+    description = Column(String(150), nullable=False)
 
 
 def add_workflow_run_statuses(session: Session) -> None:

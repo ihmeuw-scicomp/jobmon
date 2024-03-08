@@ -25,9 +25,9 @@ class Cluster(Base):
         )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), unique=True)
-    cluster_type_id = Column(Integer, ForeignKey("cluster_type.id"))
-    connection_parameters: Mapped[str] = mapped_column(String(2500), nullable=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    cluster_type_id = Column(Integer, ForeignKey("cluster_type.id"), nullable=False)
+    connection_parameters: Mapped[str] = mapped_column(String(2500))
 
     # ORM relationships
     cluster_type = relationship("ClusterType", back_populates="clusters")

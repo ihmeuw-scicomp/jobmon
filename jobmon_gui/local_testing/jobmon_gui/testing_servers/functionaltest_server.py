@@ -5,7 +5,6 @@ from time import sleep
 from random import randint
 from jobmon.server.web.app_factory import AppFactory  # noqa F401
 from flask_cors import CORS
-from jobmon.server.web.models import init_db
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from jobmon.client.api import Tool

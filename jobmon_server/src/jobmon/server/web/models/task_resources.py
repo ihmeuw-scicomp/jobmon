@@ -31,7 +31,7 @@ class TaskResources(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     queue_id = Column(Integer, ForeignKey("queue.id"))
     task_resources_type_id: Mapped[str] = mapped_column(
-        String(1), ForeignKey("task_resources_type.id")
+        String(1), ForeignKey("task_resources_type.id"), nullable=False
     )
 
     requested_resources: Mapped[str] = mapped_column(Text, default=None)

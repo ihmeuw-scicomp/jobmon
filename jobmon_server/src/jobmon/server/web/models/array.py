@@ -22,8 +22,8 @@ class Array(Base):
         )
         return serialized
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(255), index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     task_template_version_id = Column(Integer, index=True)
     workflow_id = Column(Integer, index=True)
     max_concurrently_running: Mapped[int] = mapped_column(Integer)

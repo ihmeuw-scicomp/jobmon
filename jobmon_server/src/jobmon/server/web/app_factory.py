@@ -45,7 +45,7 @@ class AppFactory:
         """Create an AppFactory from the default configuration."""
         config = JobmonConfig()
         return cls(
-            config.get("web", "sqlalchemy_database_uri"),
+            config.get("db", "sqlalchemy_database_uri"),
             config.get_boolean("otlp", "web_enabled"),
         )
 
