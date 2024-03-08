@@ -12,7 +12,7 @@ import structlog
 from jobmon.server.web.models.dag import Dag
 from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import blueprint
+from jobmon.server.web.routes.fsm import api_v1_blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -20,7 +20,7 @@ from jobmon.server.web.server_side_exception import InvalidUsage
 logger = structlog.get_logger(__name__)
 
 
-@blueprint.route("/dag", methods=["POST"])
+@api_v1_blueprint.route("/dag", methods=["POST"])
 def add_dag() -> Any:
     """Add a new dag to the database.
 
@@ -52,7 +52,7 @@ def add_dag() -> Any:
     return resp
 
 
-@blueprint.route("/dag/<dag_id>/edges", methods=["POST"])
+@api_v1_blueprint.route("/dag/<dag_id>/edges", methods=["POST"])
 def add_edges(dag_id: int) -> Any:
     """Add edges to the edge table."""
     structlog.contextvars.bind_contextvars(dag_id=dag_id)

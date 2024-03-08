@@ -3,7 +3,7 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any, List, Optional, Type
 
-from flask import Flask
+from flask import Flask, Blueprint
 import sqlalchemy
 
 from jobmon.core.configuration import JobmonConfig
@@ -95,11 +95,16 @@ class AppFactory:
         app = Flask(__name__)
         app.config["CORS_HEADERS"] = "Content-Type"
 
+        api_v1_blueprint = Blueprint("v1", __name__, url_prefix="/v1")
+        api_v2_blueprint = Blueprint("v2", __name__, url_prefix="/v2")
+
         # Register the blueprints
         for blueprint in blueprints:
             mod = import_module(f"jobmon.server.web.routes.{blueprint}")
-            app.register_blueprint(getattr(mod, "blueprint"), url_prefix=url_prefix)
-
+            api_v1_blueprint.register_blueprint(getattr(mod, "api_v1_blueprint"), url_prefix=url_prefix)
+            api_v2_blueprint.register_blueprint(getattr(mod, "api_v2_blueprint"), url_prefix=url_prefix)
+        app.register_blueprint(api_v1_blueprint)
+        app.register_blueprint(api_v2_blueprint)
         if self.otlp_api:
             self.otlp_api.instrument_app(app)
 

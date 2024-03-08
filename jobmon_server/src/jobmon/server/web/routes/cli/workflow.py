@@ -27,7 +27,7 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_status import WorkflowStatus
 from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.cli import blueprint
+from jobmon.server.web.routes.cli import api_v1_blueprint
 
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
@@ -56,7 +56,7 @@ _reversed_cli_label_mapping = {
 _cli_order = ["PENDING", "SCHEDULED", "RUNNING", "DONE", "FATAL"]
 
 
-@blueprint.route("/workflow_validation", methods=["POST"])
+@api_v1_blueprint.route("/workflow_validation", methods=["POST"])
 @cross_origin()
 def get_workflow_validation_status() -> Any:
     """Check if workflow is valid."""
@@ -95,7 +95,7 @@ def get_workflow_validation_status() -> Any:
     return resp
 
 
-@blueprint.route("/workflow/<workflow_id>/workflow_tasks", methods=["GET"])
+@api_v1_blueprint.route("/workflow/<workflow_id>/workflow_tasks", methods=["GET"])
 def get_workflow_tasks(workflow_id: int) -> Any:
     """Get the tasks for a given workflow."""
     limit = request.args.get("limit")
@@ -154,7 +154,7 @@ def get_workflow_tasks(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route(
+@api_v1_blueprint.route(
     "/workflow/<workflow_id>/validate_username/<username>", methods=["GET"]
 )
 def get_workflow_user_validation(workflow_id: int, username: str) -> Any:
@@ -176,7 +176,7 @@ def get_workflow_user_validation(workflow_id: int, username: str) -> Any:
     return resp
 
 
-@blueprint.route(
+@api_v1_blueprint.route(
     "/workflow/<workflow_id>/validate_for_workflow_reset/<username>", methods=["GET"]
 )
 def get_workflow_run_for_workflow_reset(workflow_id: int, username: str) -> Any:
@@ -207,7 +207,7 @@ def get_workflow_run_for_workflow_reset(workflow_id: int, username: str) -> Any:
     return resp
 
 
-@blueprint.route("workflow/<workflow_id>/reset", methods=["PUT"])
+@api_v1_blueprint.route("workflow/<workflow_id>/reset", methods=["PUT"])
 def reset_workflow(workflow_id: int) -> Any:
     """Update the workflow's status, all its tasks' statuses to 'G'."""
     session = SessionLocal()
@@ -245,7 +245,7 @@ def reset_workflow(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/workflow_status", methods=["GET"])
+@api_v1_blueprint.route("/workflow_status", methods=["GET"])
 @cross_origin()
 def get_workflow_status() -> Any:
     """Get the status of the workflow."""
@@ -406,7 +406,7 @@ def get_workflow_status() -> Any:
     return resp
 
 
-@blueprint.route("/workflow_status_viz", methods=["GET"])
+@api_v1_blueprint.route("/workflow_status_viz", methods=["GET"])
 def get_workflow_status_viz() -> Any:
     """Get the status of the workflows for GUI."""
     session = SessionLocal()
@@ -453,7 +453,7 @@ def get_workflow_status_viz() -> Any:
     return resp
 
 
-@blueprint.route("/workflow_overview_viz", methods=["GET"])
+@api_v1_blueprint.route("/workflow_overview_viz", methods=["GET"])
 def workflows_by_user_form() -> Any:
     """Fetch associated workflows and workflow runs by username."""
     arguments = request.args
@@ -575,7 +575,7 @@ def workflows_by_user_form() -> Any:
     return res
 
 
-@blueprint.route("/task_table_viz/<workflow_id>", methods=["GET"])
+@api_v1_blueprint.route("/task_table_viz/<workflow_id>", methods=["GET"])
 def task_details_by_wf_id(workflow_id: int) -> Any:
     """Fetch Task details associated with Workflow ID and TaskTemplate name."""
     task_template_name = request.args.get("tt_name")
@@ -621,7 +621,7 @@ def task_details_by_wf_id(workflow_id: int) -> Any:
     return res
 
 
-@blueprint.route("/workflow_details_viz/<workflow_id>", methods=["GET"])
+@api_v1_blueprint.route("/workflow_details_viz/<workflow_id>", methods=["GET"])
 def wf_details_by_wf_id(workflow_id: int) -> Any:
     """Fetch name, args, dates, tool for a Workflow provided WF ID."""
     session = SessionLocal()

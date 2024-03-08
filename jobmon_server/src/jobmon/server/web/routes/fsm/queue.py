@@ -8,10 +8,10 @@ from sqlalchemy import select
 
 from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import blueprint
+from jobmon.server.web.routes.fsm import api_v1_blueprint
 
 
-@blueprint.route("/cluster/<cluster_id>/queue/<queue_name>", methods=["GET"])
+@api_v1_blueprint.route("/cluster/<cluster_id>/queue/<queue_name>", methods=["GET"])
 def get_queue_by_cluster_queue_names(cluster_id: int, queue_name: str) -> Any:
     """Get the id, name, cluster_name and parameters of a Queue.
 

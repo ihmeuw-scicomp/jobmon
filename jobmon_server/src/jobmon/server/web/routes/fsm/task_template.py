@@ -16,14 +16,14 @@ from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.template_arg_map import TemplateArgMap
 from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import blueprint
+from jobmon.server.web.routes.fsm import api_v1_blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
 logger = structlog.get_logger(__name__)
 
 
-@blueprint.route("/task_template", methods=["POST"])
+@api_v1_blueprint.route("/task_template", methods=["POST"])
 def get_task_template() -> Any:
     """Add a task template for a given tool to the database."""
     # check input variable
@@ -58,7 +58,7 @@ def get_task_template() -> Any:
     return resp
 
 
-@blueprint.route("/task_template/<task_template_id>/versions", methods=["GET"])
+@api_v1_blueprint.route("/task_template/<task_template_id>/versions", methods=["GET"])
 def get_task_template_versions(task_template_id: int) -> Any:
     """Get the task_template_version."""
     # get task template version object
@@ -100,7 +100,7 @@ def _add_or_get_arg(name: str, session: Session) -> Arg:
     return arg
 
 
-@blueprint.route("/task_template/<task_template_id>/add_version", methods=["POST"])
+@api_v1_blueprint.route("/task_template/<task_template_id>/add_version", methods=["POST"])
 def add_task_template_version(task_template_id: int) -> Any:
     """Add a tool to the database."""
     # check input variables

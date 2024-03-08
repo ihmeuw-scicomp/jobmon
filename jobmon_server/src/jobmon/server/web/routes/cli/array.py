@@ -8,10 +8,10 @@ from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.cli import blueprint
+from jobmon.server.web.routes.cli import api_v1_blueprint
 
 
-@blueprint.route("/array/<workflow_id>/get_array_tasks")
+@api_v1_blueprint.route("/array/<workflow_id>/get_array_tasks")
 def get_array_task_instances(workflow_id: int) -> Any:
     """Return error/output filepaths for task instances filtered by array name.
 

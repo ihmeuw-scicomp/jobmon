@@ -11,13 +11,13 @@ import structlog
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.node_arg import NodeArg
 from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import blueprint
+from jobmon.server.web.routes.fsm import api_v1_blueprint
 
 
 logger = structlog.get_logger(__name__)
 
 
-@blueprint.route("/nodes", methods=["POST"])
+@api_v1_blueprint.route("/nodes", methods=["POST"])
 def add_nodes() -> Any:
     """Add a chunk of nodes to the database.
 
