@@ -48,7 +48,7 @@ class TaskTemplateVersion(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     task_template_id = Column(Integer)
     command_template: Mapped[str] = mapped_column(Text)
-    arg_mapping_hash = Column(VARCHAR(150))
+    arg_mapping_hash = Column(VARCHAR(150), nullable=False)
 
     # orm relationship
     task_template = relationship(
@@ -65,6 +65,7 @@ class TaskTemplateVersion(Base):
             "command_template",
             "arg_mapping_hash",
             unique=True,
+            mysql_length={'command_template': 617},
         ),
         Index("ix_task_template_id", "task_template_id"),
         ForeignKeyConstraint(
