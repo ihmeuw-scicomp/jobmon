@@ -59,7 +59,7 @@ class WebServerProcess:
             init_db(database_uri)
 
             config = JobmonConfig(
-                dict_config={"web": {"sqlalchemy_database_uri": database_uri}}
+                dict_config={"db": {"sqlalchemy_database_uri": database_uri}}
             )
             configure_logging(
                 loggers_dict={

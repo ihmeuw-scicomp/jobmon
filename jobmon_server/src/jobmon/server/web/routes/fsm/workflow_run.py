@@ -245,7 +245,10 @@ def task_instances_status_check(workflow_run_id: int) -> Any:
     with session.begin():
         # get time from db
         db_time = session.execute(select(func.now())).scalar()
-        str_time = db_time.strftime("%Y-%m-%d %H:%M:%S")
+        if db_time:
+            str_time = db_time.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            str_time = None
 
         where_clause = [TaskInstance.workflow_run_id == workflow_run_id]
         if len(task_instance_ids) > 0:

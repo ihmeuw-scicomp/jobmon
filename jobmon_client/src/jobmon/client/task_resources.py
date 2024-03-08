@@ -137,7 +137,7 @@ class TaskResources:
                     new_resource_value = scaler(existing_resources[resource])
                 elif isinstance(scaler, Iterator):
                     try:
-                        new_resource_value = next(scaler)
+                        new_resource_value: numbers.Number = next(scaler)
                     except StopIteration:
                         logger.warning(
                             "Not enough elements left in Iterator, re-using previous value "
@@ -246,7 +246,7 @@ class TaskResources:
 
         # Uniqueness is determined by queue name and the resources parameter.
         if not hasattr(self, "_hash_val"):
-            hashval = hashlib.sha1()
+            hashval = hashlib.sha256()
             hashval.update(bytes(str(hash(self.queue.queue_name)).encode("utf-8")))
             resources_str = str(
                 hash(json.dumps(self.requested_resources, sort_keys=True))

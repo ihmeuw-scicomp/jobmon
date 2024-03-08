@@ -3,7 +3,7 @@
 from typing import Tuple
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from jobmon.core.serializers import SerializeTaskInstanceErrorLog
@@ -21,9 +21,9 @@ class TaskInstanceErrorLog(Base):
             self.id, self.error_time, self.description
         )
 
-    id = Column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     task_instance_id = Column(Integer, ForeignKey("task_instance.id"), nullable=False)
-    error_time = Column(DateTime, default=func.now())
-    description = Column(Text)
+    error_time = mapped_column(DateTime, default=func.now())
+    description: Mapped[str] = mapped_column(Text)
 
     task_instance = relationship("TaskInstance", back_populates="errors")

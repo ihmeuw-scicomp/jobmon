@@ -5,7 +5,7 @@ import importlib
 import os
 from pathlib import Path
 import pkgutil
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import yaml
 
@@ -214,7 +214,7 @@ class JobmonConfig:
             self._config[section] = {}
         self._config[section][key] = val
 
-    def write(self, filepath: str = "") -> None:
+    def write(self, filepath: Union[str, Path] = "") -> None:
         """Persist the current config to disk."""
         if not filepath:
             filepath = self._filepath

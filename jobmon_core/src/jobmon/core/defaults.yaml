@@ -13,7 +13,7 @@ heartbeat:
   task_instance_interval: 90
 
 reaper:
-  poll_interval_minutes = 5
+  poll_interval_minutes: 5
 
 distributor:
   poll_interval: 10
@@ -21,5 +21,5 @@ distributor:
 worker_node:
   command_interrupt_timeout: 10
 
-web:
+db:
   sqlalchemy_database_uri: "sqlite://"

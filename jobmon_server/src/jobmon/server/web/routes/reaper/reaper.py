@@ -1,10 +1,10 @@
 """Routes used to move through the finite state."""
 
 from http import HTTPStatus as StatusCodes
-from typing import Any
+from typing import Any, Sequence, Tuple
 
 from flask import jsonify, request
-from sqlalchemy import func, select, text, update
+from sqlalchemy import func, Row, Select, select, text, update
 import structlog
 
 from jobmon.core.exceptions import InvalidStateTransition
@@ -34,8 +34,8 @@ def fix_wf_inconsistency(workflow_id: int) -> Any:
     )
     session = SessionLocal()
     with session.begin():
-        sql = select(Workflow.id)
-        rows = session.execute(sql).all()
+        sql0 = select(Workflow.id)
+        rows = session.execute(sql0).all()
         # the id to return to reaper as next start point
         total_wf = len(rows)
 
@@ -62,10 +62,12 @@ def fix_wf_inconsistency(workflow_id: int) -> Any:
             Workflow.status == "F",
             Workflow.id == Task.workflow_id,
         ]
-        sql = select(Workflow.id, Task.status).where(*query_filter)
-        rows = session.execute(sql).all()
-        result_set = set([r[0] for r in rows])
-        for r in rows:
+        sql: Select[Tuple[int, str]] = select(Workflow.id, Task.status).where(
+            *query_filter
+        )
+        rows1: Sequence[Row[Tuple[int, str]]] = session.execute(sql).all()
+        result_set = set([r[0] for r in rows1])
+        for r in rows1:
             if r[1] != "D" and r[0] in result_set:
                 result_set -= {r[0]}
         result_list = list(result_set)

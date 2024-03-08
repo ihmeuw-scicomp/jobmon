@@ -154,6 +154,7 @@ def get_task_subdag() -> Any:
         )
 
         # Initialize defaultdict to store information
+        grouped_data: Dict = dict()
         grouped_data = defaultdict(
             lambda: {"workflow_id": None, "dag_id": None, "node_ids": []}
         )
@@ -165,7 +166,8 @@ def get_task_subdag() -> Any:
             )  # Assuming this combination is unique for each group
             grouped_data[key]["workflow_id"] = row.workflow_id
             grouped_data[key]["dag_id"] = row.dag_id
-            grouped_data[key]["node_ids"].append(row.node_id)
+            if grouped_data[key]:
+                grouped_data[key]["node_ids"].append(row.node_id)
 
         # If we find no results, we handle it here
         if not grouped_data:
@@ -175,15 +177,16 @@ def get_task_subdag() -> Any:
 
         # Since we have validated all the tasks belong to the same wf in status_command before
         # this call, assume they all belong to the same wf.
-        some_key = next(iter(grouped_data))
-        workflow_id, dag_id = some_key
-        node_ids = [int(node_id) for node_id in grouped_data[some_key]["node_ids"]]
+        if grouped_data:
+            some_key = next(iter(grouped_data))
+            workflow_id, dag_id = some_key
+            node_ids = [int(node_id) for node_id in grouped_data[some_key]["node_ids"]]
 
-        # Continue with your current processing logic
-        sub_dag_tree = _get_subdag(node_ids, dag_id, session)
-        sub_task_tree = _get_tasks_from_nodes(
-            workflow_id, sub_dag_tree, task_status, session
-        )
+            # Continue with your current processing logic
+            sub_dag_tree = _get_subdag(node_ids, dag_id, session)
+            sub_task_tree = _get_tasks_from_nodes(
+                workflow_id, sub_dag_tree, task_status, session
+            )
 
     resp = jsonify(workflow_id=workflow_id, sub_task=sub_task_tree)
     resp.status_code = StatusCodes.OK

@@ -29,8 +29,13 @@ def get_task_resources(task_resources_id: int) -> Any:
             .join_from(TaskResources, Queue, TaskResources.queue_id == Queue.id)
             .where(TaskResources.id == task_resources_id)
         )
-        requested_resources, queue_name = session.execute(select_stmt).fetchone()
-        requested_resources = ast.literal_eval(requested_resources)
+        row = session.execute(select_stmt).fetchone()
+        requested_resources_raw, queue_name = row if row else (None, None)
+        requested_resources = (
+            ast.literal_eval(requested_resources_raw)
+            if requested_resources_raw
+            else None
+        )
 
     resp = jsonify(requested_resources=requested_resources, queue_name=queue_name)
     resp.status_code = StatusCodes.OK

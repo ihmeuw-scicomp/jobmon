@@ -4,7 +4,7 @@ import json
 from typing import Tuple
 
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 import structlog
 
@@ -33,7 +33,6 @@ class TaskInstance(Base):
             self.task.workflow_id,
             self.status,
             self.distributor_id,
-            self.cluster_id,
             self.task_resources_id,
             self.array_id,
             self.array_batch_num,
@@ -55,14 +54,20 @@ class TaskInstance(Base):
             requested_resources.get("stderr"),
         )
 
-    id = Column(Integer, primary_key=True)
-    workflow_run_id = Column(Integer, ForeignKey("workflow_run.id"))
-    array_id = Column(Integer, ForeignKey("array.id"), default=None)
-    distributor_id = Column(String(20), index=True, nullable=False)
-    task_id = Column(Integer, ForeignKey("task.id"), nullable=False)
-    task_resources_id = Column(Integer, ForeignKey("task_resources.id"), index=True)
-    array_batch_num = Column(Integer, index=True)
-    array_step_id = Column(Integer, index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workflow_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workflow_run.id"), nullable=True
+    )
+    array_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("array.id"), default=None, nullable=True
+    )
+    task_id: Mapped[int] = mapped_column(Integer, ForeignKey("task.id"), nullable=False)
+    distributor_id: Mapped[str] = mapped_column(String(20), index=True, nullable=False)
+    task_resources_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("task_resources.id"), index=True, nullable=True
+    )
+    array_batch_num: Mapped[int] = mapped_column(Integer, index=True, nullable=True)
+    array_step_id: Mapped[int] = mapped_column(Integer, index=True, nullable=True)
 
     # usage
     nodename = Column(String(150))
@@ -79,14 +84,14 @@ class TaskInstance(Base):
     stderr_log = Column(Text)
 
     # status/state
-    status = Column(
+    status: Mapped[str] = mapped_column(
         String(1),
         ForeignKey("task_instance_status.id"),
         default=TaskInstanceStatus.QUEUED,
         nullable=False,
     )
     submitted_date = Column(DateTime)
-    status_date = Column(DateTime, default=func.now())
+    status_date = mapped_column(DateTime, default=func.now())
     report_by_date = Column(DateTime)
 
     # ORM relationships
