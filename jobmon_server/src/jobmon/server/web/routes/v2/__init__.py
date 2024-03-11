@@ -6,7 +6,7 @@ from flask import Blueprint
 from jobmon.server.web import routes
 from jobmon.server.web.routes import SessionLocal
 
-api_v2_blueprint = Blueprint("v2", __name__, url_prefix="/api/v2")
+api_v2_blueprint = Blueprint("v2", __name__, url_prefix="/v2")
 
 # Shared routes
 api_v2_blueprint.add_url_rule("/", view_func=routes.is_alive, methods=["GET"])

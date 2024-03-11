@@ -8,7 +8,7 @@ from jobmon.server.web.models import load_model
 load_model()
 
 
-def test_array_launch_transition(web_server_in_memory):
+def test_array_launch_transition(web_server_in_memory, api_prefix):
     from jobmon.server.web.models.task import Task
     from jobmon.server.web.models.task_instance import TaskInstance
 
@@ -49,7 +49,7 @@ def test_array_launch_transition(web_server_in_memory):
 
     # Post the transition route, check what comes back
     resp = app.post(
-        "/array/1/transition_to_launched",
+        f"{api_prefix}/array/1/transition_to_launched",
         json={
             "batch_number": 1,
             "next_report_increment": 5 * 60,  # 5 minutes to report
@@ -85,7 +85,7 @@ def test_array_launch_transition(web_server_in_memory):
 
     # Post a request to log the distributor ids
     resp = app.post(
-        "/array/1/log_distributor_id",
+        f"{api_prefix}/array/1/log_distributor_id",
         json={
             ti1_id: "123_1",
             ti2_id: "123_2",

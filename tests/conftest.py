@@ -10,7 +10,6 @@ from time import sleep
 from types import TracebackType
 from typing import Any, Optional
 
-
 import pytest
 import sqlalchemy
 from sqlalchemy.engine import Engine
@@ -23,6 +22,13 @@ from jobmon.server.web.api import get_app, JobmonConfig, configure_logging
 from jobmon.server.web.db_admin import init_db
 
 logger = logging.getLogger(__name__)
+
+_api_prefix = "/api/v2"
+
+
+@pytest.fixture
+def api_prefix():
+    return _api_prefix
 
 
 class WebServerProcess:
@@ -41,6 +47,8 @@ class WebServerProcess:
         else:
             self.web_host = socket.getfqdn()
         self.web_port = str(10_000 + os.getpid() % 30_000)
+        self.web_port = 10000
+        self.api_prefix = _api_prefix
         self.filepath = filepath
 
     def __enter__(self) -> Any:
@@ -91,10 +99,13 @@ class WebServerProcess:
         while not status == 200 and count < max_tries:
             try:
                 count += 1
+                url = f"http://{self.web_host}:{self.web_port}{self.api_prefix}/health"
+                print(url)
                 r = requests.get(
-                    f"http://{self.web_host}:{self.web_port}/health",
+                    url,
                     headers={"Content-Type": "application/json"},
                 )
+
                 status = r.status_code
             except Exception as e:
                 # Connection failures land here
@@ -110,10 +121,10 @@ class WebServerProcess:
         return self
 
     def __exit__(
-        self,
-        exc_type: Optional[BaseException],
-        exc_value: Optional[BaseException],
-        exc_traceback: Optional[TracebackType],
+            self,
+            exc_type: Optional[BaseException],
+            exc_value: Optional[BaseException],
+            exc_traceback: Optional[TracebackType],
     ) -> None:
         """Terminate the web service process."""
         # interrupt and join for coverage
@@ -153,7 +164,7 @@ def db_engine(sqlite_file) -> Engine:
 def client_env(web_server_process, monkeypatch):
     monkeypatch.setenv(
         "JOBMON__HTTP__SERVICE_URL",
-        f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}/api/v2',
+        f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}{_api_prefix}',
     )
     monkeypatch.setenv("JOBMON__HTTP__STOP_AFTER_DELAY", "0")
 
