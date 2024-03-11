@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import getpass
 import logging
+import logging.config
 import os
 import socket
 import sys
@@ -11,8 +12,8 @@ from flask import Flask
 from opentelemetry import _logs
 from opentelemetry import trace
 from opentelemetry.sdk import resources
-from opentelemetry.sdk._logs import LoggerProvider
-from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from opentelemetry.sdk.logs import LoggerProvider
+from opentelemetry.sdk.logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import Tracer
@@ -101,7 +102,7 @@ class OtlpAPI:
         },
         "handlers": {
             "otel_jobmon": {
-                "class": "opentelemetry.sdk._logs.LoggingHandler",
+                "class": "opentelemetry.sdk.logs.LoggingHandler",
                 "formatter": "otel_jobmon",
             },
         },
