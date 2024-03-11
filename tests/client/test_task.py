@@ -294,6 +294,7 @@ def test_reset_attempts_on_resume(db_engine, tool):
         assert t.status == TaskStatus.REGISTERING
 
 
+@pytest.mark.skip(reason="check constraints on sqlite not enabled currently")
 def test_binding_length(db_engine, client_env, tool):
     """Test that mysql exceptions return the appropriate error code."""
 

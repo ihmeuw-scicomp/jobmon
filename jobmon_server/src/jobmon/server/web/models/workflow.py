@@ -37,19 +37,20 @@ class Workflow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     tool_version_id = Column(Integer, ForeignKey("tool_version.id"))
     dag_id: Mapped[int] = mapped_column(Integer, ForeignKey("dag.id"))
-    workflow_args_hash = Column(VARCHAR(150), index=True)
-    task_hash = Column(VARCHAR(150), index=True)
+    workflow_args_hash = Column(VARCHAR(150), index=True, nullable=False)
+    task_hash = Column(VARCHAR(150), index=True, nullable=False)
     description = Column(Text)
-    name = Column(String(150))
+    name = Column(String(255))
     workflow_args = Column(Text)
     max_concurrently_running: Mapped[int] = mapped_column(Integer)
+    created_date = mapped_column(DateTime, default=None)
+    status_date = mapped_column(DateTime, default=func.now())
     status: Mapped[str] = mapped_column(
         String(1),
         ForeignKey("workflow_status.id"),
         default=WorkflowStatus.REGISTERING,
+        nullable=False,
     )
-    created_date = mapped_column(DateTime, default=None)
-    status_date = mapped_column(DateTime, default=func.now())
 
     dag = relationship("Dag", back_populates="workflow", lazy=True)
     workflow_runs = relationship("WorkflowRun", back_populates="workflow", lazy=True)

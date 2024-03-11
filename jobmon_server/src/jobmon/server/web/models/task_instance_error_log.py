@@ -22,7 +22,7 @@ class TaskInstanceErrorLog(Base):
         )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    task_instance_id = Column(Integer, ForeignKey("task_instance.id"))
+    task_instance_id = Column(Integer, ForeignKey("task_instance.id"), nullable=False)
     error_time = mapped_column(DateTime, default=func.now())
     description: Mapped[str] = mapped_column(Text)
 

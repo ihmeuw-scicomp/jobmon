@@ -1,6 +1,6 @@
 """Edge Database table."""
 
-from sqlalchemy import Column, Integer, Text
+from sqlalchemy import Column, Integer, JSON
 
 from jobmon.server.web.models import Base
 
@@ -18,5 +18,5 @@ class Edge(Base):
     # for implementation details refer to
     # jobmon/client/swarm/workflow/clientdag.py
     # method: _insert_edges()
-    upstream_node_ids = Column(Text)
-    downstream_node_ids = Column(Text)
+    upstream_node_ids = Column(JSON)
+    downstream_node_ids = Column(JSON)

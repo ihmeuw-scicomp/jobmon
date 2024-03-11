@@ -11,9 +11,19 @@ http:
   service_url: http://bbritt-unmanaged-dev-d01.hosts.ihme.washington.edu:8070
 otlp:
   http_enabled: false
-  web_enabled: false
-reaper: poll_interval_minutes = 5
-web:
-  sqlalchemy_database_uri: sqlite://
+heartbeat:
+  workflow_run_interval: 30
+  report_by_buffer: 3.1
+  task_instance_interval: 90
+
+reaper:
+  poll_interval_minutes: 5
+
+distributor:
+  poll_interval: 10
+
 worker_node:
   command_interrupt_timeout: 10
+
+db:
+  sqlalchemy_database_uri: "sqlite://"

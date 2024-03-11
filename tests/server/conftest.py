@@ -7,13 +7,13 @@ def web_server_in_memory(tmp_path):
     fake server
     """
     from jobmon.server.web.api import AppFactory
-    from jobmon.server.web.models import init_db
+    from jobmon.server.web.db_admin import init_db
 
     # The create_app call sets up database connections
     d = tmp_path / "jobmon.db"
     url = "sqlite:///" + str(d)
     app_factory = AppFactory(url)
-    init_db(app_factory.engine)
+    init_db(url)
     app = app_factory.get_app()
     app.config["TESTING"] = True
     with app.app_context():

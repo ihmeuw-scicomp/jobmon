@@ -21,8 +21,10 @@ class TaskTemplate(Base):
         )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    tool_version_id: Mapped[int] = mapped_column(Integer, ForeignKey("tool_version.id"))
-    name: Mapped[str] = mapped_column(VARCHAR(255))
+    tool_version_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tool_version.id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(VARCHAR(255), nullable=False)
 
     # orm relationship
     tool_versions = relationship("ToolVersion", back_populates="task_templates")

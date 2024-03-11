@@ -61,14 +61,13 @@ class TaskInstance(Base):
     array_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("array.id"), default=None, nullable=True
     )
-    task_id: Mapped[int] = mapped_column(Integer, ForeignKey("task.id"))
+    task_id: Mapped[int] = mapped_column(Integer, ForeignKey("task.id"), nullable=False)
+    distributor_id: Mapped[str] = mapped_column(String(20), index=True, nullable=False)
     task_resources_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("task_resources.id"), index=True, nullable=True
     )
     array_batch_num: Mapped[int] = mapped_column(Integer, index=True, nullable=True)
     array_step_id: Mapped[int] = mapped_column(Integer, index=True, nullable=True)
-
-    distributor_id: Mapped[str] = mapped_column(String(20), index=True, nullable=True)
 
     # usage
     nodename = Column(String(150))
@@ -89,6 +88,7 @@ class TaskInstance(Base):
         String(1),
         ForeignKey("task_instance_status.id"),
         default=TaskInstanceStatus.QUEUED,
+        nullable=False,
     )
     submitted_date = Column(DateTime)
     status_date = mapped_column(DateTime, default=func.now())

@@ -27,8 +27,8 @@ class TaskInstanceStatus(Base):
     ERROR_FATAL = Statuses.ERROR_FATAL
 
     id = Column(String(1), primary_key=True)
-    label = Column(String(150))
-    description = Column(String(150))
+    label = Column(String(150), nullable=False)
+    description = Column(String(150), nullable=False)
 
 
 def add_task_instance_statuses(session: Session) -> None:
