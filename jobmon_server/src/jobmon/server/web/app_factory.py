@@ -20,7 +20,7 @@ class AppFactory:
     _structlog_configured = False
 
     def __init__(
-        self, sqlalchemy_database_uri: str = "", use_otlp: bool = False
+            self, sqlalchemy_database_uri: str = "", use_otlp: bool = False
     ) -> None:
         """Initialize the AppFactory object with the SQLAlchemy database URI.
 
@@ -82,7 +82,7 @@ class AppFactory:
         cls._structlog_configured = True
 
     def get_app(
-        self, blueprints: Optional[List[str]] = None, url_prefix: str = "/"
+            self, blueprints: Optional[List[str]] = None, url_prefix: str = "/"
     ) -> Flask:
         """Create and configure the Flask app.
 
@@ -95,16 +95,11 @@ class AppFactory:
         app = Flask(__name__)
         app.config["CORS_HEADERS"] = "Content-Type"
 
-        api_v1_blueprint = Blueprint("v1", __name__, url_prefix="/v1")
-        api_v2_blueprint = Blueprint("v2", __name__, url_prefix="/v2")
+        # Register the versions, reverse order
+        for version in ["v2", "v1"]:
+            mod = import_module(f"jobmon.server.web.routes.{version}")
+            app.register_blueprint(getattr(mod, f"api_{version}_blueprint"), url_prefix=url_prefix)
 
-        # Register the blueprints
-        for blueprint in blueprints:
-            mod = import_module(f"jobmon.server.web.routes.{blueprint}")
-            api_v1_blueprint.register_blueprint(getattr(mod, "api_v1_blueprint"), url_prefix=url_prefix)
-            api_v2_blueprint.register_blueprint(getattr(mod, "api_v2_blueprint"), url_prefix=url_prefix)
-        app.register_blueprint(api_v1_blueprint)
-        app.register_blueprint(api_v2_blueprint)
         if self.otlp_api:
             self.otlp_api.instrument_app(app)
 

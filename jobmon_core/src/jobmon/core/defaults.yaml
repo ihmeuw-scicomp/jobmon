@@ -1,25 +1,19 @@
-http:
-  request_timeout: 20
-  retries_timeout: 300
-  retries_attempts: 10
-
-otlp:
-  web_enabled: false
-  http_enabled: false
-
-heartbeat:
-  workflow_run_interval: 30
-  report_by_buffer: 3.1
-  task_instance_interval: 90
-
-reaper:
-  poll_interval_minutes = 5
-
 distributor:
   poll_interval: 10
-
+heartbeat:
+  report_by_buffer: 3.1
+  task_instance_interval: 90
+  workflow_run_interval: 30
+http:
+  request_timeout: 20
+  retries_attempts: 10
+  retries_timeout: 300
+  service_url: http://bbritt-unmanaged-dev-d01.hosts.ihme.washington.edu:8070
+otlp:
+  http_enabled: false
+  web_enabled: false
+reaper: poll_interval_minutes = 5
+web:
+  sqlalchemy_database_uri: sqlite://
 worker_node:
   command_interrupt_timeout: 10
-
-web:
-  sqlalchemy_database_uri: "sqlite://"

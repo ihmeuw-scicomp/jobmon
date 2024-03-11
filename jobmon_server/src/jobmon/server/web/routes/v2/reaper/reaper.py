@@ -13,8 +13,9 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_run_status import WorkflowRunStatus
 from jobmon.server.web.models.workflow_status import WorkflowStatus
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.reaper import api_v1_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)

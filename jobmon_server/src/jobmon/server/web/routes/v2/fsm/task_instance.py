@@ -19,15 +19,16 @@ from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import api_v1_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
 from jobmon.server.web.server_side_exception import ServerError
 
 
 logger = structlog.get_logger(__name__)
 
 
-@api_v1_blueprint.route("/task_instance/<task_instance_id>/log_running", methods=["POST"])
+@api_v2_blueprint.route("/task_instance/<task_instance_id>/log_running", methods=["POST"])
 def log_running(task_instance_id: int) -> Any:
     """Log a task_instance as running.
 
@@ -69,6 +70,7 @@ def log_running(task_instance_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/task_instance/<task_instance_id>/log_report_by", methods=["POST"])
+@api_v2_blueprint.route("/task_instance/<task_instance_id>/log_report_by", methods=["POST"])
 def log_ti_report_by(task_instance_id: int) -> Any:
     """Log a task_instance as being responsive with a new report_by_date.
 
@@ -106,6 +108,7 @@ def log_ti_report_by(task_instance_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/task_instance/log_report_by/batch", methods=["POST"])
+@api_v2_blueprint.route("/task_instance/log_report_by/batch", methods=["POST"])
 def log_ti_report_by_batch() -> Any:
     """Log task_instances as being responsive with a new report_by_date.
 
@@ -143,6 +146,7 @@ def log_ti_report_by_batch() -> Any:
 
 
 @api_v1_blueprint.route("/task_instance/<task_instance_id>/log_done", methods=["POST"])
+@api_v2_blueprint.route("/task_instance/<task_instance_id>/log_done", methods=["POST"])
 def log_done(task_instance_id: int) -> Any:
     """Log a task_instance as done.
 
@@ -185,6 +189,9 @@ def log_done(task_instance_id: int) -> Any:
 
 
 @api_v1_blueprint.route(
+    "/task_instance/<task_instance_id>/log_error_worker_node", methods=["POST"]
+)
+@api_v2_blueprint.route(
     "/task_instance/<task_instance_id>/log_error_worker_node", methods=["POST"]
 )
 def log_error_worker_node(task_instance_id: int) -> Any:
@@ -240,6 +247,9 @@ def log_error_worker_node(task_instance_id: int) -> Any:
 @api_v1_blueprint.route(
     "/task_instance/<task_instance_id>/task_instance_error_log", methods=["GET"]
 )
+@api_v2_blueprint.route(
+    "/task_instance/<task_instance_id>/task_instance_error_log", methods=["GET"]
+)
 def get_task_instance_error_log(task_instance_id: int) -> Any:
     """Route to return all task_instance_error_log entries of the task_instance_id.
 
@@ -269,6 +279,9 @@ def get_task_instance_error_log(task_instance_id: int) -> Any:
 @api_v1_blueprint.route(
     "/get_array_task_instance_id/<array_id>/<batch_num>/<step_id>", methods=["GET"]
 )
+@api_v2_blueprint.route(
+    "/get_array_task_instance_id/<array_id>/<batch_num>/<step_id>", methods=["GET"]
+)
 def get_array_task_instance_id(array_id: int, batch_num: int, step_id: int) -> Any:
     """Given an array ID and an index, select a single task instance ID.
 
@@ -292,6 +305,9 @@ def get_array_task_instance_id(array_id: int, batch_num: int, step_id: int) -> A
 
 
 @api_v1_blueprint.route(
+    "/task_instance/<task_instance_id>/log_no_distributor_id", methods=["POST"]
+)
+@api_v2_blueprint.route(
     "/task_instance/<task_instance_id>/log_no_distributor_id", methods=["POST"]
 )
 def log_no_distributor_id(task_instance_id: int) -> Any:
@@ -324,6 +340,9 @@ def log_no_distributor_id(task_instance_id: int) -> Any:
 @api_v1_blueprint.route(
     "/task_instance/<task_instance_id>/log_distributor_id", methods=["POST"]
 )
+@api_v2_blueprint.route(
+    "/task_instance/<task_instance_id>/log_distributor_id", methods=["POST"]
+)
 def log_distributor_id(task_instance_id: int) -> Any:
     """Log a task_instance's distributor id.
 
@@ -348,6 +367,7 @@ def log_distributor_id(task_instance_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/task_instance/<task_instance_id>/log_known_error", methods=["POST"])
+@api_v2_blueprint.route("/task_instance/<task_instance_id>/log_known_error", methods=["POST"])
 def log_known_error(task_instance_id: int) -> Any:
     """Log a task_instance as errored.
 
@@ -389,6 +409,9 @@ def log_known_error(task_instance_id: int) -> Any:
 
 
 @api_v1_blueprint.route(
+    "/task_instance/<task_instance_id>/log_unknown_error", methods=["POST"]
+)
+@api_v2_blueprint.route(
     "/task_instance/<task_instance_id>/log_unknown_error", methods=["POST"]
 )
 def log_unknown_error(task_instance_id: int) -> Any:
@@ -444,6 +467,7 @@ def log_unknown_error(task_instance_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/task_instance/instantiate_task_instances", methods=["POST"])
+@api_v2_blueprint.route("/task_instance/instantiate_task_instances", methods=["POST"])
 def instantiate_task_instances() -> Any:
     """Sync status of given task intance IDs."""
     data = cast(Dict, request.get_json())

@@ -15,8 +15,9 @@ from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import api_v1_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -24,6 +25,7 @@ logger = structlog.get_logger(__name__)
 
 
 @api_v1_blueprint.route("/workflow_run", methods=["POST"])
+@api_v2_blueprint.route("/workflow_run", methods=["POST"])
 def add_workflow_run() -> Any:
     """Add a workflow run to the db."""
     try:
@@ -96,6 +98,9 @@ def add_workflow_run() -> Any:
 @api_v1_blueprint.route(
     "/workflow_run/<workflow_run_id>/terminate_task_instances", methods=["PUT"]
 )
+@api_v2_blueprint.route(
+    "/workflow_run/<workflow_run_id>/terminate_task_instances", methods=["PUT"]
+)
 def terminate_workflow_run(workflow_run_id: int) -> Any:
     """Terminate a workflow run and get its tasks in order."""
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
@@ -163,6 +168,7 @@ def terminate_workflow_run(workflow_run_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/workflow_run/<workflow_run_id>/log_heartbeat", methods=["POST"])
+@api_v2_blueprint.route("/workflow_run/<workflow_run_id>/log_heartbeat", methods=["POST"])
 def log_workflow_run_heartbeat(workflow_run_id: int) -> Any:
     """Log a heartbeat for the workflow run to show that the client side is still alive."""
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
@@ -195,6 +201,7 @@ def log_workflow_run_heartbeat(workflow_run_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/workflow_run/<workflow_run_id>/update_status", methods=["PUT"])
+@api_v2_blueprint.route("/workflow_run/<workflow_run_id>/update_status", methods=["PUT"])
 def log_workflow_run_status_update(workflow_run_id: int) -> Any:
     """Update the status of the workflow run."""
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
@@ -228,6 +235,7 @@ def log_workflow_run_status_update(workflow_run_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/workflow_run/<workflow_run_id>/sync_status", methods=["POST"])
+@api_v2_blueprint.route("/workflow_run/<workflow_run_id>/sync_status", methods=["POST"])
 def task_instances_status_check(workflow_run_id: int) -> Any:
     """Sync status of given task intance IDs."""
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
@@ -283,7 +291,7 @@ def task_instances_status_check(workflow_run_id: int) -> Any:
     return resp
 
 
-@api_v1_blueprint.route(
+@api_v2_blueprint.route(
     "/workflow_run/<workflow_run_id>/set_status_for_triaging", methods=["POST"]
 )
 def set_status_for_triaging(workflow_run_id: int) -> Any:

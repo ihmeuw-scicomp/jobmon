@@ -10,8 +10,9 @@ import structlog
 
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.tool_version import ToolVersion
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import api_v1_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -19,6 +20,7 @@ logger = structlog.get_logger(__name__)
 
 
 @api_v1_blueprint.route("/tool_version", methods=["POST"])
+@api_v2_blueprint.route("/tool_version", methods=["POST"])
 def add_tool_version() -> Any:
     """Add a new version for a Tool."""
     # check input variable
@@ -49,6 +51,7 @@ def add_tool_version() -> Any:
 
 
 @api_v1_blueprint.route("/tool_version/<tool_version_id>/task_templates", methods=["GET"])
+@api_v2_blueprint.route("/tool_version/<tool_version_id>/task_templates", methods=["GET"])
 def get_task_templates(tool_version_id: int) -> Any:
     """Get the Tool Version."""
     # check input variable

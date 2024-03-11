@@ -20,8 +20,9 @@ from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.cli import api_v1_blueprint, api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
@@ -128,6 +129,7 @@ def get_task_status() -> Any:
 
 
 @api_v1_blueprint.route("/task/subdag", methods=["POST"])
+@api_v2_blueprint.route("/task/subdag", methods=["POST"])
 def get_task_subdag() -> Any:
     """Used to get the sub dag  of a given task.
 
@@ -195,6 +197,7 @@ def get_task_subdag() -> Any:
 
 
 @api_v1_blueprint.route("/task/update_statuses", methods=["PUT"])
+@api_v2_blueprint.route("/task/update_statuses", methods=["PUT"])
 def update_task_statuses() -> Any:
     """Update the status of the tasks."""
     data = cast(Dict, request.get_json())
@@ -258,6 +261,7 @@ def update_task_statuses() -> Any:
 
 
 @api_v1_blueprint.route("/task_dependencies/<task_id>", methods=["GET"])
+@api_v2_blueprint.route("/task_dependencies/<task_id>", methods=["GET"])
 def get_task_dependencies(task_id: int) -> Any:
     """Get task's downstream and upstream tasks and their status."""
     session = SessionLocal()
@@ -292,6 +296,7 @@ def get_task_dependencies(task_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/tasks_recursive/<direction>", methods=["PUT"])
+@api_v2_blueprint.route("/tasks_recursive/<direction>", methods=["PUT"])
 def get_tasks_recursive(direction: str) -> Any:
     """Get all input task_ids'.
 
@@ -315,6 +320,7 @@ def get_tasks_recursive(direction: str) -> Any:
 
 
 @api_v1_blueprint.route("/task_resource_usage", methods=["GET"])
+@api_v2_blueprint.route("/task_resource_usage", methods=["GET"])
 def get_task_resource_usage() -> Any:
     """Return the resource usage for a given Task ID."""
     try:

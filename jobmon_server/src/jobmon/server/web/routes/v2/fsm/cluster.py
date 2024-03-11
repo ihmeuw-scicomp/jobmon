@@ -8,11 +8,13 @@ from sqlalchemy import select
 
 from jobmon.server.web.models.cluster import Cluster
 from jobmon.server.web.models.cluster_type import ClusterType
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import api_v1_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
 
 
 @api_v1_blueprint.route("/cluster/<cluster_name>", methods=["GET"])
+@api_v2_blueprint.route("/cluster/<cluster_name>", methods=["GET"])
 def get_cluster_by_name(cluster_name: str) -> Any:
     """Get the id, cluster_type_name and connection_parameters of a Cluster."""
     session = SessionLocal()

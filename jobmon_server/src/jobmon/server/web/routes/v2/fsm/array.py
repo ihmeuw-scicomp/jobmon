@@ -14,14 +14,16 @@ from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_status import TaskStatus
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import api_v1_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
 
 
 logger = structlog.get_logger(__name__)
 
 
 @api_v1_blueprint.route("/array", methods=["POST"])
+@api_v2_blueprint.route("/array", methods=["POST"])
 def add_array() -> Any:
     """Return an array ID by workflow and task template version ID.
 
@@ -69,6 +71,7 @@ def add_array() -> Any:
 
 
 @api_v1_blueprint.route("/array/<array_id>/queue_task_batch", methods=["POST"])
+@api_v2_blueprint.route("/array/<array_id>/queue_task_batch", methods=["POST"])
 def record_array_batch_num(array_id: int) -> Any:
     """Record a batch number to associate sets of task instances with an array submission."""
     data = cast(Dict, request.get_json())
@@ -150,6 +153,7 @@ def record_array_batch_num(array_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/array/<array_id>/transition_to_launched", methods=["POST"])
+@api_v2_blueprint.route("/array/<array_id>/transition_to_launched", methods=["POST"])
 def transition_array_to_launched(array_id: int) -> Any:
     """Transition TIs associated with an array_id and batch_num to launched."""
     structlog.contextvars.bind_contextvars(array_id=array_id)
@@ -208,6 +212,7 @@ def transition_array_to_launched(array_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
+@api_v2_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
 def log_array_distributor_id(array_id: int) -> Any:
     """Add distributor_id, stderr/stdout paths to the DB for all TIs in an array."""
     data = cast(Dict, request.get_json())
