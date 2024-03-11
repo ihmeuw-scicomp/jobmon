@@ -50,7 +50,7 @@ def create_multiple_status_wf():
            3. tt cross wfs
     """
     # give the large wf sometime to run
-    # sleep(60)
+    sleep(60)
     C = "multiprocess"
     Q = "null.q"
     tool = Tool("complex_wf_tool")
