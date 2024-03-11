@@ -1,33 +1,50 @@
-"""Initialize Web services."""
 import os
+import socket
+import sys
 import multiprocessing as mp
+from jobmon.server.web.api import get_app, JobmonConfig
+from jobmon.server.web.db_admin import apply_migrations, init_db
+from sqlalchemy import create_engine
 from time import sleep
 from random import randint
 from jobmon.server.web.app_factory import AppFactory  # noqa F401
-from flask_cors import CORS
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from jobmon.client.api import Tool
 
+class WebServerProcess:
+    def __init__(self, filepath: str) -> None:
+        if sys.platform == "darwin":
+            self.web_host = "127.0.0.1"
+        else:
+            self.web_host = socket.getfqdn()
+        self.web_port = 8070
+        self.filepath = filepath
 
-print("This server starts a new jobmon server instance at port 8070 and continuously creates "
-      "workflows as the login user. If this is your first time running the testing server on a"
-      " node, please run _create_sqlite_db.py first.")
-sql_file = "/tmp/tests.sqlite"
+    def start_web_service(self):
+        database_uri = f"sqlite:///{self.filepath}"
+        print(f"Database URI: {database_uri}")
+        os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = database_uri
+        os.environ["JOBMON__WEB__SQLALCHEMY_DATABASE_URI"] = database_uri
+        os.environ["JOBMON__OTLP__WEB_ENABLED"] = "true"
+        os.environ["JOBMON__OTLP__SPAN_EXPORTER"] = ""
+        os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
+        os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070"
 
-database_uri = f"sqlite:///{sql_file}"
-os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = database_uri
-os.environ["JOBMON__FLASK__SQLALCHEMY_DATABASE_URI"] = database_uri
-os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070"
+        if not os.path.exists(self.filepath):
+            open(self.filepath, 'a').close()
+            init_db(database_uri)
+            apply_migrations(database_uri)
 
-_app_factory = AppFactory()
-app = _app_factory.get_app()
-CORS(app, resources={r"/*": {"origins": "*"}})
+        config = JobmonConfig(dict_config={"db": {"sqlalchemy_database_uri": database_uri}})
+        app = get_app(config)
+        config.set("http", "service_url", f"http://{self.web_host}:{self.web_port}")
+        config.write()
 
+        with app.app_context():
+            app.run(host="0.0.0.0", port=self.web_port)
 
-def run_server():
-    with app.app_context():
-        app.run(host="0.0.0.0", port=8070, debug=True)
+def create_multiple_status_wf():
+    print("Creating multiple status workflows...")
 
 
 def create_multiple_status_wf():
@@ -37,7 +54,7 @@ def create_multiple_status_wf():
            3. tt cross wfs
     """
     # give the large wf sometime to run
-    sleep(60)
+    # sleep(60)
     C = "multiprocess"
     Q = "null.q"
     tool = Tool("complex_wf_tool")
@@ -122,7 +139,7 @@ def create_multiple_status_wf():
         wf.add_tasks(tasks)
         wf.run()
         # insert some random resource data
-        db_engine = create_engine(database_uri)
+        db_engine = create_engine("sqlite:///tmp/jobmon.db")
         with Session(bind=db_engine) as session:
             for task in tasks:
                 query = f"""
@@ -168,13 +185,14 @@ def create_large_workflow():
     wf.run()
     # fill in fake resource usage data
 
+def start_web_service(filepath='/tmp/jobmon.db'):
+    server = WebServerProcess(filepath=filepath)
+    server.start_web_service()
 
 if __name__ == "__main__":
     ctx = mp.get_context("fork")
-    p_server = ctx.Process(target=run_server, args=())
+    p_server = ctx.Process(target=start_web_service, args=())
     p_server.start()
-    # the large wf
     p_large_wf = ctx.Process(target=create_large_workflow, args=())
     p_large_wf.start()
-    # multiple status wf in a seperate process
     create_multiple_status_wf()
