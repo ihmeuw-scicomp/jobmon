@@ -47,7 +47,6 @@ class WebServerProcess:
         else:
             self.web_host = socket.getfqdn()
         self.web_port = str(10_000 + os.getpid() % 30_000)
-        self.web_port = 10000
         self.api_prefix = _api_prefix
         self.filepath = filepath
 
@@ -67,7 +66,11 @@ class WebServerProcess:
             init_db(database_uri)
 
             config = JobmonConfig(
-                dict_config={"db": {"sqlalchemy_database_uri": database_uri}}
+                dict_config={"db": {"sqlalchemy_database_uri": database_uri},
+                             "otlp": {"web_enabled": "false",
+                                      "span_exporter": "",
+                                      "log_exporter": ""}
+                             }
             )
             configure_logging(
                 loggers_dict={
