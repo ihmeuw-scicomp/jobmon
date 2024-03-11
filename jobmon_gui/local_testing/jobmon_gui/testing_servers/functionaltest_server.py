@@ -4,7 +4,7 @@ import sys
 import multiprocessing as mp
 from jobmon.server.web.api import get_app, JobmonConfig
 from jobmon.server.web.db_admin import apply_migrations, init_db
-from sqlalchemy import create_engine
+from sqlalchemy import text, create_engine
 from time import sleep
 from random import randint
 from jobmon.server.web.app_factory import AppFactory  # noqa F401
@@ -42,10 +42,6 @@ class WebServerProcess:
 
         with app.app_context():
             app.run(host="0.0.0.0", port=self.web_port)
-
-def create_multiple_status_wf():
-    print("Creating multiple status workflows...")
-
 
 def create_multiple_status_wf():
     """Create wf with:
@@ -142,10 +138,10 @@ def create_multiple_status_wf():
         db_engine = create_engine("sqlite:///tmp/jobmon.db")
         with Session(bind=db_engine) as session:
             for task in tasks:
-                query = f"""
+                query = text(f"""
                         UPDATE task_instance
                         SET wallclock = {randint(100, 1000)}, maxrss = {randint(300000000, 4000000000)}
-                        WHERE task_id = {task.task_id}"""
+                        WHERE task_id = {task.task_id}""")
                 session.execute(query)
             session.commit()
         # allow the large workflow to finish
