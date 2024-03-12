@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 _api_prefix = "/api/v2"
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def api_prefix():
     return _api_prefix
 

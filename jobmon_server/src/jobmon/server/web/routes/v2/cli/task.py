@@ -500,6 +500,7 @@ def _get_tasks_from_nodes(
 
 
 @api_v1_blueprint.route("/task/get_downstream_tasks", methods=["POST"])
+@api_v2_blueprint.route("/task/get_downstream_tasks", methods=["POST"])
 def get_downstream_tasks() -> Any:
     """Get only the direct downstreams of a task."""
     data = cast(Dict, request.get_json())
@@ -525,6 +526,7 @@ def get_downstream_tasks() -> Any:
 
 
 @api_v1_blueprint.route("/task/get_ti_details_viz/<task_id>", methods=["GET"])
+@api_v2_blueprint.route("/task/get_ti_details_viz/<task_id>", methods=["GET"])
 def get_task_details(task_id: int) -> Any:
     """Get information about TaskInstances associated with specific Task ID."""
     session = SessionLocal()
@@ -571,6 +573,7 @@ def get_task_details(task_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/task/get_task_details_viz/<task_id>", methods=["GET"])
+@api_v2_blueprint.route("/task/get_task_details_viz/<task_id>", methods=["GET"])
 def get_task_details_viz(task_id: int) -> Any:
     """Get status of Task from Task ID."""
     session = SessionLocal()
