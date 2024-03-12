@@ -167,8 +167,9 @@ def db_engine(sqlite_file) -> Engine:
 def client_env(web_server_process, monkeypatch):
     monkeypatch.setenv(
         "JOBMON__HTTP__SERVICE_URL",
-        f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}{_api_prefix}',
+        f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}',
     )
+    monkeypatch.setenv("JOBMON__HTTP__ROUTE_PREFIX", _api_prefix)
     monkeypatch.setenv("JOBMON__HTTP__STOP_AFTER_DELAY", "0")
 
     # This instance is thrown away, hence monkey-patching the defaults via the

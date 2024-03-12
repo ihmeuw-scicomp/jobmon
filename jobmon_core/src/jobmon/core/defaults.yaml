@@ -1,4 +1,5 @@
 http:
+  route_prefix: ""
   request_timeout: 20
   retries_timeout: 300
   retries_attempts: 10
