@@ -162,7 +162,7 @@ function WorkflowDetails({ subpage }) {
             getAsyncTTdetail(setTTDict, params.workflowId, setTTLoaded)();
             safe_rum_add_label(rum_t, "wf_id", params.workflowId);
         }
-    }, [params.workflowId]);
+    }, [params.workflowId, rum_t]);
     // Update the progress bar every 60 seconds
     useEffect(() => {
         const interval = setInterval(() => {
@@ -340,7 +340,7 @@ function WorkflowDetails({ subpage }) {
                                             num_attempts_max={d["num_attempts_max"]}
                                             maxc={d["MAXC"]}
                                             placement="left"
-                                            style="none"
+                                            style={{}}
                                         />
                                     </div>
                                     <br />

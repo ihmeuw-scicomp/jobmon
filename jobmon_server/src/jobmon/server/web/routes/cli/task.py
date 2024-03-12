@@ -6,6 +6,7 @@ import json
 from typing import Any, cast, Dict, List, Set
 
 from flask import jsonify, request
+from flask_cors import cross_origin
 import pandas as pd
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -257,6 +258,7 @@ def update_task_statuses() -> Any:
 
 
 @blueprint.route("/task_dependencies/<task_id>", methods=["GET"])
+@cross_origin()
 def get_task_dependencies(task_id: int) -> Any:
     """Get task's downstream and upstream tasks and their status."""
     session = SessionLocal()
@@ -518,6 +520,7 @@ def get_downstream_tasks() -> Any:
 
 
 @blueprint.route("/task/get_ti_details_viz/<task_id>", methods=["GET"])
+@cross_origin()
 def get_task_details(task_id: int) -> Any:
     """Get information about TaskInstances associated with specific Task ID."""
     session = SessionLocal()
@@ -564,6 +567,7 @@ def get_task_details(task_id: int) -> Any:
 
 
 @blueprint.route("/task/get_task_details_viz/<task_id>", methods=["GET"])
+@cross_origin()
 def get_task_details_viz(task_id: int) -> Any:
     """Get status of Task from Task ID."""
     session = SessionLocal()
