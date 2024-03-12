@@ -46,7 +46,7 @@ class TaskTemplateVersion(Base):
         )
 
     id = Column(Integer, primary_key=True)
-    task_template_id = Column(Integer)
+    task_template_id = Column(Integer, nullable=False)
     command_template = Column(Text)
     arg_mapping_hash = Column(VARCHAR(150), nullable=False)
 

@@ -58,7 +58,7 @@ class TaskInstance(Base):
     id = Column(Integer, primary_key=True)
     workflow_run_id = Column(Integer, ForeignKey("workflow_run.id"))
     array_id = Column(Integer, ForeignKey("array.id"), default=None)
-    distributor_id = Column(String(20), index=True, nullable=False)
+    distributor_id = Column(String(20), index=True, nullable=True)
     task_id = Column(Integer, ForeignKey("task.id"), nullable=False)
     task_resources_id = Column(Integer, ForeignKey("task_resources.id"), index=True)
     array_batch_num = Column(Integer, index=True)
