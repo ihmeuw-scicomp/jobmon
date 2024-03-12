@@ -39,7 +39,7 @@ class Workflow(Base):
     workflow_args_hash = Column(VARCHAR(150), index=True, nullable=False)
     task_hash = Column(VARCHAR(150), index=True, nullable=False)
     description = Column(Text)
-    name = Column(String(255))
+    name = Column(String(255), nullable=True)
     workflow_args = Column(Text)
     max_concurrently_running = Column(Integer)
     created_date = Column(DateTime, default=None)
