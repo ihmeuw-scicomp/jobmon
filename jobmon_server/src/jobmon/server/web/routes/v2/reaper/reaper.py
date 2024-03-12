@@ -22,6 +22,7 @@ logger = structlog.get_logger(__name__)
 
 
 @api_v1_blueprint.route("/workflow/<workflow_id>/fix_status_inconsistency", methods=["PUT"])
+@api_v2_blueprint.route("/workflow/<workflow_id>/fix_status_inconsistency", methods=["PUT"])
 def fix_wf_inconsistency(workflow_id: int) -> Any:
     """Find wf in F with all tasks in D and fix them.
 
@@ -95,6 +96,7 @@ def fix_wf_inconsistency(workflow_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/workflow/<workflow_id>/workflow_name_and_args", methods=["GET"])
+@api_v2_blueprint.route("/workflow/<workflow_id>/workflow_name_and_args", methods=["GET"])
 def get_wf_name_and_args(workflow_id: int) -> Any:
     """Return workflow name and args associated with specified workflow ID."""
     session = SessionLocal()
@@ -115,6 +117,7 @@ def get_wf_name_and_args(workflow_id: int) -> Any:
 
 
 @api_v1_blueprint.route("/lost_workflow_run", methods=["GET"])
+@api_v2_blueprint.route("/lost_workflow_run", methods=["GET"])
 def get_lost_workflow_runs() -> Any:
     """Return all workflow runs that are currently in the specified state."""
     statuses = request.args.getlist("status")
@@ -135,6 +138,7 @@ def get_lost_workflow_runs() -> Any:
 
 
 @api_v1_blueprint.route("/workflow_run/<workflow_run_id>/reap", methods=["PUT"])
+@api_v2_blueprint.route("/workflow_run/<workflow_run_id>/reap", methods=["PUT"])
 def reap_workflow_run(workflow_run_id: int) -> Any:
     """If the last task was more than 2 minutes ago, transition wfr to A state.
 
