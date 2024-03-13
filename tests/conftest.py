@@ -93,6 +93,7 @@ class WebServerProcess:
                 app.run(host="0.0.0.0", port=self.web_port)
 
         ctx = mp.get_context("fork")
+        assert 0
         self.p1 = ctx.Process(target=run_server_with_handler)
         self.p1.start()
 

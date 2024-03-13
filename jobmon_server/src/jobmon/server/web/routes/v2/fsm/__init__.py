@@ -17,4 +17,4 @@ for module in [
     "workflow",
     "workflow_run",
 ]:
-    import_module("jobmon.server.web.routes.v2.fsm.{module}")
+    import_module(f"jobmon.server.web.routes.v2.fsm.{module}")
