@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import getpass
 import logging
+import logging.config
 import os
 import socket
 import sys

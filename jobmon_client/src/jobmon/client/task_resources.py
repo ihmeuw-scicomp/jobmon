@@ -131,13 +131,13 @@ class TaskResources:
             if resource in existing_resources.keys():
                 if isinstance(scaler, numbers.Number):
                     new_resource_value = self.scale_val(
-                        existing_resources[resource], scaler
+                        existing_resources[resource], scaler  # type: ignore
                     )
                 elif callable(scaler):
                     new_resource_value = scaler(existing_resources[resource])
                 elif isinstance(scaler, Iterator):
                     try:
-                        new_resource_value: numbers.Number = next(scaler)
+                        new_resource_value = next(scaler)  # type: ignore
                     except StopIteration:
                         logger.warning(
                             "Not enough elements left in Iterator, re-using previous value "
