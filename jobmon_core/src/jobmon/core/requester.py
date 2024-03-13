@@ -72,7 +72,12 @@ class Requester(object):
         retries_attempts = config.get_int("http", "retries_attempts")
         use_otlp = config.get_boolean("otlp", "http_enabled")
         return cls(
-            service_url, route_prefix, request_timeout, retries_timeout, retries_attempts, use_otlp
+            service_url,
+            route_prefix,
+            request_timeout,
+            retries_timeout,
+            retries_attempts,
+            use_otlp,
         )
 
     @property

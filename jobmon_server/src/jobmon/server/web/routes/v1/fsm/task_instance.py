@@ -1,4 +1,5 @@
 """Routes for TaskInstances."""
+
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
@@ -16,7 +17,9 @@ from jobmon.server.web.routes.v1 import api_v1_blueprint
 logger = structlog.get_logger(__name__)
 
 
-@api_v1_blueprint.route("/task_instance/<task_instance_id>/log_running", methods=["POST"])
+@api_v1_blueprint.route(
+    "/task_instance/<task_instance_id>/log_running", methods=["POST"]
+)
 def log_running(task_instance_id: int) -> Any:
     """Log a task_instance as running.
 

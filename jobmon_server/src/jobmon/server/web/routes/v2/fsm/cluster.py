@@ -8,9 +8,9 @@ from sqlalchemy import select
 
 from jobmon.server.web.models.cluster import Cluster
 from jobmon.server.web.models.cluster_type import ClusterType
-from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.routes.v1 import api_v1_blueprint
 from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 
 
 @api_v1_blueprint.route("/cluster/<cluster_name>", methods=["GET"])

@@ -13,16 +13,20 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_run_status import WorkflowRunStatus
 from jobmon.server.web.models.workflow_status import WorkflowStatus
-from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.routes.v1 import api_v1_blueprint
 from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
 
 
-@api_v1_blueprint.route("/workflow/<workflow_id>/fix_status_inconsistency", methods=["PUT"])
-@api_v2_blueprint.route("/workflow/<workflow_id>/fix_status_inconsistency", methods=["PUT"])
+@api_v1_blueprint.route(
+    "/workflow/<workflow_id>/fix_status_inconsistency", methods=["PUT"]
+)
+@api_v2_blueprint.route(
+    "/workflow/<workflow_id>/fix_status_inconsistency", methods=["PUT"]
+)
 def fix_wf_inconsistency(workflow_id: int) -> Any:
     """Find wf in F with all tasks in D and fix them.
 
@@ -95,8 +99,12 @@ def fix_wf_inconsistency(workflow_id: int) -> Any:
     return resp
 
 
-@api_v1_blueprint.route("/workflow/<workflow_id>/workflow_name_and_args", methods=["GET"])
-@api_v2_blueprint.route("/workflow/<workflow_id>/workflow_name_and_args", methods=["GET"])
+@api_v1_blueprint.route(
+    "/workflow/<workflow_id>/workflow_name_and_args", methods=["GET"]
+)
+@api_v2_blueprint.route(
+    "/workflow/<workflow_id>/workflow_name_and_args", methods=["GET"]
+)
 def get_wf_name_and_args(workflow_id: int) -> Any:
     """Return workflow name and args associated with specified workflow ID."""
     session = SessionLocal()

@@ -19,16 +19,18 @@ from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
-from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.routes.v1 import api_v1_blueprint
 from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.server_side_exception import ServerError
 
 
 logger = structlog.get_logger(__name__)
 
 
-@api_v2_blueprint.route("/task_instance/<task_instance_id>/log_running", methods=["POST"])
+@api_v2_blueprint.route(
+    "/task_instance/<task_instance_id>/log_running", methods=["POST"]
+)
 def log_running(task_instance_id: int) -> Any:
     """Log a task_instance as running.
 
@@ -69,8 +71,12 @@ def log_running(task_instance_id: int) -> Any:
     return resp
 
 
-@api_v1_blueprint.route("/task_instance/<task_instance_id>/log_report_by", methods=["POST"])
-@api_v2_blueprint.route("/task_instance/<task_instance_id>/log_report_by", methods=["POST"])
+@api_v1_blueprint.route(
+    "/task_instance/<task_instance_id>/log_report_by", methods=["POST"]
+)
+@api_v2_blueprint.route(
+    "/task_instance/<task_instance_id>/log_report_by", methods=["POST"]
+)
 def log_ti_report_by(task_instance_id: int) -> Any:
     """Log a task_instance as being responsive with a new report_by_date.
 
@@ -366,8 +372,12 @@ def log_distributor_id(task_instance_id: int) -> Any:
     return resp
 
 
-@api_v1_blueprint.route("/task_instance/<task_instance_id>/log_known_error", methods=["POST"])
-@api_v2_blueprint.route("/task_instance/<task_instance_id>/log_known_error", methods=["POST"])
+@api_v1_blueprint.route(
+    "/task_instance/<task_instance_id>/log_known_error", methods=["POST"]
+)
+@api_v2_blueprint.route(
+    "/task_instance/<task_instance_id>/log_known_error", methods=["POST"]
+)
 def log_known_error(task_instance_id: int) -> Any:
     """Log a task_instance as errored.
 

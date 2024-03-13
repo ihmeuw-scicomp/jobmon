@@ -10,9 +10,9 @@ import structlog
 
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.node_arg import NodeArg
-from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.routes.v1 import api_v1_blueprint
 from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 
 
 logger = structlog.get_logger(__name__)

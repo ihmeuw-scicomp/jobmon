@@ -66,11 +66,14 @@ class WebServerProcess:
             init_db(database_uri)
 
             config = JobmonConfig(
-                dict_config={"db": {"sqlalchemy_database_uri": database_uri},
-                             "otlp": {"web_enabled": "false",
-                                      "span_exporter": "",
-                                      "log_exporter": ""}
-                             }
+                dict_config={
+                    "db": {"sqlalchemy_database_uri": database_uri},
+                    "otlp": {
+                        "web_enabled": "false",
+                        "span_exporter": "",
+                        "log_exporter": "",
+                    },
+                }
             )
             configure_logging(
                 loggers_dict={
@@ -124,10 +127,10 @@ class WebServerProcess:
         return self
 
     def __exit__(
-            self,
-            exc_type: Optional[BaseException],
-            exc_value: Optional[BaseException],
-            exc_traceback: Optional[TracebackType],
+        self,
+        exc_type: Optional[BaseException],
+        exc_value: Optional[BaseException],
+        exc_traceback: Optional[TracebackType],
     ) -> None:
         """Terminate the web service process."""
         # interrupt and join for coverage

@@ -27,9 +27,9 @@ from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
-from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.routes.v1 import api_v1_blueprint
 from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.routes.v2.cli.workflow import _cli_label_mapping
 from jobmon.server.web.server_side_exception import InvalidUsage
 

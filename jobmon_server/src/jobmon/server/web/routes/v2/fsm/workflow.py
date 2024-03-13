@@ -21,9 +21,9 @@ from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_attribute import WorkflowAttribute
 from jobmon.server.web.models.workflow_attribute_type import WorkflowAttributeType
-from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.routes.v1 import api_v1_blueprint
 from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -399,8 +399,12 @@ def task_status_updates(workflow_id: int) -> Any:
     return resp
 
 
-@api_v1_blueprint.route("/workflow/<workflow_id>/fetch_workflow_metadata", methods=["GET"])
-@api_v2_blueprint.route("/workflow/<workflow_id>/fetch_workflow_metadata", methods=["GET"])
+@api_v1_blueprint.route(
+    "/workflow/<workflow_id>/fetch_workflow_metadata", methods=["GET"]
+)
+@api_v2_blueprint.route(
+    "/workflow/<workflow_id>/fetch_workflow_metadata", methods=["GET"]
+)
 def fetch_workflow_metadata(workflow_id: int) -> Any:
     """Get metadata associated with specified Workflow ID."""
     # Query for a workflow object

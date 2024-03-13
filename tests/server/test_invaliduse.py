@@ -11,7 +11,9 @@ def test_add_tool(requester_in_memory, api_prefix):
     # @jobmon_client.route('/tool', methods=['POST'])
     requester = Requester.from_defaults()
     with pytest.raises(InvalidRequest) as error:
-        requester.send_request(app_route=f"{api_prefix}/tool", message={}, request_type="post")
+        requester.send_request(
+            app_route=f"{api_prefix}/tool", message={}, request_type="post"
+        )
         assert "Unexpected status code 400" in str(error.value)
 
 
@@ -20,7 +22,9 @@ def test_get_tool_versions(requester_in_memory, api_prefix):
     requester = Requester.from_defaults()
     with pytest.raises(InvalidRequest) as error:
         requester.send_request(
-            app_route=f"{api_prefix}/tool/abc/tool_versions", message={}, request_type="get"
+            app_route=f"{api_prefix}/tool/abc/tool_versions",
+            message={},
+            request_type="get",
         )
         assert "Unexpected status code 400" in str(error.value)
 
@@ -30,7 +34,9 @@ def test_add_tool_version(requester_in_memory, api_prefix):
     requester = Requester.from_defaults()
     with pytest.raises(InvalidRequest) as error:
         requester.send_request(
-            app_route=f"{api_prefix}/tool_version", message={"tool_id": "abc"}, request_type="post"
+            app_route=f"{api_prefix}/tool_version",
+            message={"tool_id": "abc"},
+            request_type="post",
         )
         assert "Unexpected status code 400" in str(error.value)
 
@@ -60,7 +66,9 @@ def test_add_task_template_version(requester_in_memory, api_prefix):
     requester = Requester.from_defaults()
     with pytest.raises(InvalidRequest) as error:
         requester.send_request(
-            app_route=f"{api_prefix}/task_template/abc/add_version", message={}, request_type="post"
+            app_route=f"{api_prefix}/task_template/abc/add_version",
+            message={},
+            request_type="post",
         )
         assert "Unexpected status code 400" in str(error.value)
 
@@ -70,7 +78,9 @@ def test_add_workflow(requester_in_memory, api_prefix):
     requester = Requester.from_defaults()
     with pytest.raises(InvalidRequest) as error:
         requester.send_request(
-            app_route=f"{api_prefix}/workflow", message={"dag_id": "abc"}, request_type="post"
+            app_route=f"{api_prefix}/workflow",
+            message={"dag_id": "abc"},
+            request_type="post",
         )
         assert "Unexpected status code 400" in str(error.value)
 
@@ -91,7 +101,9 @@ def test_add_workflow(requester_in_memory, api_prefix):
 
     with pytest.raises(InvalidRequest) as error:
         requester.send_request(
-            app_route=f"{api_prefix}/workflow", message={"task_hash": "abc"}, request_type="post"
+            app_route=f"{api_prefix}/workflow",
+            message={"task_hash": "abc"},
+            request_type="post",
         )
         assert "Unexpected status code 400" in str(error.value)
 

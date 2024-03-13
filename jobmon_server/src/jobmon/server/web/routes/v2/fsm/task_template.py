@@ -15,9 +15,9 @@ from jobmon.server.web.models.arg import Arg
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.template_arg_map import TemplateArgMap
-from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.routes.v1 import api_v1_blueprint
 from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -103,8 +103,12 @@ def _add_or_get_arg(name: str, session: Session) -> Arg:
     return arg
 
 
-@api_v1_blueprint.route("/task_template/<task_template_id>/add_version", methods=["POST"])
-@api_v2_blueprint.route("/task_template/<task_template_id>/add_version", methods=["POST"])
+@api_v1_blueprint.route(
+    "/task_template/<task_template_id>/add_version", methods=["POST"]
+)
+@api_v2_blueprint.route(
+    "/task_template/<task_template_id>/add_version", methods=["POST"]
+)
 def add_task_template_version(task_template_id: int) -> Any:
     """Add a tool to the database."""
     # check input variables

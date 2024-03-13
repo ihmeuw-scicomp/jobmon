@@ -10,9 +10,9 @@ import structlog
 
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.tool_version import ToolVersion
-from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.routes.v1 import api_v1_blueprint
 from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -50,8 +50,12 @@ def add_tool_version() -> Any:
     return resp
 
 
-@api_v1_blueprint.route("/tool_version/<tool_version_id>/task_templates", methods=["GET"])
-@api_v2_blueprint.route("/tool_version/<tool_version_id>/task_templates", methods=["GET"])
+@api_v1_blueprint.route(
+    "/tool_version/<tool_version_id>/task_templates", methods=["GET"]
+)
+@api_v2_blueprint.route(
+    "/tool_version/<tool_version_id>/task_templates", methods=["GET"]
+)
 def get_task_templates(tool_version_id: int) -> Any:
     """Get the Tool Version."""
     # check input variable

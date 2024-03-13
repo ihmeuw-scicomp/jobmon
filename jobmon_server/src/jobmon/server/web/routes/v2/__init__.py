@@ -23,6 +23,5 @@ def teardown(e: Optional[BaseException]) -> None:
     SessionLocal.remove()
 
 
-import jobmon.server.web.routes.v2.cli
-import jobmon.server.web.routes.v2.fsm
-import jobmon.server.web.routes.v2.reaper
+for module in ["cli", "fsm", "reaper"]:
+    import_module(f"jobmon.server.web.routes.v2.{module}")

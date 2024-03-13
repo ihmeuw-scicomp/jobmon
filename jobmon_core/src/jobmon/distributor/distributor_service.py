@@ -245,7 +245,7 @@ class DistributorService:
     def instantiate_task_instances(
         self, task_instances: List[DistributorTaskInstance]
     ) -> None:
-        app_route = f"/task_instance/instantiate_task_instances"
+        app_route = "/task_instance/instantiate_task_instances"
         _, result = self.requester.send_request(
             app_route=app_route,
             message={

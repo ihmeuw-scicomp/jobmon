@@ -23,4 +23,4 @@ def teardown(e: Optional[BaseException]) -> None:
     SessionLocal.remove()
 
 
-import jobmon.server.web.routes.v1.fsm
+import_module("jobmon.server.web.routes.v1.fsm")

@@ -3,7 +3,7 @@ from __future__ import annotations
 from importlib import import_module
 from typing import Any, List, Optional, Type
 
-from flask import Flask, Blueprint
+from flask import Flask
 import sqlalchemy
 
 from jobmon.core.configuration import JobmonConfig
@@ -20,7 +20,7 @@ class AppFactory:
     _structlog_configured = False
 
     def __init__(
-            self, sqlalchemy_database_uri: str = "", use_otlp: bool = False
+        self, sqlalchemy_database_uri: str = "", use_otlp: bool = False
     ) -> None:
         """Initialize the AppFactory object with the SQLAlchemy database URI.
 
@@ -82,7 +82,7 @@ class AppFactory:
         cls._structlog_configured = True
 
     def get_app(
-            self, blueprints: Optional[List[str]] = None, url_prefix: str = "/api"
+        self, blueprints: Optional[List[str]] = None, url_prefix: str = "/api"
     ) -> Flask:
         """Create and configure the Flask app.
 
@@ -98,7 +98,10 @@ class AppFactory:
         # Register the versions, reverse order
         for version in ["v2", "v1"]:
             mod = import_module(f"jobmon.server.web.routes.{version}")
-            app.register_blueprint(getattr(mod, f"api_{version}_blueprint"), url_prefix=f"{url_prefix}/{version}")
+            app.register_blueprint(
+                getattr(mod, f"api_{version}_blueprint"),
+                url_prefix=f"{url_prefix}/{version}",
+            )
 
         if self.otlp_api:
             self.otlp_api.instrument_app(app)

@@ -11,32 +11,32 @@ from jobmon.core.requester import Requester
     "initial_responses, final_response, expected_attempts, expected_exception, expected_msg",
     [
         (
-                [(502, b"Some error message...")] * 2,
-                (200, {"time": "2019-02-21 17:40:07"}),
-                3,
-                None,
-                None,
+            [(502, b"Some error message...")] * 2,
+            (200, {"time": "2019-02-21 17:40:07"}),
+            3,
+            None,
+            None,
         ),
         (
-                [(502, b"Some error message...")] * 3,
-                None,  # This won't be used since we've hit the retry limit
-                3,
-                RuntimeError,
-                (
-                        "Exceeded HTTP request retry budget due to: Request failed due to status code 502 "
-                        "from GET request through route /time. Response content: b'Some error message..."
-                ),
+            [(502, b"Some error message...")] * 3,
+            None,  # This won't be used since we've hit the retry limit
+            3,
+            RuntimeError,
+            (
+                "Exceeded HTTP request retry budget due to: Request failed due to status code 502 "
+                "from GET request through route /time. Response content: b'Some error message..."
+            ),
         ),
     ],
 )
 def test_retries(
-        client_env,
-        mocker,
-        initial_responses,
-        final_response,
-        expected_attempts,
-        expected_exception,
-        expected_msg,
+    client_env,
+    mocker,
+    initial_responses,
+    final_response,
+    expected_attempts,
+    expected_exception,
+    expected_msg,
 ):
     responses = initial_responses + [final_response]
     mock_content = mocker.patch(
@@ -88,8 +88,8 @@ def test_fail_fast(client_env, mocker):
         requester.send_request("/no-route-should-fail", {}, "get")
 
     assert (
-            "Client error with status code 404 from GET request through route "
-            "/no-route-should-fail. Response content: Not Found" in str(exc.value)
+        "Client error with status code 404 from GET request through route "
+        "/no-route-should-fail. Response content: Not Found" in str(exc.value)
     )
     assert mock_content.call_count == 1
 
@@ -104,8 +104,8 @@ def test_non_tenacious_request(client_env, mocker):
         requester.send_request("/test_bad", {}, "get", tenacious=False)
 
     assert (
-            "Request failed due to status code 500 from GET request through "
-            "route /test_bad. Response content: Server Error" in str(exc.value)
+        "Request failed due to status code 500 from GET request through "
+        "route /test_bad. Response content: Server Error" in str(exc.value)
     )
     assert mock_content.call_count == 1
 
