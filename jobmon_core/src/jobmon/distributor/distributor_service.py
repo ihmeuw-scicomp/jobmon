@@ -450,7 +450,7 @@ class DistributorService:
 
     async def _log_heartbeats(self, task_instance_batches: List[List[int]]) -> None:
         """Create a task for each batch of task instances to send heartbeat."""
-        async with aiohttp.ClientSession(self.requester.url) as session:
+        async with aiohttp.ClientSession(self.requester.base_url) as session:
             heartbeat_tasks = [
                 asyncio.create_task(self._log_heartbeat_by_batch(session, batch))
                 for batch in task_instance_batches
@@ -465,7 +465,7 @@ class DistributorService:
             "next_report_increment": self._next_report_increment,
             "task_instance_ids": task_instance_ids_to_heartbeat,
         }
-        app_route = "/task_instance/log_report_by/batch"
+        app_route = f"{self.requester.route_prefix}/task_instance/log_report_by/batch"
 
         # Super basic retrying logic, to avoid fussing with tenacity logic.
         # TODO: Factor out into an asynchronous requester

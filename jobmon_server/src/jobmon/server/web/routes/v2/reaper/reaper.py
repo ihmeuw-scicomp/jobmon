@@ -13,14 +13,20 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_run_status import WorkflowRunStatus
 from jobmon.server.web.models.workflow_status import WorkflowStatus
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.reaper import blueprint
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
 
 
-@blueprint.route("/workflow/<workflow_id>/fix_status_inconsistency", methods=["PUT"])
+@api_v1_blueprint.route(
+    "/workflow/<workflow_id>/fix_status_inconsistency", methods=["PUT"]
+)
+@api_v2_blueprint.route(
+    "/workflow/<workflow_id>/fix_status_inconsistency", methods=["PUT"]
+)
 def fix_wf_inconsistency(workflow_id: int) -> Any:
     """Find wf in F with all tasks in D and fix them.
 
@@ -93,7 +99,12 @@ def fix_wf_inconsistency(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/workflow/<workflow_id>/workflow_name_and_args", methods=["GET"])
+@api_v1_blueprint.route(
+    "/workflow/<workflow_id>/workflow_name_and_args", methods=["GET"]
+)
+@api_v2_blueprint.route(
+    "/workflow/<workflow_id>/workflow_name_and_args", methods=["GET"]
+)
 def get_wf_name_and_args(workflow_id: int) -> Any:
     """Return workflow name and args associated with specified workflow ID."""
     session = SessionLocal()
@@ -113,7 +124,8 @@ def get_wf_name_and_args(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/lost_workflow_run", methods=["GET"])
+@api_v1_blueprint.route("/lost_workflow_run", methods=["GET"])
+@api_v2_blueprint.route("/lost_workflow_run", methods=["GET"])
 def get_lost_workflow_runs() -> Any:
     """Return all workflow runs that are currently in the specified state."""
     statuses = request.args.getlist("status")
@@ -133,7 +145,8 @@ def get_lost_workflow_runs() -> Any:
     return resp
 
 
-@blueprint.route("/workflow_run/<workflow_run_id>/reap", methods=["PUT"])
+@api_v1_blueprint.route("/workflow_run/<workflow_run_id>/reap", methods=["PUT"])
+@api_v2_blueprint.route("/workflow_run/<workflow_run_id>/reap", methods=["PUT"])
 def reap_workflow_run(workflow_run_id: int) -> Any:
     """If the last task was more than 2 minutes ago, transition wfr to A state.
 

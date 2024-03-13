@@ -33,11 +33,11 @@ def log_config(web_server_in_memory, tmp_path):
     configure_logging()
 
 
-def test_add_structlog_context(requester_in_memory, log_config):
+def test_add_structlog_context(requester_in_memory, log_config, api_prefix):
     requester = Requester("")
     added_context = {"foo": "bar", "baz": "qux"}
     requester.add_server_structlog_context(**added_context)
-    requester._send_request("/health", {}, "get")
+    requester._send_request(f"{api_prefix}/health", {}, "get")
     with open(log_config, "r") as server_log_file:
         for line in server_log_file:
             stripped_line = line.strip()
@@ -49,7 +49,7 @@ def test_add_structlog_context(requester_in_memory, log_config):
 
 
 @pytest.mark.skip(reason="This test is not working")
-def test_error_handling(requester_in_memory, log_config, monkeypatch):
+def test_error_handling(requester_in_memory, log_config, monkeypatch, api_prefix):
     msg = "bad luck buddy"
 
     def raise_error():
@@ -61,7 +61,7 @@ def test_error_handling(requester_in_memory, log_config, monkeypatch):
     requester = Requester("")
 
     with pytest.raises(InvalidResponse):
-        requester.send_request("/health", {}, "get", tenacious=False)
+        requester.send_request(f"{api_prefix}/health", {}, "get", tenacious=False)
 
     with open(log_config, "r", encoding="utf8") as server_log_file:
         for line in server_log_file:

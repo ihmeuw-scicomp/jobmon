@@ -23,14 +23,16 @@ from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLo
 from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import blueprint
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
 
 
-@blueprint.route("/task/bind_tasks_no_args", methods=["PUT"])
+@api_v1_blueprint.route("/task/bind_tasks_no_args", methods=["PUT"])
+@api_v2_blueprint.route("/task/bind_tasks_no_args", methods=["PUT"])
 def bind_tasks_no_args() -> Any:
     """Bind the task objects to the database."""
     all_data = cast(Dict, request.get_json())
@@ -159,7 +161,8 @@ def bind_tasks_no_args() -> Any:
     return resp
 
 
-@blueprint.route("/task/bind_task_args", methods=["PUT"])
+@api_v1_blueprint.route("/task/bind_task_args", methods=["PUT"])
+@api_v2_blueprint.route("/task/bind_task_args", methods=["PUT"])
 def bind_task_args() -> Any:
     """Add task args and associated task ids to the database."""
     all_data = cast(Dict, request.get_json())
@@ -211,7 +214,8 @@ def bind_task_args() -> Any:
     return resp
 
 
-@blueprint.route("/task/bind_task_attributes", methods=["PUT"])
+@api_v1_blueprint.route("/task/bind_task_attributes", methods=["PUT"])
+@api_v2_blueprint.route("/task/bind_task_attributes", methods=["PUT"])
 def bind_task_attributes() -> Any:
     """Add task attributes and associated attribute types to the database."""
     all_data = cast(Dict, request.get_json())
@@ -374,7 +378,8 @@ def _add_or_get_attribute_types(
     return return_dict  # type: ignore
 
 
-@blueprint.route("/task/bind_resources", methods=["POST"])
+@api_v1_blueprint.route("/task/bind_resources", methods=["POST"])
+@api_v2_blueprint.route("/task/bind_resources", methods=["POST"])
 def bind_task_resources() -> Any:
     """Add the task resources for a given task."""
     data = cast(Dict, request.get_json())
@@ -395,7 +400,8 @@ def bind_task_resources() -> Any:
     return resp
 
 
-@blueprint.route("/task/<task_id>/most_recent_ti_error", methods=["GET"])
+@api_v1_blueprint.route("/task/<task_id>/most_recent_ti_error", methods=["GET"])
+@api_v2_blueprint.route("/task/<task_id>/most_recent_ti_error", methods=["GET"])
 def get_most_recent_ti_error(task_id: int) -> Any:
     """Route to determine the cause of the most recent task_instance's error.
 
@@ -436,7 +442,8 @@ def get_most_recent_ti_error(task_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/task/<workflow_id>/set_resume_state", methods=["POST"])
+@api_v1_blueprint.route("/task/<workflow_id>/set_resume_state", methods=["POST"])
+@api_v2_blueprint.route("/task/<workflow_id>/set_resume_state", methods=["POST"])
 def set_task_resume_state(workflow_id: int) -> Any:
     """An endpoint to set all tasks to a resumable state for a workflow.
 

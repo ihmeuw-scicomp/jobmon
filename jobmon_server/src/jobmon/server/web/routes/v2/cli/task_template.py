@@ -27,16 +27,18 @@ from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.cli import blueprint
-from jobmon.server.web.routes.cli.workflow import _cli_label_mapping
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
+from jobmon.server.web.routes.v2.cli.workflow import _cli_label_mapping
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
 
 
-@blueprint.route("/get_task_template_version", methods=["GET"])
+@api_v1_blueprint.route("/get_task_template_version", methods=["GET"])
+@api_v2_blueprint.route("/get_task_template_version", methods=["GET"])
 def get_task_template_version_for_tasks() -> Any:
     """Get the task_template_version_ids."""
     # parse args
@@ -80,7 +82,8 @@ def get_task_template_version_for_tasks() -> Any:
     return resp
 
 
-@blueprint.route("/get_requested_cores", methods=["GET"])
+@api_v1_blueprint.route("/get_requested_cores", methods=["GET"])
+@api_v2_blueprint.route("/get_requested_cores", methods=["GET"])
 def get_requested_cores() -> Any:
     """Get the min, max, and arg of requested cores."""
     # parse args
@@ -132,7 +135,8 @@ def get_requested_cores() -> Any:
     return resp
 
 
-@blueprint.route("/get_most_popular_queue", methods=["GET"])
+@api_v1_blueprint.route("/get_most_popular_queue", methods=["GET"])
+@api_v2_blueprint.route("/get_most_popular_queue", methods=["GET"])
 def get_most_popular_queue() -> Any:
     """Get the most popular queue of the task template."""
     # parse args
@@ -195,7 +199,8 @@ def get_most_popular_queue() -> Any:
     return resp
 
 
-@blueprint.route("/task_template_resource_usage", methods=["POST"])
+@api_v1_blueprint.route("/task_template_resource_usage", methods=["POST"])
+@api_v2_blueprint.route("/task_template_resource_usage", methods=["POST"])
 @cross_origin()
 def get_task_template_resource_usage() -> Any:
     """Return the aggregate resource usage for a give TaskTemplate.
@@ -354,7 +359,8 @@ def get_task_template_resource_usage() -> Any:
     return resp
 
 
-@blueprint.route("/workflow_tt_status_viz/<workflow_id>", methods=["GET"])
+@api_v1_blueprint.route("/workflow_tt_status_viz/<workflow_id>", methods=["GET"])
+@api_v2_blueprint.route("/workflow_tt_status_viz/<workflow_id>", methods=["GET"])
 def get_workflow_tt_status_viz(workflow_id: int) -> Any:
     """Get the status of the workflows for GUI."""
     # return DS
@@ -485,7 +491,8 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/tt_error_log_viz/<wf_id>/<tt_id>", methods=["GET"])
+@api_v1_blueprint.route("/tt_error_log_viz/<wf_id>/<tt_id>", methods=["GET"])
+@api_v2_blueprint.route("/tt_error_log_viz/<wf_id>/<tt_id>", methods=["GET"])
 def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
     """Get the error logs for a task template id for GUI."""
     # return DS

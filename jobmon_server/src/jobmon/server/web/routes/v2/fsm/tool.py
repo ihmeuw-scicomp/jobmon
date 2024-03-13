@@ -10,15 +10,17 @@ import structlog
 
 from jobmon.server.web.models.tool import Tool
 from jobmon.server.web.models.tool_version import ToolVersion
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import blueprint
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
 logger = structlog.get_logger(__name__)
 
 
-@blueprint.route("/tool", methods=["POST"])
+@api_v1_blueprint.route("/tool", methods=["POST"])
+@api_v2_blueprint.route("/tool", methods=["POST"])
 def add_tool() -> Any:
     """Add a tool to the database."""
     data = cast(Dict, request.get_json())
@@ -48,7 +50,8 @@ def add_tool() -> Any:
     return resp
 
 
-@blueprint.route("/tool/<tool_id>/tool_versions", methods=["GET"])
+@api_v1_blueprint.route("/tool/<tool_id>/tool_versions", methods=["GET"])
+@api_v2_blueprint.route("/tool/<tool_id>/tool_versions", methods=["GET"])
 def get_tool_versions(tool_id: int) -> Any:
     """Get the Tool Version."""
     # check input variable
