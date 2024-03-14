@@ -82,7 +82,7 @@ class AppFactory:
         cls._structlog_configured = True
 
     def get_app(
-        self, blueprints: Optional[List[str]] = None, url_prefix: str = "/"
+        self, blueprints: Optional[List[str]] = None, url_prefix: str = "/api"
     ) -> Flask:
         """Create and configure the Flask app.
 
@@ -95,10 +95,13 @@ class AppFactory:
         app = Flask(__name__)
         app.config["CORS_HEADERS"] = "Content-Type"
 
-        # Register the blueprints
-        for blueprint in blueprints:
-            mod = import_module(f"jobmon.server.web.routes.{blueprint}")
-            app.register_blueprint(getattr(mod, "blueprint"), url_prefix=url_prefix)
+        # Register the versions, reverse order
+        for version in ["v2", "v1"]:
+            mod = import_module(f"jobmon.server.web.routes.{version}")
+            app.register_blueprint(
+                getattr(mod, f"api_{version}_blueprint"),
+                url_prefix=f"{url_prefix}/{version}",
+            )
 
         if self.otlp_api:
             self.otlp_api.instrument_app(app)

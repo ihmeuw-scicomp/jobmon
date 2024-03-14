@@ -21,8 +21,9 @@ from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_attribute import WorkflowAttribute
 from jobmon.server.web.models.workflow_attribute_type import WorkflowAttributeType
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.fsm import blueprint
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -49,7 +50,8 @@ def _add_workflow_attributes(
         session.add_all(wf_attributes_list)
 
 
-@blueprint.route("/workflow", methods=["POST"])
+@api_v1_blueprint.route("/workflow", methods=["POST"])
+@api_v2_blueprint.route("/workflow", methods=["POST"])
 def bind_workflow() -> Any:
     """Bind a workflow to the database."""
     try:
@@ -133,7 +135,8 @@ def bind_workflow() -> Any:
     return resp
 
 
-@blueprint.route("/workflow/<workflow_args_hash>", methods=["GET"])
+@api_v1_blueprint.route("/workflow/<workflow_args_hash>", methods=["GET"])
+@api_v2_blueprint.route("/workflow/<workflow_args_hash>", methods=["GET"])
 def get_matching_workflows_by_workflow_args(workflow_args_hash: str) -> Any:
     """Return any dag hashes that are assigned to workflows with identical workflow args."""
     try:
@@ -221,7 +224,8 @@ def _upsert_wf_attribute(
         session.execute(upsert_stmt)
 
 
-@blueprint.route("/workflow/<workflow_id>/workflow_attributes", methods=["PUT"])
+@api_v1_blueprint.route("/workflow/<workflow_id>/workflow_attributes", methods=["PUT"])
+@api_v2_blueprint.route("/workflow/<workflow_id>/workflow_attributes", methods=["PUT"])
 def update_workflow_attribute(workflow_id: int) -> Any:
     """Update the attributes for a given workflow."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
@@ -247,7 +251,8 @@ def update_workflow_attribute(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/workflow/<workflow_id>/set_resume", methods=["POST"])
+@api_v1_blueprint.route("/workflow/<workflow_id>/set_resume", methods=["POST"])
+@api_v2_blueprint.route("/workflow/<workflow_id>/set_resume", methods=["POST"])
 def set_resume(workflow_id: int) -> Any:
     """Set resume on a workflow."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
@@ -275,7 +280,8 @@ def set_resume(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/workflow/<workflow_id>/is_resumable", methods=["GET"])
+@api_v1_blueprint.route("/workflow/<workflow_id>/is_resumable", methods=["GET"])
+@api_v2_blueprint.route("/workflow/<workflow_id>/is_resumable", methods=["GET"])
 def workflow_is_resumable(workflow_id: int) -> Any:
     """Check if a workflow is in a resumable state."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
@@ -291,7 +297,10 @@ def workflow_is_resumable(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route(
+@api_v1_blueprint.route(
+    "/workflow/<workflow_id>/get_max_concurrently_running", methods=["GET"]
+)
+@api_v2_blueprint.route(
     "/workflow/<workflow_id>/get_max_concurrently_running", methods=["GET"]
 )
 def get_max_concurrently_running(workflow_id: int) -> Any:
@@ -308,7 +317,10 @@ def get_max_concurrently_running(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route(
+@api_v1_blueprint.route(
+    "workflow/<workflow_id>/update_max_concurrently_running", methods=["PUT"]
+)
+@api_v2_blueprint.route(
     "workflow/<workflow_id>/update_max_concurrently_running", methods=["PUT"]
 )
 def update_max_running(workflow_id: int) -> Any:
@@ -348,7 +360,8 @@ def update_max_running(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/workflow/<workflow_id>/task_status_updates", methods=["POST"])
+@api_v1_blueprint.route("/workflow/<workflow_id>/task_status_updates", methods=["POST"])
+@api_v2_blueprint.route("/workflow/<workflow_id>/task_status_updates", methods=["POST"])
 def task_status_updates(workflow_id: int) -> Any:
     """Returns all tasks in the database that have the specified status.
 
@@ -386,7 +399,12 @@ def task_status_updates(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/workflow/<workflow_id>/fetch_workflow_metadata", methods=["GET"])
+@api_v1_blueprint.route(
+    "/workflow/<workflow_id>/fetch_workflow_metadata", methods=["GET"]
+)
+@api_v2_blueprint.route(
+    "/workflow/<workflow_id>/fetch_workflow_metadata", methods=["GET"]
+)
 def fetch_workflow_metadata(workflow_id: int) -> Any:
     """Get metadata associated with specified Workflow ID."""
     # Query for a workflow object
@@ -407,7 +425,8 @@ def fetch_workflow_metadata(workflow_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/workflow/get_tasks/<workflow_id>", methods=["GET"])
+@api_v1_blueprint.route("/workflow/get_tasks/<workflow_id>", methods=["GET"])
+@api_v2_blueprint.route("/workflow/get_tasks/<workflow_id>", methods=["GET"])
 def get_tasks_from_workflow(workflow_id: int) -> Any:
     """Return tasks associated with specified Workflow ID."""
     max_task_id = request.args.get("max_task_id")

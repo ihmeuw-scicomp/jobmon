@@ -21,8 +21,9 @@ from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.routes import SessionLocal
-from jobmon.server.web.routes.cli import blueprint
+from jobmon.server.web.routes.v1 import api_v1_blueprint
+from jobmon.server.web.routes.v2 import api_v2_blueprint
+from jobmon.server.web.routes.v2 import SessionLocal
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
@@ -49,7 +50,8 @@ _reversed_task_instance_label_mapping = {
 }
 
 
-@blueprint.route("/task_status", methods=["GET"])
+@api_v1_blueprint.route("/task_status", methods=["GET"])
+@api_v2_blueprint.route("/task_status", methods=["GET"])
 def get_task_status() -> Any:
     """Get the status of a task."""
     task_ids = request.args.getlist("task_ids")
@@ -127,7 +129,8 @@ def get_task_status() -> Any:
     return resp
 
 
-@blueprint.route("/task/subdag", methods=["POST"])
+@api_v1_blueprint.route("/task/subdag", methods=["POST"])
+@api_v2_blueprint.route("/task/subdag", methods=["POST"])
 def get_task_subdag() -> Any:
     """Used to get the sub dag  of a given task.
 
@@ -194,7 +197,8 @@ def get_task_subdag() -> Any:
     return resp
 
 
-@blueprint.route("/task/update_statuses", methods=["PUT"])
+@api_v1_blueprint.route("/task/update_statuses", methods=["PUT"])
+@api_v2_blueprint.route("/task/update_statuses", methods=["PUT"])
 def update_task_statuses() -> Any:
     """Update the status of the tasks."""
     data = cast(Dict, request.get_json())
@@ -257,7 +261,8 @@ def update_task_statuses() -> Any:
     return resp
 
 
-@blueprint.route("/task_dependencies/<task_id>", methods=["GET"])
+@api_v1_blueprint.route("/task_dependencies/<task_id>", methods=["GET"])
+@api_v2_blueprint.route("/task_dependencies/<task_id>", methods=["GET"])
 @cross_origin()
 def get_task_dependencies(task_id: int) -> Any:
     """Get task's downstream and upstream tasks and their status."""
@@ -292,7 +297,8 @@ def get_task_dependencies(task_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/tasks_recursive/<direction>", methods=["PUT"])
+@api_v1_blueprint.route("/tasks_recursive/<direction>", methods=["PUT"])
+@api_v2_blueprint.route("/tasks_recursive/<direction>", methods=["PUT"])
 def get_tasks_recursive(direction: str) -> Any:
     """Get all input task_ids'.
 
@@ -315,7 +321,8 @@ def get_tasks_recursive(direction: str) -> Any:
         raise e
 
 
-@blueprint.route("/task_resource_usage", methods=["GET"])
+@api_v1_blueprint.route("/task_resource_usage", methods=["GET"])
+@api_v2_blueprint.route("/task_resource_usage", methods=["GET"])
 def get_task_resource_usage() -> Any:
     """Return the resource usage for a given Task ID."""
     try:
@@ -494,7 +501,8 @@ def _get_tasks_from_nodes(
     return task_dict
 
 
-@blueprint.route("/task/get_downstream_tasks", methods=["POST"])
+@api_v1_blueprint.route("/task/get_downstream_tasks", methods=["POST"])
+@api_v2_blueprint.route("/task/get_downstream_tasks", methods=["POST"])
 def get_downstream_tasks() -> Any:
     """Get only the direct downstreams of a task."""
     data = cast(Dict, request.get_json())
@@ -519,7 +527,8 @@ def get_downstream_tasks() -> Any:
     return resp
 
 
-@blueprint.route("/task/get_ti_details_viz/<task_id>", methods=["GET"])
+@api_v1_blueprint.route("/task/get_ti_details_viz/<task_id>", methods=["GET"])
+@api_v2_blueprint.route("/task/get_ti_details_viz/<task_id>", methods=["GET"])
 @cross_origin()
 def get_task_details(task_id: int) -> Any:
     """Get information about TaskInstances associated with specific Task ID."""
@@ -566,7 +575,8 @@ def get_task_details(task_id: int) -> Any:
     return resp
 
 
-@blueprint.route("/task/get_task_details_viz/<task_id>", methods=["GET"])
+@api_v1_blueprint.route("/task/get_task_details_viz/<task_id>", methods=["GET"])
+@api_v2_blueprint.route("/task/get_task_details_viz/<task_id>", methods=["GET"])
 @cross_origin()
 def get_task_details_viz(task_id: int) -> Any:
     """Get status of Task from Task ID."""
