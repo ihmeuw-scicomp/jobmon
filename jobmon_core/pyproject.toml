@@ -19,6 +19,16 @@ dependencies = [
     'tenacity>=8.1',
     'typing_extensions; python_version<"3.8"',
     'proplot',
+    'opentelemetry-api',
+    'opentelemetry-sdk',
+    'opentelemetry-exporter-otlp',
+    'opentelemetry-distro',
+    'opentelemetry-instrumentation',
+    'opentelemetry-instrumentation-requests',
+    'opentelemetry-instrumentation-flask',
+    'opentelemetry-instrumentation-logging',
+    'opentelemetry-instrumentation-sqlalchemy',
+    'opentelemetry-instrumentation-asyncio',
 ]
 dynamic = ["version"]
 
