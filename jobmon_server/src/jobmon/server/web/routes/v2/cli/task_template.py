@@ -361,6 +361,7 @@ def get_task_template_resource_usage() -> Any:
 
 @api_v1_blueprint.route("/workflow_tt_status_viz/<workflow_id>", methods=["GET"])
 @api_v2_blueprint.route("/workflow_tt_status_viz/<workflow_id>", methods=["GET"])
+@cross_origin()
 def get_workflow_tt_status_viz(workflow_id: int) -> Any:
     """Get the status of the workflows for GUI."""
     # return DS
@@ -493,6 +494,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
 
 @api_v1_blueprint.route("/tt_error_log_viz/<wf_id>/<tt_id>", methods=["GET"])
 @api_v2_blueprint.route("/tt_error_log_viz/<wf_id>/<tt_id>", methods=["GET"])
+@cross_origin()
 def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
     """Get the error logs for a task template id for GUI."""
     # return DS

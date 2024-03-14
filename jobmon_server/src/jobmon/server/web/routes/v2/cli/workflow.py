@@ -418,6 +418,7 @@ def get_workflow_status() -> Any:
 
 @api_v1_blueprint.route("/workflow_status_viz", methods=["GET"])
 @api_v2_blueprint.route("/workflow_status_viz", methods=["GET"])
+@cross_origin()
 def get_workflow_status_viz() -> Any:
     """Get the status of the workflows for GUI."""
     session = SessionLocal()
@@ -466,6 +467,7 @@ def get_workflow_status_viz() -> Any:
 
 @api_v1_blueprint.route("/workflow_overview_viz", methods=["GET"])
 @api_v2_blueprint.route("/workflow_overview_viz", methods=["GET"])
+@cross_origin()
 def workflows_by_user_form() -> Any:
     """Fetch associated workflows and workflow runs by username."""
     arguments = request.args
@@ -589,6 +591,7 @@ def workflows_by_user_form() -> Any:
 
 @api_v1_blueprint.route("/task_table_viz/<workflow_id>", methods=["GET"])
 @api_v2_blueprint.route("/task_table_viz/<workflow_id>", methods=["GET"])
+@cross_origin()
 def task_details_by_wf_id(workflow_id: int) -> Any:
     """Fetch Task details associated with Workflow ID and TaskTemplate name."""
     task_template_name = request.args.get("tt_name")
@@ -636,6 +639,7 @@ def task_details_by_wf_id(workflow_id: int) -> Any:
 
 @api_v1_blueprint.route("/workflow_details_viz/<workflow_id>", methods=["GET"])
 @api_v2_blueprint.route("/workflow_details_viz/<workflow_id>", methods=["GET"])
+@cross_origin()
 def wf_details_by_wf_id(workflow_id: int) -> Any:
     """Fetch name, args, dates, tool for a Workflow provided WF ID."""
     session = SessionLocal()

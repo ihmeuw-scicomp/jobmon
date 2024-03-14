@@ -11,12 +11,11 @@ import axios from 'axios';
 // @ts-ignore
 import JobmonWFTable from './wf_table.tsx';
 import '../../css/jobmon_gui.css';
-import { init_apm, safe_rum_add_label, safe_rum_transaction, safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum';
+import { init_apm, safe_rum_add_label, safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum';
 import { FaCircle } from "react-icons/fa";
 
 function App() {
   const apm: any = init_apm("workflow_overview_page");
-  let rum_t: any = safe_rum_transaction(apm);
   const [user, setUser] = useState('');
   const [tool, setTool] = useState('');
   const [wf_name, setWFName] = useState('');
@@ -26,7 +25,7 @@ function App() {
   const [date_submitted, setDateSubmitted] = useState('');
   const [status, setStatus] = useState('');
   const [workflows, setWorkflows] = useState([]);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
 
@@ -65,7 +64,7 @@ function App() {
     if (url_status !== null && url_status !== "" && url_status !== undefined) {
       setStatus(url_status)
     }
-  }, []);
+  }, [searchParams]);
 
   const firstUpdate = useRef(true);
   //user change hook
@@ -116,7 +115,7 @@ function App() {
     };
     fetchData();
     safe_rum_unit_end(rum_s1);
-  }, [user, tool, wf_name, wf_args, wf_attribute, date_submitted, status, wf_id]);
+  }, [user, tool, wf_name, wf_args, wf_attribute, date_submitted, status, wf_id, apm]);
 
 
   //*******************event handling****************************

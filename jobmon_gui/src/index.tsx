@@ -13,7 +13,6 @@ import Help from './pages/help_page/help';
 import JobmonAtIHME from './pages/jobmon_at_ihme_page/jobmon_at_ihme'
 import { LeftHandNavBar } from "bifrost";
 
-const ihme_deployment = true
 const root = ReactDOM.createRoot(
     document.getElementById('root') as HTMLElement
 );

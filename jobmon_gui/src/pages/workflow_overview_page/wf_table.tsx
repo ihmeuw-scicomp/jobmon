@@ -14,7 +14,6 @@ import { FaCaretDown, FaCaretUp, FaCircle } from "react-icons/fa";
 // @ts-ignore
 import JobmonProgressBar from '../../components/JobmonProgressBar.tsx';
 
-const DEBUG = false
 
 const customCaret = (order, column) => {
     if (!order) return (<span><FaCaretUp style={{ marginLeft: "5px" }} /></span>);
