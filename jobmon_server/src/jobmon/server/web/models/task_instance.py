@@ -33,7 +33,6 @@ class TaskInstance(Base):
             self.task.workflow_id,
             self.status,
             self.distributor_id,
-            self.cluster_id,
             self.task_resources_id,
             self.array_id,
             self.array_batch_num,
