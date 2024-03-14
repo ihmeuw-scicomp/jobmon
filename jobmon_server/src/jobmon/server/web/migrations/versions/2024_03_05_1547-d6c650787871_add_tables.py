@@ -71,7 +71,7 @@ def upgrade() -> None:
     op.create_table(
         "dag",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("hash", sa.VARCHAR(length=50), nullable=True),
+        sa.Column("hash", sa.VARCHAR(length=150), nullable=True),
         sa.Column("created_date", sa.DateTime(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("hash"),
@@ -88,7 +88,7 @@ def upgrade() -> None:
         "node",
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("task_template_version_id", sa.Integer(), nullable=True),
-        sa.Column("node_args_hash", sa.VARCHAR(length=50), nullable=True),
+        sa.Column("node_args_hash", sa.VARCHAR(length=150), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
             "task_template_version_id",
@@ -147,7 +147,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("task_template_id", sa.Integer(), nullable=True),
         sa.Column("command_template", sa.Text(), nullable=True),
-        sa.Column("arg_mapping_hash", sa.VARCHAR(length=50), nullable=True),
+        sa.Column("arg_mapping_hash", sa.VARCHAR(length=150), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -277,8 +277,8 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("tool_version_id", sa.Integer(), nullable=True),
         sa.Column("dag_id", sa.Integer(), nullable=True),
-        sa.Column("workflow_args_hash", sa.VARCHAR(length=50), nullable=True),
-        sa.Column("task_hash", sa.VARCHAR(length=50), nullable=True),
+        sa.Column("workflow_args_hash", sa.VARCHAR(length=150), nullable=True),
+        sa.Column("task_hash", sa.VARCHAR(length=150), nullable=True),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("name", sa.String(length=150), nullable=True),
         sa.Column("workflow_args", sa.Text(), nullable=True),
@@ -366,7 +366,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("workflow_id", sa.Integer(), nullable=True),
         sa.Column("node_id", sa.Integer(), nullable=True),
-        sa.Column("task_args_hash", sa.VARCHAR(length=50), nullable=True),
+        sa.Column("task_args_hash", sa.VARCHAR(length=150), nullable=True),
         sa.Column("array_id", sa.Integer(), nullable=True),
         sa.Column("name", sa.String(length=255), nullable=True),
         sa.Column("command", sa.Text(), nullable=True),
