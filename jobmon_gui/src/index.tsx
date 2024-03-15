@@ -11,14 +11,12 @@ import WorkflowDetails from './pages/workflow_details_page/workflow_details_page
 import TaskDetails from './pages/task_details_page/task_details';
 import Help from './pages/help_page/help';
 import JobmonAtIHME from './pages/jobmon_at_ihme_page/jobmon_at_ihme'
-import { LeftHandNavBar } from "bifrost";
 
 const root = ReactDOM.createRoot(
     document.getElementById('root') as HTMLElement
 );
 root.render(
   <HashRouter>
-    {process.env.REACT_APP_DEPLOYMENT_TYPE === "ihme" && <LeftHandNavBar/>}
     <Routes>
       <Route path="workflow">
         <Route path=":workflowId/tasks" element={<WorkflowDetails subpage="tasks" />} />
