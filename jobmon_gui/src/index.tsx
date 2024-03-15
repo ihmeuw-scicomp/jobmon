@@ -12,7 +12,6 @@ import TaskDetails from './pages/task_details_page/task_details';
 import Help from './pages/help_page/help';
 import JobmonAtIHME from './pages/jobmon_at_ihme_page/jobmon_at_ihme'
 
-const ihme_deployment = true
 const root = ReactDOM.createRoot(
     document.getElementById('root') as HTMLElement
 );

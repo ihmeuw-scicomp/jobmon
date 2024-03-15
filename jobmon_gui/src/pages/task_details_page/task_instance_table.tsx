@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import BootstrapTable, { ColumnDescription }  from "react-bootstrap-table-next";
 import paginationFactory from "react-bootstrap-table2-paginator";
-import { OverlayTrigger } from "react-bootstrap";
-import Popover from 'react-bootstrap/Popover';
-import { FaCaretDown, FaCaretUp, FaLightbulb } from "react-icons/fa";
+import { FaCaretDown, FaCaretUp } from "react-icons/fa";
 import { HiInformationCircle } from "react-icons/hi";
 import CustomModal from '../../components/Modal';
 import { sanitize } from 'dompurify';

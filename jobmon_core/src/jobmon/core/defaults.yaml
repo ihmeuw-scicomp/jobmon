@@ -5,8 +5,8 @@ http:
   retries_attempts: 10
 
 otlp:
-  web_enabled: false
-  http_enabled: false
+  web_enabled: true
+  http_enabled: true
 
 heartbeat:
   workflow_run_interval: 30
