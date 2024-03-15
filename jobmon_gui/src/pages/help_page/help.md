@@ -1,4 +1,4 @@
-# Getting help with Jobmon
+# Getting Help with Jobmon
 ---
 ## Slack
 There are two Jobmon channels on Slack: #jobmon-users is the main channel to ask for help about Jobmon questions.
