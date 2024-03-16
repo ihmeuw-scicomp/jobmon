@@ -39,7 +39,7 @@ class JobmonConfig:
             # Allow the user to specify a different config file using an environment variable
             self._filepath = os.getenv("JOBMON__CONFIG_FILE", "")
             # if the env not set, check if the installer plugin exists
-            if self._filepath == '':
+            if self._filepath == "":
                 # if the installer plugin exists, use the config file form the plugin
                 self._filepath = CONFIG_FILE_FROM_INSTALLER_PLUGIN
 
@@ -47,8 +47,9 @@ class JobmonConfig:
             with open(self._filepath, "r", encoding="utf-8") as f:
                 self._config = yaml.safe_load(f)
         else:
-            # when no config file in env and not installer plug-in, use the default yaml in core
-            self._filepath = DEFAULTS_FILE
+            # when no config file in env and not installer plug-in,
+            # use the default yaml in core
+            self._filepath = DEFAULTS_FILE  # type: ignore
             with open(DEFAULTS_FILE, "r", encoding="utf-8") as f:
                 self._config = yaml.safe_load(f)
 

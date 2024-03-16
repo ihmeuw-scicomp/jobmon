@@ -1,8 +1,10 @@
 import importlib
-import pkg_resources
 import pkgutil
 
+import pkg_resources
+
 __version__ = pkg_resources.get_distribution("jobmon_core").version
+
 
 def _get_config_file_from_installer_plug_in() -> str:
     """Return the default configuration file path from the installer plug-in."""
@@ -20,11 +22,11 @@ def _get_config_file_from_installer_plug_in() -> str:
         filepath = get_config_file()
         return filepath
     elif len(plugins) > 1:
-        raise(
+        raise Exception(
             "Found multiple plugins while installing config from plugin, but only one "
             f'is allowed. Got "{plugins}"'
         )
+    return ""
 
 
 CONFIG_FILE_FROM_INSTALLER_PLUGIN = _get_config_file_from_installer_plug_in()
-
