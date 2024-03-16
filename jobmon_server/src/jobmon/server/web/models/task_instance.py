@@ -56,18 +56,18 @@ class TaskInstance(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     workflow_run_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("workflow_run.id"), nullable=True
+        Integer, ForeignKey("workflow_run.id")
     )
     array_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("array.id"), default=None, nullable=True
+        Integer, ForeignKey("array.id"), default=None
     )
     task_id: Mapped[int] = mapped_column(Integer, ForeignKey("task.id"), nullable=False)
-    distributor_id: Mapped[str] = mapped_column(String(20), index=True, nullable=False)
+    distributor_id: Mapped[str] = mapped_column(String(20), index=True, nullable=True)
     task_resources_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("task_resources.id"), index=True, nullable=True
+        Integer, ForeignKey("task_resources.id"), index=True
     )
-    array_batch_num: Mapped[int] = mapped_column(Integer, index=True, nullable=True)
-    array_step_id: Mapped[int] = mapped_column(Integer, index=True, nullable=True)
+    array_batch_num: Mapped[int] = mapped_column(Integer, index=True)
+    array_step_id: Mapped[int] = mapped_column(Integer, index=True)
 
     # usage
     nodename = Column(String(150))
