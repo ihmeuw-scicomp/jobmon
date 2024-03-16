@@ -1,7 +1,7 @@
 """Queue Table in the Database."""
 
 from sqlalchemy import Column, ForeignKey, Integer, select, String, UniqueConstraint
-from sqlalchemy.orm import relationship, Session
+from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
 
 from jobmon.core.serializers import SerializeQueue
 from jobmon.server.web.models import Base
@@ -17,10 +17,10 @@ class Queue(Base):
         """Serialize cluster object."""
         return SerializeQueue.to_wire(self.id, self.name, self.parameters)
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
     cluster_id = Column(Integer, ForeignKey("cluster.id"), nullable=False)
-    parameters = Column(String(2500), nullable=False)
+    parameters: Mapped[str] = mapped_column(String(2500), nullable=False)
 
     # ORM relationships
     cluster = relationship("Cluster", back_populates="queues")

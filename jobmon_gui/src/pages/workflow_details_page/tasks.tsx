@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import TaskTable from './task_table';
 import { FaSearch } from "react-icons/fa";
 
 import { safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum'
 
 export default function Tasks({ tasks, onSubmit, register, loading, apm }) {
-    const s: any = safe_rum_start_span(apm, "tasks", "custom");
+    useEffect(() => {
+        const s = safe_rum_start_span(apm, "tasks", "custom");
+        return () => {
+            safe_rum_unit_end(s);
+        };
+    }, [apm]);
     return (
         <div>
             <br></br>
@@ -19,5 +24,4 @@ export default function Tasks({ tasks, onSubmit, register, loading, apm }) {
             <TaskTable taskData={tasks} loading={loading} />
         </div>
     )
-    safe_rum_unit_end(s);
 }

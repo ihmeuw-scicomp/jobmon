@@ -5,8 +5,6 @@ import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import TaskInstanceTable from './task_instance_table';
 import NodeLists from './node_list';
 import TaskFSM from './task_fsm';
-import { FaLightbulb } from "react-icons/fa";
-import { OverlayTrigger, Popover } from 'react-bootstrap';
 import { convertDatePST } from '../../utilities/formatters'
 import { HiInformationCircle } from "react-icons/hi";
 import CustomModal from '../../components/Modal';
