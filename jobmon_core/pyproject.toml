@@ -17,8 +17,7 @@ dependencies = [
     'psutil',
     'requests',
     'tenacity>=8.1',
-    'typing_extensions; python_version<"3.8"',
-    'proplot'
+    'typing_extensions; python_version<"3.8"'
 ]
 dynamic = ["version"]
 
