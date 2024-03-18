@@ -446,8 +446,7 @@ def _get_node_dependencies(
     node_ids: Set[int] = set()
     for r in result:
         if r[0] is not None:
-            ids = json.loads(r[0])
-            node_ids = node_ids.union(set(ids))
+            node_ids = node_ids.union(set(r[0]))
     return node_ids
 
 
