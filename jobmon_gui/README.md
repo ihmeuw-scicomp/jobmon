@@ -35,11 +35,10 @@ Note: When running locally the React app uses the Webpack Dev Server to serve it
 You can then access the site at: http://localhost:3000
 
 ## Deploying to Kubernetes
-To deploy the Jobmon GUI:
+The Jobmon GUI is deployed via the primary Jobmon Jenkins deployment pipelines i.e. you cannot deploy the Jobmon GUI with out deploying Jobmon and vice versa.
+The build follows the dev (dev k8s cluster) -> stage (dev k8s cluster) -> prod deployment (prod k8s cluster) process:
+- Development Jenkins pipeline: https://jenkins.scicomp.ihme.washington.edu/job/jobmon/job/release/job/jobmon.dev.deploy/
+- Stage Jenkins pipeline: https://jenkins.scicomp.ihme.washington.edu/job/jobmon/job/release/job/jobmon.stage.deploy/
+- Prod Jenkins pipeline: https://jenkins.scicomp.ihme.washington.edu/job/jobmon/job/release/job/jobmon.prod.deploy/
 
-1. Build the images with the `build_gui_image` Jenkins pipeline: https://jenkins.scicomp.ihme.washington.edu/job/scicomp/job/jobmon_TAD/job/build_gui_image/
-2. Deploy the images with the `deploy_gui` Jenkins pipeline: https://jenkins.scicomp.ihme.washington.edu/job/scicomp/job/jobmon_TAD/job/deploy_gui/
-3. If a production deployment tag the commit in Bitbucket.
-4. If the pipelines were successful you should be able to 1. see the webpage and 2. the pods spun up in the provided namespace in Rancher.
-
-Note: Please deploy to development and have the team look at the GUI changes before deploying to production.
+If the pipelines were successful you should be able to see the webpage and the pods spun up in Rancher.

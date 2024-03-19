@@ -50,7 +50,7 @@ def swap_foreign_keys_for_indices(metadata: MetaData) -> None:
             if isinstance(constraint, ForeignKeyConstraint):
                 # Create an index for each foreign key constraint
                 for column in constraint.columns:
-                    index_name = f"ix_{table.name}_{column.name}"
+                    index_name = f"fkidx_{table.name}_{column.name}"
                     # Check if index already exists to avoid duplication
                     if not any(index.name == index_name for index in table.indexes):
                         Index(index_name, column)
