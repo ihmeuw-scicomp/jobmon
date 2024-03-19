@@ -1,14 +1,13 @@
 """Parse configuration options and set them to be used throughout the Jobmon Architecture."""
 
 import argparse
-import importlib
 import os
 from pathlib import Path
-import pkgutil
 from typing import Any, Dict, Optional, Union
 
 import yaml
 
+from jobmon.core import CONFIG_FILE_FROM_INSTALLER_PLUGIN
 from jobmon.core.cli import CLI
 from jobmon.core.exceptions import ConfigError
 
@@ -27,19 +26,32 @@ class JobmonConfig:
         Args:
             filepath: where to read defaults from.
             dict_config: dictionary of values to override
+
+        Config file priority:
+            1. user specified file passed in
+            2. environment variable JOBMON__CONFIG_FILE (backdoor for testing):q!
+            3. config file from installer
+            4. default config file in core
         """
         if filepath:
             self._filepath = filepath
         else:
+            # Allow the user to specify a different config file using an environment variable
             self._filepath = os.getenv("JOBMON__CONFIG_FILE", "")
-
-        with open(DEFAULTS_FILE, "r", encoding="utf-8") as f:
-            self._config = yaml.safe_load(f)
+            # if the env not set, check if the installer plugin exists
+            if self._filepath == "":
+                # if the installer plugin exists, use the config file form the plugin
+                self._filepath = CONFIG_FILE_FROM_INSTALLER_PLUGIN
 
         if self._filepath:
             with open(self._filepath, "r", encoding="utf-8") as f:
-                user_config = yaml.safe_load(f)
-                self._merge_dicts(self._config, user_config)
+                self._config = yaml.safe_load(f)
+        else:
+            # when no config file in env and not installer plug-in,
+            # use the default yaml in core
+            self._filepath = DEFAULTS_FILE  # type: ignore
+            with open(DEFAULTS_FILE, "r", encoding="utf-8") as f:
+                self._config = yaml.safe_load(f)
 
         self._dict_config = dict_config
 
@@ -95,33 +107,6 @@ class JobmonConfig:
             "found."
         )
 
-    def _handle_plugin_installation(self) -> bool:
-        """Handle plugin installation if configuration is not found."""
-        print(
-            "Jobmon client not configured. Attempting to install configuration "
-            "from installer plugin."
-        )
-        plugins = [
-            plugin_name
-            for finder, plugin_name, ispkg in pkgutil.iter_modules()
-            if plugin_name.startswith("jobmon_installer")
-        ]
-
-        if len(plugins) == 1:
-            plugin_name = plugins[0]
-            print(f"Found one plugin: {plugin_name}")
-            module = importlib.import_module(plugin_name)
-            config_installer = getattr(module, "install_config")
-            config_installer()
-            print(f"Successfully ran installer from {module}.")
-            return True
-        elif len(plugins) > 1:
-            raise RuntimeError(
-                "Found multiple plugins while installing config from plugin, but only one "
-                f'is allowed. Got "{plugins}".'
-            )
-        return False
-
     def get(self, section: str, key: str) -> str:
         """Get the configuration value for the section and key. Raise if key not found.
 
@@ -135,11 +120,7 @@ class JobmonConfig:
             val = self._wrapped_get(section, key)
             return self._interpolate_env_vars(val)
         except ConfigError as e:
-            if self._handle_plugin_installation():
-                val = self._wrapped_get(section, key)
-                return self._interpolate_env_vars(val)
-            else:
-                raise e
+            raise e
 
     def get_section(self, section: str) -> Dict[str, Any]:
         """Returns a dictionary of all key-value pairs in the given section.
