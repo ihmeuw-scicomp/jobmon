@@ -13,10 +13,29 @@ All notable changes to Jobmon will be documented in this file.
 ### Added
 - Reaper "poll_interval_minutes" config key - default 5 minutes (PR 69).
 - Add workflow timeout to `resume_workflow` CLI (PR 73).
+- Added alembic to Jobmon database (PR 84).
+- Added API versions to Jobmon - one server deployment can now support multiple versions of the Jobmon client (PRs 88, 90).
+- Enabled OpenTelemtry Protocol (OTLP) to Jobmon (PRs 89, 93).
+- Added non-Bifrost navigation to the Jobmon GUI (PR 95).
 
 ### Changed
 - Updated developer documentation (PR 72).
 - When getting Tasks from Workflow, pre-query for initial Task ID. Performance optimization (PR 70).
+- Changed hash function from sha1 to sha256, in attempt to fix task hash conflict bug (PR 78).
+- Increased hashing columns from VARCHAR(50) to VARCHAR(150) (PR78).
+- Changed upstream_node_id and downstream_node_id columns in edge table from TEXT to JSON (PR 84).
+- Switch Jobmon deployment to be a one-click deployment. Created pipelines for dev, stage, and prod (jobmon_ihme_tad PR 98).
+- Consolidate Jobmon GUI deployment pipeline in to main Jobmon pipeline (jobmon_ihme_tad PR 113)
+
+### Fixed
+- Linting, typechecking and the test suite are passing (PRs 74, 75, 80, 81, 82, 83).
+- Auto-build of ReadTheDocs is working again (PR 77).
+- Fixed the Jobmon GUI local frontend and backend deployment (PR 87).
+- Fixed bug where the usage integrator was pulling wrong resource values from the Slurm Accounting DB (jobmon_slurm PR 154).
+
+### Removed
+- Removed cluster_type_id and cluster_id columns from the task_instance table in the database (PR 80).
+- Removed Bifrost package from the Jobmon GUI (PR 94). 
 
 ## [3.2.5] - 2023-11-14
 ### Changed
