@@ -35,7 +35,8 @@ All notable changes to Jobmon will be documented in this file.
 
 ### Removed
 - Removed cluster_type_id and cluster_id columns from the task_instance table in the database (PR 80).
-- Removed Bifrost package from the Jobmon GUI (PR 94). 
+- Removed Bifrost package from the Jobmon GUI (PR 94).
+- Removed the `jobmon_ihme` CLI command.
 
 ## [3.2.5] - 2023-11-14
 ### Changed
