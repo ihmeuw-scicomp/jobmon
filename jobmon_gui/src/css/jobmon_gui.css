@@ -553,7 +553,7 @@ h-1rem{
 }
 
 body .error-log-modal .modal-dialog {
-   max-width: 96%;
+   max-width: 85%;
 }
 
 .error-log-modal .modal-dialog pre {
