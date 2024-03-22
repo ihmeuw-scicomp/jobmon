@@ -471,6 +471,11 @@ def get_workflow_status_viz() -> Any:
 def workflows_by_user_form() -> Any:
     """Fetch associated workflows and workflow runs by username."""
     arguments = request.args
+    if not arguments:
+        res = jsonify(workflows=[])
+        res.return_code = StatusCodes.OK
+        return res
+
     clean_args: Dict[str, Optional[str]] = {}
     for key, value in arguments.items():
         if value is None or value == "undefined" or value == "":
@@ -515,6 +520,7 @@ def workflows_by_user_form() -> Any:
             where_clauses.append("workflow.status = :status")
             substitution_dict["status"] = status
         inner_where_clause = " AND ".join(where_clauses)
+
         query = text(
             f"""
             SELECT

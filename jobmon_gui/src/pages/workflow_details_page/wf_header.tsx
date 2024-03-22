@@ -28,7 +28,7 @@ export default function WFHeader({
             placement="bottom"
             trigger={["hover", "focus"]}
             overlay={(
-              <Popover id="task_count" className="header-popover">
+              <Popover id="task_count" className="header-popover" style={{ zIndex: 9999 }}>
                         <p><b>Workflow Status:</b> {wf_status_desc}</p>
                         <hr/>
                         <p><b>Workflow Tool:</b> {wf_tool}</p>

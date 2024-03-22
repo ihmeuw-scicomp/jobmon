@@ -12,6 +12,7 @@ export default function CustomModal({headerContent, bodyContent, showModal, setS
             show={showModal}
             onHide={() => { setShowModal(false) }}
             className={className}
+            style={{ zIndex: 9999 }}
         >
             <Modal.Header className='bg-grey px-4 pt-4'>
                 <Modal.Title id="contained-modal-title-vcenter">
