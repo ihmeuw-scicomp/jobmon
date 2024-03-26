@@ -1,4 +1,5 @@
 """Inteface definition for jobmon executor plugins."""
+
 from __future__ import annotations
 
 import importlib

@@ -237,10 +237,25 @@ any tasks that are already Done. It will restart jobs that were in Error (maybe 
 that bug!) or are Registered. As always it only starts a job when all its upstreams are Done.
 In other words, it starts from first failure. Jobmon creates a new workflow run for an existing workflow.
 
-There are two ways to resume a Woerkflow –by ID or be recreting the workflow with the same workflow args.
+**Note**: There is a distinction between "restart" and "resume."
+Jobmon itself will *restart* individual *Tasks,* whereas a human operator can *resume* the
+entire *Workflow.*
+
+There are two ways to resume a Workflow – by ID or by recreating the workflow with the same workflow args.
+
+Resume by ID
+************
 
 To resume by ID, you can either use the CLI function:
-``jobmon workflow_resume -w <workflow_id> -c <cluster_name``
+
+``jobmon workflow_resume -w <workflow_id> -c <cluster_name>``
+
+The "workflow_resume" CLI has two optional flags:
+
+* ``--reset-running-jobs`` - Whether to kill currently running jobs or let them finish. Setting this flag means that it
+  will be a cold resume i.e. currently running jobs are also terminated and rerun. Default is set to False.
+* ``--timeout`` or ``-t`` - Allows users to set the Workflow timeout. Default is 180.
+
 or the following code fragment::
 
     resume_factory = WorkflowRunFactory(workflow_id)
@@ -248,8 +263,16 @@ or the following code fragment::
     resume_factory.reset_task_statuses()
     resume_wfr = resume_factory.create_workflow_run()
 
+Important caveat: if resuming a workflow by ID, you will not have the ability to change certain parameters that have been
+bound to the database, such as the workflow attributes or the compute resources. To run a workflow with updated resources,
+use the other resume path (recreate the workflow with the same workflow args). 
+
+Resume By Recreating the Workflow
+*********************************
+
 To resume a Workflow programmatically, make sure that your previous workflow
 run process is dead (kill it using the Slurm scancel command).
+
 When creating a resumed workflow, the
 workflow_args provided to Tool.create_workflow() match the workflow they are attempting to resume. Additionally,
 users need to add a resume parameter to the run() function to resume their Workflow.::
@@ -260,11 +283,7 @@ users need to add a resume parameter to the run() function to resume their Workf
 That's it. If you don't set "resume=True", Jobmon will raise an error saying that the user is
 trying to create a Workflow that already exists.
 
-Note carefully the distinction between "restart" and "resume."
-Jobmon itself will *restart* individual *Tasks,* whereas a human operator can *resume* the
-entire *Workflow.*
-
-For more examples, take a look at the `resume tests <https://stash.ihme.washington.edu/projects/SCIC/repos/jobmon/browse/tests/workflow/test_workflow_resume.py>`_.
+For more examples, take a look at the `resume tests <https://github.com/ihmeuw-scicomp/jobmon/blob/release/3.2/tests/end_to_end/test_workflow_resume.py>`_.
 
 .. note::
 

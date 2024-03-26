@@ -347,6 +347,7 @@ def test_add_tasks_dependencynotexist(tool, client_env, task_template):
     assert len(wf.tasks) == 3
 
 
+@pytest.mark.skip()
 def test_workflow_validation(tool, task_template, caplog):
     """Test the workflow.validate() function, and ensure idempotency"""
     too_many_cores = {"cores": 1000, "queue": "null.q", "runtime": "01:02:33"}

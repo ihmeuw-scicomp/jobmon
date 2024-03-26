@@ -1,8 +1,9 @@
 """Cluster Table in the Database."""
+
 from typing import Tuple
 
 from sqlalchemy import Column, ForeignKey, Integer, select, String
-from sqlalchemy.orm import relationship, Session
+from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
 
 from jobmon.core.serializers import SerializeCluster
 from jobmon.server.web.models import Base
@@ -23,10 +24,10 @@ class Cluster(Base):
             self.connection_parameters,
         )
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(255), unique=True)
-    cluster_type_id = Column(Integer, ForeignKey("cluster_type.id"))
-    connection_parameters = Column(String(2500))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    cluster_type_id = Column(Integer, ForeignKey("cluster_type.id"), nullable=False)
+    connection_parameters: Mapped[str] = mapped_column(String(2500))
 
     # ORM relationships
     cluster_type = relationship("ClusterType", back_populates="clusters")

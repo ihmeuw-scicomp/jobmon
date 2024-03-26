@@ -9,7 +9,18 @@ import { AiFillSchedule, AiFillCheckCircle} from "react-icons/ai";
 import { TbHandStop } from "react-icons/tb";
 import {HiRocketLaunch} from "react-icons/hi2";
 
-export default function WFHeader({ wf_id, wf_status, wf_status_desc, wf_tool, wf_name, wf_args, wf_submitted_date, wf_status_date, wf_elapsed_time }) {
+export default function WFHeader({
+    wf_id,
+    wf_status,
+    wf_status_desc,
+    wf_tool,
+    wf_name,
+    wf_args,
+    wf_submitted_date,
+    wf_status_date,
+    wf_elapsed_time,
+    jobmon_version
+}) {
 
   return (
      <header className="App-header">
@@ -17,7 +28,7 @@ export default function WFHeader({ wf_id, wf_status, wf_status_desc, wf_tool, wf
             placement="bottom"
             trigger={["hover", "focus"]}
             overlay={(
-              <Popover id="task_count" className="header-popover">
+              <Popover id="task_count" className="header-popover" style={{ zIndex: 9999 }}>
                         <p><b>Workflow Status:</b> {wf_status_desc}</p>
                         <hr/>
                         <p><b>Workflow Tool:</b> {wf_tool}</p>
@@ -26,6 +37,7 @@ export default function WFHeader({ wf_id, wf_status, wf_status_desc, wf_tool, wf
                         <p><b>Workflow Submitted Date:</b> {wf_submitted_date}</p>
                         <p><b>Workflow Status Date:</b> {wf_status_date}</p>
                         <p><b>Workflow Elapsed Time:</b> {wf_elapsed_time}</p>
+                        <p><b>Jobmon Version:</b> {jobmon_version} </p>
               </Popover>
             )}
           >

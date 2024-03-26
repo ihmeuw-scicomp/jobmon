@@ -1,4 +1,5 @@
 """ArgType table in the database."""
+
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import relationship, Session
 
@@ -16,7 +17,7 @@ class ArgType(Base):
     OP_ARG = constants.ArgType.OP_ARG
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), unique=True)
+    name = Column(String(255), unique=True, nullable=False)
 
     template_arg_map = relationship("TemplateArgMap", back_populates="argument_type")
 

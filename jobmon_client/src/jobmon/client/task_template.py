@@ -1,4 +1,5 @@
 """A framework that many tasks have in common while varying by a declared set of arguments."""
+
 from __future__ import annotations
 
 import copy
@@ -709,7 +710,7 @@ class TaskTemplate:
     def __hash__(self) -> int:
         """A hash of the TaskTemplate name and tool version concatenated together."""
         hash_value = int(
-            hashlib.sha1(self.template_name.encode("utf-8")).hexdigest(), 16
+            hashlib.sha256(self.template_name.encode("utf-8")).hexdigest(), 16
         )
         return hash_value
 

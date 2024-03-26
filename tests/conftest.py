@@ -10,7 +10,6 @@ from time import sleep
 from types import TracebackType
 from typing import Any, Optional
 
-
 import pytest
 import sqlalchemy
 from sqlalchemy.engine import Engine
@@ -20,9 +19,16 @@ from jobmon.client.api import Tool
 from jobmon.core import requester
 from jobmon.core.requester import Requester
 from jobmon.server.web.api import get_app, JobmonConfig, configure_logging
-from jobmon.server.web.models import init_db
+from jobmon.server.web.db_admin import init_db
 
 logger = logging.getLogger(__name__)
+
+_api_prefix = "/api/v2"
+
+
+@pytest.fixture(scope="session")
+def api_prefix():
+    return _api_prefix
 
 
 class WebServerProcess:
@@ -41,6 +47,7 @@ class WebServerProcess:
         else:
             self.web_host = socket.getfqdn()
         self.web_port = str(10_000 + os.getpid() % 30_000)
+        self.api_prefix = _api_prefix
         self.filepath = filepath
 
     def __enter__(self) -> Any:
@@ -56,10 +63,17 @@ class WebServerProcess:
 
             signal.signal(signal.SIGTERM, sigterm_handler)
 
-            init_db(create_engine(database_uri))
+            init_db(database_uri)
 
             config = JobmonConfig(
-                dict_config={"db": {"sqlalchemy_database_uri": database_uri}}
+                dict_config={
+                    "db": {"sqlalchemy_database_uri": database_uri},
+                    "otlp": {
+                        "web_enabled": "false",
+                        "span_exporter": "",
+                        "log_exporter": "",
+                    },
+                }
             )
             configure_logging(
                 loggers_dict={
@@ -91,8 +105,13 @@ class WebServerProcess:
         while not status == 200 and count < max_tries:
             try:
                 count += 1
-                r = requests.get(f"http://{self.web_host}:{self.web_port}/health",
-                                 headers={'Content-Type': 'application/json'})
+                url = f"http://{self.web_host}:{self.web_port}{self.api_prefix}/health"
+                print(url)
+                r = requests.get(
+                    url,
+                    headers={"Content-Type": "application/json"},
+                )
+
                 status = r.status_code
             except Exception as e:
                 # Connection failures land here
@@ -153,6 +172,7 @@ def client_env(web_server_process, monkeypatch):
         "JOBMON__HTTP__SERVICE_URL",
         f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}',
     )
+    monkeypatch.setenv("JOBMON__HTTP__ROUTE_PREFIX", _api_prefix)
     monkeypatch.setenv("JOBMON__HTTP__STOP_AFTER_DELAY", "0")
 
     # This instance is thrown away, hence monkey-patching the defaults via the
@@ -163,67 +183,7 @@ def client_env(web_server_process, monkeypatch):
 
 @pytest.fixture(scope="function")
 def requester_no_retry(client_env):
-    return Requester(client_env, max_retries=0)
-
-
-@pytest.fixture(scope="function")
-def web_server_in_memory(sqlite_file, monkeypatch):
-    """This sets up the JSM/JQS using the test_client which is a
-    fake server
-    """
-    from jobmon.server.web.app_factory import AppFactory
-
-    # The create_app call sets up database connections
-    monkeypatch.setenv(
-        "JOBMON__FLASK__SQLALCHEMY_DATABASE_URI", f"sqlite:///{sqlite_file}"
-    )
-    app_factory = AppFactory()
-    app = app_factory.get_app()
-    app.config["TESTING"] = True
-    with app.app_context():
-        client = app.test_client()
-        yield client, app_factory.engine
-
-
-def get_test_content(response):
-    """The function called by the no_request_jsm_jqs to query the fake
-    test_client for a response
-    """
-    if "application/json" in response.headers.get("Content-Type"):
-        content = response.json
-    elif "text/html" in response.headers.get("Content-Type"):
-        content = response.data
-    else:
-        content = response.content
-    return response.status_code, content
-
-
-@pytest.fixture(scope="function")
-def requester_in_memory(monkeypatch, web_server_in_memory):
-    """This function monkeypatches the requests library to use the
-    test_client
-    """
-
-    monkeypatch.setenv("JOBMON__HTTP__SERVICE_URL", "1")
-
-    app, engine = web_server_in_memory
-
-    def get_in_mem(url, params, data, headers, timeout):
-        url = "/" + url.split(":")[-1].split("/", 1)[1]
-        return app.get(path=url, query_string=params, data=data, headers=headers, timeout=timeout)
-
-    def post_in_mem(url, params, json, headers, timeout):
-        url = "/" + url.split(":")[-1].split("/", 1)[1]
-        return app.post(url, query_string=params, json=json, headers=headers, timeout=timeout)
-
-    def put_in_mem(url, params, json, headers, timeout):
-        url = "/" + url.split(":")[-1].split("/", 1)[1]
-        return app.put(url, query_string=params, json=json, headers=headers, timeout=timeout)
-
-    monkeypatch.setattr(requests, "get", get_in_mem)
-    monkeypatch.setattr(requests, "post", post_in_mem)
-    monkeypatch.setattr(requests, "put", put_in_mem)
-    monkeypatch.setattr(requester, "get_content", get_test_content)
+    return Requester(client_env, retries_timeout=0)
 
 
 def get_task_template(tool, template_name):

@@ -31,7 +31,7 @@ from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow import DistributorContext
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskStatus, WorkflowStatus, WorkflowRunStatus
-from jobmon.core.exceptions import InvalidResponse, ConfigError
+from jobmon.core.exceptions import InvalidRequest, ConfigError
 from jobmon.core.requester import Requester
 from jobmon.server.web.models import load_model
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -678,14 +678,14 @@ def test_update_task_status(db_engine, client_env, tool, cli):
 
 def test_400_cli_route(db_engine, client_env):
     requester = Requester(client_env)
-    with pytest.raises(InvalidResponse) as exc:
+    with pytest.raises(InvalidRequest) as exc:
         requester.send_request(app_route="/task_status", message={}, request_type="get")
         assert "400" in str(exc.value)
 
 
 def test_bad_put_route(db_engine, client_env):
     requester = Requester(client_env)
-    with pytest.raises(InvalidResponse) as exc:
+    with pytest.raises(InvalidRequest) as exc:
         requester.send_request(
             app_route="/task/update_statuses", message={}, request_type="put"
         )

@@ -1,9 +1,12 @@
 """Requester object to make HTTP requests to the Jobmon Flask services."""
+
 from __future__ import annotations
 
+import contextlib
+import functools
 import json
 import logging
-from typing import Any, Dict, Tuple, Type
+from typing import Any, Callable, Dict, Tuple, Type
 
 import requests
 import tenacity
@@ -11,7 +14,7 @@ import urllib3
 
 from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
-from jobmon.core.exceptions import InvalidResponse
+from jobmon.core.exceptions import InvalidRequest, InvalidResponse
 
 logger = logging.getLogger(__name__)
 
@@ -22,165 +25,140 @@ def http_request_ok(status_code: int) -> bool:
 
 
 class Requester(object):
-    """Sends an HTTP messages via the Requests library to one of the running services.
+    """Requester object to make HTTP requests to the Jobmon Flask services."""
 
-    Either the JQS or the JSM, and returns the response from the server. A common use case is
-    where the swarm of application jobs send status messages via a Requester to the
-    JobStateManager or requests job status from the JobQueryServer.
-    """
+    # Class-level attribute to store the OtlpAPI instance
+    _otlp_api = None
 
-    def __init__(self, url: str, request_timeout: int = 20, retries_timeout: int = 300
+    def __init__(
+        self,
+        url: str,
+        route_prefix: str = "",
+        request_timeout: int = 20,
+        retries_timeout: int = 300,
+        retries_attempts: int = 10,
+        use_otlp: bool = False,
     ) -> None:
         """Initialize the Requester object with the url to make requests to."""
-        self.url = url
+        self.base_url = url
+        self.route_prefix = route_prefix
         self.request_timeout = request_timeout
         self.retries_timeout = retries_timeout
+        self.retries_attempts = retries_attempts
+        if use_otlp and Requester._otlp_api is None:
+            self._init_otlp()
         self.server_structlog_context: Dict[str, str] = {}
+
+    @classmethod
+    def _init_otlp(cls: Type[Requester]) -> None:
+        from jobmon.core.otlp import OtlpAPI
+
+        # setup connections to backend
+        otlp_instance = OtlpAPI()
+        otlp_instance.instrument_requests()
+        otlp_instance.correlate_logger("jobmon.core.requester")
+
+        # setup tracer for Requester to use
+        cls._otlp_api = otlp_instance
 
     @classmethod
     def from_defaults(cls: Type[Requester]) -> Requester:
         """Instantiate a requester from default config values."""
         config = JobmonConfig()
         service_url = config.get("http", "service_url")
+        route_prefix = config.get("http", "route_prefix")
         request_timeout = config.get_int("http", "request_timeout")
         retries_timeout = config.get_int("http", "retries_timeout")
+        retries_attempts = config.get_int("http", "retries_attempts")
+        use_otlp = config.get_boolean("otlp", "http_enabled")
+        return cls(
+            service_url,
+            route_prefix,
+            request_timeout,
+            retries_timeout,
+            retries_attempts,
+            use_otlp,
+        )
 
-        return cls(service_url, request_timeout, retries_timeout)
+    @property
+    def url(self) -> str:
+        """Return the base url for the requester."""
+        return self.base_url + self.route_prefix
 
     def add_server_structlog_context(self, **kwargs: Any) -> None:
         """Add the structlogging context if it has been provided."""
         for key, value in kwargs.items():
             self.server_structlog_context[key] = value
 
-    def send_request(
-        self,
-        app_route: str,
-        message: dict,
-        request_type: str,
-        tenacious: bool = True,
-    ) -> Tuple[int, Any]:
-        """Send request to server.
-
-        If we get a 5XX status code, we will retry for up to 2 minutes using
-        exponential backoff.
-
-        Args:
-            app_route:
-                The specific end point with which you want to
-                interact. The app_route must always start with a slash ('/') and
-                must match one of the function decorations of @jsm.route or
-                @jqs.route on the server side.
-            message: The message dict to be sent to the server.
-                Must contain any arguments the JSM/JQS route needs to operate.
-                If the request is a 'GET', the value of the message dict will
-                likely be parsed into the url. If the request is a 'POST' or 'PUT',
-                the message dict will get stored in a dictionary that is parsed on
-                the server side and passed into the work done by that route.
-                For example, a valid message for a request to add a task_dag
-                to the JSM might be:
-
-                    {'name': 'my_name',
-                     'user': 'my_user',
-                     'dag_hash': 'my_dag_hash'}
-
-            request_type: The type of request desired, either 'get', 'post, or 'put'
-            tenacious: use tenacity for retries
-
-
-        Returns:
-            Server reply message
-
-        Raises:
-            RuntimeError if 500 errors occur for > 2 minutes
-
-        """
-        if tenacious:
-            res = self._tenacious_send_request(app_route, message, request_type)
+    @contextlib.contextmanager
+    def tracing_span(self, app_route: str, request_type: str) -> Any:
+        if self._otlp_api:
+            tracer = self._otlp_api.get_tracer("requester")
+            with tracer.start_as_current_span("send_request") as span:
+                span.set_attribute("http.method", request_type.upper())
+                span.set_attribute("http.url", self.url + app_route)
+                yield span
         else:
-            res = self._send_request(app_route, message, request_type)
+            yield None
 
-        if not http_request_ok(res[0]):
-            raise InvalidResponse(
-                f"Unexpected status code {res[0]} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {res[1]}"
+    def _maybe_trace(self, func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Callable:
+            with self.tracing_span(
+                kwargs.get("app_route", "UNKNOWN"),
+                kwargs.get("request_type", "UNKNOWN"),
+            ):
+                return func(*args, **kwargs)
+
+        return wrapper
+
+    def _maybe_retry(self, func: Callable, tenacious: bool) -> Any:
+        if not tenacious:
+            return func
+
+        def should_retry_exception(exception: Any) -> Any:
+            """Return True if we should retry on the given exception."""
+            logger.warning(f"Exception occurred: {exception}")
+
+            # Do not retry for certain client errors.
+            if isinstance(exception, InvalidRequest):
+                return False
+
+            # Retry for specific exceptions.
+            return isinstance(
+                exception,
+                (
+                    InvalidResponse,
+                    TimeoutError,
+                    requests.ConnectionError,
+                    requests.adapters.MaxRetryError,
+                    requests.exceptions.ReadTimeout,
+                    urllib3.exceptions.NewConnectionError,
+                    urllib3.exceptions.MaxRetryError,
+                ),
             )
 
-        return res
-
-    def _tenacious_send_request(
-        self,
-        app_route: str,
-        message: dict,
-        request_type: str,
-    ) -> Tuple[int, Any]:
-        """Use tenacity to retry requests if they get an unsatisfactory return code."""
-
-        def is_5XX(result: Tuple[int, dict]) -> bool:
-            """Return True if get_content result has 5XX status."""
-            status = result[0]
-            content = str(result[1])
-            is_bad = 499 < status < 600
-            if is_bad:
-                if "2013, 'Lost connection to MySQL server during query'" in content:
-                    msg = (
-                        "A 'Lost connection to MySQL server' event occurred, "
-                        "for which a new db connection pool has been created "
-                        "(usually due to a routine db hot cutover operation)"
-                    )
-                    logger.warning(
-                        f"Got HTTP status_code={status} from server. app_route: {app_route}."
-                        f" message: {msg}"
-                    )
-                else:
-                    logger.warning(
-                        f"Got HTTP status_code={status} from server. app_route: {app_route}."
-                        f" message: {message}"
-                    )
-            return is_bad
-
-        def is_423(result: Tuple[int, dict]) -> bool:
-            """Return True if get_content result has 423 status.
-
-            Indicates a retryable transaction on the server.
-            """
-            status = result[0]
-            is_bad = status == 423
-            if is_bad:
-                logger.info(
-                    f"Got HTTP status_code=423 from server. app_route: {app_route}. "
-                    f"Retrying as per design."
-                    f" message: {message}"
-                )
-            return is_bad
-
-        def raise_if_exceed_retry(retry_state: tenacity.RetryCallState) -> None:
+        def raise_if_exceed_retry(retry_state: tenacity.RetryCallState) -> Any:
             """If we trigger retry error, raise informative RuntimeError."""
-            logger.exception(f"Retry exceeded. {retry_state}")
-            status, content = retry_state.outcome.result()  # type: ignore
-            raise RuntimeError(
-                f"Exceeded HTTP request retry budget. Status code was {status} "
-                f"and content was {content}"
-            )
+            # Check if the retry outcome is an exception
+            outcome = retry_state.outcome
+            if outcome and outcome.exception():
+                exception = outcome.exception()
+                raise RuntimeError(
+                    f"Exceeded HTTP request retry budget due to: {exception}"
+                ) from exception
 
-        # so we can access it in tests
-        self._retry = tenacity.Retrying(
-            wait=tenacity.wait_exponential_jitter(initial=1, max=self.retries_timeout, exp_base=2, jitter=1),
-            retry=(
-                tenacity.retry_if_result(is_5XX)
-                | tenacity.retry_if_result(is_423)
-                | tenacity.retry_if_exception_type(requests.ConnectionError)
-                | tenacity.retry_if_exception_type(TimeoutError)
-                | tenacity.retry_if_exception_type(requests.adapters.MaxRetryError)
-                | tenacity.retry_if_exception_type(urllib3.exceptions.NewConnectionError)
-                | tenacity.retry_if_exception_type(urllib3.exceptions.MaxRetryError)
+        retrying = tenacity.retry(
+            stop=(
+                tenacity.stop_after_attempt(self.retries_attempts)
+                | tenacity.stop_after_delay(self.retries_timeout)
             ),
+            wait=tenacity.wait_exponential_jitter(initial=1, exp_base=2, jitter=1),
+            retry=tenacity.retry_if_exception(should_retry_exception),
             retry_error_callback=raise_if_exceed_retry,
-        )
+        )(func)
 
-        return self._retry.__call__(
-            self._send_request, app_route, message, request_type
-        )
+        return retrying
 
     def _send_request(
         self,
@@ -232,8 +210,41 @@ class Requester(object):
             )
 
         status_code, content = get_content(response)
-        logger.debug(f"Route: {route}; status: {status_code}; content: {content}")
+
+        # Raise the InvalidResponse exception based on the logic from should_retry_result
+        if 499 < status_code < 600 or status_code == 423:
+            raise InvalidResponse(
+                f"Request failed due to status code {status_code} from {request_type.upper()} "
+                f"request through route {app_route}. Response content: {content}"
+            )
+
+        # Keep the logic for other status codes that might be encountered but
+        # aren't in the retry condition.
+        if 400 <= status_code < 500:
+            raise InvalidRequest(
+                f"Client error with status code {status_code} from {request_type.upper()} "
+                f"request through route {app_route}. Response content: {content}"
+            )
+
         return status_code, content
+
+    def send_request(
+        self, app_route: str, message: dict, request_type: str, tenacious: bool = True
+    ) -> Tuple[int, Any]:
+        """Send a request to the Jobmon server."""
+
+        def send_fn(
+            app_route: str, message: dict, request_type: str
+        ) -> Tuple[int, Any]:
+            return self._send_request(app_route, message, request_type)
+
+        send_method = self._maybe_retry(send_fn, tenacious)
+        send_with_trace = self._maybe_trace(send_method)
+        res = send_with_trace(
+            app_route=app_route, message=message, request_type=request_type
+        )
+
+        return res
 
 
 def get_content(response: Any) -> Tuple[int, Any]:

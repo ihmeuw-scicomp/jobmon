@@ -1,4 +1,5 @@
 """Configuration setting for client-side only."""
+
 from __future__ import annotations
 
 import logging

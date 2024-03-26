@@ -15,6 +15,12 @@ class InvalidResponse(Exception):
     pass
 
 
+class InvalidRequest(Exception):
+    """Invalid Request type Exception."""
+
+    pass
+
+
 class RemoteExitInfoNotAvailable(Exception):
     """Exception raised when Exit Info is not available for different executor types."""
 
@@ -114,11 +120,9 @@ class ConfigError(Exception):
 class InvalidStateTransition(Exception):
     """Invalid State Transition implementation."""
 
-    def __init__(self, model: str, id: str, old_state: str, new_state: str) -> None:
+    def __init__(self, model: str, id: int, old_state: str, new_state: str) -> None:
         """Initialize Exception."""
-        msg = "Cannot transition {} id: {} from {} to {}".format(
-            model, id, old_state, new_state
-        )
+        msg = f"Cannot transition {model} id: {id} from {old_state} to {new_state}"
         super(InvalidStateTransition, self).__init__(self, msg)
 
 

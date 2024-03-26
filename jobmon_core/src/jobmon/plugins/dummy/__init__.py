@@ -1,4 +1,5 @@
 """Dummy Executor fakes execution for testing purposes."""
+
 from __future__ import annotations
 
 import logging

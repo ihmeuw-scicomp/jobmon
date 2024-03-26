@@ -1,4 +1,5 @@
 """jobmon built-in."""
+
 from typing import Type
 
 import pkg_resources

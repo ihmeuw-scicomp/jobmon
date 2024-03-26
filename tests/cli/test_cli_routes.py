@@ -271,7 +271,7 @@ def test_get_workflow_user_validation(db_engine, tool):
     assert msg["validation"] is True
 
 
-def test_get_workflow_run_for_workflow_reset(db_engine, tool, web_server_in_memory):
+def test_get_workflow_run_for_workflow_reset(db_engine, tool):
     t = tool
     wf = t.create_workflow(name="i_am_a_fake_wf")
     tt1 = t.get_task_template(
@@ -301,7 +301,7 @@ def test_get_workflow_run_for_workflow_reset(db_engine, tool, web_server_in_memo
     assert msg["workflow_run_id"] is None
 
 
-def test_reset_workflow(db_engine, tool, web_server_in_memory):
+def test_reset_workflow(db_engine, tool):
     t = tool
     wf = t.create_workflow(name="i_am_a_fake_wf")
     tt1 = t.get_task_template(
@@ -890,15 +890,15 @@ def test_workflow_details_viz(client_env, db_engine):
         compute_resources={"queue": "null.q", "num_cores": 2},
     )
     wf.add_tasks([t1])
-    wf.bind()
-    wf._bind_tasks()
+    wf.run()
     app_route = f"/workflow_details_viz/{wf.workflow_id}"
     return_code, msg = wf.requester.send_request(
         app_route=app_route, message={}, request_type="get"
     )
     assert return_code == 200
-    assert msg[0]["wf_status"] == "G"
-    assert msg[0]["wf_status_desc"] == "Workflow is being validated."
+    assert msg[0]["wf_name"] == "i_am_another_fake_wf_vv"
+    assert msg[0]["tool_name"] == "task_detail_tool"
+    assert msg[0]["wf_status"] == "D"
 
 
 def test_workflow_overview_viz(client_env, db_engine):

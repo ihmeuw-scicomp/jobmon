@@ -1,4 +1,5 @@
 """Workflow Attribute type database table."""
+
 from typing import Any, Dict
 
 from sqlalchemy import Column, Integer, String
@@ -12,7 +13,7 @@ class WorkflowAttributeType(Base):
     __tablename__ = "workflow_attribute_type"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), unique=True)
+    name = Column(String(255), unique=True, nullable=False)
 
     @classmethod
     def from_wire(cls: Any, dct: Dict) -> Any:

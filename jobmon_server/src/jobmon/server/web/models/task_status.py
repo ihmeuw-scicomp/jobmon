@@ -1,4 +1,5 @@
 """Task Instance Status Database table."""
+
 from sqlalchemy import Column, String
 from sqlalchemy.orm import Session
 
@@ -22,8 +23,8 @@ class TaskStatus(Base):
     DONE = Statuses.DONE
 
     id = Column(String(1), primary_key=True)
-    label = Column(String(150))
-    description = Column(String(150))
+    label = Column(String(150), nullable=False)
+    description = Column(String(150), nullable=False)
 
 
 def add_task_statuses(session: Session) -> None:

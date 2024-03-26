@@ -159,7 +159,7 @@ bottleneck for small local workflows.
     import sys
 
     from jobmon.server.web.api import get_app, JobmonConfig
-    from jobmon.server.web.models import init_db
+    from jobmon.server.web.db_admin import init_db
     from sqlalchemy import create_engine
 
     # Setup local Jobmon web service
@@ -184,7 +184,7 @@ bottleneck for small local workflows.
             database_uri = f"sqlite:///{self.filepath}"
             if not os.path.exists(self.filepath):
                 open(self.filepath, 'a').close()  # Make an empty database file
-                init_db(create_engine(database_uri))
+                init_db(database_uri)
 
             config = JobmonConfig(
                 dict_config={"db": {"sqlalchemy_database_uri": database_uri}}

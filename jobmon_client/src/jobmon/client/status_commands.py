@@ -1,4 +1,5 @@
 """Commands to check for workflow and task status (from CLI)."""
+
 import getpass
 import logging
 from typing import Any, Dict, List, Optional, Union
@@ -15,8 +16,8 @@ from jobmon.core.constants import (
     WorkflowRunStatus,
     WorkflowStatus,
 )
-from jobmon.core.exceptions import InvalidResponse, WorkflowRunStateError
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.exceptions import WorkflowRunStateError
+from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
 
 
@@ -595,24 +596,21 @@ def get_filepaths(
         requester = Requester.from_defaults()
 
     app_route = f"/array/{workflow_id}/get_array_tasks"
-    rc, resp = requester.send_request(
+    _, resp = requester.send_request(
         app_route=app_route,
         message={"array_name": array_name, "job_name": job_name, "limit": limit},
         request_type="get",
     )
 
-    if http_request_ok(rc) is False:
-        raise InvalidResponse(
-            f"Unexpected status code {rc} from POST "
-            f"request through route {app_route}. Expected "
-            f"code 200. Response content: {resp}"
-        )
-
     return resp["array_tasks"]
 
 
 def resume_workflow_from_id(
-    workflow_id: int, cluster_name: str, reset_if_running: bool = True, log: bool = True
+    workflow_id: int,
+    cluster_name: str,
+    reset_if_running: bool = True,
+    log: bool = True,
+    timeout: int = 180,
 ) -> None:
     """Given a workflow ID, resume the workflow.
 
@@ -638,7 +636,9 @@ def resume_workflow_from_id(
     swarm.from_workflow_id(workflow_id)
 
     with DistributorContext(
-        workflow_run_id=new_wfr.workflow_run_id, cluster_name=cluster_name, timeout=180
+        workflow_run_id=new_wfr.workflow_run_id,
+        cluster_name=cluster_name,
+        timeout=timeout,
     ) as distributor:
         swarm.run(distributor_alive_callable=distributor.alive)
 

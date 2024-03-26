@@ -1,4 +1,5 @@
 """Routes used by task instances on worker nodes."""
+
 from http import HTTPStatus as StatusCodes
 import os
 from typing import Any
@@ -29,7 +30,9 @@ def is_alive() -> Any:
 def _get_time() -> str:
     with SessionLocal() as session:
         db_time = session.execute(select(func.now())).scalar()
-        str_time = db_time.strftime("%Y-%m-%d %H:%M:%S")
+        str_time = (
+            db_time.strftime("%Y-%m-%d %H:%M:%S") if db_time else "0000-00-00 00:00:00"
+        )
     return str_time
 
 

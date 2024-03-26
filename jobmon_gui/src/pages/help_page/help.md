@@ -1,4 +1,4 @@
-# Getting help with Jobmon
+# Getting Help with Jobmon
 ---
 ## Slack
 There are two Jobmon channels on Slack: #jobmon-users is the main channel to ask for help about Jobmon questions.
@@ -9,4 +9,4 @@ Submitting a ticket is always a good way to get your Jobmon problems addressed o
 You can submit a new ticket [here](https://helpdesk.ihme.washington.edu/tickets/)
 
 ## Documentation
-You can view the Jobmon documentation [here](https://scicomp-docs.ihme.washington.edu/jobmon/current/quickstart.html)
+You can view the Jobmon documentation [here](https://jobmon.readthedocs.io/en/latest/)

@@ -1,4 +1,5 @@
 """Serializing data when going to and from the database."""
+
 import ast
 from datetime import datetime
 import json
@@ -31,9 +32,9 @@ class SerializeDistributorTask:
             "array_id": int(wire_tuple[1]) if wire_tuple[1] is not None else None,
             "name": wire_tuple[2],
             "command": wire_tuple[3],
-            "requested_resources": {}
-            if wire_tuple[4] is None
-            else ast.literal_eval(wire_tuple[4]),
+            "requested_resources": (
+                {} if wire_tuple[4] is None else ast.literal_eval(wire_tuple[4])
+            ),
         }
 
 
@@ -61,8 +62,7 @@ class SerializeTaskInstance:
         workflow_run_id: int,
         workflow_id: int,
         status: str,
-        distributor_id: Union[int, None],
-        cluster_id: Optional[int] = None,
+        distributor_id: Union[str, None],
         task_resources_id: Optional[int] = None,
         array_id: Optional[int] = None,
         array_batch_num: Optional[int] = None,
@@ -76,7 +76,6 @@ class SerializeTaskInstance:
             workflow_id,
             status,
             distributor_id,
-            cluster_id,
             task_resources_id,
             array_id,
             array_batch_num,
@@ -364,9 +363,9 @@ class SerializeQueue:
         return {
             "queue_id": int(wire_tuple[0]),
             "queue_name": str(wire_tuple[1]),
-            "parameters": {}
-            if wire_tuple[2] is None
-            else ast.literal_eval(wire_tuple[2]),
+            "parameters": (
+                {} if wire_tuple[2] is None else ast.literal_eval(wire_tuple[2])
+            ),
         }
 
 

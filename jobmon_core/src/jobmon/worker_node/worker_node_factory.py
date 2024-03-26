@@ -1,9 +1,9 @@
 """Start up distributing process."""
+
 from typing import Optional
 
 from jobmon.core.cluster import Cluster
-from jobmon.core.exceptions import InvalidResponse
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.requester import Requester
 from jobmon.worker_node.worker_node_task_instance import WorkerNodeTaskInstance
 
 
@@ -41,15 +41,9 @@ class WorkerNodeFactory:
         app_route = (
             f"/get_array_task_instance_id/{array_id}/{batch_number}/{array_step_id}"
         )
-        rc, resp = requester.send_request(
+        _, resp = requester.send_request(
             app_route=app_route, message={}, request_type="get"
         )
-        if http_request_ok(rc) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {rc} from POST "
-                f"request through route {app_route}. Expected code "
-                f"200. Response content: {rc}"
-            )
         task_instance_id = resp["task_instance_id"]
 
         worker_node_task_instance = WorkerNodeTaskInstance(

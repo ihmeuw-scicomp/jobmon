@@ -13,8 +13,8 @@ from typing import Dict, Optional, TextIO
 from jobmon.core.cluster_protocol import ClusterWorkerNode
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus
-from jobmon.core.exceptions import InvalidResponse, ReturnCodes, TransitionError
-from jobmon.core.requester import http_request_ok, Requester
+from jobmon.core.exceptions import ReturnCodes, TransitionError
+from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeTaskInstance
 
 logger = logging.getLogger(__name__)
@@ -232,17 +232,11 @@ class WorkerNodeTaskInstance:
         }
 
         app_route = f"/task_instance/{self.task_instance_id}/log_done"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route,
             message=message,
             request_type="post",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
         self._status = response["status"]
         if self.status != TaskInstanceStatus.DONE:
             raise TransitionError(
@@ -266,17 +260,11 @@ class WorkerNodeTaskInstance:
         }
 
         app_route = f"/task_instance/{self.task_instance_id}/log_error_worker_node"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route,
             message=message,
             request_type="post",
         )
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
         self._status = response["status"]
         if self.status != error_state:
             raise TransitionError(
@@ -307,18 +295,11 @@ class WorkerNodeTaskInstance:
             )
 
         app_route = f"/task_instance/{self.task_instance_id}/log_running"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route,
             message=message,
             request_type="post",
         )
-
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
 
         kwargs = SerializeTaskInstance.kwargs_from_wire_worker_node(
             response["task_instance"]
@@ -359,18 +340,12 @@ class WorkerNodeTaskInstance:
             logger.debug("No distributor_id was found in the sbatch env at this time")
 
         app_route = f"/task_instance/{self.task_instance_id}/log_report_by"
-        return_code, response = self.requester.send_request(
+        _, response = self.requester.send_request(
             app_route=app_route,
             message=message,
             request_type="post",
         )
 
-        if http_request_ok(return_code) is False:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response}"
-            )
         self._status = response["status"]
         self.last_heartbeat_time = time()
 
@@ -443,6 +418,17 @@ class WorkerNodeTaskInstance:
         mem_buffer = ""
         output_block = b""
         while not async_stream.at_eof():
+            # A known issue is that if a process managed by Jobmon itself implements
+            # multiprocessing, and the parent job is sig-killed by a cluster OOM killer,
+            # there is a potential for the process to enter a deadlocking IO state.
+            # If async_stream.read attempts to read from this process, it will hang
+            # and potentially block the event loop from logging heartbeats. The end result
+            # is a task instance in Unknown error rather than a resource retry state.
+
+            # implementing a timeout with asyncio.wait_for does not produce the expected fix
+            # so the only currently known fix is for the managed process to _not_ call exit
+            # handlers. It should invoke os._exit instead of sys.exit to forcibly kill the
+            # process and allow the worker node to handle errors cleanly.
             output_block += await async_stream.read(64)
             try:
                 output_block_str = output_block.decode()

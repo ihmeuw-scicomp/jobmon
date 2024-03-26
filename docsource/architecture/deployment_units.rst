@@ -151,8 +151,6 @@ services:
 +-------------------+-----------------------------------------------------------------------+
 | kibana            | GUI layer for APM and elasticsearch.                                  |
 +-------------------+-----------------------------------------------------------------------+
-| logstash          | Ingest point for logs from all kubernetes containers                  |
-+-------------------+-----------------------------------------------------------------------+
 | workflow-reaper   | Continually check for lost & dead workflows                           |
 +-------------------+-----------------------------------------------------------------------+
 
@@ -214,58 +212,34 @@ without eliminating existing reaper deployments.
 .. image:: ./screenshots/reaper_namespace.png
 
 
-uWSGI
+Gunicorn
 =====
 
-uWSGI is a connection library used to communicate between the NGINX web server and the python virtual
-machine within the jobmon-server container. uWSGI not only carries the messages, it also
-scales the number of worker-threds, see below.
-In our architecture, uWSGI runs inside each of the docker containers created by Kubernetes [#f1]_ .
-uWSGI consists of a main process that manages a series of flask worker processes.
+Gunicorn is a Python WSGI HTTP server. It is used to serve the Jobmon server code, and communicates between the
+NGINX web server and the Python virtual machine within the jobmon-server container. It also
+scales the number of worker-threads, see below.
+
+In our architecture, gunicorn runs inside each of the docker containers created by Kubernetes [#f1]_ .
+Gunicorn consists of a main process that manages a series of flask worker processes, and reaps them if the global timeout
+is exceeded.
 
 
 Autoscaling Behavior
 ====================
 
-Jobmon relies on uWSGI and Kubernetes to autoscale so as to remain performant under
+Jobmon relies on gunicorn and Kubernetes to autoscale so as to remain performant under
 heavy load.
-uWSGI manages threads within one container; Kubernetes manages whole containers.
-Future work will probably replace uWSGI by gunicorn, and all scaling will therefore
-be container-level scaling handled by Kubernetes.
+Gunicorn manages threads within one container; Kubernetes manages whole containers.
 
 In the event of a very large workflow, or a series of concurrent workflows,
 the jobmon-server pods can become overloaded with incoming requests, leading to timeouts or lost jobs.
-The first level of scaling is uWSGI worker-thread control within a container.
 
-Each container starts with a minimum number of workers
-as specified `here <https://stash.ihme.washington.edu/projects/SCIC/repos/jobmon/browse/jobmon/server/deployment/container/uwsgi.ini#35>`_.
-If a specific container falls under heavy load, uWSGI can utilize
-a so-called 'cheaper' algorithm to spawn more workers and process the additional incoming requests.
-There are a variety of cheaper algorithms that can determine when
-to scale up/down worker processes - Jobmon uses the `busyness algorithm <https://uwsgi-docs.readthedocs.io/en/latest/Cheaper.html#busyness-cheaper-algorithm>`__. Under this specification, busyness is set by average utilization over a given time period. Configurations can be set in the same uwsgi.ini file linked above.
-See the configuration in ``uwsgi.ini``
-At IHME that file is in the ``jobmon_ihme_tad`` repository
+Each container starts with 4 worker processes as specified in the gunicorn.conf.py file. As the number of requests increases,
+container-level worker processes will increase memory and CPU utilization inside the container to be able to manage the load.
 
-Similarly to the Kubernetes pod autoscaler, the uWSGI busyness algorithm creates workers to
-handle a usage spike and spin down workers when usage is low. This is important for two reasons:
-
-1. A container can efficiently process incoming requests with more workers.
-   If there are no free workers to handle a request, it will sit in the queue until a worker frees up. If requests are incoming more quickly than the workers can execute, this can potentially result in long queue wait times and request timeouts.
-2. Without worker autoscaling behavior the resource thresholds needed for Kubernetes horizontal
-   autoscaling will not be reached. Remember that Kubernetes defines busyness by container CPU
-   and memory usage. Adding workers directly adds to the CPU usage, and indirectly adds to memory usage by allowing more concurrent data flow. If the additional threads in the container cannot be allocated work due to lack of autoscaling, then the requisite busyness needed in each container won't be reached. Kubernetes does not track the length of the request queue as a busyness parameter.
-
-UWSGI is configured to restart workers after a certain number of requests or seconds have
-passed. This guards against memory leaks.
-
-In addition, Kubernetes uses
-`horizontal autoscaling algorithm <https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/>`_
+Kubernetes uses `horizontal autoscaling algorithm <https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/>`_
 when it detects heavy memory or CPU load in the containers.
-When either CPU or memory is at 80% or more utilization,
-we can spin up more containers up to a limit of 20.
-
-The database is tuned to use all threads on its VM, and
-80% of the available memory for its buffers.
+When either CPU or memory is at 80% or more utilization, we can spin up more containers up to a limit of 25.
 
 Metallb
 =======
@@ -303,16 +277,15 @@ so the workflow can be retried.
 #. The ``requester`` Python package within the client sends it to a configured IP address owned by Metallb.
 #. Metallb  sends the request to Traefik
 #. The Traefik controller routes the request to the next jobmon-server container
-#. Nginx within the container (part of the tiangolo base image) passes it to uWSGI
-#. uWSGI, running inside the container, assigns a worker-thread to handle the request.
-   The main process either assigns a worker to the request, or instantiates a
-   new worker process to handle the request if load is high within the container.
-#. The requested arrives at Python-Flask
-#. (Finally) Flask calls the actual Jobmon code to handle the request.
+#. Nginx within the container (part of the tiangolo base image) passes it to gunicorn
+#. Gunicorn, running inside the container, assigns a worker-thread to handle the request.
+#. The request arrives at Python-Flask
+#. (Finally) Flask calls the actual Jobmon code to handle the request. Generally this code will require one or multiple
+    database queries, handled by sqlalchemy.
 #. The response data is sent back to the main process.
 #. The main process sends the returned data back to the client application.
 
-Kubernetes is asynchronously scaling the number of pods up and down.
+Kubernetes is asynchronously scaling the number of pods up and down as needed to handle a high volume of incoming requests.
 
 Performance Monitoring
 ======================

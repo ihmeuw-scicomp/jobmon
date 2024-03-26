@@ -1,6 +1,7 @@
 """Task Template database table."""
-from sqlalchemy import Column, ForeignKey, Integer, UniqueConstraint, VARCHAR
-from sqlalchemy.orm import relationship
+
+from sqlalchemy import ForeignKey, Integer, UniqueConstraint, VARCHAR
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from jobmon.core.serializers import SerializeClientTaskTemplate
 from jobmon.server.web.models import Base
@@ -19,9 +20,11 @@ class TaskTemplate(Base):
             self.id, self.tool_version_id, self.name
         )
 
-    id = Column(Integer, primary_key=True)
-    tool_version_id = Column(Integer, ForeignKey("tool_version.id"))
-    name = Column(VARCHAR(255))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tool_version_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tool_version.id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(VARCHAR(255), nullable=False)
 
     # orm relationship
     tool_versions = relationship("ToolVersion", back_populates="task_templates")

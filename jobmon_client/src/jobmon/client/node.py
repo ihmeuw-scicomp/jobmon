@@ -1,4 +1,5 @@
 """A node represents an individual task within a DAG."""
+
 from __future__ import annotations
 
 import hashlib
@@ -100,7 +101,9 @@ class Node:
         str_arg_ids = [str(arg) for arg in arg_ids]
 
         hash_value = int(
-            hashlib.sha1("".join(str_arg_ids + arg_values).encode("utf-8")).hexdigest(),
+            hashlib.sha256(
+                "".join(str_arg_ids + arg_values).encode("utf-8")
+            ).hexdigest(),
             16,
         )
         return hash_value
@@ -166,7 +169,7 @@ class Node:
     def __hash__(self) -> int:
         """Create a hash that will be a unique identifier for the node."""
         if not hasattr(self, "_hash_val"):
-            hash_value = hashlib.sha1()
+            hash_value = hashlib.sha256()
             hash_value.update(bytes(str(self.node_args_hash).encode("utf-8")))
             hash_value.update(bytes(str(self.task_template_version_id).encode("utf-8")))
             self._hash_val = int(hash_value.hexdigest(), 16)

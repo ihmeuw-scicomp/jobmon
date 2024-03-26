@@ -1,4 +1,5 @@
 """DAG Database Table."""
+
 from sqlalchemy import Column, DateTime, Integer, VARCHAR
 from sqlalchemy.orm import relationship
 
@@ -11,7 +12,7 @@ class Dag(Base):
     __tablename__ = "dag"
 
     id = Column(Integer, primary_key=True)
-    hash = Column(VARCHAR(50), unique=True)
+    hash = Column(VARCHAR(150), unique=True, nullable=False)
     created_date = Column(DateTime, default=None)
 
     workflow = relationship("Workflow", back_populates="dag", lazy=True)
