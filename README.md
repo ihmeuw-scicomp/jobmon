@@ -1,4 +1,4 @@
-# Jobmon
+# JobMon
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@
 
 ## Introduction
 
-Jobmon is a Python package developed by IHME's Scientific Computing team, designed to simplify and standardize the process of job monitoring and workflow management in computational projects. It facilitates the tracking of job statuses, manages dependencies, and streamlines the execution of complex workflows across various computing environments.
+JobMon is a Python package developed by IHME's Scientific Computing team, designed to simplify and standardize the process of job monitoring and workflow management in computational projects. It facilitates the tracking of job statuses, manages dependencies, and streamlines the execution of complex workflows across various computing environments.
 
 ## Description
 
@@ -31,7 +31,7 @@ The tool aims to enhance productivity and ensure computational tasks are efficie
 
 ## Installation
 
-To install Jobmon, use the following pip command:
+To install JobMon, use the following pip command:
 
 ```bash
 pip install jobmon_client[server]
@@ -86,7 +86,7 @@ For a detailed history of changes and version updates, please refer to the [CHAN
 
 ## License
 
-This project is licensed under the Jobmon Non-commercial License, developed at the Institute for Health Metrics and Evaluation (IHME), University of Washington. The license allows for redistribution and use in source and binary forms, with or without modification, under the conditions that:
+This project is licensed under the JobMon Non-commercial License, developed at the Institute for Health Metrics and Evaluation (IHME), University of Washington. The license allows for redistribution and use in source and binary forms, with or without modification, under the conditions that:
 
 - The software is used solely for non-commercial purposes. Commercial use, including indirect commercial use such as content on a website that accepts advertising money, is not permitted under this license. However, use by a for-profit company in its research is considered non-commercial use.
 - All redistributions of source code must retain the copyright notice, this list of conditions, and the following disclaimer.
