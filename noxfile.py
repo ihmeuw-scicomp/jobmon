@@ -202,5 +202,5 @@ def launch_gui_test_server(session: Session) -> None:
         os.remove("/tmp/tests.sqlite")
     session.install("-e", "./jobmon_core")
     session.install("-e", "./jobmon_client")
-    session.install("-e", "./jobmon_server")
+    session.install("-e", "./jobmon_server[otlp]")
     session.run("python", "jobmon_gui/local_testing/jobmon_gui/testing_servers/_create_sqlite_db.py")

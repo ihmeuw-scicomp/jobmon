@@ -18,7 +18,7 @@ To deploy the Flask app locally:
 2. Make a conda environment and activate it
 3. Navigate to the top of the Jobmon repository
 4. Run `nox -s launch_gui_test_server`
-5. Run `python jobmon_gui/local_testing/jobmon_gui/testing_servers/functionaltest_server.py`
+5. Run `.nox/launch_gui_test_server/bin/python jobmon_gui/local_testing/jobmon_gui/testing_servers/functionaltest_server.py`
     - This command will spin up a local version of the Flask backend, running on 127.0.0.1:8070 by default. You can then configure the React app to point to this URL for testing purposes.
 
 ### Deploying the React App Locally
