@@ -52,7 +52,7 @@ For comprehensive documentation, visit [readthedocs](https://jobmon.readthedocs.
 
 ## Contributing
 
-We encourage contributions from the community. If you're interested in improving JobMon or adding new features, please refer to our [developer guide](https://jobmon.readthedocs.io/en/latest/developers_guide/developer-start.html).
+We encourage contributions from the community. If you're interested in improving JobMon or adding new features, please refer to our [developer guide](https://jobmon.readthedocs.io/en/latest/developers_guide/developer-start.html) for python client contributions or the GUI [README.md](jobmon_gui/README.md) for visualization contributions.
 
 ## Changelog
 
