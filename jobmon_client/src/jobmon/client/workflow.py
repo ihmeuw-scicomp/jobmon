@@ -502,7 +502,10 @@ class Workflow(object):
         # bind to database
         logger.info("Adding Workflow metadata to database")
         self.bind()
-        logger.info(f"Workflow ID {self.workflow_id} assigned")
+        logger.info(
+            f"Workflow ID {self.workflow_id} assigned. Progress can be monitored at "
+            f"https://jobmon-gui.ihme.washington.edu/#/workflow/{self.workflow_id}/tasks"
+        )
 
         # Check if this workflow is already complete and is runnable
         if self._status == WorkflowStatus.DONE:
