@@ -700,7 +700,6 @@ def test_concurrency_limit(client_env, db_engine):
         assert r[0] == MaxConcurrentlyRunning.MAXCONCURRENTLYRUNNING
 
 
-@pytest.mark.xfail(reason="The exception is not yet implemented.")
 class TestDAGCycles:
     def create_workflow(self, tool: Tool) -> Workflow:
         return tool.create_workflow(

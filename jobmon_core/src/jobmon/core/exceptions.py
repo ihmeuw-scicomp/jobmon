@@ -142,3 +142,9 @@ class DistributorInterruptedError(Exception):
     """raised when signal is sent to distributor."""
 
     pass
+
+
+class CyclicGraphError(Exception):
+    """Cyclic graph detected."""
+
+    pass
