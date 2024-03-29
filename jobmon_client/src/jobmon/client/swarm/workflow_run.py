@@ -409,8 +409,7 @@ class WorkflowRun:
                 node_id, downstream_node_ids = values
                 # Convert to Python datatypes
                 task_id = int(task_id)
-                if downstream_node_ids:
-                    downstream_node_ids = ast.literal_eval(downstream_node_ids)
+
                 # Assumption: every single node in the downstream edge is not in "D" state
                 # Shouldn't be possible to have a downstream node of a task not in "D" state
                 # that is complete. If it is, we'll raise unexpected KeyErrors here
