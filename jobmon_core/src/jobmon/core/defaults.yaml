@@ -1,26 +1,21 @@
-http:
-  route_prefix: ""
-  request_timeout: 20
-  retries_timeout: 300
-  retries_attempts: 10
-
-otlp:
-  web_enabled: false
-  http_enabled: false
-
-heartbeat:
-  workflow_run_interval: 30
-  report_by_buffer: 3.1
-  task_instance_interval: 90
-
-reaper:
-  poll_interval_minutes: 5
-
+db:
+  sqlalchemy_database_uri: sqlite://
 distributor:
   poll_interval: 10
-
+heartbeat:
+  report_by_buffer: 3.1
+  task_instance_interval: 90
+  workflow_run_interval: 30
+http:
+  request_timeout: 20
+  retries_attempts: 10
+  retries_timeout: 300
+  route_prefix: ''
+  service_url: http://127.0.0.1:8070
+otlp:
+  http_enabled: false
+  web_enabled: false
+reaper:
+  poll_interval_minutes: 5
 worker_node:
   command_interrupt_timeout: 10
-
-db:
-  sqlalchemy_database_uri: "sqlite://"
