@@ -19,7 +19,6 @@ python = "3.8"
 @nox.session(python=python, venv_backend="conda")
 def tests(session: Session) -> None:
     """Run the test suite."""
-    session.conda_install("mysqlclient")
     session.install("pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock")
     session.install("-e", "./jobmon_core")
     session.install("-e", "./jobmon_client")
