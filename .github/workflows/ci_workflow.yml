@@ -7,13 +7,12 @@ on:
       - 'release/*'
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
     
     steps:
       - uses: actions/checkout@v3
@@ -36,9 +35,8 @@ jobs:
       - name: Upload coverage report
         id: coverage
         if: steps.tests.outcome == 'success'
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-pages-artifact@v1
         with:
-          name: coverage-report
           path: htmlcov/*
 
       - name: Deploy coverage to Github Pages
