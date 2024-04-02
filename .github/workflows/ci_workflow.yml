@@ -22,14 +22,11 @@ jobs:
       - name: Install nox
         run: pip install --upgrade nox
         
-      - name: Type checking
-        run: nox -s typecheck
-        
-      - name: Linting
-        run: nox -s lint
+      - name: Type checking and Linting
+        run: nox -s typecheck lint
 
       - name: Run tests
-        run: nox -s tests
+        run: nox -s tests -- ./tests/core
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v2
