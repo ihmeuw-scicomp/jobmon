@@ -26,21 +26,23 @@ jobs:
         run: nox -s typecheck lint
 
       - name: Run tests
+        id: tests
         run: nox -s tests -- ./tests/core
 
       - name: Upload coverage report
+        id: coverage
+        if: steps.tests.outcome == 'success'
         uses: actions/upload-artifact@v2
         with:
           name: coverage-report
           path: htmlcov/*
 
-      - name: deploy to Github Pages
+      - name: Deploy coverage to Github Pages
+        if: steps.coverage.outcome == 'success'
         uses: actions/deploy-pages@v2
-        id: deployment
 
-      - name: Publish Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        if: always()
+      - name: Junit Test Dashboard
+        if: always() && steps.tests.outcome != 'skipped'
+        uses: correct-action-for-junit@version
         with:
-          files: |
-            out/test_report.xml
+          path: out/test_report.xml

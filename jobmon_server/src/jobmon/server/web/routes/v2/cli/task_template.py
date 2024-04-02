@@ -552,11 +552,15 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
     errors_df = pd.DataFrame(return_list)
 
     # Create DataFrame of the most recent attempts
-    errors_most_recent_df = errors_df.groupby("task_id")["task_instance_id"].max().reset_index()
+    errors_most_recent_df = (
+        errors_df.groupby("task_id")["task_instance_id"].max().reset_index()
+    )
     errors_most_recent_df["most_recent_attempt"] = True
 
     # Merge original DataFrame with most recent attempts DataFrame
-    errors_df = pd.merge(errors_df, errors_most_recent_df, on="task_instance_id", how="left")
+    errors_df = pd.merge(
+        errors_df, errors_most_recent_df, on="task_instance_id", how="left"
+    )
 
     resp = jsonify(errors_df.to_dict(orient="records"))
     resp.status_code = 200
