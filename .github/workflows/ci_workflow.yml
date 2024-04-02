@@ -1,0 +1,31 @@
+name: Run CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - 'release/*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.x'
+          
+      - name: Install nox
+        run: pip install --upgrade nox
+        
+      - name: Type checking
+        run: nox -s typecheck
+        
+      - name: Linting
+        run: nox -s lint
+
+      - name: Run tests
+        run: nox -s tests
