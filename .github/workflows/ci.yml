@@ -35,18 +35,6 @@ jobs:
         id: tests
         run: nox -s tests -- ./tests/core
 
-      # - name: Upload coverage report
-      #   id: coverage
-      #   if: steps.tests.outcome == 'success'
-      #   uses: actions/upload-pages-artifact@v1
-      #   with:
-      #     path: htmlcov
-
-      # - name: Deploy coverage to Github Pages
-      #   id: deployment
-      #   if: steps.coverage.outcome == 'success'
-      #   uses: actions/deploy-pages@v2
-
       - name: Coverage comment
         id: coverage_comment
         uses: py-cov-action/python-coverage-comment-action@v3
@@ -66,4 +54,4 @@ jobs:
         if: always() && steps.tests.outcome != 'skipped'
         uses: EnricoMi/publish-unit-test-result-action@v2
         with:
-          junit_files: out/test_report.xml
+          junit_files: .test_report.xml
