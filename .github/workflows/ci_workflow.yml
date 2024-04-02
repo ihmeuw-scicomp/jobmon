@@ -37,7 +37,7 @@ jobs:
         if: steps.tests.outcome == 'success'
         uses: actions/upload-pages-artifact@v1
         with:
-          path: htmlcov/*
+          path: htmlcov
 
       - name: Deploy coverage to Github Pages
         if: steps.coverage.outcome == 'success'
