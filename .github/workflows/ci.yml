@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
+      - 'release/*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.x'
+          
+      - name: Install nox
+        run: pip install --upgrade nox
+        
+      - name: Type checking and Linting
+        run: nox -s typecheck lint
+
+      - name: Run tests
+        id: tests
+        run: nox -s tests -- ./tests/core
+
+      # - name: Upload coverage report
+      #   id: coverage
+      #   if: steps.tests.outcome == 'success'
+      #   uses: actions/upload-pages-artifact@v1
+      #   with:
+      #     path: htmlcov
+
+      # - name: Deploy coverage to Github Pages
+      #   id: deployment
+      #   if: steps.coverage.outcome == 'success'
+      #   uses: actions/deploy-pages@v2
+
+      - name: Coverage comment
+        id: coverage_comment
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Store Pull Request comment to be posted
+        uses: actions/upload-artifact@v4
+        if: steps.coverage_comment.outputs.COMMENT_FILE_WRITTEN == 'true'
+        with:
+          # If you use a different name, update COMMENT_ARTIFACT_NAME accordingly
+          name: python-coverage-comment-action
+          # If you use a different name, update COMMENT_FILENAME accordingly
+          path: python-coverage-comment-action.txt
+
+      - name: Junit Test Dashboard
+        if: always() && steps.tests.outcome != 'skipped'
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          junit_files: out/test_report.xml
