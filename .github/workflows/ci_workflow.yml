@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - 'release/*'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -29,3 +30,15 @@ jobs:
 
       - name: Run tests
         run: nox -s tests
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage-report
+          path: htmlcov/*
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-report
+          path: out/test_report.xml

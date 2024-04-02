@@ -3,6 +3,7 @@
 
 # editor files
 *.sublime*
+.vscode/
 
 # log files
 *.log
