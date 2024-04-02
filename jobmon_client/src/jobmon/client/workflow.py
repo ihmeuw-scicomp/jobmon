@@ -599,9 +599,11 @@ class Workflow(object):
     def validate(self, strict: bool = True, raise_on_error: bool = False) -> None:
         """Confirm that the tasks in this workflow are valid.
 
-        This method will access the database to confirm the requested resources are valid for
-        the specified cluster. It will also confirm that the workflow args are valid.  It also
-        will make sure no task contains up/down stream tasks that are not in the workflow.
+        This method will:
+        - access the database to confirm the requested resources are valid for
+        the specified cluster
+        - confirm that the workflow args are valid
+        - make sure no task contains up/down stream tasks that are not in the workflow
         """
         # construct task resources
         for task in self.tasks.values():

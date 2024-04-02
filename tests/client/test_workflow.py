@@ -1,10 +1,14 @@
 import logging
+import random
+from typing import List
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from jobmon.client.task import Task
 from jobmon.client.tool import Tool
+from jobmon.client.workflow import Workflow
 from jobmon.client.workflow_run import WorkflowRun, WorkflowRunFactory
 from jobmon.core.constants import MaxConcurrentlyRunning, WorkflowRunStatus
 from jobmon.core.exceptions import (
@@ -694,3 +698,289 @@ def test_concurrency_limit(client_env, db_engine):
                         WHERE workflow_id={workflow4.workflow_id}"""
         r = session.execute(text(sql)).fetchone()
         assert r[0] == MaxConcurrentlyRunning.MAXCONCURRENTLYRUNNING
+
+
+class TestDAGCycles:
+    def create_workflow(self, tool: Tool) -> Workflow:
+        return tool.create_workflow(
+            name="test_workflow",
+            default_cluster_name="dummy",
+            workflow_args=f"dummy_wf_{random.randint(0, 100_000_000)}",
+        )
+
+    def create_tasks(self, tool: Tool, num_tasks: int) -> List[Task]:
+        task_template = tool.get_task_template(
+            template_name="dummy_task",
+            command_template="sleep {task_number}",
+            node_args=["task_number"],
+            op_args=[],
+            task_args=[],
+        )
+        return [
+            task_template.create_task(
+                task_number=i,
+                name=f"task_{i}",
+                compute_resources={
+                    "memory": "1G",
+                    "cores": 1,
+                    "runtime": "1m",
+                    "queue": "null.q",
+                    "project": "dummy_proj",
+                    "stderr": "/tmp/errors",
+                    "stdout": "/tmp/output",
+                },
+            )
+            for i in range(num_tasks)
+        ]
+
+    def test_simple(self, tool: Tool) -> None:
+        """Ensure an error is raised with a simple cycle like:
+        t0 -> t1 -> t2
+        ^------------'
+        """
+        # Create workflow and tasks
+        wf = self.create_workflow(tool)
+        t0, t1, t2 = self.create_tasks(tool, 3)
+
+        # Set the dependencies between the tasks creating a cycle, and verify the cycle
+        # was created correctly:
+        # t0 -> t1 -> t2
+        #  ^----------'
+        t0.add_downstream(t1)
+        t1.add_downstream(t2)
+        t2.add_downstream(t0)
+
+        # t2 <- t0 -> t1
+        assert t0.upstream_tasks == {t2}
+        assert t0.downstream_tasks == {t1}
+
+        # t0 <- t1 -> t2
+        assert t1.upstream_tasks == {t0}
+        assert t1.downstream_tasks == {t2}
+
+        # t1 <- t2 -> t0
+        assert t2.upstream_tasks == {t1}
+        assert t2.downstream_tasks == {t0}
+
+        # Add the tasks to the workflow
+        wf.add_tasks([t0, t1, t2])
+
+        # Exercise & Verify an error is raised
+        with pytest.raises(Exception, match="Cycle detected in the task graph"):
+            wf.bind()
+
+    def test_midway(self, tool: Tool) -> None:
+        """Ensure an error is raised with a cycle like:
+        t0 -> t1 -> t2 -> t3 -> t4
+               ^-----------'
+        """
+        # Create workflow and tasks
+        wf = self.create_workflow(tool)
+        t0, t1, t2, t3, t4 = self.create_tasks(tool, 5)
+
+        # Set the dependencies between the tasks creating a cycle, and verify the cycle
+        # was created correctly:
+        # t0 -> t1 -> t2 -> t3 -> t4
+        #        ^-----------'
+        t0.add_downstream(t1)
+        t1.add_downstream(t2)
+        t2.add_downstream(t3)
+        t3.add_downstream(t4)
+        t3.add_downstream(t1)
+
+        # t0 -> t1
+        assert t0.downstream_tasks == {t1}
+        assert t0.upstream_tasks == set()
+
+        # t0 <- t1 -> t2
+        #        ^
+        #       t3
+        assert t1.upstream_tasks == {t0, t3}
+        assert t1.downstream_tasks == {t2}
+
+        # t1 <- t2 -> t3
+        assert t2.upstream_tasks == {t1}
+        assert t2.downstream_tasks == {t3}
+
+        #       t1
+        #       ^
+        # t2 <- t3 -> t4
+        assert t3.upstream_tasks == {t2}
+        assert t3.downstream_tasks == {t1, t4}
+
+        # t3 <- t4
+        assert t4.upstream_tasks == {t3}
+
+        # Add the tasks to the workflow
+        wf.add_tasks([t0, t1, t2, t3, t4])
+
+        # Exercise & Verify an error is raised
+        with pytest.raises(Exception, match="Cycle detected in the task graph"):
+            wf.bind()
+
+    def test_fork_join(self, tool: Tool) -> None:
+        r"""Ensure an error is raised with a cycle like:
+               - t0
+             /  /  \
+            |  t1  t2
+            |   \  /
+             `---t3
+        """
+        # Create workflow and tasks
+        wf = self.create_workflow(tool)
+        t0, t1, t2, t3 = self.create_tasks(tool, 4)
+
+        # Set the dependencies between the tasks creating a cycle, and verify the cycle
+        # was created correctly:
+        #        - t0
+        #      /  /  \
+        #     |  t1  t2
+        #     |   \  /
+        #      `---t3
+        t0.add_downstream(t1)
+        t0.add_downstream(t2)
+        t1.add_downstream(t3)
+        t2.add_downstream(t3)
+        t3.add_downstream(t0)
+
+        #     ,-> t1
+        #    t0
+        #     `-> t2
+        assert t0.downstream_tasks == {t1, t2}
+
+        # t1 -> t3
+        # t2 ---^
+        assert t1.downstream_tasks == {t3}
+        assert t2.downstream_tasks == {t3}
+
+        # t3 -> t0
+        assert t3.downstream_tasks == {t0}
+
+        # Add the tasks to the workflow
+        wf.add_tasks([t0, t1, t2, t3])
+
+        # Exercise & Verify an error is raised
+        with pytest.raises(Exception, match="Cycle detected in the task graph"):
+            wf.bind()
+
+    def test_subtree(self, tool: Tool) -> None:
+        r"""Ensure an error is raised with a cycle like:
+               --  t0
+             /    /  \
+            |   t1    t2
+            | /  \   /  \
+             t3  t4 t5  t6
+                       /  \
+                      t7  t8
+        """
+        # Create workflow and tasks
+        wf = self.create_workflow(tool)
+        t0, t1, t2, t3, t4, t5, t6, t7, t8 = self.create_tasks(tool, 9)
+
+        # Set the dependencies between the tasks creating a cycle, and verify the cycle
+        # was created correctly:
+        #       --  t0
+        #     /    /  \
+        #    |   t1    t2
+        #    | /  \   /  \
+        #     t3  t4 t5  t6
+        #               /  \
+        #              t7  t8
+        t0.add_downstream(t1)
+        t0.add_downstream(t2)
+        t1.add_downstream(t3)
+        t1.add_downstream(t4)
+        t2.add_downstream(t5)
+        t2.add_downstream(t6)
+        t6.add_downstream(t7)
+        t6.add_downstream(t8)
+        t3.add_downstream(t0)
+
+        #     ,-> t1
+        #    t0
+        #     `-> t2
+        assert t0.downstream_tasks == {t1, t2}
+
+        #     ,-> t3
+        #    t1
+        #     `-> t4
+        assert t1.downstream_tasks == {t3, t4}
+
+        #     ,-> t5
+        #    t2
+        #     `-> t6
+        assert t2.downstream_tasks == {t5, t6}
+
+        #     ,-> t7
+        #    t6
+        #     `-> t8
+        assert t6.downstream_tasks == {t7, t8}
+
+        # t3 -> t0
+        assert t3.downstream_tasks == {t0}
+
+        # Add the tasks to the workflow
+        wf.add_tasks([t0, t1, t2, t3, t4, t5, t6, t7, t8])
+
+        # Exercise & Verify an error is raised
+        with pytest.raises(Exception, match="Cycle detected in the task graph"):
+            wf.bind()
+
+    def test_no_cycle(self, tool: Tool) -> None:
+        r"""Ensure no error is raised with a DAG that has no cycles.
+
+                   t0
+                  /  \
+                t1    t2
+              /  \   /  \
+             t3  t4 t5  t6
+                       /  \
+                      t7  t8
+        """
+        # Create workflow and tasks
+        wf = self.create_workflow(tool)
+        t0, t1, t2, t3, t4, t5, t6, t7, t8 = self.create_tasks(tool, 9)
+
+        # Set the dependencies between the tasks creating a cycle, and verify the cycle
+        # was created correctly:
+        #           t0
+        #          /  \
+        #        t1    t2
+        #      /  \   /  \
+        #     t3  t4 t5  t6
+        #               /  \
+        #              t7  t8
+        t0.add_downstream(t1)
+        t0.add_downstream(t2)
+        t1.add_downstream(t3)
+        t1.add_downstream(t4)
+        t2.add_downstream(t5)
+        t2.add_downstream(t6)
+        t6.add_downstream(t7)
+        t6.add_downstream(t8)
+
+        #     ,-> t1
+        #    t0
+        #     `-> t2
+        assert t0.downstream_tasks == {t1, t2}
+
+        #     ,-> t3
+        #    t1
+        #     `-> t4
+        assert t1.downstream_tasks == {t3, t4}
+
+        #     ,-> t5
+        #    t2
+        #     `-> t6
+        assert t2.downstream_tasks == {t5, t6}
+
+        #     ,-> t7
+        #    t6
+        #     `-> t8
+        assert t6.downstream_tasks == {t7, t8}
+
+        # Add the tasks to the workflow
+        wf.add_tasks([t0, t1, t2, t3, t4, t5, t6, t7, t8])
+
+        # Exercise & Verify an error **IS NOT** raised
+        wf.bind()
