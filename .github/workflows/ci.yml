@@ -33,7 +33,7 @@ jobs:
 
       - name: Run tests
         id: tests
-        run: nox -s tests -- ./tests/core
+        run: nox -s tests -- ./tests -n 4
 
       - name: Coverage comment
         id: coverage_comment
