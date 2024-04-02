@@ -19,7 +19,7 @@ dist
 # Ignore test artifacts
 .coverage
 .coverage.*
-out
+.test_report.xml
 
 # ignore cache directories
 *__pycache__*

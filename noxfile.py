@@ -28,8 +28,6 @@ def tests(session: Session) -> None:
 
     session.run(
         "pytest",
-        "--cov=jobmon",
-        "--cov-report=html",
         *args,
         env={"SQLALCHEMY_WARN_20": "1"}
     )
