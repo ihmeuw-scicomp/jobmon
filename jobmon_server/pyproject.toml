@@ -21,7 +21,6 @@ dependencies = [
     'structlog',
     'scipy',
     'pandas',
-    'polars',
     'alembic',
 ]
 dynamic = ["version"]

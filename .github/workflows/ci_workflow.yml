@@ -34,8 +34,13 @@ jobs:
           name: coverage-report
           path: htmlcov/*
 
-      - name: Upload test report
-        uses: actions/upload-artifact@v2
+      - name: deploy to Github Pages
+        uses: actions/deploy-pages@v2
+        id: deployment
+
+      - name: Publish Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
         with:
-          name: test-report
-          path: out/test_report.xml
+          files: |
+            out/test_report.xml
