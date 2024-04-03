@@ -24,3 +24,4 @@ worker_node:
 
 db:
   sqlalchemy_database_uri: "sqlite://"
+  # sqlalchemy_database_uri: "mysql+mysqldb://table_creator:vVBkGfFJUTPAYTTiFq@scicomp-mysql-db-d01.mysql.database.azure.com:3306/jobmon_stage?ssl=True"
