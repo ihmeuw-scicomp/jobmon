@@ -20,9 +20,7 @@ python = "3.8"
 def tests(session: Session) -> None:
     """Run the test suite."""
     session.install("pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock")
-    session.install("-e", "./jobmon_core")
-    session.install("-e", "./jobmon_client")
-    session.install("-e", "./jobmon_server")
+    session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
 
     args = session.posargs or test_locations
 
@@ -71,10 +69,7 @@ def typecheck(session: Session) -> None:
     session.install("mypy", "types-Flask", "types-requests", "types-PyMySQL", "types-filelock",
                     "types-PyYAML", "types-tabulate", "types-psutil", "types-Flask-Cors",
                     "types-sqlalchemy-utils", "types-pkg-resources", "types-mysqlclient")
-
-    session.install("-e", "./jobmon_core")
-    session.install("-e", "./jobmon_client")
-    session.install("-e", "./jobmon_server")
+    session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
 
     session.run("mypy", "--explicit-package-bases", *args)
 

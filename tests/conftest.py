@@ -174,6 +174,10 @@ def client_env(web_server_process, monkeypatch):
     )
     monkeypatch.setenv("JOBMON__HTTP__ROUTE_PREFIX", _api_prefix)
     monkeypatch.setenv("JOBMON__HTTP__STOP_AFTER_DELAY", "0")
+    monkeypatch.setenv("JOBMON__HTTP__RETRIES_TIMEOUT", "0")
+    monkeypatch.setenv("JOBMON__DISTRIBUTOR__POLL_INTERVAL", "1")
+    monkeypatch.setenv("JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL", "1")
+    monkeypatch.setenv("JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL", "1")
 
     # This instance is thrown away, hence monkey-patching the defaults via the
     # environment variables

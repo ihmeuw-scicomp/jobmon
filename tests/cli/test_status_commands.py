@@ -604,7 +604,11 @@ def test_dynamic_concurrency_limiting_cli(db_engine, client_env, cli):
         cli.parse_args(bad_command.format(-59))
 
 
-def test_update_task_status(db_engine, client_env, tool, cli):
+def test_update_task_status(db_engine, client_env, cli):
+    tool = Tool(name="test_update_task_status_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="sequential", compute_resources={"queue": "null.q"}
+    )
     # Create a 5 task DAG. Tasks 1-3 should finish, 4 should error out and block 5
     def generate_workflow_and_tasks(tool):
         wf = tool.create_workflow(workflow_args="test_cli_update_workflow")

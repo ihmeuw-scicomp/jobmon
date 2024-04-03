@@ -1,7 +1,9 @@
+import getpass
+import uuid
+
+import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy import select, text, update
-import getpass
-import pandas as pd
 
 from jobmon.client.api import Tool
 from jobmon.client.workflow_run import WorkflowRunFactory
@@ -588,15 +590,16 @@ def test_get_task_template_resource_usage(db_engine, tool):
 
 def test_node_dependencies(tool):
     t = tool
+    random = str(uuid.uuid4())
     wf_1 = tool.create_workflow(name="some_random_workflow_1")
     tt1 = t.get_task_template(
-        template_name="random_1", command_template="echo {arg}", node_args=["arg"]
+        template_name=f"{random}_1", command_template="echo {arg}", node_args=["arg"]
     )
     tt2 = t.get_task_template(
-        template_name="random_2", command_template="sleep {arg}", node_args=["arg"]
+        template_name=f"{random}_2", command_template="sleep {arg}", node_args=["arg"]
     )
     tt3 = t.get_task_template(
-        template_name="random_3", command_template="echo hello {arg}", node_args=["arg"]
+        template_name=f"{random}_3", command_template="echo hello {arg}", node_args=["arg"]
     )
     t1 = tt1.create_task(
         arg="hello world",
@@ -631,6 +634,7 @@ def test_node_dependencies(tool):
         request_type="get",
     )
     assert return_code == 200
+    print(msg)
     assert msg["down"][0][0]["id"] == t3.task_id
     assert msg["down"][1][0]["id"] == t4.task_id
     assert msg["up"][0][0]["id"] == t1.task_id
@@ -842,7 +846,7 @@ def test_get_tt_error_log_viz(client_env, db_engine):
     wf2.add_tasks([t2])
     wf2.run()
     app_route = f"/tt_error_log_viz/{wf2.workflow_id}/{tt2.id}"
-    return_code, msg = wf1.requester.send_request(
+    _, msg = wf2.requester.send_request(
         app_route=app_route, message={}, request_type="get"
     )
     assert len(msg) == 1
