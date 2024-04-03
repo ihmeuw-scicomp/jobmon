@@ -537,25 +537,29 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         session.commit()
     for r in rows:
         # dict: {<error log id>: [<tid>, <tiid>, <error time>, <error log>}
-        return_list.append({
-            "task_id": r[0],
-            "task_instance_id": r[1],
-            "task_instance_err_id": r[2],
-            "error_time": r[3],
-            "error": r[4],
-            "task_instance_stderr_log": r[5],
-        })
+        return_list.append(
+            {
+                "task_id": r[0],
+                "task_instance_id": r[1],
+                "task_instance_err_id": r[2],
+                "error_time": r[3],
+                "error": r[4],
+                "task_instance_stderr_log": r[5],
+            }
+        )
     errors_df = pd.DataFrame(return_list)
 
     # Add the 'most_recent_attempt' column to the DataFrame, defaulting to False
-    errors_df['most_recent_attempt'] = False
+    errors_df["most_recent_attempt"] = False
 
     if not errors_df.empty:
         # Identify the most recent task_instance_id for each task_id
-        idx = errors_df.groupby('task_id')['task_instance_id'].transform(max) == errors_df['task_instance_id']
+        idx = (
+            errors_df.groupby("task_id")["task_instance_id"].transform(max)
+            == errors_df["task_instance_id"]
+        )
         # Update 'most_recent_attempt' based on the identified most recent task_instance_ids
-        errors_df.loc[idx, 'most_recent_attempt'] = True
-
+        errors_df.loc[idx, "most_recent_attempt"] = True
 
     resp = jsonify(errors_df.to_dict(orient="records"))
     resp.status_code = 200

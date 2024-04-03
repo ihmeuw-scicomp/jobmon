@@ -599,7 +599,9 @@ def test_node_dependencies(tool):
         template_name=f"{random}_2", command_template="sleep {arg}", node_args=["arg"]
     )
     tt3 = t.get_task_template(
-        template_name=f"{random}_3", command_template="echo hello {arg}", node_args=["arg"]
+        template_name=f"{random}_3",
+        command_template="echo hello {arg}",
+        node_args=["arg"],
     )
     t1 = tt1.create_task(
         arg="hello world",

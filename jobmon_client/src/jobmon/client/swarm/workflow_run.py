@@ -25,8 +25,8 @@ from jobmon.client.swarm.swarm_array import SwarmArray
 from jobmon.client.swarm.swarm_task import SwarmTask
 from jobmon.client.task_resources import TaskResources
 from jobmon.core.cluster import Cluster
-from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 from jobmon.core.configuration import JobmonConfig
+from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 from jobmon.core.exceptions import (
     CallableReturnedInvalidObject,
     DistributorNotAlive,
