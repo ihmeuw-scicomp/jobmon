@@ -22,6 +22,7 @@ dependencies = [
     'scipy',
     'pandas',
     'alembic',
+    'importlib_resources; python_version<"3.9"'
 ]
 dynamic = ["version"]
 
