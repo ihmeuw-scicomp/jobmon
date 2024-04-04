@@ -381,8 +381,8 @@ class WorkerNodeTaskInstance:
                 # log an error with db if we are in K state
                 if self.status == TaskInstanceStatus.KILL_SELF:
                     msg = (
-                        f"Command: '{self.command}' got KILL_SELF event. Process shut down with "
-                        f"exit code: '{self.command_returncode}'"
+                        f"Command: '{self.command}' got KILL_SELF event. Process shut down"
+                        f" with exit code: '{self.command_returncode}'"
                     )
                     logger.error(msg)
                     self.log_error(TaskInstanceStatus.ERROR_FATAL, msg)
