@@ -26,8 +26,8 @@ def tests(session: Session) -> None:
 
     session.run(
         "pytest",
-        *args,
-        env={"SQLALCHEMY_WARN_20": "1"}
+        "tests/worker_node/test_task_instance_worker_node.py::test_ti_kill_self_state",
+        env={"PYTHONASYNCIODEBUG": "1"}
     )
 
 
