@@ -413,33 +413,33 @@ class WorkerNodeTaskInstance:
     async def _communicate(
         async_stream: asyncio.StreamReader,
         output_stream: TextIO,
-        poll_interval: float = 1.0,
+        chunk_size: int = 64
     ) -> str:
         mem_buffer = ""
-        output_block = b""
-        while not async_stream.at_eof():
-            # A known issue is that if a process managed by Jobmon itself implements
-            # multiprocessing, and the parent job is sig-killed by a cluster OOM killer,
-            # there is a potential for the process to enter a deadlocking IO state.
-            # If async_stream.read attempts to read from this process, it will hang
-            # and potentially block the event loop from logging heartbeats. The end result
-            # is a task instance in Unknown error rather than a resource retry state.
-
-            # implementing a timeout with asyncio.wait_for does not produce the expected fix
-            # so the only currently known fix is for the managed process to _not_ call exit
-            # handlers. It should invoke os._exit instead of sys.exit to forcibly kill the
-            # process and allow the worker node to handle errors cleanly.
-            output_block += await async_stream.read(64)
-            try:
-                output_block_str = output_block.decode()
-                output_stream.write(output_block_str)
-                output_stream.flush()
-                mem_buffer += output_block_str
-                mem_buffer = mem_buffer[-10000:]
-                output_block = b""
-            except UnicodeDecodeError:
-                pass
-        return mem_buffer
+        try:
+            while True:
+                # Read a chunk of data. If no data is returned, we've reached EOF.
+                data_chunk = await async_stream.read(chunk_size)
+                if not data_chunk:
+                    break  # EOF reached
+                
+                # Attempt to decode and write the data chunk.
+                try:
+                    data_chunk_str = data_chunk.decode()
+                    output_stream.write(data_chunk_str)
+                    output_stream.flush()
+                    mem_buffer += data_chunk_str
+                    # Keep only the last 10k characters in memory.
+                    mem_buffer = mem_buffer[-10000:]
+                except UnicodeDecodeError as decode_error:
+                    pass  # Ignore decoding errors and continue reading the stream.
+        except Exception as e:
+            # Log unexpected errors. This could be any exception raised by the reading or writing operations.
+            # Consider appending an error message to `mem_buffer` to indicate that an error occurred.
+            mem_buffer += "\n[Error reading stream: {}]".format(e)
+        finally:
+            # Ensure that the method always returns the buffer, even if an error occurred.
+            return mem_buffer
 
     async def _process_poller(self, process: asyncio.subprocess.Process) -> int:
         keep_polling = True
