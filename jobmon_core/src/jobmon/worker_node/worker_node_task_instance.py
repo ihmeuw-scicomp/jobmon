@@ -370,25 +370,28 @@ class WorkerNodeTaskInstance:
             asyncio.run(self._run_cmd())
 
         # some other deployment unit transitioned task instance out of R state
-        except TransitionError as e:
-            msg = (
-                f"TaskInstance is in status '{self.status}'. Expected status 'R'."
-                f" Terminating command {self.command}."
-            )
-            logger.error(msg)
-
-            # log an error with db if we are in K state
-            if self.status == TaskInstanceStatus.KILL_SELF:
+        except RuntimeError as e:
+            if isinstance(e.__cause__, TransitionError):
                 msg = (
-                    f"Command: '{self.command}' got KILL_SELF event. Process shut down with "
-                    f"exit code: '{self.command_returncode}'"
+                    f"TaskInstance is in status '{self.status}'. Expected status 'R'."
+                    f" Terminating command {self.command}."
                 )
                 logger.error(msg)
-                self.log_error(TaskInstanceStatus.ERROR_FATAL, msg)
 
-            # otherwise raise the error cause we are in trouble
+                # log an error with db if we are in K state
+                if self.status == TaskInstanceStatus.KILL_SELF:
+                    msg = (
+                        f"Command: '{self.command}' got KILL_SELF event. Process shut down with "
+                        f"exit code: '{self.command_returncode}'"
+                    )
+                    logger.error(msg)
+                    self.log_error(TaskInstanceStatus.ERROR_FATAL, msg)
+
+                # otherwise raise the error cause we are in trouble
+                else:
+                    raise e.__cause__
             else:
-                raise e
+                raise
 
         # normal happy path
         else:
@@ -462,11 +465,9 @@ class WorkerNodeTaskInstance:
         return returncode
 
     async def _run_cmd(self) -> None:
-        # construct shell invironment
         env = os.environ.copy()
         env.update(self.command_add_env)
 
-        # start the subprocess
         process = await asyncio.create_subprocess_shell(
             self.command,
             env=env,
@@ -474,68 +475,62 @@ class WorkerNodeTaskInstance:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        # open the error and output streams
-        with open(self.stdout, "w") as stdout_steam, open(
-            self.stderr, "w"
-        ) as stderr_steam:
-            try:
-                # keep typecheck happy
-                if process.stdout is None or process.stderr is None:
-                    raise AttributeError(
-                        f"async process {process} had None type for stdout or stderr. Must be "
-                        "type StreamReader"
-                    )
+        stdout_task = stderr_task = heartbeat_task = None
 
-                # create poller tasks for IO
-                stdout_task = asyncio.Task(
-                    self._communicate(process.stdout, stdout_steam)
+        try:
+            with open(self.stdout, "w") as stdout_stream, open(
+                self.stderr, "w"
+            ) as stderr_stream:
+                stdout_task = asyncio.create_task(
+                    self._communicate(process.stdout, stdout_stream)
                 )
-                stderr_task = asyncio.Task(
-                    self._communicate(process.stderr, stderr_steam)
+                stderr_task = asyncio.create_task(
+                    self._communicate(process.stderr, stderr_stream)
                 )
+                heartbeat_task = asyncio.create_task(self._process_poller(process))
 
-                # create heartbeat loop
-                heartbeat_task = asyncio.Task(self._process_poller(process))
+                # Wait for all tasks to complete
                 await asyncio.gather(stdout_task, stderr_task, heartbeat_task)
-            except Exception as e:
-                try:
-                    # attempt a graceful shutdown
-                    process.send_signal(signal.SIGINT)
-                    await asyncio.wait_for(
-                        process.wait(), timeout=self._command_interrupt_timeout
-                    )
-                except asyncio.TimeoutError:
-                    # otherwise violent death
-                    process.kill()
-                    await process.wait()
 
-                if process.returncode is None:
-                    raise RuntimeError(
-                        "process.returncode is None after awaiting process shutdown"
-                    ) from e
-                else:
-                    returncode = process.returncode
+        except Exception as e:
+            # Cancel all potentially created tasks
+            tasks = [stdout_task, stderr_task, heartbeat_task]
+            for task in tasks:
+                if task:
+                    task.cancel()
+            await asyncio.gather(
+                *tasks, return_exceptions=True
+            )  # Ignore exceptions from cancellations
 
-                raise
-            else:
-                returncode = heartbeat_task.result()
-            finally:
-                # Before accessing results, ensure tasks have completed
-                if stdout_task.done():
-                    stdout_result = stdout_task.result()
-                else:
-                    stdout_result = (
-                        "Stream reading was interrupted or did not complete."
-                    )
-
-                if stderr_task.done():
-                    stderr_result = stderr_task.result()
-                else:
-                    stderr_result = (
-                        "Stream reading was interrupted or did not complete."
-                    )
-                self.set_command_output(
-                    returncode=returncode,
-                    stdout=stdout_result,
-                    stderr=stderr_result,
+            # Attempt a graceful shutdown of the process
+            process.send_signal(signal.SIGINT)
+            try:
+                await asyncio.wait_for(
+                    process.wait(), timeout=self._command_interrupt_timeout
                 )
+            except asyncio.TimeoutError:
+                # If the process does not exit within the timeout, forcefully terminate it
+                process.kill()
+                await process.wait()
+
+            # It's safe to re-raise the exception or handle it after cleanup
+            raise RuntimeError(
+                f"Failed to execute command '{self.command}': {e}"
+            ) from e
+
+        finally:
+            # Retrieve results from tasks if they completed successfully
+            stdout_result = stderr_result = ""
+            if stdout_task and stdout_task.done():
+                stdout_result = stdout_task.result()
+            if stderr_task and stderr_task.done():
+                stderr_result = stderr_task.result()
+
+            # Ensure the process is awaited before exiting the method
+            returncode = await process.wait()
+
+            self.set_command_output(
+                returncode=returncode,
+                stdout=stdout_result,
+                stderr=stderr_result,
+            )
