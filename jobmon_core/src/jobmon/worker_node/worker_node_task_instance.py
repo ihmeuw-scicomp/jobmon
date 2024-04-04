@@ -520,8 +520,18 @@ class WorkerNodeTaskInstance:
             else:
                 returncode = heartbeat_task.result()
             finally:
+                # Before accessing results, ensure tasks have completed
+                if stdout_task.done():
+                    stdout_result = stdout_task.result()
+                else:
+                    stdout_result = "Stream reading was interrupted or did not complete."
+
+                if stderr_task.done():
+                    stderr_result = stderr_task.result()
+                else:
+                    stderr_result = "Stream reading was interrupted or did not complete."
                 self.set_command_output(
                     returncode=returncode,
-                    stdout=stdout_task.result(),
-                    stderr=stderr_task.result(),
+                    stdout=stdout_result,
+                    stderr=stderr_result,
                 )
