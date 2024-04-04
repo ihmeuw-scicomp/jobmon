@@ -465,70 +465,85 @@ class WorkerNodeTaskInstance:
         return returncode
 
     async def _run_cmd(self) -> None:
+        # Copy the current environment variables and update them with additional settings
         env = os.environ.copy()
         env.update(self.command_add_env)
 
+        # capture stdout and stderr for asynchronous reading
         process = await asyncio.create_subprocess_shell(
             self.command,
             env=env,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,  # Captures stdout
+            stderr=asyncio.subprocess.PIPE,  # Captures stderr
         )
 
+        # Assert that stdout and stderr are not None for the type checker.
+        assert process.stdout is not None
+        assert process.stderr is not None
+
+        # Initialize task variables to None. These will hold the asyncio tasks for
+        # communicating with and monitoring the subprocess.
         stdout_task = stderr_task = heartbeat_task = None
 
         try:
+            # Context manager to ensure file streams are properly closed after writing.
             with open(self.stdout, "w") as stdout_stream, open(
                 self.stderr, "w"
             ) as stderr_stream:
+                # Create asyncio tasks for reading subprocess stdout and stderr.
                 stdout_task = asyncio.create_task(
                     self._communicate(process.stdout, stdout_stream)
                 )
                 stderr_task = asyncio.create_task(
                     self._communicate(process.stderr, stderr_stream)
                 )
+                # Task for monitoring the subprocess (e.g., for timeouts or heartbeats).
                 heartbeat_task = asyncio.create_task(self._process_poller(process))
 
-                # Wait for all tasks to complete
-                await asyncio.gather(stdout_task, stderr_task, heartbeat_task)
+                # Await the completion of communication and monitoring tasks.
+                # We gather all tasks together, ensuring they are completed before proceeding.
+                valid_tasks = [stdout_task, stderr_task, heartbeat_task]
+                await asyncio.gather(*valid_tasks)
 
         except Exception as e:
-            # Cancel all potentially created tasks
-            tasks = [stdout_task, stderr_task, heartbeat_task]
-            for task in tasks:
-                if task:
-                    task.cancel()
-            await asyncio.gather(
-                *tasks, return_exceptions=True
-            )  # Ignore exceptions from cancellations
+            # If an exception occurs, cancel all ongoing tasks to prevent dangling operations.
+            tasks_to_cancel = [
+                t for t in [stdout_task, stderr_task, heartbeat_task] if t is not None
+            ]
+            for task in tasks_to_cancel:
+                task.cancel()
+            # Await cancellation, ignoring any exceptions raised from cancellation.
+            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
 
-            # Attempt a graceful shutdown of the process
+            # Attempt a graceful shutdown of the subprocess if it's still running.
             process.send_signal(signal.SIGINT)
             try:
+                # Wait for the process to terminate, with a specified timeout.
                 await asyncio.wait_for(
                     process.wait(), timeout=self._command_interrupt_timeout
                 )
             except asyncio.TimeoutError:
-                # If the process does not exit within the timeout, forcefully terminate it
+                # Forcefully terminate the subprocess
                 process.kill()
                 await process.wait()
 
-            # It's safe to re-raise the exception or handle it after cleanup
             raise RuntimeError(
                 f"Failed to execute command '{self.command}': {e}"
             ) from e
 
         finally:
-            # Retrieve results from tasks if they completed successfully
+            # After tasks have been handled and the subprocess is ensured to be terminated,
+            # retrieve the results from the tasks if they were successfully completed.
             stdout_result = stderr_result = ""
             if stdout_task and stdout_task.done():
                 stdout_result = stdout_task.result()
             if stderr_task and stderr_task.done():
                 stderr_result = stderr_task.result()
 
-            # Ensure the process is awaited before exiting the method
+            # Ensure the subprocess is fully terminated before exiting this method.
             returncode = await process.wait()
 
+            # Update the task instance with the final results of command execution.
             self.set_command_output(
                 returncode=returncode,
                 stdout=stdout_result,
