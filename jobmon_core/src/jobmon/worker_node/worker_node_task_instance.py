@@ -411,9 +411,7 @@ class WorkerNodeTaskInstance:
 
     @staticmethod
     async def _communicate(
-        async_stream: asyncio.StreamReader,
-        output_stream: TextIO,
-        chunk_size: int = 64
+        async_stream: asyncio.StreamReader, output_stream: TextIO, chunk_size: int = 64
     ) -> str:
         mem_buffer = ""
         try:
@@ -422,7 +420,7 @@ class WorkerNodeTaskInstance:
                 data_chunk = await async_stream.read(chunk_size)
                 if not data_chunk:
                     break  # EOF reached
-                
+
                 # Attempt to decode and write the data chunk.
                 try:
                     data_chunk_str = data_chunk.decode()
@@ -431,11 +429,12 @@ class WorkerNodeTaskInstance:
                     mem_buffer += data_chunk_str
                     # Keep only the last 10k characters in memory.
                     mem_buffer = mem_buffer[-10000:]
-                except UnicodeDecodeError as decode_error:
+                except UnicodeDecodeError:
                     pass  # Ignore decoding errors and continue reading the stream.
         except Exception as e:
-            # Log unexpected errors. This could be any exception raised by the reading or writing operations.
-            # Consider appending an error message to `mem_buffer` to indicate that an error occurred.
+            # Log unexpected errors. This could be any exception raised by
+            # the reading or writing operations. Consider appending an error message
+            # to `mem_buffer` to indicate that an error occurred.
             mem_buffer += "\n[Error reading stream: {}]".format(e)
         finally:
             # Ensure that the method always returns the buffer, even if an error occurred.
