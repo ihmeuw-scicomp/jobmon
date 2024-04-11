@@ -21,8 +21,8 @@ dependencies = [
     'structlog',
     'scipy',
     'pandas',
-    'polars',
     'alembic',
+    'importlib_resources; python_version<"3.9"'
 ]
 dynamic = ["version"]
 

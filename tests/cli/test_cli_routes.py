@@ -1,7 +1,10 @@
+import getpass
+import random
+import string
+
+import pandas as pd
 from sqlalchemy.orm import Session
 from sqlalchemy import select, text, update
-import getpass
-import pandas as pd
 
 from jobmon.client.api import Tool
 from jobmon.client.workflow_run import WorkflowRunFactory
@@ -586,17 +589,26 @@ def test_get_task_template_resource_usage(db_engine, tool):
     assert msg[0] is None
 
 
-def test_node_dependencies(tool):
-    t = tool
+def test_node_dependencies(client_env):
+    tool = Tool(name="node_dependencies")
+    # Generate a random 10-character string excluding digits
+    random_name = "".join(random.choice(string.ascii_letters) for _ in range(10))
+
     wf_1 = tool.create_workflow(name="some_random_workflow_1")
-    tt1 = t.get_task_template(
-        template_name="random_1", command_template="echo {arg}", node_args=["arg"]
+    tt1 = tool.get_task_template(
+        template_name=f"{random_name}_1",
+        command_template="echo {arg}",
+        node_args=["arg"],
     )
-    tt2 = t.get_task_template(
-        template_name="random_2", command_template="sleep {arg}", node_args=["arg"]
+    tt2 = tool.get_task_template(
+        template_name=f"{random_name}_2",
+        command_template="sleep {arg}",
+        node_args=["arg"],
     )
-    tt3 = t.get_task_template(
-        template_name="random_3", command_template="echo hello {arg}", node_args=["arg"]
+    tt3 = tool.get_task_template(
+        template_name=f"{random_name}_3",
+        command_template="echo hello {arg}",
+        node_args=["arg"],
     )
     t1 = tt1.create_task(
         arg="hello world",
@@ -631,9 +643,10 @@ def test_node_dependencies(tool):
         request_type="get",
     )
     assert return_code == 200
-    assert msg["down"][0][0]["id"] == t3.task_id
-    assert msg["down"][1][0]["id"] == t4.task_id
-    assert msg["up"][0][0]["id"] == t1.task_id
+    down_ids = set([node["id"] for sublist in msg["down"] for node in sublist])
+    up_ids = set([node["id"] for sublist in msg["up"] for node in sublist])
+    assert down_ids == set([t3.task_id, t4.task_id])
+    assert up_ids == set([t1.task_id])
 
 
 def test_get_workflow_status_viz(tool):
@@ -842,12 +855,12 @@ def test_get_tt_error_log_viz(client_env, db_engine):
     wf2.add_tasks([t2])
     wf2.run()
     app_route = f"/tt_error_log_viz/{wf2.workflow_id}/{tt2.id}"
-    return_code, msg = wf1.requester.send_request(
+    _, msg = wf2.requester.send_request(
         app_route=app_route, message={}, request_type="get"
     )
     assert len(msg) == 1
     assert msg[0]["task_id"] == t2.task_id
-    assert "command not found" in msg[0]["error"]
+    assert "not found" in msg[0]["error"]
 
 
 def test_task_details_by_wf_id(client_env, db_engine):

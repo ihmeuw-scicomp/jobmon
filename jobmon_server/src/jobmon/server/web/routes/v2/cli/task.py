@@ -269,12 +269,15 @@ def get_task_dependencies(task_id: int) -> Any:
     session = SessionLocal()
     with session.begin():
         dag_id, workflow_id, node_id = _get_dag_and_wf_id(task_id, session)
+        logger.info(f"task_id: {task_id}, dag_id: {dag_id}, workflow_id: {workflow_id}")
         up_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.UP)
         down_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.DOWN)
         up_task_dict = _get_tasks_from_nodes(workflow_id, list(up_nodes), [], session)
         down_task_dict = _get_tasks_from_nodes(
             workflow_id, list(down_nodes), [], session
         )
+    print(up_nodes, down_nodes, up_task_dict, down_task_dict)
+
     # return a "standard" json format so that it can be reused by future GUI
     up = (
         []
@@ -432,21 +435,30 @@ def _get_node_dependencies(
         session (Session): SQLAlchemy session
         direction (Direction): either up or down
     """
-    if direction == Direction.UP:
-        select_stmt = select(Edge.upstream_node_ids).where(
-            Edge.dag_id == dag_id, Edge.node_id.in_(list(nodes))
-        )
-    elif direction == Direction.DOWN:
-        select_stmt = select(Edge.downstream_node_ids).where(
-            Edge.dag_id == dag_id, Edge.node_id.in_(list(nodes))
-        )
-    else:
-        raise ValueError(f"Invalid direction type. Expected one of: {Direction}")
-    result = session.execute(select_stmt).all()
+    select_stmt = select(Edge).where(
+        Edge.dag_id == dag_id, Edge.node_id.in_(list(nodes))
+    )
     node_ids: Set[int] = set()
-    for r in result:
-        if r[0] is not None:
-            node_ids = node_ids.union(set(r[0]))
+    for (edges,) in session.execute(select_stmt).all():
+        if direction == Direction.UP:
+            upstreams = (
+                json.loads(edges.upstream_node_ids)
+                if isinstance(edges.upstream_node_ids, str)
+                else edges.upstream_node_ids
+            )
+            if upstreams:
+                node_ids = node_ids.union(set(upstreams))
+        elif direction == Direction.DOWN:
+            downstreams = (
+                json.loads(edges.downstream_node_ids)
+                if isinstance(edges.downstream_node_ids, str)
+                else edges.downstream_node_ids
+            )
+            if downstreams:
+                node_ids = node_ids.union(set(downstreams))
+        else:
+            raise ValueError(f"Invalid direction type. Expected one of: {Direction}")
+        print(node_ids)
     return node_ids
 
 

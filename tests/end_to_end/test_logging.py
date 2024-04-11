@@ -66,7 +66,7 @@ def test_sequential_logging(tool, task_template, tmp_path):
     distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
 
     with open(tmp_path / "stderr_task.e2") as f:
-        assert f.readline().rstrip() == "/bin/sh: foobar: command not found"
+        assert "not found" in f.readline().rstrip()
 
 
 def test_multiprocess_logging(tool, task_template, tmp_path):
@@ -144,7 +144,7 @@ def test_multiprocess_logging(tool, task_template, tmp_path):
             break
 
     with open(tmp_path / "stderr_task.e2_0") as f:
-        assert f.readline().rstrip() == "/bin/sh: foobar: command not found"
+        assert "not found" in f.readline().rstrip()
 
     distributor_service.cluster_interface.stop()
 

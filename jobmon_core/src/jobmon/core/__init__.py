@@ -1,9 +1,8 @@
 import importlib
+from importlib.metadata import version
 import pkgutil
 
-import pkg_resources
-
-__version__ = pkg_resources.get_distribution("jobmon_core").version
+__version__ = version("jobmon_core")
 
 
 def _get_config_file_from_installer_plug_in() -> str:
@@ -16,7 +15,6 @@ def _get_config_file_from_installer_plug_in() -> str:
     ]
     if len(plugins) == 1:
         plugin_name = plugins[0]
-        print(f"Found one plugin: {plugin_name}. Installing config from plugin.")
         module = importlib.import_module(plugin_name)
         get_config_file = getattr(module, "get_config_file")
         filepath = get_config_file()

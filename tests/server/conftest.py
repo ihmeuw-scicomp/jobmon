@@ -35,13 +35,14 @@ def get_test_content(response):
 
 
 @pytest.fixture(scope="function")
-def requester_in_memory(monkeypatch, web_server_in_memory):
+def requester_in_memory(monkeypatch, web_server_in_memory, api_prefix):
     """This function monkeypatches the requests library to use the
     test_client
     """
     import requests
     from jobmon.core import requester
 
+    monkeypatch.setenv("JOBMON__HTTP__ROUTE_PREFIX", api_prefix)
     monkeypatch.setenv("JOBMON__HTTP__SERVICE_URL", "1")
 
     app, engine = web_server_in_memory

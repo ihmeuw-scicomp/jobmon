@@ -19,18 +19,13 @@ python = "3.8"
 @nox.session(python=python, venv_backend="conda")
 def tests(session: Session) -> None:
     """Run the test suite."""
-    session.conda_install("mysqlclient")
     session.install("pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock")
-    session.install("-e", "./jobmon_core")
-    session.install("-e", "./jobmon_client")
-    session.install("-e", "./jobmon_server")
+    session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
 
     args = session.posargs or test_locations
 
     session.run(
         "pytest",
-        "--cov=jobmon",
-        "--cov-report=html",
         *args,
         env={"SQLALCHEMY_WARN_20": "1"}
     )
@@ -74,66 +69,9 @@ def typecheck(session: Session) -> None:
     session.install("mypy", "types-Flask", "types-requests", "types-PyMySQL", "types-filelock",
                     "types-PyYAML", "types-tabulate", "types-psutil", "types-Flask-Cors",
                     "types-sqlalchemy-utils", "types-pkg-resources", "types-mysqlclient")
-
-    session.install("-e", "./jobmon_core")
-    session.install("-e", "./jobmon_client")
-    session.install("-e", "./jobmon_server")
+    session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
 
     session.run("mypy", "--explicit-package-bases", *args)
-
-
-@nox.session(python=python, venv_backend="conda")
-def docs(session: Session) -> None:
-    """Build the documentation."""
-    # environment variables used in build script
-    web_service_fqdn = os.environ.get("WEB_SERVICE_FQDN", "TBD")
-    web_service_port = os.environ.get("WEB_SERVICE_PORT", "TBD")
-
-    session.conda_install("graphviz", "mysqlclient")
-    session.install(
-        "sphinx",
-        "sphinx-autodoc-typehints",
-        "sphinx_rtd_theme",
-        "sphinx_tabs",
-        "sphinx_autoapi"
-    )
-
-    # # combine source into one directory by installing
-    session.install("./jobmon_core")
-    session.install("./jobmon_client")
-    session.install("./jobmon_server")
-    # install_path = (
-    #     Path(session.virtualenv.location)
-    #     / "lib"
-    #     / f"python{session.python}"
-    #     / "site-packages"
-    #     / "jobmon"
-    # )
-
-    # # generate api docs
-    # autodoc_output = 'docsource/api'
-    # if os.path.exists(autodoc_output):
-    #     shutil.rmtree(autodoc_output)
-    # session.run(
-    #     'sphinx-apidoc',
-    #     # output dir
-    #     '-o', autodoc_output,
-    #     "--implicit-namespaces",
-    #     # source dir
-    #     str(install_path),
-    # )
-
-    # generate html
-    html_output = "out/_html"
-    if os.path.exists(html_output):
-        shutil.rmtree(html_output)
-    session.run(
-        "sphinx-build", "docsource", html_output,
-        env={
-            "WEB_SERVICE_FQDN": web_service_fqdn,
-            "WEB_SERVICE_PORT": web_service_port
-        }
-    )
 
 
 @nox.session(python=python, venv_backend="conda")
