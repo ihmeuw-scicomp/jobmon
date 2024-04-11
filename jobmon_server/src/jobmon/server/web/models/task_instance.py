@@ -55,12 +55,8 @@ class TaskInstance(Base):
         )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    workflow_run_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("workflow_run.id")
-    )
-    array_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("array.id"), default=None
-    )
+    workflow_run_id: Mapped[int] = mapped_column(Integer, ForeignKey("workflow_run.id"))
+    array_id: Mapped[int] = mapped_column(Integer, ForeignKey("array.id"), default=None)
     task_id: Mapped[int] = mapped_column(Integer, ForeignKey("task.id"), nullable=False)
     distributor_id: Mapped[str] = mapped_column(String(20), index=True, nullable=True)
     task_resources_id: Mapped[int] = mapped_column(

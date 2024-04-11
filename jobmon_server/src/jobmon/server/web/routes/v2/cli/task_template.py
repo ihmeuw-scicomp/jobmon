@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Tuple
 from flask import jsonify, request
 from flask_cors import cross_origin
 import numpy as np
-import polars as pl
+import pandas as pd
 import scipy.stats as st  # type:ignore
 from sqlalchemy import Row, Select, select
 from sqlalchemy.sql import func
@@ -547,41 +547,20 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 "task_instance_stderr_log": r[5],
             }
         )
+    errors_df = pd.DataFrame(return_list)
 
-    # Create Polars DataFrame with the errors, initializing most_recent_attempt to False
-    error_schema = {
-        "error": pl.Utf8,
-        "error_time": pl.Datetime,
-        "task_id": pl.Int32,
-        "task_instance_err_id": pl.Int32,
-        "task_instance_id": pl.Int32,
-        "task_instance_stderr_log": pl.Utf8,
-    }
+    # Add the 'most_recent_attempt' column to the DataFrame, defaulting to False
+    errors_df["most_recent_attempt"] = False
 
-    errors_df = pl.DataFrame(return_list, schema=error_schema)
-    errors_df = (
-        errors_df.lazy()
-        .with_columns(pl.lit(False).alias("most_recent_attempt"))
-        .collect()
-    )
+    if not errors_df.empty:
+        # Identify the most recent task_instance_id for each task_id
+        idx = (
+            errors_df.groupby("task_id")["task_instance_id"].transform(max)
+            == errors_df["task_instance_id"]
+        )
+        # Update 'most_recent_attempt' based on the identified most recent task_instance_ids
+        errors_df.loc[idx, "most_recent_attempt"] = True
 
-    # Create Polars DataFrame of the most recent attempts
-    errors_most_recent_df = (
-        errors_df.lazy()
-        .groupby("task_id")
-        .agg([pl.col("task_instance_id").max()])
-        .with_columns(pl.lit(True).alias("most_recent_attempt"))
-        .collect()
-    )
-
-    #  Update original DF with the second (join + coalesce)
-    errors_df = (
-        errors_df.lazy()
-        .update(errors_most_recent_df.lazy(), on=["task_instance_id"], how="left")
-        .collect()
-    )
-
-    resp = jsonify(errors_df.to_dicts())
-
+    resp = jsonify(errors_df.to_dict(orient="records"))
     resp.status_code = 200
     return resp
