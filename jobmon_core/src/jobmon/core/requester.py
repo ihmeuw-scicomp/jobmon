@@ -33,13 +33,15 @@ class Requester(object):
     def __init__(
         self,
         url: str,
+        route_prefix: str = "",
         request_timeout: int = 20,
         retries_timeout: int = 300,
         retries_attempts: int = 10,
         use_otlp: bool = False,
     ) -> None:
         """Initialize the Requester object with the url to make requests to."""
-        self.url = url
+        self.base_url = url
+        self.route_prefix = route_prefix
         self.request_timeout = request_timeout
         self.retries_timeout = retries_timeout
         self.retries_attempts = retries_attempts
@@ -64,13 +66,24 @@ class Requester(object):
         """Instantiate a requester from default config values."""
         config = JobmonConfig()
         service_url = config.get("http", "service_url")
+        route_prefix = config.get("http", "route_prefix")
         request_timeout = config.get_int("http", "request_timeout")
         retries_timeout = config.get_int("http", "retries_timeout")
         retries_attempts = config.get_int("http", "retries_attempts")
         use_otlp = config.get_boolean("otlp", "http_enabled")
         return cls(
-            service_url, request_timeout, retries_timeout, retries_attempts, use_otlp
+            service_url,
+            route_prefix,
+            request_timeout,
+            retries_timeout,
+            retries_attempts,
+            use_otlp,
         )
+
+    @property
+    def url(self) -> str:
+        """Return the base url for the requester."""
+        return self.base_url + self.route_prefix
 
     def add_server_structlog_context(self, **kwargs: Any) -> None:
         """Add the structlogging context if it has been provided."""
@@ -128,10 +141,12 @@ class Requester(object):
         def raise_if_exceed_retry(retry_state: tenacity.RetryCallState) -> Any:
             """If we trigger retry error, raise informative RuntimeError."""
             # Check if the retry outcome is an exception
-            exception = retry_state.outcome.exception()
-            raise RuntimeError(
-                f"Exceeded HTTP request retry budget due to: {exception}"
-            ) from exception
+            outcome = retry_state.outcome
+            if outcome and outcome.exception():
+                exception = outcome.exception()
+                raise RuntimeError(
+                    f"Exceeded HTTP request retry budget due to: {exception}"
+                ) from exception
 
         retrying = tenacity.retry(
             stop=(

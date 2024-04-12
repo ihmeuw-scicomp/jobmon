@@ -4,6 +4,7 @@ import datetime
 from typing import Tuple
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, VARCHAR
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import structlog
@@ -33,18 +34,18 @@ class Workflow(Base):
         )
         return serialized
 
-    id = Column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     tool_version_id = Column(Integer, ForeignKey("tool_version.id"))
-    dag_id = Column(Integer, ForeignKey("dag.id"))
+    dag_id: Mapped[int] = mapped_column(Integer, ForeignKey("dag.id"))
     workflow_args_hash = Column(VARCHAR(150), index=True, nullable=False)
     task_hash = Column(VARCHAR(150), index=True, nullable=False)
     description = Column(Text)
-    name = Column(String(255))
+    name = Column(String(255), nullable=True)
     workflow_args = Column(Text)
-    max_concurrently_running = Column(Integer)
-    created_date = Column(DateTime, default=None)
-    status_date = Column(DateTime, default=func.now())
-    status = Column(
+    max_concurrently_running: Mapped[int] = mapped_column(Integer)
+    created_date = mapped_column(DateTime, default=None)
+    status_date = mapped_column(DateTime, default=func.now())
+    status: Mapped[str] = mapped_column(
         String(1),
         ForeignKey("workflow_status.id"),
         default=WorkflowStatus.REGISTERING,

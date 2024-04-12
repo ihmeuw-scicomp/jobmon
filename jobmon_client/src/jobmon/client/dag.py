@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Set, Tuple, Union
 
 from jobmon.client.node import Node
 from jobmon.core.exceptions import (
+    CyclicGraphError,
     DuplicateNodeArgsError,
     InvalidResponse,
     NodeDependencyNotExistError,
@@ -104,6 +105,39 @@ class Dag(object):
                         "does not exist in the dag.Check that every task has been added to "
                         "the workflow and is in the correct order."
                     )
+
+        dag_map = {node: node.downstream_nodes for node in nodes_in_dag}
+        if self._is_cyclic(dag_map):
+            raise CyclicGraphError(
+                "Cycle detected in the task graph. Please ensure that your task dependencies "
+                "flow in only one direction."
+            )
+
+    def _is_cyclic(self, dag_map: Dict[Node, Set[Node]]) -> bool:
+        """Return true if the nodes are cyclic.
+
+        This method is effectively a depth-first search looking for already-seen nodes,
+        implemented using the "stack of iterators" pattern to get around Python's recursion
+        limit of 1000.
+        """
+        visited = set()
+        path = [object()]
+        path_set = set(path)
+        stack = [iter(dag_map)]
+        while stack:
+            for v in stack[-1]:
+                if v in path_set:
+                    return True
+                elif v not in visited:
+                    visited.add(v)
+                    path.append(v)
+                    path_set.add(v)
+                    stack.append(iter(dag_map.get(v, ())))
+                    break
+            else:
+                path_set.remove(path.pop())
+                stack.pop()
+        return False
 
     def _bulk_bind_nodes(self, chunk_size: int) -> None:
         def get_chunk(total_nodes: int, chunk_number: int) -> Optional[Tuple[int, int]]:
@@ -207,7 +241,7 @@ class Dag(object):
 
     def __hash__(self) -> int:
         """Determined by hashing all sorted node hashes and their downstream."""
-        hash_value = hashlib.sha1()
+        hash_value = hashlib.sha256()
         if len(self.nodes) > 0:  # if the dag is empty, we want to skip this
             for node in sorted(self.nodes):
                 hash_value.update(str(hash(node)).encode("utf-8"))

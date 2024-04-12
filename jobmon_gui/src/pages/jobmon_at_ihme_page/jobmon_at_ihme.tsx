@@ -11,17 +11,18 @@ const replacements = {
 }
 export default function JobmonAtIHME(){
     const [text, setText] = useState('')
-    let markdown;
-    useEffect(()=>{
-    const path = require("./jobmon_at_ihme.md");
-      fetch(path)
-        .then(response => {
-          markdown = response.text()
-          return markdown
-        })
-        .then(text => setText(text.replace(/JOBMON_DB_HOST|JOBMON_DB_USER|JOBMON_DB_PASSWORD|JOBMON_DB_DATABASE|JOBMON_DB_PORT/g,
-        matched => replacements[matched])))
-    },[])
+    useEffect(() => {
+        const path = require("./jobmon_at_ihme.md");
+        fetch(path)
+            .then(response => {
+                return response.text();
+            })
+            .then(text => {
+                const markdown = text.replace(/JOBMON_DB_HOST|JOBMON_DB_USER|JOBMON_DB_PASSWORD|JOBMON_DB_DATABASE|JOBMON_DB_PORT/g,
+                    matched => replacements[matched]);
+                setText(markdown);
+            });
+    }, []);
 
     return(
         <div className="markdown-container">

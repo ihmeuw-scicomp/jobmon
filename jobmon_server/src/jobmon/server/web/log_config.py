@@ -8,7 +8,7 @@ import structlog
 # from jobmon.server import __version__
 
 
-def configure_structlog(extra_processors: List = None) -> None:
+def configure_structlog(extra_processors: Optional[List] = None) -> None:
     """Configure logging format, handlers, etc."""
     if extra_processors is None:
         extra_processors = []

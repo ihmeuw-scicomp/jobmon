@@ -13,7 +13,7 @@ class TaskAttributeType(Base):
     __tablename__ = "task_attribute_type"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=False)
+    name = Column(String(255), unique=True, nullable=False)
 
     @classmethod
     def from_wire(cls: Any, dct: Dict) -> Any:

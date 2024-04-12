@@ -1,4 +1,5 @@
 http:
+  route_prefix: ""
   request_timeout: 20
   retries_timeout: 300
   retries_attempts: 10
@@ -13,7 +14,7 @@ heartbeat:
   task_instance_interval: 90
 
 reaper:
-  poll_interval_minutes = 5
+  poll_interval_minutes: 5
 
 distributor:
   poll_interval: 10
@@ -21,5 +22,6 @@ distributor:
 worker_node:
   command_interrupt_timeout: 10
 
-web:
+db:
   sqlalchemy_database_uri: "sqlite://"
+  # sqlalchemy_database_uri: "mysql+mysqldb://table_creator:vVBkGfFJUTPAYTTiFq@scicomp-mysql-db-d01.mysql.database.azure.com:3306/jobmon_stage?ssl=True"

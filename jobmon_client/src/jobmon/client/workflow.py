@@ -212,7 +212,7 @@ class Workflow(object):
                 "Then add the same tasks to this workflow".format(self.workflow_args)
             )
         self.workflow_args_hash = int(
-            hashlib.sha1(self.workflow_args.encode("utf-8")).hexdigest(), 16
+            hashlib.sha256(self.workflow_args.encode("utf-8")).hexdigest(), 16
         )
 
         self.workflow_attributes: Dict[str, Any] = {}
@@ -272,7 +272,7 @@ class Workflow(object):
     @property
     def task_hash(self) -> int:
         """Hash of all of the tasks."""
-        hash_value = hashlib.sha1()
+        hash_value = hashlib.sha256()
         tasks = sorted(self.tasks.values())
         if len(tasks) > 0:  # if there are no tasks, we want to skip this
             for task in tasks:
@@ -599,9 +599,11 @@ class Workflow(object):
     def validate(self, strict: bool = True, raise_on_error: bool = False) -> None:
         """Confirm that the tasks in this workflow are valid.
 
-        This method will access the database to confirm the requested resources are valid for
-        the specified cluster. It will also confirm that the workflow args are valid.  It also
-        will make sure no task contains up/down stream tasks that are not in the workflow.
+        This method will:
+        - access the database to confirm the requested resources are valid for
+        the specified cluster
+        - confirm that the workflow args are valid
+        - make sure no task contains up/down stream tasks that are not in the workflow
         """
         # construct task resources
         for task in self.tasks.values():
@@ -725,13 +727,13 @@ class Workflow(object):
                 for resource, scaler in task.resource_scales.items():
                     # We can't serialize a callable, so use the function name instead.
                     if callable(scaler):
-                        serializable_resource_scales[resource] = getattr(
-                            scaler, "__name__", "Unknown Callable"
+                        serializable_resource_scales[resource] = getattr(  # type: ignore
+                            scaler, "__name__", "Unknown Callable"  # type: ignore
                         )
                     # We can't serialize an iterator, so take the relevant elements as a
                     # list.
                     elif isinstance(scaler, Iterator):
-                        serializable_resource_scales[resource] = list(
+                        serializable_resource_scales[resource] = list(  # type: ignore
                             itertools.islice(
                                 copy.deepcopy(scaler), task.max_attempts - 1
                             )
@@ -899,7 +901,7 @@ class Workflow(object):
 
     def __hash__(self) -> int:
         """Hash to encompass tool version id, workflow args, tasks and dag."""
-        hash_value = hashlib.sha1()
+        hash_value = hashlib.sha256()
         hash_value.update(str(hash(self._tool_version.id)).encode("utf-8"))
         hash_value.update(str(self.workflow_args_hash).encode("utf-8"))
         hash_value.update(str(self.task_hash).encode("utf-8"))
