@@ -2,7 +2,6 @@
 
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
-import json
 from typing import Any, cast, Dict, List, Set
 
 from flask import jsonify, request
