@@ -313,8 +313,8 @@ def set_status_for_triaging(workflow_run_id: int) -> Any:
         common_condition = and_(condition1, condition2, condition3)
 
         # pre-selecting rows to update using with_for_update prevents deadlocks by setting intent locks
-        select_rows_to_update = TaskInstance.select().where(common_condition)
-        session.execute(select_rows_to_update).with_for_update().fetchall()
+        select_rows_to_update = TaskInstance.select().where(common_condition).with_for_update()
+        session.execute(select_rows_to_update).fetchall()
 
         update_stmt = (
             update(TaskInstance)
