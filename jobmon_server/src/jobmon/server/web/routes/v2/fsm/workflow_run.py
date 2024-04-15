@@ -5,7 +5,7 @@ from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict, List
 
 from flask import jsonify, request
-from sqlalchemy import case, func, insert, select, update, and_, or_
+from sqlalchemy import and_, case, func, insert, select, update
 import structlog
 
 from jobmon.core import constants
@@ -320,19 +320,23 @@ def set_status_for_triaging(workflow_run_id: int) -> Any:
 
     session = SessionLocal()
     with session.begin():
-        
+
         condition1 = TaskInstance.workflow_run_id == workflow_run_id
         condition2 = TaskInstance.status.in_(
-                        [
-                            constants.TaskInstanceStatus.LAUNCHED,
-                            constants.TaskInstanceStatus.RUNNING,
-                        ]
-                    )
+            [
+                constants.TaskInstanceStatus.LAUNCHED,
+                constants.TaskInstanceStatus.RUNNING,
+            ]
+        )
         condition3 = TaskInstance.report_by_date <= func.now()
         common_condition = and_(condition1, condition2, condition3)
 
-        # pre-selecting rows to update using with_for_update prevents deadlocks by setting intent locks
-        select_rows_to_update = TaskInstance.select().where(common_condition).with_for_update()
+        # pre-selecting rows to update using with_for_update
+        # prevents deadlocks by setting intent locks
+        select_rows_to_update = (
+            select(TaskInstance).where(common_condition).with_for_update()
+        )
+
         session.execute(select_rows_to_update).fetchall()
 
         update_stmt = (
