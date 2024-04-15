@@ -1,4 +1,4 @@
-from typing import Any, cast, Dict
+from typing import Any, cast, Dict, Optional
 
 from flask import Flask, jsonify, request
 import structlog
@@ -9,7 +9,7 @@ from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 logger = structlog.get_logger(__name__)
 
 
-def _handle_error(error: Exception, status_code: int = None) -> Any:
+def _handle_error(error: Exception, status_code: Optional[int] = None) -> Any:
     """Handle all exceptions in a uniform manner."""
     # Extract status code from the error
     status_code = status_code or getattr(error, "status_code", 500)

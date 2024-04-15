@@ -3,7 +3,7 @@
 import datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 import structlog
 
@@ -31,12 +31,12 @@ class WorkflowRun(Base):
         )
         return serialized
 
-    id = Column(Integer, primary_key=True)
-    workflow_id = Column(Integer, ForeignKey("workflow.id"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workflow_id: Mapped[int] = mapped_column(Integer, ForeignKey("workflow.id"))
     user = Column(String(150))
     jobmon_version = Column(String(150), default="UNKNOWN")
     jobmon_server_version = Column(String(150), default=__version__)
-    status = Column(
+    status: Mapped[str] = mapped_column(
         String(1),
         ForeignKey("workflow_run_status.id"),
         default=WorkflowRunStatus.REGISTERED,
@@ -44,8 +44,8 @@ class WorkflowRun(Base):
     )
 
     created_date = Column(DateTime, default=func.now())
-    status_date = Column(DateTime, default=func.now())
-    heartbeat_date = Column(DateTime, default=func.now())
+    status_date = mapped_column(DateTime, default=func.now())
+    heartbeat_date = mapped_column(DateTime, default=func.now())
 
     workflow = relationship("Workflow", back_populates="workflow_runs", lazy=True)
 

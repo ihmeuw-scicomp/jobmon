@@ -85,7 +85,6 @@ class WorkflowReaper(object):
             f"WorkflowReaper initializing with: poll_interval_minutes={poll_interval_seconds},"
             f"requester_url={requester.url}"
         )
-
         self._poll_interval_seconds = poll_interval_seconds
         self._requester = requester
         self._wf_notification_sink = wf_notification_sink

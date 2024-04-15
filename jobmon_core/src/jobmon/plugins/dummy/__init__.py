@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+from importlib.metadata import version
 import logging
 import os
 import random
 from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union
-
-import pkg_resources
 
 from jobmon.core.cluster_protocol import (
     ClusterDistributor,
@@ -21,7 +20,8 @@ from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
 
 
 logger = logging.getLogger(__name__)
-__version__ = pkg_resources.get_distribution("jobmon_core").version
+
+__version__ = version("jobmon_core")
 
 
 class DummyQueue(ClusterQueue):

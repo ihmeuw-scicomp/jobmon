@@ -13,7 +13,6 @@ import { safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum';
 import CustomModal from '../../components/Modal';
 
 export default function Errors({ errorLogs, tt_name, loading, apm }) {
-    const s: any = safe_rum_start_span(apm, "errors", "custom");
 
     const [errorDetail, setErrorDetail] = useState({
         'error': '', 'error_time': '', 'task_id': '',
@@ -133,6 +132,12 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
     }, [errorLogs]);
 
 
+    useEffect(() => {
+        const s = safe_rum_start_span(apm, "tasks", "custom");
+        return () => {
+            safe_rum_unit_end(s);
+        };
+    }, [apm]);
 
     // logic: when task template name selected, show a loading spinner; when loading finished and there is no error, show a no error message; when loading finished and there are errors, show error logs
     return (
@@ -207,5 +212,4 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
             }
         </div>
     )
-    safe_rum_unit_end(s);
 }

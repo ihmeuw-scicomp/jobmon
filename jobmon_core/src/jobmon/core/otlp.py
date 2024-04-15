@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import getpass
 import logging
+import logging.config
 import os
 import socket
 import sys
@@ -112,9 +113,7 @@ class OtlpAPI:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(
-        self, extra_detectors: List[resources.ResourceDetector] = None
-    ) -> None:
+    def __init__(self, extra_detectors: List[resources.ResourceDetector] = []) -> None:
         """Initialize the OtlpAPI object."""
         if OtlpAPI._initialized:
             return

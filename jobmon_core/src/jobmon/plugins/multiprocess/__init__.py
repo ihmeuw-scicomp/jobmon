@@ -1,8 +1,7 @@
 """jobmon built-in."""
 
+from importlib.metadata import version
 from typing import Type
-
-import pkg_resources
 
 from jobmon.core.cluster_protocol import (
     ClusterDistributor,
@@ -10,7 +9,7 @@ from jobmon.core.cluster_protocol import (
     ClusterWorkerNode,
 )
 
-__version__ = pkg_resources.get_distribution("jobmon_core").version
+__version__ = version("jobmon_core")
 
 
 def get_cluster_queue_class() -> Type[ClusterQueue]:

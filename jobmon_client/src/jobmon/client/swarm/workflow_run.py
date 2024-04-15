@@ -25,6 +25,7 @@ from jobmon.client.swarm.swarm_array import SwarmArray
 from jobmon.client.swarm.swarm_task import SwarmTask
 from jobmon.client.task_resources import TaskResources
 from jobmon.core.cluster import Cluster
+from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 from jobmon.core.exceptions import (
     CallableReturnedInvalidObject,
@@ -78,8 +79,8 @@ class WorkflowRun:
     def __init__(
         self,
         workflow_run_id: int,
-        workflow_run_heartbeat_interval: int = 30,
-        heartbeat_report_by_buffer: float = 3.1,
+        workflow_run_heartbeat_interval: Optional[int] = None,
+        heartbeat_report_by_buffer: Optional[float] = None,
         fail_fast: bool = False,
         wedged_workflow_sync_interval: int = 600,
         fail_after_n_executions: int = 1_000_000_000,
@@ -128,8 +129,21 @@ class WorkflowRun:
         self._n_executions = 0
 
         # optional config
-        self._workflow_run_heartbeat_interval = workflow_run_heartbeat_interval
-        self._heartbeat_report_by_buffer = heartbeat_report_by_buffer
+        # config
+        config = JobmonConfig()
+        if workflow_run_heartbeat_interval is None:
+            self._workflow_run_heartbeat_interval = config.get_int(
+                "heartbeat", "workflow_run_interval"
+            )
+        else:
+            self._task_instance_heartbeat_interval = workflow_run_heartbeat_interval
+        if heartbeat_report_by_buffer is None:
+            self._heartbeat_report_by_buffer = config.get_float(
+                "heartbeat", "report_by_buffer"
+            )
+        else:
+            self._heartbeat_report_by_buffer = heartbeat_report_by_buffer
+
         if requester is None:
             requester = Requester.from_defaults()
         self.requester = requester
