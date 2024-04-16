@@ -92,7 +92,21 @@ def add_nodes() -> Any:
                     {"node_id": node_id, "arg_id": arg_id, "val": val}
                 )
 
-        # Bulk insert again with raw SQL
+    # Bulk insert again with raw SQL. Separate method for separate session.
+    _insert_node_args(node_args_list)
+
+    # return result
+    return_nodes = {
+        ":".join(str(i) for i in key): val for key, val in node_id_dict.items()
+    }
+    resp = jsonify(nodes=return_nodes)
+    resp.status_code = StatusCodes.OK
+    return resp
+
+
+def _insert_node_args(node_args_list: list) -> None:
+    session = SessionLocal()
+    with session.begin():
         if node_args_list:
             node_arg_insert_stmt = insert(NodeArg).values(node_args_list)
             if (
@@ -110,11 +124,3 @@ def add_nodes() -> Any:
 
             session.execute(node_arg_insert_stmt)
             session.flush()
-
-    # return result
-    return_nodes = {
-        ":".join(str(i) for i in key): val for key, val in node_id_dict.items()
-    }
-    resp = jsonify(nodes=return_nodes)
-    resp.status_code = StatusCodes.OK
-    return resp
