@@ -519,7 +519,11 @@ def workflows_by_user_form() -> Any:
         if status:
             where_clauses.append("workflow.status = :status")
             substitution_dict["status"] = status
-        inner_where_clause = " AND ".join(where_clauses)
+
+        if where_clauses:
+            inner_where_clause = " WHERE " + (" AND ".join(where_clauses))
+        else:
+            inner_where_clause = ""
 
         query = text(
             f"""
@@ -552,8 +556,7 @@ def workflows_by_user_form() -> Any:
                                 JOIN workflow_run ON workflow.id = workflow_run.workflow_id
                                 LEFT JOIN workflow_attribute
                                     ON workflow.id = workflow_attribute.workflow_id
-                            WHERE
-                                {inner_where_clause}
+                            {inner_where_clause}
                         )
                     GROUP BY
                         workflow_id, queue_id
