@@ -5,7 +5,8 @@ from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
 from flask import jsonify, request
-from sqlalchemy import bindparam, func, insert, literal_column, select, update
+from sqlalchemy import and_, bindparam, func, insert, literal_column, select, update
+#from sqlalchemy.sql.expression import ANY
 import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
@@ -127,7 +128,7 @@ def record_array_batch_num(array_id: int) -> Any:
                 # status columns
                 literal_column(f"'{TaskInstanceStatus.QUEUED}'").label("status"),
                 func.now().label("status_date"),
-            ).where(Task.id.in_(task_ids), Task.status == TaskStatus.QUEUED),
+            ).where(Task.id.in_(task_ids), Task.status == TaskStatus.QUEUED).with_for_update(),
             # no python side defaults. Server defaults only
             include_defaults=False,
         )
@@ -137,6 +138,7 @@ def record_array_batch_num(array_id: int) -> Any:
         tasks_by_status_query = (
             select(Task.status, Task.id)
             .where(Task.id.in_(task_ids))
+            .with_for_update()
             .order_by(
                 Task.status
             )  # This line is optional but helps in organizing the result
@@ -170,6 +172,7 @@ def transition_array_to_launched(array_id: int) -> Any:
                 TaskInstance.array_id == array_id,
                 TaskInstance.array_batch_num == batch_num,
             )
+            .with_for_update()
             .execution_options(synchronize_session=False)
         )
 
@@ -185,6 +188,9 @@ def transition_array_to_launched(array_id: int) -> Any:
             .values(status=TaskStatus.LAUNCHED, status_date=func.now())
         ).execution_options(synchronize_session=False)
         session.execute(update_task_stmt)
+
+    # Update the task instances in a separate session
+    #_update_task_instance(array_id, batch_num, next_report)
 
         # Transition all the task instances in the batch
         # Bypassing the ORM for performance reasons.
@@ -209,6 +215,29 @@ def transition_array_to_launched(array_id: int) -> Any:
     resp.status_code = StatusCodes.OK
     return resp
 
+
+# def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> None:
+#     session = SessionLocal()
+#     with session.begin():
+#         # TODO: select for update
+
+#         # Transition all the task instances in the batch
+#         # Bypassing the ORM for performance reasons.
+#         update_stmt = (
+#             update(TaskInstance)
+#             .where(
+#                 TaskInstance.array_id == array_id,
+#                 TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
+#                 TaskInstance.array_batch_num == batch_num,
+#             )
+#             .values(
+#                 status=TaskInstanceStatus.LAUNCHED,
+#                 submitted_date=func.now(),
+#                 status_date=func.now(),
+#                 report_by_date=add_time(next_report),
+#             )
+#         ).execution_options(synchronize_session=False)
+#     session.execute(update_stmt)
 
 @api_v1_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
 @api_v2_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
@@ -241,3 +270,46 @@ def log_array_distributor_id(array_id: int) -> Any:
     resp = jsonify()
     resp.status_code = StatusCodes.OK
     return resp
+
+# @api_v1_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
+# @api_v2_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
+# def log_array_distributor_id(array_id: int) -> Any:
+#     """Add distributor_id, stderr/stdout paths to the DB for all TIs in an array."""
+#     data = cast(Dict, request.get_json())
+
+#     # Create a list of dicts out of the distributor id map.
+#     params = [
+#         {"task_instance_id": key, "distributor_id": val} for key, val in data.items()
+#     ]
+
+#     session = SessionLocal()
+#     with session.begin():
+#         condition1 = TaskInstance.array_id == array_id
+#         task_instance_ids = params.task_instance_id
+#         condition2 = TaskInstance.id == ANY(task_instance_ids)
+
+#         common_condition = and_(condition1, condition2)
+
+#         # pre-selecting rows to update using with_for_update
+#         # prevents deadlocks by setting intent locks
+#         select_rows_to_update = (
+#             select(TaskInstance).where(common_condition).with_for_update()
+#         )
+
+#         session.execute(select_rows_to_update).fetchall()
+
+#         # Acquire a lock and update the task instance table
+#         # Using bindparam only issues one query; unfortunately, the MariaDB optimizer actually
+#         # performs this operation iteratively. The update is fairly slow despite the fact that
+#         # we are issuing a single bulk query.
+#         update_stmt = (
+#             update(TaskInstance)
+#             .where(common_condition)
+#             .values(distributor_id=bindparam("distributor_id"))
+#             .execution_options(synchronize_session=False)
+#         )
+#         session.connection().execute(update_stmt, params)
+
+#     resp = jsonify()
+#     resp.status_code = StatusCodes.OK
+#     return resp
