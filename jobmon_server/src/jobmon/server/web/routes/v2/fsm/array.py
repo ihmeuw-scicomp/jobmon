@@ -190,7 +190,17 @@ def transition_array_to_launched(array_id: int) -> Any:
         session.execute(update_task_stmt)
 
     # Update the task instances in a separate session
-    #_update_task_instance(array_id, batch_num, next_report)
+    _update_task_instance(array_id, batch_num, next_report)
+
+    resp = jsonify()
+    resp.status_code = StatusCodes.OK
+    return resp
+
+
+def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> None:
+    session = SessionLocal()
+    with session.begin():
+        # TODO: select using with_for_update() to prevent deadlocks
 
         # Transition all the task instances in the batch
         # Bypassing the ORM for performance reasons.
@@ -208,36 +218,7 @@ def transition_array_to_launched(array_id: int) -> Any:
                 report_by_date=add_time(next_report),
             )
         ).execution_options(synchronize_session=False)
-
         session.execute(update_stmt)
-
-    resp = jsonify()
-    resp.status_code = StatusCodes.OK
-    return resp
-
-
-# def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> None:
-#     session = SessionLocal()
-#     with session.begin():
-#         # TODO: select for update
-
-#         # Transition all the task instances in the batch
-#         # Bypassing the ORM for performance reasons.
-#         update_stmt = (
-#             update(TaskInstance)
-#             .where(
-#                 TaskInstance.array_id == array_id,
-#                 TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
-#                 TaskInstance.array_batch_num == batch_num,
-#             )
-#             .values(
-#                 status=TaskInstanceStatus.LAUNCHED,
-#                 submitted_date=func.now(),
-#                 status_date=func.now(),
-#                 report_by_date=add_time(next_report),
-#             )
-#         ).execution_options(synchronize_session=False)
-#     session.execute(update_stmt)
 
 @api_v1_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
 @api_v2_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
