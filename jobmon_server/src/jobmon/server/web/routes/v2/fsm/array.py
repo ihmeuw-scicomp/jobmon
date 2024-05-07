@@ -200,13 +200,26 @@ def transition_array_to_launched(array_id: int) -> Any:
 def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> None:
     session = SessionLocal()
     with session.begin():
-        # TODO: select using with_for_update() to prevent deadlocks
+        # Acquire a lock and update tasks to launched
+        task_instance_ids_query = (
+            select(TaskInstance.id)
+            .where(
+                TaskInstance.array_id == array_id,
+                TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
+                TaskInstance.array_batch_num == batch_num,
+            )
+            .with_for_update()
+            .execution_options(synchronize_session=False)
+        )
+
+        task_instance_ids = session.execute(task_instance_ids_query).scalars()
 
         # Transition all the task instances in the batch
         # Bypassing the ORM for performance reasons.
         update_stmt = (
             update(TaskInstance)
             .where(
+                TaskInstance.id.in_(task_instance_ids),
                 TaskInstance.array_id == array_id,
                 TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
                 TaskInstance.array_batch_num == batch_num,
