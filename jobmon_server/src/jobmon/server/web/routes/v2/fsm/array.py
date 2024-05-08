@@ -239,9 +239,10 @@ def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> No
 @api_v2_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
 def log_array_distributor_id(array_id: int) -> Any:
     """Add distributor_id, stderr/stdout paths to the DB for all TIs in an array."""
-    data = request.get_json()
+    data = cast(Dict, request.get_json())
 
-    # 'data' is a dictionary mapping task_instance_ids to distributor_ids
+    # Create a list of dictionaries out of the distributor id map.
+    # (maps task_instance_ids to distributor_ids)
     params = [
         {"task_instance_id": key, "distributor_id": val} for key, val in data.items()
     ]
