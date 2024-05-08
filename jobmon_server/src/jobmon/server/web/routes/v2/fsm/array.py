@@ -5,8 +5,7 @@ from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
 from flask import jsonify, request
-from sqlalchemy import and_, bindparam, func, insert, literal_column, select, update
-#from sqlalchemy.sql.expression import ANY
+from sqlalchemy import func, insert, literal_column, select, text, update
 import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
@@ -128,7 +127,9 @@ def record_array_batch_num(array_id: int) -> Any:
                 # status columns
                 literal_column(f"'{TaskInstanceStatus.QUEUED}'").label("status"),
                 func.now().label("status_date"),
-            ).where(Task.id.in_(task_ids), Task.status == TaskStatus.QUEUED).with_for_update(),
+            )
+            .where(Task.id.in_(task_ids), Task.status == TaskStatus.QUEUED)
+            .with_for_update(),
             # no python side defaults. Server defaults only
             include_defaults=False,
         )
@@ -233,77 +234,39 @@ def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> No
         ).execution_options(synchronize_session=False)
         session.execute(update_stmt)
 
+
 @api_v1_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
 @api_v2_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
 def log_array_distributor_id(array_id: int) -> Any:
     """Add distributor_id, stderr/stdout paths to the DB for all TIs in an array."""
-    data = cast(Dict, request.get_json())
+    data = request.get_json()
 
-    # Create a list of dicts out of the distributor id map.
+    # 'data' is a dictionary mapping task_instance_ids to distributor_ids
     params = [
         {"task_instance_id": key, "distributor_id": val} for key, val in data.items()
     ]
 
+    # Convert params to a format that can be used in a CTE
+    values_clause = ", ".join(
+        f"({item['task_instance_id']}, '{item['distributor_id']}')" for item in params
+    )
+
+    # CTE allows a single set operation for the update instead of multiple updates
+    update_cte = f"""
+    WITH distributor_updates(task_instance_id, distributor_id) AS (
+        VALUES {values_clause}
+    )
+    UPDATE task_instance
+    SET distributor_id = distributor_updates.distributor_id
+    FROM distributor_updates
+    WHERE task_instance.id = distributor_updates.task_instance_id;
+    """
+
     session = SessionLocal()
     with session.begin():
-        # Acquire a lock and update the task instance table
-        # Using bindparam only issues one query; unfortunately, the MariaDB optimizer actually
-        # performs this operation iteratively. The update is fairly slow despite the fact that
-        # we are issuing a single bulk query.
-        update_stmt = (
-            update(TaskInstance)
-            .where(
-                TaskInstance.array_id == array_id,
-                TaskInstance.id == bindparam("task_instance_id"),
-            )
-            .values(distributor_id=bindparam("distributor_id"))
-            .execution_options(synchronize_session=False)
-        )
-        session.connection().execute(update_stmt, params)
+        # wrap raw SQL strings in text() function
+        session.execute(text(update_cte))
 
-    resp = jsonify()
+    resp = jsonify(success=True)
     resp.status_code = StatusCodes.OK
     return resp
-
-# @api_v1_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
-# @api_v2_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
-# def log_array_distributor_id(array_id: int) -> Any:
-#     """Add distributor_id, stderr/stdout paths to the DB for all TIs in an array."""
-#     data = cast(Dict, request.get_json())
-
-#     # Create a list of dicts out of the distributor id map.
-#     params = [
-#         {"task_instance_id": key, "distributor_id": val} for key, val in data.items()
-#     ]
-
-#     session = SessionLocal()
-#     with session.begin():
-#         condition1 = TaskInstance.array_id == array_id
-#         task_instance_ids = params.task_instance_id
-#         condition2 = TaskInstance.id == ANY(task_instance_ids)
-
-#         common_condition = and_(condition1, condition2)
-
-#         # pre-selecting rows to update using with_for_update
-#         # prevents deadlocks by setting intent locks
-#         select_rows_to_update = (
-#             select(TaskInstance).where(common_condition).with_for_update()
-#         )
-
-#         session.execute(select_rows_to_update).fetchall()
-
-#         # Acquire a lock and update the task instance table
-#         # Using bindparam only issues one query; unfortunately, the MariaDB optimizer actually
-#         # performs this operation iteratively. The update is fairly slow despite the fact that
-#         # we are issuing a single bulk query.
-#         update_stmt = (
-#             update(TaskInstance)
-#             .where(common_condition)
-#             .values(distributor_id=bindparam("distributor_id"))
-#             .execution_options(synchronize_session=False)
-#         )
-#         session.connection().execute(update_stmt, params)
-
-#     resp = jsonify()
-#     resp.status_code = StatusCodes.OK
-#     return resp
