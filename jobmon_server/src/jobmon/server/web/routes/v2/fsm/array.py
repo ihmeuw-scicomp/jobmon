@@ -241,7 +241,7 @@ def log_array_distributor_id(array_id: int) -> Any:
     """Add distributor_id, stderr/stdout paths to the DB for all TIs in an array."""
     data = cast(Dict, request.get_json())
 
-    # Create a list of dictionaries out of the distributor id map.
+    # Create a list of dicts out of the distributor id map.
     # (maps task_instance_ids to distributor_ids)
     params = [
         {"task_instance_id": key, "distributor_id": val} for key, val in data.items()
