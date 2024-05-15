@@ -293,9 +293,9 @@ class Array:
         Given kwargs and values corresponding to node_args,
         return a dict of combinations of those node_args. Values of kwargs must be iterables.
         """
-        # Return empty iterator if no arguments provided
+        # Return empty if no arguments provided
         if len(kwargs) == 0:
-            return iter(())
+            return
         keys = kwargs.keys()
         for element in product(*kwargs.values()):
             yield dict(zip(keys, element))
