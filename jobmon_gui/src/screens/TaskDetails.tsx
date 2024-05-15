@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
-import TaskInstanceTable from './task_instance_table';
-import NodeLists from './node_list';
-import TaskFSM from './task_fsm';
-import { convertDatePST } from '../../utilities/formatters'
+import TaskInstanceTable from '../components/task_details/TaskInstanceTable';
+import NodeLists from '../components/task_details/NodeLists';
+import TaskFSM from '../components/task_details/TaskFSM';
+import { convertDatePST } from '../utils/formatters'
 import { HiInformationCircle } from "react-icons/hi";
-import CustomModal from '../../components/Modal';
+import CustomModal from '../components/Modal';
 
 function getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId) {
     // Returns task status and workflow ID
@@ -74,7 +74,7 @@ function getTaskDependencies(setUpstreamTasks, setDownstreamTasks, taskId) {
     return fetchData
 }
 
-function TaskDetails() {
+export default function TaskDetails() {
     let params = useParams();
     let taskId = params.taskId
     const [ti_details, setTIDetails] = useState([])
@@ -183,5 +183,3 @@ function TaskDetails() {
     );
 
 }
-
-export default TaskDetails;

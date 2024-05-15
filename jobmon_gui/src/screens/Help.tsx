@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 export default function Help(){
     const [text, setText] = useState('')
     useEffect(()=>{
-    const path = require("./help.md");
+    const path = require("../assets/content/Help.md");
 
       fetch(path)
         .then(response => {

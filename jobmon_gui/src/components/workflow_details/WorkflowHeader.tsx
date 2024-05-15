@@ -1,4 +1,4 @@
-import "../../css/jobmon_gui.css";
+import "../../styles/jobmon_gui.css";
 
 import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
@@ -9,7 +9,7 @@ import { AiFillSchedule, AiFillCheckCircle} from "react-icons/ai";
 import { TbHandStop } from "react-icons/tb";
 import {HiRocketLaunch} from "react-icons/hi2";
 
-export default function WFHeader({
+export default function WorkflowHeader({
     wf_id,
     wf_status,
     wf_status_desc,

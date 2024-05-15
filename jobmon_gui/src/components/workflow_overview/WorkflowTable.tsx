@@ -8,11 +8,11 @@ import ToolkitProvider, { CSVExport } from 'react-bootstrap-table2-toolkit/dist/
 import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import Spinner from 'react-bootstrap/Spinner';
 import { Link } from "react-router-dom";
-import { convertDate, convertDatePST } from '../../utilities/formatters';
+import { convertDate, convertDatePST } from '../../utils/formatters';
 import { FaCaretDown, FaCaretUp, FaCircle } from "react-icons/fa";
 
 // @ts-ignore
-import JobmonProgressBar from '../../components/JobmonProgressBar.tsx';
+import JobmonProgressBar from '../JobmonProgressBar.tsx';
 
 
 const customCaret = (order, column) => {
@@ -81,7 +81,7 @@ interface Data {
     wfr_count: number
 }
 
-export default function JobmonWFTable({ allData }) {
+export default function WorkflowTable({ allData }) {
     const [expandedRows, setExpandedRows] = useState([]);
     const [statusDict, setStatusDict] = useState({});
     //TODO: get rid of finishedWF

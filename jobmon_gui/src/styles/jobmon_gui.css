@@ -1,8 +1,8 @@
 /* Colors */
 /* Dang Wong palettes: #000000 #e69f00 #56b4e9 #009e73 #f0e442 #0072b2 #d55e00 #cc79a7 */
-:root{
+:root {
     --base-spacing-unit: 24px;
-    --half-spacing-unit: $base-spacing-unit / 2;
+    --half-spacing-unit: base-spacing-unit / 2;
 
     --color-bg: #f0f0f0;
     --color-title: #36486b;
@@ -42,51 +42,51 @@ ul {
 }
 
 /* Style of icons of the workflow status indicator. */
-.icon-rr{
-  color: var(--color-running);
-  font-size: calc(30px + 1vmin);
-  margin-right: 15px;
+.icon-rr {
+    color: var(--color-running);
+    font-size: calc(30px + 1vmin);
+    margin-right: 15px;
 }
 
-.icon-dd{
-  color: var(--color-done);
-  font-size: calc(30px + 1vmin);
-  margin-right: 15px;
+.icon-dd {
+    color: var(--color-done);
+    font-size: calc(30px + 1vmin);
+    margin-right: 15px;
 }
 
-.icon-aa{
-  color: var(--color-aborted);
-  font-size: calc(30px + 1vmin);
-  margin-right: 15px;
+.icon-aa {
+    color: var(--color-aborted);
+    font-size: calc(30px + 1vmin);
+    margin-right: 15px;
 }
 
-.icon-ff{
-  color: var(--color-fatal);
-  font-size: calc(30px + 1vmin);
-  margin-right: 15px;
+.icon-ff {
+    color: var(--color-fatal);
+    font-size: calc(30px + 1vmin);
+    margin-right: 15px;
 }
 
-.icon-pp{
-  color: var(--color-pending);
-  font-size: calc(30px + 1vmin);
-  margin-right: 15px;
+.icon-pp {
+    color: var(--color-pending);
+    font-size: calc(30px + 1vmin);
+    margin-right: 15px;
 }
 
-.icon-ss{
-  color: var(--color-scheduled);
-  font-size: calc(30px + 1vmin);
-  margin-right: 15px;
+.icon-ss {
+    color: var(--color-scheduled);
+    font-size: calc(30px + 1vmin);
+    margin-right: 15px;
 }
 
 .header-popover {
     max-width: 600px;
 }
 
-::placeholder{
+::placeholder {
     color: #8E93A0;
 }
 
-.text-custom{
+.text-custom {
     color: #36486b;
     font-size: large;
     text-align: center;
@@ -106,7 +106,7 @@ ul {
     color: white;
 }
 
-.mx-40p{
+.mx-40p {
     margin-left: 40%;
     margin-right: 40%;
 }
@@ -125,7 +125,7 @@ ul {
 }
 
 /* Color of "Running" square and text size in Task status key. */
-.bar-rr{
+.bar-rr {
     color: var(--color-running);
     font-size: 15px;
     text-align: center;
@@ -133,7 +133,7 @@ ul {
 }
 
 /* Color of "Pending" square and text size in Task status key. */
-.bar-pp{
+.bar-pp {
     color: var(--color-pending);
     font-size: 15px;
     text-align: center;
@@ -141,7 +141,7 @@ ul {
 }
 
 /* Color of "Scheduled" square and text size in Task status key. */
-.bar-ss{
+.bar-ss {
     color: var(--color-scheduled);
     font-size: 15px;
     text-align: center;
@@ -149,7 +149,7 @@ ul {
 }
 
 /* Color of "Scheduled" square and text size in Task status key. */
-.bar-pss{
+.bar-pss {
     color: var(--color-scheduled);
     font-size: 15px;
     text-align: center;
@@ -157,27 +157,27 @@ ul {
 }
 
 /* Color of "Done" square and text size in Task status key. */
-.bar-dd{
+.bar-dd {
     color: var(--color-done);
     font-size: 15px;
     margin-right: 5px;
 }
 
 /* Color of "Fatal" square and text size in Task status key. */
-.bar-ff{
+.bar-ff {
     color: var(--color-fatal);
     font-size: 15px;
     margin-right: 5px;
 }
 
 /* Color of "Aborted" square and text size in Workflow status key. */
-.bar-aa{
+.bar-aa {
     color: var(--color-aborted);
     font-size: 15px;
     margin-right: 5px;
 }
 
-.popover{
+.popover {
     background-color: #f0f0f0;
     padding: 20px;
 }
@@ -222,20 +222,20 @@ ul {
 }
 
 #tt_progress ul {
-   padding: 0;
+    padding: 0;
 }
 
 #tt_progress .tt-name {
-   color: #303030;
+    color: #303030;
 }
 
-.progress{
+.progress {
     height: 1.3rem;
 }
 
 /* flex div */
 .div-hidden {
-   display: none;
+    display: none;
 }
 
 /* space occupier */
@@ -258,9 +258,9 @@ ul {
 
 /* Word wrap for task instance error log */
 .div-break-word {
-   margin-top: 5px;
-   word-wrap: break-word;
-   white-space: pre-wrap; /* or pre-line */
+    margin-top: 5px;
+    word-wrap: break-word;
+    white-space: pre-wrap; /* or pre-line */
 }
 
 .div-hint {
@@ -270,13 +270,13 @@ ul {
 
 /* Take the left 1/3 of the display*/
 .div_floatleft {
-    float:left;
+    float: left;
     width: 33%;
     overflow-wrap: break-word;
 }
 
-.float_bar{
-    float:left;
+.float_bar {
+    float: left;
     width: fit-content;
     overflow-wrap: break-word;
     padding-right: 2rem;
@@ -284,45 +284,46 @@ ul {
 
 /* Take the right 2/3 of the display*/
 .div_floatright {
-   float: right;
-   width: 67%;
-   text-align: right;
-   margin-top: 4px;
+    float: right;
+    width: 67%;
+    text-align: right;
+    margin-top: 4px;
 }
 
 /* Take the right 2/3 of the display align left*/
 .div_floatright_align_left {
-   float: right;
-   width: 67%;
-   text-align: left;
+    float: right;
+    width: 67%;
+    text-align: left;
 }
 
-h-1rem{
+h-1rem {
     height: 1rem;
 }
+
 /* Line beneath "Jobmon GUI" title. */
 .hr-1 {
-    height:4px;
-    border-width:0;
-    width:100%;
+    height: 4px;
+    border-width: 0;
+    width: 100%;
     color: var(--color-highlight-1);
     background-color: var(--color-highlight-1);
 }
 
 /* second level hr */
 .hr-2 {
-   height:2px;
-   border-width:0;
-   width:100%;
-   color: var(--color-highlight-2);
-   background-color: var(--color-highlight-2);
+    height: 2px;
+    border-width: 0;
+    width: 100%;
+    color: var(--color-highlight-2);
+    background-color: var(--color-highlight-2);
 }
 
 /* third level hr */
 .hr-3 {
-   height:2px;
-   color: var(--color-highlight-2);
-   border-top: 2px dashed;
+    height: 2px;
+    color: var(--color-highlight-2);
+    border-top: 2px dashed;
 }
 
 /* in dots */
@@ -361,16 +362,21 @@ h-1rem{
 
 /* a spinning loader */
 .loader {
-  border: 16px solid #f3f3f3; /* Light grey */
-  border-top: 16px solid #3498db; /* Blue */
-  border-radius: 50%;
-  width: 120px;
-  height: 120px;
-  animation: spin 2s linear infinite;
+    border: 16px solid #f3f3f3; /* Light grey */
+    border-top: 16px solid #3498db; /* Blue */
+    border-radius: 50%;
+    width: 120px;
+    height: 120px;
+    animation: spin 2s linear infinite;
 }
+
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Color blindness palettes: https://davidmathlogic.com/colorblind/#%23D81B60-%231E88E5-%23FFC107-%23004D40 */
@@ -405,8 +411,8 @@ h-1rem{
 #tt-tasks .running,
 #tt-tasks .done,
 #tt-tasks .fatal {
-   color: #222222;
-   font-weight: normal;
+    color: #222222;
+    font-weight: normal;
 }
 
 #tt-tasks .pending {
@@ -434,16 +440,17 @@ h-1rem{
     text-decoration: underline;
     text-decoration-color: blue;
 }
+
 .p-underline:hover {
     text-decoration-color: cyan;
     cursor: pointer;
     opacity: 2;
- }
+}
 
 /* a span above tables to show helper texts */
 .span-helper {
-    color:grey;
-    font-size:10px;
+    color: grey;
+    font-size: 10px;
     padding: 5px;
     width: 100%;
     height: 1rem;
@@ -455,24 +462,30 @@ h-1rem{
     border-style: ridge;
     width: 90%;
 }
+
 .table-solid tr {
-   border-style: ridge;
+    border-style: ridge;
 }
+
 .table-solid solid {
-   border-style: ridge;
-   height: 60px;
+    border-style: ridge;
+    height: 60px;
 }
+
 .table-full {
-   border: none;
-   width: 100%;
+    border: none;
+    width: 100%;
 }
+
 .table-full tr {
-  border: none;
+    border: none;
 }
+
 .table-full td {
-  border: none;
-  text-align: right;
+    border: none;
+    text-align: right;
 }
+
 .center-histogram {
     display: flex;
     justify-content: center;
@@ -481,13 +494,13 @@ h-1rem{
 }
 
 /* scroll bar for task dependencies list group */
-.dependency-list-scroll{
+.dependency-list-scroll {
     max-height: 300px;
     overflow-y: auto;
 }
 
 /* Allows for a fixed header on the the task dependencies list group */
-.dependency-header{
+.dependency-header {
     background: rgb(250, 250, 250);
     position: sticky;
     top: 0;
@@ -495,7 +508,7 @@ h-1rem{
 }
 
 /* Reduces spacing between links in task dependencies list group */
-.dependency-list-group-item{
+.dependency-list-group-item {
     padding: 0.25rem 1.25rem;
 }
 
@@ -512,105 +525,107 @@ h-1rem{
     font-weight: 300;
 }
 
-.bg-grey{
+.bg-grey {
     background-color: #dbdbdb;
 }
 
 #task-count, #task_count {
-   margin: 2px;
-   padding: 15px;
-   border: 1px solid gray;
+    margin: 2px;
+    padding: 15px;
+    border: 1px solid gray;
 }
 
 #tt-tasks th, td,
 #tt-stats th, td {
-   padding: 2px;
+    padding: 2px;
 }
+
 #tt-tasks td.tt-stats-spacer {
-   width: 20px;
+    width: 20px;
 }
 
 #task_count table td {
-   text-align: right;
+    text-align: right;
 }
+
 #tt-tasks td, #tt-stats td {
-   text-align: right;
+    text-align: right;
 }
 
 #tt_search .error-log {
-   cursor: pointer;
-   white-space: nowrap;
-   overflow: hidden;
-   text-overflow: ellipsis;
-   height: 40px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    height: 40px;
 }
 
 #tt_search .error-time .error-time-since {
-   color:grey;
-   text-align:right;
-   float:right;
-   font-size: 8px;
+    color: grey;
+    text-align: right;
+    float: right;
+    font-size: 8px;
 }
 
 body .error-log-modal .modal-dialog {
-   max-width: 85%;
+    max-width: 85%;
 }
 
 .error-log-modal .modal-dialog pre {
-   font-size: 11px;
+    font-size: 11px;
 }
 
-.font-weight-300{
+.font-weight-300 {
     font-weight: 300 !important;
 }
 
 .toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 45px;
-  height: 25px;
+    position: relative;
+    display: inline-block;
+    width: 45px;
+    height: 25px;
 }
 
 /* Hide default HTML checkbox */
 .toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+    opacity: 0;
+    width: 0;
+    height: 0;
 }
 
 /* The slider */
 .toggle-slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  -webkit-transition: .4s;
-  transition: .4s;
-  border-radius: 34px;
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    -webkit-transition: .4s;
+    transition: .4s;
+    border-radius: 34px;
 }
 
 .toggle-slider::before {
-  position: absolute;
-  content: "";
-  height: 90%;
-  width: 49%;
-  left: 1%;
-  bottom: 5%;
-  background-color: white;
-  -webkit-transition: .4s;
-  transition: .4s;
-  border-radius: 50%;
+    position: absolute;
+    content: "";
+    height: 90%;
+    width: 49%;
+    left: 1%;
+    bottom: 5%;
+    background-color: white;
+    -webkit-transition: .4s;
+    transition: .4s;
+    border-radius: 50%;
 }
 
-.nav-pills{
+.nav-pills {
     border: #4E606D 1px solid;
     border-radius: .25rem;
 }
 
-.nav-link{
+.nav-link {
     color: #4E606D;
 }
 
@@ -628,14 +643,14 @@ input:focus + .slider {
 } */
 
 .toggle-slider.active {
-  background-color: #2196F3;
-  
+    background-color: #2196F3;
+
 }
 
 .toggle-slider.active::before {
-  -webkit-transform: translateX(100%);
-  -ms-transform: translateX(100%);
-  transform: translateX(100%);
+    -webkit-transform: translateX(100%);
+    -ms-transform: translateX(100%);
+    transform: translateX(100%);
 }
 
 
@@ -644,7 +659,7 @@ input:focus + .slider {
     border: 1px solid var(--color-text);
 }
 
-.btn-secondary{
+.btn-secondary {
     background-color: var(--color-text);
     border: 1px solid var(--color-text);
 
@@ -655,7 +670,7 @@ input:focus + .slider {
 }
 
 
-.updatemenu-item-text{
+.updatemenu-item-text {
     fill: white !important;
 }
 
@@ -672,17 +687,17 @@ input:focus + .slider {
 }
 
 .breadcrumb-button {
-    background: none!important;
+    background: none !important;
     border: none;
-    padding: 0!important;
+    padding: 0 !important;
     color: #007bff;
     cursor: pointer;
 }
 
 /* styles.css or inline styles */
 .markdown-container img {
-  width: 1250px; /* Adjust the width as needed */
-  height: auto; /* Allows the SVG to maintain its aspect ratio */
+    width: 1250px; /* Adjust the width as needed */
+    height: auto; /* Allows the SVG to maintain its aspect ratio */
 }
 
 .markdown-container {

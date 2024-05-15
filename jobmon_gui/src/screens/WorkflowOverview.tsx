@@ -9,9 +9,9 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import axios from 'axios';
 
 // @ts-ignore
-import JobmonWFTable from './wf_table.tsx';
-import '../../css/jobmon_gui.css';
-import { init_apm, safe_rum_add_label, safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum';
+import WorkflowTable from '../components/workflow_overview/WorkflowTable.tsx';
+import '../styles/jobmon_gui.css';
+import { init_apm, safe_rum_add_label, safe_rum_start_span, safe_rum_unit_end } from '../utils/rum';
 import { FaCircle } from "react-icons/fa";
 
 function App() {
@@ -211,7 +211,7 @@ function App() {
         </form>
       </div>
       <div id="wftable" className="div-level-2">
-        {workflows.length !== 0 && <JobmonWFTable allData={workflows} />}
+        {workflows.length !== 0 && <WorkflowTable allData={workflows} />}
         {workflows.length === 0 && <p>No workflows found for specified filters.</p>}
       </div>
     </div>

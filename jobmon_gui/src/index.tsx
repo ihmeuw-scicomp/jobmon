@@ -1,17 +1,17 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import './css/index.css';
-import App from './pages/workflow_overview_page/workflow_overview';
+import './styles/index.css';
+import App from './screens/WorkflowOverview';
 import {
   HashRouter,
   Routes,
   Route,
 } from "react-router-dom";
-import WorkflowDetails from './pages/workflow_details_page/workflow_details_page'
-import TaskDetails from './pages/task_details_page/task_details';
-import Help from './pages/help_page/help';
-import JobmonAtIHME from './pages/jobmon_at_ihme_page/jobmon_at_ihme'
-import PageNavigation from './pages/page_navigation/page_navigation'
+import WorkflowDetails from './screens/WorkflowDetails'
+import TaskDetails from './screens/TaskDetails';
+import Help from './screens/Help';
+import JobmonAtIHME from './screens/JobmonAtIhme'
+import PageNavigation from './components/navigation/PageNavigation';
 
 const root = ReactDOM.createRoot(
     document.getElementById('root') as HTMLElement
