@@ -1,4 +1,4 @@
-import "../../css/jobmon_gui.css";
+import "../../styles/jobmon_gui.css";
 
 import { OverlayTrigger } from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';

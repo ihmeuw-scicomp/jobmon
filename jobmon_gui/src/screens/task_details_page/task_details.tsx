@@ -5,7 +5,7 @@ import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import TaskInstanceTable from './task_instance_table';
 import NodeLists from './node_list';
 import TaskFSM from './task_fsm';
-import { convertDatePST } from '../../utilities/formatters'
+import { convertDatePST } from '../../utils/formatters'
 import { HiInformationCircle } from "react-icons/hi";
 import CustomModal from '../../components/Modal';
 

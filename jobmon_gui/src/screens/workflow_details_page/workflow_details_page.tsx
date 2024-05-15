@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import '../../css/jobmon_gui.css';
+import '../../styles/jobmon_gui.css';
+// import '../../styles/jobmon_gui.css';
 import { useParams, Link, Outlet, useNavigate } from 'react-router-dom';
 import { useForm } from "react-hook-form";
 import axios from 'axios';
@@ -16,8 +17,8 @@ import Tasks from './tasks';
 import Usage from './usage';
 import Errors from './errors';
 import WFHeader from "./wf_header"
-import { convertDatePST } from '../../utilities/formatters';
-import { init_apm, safe_rum_add_label, safe_rum_transaction } from '../../utilities/rum';
+import { convertDatePST } from '../../utils/formatters';
+import { init_apm, safe_rum_add_label, safe_rum_transaction } from '../../utils/rum';
 
 function getAsyncWFdetail(setWFDict, wf_id: string) {
     const url = process.env.REACT_APP_BASE_URL + "/workflow_status_viz";

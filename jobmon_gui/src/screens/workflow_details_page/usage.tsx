@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
 import MemoryHistogram from './memory_histogram';
 import RuntimeHistogram from './runtime_histogram';
-import { formatBytes, bytes_to_gib } from '../../utilities/formatters'
-import { safe_rum_start_span, safe_rum_unit_end } from '../../utilities/rum'
+import { formatBytes, bytes_to_gib } from '../../utils/formatters'
+import { safe_rum_start_span, safe_rum_unit_end } from '../../utils/rum'
 import humanizeDuration from 'humanize-duration';
 
 export default function Usage({ taskTemplateName, taskTemplateVersionId, usageInfo, apm}) {
