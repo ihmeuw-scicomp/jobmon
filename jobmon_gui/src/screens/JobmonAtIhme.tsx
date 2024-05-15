@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import '../../styles/jobmon_gui.css'
+import '../styles/jobmon_gui.css'
 
 const replacements = {
     "JOBMON_DB_HOST": process.env.REACT_APP_DOCS_DB_HOST,
@@ -12,7 +12,7 @@ const replacements = {
 export default function JobmonAtIHME(){
     const [text, setText] = useState('')
     useEffect(() => {
-        const path = require("./jobmon_at_ihme.md");
+        const path = require("../assets/content/JobmonAtIhme.md");
         fetch(path)
             .then(response => {
                 return response.text();

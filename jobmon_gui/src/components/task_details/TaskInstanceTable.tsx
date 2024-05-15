@@ -4,7 +4,7 @@ import BootstrapTable, { ColumnDescription }  from "react-bootstrap-table-next";
 import paginationFactory from "react-bootstrap-table2-paginator";
 import { FaCaretDown, FaCaretUp } from "react-icons/fa";
 import { HiInformationCircle } from "react-icons/hi";
-import CustomModal from '../../components/Modal';
+import CustomModal from '../Modal';
 import { sanitize } from 'dompurify';
 
 const customCaret = (order, column) => {

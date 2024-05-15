@@ -10,7 +10,7 @@ import { HashLink } from 'react-router-hash-link';
 import '../../styles/jobmon_gui.css';
 import { convertDatePST } from '../../utils/formatters';
 import { safe_rum_start_span, safe_rum_unit_end } from '../../utils/rum';
-import CustomModal from '../../components/Modal';
+import CustomModal from '../Modal';
 
 export default function Errors({ errorLogs, tt_name, loading, apm }) {
 
