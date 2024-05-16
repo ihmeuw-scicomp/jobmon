@@ -94,6 +94,7 @@ function App() {
         safe_rum_unit_end(rum_s1);
     }, [user, tool, wf_name, wf_args, wf_attribute, date_submitted, status, wf_id, apm]);
 
+
     const {register, handleSubmit} = useForm();
     const onSubmit = handleSubmit(({
                                        user_input: user,
