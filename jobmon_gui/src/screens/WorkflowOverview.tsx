@@ -8,11 +8,10 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 
 import axios from 'axios';
 
-// @ts-ignore
-import WorkflowTable from '../components/workflow_overview/WorkflowTable.tsx';
+import WorkflowTable from '../components/workflow_overview/WorkflowTable';
 import '../styles/jobmon_gui.css';
 import {init_apm, safe_rum_add_label, safe_rum_start_span, safe_rum_unit_end} from '../utils/rum';
-import {FaCircle} from "react-icons/fa";
+import WorkflowStatus from "../components/workflow_overview/WorkflowStatus";
 
 function App() {
     const apm: any = init_apm("workflow_overview_page");
@@ -96,18 +95,7 @@ function App() {
         params.append("date_submitted", date_submitted)
         params.append("status", status)
         let workflow_status_url = process.env.REACT_APP_BASE_URL + "/workflow_overview_viz";
-        const workflow_status_renders = {
-            "PENDING": (<div>< label className="label-middle"> <FaCircle className="bar-pp"/> </label><label
-                className="label-left font-weight-300">PENDING </label></div>),
-            "SCHEDULED": (<div><label className="label-middle"><FaCircle className="bar-ss"/> </label><label
-                className="label-left font-weight-300">SCHEDULED </label></div>),
-            "RUNNING": (<div>< label className="label-middle"> <FaCircle className="bar-rr"/> </label><label
-                className="label-left font-weight-300">RUNNING </label></div>),
-            "FAILED": (<div>< label className="label-middle"> <FaCircle className="bar-ff"/> </label><label
-                className="label-left font-weight-300">FAILED </label></div>),
-            "DONE": (<div>< label className="label-middle"> <FaCircle className="bar-dd"/> </label><label
-                className="label-left font-weight-300">DONE </label></div>)
-        }
+
         const fetchData = async () => {
             const result: any = await axios({
                     method: 'get',
@@ -122,14 +110,8 @@ function App() {
             );
             let wfs = result.data.workflows;
             wfs.forEach((workflow) => {
-                if (workflow.wf_status in workflow_status_renders) {
-                    workflow.wf_status = workflow_status_renders[workflow.wf_status]
-                } else {
-                    workflow.wf_status = (
-                        <div>< label className="label-middle"> <FaCircle className="bar-pp"/> </label><label
-                            className="label-left font-weight-300">{workflow.wf_status} </label></div>)
-                }
-            })
+                workflow.wf_status = <WorkflowStatus status={workflow.wf_status}/>;
+            });
             setWorkflows(wfs);
         };
         fetchData();
