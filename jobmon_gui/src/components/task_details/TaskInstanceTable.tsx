@@ -1,20 +1,23 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
-import BootstrapTable, { ColumnDescription }  from "react-bootstrap-table-next";
+import BootstrapTable, {ColumnDescription} from "react-bootstrap-table-next";
 import paginationFactory from "react-bootstrap-table2-paginator";
-import { FaCaretDown, FaCaretUp } from "react-icons/fa";
-import { HiInformationCircle } from "react-icons/hi";
+import {FaCaretDown, FaCaretUp} from "react-icons/fa";
+import {HiInformationCircle} from "react-icons/hi";
 import CustomModal from '../Modal';
-import { sanitize } from 'dompurify';
+import {sanitize} from 'dompurify';
+import {formatBytes} from "../../utils/formatters";
+import humanizeDuration from 'humanize-duration';
+
 
 const customCaret = (order, column) => {
-    if (!order) return (<span><FaCaretUp style={{ marginLeft: "5px" }} /></span>);
-    else if (order === 'asc') return (<span><FaCaretUp style={{ marginLeft: "5px" }} /></span>);
-    else if (order === 'desc') return (<span><FaCaretDown style={{ marginLeft: "5px" }} /></span>);
+    if (!order) return (<span><FaCaretUp style={{marginLeft: "5px"}}/></span>);
+    else if (order === 'asc') return (<span><FaCaretUp style={{marginLeft: "5px"}}/></span>);
+    else if (order === 'desc') return (<span><FaCaretDown style={{marginLeft: "5px"}}/></span>);
     return null;
 }
 
-export default function TaskInstanceTable({ taskInstanceData }) {
+export default function TaskInstanceTable({taskInstanceData}) {
     const [showStdoutModal, setShowStdoutModal] = useState(false)
     const [showStderrModal, setShowStderrModal] = useState(false)
     const [showTIStatusModal, setShowTIStatusModal] = useState(false)
@@ -24,11 +27,12 @@ export default function TaskInstanceTable({ taskInstanceData }) {
         'ti_id': '', 'ti_status': '', 'ti_stdout': '',
         'ti_stderr': '', 'ti_stdout_log': '', 'ti_stderr_log': '',
         'ti_distributor_id': '', 'ti_nodename': '', 'ti_error_log_description': '',
+        'ti_wallclock': '', 'ti_maxrss': ''
     });
 
     const htmlFormatter = cell => {
         // add sanitize to prevent xss attack
-        return <div dangerouslySetInnerHTML={{ __html: sanitize(`${cell}`) }} />;
+        return <div dangerouslySetInnerHTML={{__html: sanitize(`${cell}`)}}/>;
     };
 
     function get_data_brief(data) {
@@ -40,7 +44,7 @@ export default function TaskInstanceTable({ taskInstanceData }) {
             let stdout_display = e.ti_stdout_log
 
             // Currently not using. Leave in, in case we want to switch to showing logs in table when more users switch to 3.2.1
-            if (stderr_display  !== null && stderr_display  !== undefined) {
+            if (stderr_display !== null && stderr_display !== undefined) {
                 stderr_display = `
                 <div class="ti-logs">${e.ti_stderr_log.trim().split("\n").slice(-1)}</div>
                 `;
@@ -61,7 +65,9 @@ export default function TaskInstanceTable({ taskInstanceData }) {
                 "ti_nodename": e.ti_nodename,
                 "ti_stdout_log": e.ti_stdout_log,
                 "ti_stderr_log": e.ti_stderr_log,
-                "ti_error_log_description": e.ti_error_log_description
+                "ti_error_log_description": e.ti_error_log_description,
+                "ti_wallclock": e.ti_wallclock,
+                "ti_maxrss": e.ti_maxrss,
             })
 
         }
@@ -76,7 +82,7 @@ export default function TaskInstanceTable({ taskInstanceData }) {
             text: "ID",
             sort: true,
             sortCaret: customCaret,
-            headerStyle: { width: "10%" },
+            headerStyle: {width: "10%"},
             formatter: (cell) => (
                 <div id={`${cell}`}>{cell}</div>
             )
@@ -86,8 +92,8 @@ export default function TaskInstanceTable({ taskInstanceData }) {
             text: "Status",
             sort: true,
             sortCaret: customCaret,
-            headerStyle: { width: "10%" },
-            style: { overflowWrap: 'break-word' },
+            headerStyle: {width: "10%"},
+            style: {overflowWrap: 'break-word'},
         },
         {
             dataField: "ti_stderr",
@@ -102,7 +108,7 @@ export default function TaskInstanceTable({ taskInstanceData }) {
             },
             sort: true,
             sortCaret: customCaret,
-            style: { overflowWrap: 'break-word' },
+            style: {overflowWrap: 'break-word'},
         },
         {
             dataField: "ti_stdout",
@@ -117,12 +123,12 @@ export default function TaskInstanceTable({ taskInstanceData }) {
             },
             sort: true,
             sortCaret: customCaret,
-            style: { overflowWrap: 'break-word' },
+            style: {overflowWrap: 'break-word'},
         },
         {
             dataField: "ti_distributor_id",
             text: "Distributor ID",
-            headerStyle: { width: "15%" },
+            headerStyle: {width: "15%"},
             sort: true,
             sortCaret: customCaret,
         },
@@ -131,19 +137,33 @@ export default function TaskInstanceTable({ taskInstanceData }) {
             text: "Node Name",
             sort: true,
             sortCaret: customCaret,
-            style: { overflowWrap: 'break-word' },
-        }
+            style: {overflowWrap: 'break-word'},
+        },
+        {
+            dataField: "ti_wallclock",
+            text: "Runtime",
+            sort: true,
+            formatter: (cell) => humanizeDuration(cell * 1000),
+            sortCaret: customCaret,
+        },
+        {
+            dataField: "ti_maxrss",
+            text: "Memory",
+            sort: true,
+            formatter: (cell) => formatBytes(cell),
+            sortCaret: customCaret,
+        },
     ]
 
     // Create and return the React Bootstrap Table
     return (
         <div>
-            <div style={{ display: "flex" }}>
+            <div style={{display: "flex"}}>
                 <header className="header-1">
                     <p className='color-dark'>
                         Task Instances&nbsp;
                         <span>
-                            <HiInformationCircle onClick={() => setShowTIStatusModal(true)} />
+                            <HiInformationCircle onClick={() => setShowTIStatusModal(true)}/>
                         </span>
                     </p>
                 </header>
@@ -155,7 +175,7 @@ export default function TaskInstanceTable({ taskInstanceData }) {
                 bootstrap4
                 headerClasses="thead-dark"
                 striped
-                pagination={taskInstanceData.length === 0 ? undefined : paginationFactory({ sizePerPage: 10 })}
+                pagination={taskInstanceData.length === 0 ? undefined : paginationFactory({sizePerPage: 10})}
                 selectRow={{
                     mode: "radio",
                     hideSelectColumn: true,
@@ -213,16 +233,22 @@ export default function TaskInstanceTable({ taskInstanceData }) {
                         <b>Submitted to Batch Distributor:</b> TaskInstance registered in the Jobmon database.<br/>
                         <b>Done:</b> TaskInstance finished successfully.<br/>
                         <b>Error:</b> TaskInstance stopped with an application error (non-zero return code).<br/>
-                        <b>Error Fatal:</b> TaskInstance killed itself as part of a cold workflow resume, and cannot be retried.<br/>
-                        <b>Instantiated:</b> TaskInstance is created within Jobmon, but not queued for submission to the cluster.<br/>
-                        <b>Kill Self:</b> TaskInstance has been ordered to kill itself if it is still alive, as part of a cold workflow resume.<br/>
+                        <b>Error Fatal:</b> TaskInstance killed itself as part of a cold workflow resume, and cannot be
+                        retried.<br/>
+                        <b>Instantiated:</b> TaskInstance is created within Jobmon, but not queued for submission to the
+                        cluster.<br/>
+                        <b>Kill Self:</b> TaskInstance has been ordered to kill itself if it is still alive, as part of
+                        a cold workflow resume.<br/>
                         <b>Launched:</b> TaskInstance submitted to the cluster normally, part of a Job Array.<br/>
                         <b>Queued:</b> TaskInstance is queued for submission to the cluster.<br/>
                         <b>Running:</b> TaskInstance has started running normally.<br/>
                         <b>Triaging:</b> TaskInstance has errored, Jobmon is determining the category of error.<br/>
-                        <b>Unknown Error:</b> TaskInstance stopped reporting that it was alive for an unknown reason.<br/>
-                        <b>No Distributor ID:</b> TaskInstance submission within Jobmon failed – did not receive a job number from the cluster.<br/>
-                        <b>Resource Error:</b> TaskInstance died because of insufficient resource request, i.e. insufficient memory or runtime.<br/>
+                        <b>Unknown Error:</b> TaskInstance stopped reporting that it was alive for an unknown
+                        reason.<br/>
+                        <b>No Distributor ID:</b> TaskInstance submission within Jobmon failed – did not receive a job
+                        number from the cluster.<br/>
+                        <b>Resource Error:</b> TaskInstance died because of insufficient resource request, i.e.
+                        insufficient memory or runtime.<br/>
                     </p>
                 }
                 showModal={showTIStatusModal}

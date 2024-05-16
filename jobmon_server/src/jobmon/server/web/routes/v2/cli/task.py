@@ -556,6 +556,8 @@ def get_task_details(task_id: int) -> Any:
                 TaskInstance.distributor_id,
                 TaskInstance.nodename,
                 TaskInstanceErrorLog.description,
+                TaskInstance.wallclock,
+                TaskInstance.maxrss,
             )
             .outerjoin_from(
                 TaskInstance,
@@ -579,6 +581,8 @@ def get_task_details(task_id: int) -> Any:
         "ti_distributor_id",
         "ti_nodename",
         "ti_error_log_description",
+        "ti_wallclock",
+        "ti_maxrss",
     )
     result = [dict(zip(column_names, row)) for row in rows]
     resp = jsonify(taskinstances=result)
