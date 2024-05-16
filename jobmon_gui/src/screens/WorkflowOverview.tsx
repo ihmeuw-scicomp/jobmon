@@ -1,17 +1,17 @@
 import React, {useEffect, useState, useRef} from 'react';
-import {useForm} from "react-hook-form";
-import {useSearchParams, useNavigate} from "react-router-dom";
-import Form from 'react-bootstrap/Form';
-import Row from 'react-bootstrap/Row';
-import Col from 'react-bootstrap/Col';
-import 'bootstrap/dist/css/bootstrap.min.css';
-
+import {useForm} from 'react-hook-form';
+import {useSearchParams, useNavigate} from 'react-router-dom';
+import {Form, Row, Col} from 'react-bootstrap';
 import axios from 'axios';
 
+import 'bootstrap/dist/css/bootstrap.min.css';
+
 import WorkflowTable from '../components/workflow_overview/WorkflowTable';
-import '../styles/jobmon_gui.css';
+import WorkflowStatus from '../components/workflow_overview/WorkflowStatus';
+
 import {init_apm, safe_rum_add_label, safe_rum_start_span, safe_rum_unit_end} from '../utils/rum';
-import WorkflowStatus from "../components/workflow_overview/WorkflowStatus";
+import '../styles/jobmon_gui.css';
+
 
 function App() {
     const apm: any = init_apm("workflow_overview_page");
@@ -28,72 +28,48 @@ function App() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
 
-
-    //***********************hooks*****************************
-    //page loading hook
     useEffect(() => {
-        let url_user = searchParams.get("user");
-        let url_tool = searchParams.get("tool");
-        let url_wf_name = searchParams.get("wf_name");
-        let url_wf_args = searchParams.get("wf_args");
-        let url_wf_attribute = searchParams.get("wf_attribute")
-        let url_wf_id = searchParams.get("wf_id")
-        let url_date_submitted = searchParams.get("date_submitted");
-        let url_status = searchParams.get("status");
-        if (url_user) {
-            setUser(url_user);
-        }
-        if (url_tool) {
-            setTool(url_tool)
-        }
-        if (url_wf_name) {
-            setWFName(url_wf_name);
-        }
-        if (url_wf_args) {
-            setWFArgs(url_wf_args)
-        }
-        if (url_wf_attribute) {
-            setWFAttribute(url_wf_attribute)
-        }
-        if (url_wf_id) {
-            setWFID(url_wf_id)
-        }
-        if (url_date_submitted) {
-            setDateSubmitted(url_date_submitted)
-        }
-        if (url_status) {
-            setStatus(url_status)
-        }
+        const queryParams = {
+            user: setUser,
+            tool: setTool,
+            wf_name: setWFName,
+            wf_args: setWFArgs,
+            wf_attribute: setWFAttribute,
+            wf_id: setWFID,
+            date_submitted: setDateSubmitted,
+            status: setStatus
+        };
+
+        Object.keys(queryParams).forEach(key => {
+            const value = searchParams.get(key);
+            if (value) {
+                queryParams[key](value);
+            }
+        });
     }, [searchParams]);
 
     const firstUpdate = useRef(true);
-    //user change hook
     useEffect(() => {
         if (firstUpdate.current) {
             // By default, only show workflows that were submitted in the last two weeks
-            const currentDate = new Date();
-            const twoWeeksAgo = new Date(currentDate);
-            twoWeeksAgo.setDate(currentDate.getDate() - 14);
-            const year = twoWeeksAgo.getFullYear();
-            const month = String(twoWeeksAgo.getMonth() + 1).padStart(2, '0');
-            const day = String(twoWeeksAgo.getDate()).padStart(2, '0');
-            const formattedDate = `${year}-${month}-${day}`;
-            setTwoWeeksAgoDate(formattedDate)
-
+            const twoWeeksAgo = new Date(Date.now() - 12096e5); // 2 weeks in milliseconds
+            const formattedDate = twoWeeksAgo.toISOString().split('T')[0];
+            setTwoWeeksAgoDate(formattedDate);
             firstUpdate.current = false;
             return;
         }
         const rum_s1: any = safe_rum_start_span(apm, "landing_page", "external.http");
         safe_rum_add_label(rum_s1, "user", user);
-        const params = new URLSearchParams();
-        params.append("user", user)
-        params.append("tool", tool)
-        params.append("wf_name", wf_name)
-        params.append("wf_args", wf_args)
-        params.append("wf_attribute", wf_attribute)
-        params.append("wf_id", wf_id)
-        params.append("date_submitted", date_submitted)
-        params.append("status", status)
+        const params = new URLSearchParams({
+            user,
+            tool,
+            wf_name,
+            wf_args,
+            wf_attribute,
+            wf_id,
+            date_submitted,
+            status
+        });
         let workflow_status_url = process.env.REACT_APP_BASE_URL + "/workflow_overview_viz";
 
         const fetchData = async () => {
@@ -118,30 +94,46 @@ function App() {
         safe_rum_unit_end(rum_s1);
     }, [user, tool, wf_name, wf_args, wf_attribute, date_submitted, status, wf_id, apm]);
 
-
-    //*******************event handling****************************
-    // user form
     const {register, handleSubmit} = useForm();
-    const onSubmit = handleSubmit((d) => {
-        if (!d["date_submitted_input"]) {
-            d["date_submitted_input"] = two_weeks_ago_date;
+    const onSubmit = handleSubmit(({
+                                       user_input: user,
+                                       tool_input: tool,
+                                       wf_name_input: wf_name,
+                                       wf_args_input: wf_args,
+                                       wf_attribute_input: wf_attribute,
+                                       wf_id: wf_id,
+                                       date_submitted_input: date_submitted,
+                                       status: status
+                                   }) => {
+        if (!date_submitted) {
+            date_submitted = two_weeks_ago_date;
         }
-        navigate('/?user=' + d["user_input"] + "&tool=" + d["tool_input"] + "&wf_name=" + d["wf_name_input"] + "&wf_args=" + d["wf_args_input"] + "&wf_attribute=" + d["wf_attribute_input"] + "&wf_id=" + d["wf_id"] + "&date_submitted=" + d["date_submitted_input"] + "&status=" + d["status"]);
-        setUser(d["user_input"]);
-        setTool(d["tool_input"])
-        setWFName(d["wf_name_input"])
-        setWFArgs(d["wf_args_input"])
-        setWFAttribute(d["wf_attribute_input"])
-        setWFID(d["wf_id"])
-        setDateSubmitted(d["date_submitted_input"])
-        setStatus(d["status"])
+        const queryParams = new URLSearchParams({
+            user,
+            tool,
+            wf_name,
+            wf_args,
+            wf_attribute,
+            wf_id,
+            date_submitted,
+            status
+        });
+        navigate('/?' + queryParams.toString());
+        setUser(user);
+        setTool(tool);
+        setWFName(wf_name);
+        setWFArgs(wf_args);
+        setWFAttribute(wf_attribute);
+        setWFID(wf_id);
+        setDateSubmitted(date_submitted);
+        setStatus(status);
     });
 
     const handleClear = handleSubmit((d) => {
-        navigate(`/?user=&tool=&wf_name=&wf_args=&wf_attribute=&wf_id=&date_submitted=&status=`);
+        navigate("/")
         navigate(0)
     });
-    //********************html page*************************************
+
     return (
         <div id="div-main" className="App">
             <div id="div-header" className="div-level-2">
