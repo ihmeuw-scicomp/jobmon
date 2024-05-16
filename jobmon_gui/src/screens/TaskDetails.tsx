@@ -158,7 +158,7 @@ export default function TaskDetails() {
                     setShowModal={setShowTaskInfo}
                 />
                 <CustomModal
-                    className="task_info_modal"
+                    className="task_fsm_modal"
                     headerContent={
                         <h5> Task Finite State Machine</h5>
                     }

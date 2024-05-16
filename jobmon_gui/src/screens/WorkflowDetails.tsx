@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import '../styles/jobmon_gui.css';
-// import '../../styles/jobmon_gui.css';
 import { useParams, Link, Outlet, useNavigate } from 'react-router-dom';
 import { useForm } from "react-hook-form";
 import axios from 'axios';
