@@ -20,6 +20,7 @@ const customCaret = (order, column) => {
 export default function TaskInstanceTable({taskInstanceData}) {
     const [showStdoutModal, setShowStdoutModal] = useState(false)
     const [showStderrModal, setShowStderrModal] = useState(false)
+    const [showResourcesModal, setShowResourcesModal] = useState(false)
     const [showTIStatusModal, setShowTIStatusModal] = useState(false)
 
     // ti_stderr_log is pulled from task_instance.stderr_log, ti_error_log_description is pulled from task_instance_error_log.description
@@ -27,7 +28,7 @@ export default function TaskInstanceTable({taskInstanceData}) {
         'ti_id': '', 'ti_status': '', 'ti_stdout': '',
         'ti_stderr': '', 'ti_stdout_log': '', 'ti_stderr_log': '',
         'ti_distributor_id': '', 'ti_nodename': '', 'ti_error_log_description': '',
-        'ti_wallclock': '', 'ti_maxrss': ''
+        'ti_wallclock': 0, 'ti_maxrss': '', 'ti_resources': ''
     });
 
     const htmlFormatter = cell => {
@@ -44,16 +45,17 @@ export default function TaskInstanceTable({taskInstanceData}) {
             let stdout_display = e.ti_stdout_log
 
             // Currently not using. Leave in, in case we want to switch to showing logs in table when more users switch to 3.2.1
-            if (stderr_display !== null && stderr_display !== undefined) {
+            if (stderr_display != null) {
                 stderr_display = `
                 <div class="ti-logs">${e.ti_stderr_log.trim().split("\n").slice(-1)}</div>
                 `;
             }
-            if (stdout_display !== null && stdout_display !== undefined) {
+            if (stdout_display != null) {
                 stdout_display = `
                 <div class="ti-logs">${e.ti_stdout_log.trim().split("\n").slice(-1)}</div>
                 `;
             }
+
             r.push({
                 "ti_id": e.ti_id,
                 "ti_status": e.ti_status,
@@ -68,14 +70,15 @@ export default function TaskInstanceTable({taskInstanceData}) {
                 "ti_error_log_description": e.ti_error_log_description,
                 "ti_wallclock": e.ti_wallclock,
                 "ti_maxrss": e.ti_maxrss,
+                "ti_resources": e.ti_resources,
             })
 
         }
         return r;
     }
 
-
     const data_brief = get_data_brief(taskInstanceData)
+
     const columns: Array<ColumnDescription> = [
         {
             dataField: "ti_id",
@@ -140,22 +143,19 @@ export default function TaskInstanceTable({taskInstanceData}) {
             style: {overflowWrap: 'break-word'},
         },
         {
-            dataField: "ti_wallclock",
-            text: "Runtime",
-            sort: true,
-            formatter: (cell) => humanizeDuration(cell * 1000),
-            sortCaret: customCaret,
-        },
-        {
-            dataField: "ti_maxrss",
-            text: "Memory",
-            sort: true,
-            formatter: (cell) => formatBytes(cell),
-            sortCaret: customCaret,
+            dataField: "ti_resources",
+            text: "Resources",
+            // @ts-ignore
+            events: {
+                onClick: (e: any, column: any, columnIndex: any, row: any, rowIndex: any) => {
+                    setShowResourcesModal(true)
+                    setRowDetail(taskInstanceData[rowIndex])
+                }
+            },
+            style: {overflowWrap: 'break-word'},
         },
     ]
 
-    // Create and return the React Bootstrap Table
     return (
         <div>
             <div style={{display: "flex"}}>
@@ -185,7 +185,7 @@ export default function TaskInstanceTable({taskInstanceData}) {
             />
 
             <CustomModal
-                className="task_instance_modal"
+                className="ti_stdout_modal"
                 headerContent={
                     <h5> Standard Out</h5>
                 }
@@ -203,7 +203,7 @@ export default function TaskInstanceTable({taskInstanceData}) {
             />
 
             <CustomModal
-                className="task_instance_modal"
+                className="ti_error_modal"
                 headerContent={
                     <h5> Standard Error</h5>
                 }
@@ -220,6 +220,45 @@ export default function TaskInstanceTable({taskInstanceData}) {
                 }
                 showModal={showStderrModal}
                 setShowModal={setShowStderrModal}
+
+            />
+            <CustomModal
+                className="ti_resources_modal"
+                headerContent={
+                    <h5>Resources</h5>
+                }
+                bodyContent={
+                    <p>
+                        <b>Requested Resources:</b> <br></br>
+                        {rowDetail.ti_resources && (
+                            <>
+                                <ul style={{listStyleType: 'none', padding: 0}}>
+                                    {Object.keys(JSON.parse(rowDetail.ti_resources)).map(key => {
+                                        let value = JSON.parse(rowDetail.ti_resources)[key];
+                                        if (key === "memory") {
+                                            value += " GiB";
+                                        }
+                                        if (key === "runtime") {
+                                            value = humanizeDuration(value * 1000)
+                                        }
+                                        return (
+                                            <li key={key}>
+                                                <i>{key}</i>: {value}
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                                <br/>
+                            </>
+                        )}
+                        <br></br>
+                        <b>Utilized Resources:</b> <br></br>
+                        <i>memory</i>: {formatBytes(rowDetail.ti_maxrss)}<br></br>
+                        <i>runtime</i>: {humanizeDuration(rowDetail.ti_wallclock * 1000)}
+                    </p>
+                }
+                showModal={showResourcesModal}
+                setShowModal={setShowResourcesModal}
 
             />
 
