@@ -13,7 +13,7 @@ import {init_apm, safe_rum_add_label, safe_rum_start_span, safe_rum_unit_end} fr
 import '../styles/jobmon_gui.css';
 
 
-function App() {
+function WorkflowOverview() {
     const apm: any = init_apm("workflow_overview_page");
     const [user, setUser] = useState('');
     const [tool, setTool] = useState('');
@@ -223,4 +223,4 @@ function App() {
     );
 }
 
-export default App;
+export default WorkflowOverview;
