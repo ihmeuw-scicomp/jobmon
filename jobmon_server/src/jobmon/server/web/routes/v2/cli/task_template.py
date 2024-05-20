@@ -568,8 +568,8 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
 
         # Identify the most recent workflow_run_id for each workflow_id
         idx_workflow = (
-                errors_df.groupby("workflow_id")["workflow_run_id"].transform(max)
-                == errors_df["workflow_run_id"]
+            errors_df.groupby("workflow_id")["workflow_run_id"].transform(max)
+            == errors_df["workflow_run_id"]
         )
         errors_df.loc[idx_workflow, "most_recent_workflow_attempt"] = True
 
