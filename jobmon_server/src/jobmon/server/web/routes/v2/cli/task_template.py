@@ -519,6 +519,8 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 TaskInstanceErrorLog.error_time,
                 TaskInstanceErrorLog.description,
                 TaskInstance.stderr_log,
+                TaskInstance.workflow_run_id,
+                Task.workflow_id,
             )
             .where(*query_filter)
             .order_by(TaskInstanceErrorLog.id.desc())
@@ -545,12 +547,15 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 "error_time": r[3],
                 "error": r[4],
                 "task_instance_stderr_log": r[5],
+                "workflow_run_id": r[6],
+                "workflow_id": r[7],
             }
         )
     errors_df = pd.DataFrame(return_list)
 
     # Add the 'most_recent_attempt' column to the DataFrame, defaulting to False
-    errors_df["most_recent_attempt"] = False
+    errors_df["most_recent_task_attempt"] = False
+    errors_df["most_recent_workflow_attempt"] = False
 
     if not errors_df.empty:
         # Identify the most recent task_instance_id for each task_id
@@ -559,7 +564,14 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             == errors_df["task_instance_id"]
         )
         # Update 'most_recent_attempt' based on the identified most recent task_instance_ids
-        errors_df.loc[idx, "most_recent_attempt"] = True
+        errors_df.loc[idx, "most_recent_task_attempt"] = True
+
+        # Identify the most recent workflow_run_id for each workflow_id
+        idx_workflow = (
+                errors_df.groupby("workflow_id")["workflow_run_id"].transform(max)
+                == errors_df["workflow_run_id"]
+        )
+        errors_df.loc[idx_workflow, "most_recent_workflow_attempt"] = True
 
     resp = jsonify(errors_df.to_dict(orient="records"))
     resp.status_code = 200

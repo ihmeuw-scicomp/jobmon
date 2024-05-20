@@ -1,18 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import BootstrapTable from "react-bootstrap-table-next";
-import filterFactory, { textFilter, dateFilter } from 'react-bootstrap-table2-filter';
-import { sanitize } from 'dompurify';
+import filterFactory, {textFilter, dateFilter} from 'react-bootstrap-table2-filter';
+import {sanitize} from 'dompurify';
 import paginationFactory from "react-bootstrap-table2-paginator";
 import 'react-bootstrap-table2-paginator/dist/react-bootstrap-table2-paginator.min.css';
-import { HashLink } from 'react-router-hash-link';
+import {HashLink} from 'react-router-hash-link';
 
 
 import '../../styles/jobmon_gui.css';
-import { convertDatePST } from '../../utils/formatters';
-import { safe_rum_start_span, safe_rum_unit_end } from '../../utils/rum';
+import {convertDatePST} from '../../utils/formatters';
+import {safe_rum_start_span, safe_rum_unit_end} from '../../utils/rum';
 import CustomModal from '../Modal';
 
-export default function Errors({ errorLogs, tt_name, loading, apm }) {
+export default function Errors({errorLogs, tt_name, loading, apm}) {
 
     const [errorDetail, setErrorDetail] = useState({
         'error': '', 'error_time': '', 'task_id': '',
@@ -33,7 +33,7 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
         for (let i in errors) {
 
             let e = errors[i];
-            if (!justRecentErrors || (justRecentErrors && e.most_recent_attempt)) {
+            if (!justRecentErrors || (justRecentErrors && e.most_recent_task_attempt && e.most_recent_workflow_attempt)) {
 
                 let date_display = `
             <div class="error-time">
@@ -61,7 +61,7 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
 
     const htmlFormatter = cell => {
         // add sanitize to prevent xss attack
-        return <div dangerouslySetInnerHTML={{ __html: sanitize(`${cell}`) }} />;
+        return <div dangerouslySetInnerHTML={{__html: sanitize(`${cell}`)}}/>;
     };
 
     const error_brief = get_error_brief(errorLogs);
@@ -74,12 +74,12 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
         {
             dataField: "task_id",
             text: "Task ID",
-            headerStyle: { width: "10%" },
+            headerStyle: {width: "10%"},
         },
         {
             dataField: "task_instance_id",
             text: "Task Instance ID",
-            headerStyle: { width: "15%" },
+            headerStyle: {width: "15%"},
             sort: true,
             formatter: (cell, row) => <nav>
                 <HashLink
@@ -93,7 +93,7 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
             dataField: "date",
             text: "Error Date",
             formatter: htmlFormatter,
-            headerStyle: { width: "20%" },
+            headerStyle: {width: "20%"},
             filter: dateFilter()
 
         },
@@ -144,20 +144,19 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
         <div>
             <div>
                 <span className="span-helper"><i>{helper}</i></span>
-                <br />
+                <br/>
                 {errorLogs.length !== 0 && loading === false &&
                     <>
                         <div className="d-flex pt-4">
-                            <p className=''>Show only most recent task instances</p>
+                            <p className=''>Show latest TaskInstances for latest WorkflowRun</p>
                             <div className='px-4' onClick={handleToggle}>
                                 <div className={"toggle-switch " + (justRecentErrors ? "active" : "")}>
-                                    <div />
-                                    <span className={"toggle-slider " + (justRecentErrors ? "active" : "")}
-                                    ></span>
+                                    <div/>
+                                    <span className={"toggle-slider " + (justRecentErrors ? "active" : "")}></span>
                                 </div>
                             </div>
                         </div>
-                        <hr />
+                        <hr/>
 
                         <BootstrapTable
                             keyField="id"
@@ -167,7 +166,7 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
                             data={error_brief}
                             columns={columns}
                             filter={filterFactory()}
-                            pagination={error_brief.length === 0 ? undefined : paginationFactory({ sizePerPage: 10 })}
+                            pagination={error_brief.length === 0 ? undefined : paginationFactory({sizePerPage: 10})}
                             selectRow={{
                                 mode: "radio",
                                 hideSelectColumn: true,
@@ -199,15 +198,15 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
 
             {errorLogs.length === 0 && tt_name !== "" && loading === false &&
                 <div>
-                    <br />
+                    <br/>
                     There is no error log associated with task template <i>{tt_name}</i>.
                 </div>
             }
 
             {tt_name !== "" && loading &&
                 <div>
-                    <br />
-                    <div className="loader" />
+                    <br/>
+                    <div className="loader"/>
                 </div>
             }
         </div>
