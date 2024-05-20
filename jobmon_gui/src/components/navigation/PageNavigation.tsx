@@ -117,7 +117,7 @@ export default function PageNavigation({children}: PropsWithChildren) {
     return (
         <Box sx={{display: "flex"}}>
             <CssBaseline/>
-            <AppBar position="fixed" open={open} sx={{ backgroundColor: "#17B9CF" }}>
+            <AppBar position="fixed" open={open} sx={{backgroundColor: "#17B9CF"}}>
                 <Toolbar>
                     <IconButton
                         color="inherit"
@@ -130,26 +130,26 @@ export default function PageNavigation({children}: PropsWithChildren) {
                         }}>
                         <MenuIcon/>
                     </IconButton>
-                        <Box sx={{ display: "flex", alignItems: "center" }}>
-                          <img src={IhmeIcon} style={{ padding: 5 }} height={50} alt="" />
-                          <Typography
+                    <Box sx={{display: "flex", alignItems: "center"}}>
+                        <img src={IhmeIcon} style={{padding: 5}} height={50} alt=""/>
+                        <Typography
                             sx={{
-                              fontFamily: "'Archivo', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'sans-serif'",
-                              fontWeight: 300,
-                              fontSize: "3rem",
-                              lineHeight: 1.167,
-                              letterSpacing: "0em",
-                              color: "white",
-                              textDecoration: "none",
-                              boxShadow: "none",
-                              userSelect: "none",
-                              display: "flex",
-                              alignItems: "center",
+                                fontFamily: "'Archivo', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'sans-serif'",
+                                fontWeight: 300,
+                                fontSize: "3rem",
+                                lineHeight: 1.167,
+                                letterSpacing: "0em",
+                                color: "white",
+                                textDecoration: "none",
+                                boxShadow: "none",
+                                userSelect: "none",
+                                display: "flex",
+                                alignItems: "center",
                             }}
-                          >
+                        >
                             Jobmon GUI
-                          </Typography>
-                        </Box>
+                        </Typography>
+                    </Box>
                 </Toolbar>
             </AppBar>
             <Drawer variant="permanent" open={open}>
@@ -202,6 +202,14 @@ export default function PageNavigation({children}: PropsWithChildren) {
                     </Tooltip>
                 </ListItem>
                 <BifrostLinks enabled={bifrostEnabled()} open={open}/>
+                <Box sx={{
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "flex-end"
+                }}></Box>
+                <Typography color={"#ccc"} align={"center"}>v: {process.env.REACT_APP_VERSION}</Typography>
+
+
             </Drawer>
             <Box component="main" sx={{flexGrow: 1, p: 3}}>
                 <DrawerHeader/>
