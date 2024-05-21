@@ -410,9 +410,9 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
         # the optimizer may choose a suboptimal execution plan for large datasets.
         # Has to be conditional since not all database engines support STRAIGHT_JOIN.
         if (
-                SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
+            SessionLocal
+            and SessionLocal.bind
+            and SessionLocal.bind.dialect.name == "mysql"
         ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
@@ -444,9 +444,9 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             .group_by(TaskTemplate.id)
         )
         if (
-                SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
+            SessionLocal
+            and SessionLocal.bind
+            and SessionLocal.bind.dialect.name == "mysql"
         ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         attempts0 = session.execute(sql).all()
@@ -502,7 +502,7 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
     arguments = request.args
     page = int(arguments.get("page", 1))
     page_size = int(arguments.get("page_size", 10))
-    just_recent_errors = arguments.get("just_recent_errors")
+    just_recent_errors = arguments.get("just_recent_errors", "false")
     recent_errors = just_recent_errors.lower() == "true"
     offset = (page - 1) * page_size
 
@@ -519,16 +519,24 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
 
         where_conditions = query_filter[:]
         if recent_errors:
-            where_conditions.extend([
-                (TaskInstance.id == select(func.max(TaskInstance.id))
-                 .where(TaskInstance.task_id == Task.id)
-                 .correlate(Task)
-                 .scalar_subquery()),
-                (TaskInstance.workflow_run_id == select(func.max(WorkflowRun.id))
-                 .where(WorkflowRun.workflow_id == Task.workflow_id)
-                 .correlate(Task)
-                 .scalar_subquery())
-            ])
+            where_conditions.extend(
+                [
+                    (
+                        TaskInstance.id
+                        == select(func.max(TaskInstance.id))
+                        .where(TaskInstance.task_id == Task.id)
+                        .correlate(Task)
+                        .scalar_subquery()
+                    ),
+                    (
+                        TaskInstance.workflow_run_id
+                        == select(func.max(WorkflowRun.id))
+                        .where(WorkflowRun.workflow_id == Task.workflow_id)
+                        .correlate(Task)
+                        .scalar_subquery()
+                    ),
+                ]
+            )
 
         total_count_query = (
             select(func.count(TaskInstanceErrorLog.id))
@@ -558,9 +566,9 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         )
 
         if (
-                SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
+            SessionLocal
+            and SessionLocal.bind
+            and SessionLocal.bind.dialect.name == "mysql"
         ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
@@ -581,11 +589,13 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         )
     errors_df = pd.DataFrame(return_list)
 
-    resp = jsonify({
-        "error_logs": errors_df.to_dict(orient="records"),
-        "total_count": total_count,
-        "page": page,
-        "page_size": page_size
-    })
+    resp = jsonify(
+        {
+            "error_logs": errors_df.to_dict(orient="records"),
+            "total_count": total_count,
+            "page": page,
+            "page_size": page_size,
+        }
+    )
     resp.status_code = 200
     return resp
