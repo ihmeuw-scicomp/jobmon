@@ -581,22 +581,6 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         )
     errors_df = pd.DataFrame(return_list)
 
-    errors_df["most_recent_task_attempt"] = False
-    errors_df["most_recent_workflow_attempt"] = False
-
-    if not errors_df.empty:
-        idx = (
-                errors_df.groupby("task_id")["task_instance_id"].transform(max)
-                == errors_df["task_instance_id"]
-        )
-        errors_df.loc[idx, "most_recent_task_attempt"] = True
-
-        idx_workflow = (
-                errors_df.groupby("workflow_id")["workflow_run_id"].transform(max)
-                == errors_df["workflow_run_id"]
-        )
-        errors_df.loc[idx_workflow, "most_recent_workflow_attempt"] = True
-
     resp = jsonify({
         "error_logs": errors_df.to_dict(orient="records"),
         "total_count": total_count,

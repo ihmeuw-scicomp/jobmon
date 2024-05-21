@@ -30,8 +30,6 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
     const [totalSize, setTotalSize] = useState(0);
 
     function handleToggle() {
-        console.log("YOURE IN HANDLETOGGLE")
-        console.log(!justRecentErrors)
         setRecentErrors(!justRecentErrors)
     }
 
@@ -39,8 +37,6 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
         setErrorLoading(true);
         const url = process.env.REACT_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
         const fetchData = async () => {
-            console.log("FETCH DATA")
-            console.log(justRecentErrors)
             const result: any = await axios({
                     method: 'get',
                     url: url,
