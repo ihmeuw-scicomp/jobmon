@@ -11,8 +11,9 @@ import '../../styles/jobmon_gui.css';
 import {convertDatePST} from '../../utils/formatters';
 import {safe_rum_start_span, safe_rum_unit_end} from '../../utils/rum';
 import CustomModal from '../Modal';
+import axios from "axios";
 
-export default function Errors({errorLogs, tt_name, loading, apm}) {
+export default function Errors({taskTemplateName, taskTemplateId, workflowId, apm}) {
 
     const [errorDetail, setErrorDetail] = useState({
         'error': '', 'error_time': '', 'task_id': '',
@@ -22,9 +23,31 @@ export default function Errors({errorLogs, tt_name, loading, apm}) {
     const [helper, setHelper] = useState("");
     const [showModal, setShowModal] = useState(false)
     const [justRecentErrors, setRecentErrors] = useState(false)
+    const [errorLoading, setErrorLoading] = useState(false);
+    const [errorLogs, setErrorLogs] = useState([]);
 
     function handleToggle() {
         setRecentErrors(!justRecentErrors)
+    }
+
+    function getAsyncErrorLogs(wf_id: string, tt_id?: string) {
+        setErrorLoading(true);
+        const url = process.env.REACT_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
+        const fetchData = async () => {
+            const result: any = await axios({
+                    method: 'get',
+                    url: url,
+                    data: null,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                }
+            )
+            setErrorLogs(result.data);
+            setErrorLoading(false);
+        };
+        return fetchData
     }
 
     function get_error_brief(errors) {
@@ -119,8 +142,12 @@ export default function Errors({errorLogs, tt_name, loading, apm}) {
             }
         }
     ];
+    useEffect(() => {
+        if (typeof workflowId !== 'undefined' && taskTemplateId !== 'undefined' && taskTemplateId !== '') {
+            getAsyncErrorLogs(workflowId, taskTemplateId)();
+        }
+    }, [taskTemplateId, workflowId]);
 
-    //hook
     useEffect(() => {
         // clean the error log detail display (right side) when task template changes
         let temp = {
@@ -145,7 +172,7 @@ export default function Errors({errorLogs, tt_name, loading, apm}) {
             <div>
                 <span className="span-helper"><i>{helper}</i></span>
                 <br/>
-                {errorLogs.length !== 0 && loading === false &&
+                {errorLogs.length !== 0 && !errorLoading &&
                     <>
                         <div className="d-flex pt-4">
                             <p className=''>Show latest TaskInstances for latest WorkflowRun</p>
@@ -196,14 +223,14 @@ export default function Errors({errorLogs, tt_name, loading, apm}) {
             />
 
 
-            {errorLogs.length === 0 && tt_name !== "" && loading === false &&
+            {errorLogs.length === 0 && taskTemplateName !== "" && !errorLoading &&
                 <div>
                     <br/>
-                    There is no error log associated with task template <i>{tt_name}</i>.
+                    There is no error log associated with task template <i>{taskTemplateName}</i>.
                 </div>
             }
 
-            {tt_name !== "" && loading &&
+            {taskTemplateName !== "" && errorLoading &&
                 <div>
                     <br/>
                     <div className="loader"/>
