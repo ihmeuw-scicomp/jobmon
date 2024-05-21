@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import BootstrapTable from "react-bootstrap-table-next";
 import filterFactory, { textFilter, dateFilter } from 'react-bootstrap-table2-filter';
-import { sanitize } from 'dompurify';
+import DOMPurify from 'dompurify';
 import paginationFactory from "react-bootstrap-table2-paginator";
 import 'react-bootstrap-table2-paginator/dist/react-bootstrap-table2-paginator.min.css';
 import { HashLink } from 'react-router-hash-link';
 
-
+export const sanitize = (html: string): string => DOMPurify.sanitize(html);
 import '../../styles/jobmon_gui.css';
 import { convertDatePST } from '../../utils/formatters';
 import { safe_rum_start_span, safe_rum_unit_end } from '../../utils/rum';

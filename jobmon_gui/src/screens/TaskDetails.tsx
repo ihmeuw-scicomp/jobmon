@@ -11,7 +11,7 @@ import CustomModal from '../components/Modal';
 
 function getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId) {
     // Returns task status and workflow ID
-    const url = process.env.REACT_APP_BASE_URL + "/task/get_task_details_viz/" + taskId;
+    const url = import.meta.env.VITE_APP_BASE_URL + "/task/get_task_details_viz/" + taskId;
     const fetchData = async () => {
         const result: any = await axios({
             method: 'get',
@@ -36,7 +36,7 @@ function getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskComman
 
 function getTIDetails(setTIDetails, taskId) {
     // Data for the TaskInstance table
-    const url = process.env.REACT_APP_BASE_URL + "/task/get_ti_details_viz/" + taskId;
+    const url = import.meta.env.VITE_APP_BASE_URL + "/task/get_ti_details_viz/" + taskId;
     const fetchData = async () => {
         const result: any = await axios({
             method: 'get',
@@ -55,7 +55,7 @@ function getTIDetails(setTIDetails, taskId) {
 
 function getTaskDependencies(setUpstreamTasks, setDownstreamTasks, taskId) {
     // Data for upstream and downstream task lists
-    const url = process.env.REACT_APP_BASE_URL + "/task_dependencies/" + taskId;
+    const url = import.meta.env.VITE_APP_BASE_URL + "/task_dependencies/" + taskId;
     const fetchData = async () => {
         const result: any = await axios({
             method: 'get',

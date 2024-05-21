@@ -1,5 +1,5 @@
 const bifrostEnabled = () => {
-    const enableEnvVar = process.env.REACT_APP_DEPLOYMENT_TYPE
+    const enableEnvVar = import.meta.env.VITE_APP_DEPLOYMENT_TYPE
     try {
         if (enableEnvVar && enableEnvVar.toLowerCase() == "ihme") {
             return true

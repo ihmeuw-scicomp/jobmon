@@ -207,7 +207,7 @@ export default function PageNavigation({children}: PropsWithChildren) {
                     display: "flex",
                     alignItems: "flex-end"
                 }}></Box>
-                <Typography color={"#ccc"} align={"center"}>v: {process.env.REACT_APP_VERSION}</Typography>
+                <Typography color={"#ccc"} align={"center"}>v: {import.meta.env.VITE_APP_VERSION}</Typography>
 
 
             </Drawer>

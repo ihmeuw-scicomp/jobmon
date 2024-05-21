@@ -24,7 +24,7 @@ const customCaret = (order, column) => {
 
 // Get task status count for specified workflows
 function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_ids, wf_ids: number[]) {
-    const url = process.env.REACT_APP_BASE_URL + "/workflow_status_viz";
+    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_status_viz";
     const fetchData = async () => {
         let unfinished_wf_ids: number[] = [];
         let finished_wf_ids: number[] = [];

@@ -70,7 +70,7 @@ function WorkflowOverview() {
             date_submitted,
             status
         });
-        let workflow_status_url = process.env.REACT_APP_BASE_URL + "/workflow_overview_viz";
+        let workflow_status_url = import.meta.env.VITE_APP_BASE_URL + "/workflow_overview_viz";
 
         const fetchData = async () => {
             const result: any = await axios({

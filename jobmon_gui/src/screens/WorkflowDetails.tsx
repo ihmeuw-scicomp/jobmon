@@ -20,7 +20,7 @@ import { convertDatePST } from '../utils/formatters';
 import { init_apm, safe_rum_add_label, safe_rum_transaction } from '../utils/rum';
 
 function getAsyncWFdetail(setWFDict, wf_id: string) {
-    const url = process.env.REACT_APP_BASE_URL + "/workflow_status_viz";
+    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_status_viz";
     const wf_ids = [wf_id];
     const fetchData = async () => {
         const result: any = await axios({
@@ -51,7 +51,7 @@ function getWorkflowAttributes(
     setWFElapsedTime,
     setJobmonVersion
 ) {
-    const url = process.env.REACT_APP_BASE_URL + "/workflow_details_viz/" + wf_id;
+    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_details_viz/" + wf_id;
     const fetchData = async () => {
         const result: any = await axios({
             method: 'get',
@@ -78,7 +78,7 @@ function getWorkflowAttributes(
 }
 
 function getAsyncTTdetail(setTTDict, wf_id: string, setTTLoaded) {
-    const url = process.env.REACT_APP_BASE_URL + "/workflow_tt_status_viz/" + wf_id;
+    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_tt_status_viz/" + wf_id;
     const fetchData = async () => {
         const result: any = await axios({
             method: 'get',
@@ -102,7 +102,7 @@ function getAsyncTTdetail(setTTDict, wf_id: string, setTTLoaded) {
 
 function getAsyncErrorLogs(setErrorLogs, wf_id: string, setErrorLoading, tt_id?: string) {
     setErrorLoading(true);
-    const url = process.env.REACT_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
+    const url = import.meta.env.VITE_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
     const fetchData = async () => {
         const result: any = await axios({
             method: 'get',
@@ -184,7 +184,7 @@ function WorkflowDetails({ subpage }) {
             return
         }
         setTaskLoading(true);
-        let task_table_url = process.env.REACT_APP_BASE_URL + "/task_table_viz/" + workflowId;
+        let task_table_url = import.meta.env.VITE_APP_BASE_URL + "/task_table_viz/" + workflowId;
         const fetchData = async () => {
             const result: any = await axios({
                 method: 'get',
@@ -214,7 +214,7 @@ function WorkflowDetails({ subpage }) {
         if (!task_template_version_id) {
             return
         }
-        let usage_url = process.env.REACT_APP_BASE_URL + "/task_template_resource_usage";
+        let usage_url = import.meta.env.VITE_APP_BASE_URL + "/task_template_resource_usage";
 
         const fetchData = async () => {
             const result: any = await axios({
