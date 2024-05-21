@@ -25,6 +25,9 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
     const [justRecentErrors, setRecentErrors] = useState(false)
     const [errorLoading, setErrorLoading] = useState(false);
     const [errorLogs, setErrorLogs] = useState([]);
+    const [page, setPage] = useState(1);
+    const [sizePerPage, setSizePerPage] = useState(10);
+    const [totalSize, setTotalSize] = useState(0);
 
     function handleToggle() {
         setRecentErrors(!justRecentErrors)
@@ -38,14 +41,19 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
                     method: 'get',
                     url: url,
                     data: null,
+                    params: {
+                        page: page,
+                        page_size: sizePerPage
+                    },
                     headers: {
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     }
                 }
             )
-            setErrorLogs(result.data);
+            setErrorLogs(result.data.error_logs);
             setErrorLoading(false);
+            setTotalSize(result.data.total_count);
         };
         return fetchData
     }
@@ -120,7 +128,6 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
             filter: dateFilter()
 
         },
-
         {
             dataField: "brief",
             text: "Error Log",
@@ -146,7 +153,7 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
         if (typeof workflowId !== 'undefined' && taskTemplateId !== 'undefined' && taskTemplateId !== '') {
             getAsyncErrorLogs(workflowId, taskTemplateId)();
         }
-    }, [taskTemplateId, workflowId]);
+    }, [taskTemplateId, workflowId, page, sizePerPage]);
 
     useEffect(() => {
         // clean the error log detail display (right side) when task template changes
@@ -165,6 +172,12 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
             safe_rum_unit_end(s);
         };
     }, [apm]);
+
+    const handleTableChange = (type, {page, sizePerPage}) => {
+        setPage(page);
+        setSizePerPage(sizePerPage);
+    };
+
 
     // logic: when task template name selected, show a loading spinner; when loading finished and there is no error, show a no error message; when loading finished and there are errors, show error logs
     return (
@@ -193,7 +206,15 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
                             data={error_brief}
                             columns={columns}
                             filter={filterFactory()}
-                            pagination={error_brief.length === 0 ? undefined : paginationFactory({sizePerPage: 10})}
+                            pagination={paginationFactory({
+                                page,
+                                sizePerPage,
+                                totalSize,
+                                onPageChange: (page) => setPage(page),
+                                onSizePerPageChange: (sizePerPage) => setSizePerPage(sizePerPage),
+                            })}
+                            remote={{pagination: true}}
+                            onTableChange={handleTableChange}
                             selectRow={{
                                 mode: "radio",
                                 hideSelectColumn: true,

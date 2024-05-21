@@ -500,6 +500,11 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
     # return DS
     return_list: List[Any] = []
 
+    arguments = request.args
+    page = int(arguments.get("page", 1))
+    page_size = int(arguments.get("page_size", 10))
+    offset = (page - 1) * page_size
+
     session = SessionLocal()
     with session.begin():
         query_filter = [
@@ -510,6 +515,12 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             TaskInstance.task_id == Task.id,
             TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
         ]
+
+        total_count_query = (
+            select(func.count(TaskInstanceErrorLog.id))
+            .where(*query_filter)
+        )
+        total_count = session.execute(total_count_query).scalar()
 
         sql = (
             select(
@@ -524,7 +535,8 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             )
             .where(*query_filter)
             .order_by(TaskInstanceErrorLog.id.desc())
-            .limit(2000)
+            .offset(offset)
+            .limit(page_size)
         )
         # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
         # the optimizer may choose a suboptimal execution plan for large datasets.
@@ -573,6 +585,12 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         )
         errors_df.loc[idx_workflow, "most_recent_workflow_attempt"] = True
 
-    resp = jsonify(errors_df.to_dict(orient="records"))
+    # resp = jsonify(errors_df.to_dict(orient="records"))
+    resp = jsonify({
+        "error_logs": errors_df.to_dict(orient="records"),
+        "total_count": total_count,
+        "page": page,
+        "page_size": page_size
+    })
     resp.status_code = 200
     return resp
