@@ -410,9 +410,9 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
         # the optimizer may choose a suboptimal execution plan for large datasets.
         # Has to be conditional since not all database engines support STRAIGHT_JOIN.
         if (
-            SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
         ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
@@ -444,9 +444,9 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             .group_by(TaskTemplate.id)
         )
         if (
-            SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
         ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         attempts0 = session.execute(sql).all()
@@ -497,7 +497,6 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
 @cross_origin()
 def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
     """Get the error logs for a task template id for GUI."""
-    # return DS
     return_list: List[Any] = []
 
     arguments = request.args
@@ -516,9 +515,26 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
         ]
 
+        latest_toggle = False
+
+        where_conditions = query_filter[:]
+        if latest_toggle:
+            where_conditions.extend([
+                (TaskInstance.id == select(func.max(TaskInstance.id))
+                 .where(TaskInstance.task_id == Task.id)
+                 .correlate(Task)
+                 .scalar_subquery()),
+                (TaskInstance.workflow_run_id == select(func.max(WorkflowRun.id))
+                 .where(WorkflowRun.workflow_id == Task.workflow_id)
+                 .correlate(Task)
+                 .scalar_subquery())
+            ])
+
         total_count_query = (
             select(func.count(TaskInstanceErrorLog.id))
-            .where(*query_filter)
+            .join(TaskInstance, Task.id == TaskInstance.task_id)
+            .join(WorkflowRun, WorkflowRun.id == TaskInstance.workflow_run_id)
+            .where(*where_conditions)
         )
         total_count = session.execute(total_count_query).scalar()
 
@@ -533,24 +549,24 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 TaskInstance.workflow_run_id,
                 Task.workflow_id,
             )
-            .where(*query_filter)
+            .join(TaskInstance, Task.id == TaskInstance.task_id)
+            .join(WorkflowRun, WorkflowRun.id == TaskInstance.workflow_run_id)
+            .where(*where_conditions)
             .order_by(TaskInstanceErrorLog.id.desc())
             .offset(offset)
             .limit(page_size)
         )
-        # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
-        # the optimizer may choose a suboptimal execution plan for large datasets.
-        # Has to be conditional since not all database engines support STRAIGHT_JOIN.
+
         if (
-            SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
         ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
         session.commit()
+
     for r in rows:
-        # dict: {<error log id>: [<tid>, <tiid>, <error time>, <error log>}
         return_list.append(
             {
                 "task_id": r[0],
@@ -565,27 +581,22 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         )
     errors_df = pd.DataFrame(return_list)
 
-    # Add the 'most_recent_attempt' column to the DataFrame, defaulting to False
     errors_df["most_recent_task_attempt"] = False
     errors_df["most_recent_workflow_attempt"] = False
 
     if not errors_df.empty:
-        # Identify the most recent task_instance_id for each task_id
         idx = (
-            errors_df.groupby("task_id")["task_instance_id"].transform(max)
-            == errors_df["task_instance_id"]
+                errors_df.groupby("task_id")["task_instance_id"].transform(max)
+                == errors_df["task_instance_id"]
         )
-        # Update 'most_recent_attempt' based on the identified most recent task_instance_ids
         errors_df.loc[idx, "most_recent_task_attempt"] = True
 
-        # Identify the most recent workflow_run_id for each workflow_id
         idx_workflow = (
-            errors_df.groupby("workflow_id")["workflow_run_id"].transform(max)
-            == errors_df["workflow_run_id"]
+                errors_df.groupby("workflow_id")["workflow_run_id"].transform(max)
+                == errors_df["workflow_run_id"]
         )
         errors_df.loc[idx_workflow, "most_recent_workflow_attempt"] = True
 
-    # resp = jsonify(errors_df.to_dict(orient="records"))
     resp = jsonify({
         "error_logs": errors_df.to_dict(orient="records"),
         "total_count": total_count,
