@@ -30,6 +30,8 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
     const [totalSize, setTotalSize] = useState(0);
 
     function handleToggle() {
+        console.log("YOURE IN HANDLETOGGLE")
+        console.log(!justRecentErrors)
         setRecentErrors(!justRecentErrors)
     }
 
@@ -37,13 +39,16 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
         setErrorLoading(true);
         const url = process.env.REACT_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
         const fetchData = async () => {
+            console.log("FETCH DATA")
+            console.log(justRecentErrors)
             const result: any = await axios({
                     method: 'get',
                     url: url,
                     data: null,
                     params: {
                         page: page,
-                        page_size: sizePerPage
+                        page_size: sizePerPage,
+                        just_recent_errors: justRecentErrors,
                     },
                     headers: {
                         'Content-Type': 'application/json',
@@ -64,28 +69,27 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
         for (let i in errors) {
 
             let e = errors[i];
-            if (!justRecentErrors || (justRecentErrors && e.most_recent_task_attempt && e.most_recent_workflow_attempt)) {
-
-                let date_display = `
-            <div class="error-time">
-            <span>${convertDatePST(e.error_time)}</span>
-            </div>
+            let date_display = `
+                <div class="error-time">
+                    <span>${convertDatePST(e.error_time)}</span>
+                </div>
             `;
-                let error_display = `
-            <div class="error-log">${e.error.trim().split("\n").slice(-1)}</div>
+            let error_display = `
+                <div class="error-log">
+                    ${e.error.trim().split("\n").slice(-1)}
+                </div>
             `;
 
-                r.push({
-                    "id": e.task_instance_err_id,
-                    "task_id": e.task_id,
-                    "task_instance_id": e.task_instance_id,
-                    "brief": error_display,
-                    "date": date_display,
-                    "time": e.error_time,
-                    "error": e.error,
-                    "task_instance_stderr_log": e.task_instance_stderr_log
-                })
-            }
+            r.push({
+                "id": e.task_instance_err_id,
+                "task_id": e.task_id,
+                "task_instance_id": e.task_instance_id,
+                "brief": error_display,
+                "date": date_display,
+                "time": e.error_time,
+                "error": e.error,
+                "task_instance_stderr_log": e.task_instance_stderr_log
+            })
         }
         return r;
     }
@@ -153,7 +157,7 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
         if (typeof workflowId !== 'undefined' && taskTemplateId !== 'undefined' && taskTemplateId !== '') {
             getAsyncErrorLogs(workflowId, taskTemplateId)();
         }
-    }, [taskTemplateId, workflowId, page, sizePerPage]);
+    }, [taskTemplateId, workflowId, page, sizePerPage, justRecentErrors]);
 
     useEffect(() => {
         // clean the error log detail display (right side) when task template changes

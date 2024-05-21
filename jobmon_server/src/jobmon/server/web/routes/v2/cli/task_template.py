@@ -502,6 +502,8 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
     arguments = request.args
     page = int(arguments.get("page", 1))
     page_size = int(arguments.get("page_size", 10))
+    just_recent_errors = arguments.get("just_recent_errors")
+    recent_errors = just_recent_errors.lower() == "true"
     offset = (page - 1) * page_size
 
     session = SessionLocal()
@@ -515,10 +517,8 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
         ]
 
-        latest_toggle = False
-
         where_conditions = query_filter[:]
-        if latest_toggle:
+        if recent_errors:
             where_conditions.extend([
                 (TaskInstance.id == select(func.max(TaskInstance.id))
                  .where(TaskInstance.task_id == Task.id)
