@@ -8,7 +8,7 @@ import HubIcon from "@mui/icons-material/Hub";
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import {Tooltip} from "@mui/material";
-import {imageLauncherUrl, metricMindUrl, squidUrl} from "../../configs/ExternalUrls";
+import {imageLauncherUrl, metricMindUrl, squidUrl} from "@jobmon_gui/configs/ExternalUrls";
 
 
 type BifrostLinksProps = {

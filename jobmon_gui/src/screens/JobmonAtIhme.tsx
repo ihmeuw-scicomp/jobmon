@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import '../styles/jobmon_gui.css'
+import '@jobmon_gui/styles/jobmon_gui.css'
 
 const replacements = {
     "JOBMON_DB_HOST": import.meta.env.VITE_APP_DOCS_DB_HOST,

@@ -7,8 +7,8 @@ import filterFactory, { textFilter, numberFilter } from 'react-bootstrap-table2-
 import 'react-bootstrap-table2-filter/dist/react-bootstrap-table2-filter.min.css';
 import 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit.min.css';
 
-import { convertDate, convertDatePST } from '../../utils/formatters'
-import '../../styles/jobmon_gui.css';
+import { convertDate, convertDatePST } from '@jobmon_gui/utils/formatters'
+import '@jobmon_gui/styles/jobmon_gui.css';
 import { FaCaretDown, FaCaretUp, FaCircle } from "react-icons/fa";
 
 const customCaret = (order, column) => {
