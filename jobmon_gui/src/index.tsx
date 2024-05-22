@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles/index.css';
-import App from './screens/WorkflowOverview';
+import WorkflowOverview from './screens/WorkflowOverview';
 import {
   HashRouter,
   Routes,
@@ -28,7 +28,7 @@ root.render(
           <Route path="task_details/:taskId" element={<TaskDetails />}></Route>
           <Route path="help" element={<Help />}></Route>
           <Route path="jobmon_at_ihme" element={<JobmonAtIHME />}></Route>
-          <Route path="/" element={<App />} />
+          <Route path="/" element={<WorkflowOverview />} />
           <Route
             path="*"
             element={

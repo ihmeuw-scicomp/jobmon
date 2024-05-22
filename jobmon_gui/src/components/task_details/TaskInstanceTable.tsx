@@ -5,11 +5,11 @@ import paginationFactory from "react-bootstrap-table2-paginator";
 import {FaCaretDown, FaCaretUp} from "react-icons/fa";
 import {HiInformationCircle} from "react-icons/hi";
 import CustomModal from '../Modal';
-import {sanitize} from 'dompurify';
+import DOMPurify from 'dompurify';
 import {formatBytes} from "../../utils/formatters";
 import humanizeDuration from 'humanize-duration';
 
-
+export const sanitize = (html: string): string => DOMPurify.sanitize(html);
 const customCaret = (order, column) => {
     if (!order) return (<span><FaCaretUp style={{marginLeft: "5px"}}/></span>);
     else if (order === 'asc') return (<span><FaCaretUp style={{marginLeft: "5px"}}/></span>);
