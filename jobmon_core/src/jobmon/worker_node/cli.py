@@ -1,11 +1,14 @@
 """Command line interface for Execution."""
 
 import argparse
+import ast
+import importlib
 import logging
 import sys
 from typing import Optional
 
 from jobmon.core.cli import CLI
+from jobmon.core.task_generator import TaskGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +25,7 @@ class WorkerNodeCLI(CLI):
 
         self._add_worker_node_job_parser()
         self._add_worker_node_array_parser()
+        self._add_run_task_generator_parser()
 
     def run_task_instance_job(self, args: argparse.Namespace) -> int:
         """Configuration for the jobmon worker node."""
@@ -78,6 +82,75 @@ class WorkerNodeCLI(CLI):
             sys.exit(ReturnCodes.WORKER_NODE_CLI_FAILURE)
 
         return worker_node_task_instance.command_returncode
+
+    def run_task_generator(self, args: argparse.Namespace) -> int:
+        from jobmon.core.exceptions import ReturnCodes
+        from jobmon.worker_node import __version__
+        from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
+
+        if __version__ != args.expected_jobmon_version:
+            msg = (
+                f"Your expected Jobmon version is {args.expected_jobmon_version} and your "
+                f"worker node is using {__version__}. Please check your bash profile "
+            )
+            logger.error(msg)
+            sys.exit(ReturnCodes.WORKER_NODE_ENV_FAILURE)
+
+        # Import the module and get the task generator we've been pointed to, raise an error
+        # if it's not a TaskGenerator
+        mod = importlib.import_module(args.module_name)
+        task_generator = getattr(mod, args.task_name)
+        if not isinstance(task_generator, TaskGenerator):
+            raise ValueError(f"{args.module_name}:{args.task_name} doesn't point to a runnable jobmon task.")
+
+        # if the user used the --arghelp flag, print the help message for the task generator
+        if args.arghelp:
+            print(task_generator.help())
+            return ReturnCodes.SUCCESS
+        # if the user used the --args flag, parse the args and run the task generator
+        if args.args:
+            arg_dict = {}
+            pairs = args.args.split(', ')
+
+            for pair in pairs:
+                key, value = pair.split('=')
+                if value.startswith('[') and value.endswith(']'):
+                    value = ast.literal_eval(value)
+                arg_dict[key] = value
+            task_generator.run(**arg_dict)
+
+    def _add_run_task_generator_parser(self) -> None:
+        generator_parser = self._subparsers.add_parser("task_generator")
+        generator_parser.set_defaults(func=self.run_task_generator)
+        generator_parser.add_argument(
+            "--module_name",
+            help="name of the module containing the TaskGenerator",
+            required=True,
+        )
+        generator_parser.add_argument(
+            "--task_name",
+            type=str,
+            help="the name of the function which has been turned into a TaskGenerator",
+            required=True,
+        )
+        generator_parser.add_argument(
+            "--args",
+            type=str,
+            help="Pair the args with the params of the function. For example: --args arg1=1,arg2=[2, 3]",
+            required=False,
+        )
+        generator_parser.add_argument(
+            "--arghelp",
+            type=str,
+            help="Show the help message for the task generator. For example: --arghelp",
+            required=False,
+        )
+        generator_parser.add_argument(
+            "--expected_jobmon_version",
+            type=str,
+            help="expected_jobmon_version of the work node.",
+            required=True,
+        )
 
     def _add_worker_node_job_parser(self) -> None:
         job_parser = self._subparsers.add_parser("worker_node_job")
