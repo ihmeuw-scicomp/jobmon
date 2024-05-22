@@ -86,6 +86,16 @@ class WorkerNodeCLI(CLI):
     def run_task_generator(self, args: argparse.Namespace) -> int:
         from jobmon.core.exceptions import ReturnCodes
         from jobmon.worker_node import __version__
+        # if the user used the --args flag, parse the args and run the task generator
+        if args.args:
+            arg_dict = {}
+            pairs = args.args.split(' ')
+
+            for pair in pairs:
+                key, value = pair.split('=')
+                if value.startswith('[') and value.endswith(']'):
+                    value = ast.literal_eval(value)
+                arg_dict[key] = value
 
         if __version__ != args.expected_jobmon_version:
             msg = (
@@ -106,17 +116,7 @@ class WorkerNodeCLI(CLI):
         if args.arghelp:
             print(task_generator.help())
             return ReturnCodes.SUCCESS
-        # if the user used the --args flag, parse the args and run the task generator
-        if args.args:
-            arg_dict = {}
-            pairs = args.args.split(' ')
-
-            for pair in pairs:
-                key, value = pair.split('=')
-                if value.startswith('[') and value.endswith(']'):
-                    value = ast.literal_eval(value)
-                arg_dict[key] = value
-            task_generator.run(**arg_dict)
+        task_generator.run(**arg_dict)
 
     def _add_run_task_generator_parser(self) -> None:
         generator_parser = self._subparsers.add_parser("task_generator")
