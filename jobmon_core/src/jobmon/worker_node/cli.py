@@ -89,7 +89,7 @@ class WorkerNodeCLI(CLI):
         # if the user used the --args flag, parse the args and run the task generator
         if args.args:
             arg_dict = {}
-            pairs = args.args.split(' ')
+            pairs = args.args.split('; ')
 
             for pair in pairs:
                 key, value = pair.split('=')
@@ -135,7 +135,7 @@ class WorkerNodeCLI(CLI):
         generator_parser.add_argument(
             "--args",
             type=str,
-            help="Pair the args with the params of the function. For example: --args \"arg1=1 arg2=[2, 3]\"",
+            help="Pair the args with the params of the function, seperated by `; `. For example: --args \"arg1=1; arg2=[2, 3]\"",
             required=False,
         )
         generator_parser.add_argument(
