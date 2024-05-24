@@ -89,7 +89,7 @@ class WorkerNodeCLI(CLI):
         # if the user used the --args flag, parse the args and run the task generator
         if args.args:
             arg_dict = {}
-            pairs = args.args.split('; ')
+            pairs = args.args.split(';')
 
             for pair in pairs:
                 key, value = pair.split('=')
@@ -108,9 +108,9 @@ class WorkerNodeCLI(CLI):
         # Import the module and get the task generator we've been pointed to, raise an error
         # if it's not a TaskGenerator
         mod = importlib.import_module(args.module_name)
-        task_generator = getattr(mod, args.task_name)
+        task_generator = getattr(mod, args.func_name)
         if not isinstance(task_generator, TaskGenerator):
-            raise ValueError(f"{args.module_name}:{args.task_name} doesn't point to a runnable jobmon task.")
+            raise ValueError(f"{args.module_name}:{args.func_name} doesn't point to a runnable jobmon task.")
 
         # if the user used the --arghelp flag, print the help message for the task generator
         if args.arghelp:
@@ -127,7 +127,7 @@ class WorkerNodeCLI(CLI):
             required=True,
         )
         generator_parser.add_argument(
-            "--task_name",
+            "--func_name",
             type=str,
             help="the name of the function which has been turned into a TaskGenerator",
             required=True,
@@ -135,7 +135,7 @@ class WorkerNodeCLI(CLI):
         generator_parser.add_argument(
             "--args",
             type=str,
-            help="Pair the args with the params of the function, seperated by `; `. For example: --args \"arg1=1; arg2=[2, 3]\"",
+            help="Pair the args with the params of the function, seperated by `;`. For example: --args \"arg1=1; arg2=[2, 3]\"",
             required=False,
         )
         generator_parser.add_argument(

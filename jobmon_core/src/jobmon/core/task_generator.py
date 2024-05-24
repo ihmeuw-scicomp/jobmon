@@ -1,21 +1,21 @@
 import ast
 import inspect
-from typing import Any, Callable, Collection, Optional, Type
+from typing import Any, Callable, Collection, Dict, List, Optional, Type, Union
 import shutil
 
 import docstring_parser
 from jobmon.client.api import Tool
 from jobmon.client.task import Task
 from jobmon.client.workflow import Workflow
+from jobmon.core import __version__ as core_version
 
 SIMPLE_TYPES = {str, int, float, bool}
 BUILT_IN_COLLECTIONS = {list, tuple, set}
 OPTIONAL_TYPES = {Optional, type(None)}
 
-TASK_RUNNER_NAME = "jobmon_task_runner"
+TASK_RUNNER_NAME = "worker_node_entry_point task_generator "
 HELP_TEXT_INTRO_FORMAT = "Command Line Documentation for {full_path}"
 
-ARGUMENT_NAME_PREFIX = "--"
 SERIALIZED_EMPTY_STRING = '""'
 
 def _find_executable_path(executable_name):
@@ -35,7 +35,7 @@ def _is_unannotated_built_in_collection_type(obj_type: Any) -> bool:
     return obj_type in BUILT_IN_COLLECTIONS
 
 
-def _get_collection_type(obj_type: Any) -> Type | None:
+def _get_collection_type(obj_type: Any) -> Optional[Type]:
     """Return the type of collection.
 
     To check, we extract the ``__origin__`` component of the ``obj_type`` -- this would be
@@ -51,7 +51,7 @@ def _get_collection_type(obj_type: Any) -> Type | None:
     return getattr(obj_type, "__origin__", None)
 
 
-def _get_generic_type_parameters(obj_type: Any) -> tuple[Type, ...] | None:
+def _get_generic_type_parameters(obj_type: Any) -> Any:
     """Return the parameters for a generic type.
 
     The results are a tuple of types. For example, a ``list[int]`` returns ``(int,)``, a
@@ -71,8 +71,8 @@ def _is_annotated_built_in_collection_type(obj_type: Any) -> bool:
 
 
 def _zip_collection_items_and_types(
-    obj: Collection[str], collection_items_type: tuple[Type, ...]
-) -> list[tuple[str, Any]]:
+    obj: Collection[str], collection_items_type: tuple
+) -> Any:
     """Return a list of tuples mapping collection items and their types.
 
     Ex. ``obj`` is ``[1, 2, 3]`` and ``collection_items_type`` is ``(int,)`` would return
@@ -156,21 +156,21 @@ def _get_short_description(task_function_docstring: docstring_parser.Docstring) 
     return short_description
 
 
-def make_cli_argument_string(arg_name: str, arg_value: str | list[str]) -> str:
+def make_cli_argument_string(serialized_kwargs) -> str:
     """Make a CLI argument string from an argument name and value.
 
-    Be aware that the spacing around the arguments and values is important! We want to end up
-    with something like `` --foo foo`` where each argument is responsible for prefixing itself
-    with a space and **SHOULD NOT** have a space at the end.
+    Be aware that args ard passed in as a list of strings leading by "--args",
+    with format key=value or key=[value1, value2], separated by ";".
+    This function will return a string with the format "--args \"arg1=1;arg2=[2, 3]\""".
+    Note: there should be no space after the ";".
     """
-    if isinstance(arg_value, list):
-        return "".join(f" {ARGUMENT_NAME_PREFIX}{arg_name} {v}" for v in arg_value)
-
-    return f" {ARGUMENT_NAME_PREFIX}{arg_name} {arg_value}"
-
-
-def _has_even_arg_count(args: list[str]) -> bool:
-    return len(args) % 2 == 0
+    result_elements = []
+    for key, value in serialized_kwargs.items():
+        if isinstance(value, list):
+            result_elements.append(f"{key}=[{', '.join(value)}]")
+        else:
+            result_elements.append(f"{key}={value}")
+    return ";".join(result_elements)
 
 
 class TaskGenerator:
@@ -202,9 +202,9 @@ class TaskGenerator:
     def __init__(
         self,
         task_function: Callable,
-        serializers: dict[Type, tuple[Callable, Callable]],
+        serializers: Dict,
         tool: Tool,
-        naming_args: Optional[list[str]] = None,
+        naming_args: Optional[List[str]] = None,
         max_attempts: Optional[int] = None,
     ) -> None:
         """Initialize TaskGenerator.
@@ -224,7 +224,7 @@ class TaskGenerator:
         self.serializers = serializers
         self.tool = tool
         self.max_attempts = max_attempts
-
+        self.mod_name = f"{task_function.__module__}"
         self.name = task_function.__name__
         self.full_path = f"{task_function.__module__}:{self.name}"
         self.params = {
@@ -294,11 +294,14 @@ class TaskGenerator:
 
     def _generate_task_template(self) -> None:
         """Generate and store the task template."""
-        args_template = "".join(f"{{{arg_name}}}" for arg_name in self.params)
         self._task_template = self.tool.get_task_template(
             template_name=self.name,
-            command_template=("{executable} " + self.full_path + args_template),
-            node_args=self.params.keys(),
+            command_template=("{executable} " +
+                              " --expected_jobmon_version " + core_version +
+                              " --module_name " + self.mod_name +
+                              " --func_name "  + self.name +
+                              " --args {tg_arg_string}"),
+            node_args='tg_arg_string',
             op_args=["executable"],
         )
 
@@ -316,7 +319,7 @@ class TaskGenerator:
 
         return matches
 
-    def serialize(self, obj: Any, expected_type: Type) -> str | list[str]:
+    def serialize(self, obj: Any, expected_type: Type) -> Union[str, List]:
         """Serialize ``obj``, validating that it is actually of type ``expected_type``."""
         if not self._is_valid_type(obj, expected_type):
             raise TypeError(
@@ -324,7 +327,7 @@ class TaskGenerator:
                 f"type ``{type(obj)}``."
             )
 
-        serialized_result: str | list[str]
+        serialized_result: Union[str, list[str]]
 
         if expected_type in self.serializers.keys():
             # The 0'th index of the serializers dict is the serialization function
@@ -370,7 +373,7 @@ class TaskGenerator:
 
         return serialized_result
 
-    def deserialize(self, obj: str | list[str], obj_type: Type) -> Any:
+    def deserialize(self, obj: Union[str, List], obj_type: Type) -> Any:
         """Deserialize ``obj``."""
         deserialized_result: Any
 
@@ -438,21 +441,14 @@ class TaskGenerator:
         Currently we check:
         - that the command has an even number of arguments
         """
+        pass
         # Split the command on spaces and remove elements from the beginning of the command
         # until we find the first argument (i.e. the first item which starts with ``--``)
         cleaned_command = command.split()
-        while not cleaned_command[0].startswith(ARGUMENT_NAME_PREFIX):
-            cleaned_command.pop(0)
+        #while not cleaned_command[0].startswith(ARGUMENT_NAME_PREFIX):
+        #    cleaned_command.pop(0)
 
-        if not _has_even_arg_count(cleaned_command):
-            raise ValueError(
-                "A malformed task has been generated with an uneven pairing of arguments and "
-                "values, this task is not runnable. Please check the task command for any "
-                "arguments without a value, or for any back-to-back values. Each argument is "
-                f"expected to be paired with exactly one value: ``{command}``."
-            )
-
-    def create_task(self, compute_resources: dict[str, Any], **kwargs: Any) -> Task:
+    def create_task(self, compute_resources: Dict, **kwargs: Any) -> Task:
         """Create a task for the task_function with the given kwargs."""
         executable_path = _find_executable_path(executable=TASK_RUNNER_NAME)
 
@@ -463,10 +459,7 @@ class TaskGenerator:
         }
 
         # Format the kwargs for the task
-        kwargs_for_task = {
-            name: make_cli_argument_string(arg_name=name, arg_value=value)
-            for name, value in serialized_kwargs.items()
-        }
+        tg_arg_string = make_cli_argument_string(serialized_kwargs)
 
         # We want a slightly different format to put list kwargs into the name
         kwargs_for_name = {
@@ -493,13 +486,13 @@ class TaskGenerator:
             compute_resources=compute_resources,
             max_attempts=self.max_attempts,
             executable=executable_path,
-            **kwargs_for_task,
+            tg_arg_string=f"'{tg_arg_string}'",
         )
         self._verify_task_command_is_valid(task.command)
 
         return task
 
-    def run(self, parsed_arg_value_pairs: dict[str, str | list[str]]) -> Any:
+    def run(self, parsed_arg_value_pairs: Dict) -> Any:
         """Run the task_function with the given args and return any result."""
 
         # Raise an error if the user did not provide all of the arguments for the task_function
@@ -561,9 +554,9 @@ class TaskGenerator:
 
     def _get_param_names_and_descriptions(
         self,
-        task_function_docstring_param_names_to_annotations: dict[str, str],
-        task_function_docstring_param_names_to_descriptions: dict[str, str],
-    ) -> list[str]:
+        task_function_docstring_param_names_to_annotations: Dict,
+        task_function_docstring_param_names_to_descriptions: Dict,
+    ) -> List[str]:
         parameter_names_and_descriptions = []
 
         for param, annotation in self.params.items():
@@ -598,9 +591,9 @@ class TaskGenerator:
 
 
 def task_generator(
-    serializers: dict[Type, tuple[Callable, Callable]],
+    serializers: Dict,
     tool: Tool,
-    naming_args: Optional[list[str]] = None,
+    naming_args: Optional[List[str]] = None,
     max_attempts: Optional[int] = None,
 ) -> Callable:
     """Decorator for generating jobmon tasks from a python function."""
@@ -621,9 +614,9 @@ def task_generator(
 def get_tasks_by_node_args(
     workflow: Workflow,
     task_generator: TaskGenerator,
-    node_args_dict: dict[str, Any],
+    node_args_dict: Dict,
     error_on_empty: bool = True,
-) -> list[Task]:
+) -> List[Task]:
     """Get the tasks of a TaskGenerator in a workflow that have the given node arguments.
 
     This method does some value serialization and formatting before handing the node argument
