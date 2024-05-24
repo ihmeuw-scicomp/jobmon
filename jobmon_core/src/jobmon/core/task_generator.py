@@ -296,12 +296,12 @@ class TaskGenerator:
         """Generate and store the task template."""
         self._task_template = self.tool.get_task_template(
             template_name=self.name,
-            command_template=("{executable} " +
-                              " --expected_jobmon_version " + core_version +
-                              " --module_name " + self.mod_name +
-                              " --func_name "  + self.name +
-                              " --args {tg_arg_string}"),
-            node_args='tg_arg_string',
+            command_template="{executable} " +
+                             " --expected_jobmon_version " + core_version +
+                             " --module_name " + self.mod_name +
+                             " --func_name " + self.name +
+                             " --args {tgargs}",
+            node_args=["tgargs"],
             op_args=["executable"],
         )
 
@@ -486,7 +486,7 @@ class TaskGenerator:
             compute_resources=compute_resources,
             max_attempts=self.max_attempts,
             executable=executable_path,
-            tg_arg_string=f"'{tg_arg_string}'",
+            tgargs=f"'{tg_arg_string}'",
         )
         self._verify_task_command_is_valid(task.command)
 
@@ -624,13 +624,7 @@ def get_tasks_by_node_args(
     """
     # Re-serialize the node args dict and format them as CLI arguments
     serialized_node_args = {
-        arg_name: make_cli_argument_string(
-            arg_name=arg_name,
-            arg_value=task_generator.serialize(
-                obj=arg_value, expected_type=task_generator.params[arg_name]
-            ),
-        )
-        for arg_name, arg_value in node_args_dict.items()
+        make_cli_argument_string(node_args_dict)
     }
 
     try:
