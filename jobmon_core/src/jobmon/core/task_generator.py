@@ -231,7 +231,7 @@ class TaskGenerator:
             name: details.annotation
             for name, details in inspect.signature(self.task_function).parameters.items()
         }
-        self._naming_args = naming_args or self.params.keys()
+        self._naming_args = naming_args if naming_args is not None else self.params.keys()
 
         self._validate_task_function()
 
@@ -460,7 +460,6 @@ class TaskGenerator:
 
         # Format the kwargs for the task
         tg_arg_string = make_cli_argument_string(serialized_kwargs)
-
         # We want a slightly different format to put list kwargs into the name
         kwargs_for_name = {
             name: ",".join(value) if isinstance(value, list) else value
@@ -479,6 +478,8 @@ class TaskGenerator:
             + ":"
             + ":".join(f"{name}={value}" for name, value in kwargs_for_name.items())
         )
+        # trim ending :
+        if name[-1] == ":": name = name[:-1]
 
         # Create the task
         task = self._task_template.create_task(

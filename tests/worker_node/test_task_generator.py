@@ -77,3 +77,53 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
     )
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
+
+@pytest.mark.parametrize(
+        ["naming_args", "expected_name"],
+        [
+            [["foo", "bar"], "simple_function:foo=1:bar=baz"],
+            [None, "simple_function:foo=1:bar=baz"],
+            [["foo"], "simple_function:foo=1"],
+            [[], "simple_function"],
+        ],
+    )
+def test_naming_args(
+        client_env, naming_args, expected_name, monkeypatch: pytest.fixture
+) -> None:
+    """Verify that the name only includes the expected naming args.
+
+
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#711
+    """
+    # Set up function
+    monkeypatch.setattr(
+        task_generator, "_find_executable_path", Mock(return_value=task_generator.TASK_RUNNER_NAME)
+    )
+    tool = Tool()
+    @task_generator.task_generator(
+        serializers={}, tool=tool, naming_args=naming_args
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    compute_resources = {}
+
+    # Exercise
+    task = simple_function.create_task(
+        compute_resources=compute_resources, foo=1, bar="baz"
+    )
+
+    # Verify task name matches the expected
+    assert task.name == expected_name
+
+    # Verify command
+    expected_command = (
+        f"{task_generator.TASK_RUNNER_NAME} "
+        f" --expected_jobmon_version {core_version}"
+        f" --module_name worker_node.test_task_generator"
+        " --func_name simple_function"
+        " --args 'foo=1;bar=baz'"
+    )
+    assert task.command == expected_command
+    assert task.compute_resources == compute_resources
