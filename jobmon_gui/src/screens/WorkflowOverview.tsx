@@ -6,11 +6,11 @@ import axios from 'axios';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-import WorkflowTable from '../components/workflow_overview/WorkflowTable';
-import WorkflowStatus from '../components/workflow_overview/WorkflowStatus';
+import WorkflowTable from '@jobmon_gui/components/workflow_overview/WorkflowTable';
+import WorkflowStatus from '@jobmon_gui/components/workflow_overview/WorkflowStatus';
 
-import {init_apm, safe_rum_add_label, safe_rum_start_span, safe_rum_unit_end} from '../utils/rum';
-import '../styles/jobmon_gui.css';
+import {init_apm, safe_rum_add_label, safe_rum_start_span, safe_rum_unit_end} from '@jobmon_gui/utils/rum';
+import '@jobmon_gui/styles/jobmon_gui.css';
 
 
 function WorkflowOverview() {
