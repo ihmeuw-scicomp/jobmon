@@ -127,3 +127,29 @@ def test_naming_args(
     )
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
+
+
+def test_max_attempts(client_env, monkeypatch: pytest.fixture) -> None:
+    """Verify that we pass max_attempts correctly to the task."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator, "_find_executable_path", Mock(return_value=task_generator.TASK_RUNNER_NAME)
+    )
+
+    max_attempts = 40
+    tool = Tool()
+    @task_generator.task_generator(
+        serializers={}, tool=tool, max_attempts=max_attempts
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    compute_resources = {}
+
+    # Exercise
+    task = simple_function.create_task(
+        compute_resources=compute_resources, foo=1, bar="baz"
+    )
+
+    assert task.max_attempts == max_attempts
