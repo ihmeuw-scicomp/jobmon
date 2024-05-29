@@ -1,6 +1,6 @@
 import ast
 import inspect
-from typing import Any, Callable, Collection, Dict, List, Optional, Type, Union
+from typing import Any, Callable, Collection, Dict, List, Optional, Set, Type, Tuple, Union
 import shutil
 
 import docstring_parser

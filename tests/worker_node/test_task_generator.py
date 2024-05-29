@@ -1,5 +1,5 @@
 import pytest
-from typing import Any, List
+from typing import Any, List, Optional
 from unittest.mock import Mock
 
 from jobmon.core import task_generator, __version__ as core_version
@@ -217,20 +217,146 @@ def test_serializer_specified_type(client_env) -> None:
     # Verify the result is the stringified object
     assert result == str(my_obj)
 
-    def test_unknown_type_raises_error(client_env) -> None:
-        """Ensure an unknown type raises an error.
+def test_unknown_type_raises_error(client_env) -> None:
+    """Ensure an unknown type raises an error.
 
-        Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#273
-        """
-        # Instantiate the TaskGenerator without a serializer for YearRange
-        tool = Tool()
-        task_gen = task_generator.TaskGenerator(
-            task_function=my_func, serializers={}, tool=tool
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#269
+    """
+    # Instantiate the TaskGenerator without a serializer for YearRange
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Instantiate an unknown, non-simple type
+    my_obj = FakeYearRange.parse_year_range("2010:2020:2030")
+
+    # Exercise by calling serialize & Verify an error is raised
+    with pytest.raises(TypeError, match="Cannot serialize unknown type FakeYearRange"):
+        task_gen.serialize(my_obj, FakeYearRange)
+
+
+
+def test_built_in_collections(client_env) -> None:
+    """Ensure the built-in collection types can be serialized.
+
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#292
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func,
+        serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
+        tool=tool,
+    )
+
+    # Cast the items as the collection_type
+    items_to_serialize = [1.0, False, "something", FakeYearRange.parse_year_range("2010:2020:2030")]
+
+    for item_to_serialize in items_to_serialize:
+        # Define the expected serialized result
+        expected_result = str(item_to_serialize)
+
+        # Exercise
+        result = task_gen.serialize(
+            obj=item_to_serialize, expected_type=type(item_to_serialize)
         )
 
-        # Instantiate an unknown, non-simple type
-        my_obj = FakeYearRange.parse_year_range("2010:2020:2030")
+        assert result == expected_result
 
-        # Exercise by calling serialize & Verify an error is raised
-        with pytest.raises(TypeError, match="Cannot serialize unknown type YearRange"):
-            task_gen.serialize(my_obj, FakeYearRange)
+
+def test_multidimensional_collection_raises_error(client_env) -> None:
+    """Ensure an error is raised if a multi-dimensional collection is passed.
+
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#318
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Define the items to serialize
+    items_to_serialize = ["1.0", "False", "something", "2010:2020:2030"]
+
+    # Cast the items as a multi-dimensional collection
+    items_to_serialize = [items_to_serialize]
+
+    # Exercise & Verify an error is raised
+    with pytest.raises(TypeError, match="Cannot serialize multi-dimensional collection"):
+        task_gen.serialize(obj=items_to_serialize, expected_type=List[List[str]])
+
+def test_serialize_optional(client_env) -> None:
+    """Ensure an optional type can be serialized.
+
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#335
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Exercise by calling serialize
+    result = task_gen.serialize(None, Optional[int])
+
+    # Verify the result is simply the stringified None
+    assert result == "None"
+
+def test_empty_collection(client_env) -> None:
+    """Ensure empty collections are returned as an empty list.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#349
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Define the expected result
+    expected_result = []
+
+    # Exercise
+    result = task_gen.serialize(list(), List[str])
+
+    # Verify
+    assert result == expected_result
+
+def test_optional_collection(client_env) -> None:
+    """Ensure an optional collection with data is serialized.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#363
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Define the items to serialize
+    items_to_serialize = [1, 2, 3]
+
+    # Exercise
+    result = task_gen.serialize(items_to_serialize, Optional[List[int]])
+
+    # Verify the result matches the expected result
+    assert result == ["1", "2", "3"]
+
+    # Exercise
+    result = task_gen.serialize(None, Optional[List[int]])
+
+    # Verify the result is simply the stringified None
+    assert result == "None"
+
+def test_no_internal_type_raises_error(client_env) -> None:
+    """Ensure a collection with no internal type raises an error (``tuple``)."""
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Exercise & Verify an error is raised
+    with pytest.raises(TypeError, match="Cannot serialize collection with.*"):
+        task_gen.serialize(obj=(1.0, "this"), expected_type=tuple)
