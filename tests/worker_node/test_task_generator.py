@@ -1,5 +1,5 @@
 import pytest
-from typing import List
+from typing import Any, List
 from unittest.mock import Mock
 
 from jobmon.core import task_generator, __version__ as core_version
@@ -92,7 +92,6 @@ def test_naming_args(
 ) -> None:
     """Verify that the name only includes the expected naming args.
 
-
     Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#711
     """
     # Set up function
@@ -130,7 +129,10 @@ def test_naming_args(
 
 
 def test_max_attempts(client_env, monkeypatch: pytest.fixture) -> None:
-    """Verify that we pass max_attempts correctly to the task."""
+    """Verify that we pass max_attempts correctly to the task.
+
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#745
+    """
     # Set up function
     monkeypatch.setattr(
         task_generator, "_find_executable_path", Mock(return_value=task_generator.TASK_RUNNER_NAME)
@@ -153,3 +155,64 @@ def test_max_attempts(client_env, monkeypatch: pytest.fixture) -> None:
     )
 
     assert task.max_attempts == max_attempts
+
+
+def my_func() -> None:
+    """A simple function.
+
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#243
+    """
+    pass
+
+
+@pytest.mark.parametrize(
+    "simple_type", ["something", 10, 1.5, True]  # Test instances of the SIMPLE_TYPES
+)
+def test_simple_type(client_env, simple_type: Any) -> None:
+    """Ensure a known simple type is properly serialized.
+
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#243
+    """
+    # Instantiate the TaskGenerator
+
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Exercise by calling serialize
+    result = task_gen.serialize(simple_type, type(simple_type))
+
+    # Verify the result is simply the stringified simple_type
+    assert result == str(simple_type)
+
+class FakeYearRange:
+    """A fake YearRange class for testing"""
+    def __init__(self, year: int) -> None:
+        self.year = year
+
+    @staticmethod
+    def parse_year_range(year: str) -> "FakeYearRange":
+        """Parse a year range."""
+        return FakeYearRange(int(year.split(":")[0]))
+
+def test_serializer_specified_type(client_env) -> None:
+    """Ensure a serializer-specified type is properly serialized.
+
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#756
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func,
+        serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
+        tool=tool,
+    )
+
+    # Instantiate a serializer-specified type
+    my_obj = FakeYearRange.parse_year_range("2010:2020:2030")
+
+    # Exercise by calling serialize
+    result = task_gen.serialize(my_obj, FakeYearRange)
+    # Verify the result is the stringified object
+    assert result == str(my_obj)
