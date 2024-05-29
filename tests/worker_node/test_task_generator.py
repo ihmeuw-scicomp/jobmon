@@ -199,7 +199,7 @@ class FakeYearRange:
 def test_serializer_specified_type(client_env) -> None:
     """Ensure a serializer-specified type is properly serialized.
 
-    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#756
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#255
     """
     # Instantiate the TaskGenerator
     tool = Tool()
@@ -216,3 +216,21 @@ def test_serializer_specified_type(client_env) -> None:
     result = task_gen.serialize(my_obj, FakeYearRange)
     # Verify the result is the stringified object
     assert result == str(my_obj)
+
+    def test_unknown_type_raises_error(client_env) -> None:
+        """Ensure an unknown type raises an error.
+
+        Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#273
+        """
+        # Instantiate the TaskGenerator without a serializer for YearRange
+        tool = Tool()
+        task_gen = task_generator.TaskGenerator(
+            task_function=my_func, serializers={}, tool=tool
+        )
+
+        # Instantiate an unknown, non-simple type
+        my_obj = FakeYearRange.parse_year_range("2010:2020:2030")
+
+        # Exercise by calling serialize & Verify an error is raised
+        with pytest.raises(TypeError, match="Cannot serialize unknown type YearRange"):
+            task_gen.serialize(my_obj, FakeYearRange)
