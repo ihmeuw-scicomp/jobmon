@@ -1,5 +1,5 @@
 import pytest
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 from unittest.mock import Mock
 
 from jobmon.core import task_generator, __version__ as core_version
@@ -196,6 +196,12 @@ class FakeYearRange:
         """Parse a year range."""
         return FakeYearRange(int(year.split(":")[0]))
 
+    def __str__(self) -> str:
+        return str(self.year)
+
+    def __eq__(self, other):
+        return self.year == other.year
+
 def test_serializer_specified_type(client_env) -> None:
     """Ensure a serializer-specified type is properly serialized.
 
@@ -230,7 +236,6 @@ def test_unknown_type_raises_error(client_env) -> None:
 
     # Instantiate an unknown, non-simple type
     my_obj = FakeYearRange.parse_year_range("2010:2020:2030")
-
     # Exercise by calling serialize & Verify an error is raised
     with pytest.raises(TypeError, match="Cannot serialize unknown type FakeYearRange"):
         task_gen.serialize(my_obj, FakeYearRange)
@@ -350,7 +355,10 @@ def test_optional_collection(client_env) -> None:
     assert result == "None"
 
 def test_no_internal_type_raises_error(client_env) -> None:
-    """Ensure a collection with no internal type raises an error (``tuple``)."""
+    """Ensure a collection with no internal type raises an error (``tuple``).
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#398
+    """
     # Instantiate the TaskGenerator
     tool = Tool()
     task_gen = task_generator.TaskGenerator(
@@ -360,3 +368,268 @@ def test_no_internal_type_raises_error(client_env) -> None:
     # Exercise & Verify an error is raised
     with pytest.raises(TypeError, match="Cannot serialize collection with.*"):
         task_gen.serialize(obj=(1.0, "this"), expected_type=tuple)
+
+
+@pytest.mark.parametrize(
+        "simple_type, expected_result",
+        [
+            ["something", "something"],  # Test instances of the SIMPLE_TYPES
+            ["10", 10],
+            ["1.5", 1.5],
+            ["True", True],
+        ],
+    )
+def test_deserialize_simple_type(client_env, simple_type: str, expected_result: Any) -> None:
+    """Ensure a known simple type is properly deserialized.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#410
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Exercise by calling deserialize
+    result = task_gen.deserialize(obj=simple_type, obj_type=type(expected_result))
+
+    # Verify the result matches the expected result
+    assert result == expected_result
+
+def test_deserializer_specified_type(client_env) -> None:
+    """Ensure a serializer-specified type is properly deserialized.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#423
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func,
+        serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
+        tool=tool,
+    )
+
+    # Instantiate a serializer-specified type
+    my_obj = FakeYearRange.parse_year_range("2010:2020:2030")
+
+    # Exercise by calling deserialize
+    result = task_gen.deserialize(obj=str(my_obj), obj_type=FakeYearRange)
+
+    # Verify the result is the same as the original object
+    assert result == my_obj
+
+
+def test_deserializer_unknown_type_raises_error(client_env) -> None:
+    """Ensure an unknown type raises an error.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#455
+    """
+    # Instantiate the TaskGenerator without a serializer for YearRange
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Instantiate an unknown, non-simple type
+    my_obj = FakeYearRange.parse_year_range("2010:2020:2030")
+
+    # Exercise by calling deserialize & Verify an error is raised
+    with pytest.raises(TypeError, match="Cannot deserialize unknown type FakeYearRange"):
+        task_gen.deserialize(obj=str(my_obj), obj_type=FakeYearRange)
+
+
+@pytest.mark.parametrize(
+    "item_type, items_to_deserialize, expected_result",
+    [
+        [int, ["1", "3", "5"], [1, 3, 5]],
+        [float, ["1.0", "3.0", "5.0"], [1.0, 3.0, 5.0]],
+        [str, ["one", "three", "five"], ["one", "three", "five"]],
+        [bool, ["True", "False"], [True, False]],
+        [
+            FakeYearRange,
+            ["2010:2020:2030", "2040:2050:2060"],
+            [
+                FakeYearRange.parse_year_range("2010:2020:2030"),
+                FakeYearRange.parse_year_range("2040:2050:2060"),
+            ],
+        ],
+    ],
+)
+def test_deserialize_built_in_collections(
+    client_env,
+    item_type: Any,
+    items_to_deserialize: List[str],
+    expected_result: List[Any],
+) -> None:
+    """Ensure the built-in collection types can be deserialized.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#469
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func,
+        serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
+        tool=tool,
+    )
+
+    # Exercise by calling deserialize on the items_to_deserialize, having cast them to
+    # the collection_type
+    result = task_gen.deserialize(
+        obj=items_to_deserialize, obj_type=List[item_type]
+    )
+
+    # Verify the result matches the expected result (cast as the collection type)
+    assert result == expected_result
+
+def test_deserialize_multi_annotated_collection(client_env) -> None:
+    """Ensure a multi-annotated collection can be deserialized.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#511
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func,
+        serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
+        tool=tool,
+    )
+
+    # Define the items to deserialize
+    items_to_deserialize = ["0.1", "2010:2020:2030"]
+
+    # Define the expected result
+    expected_result = (0.1, FakeYearRange.parse_year_range("2010:2020:2030"))
+
+    # Exercise
+    result = task_gen.deserialize(
+        obj=items_to_deserialize, obj_type=Tuple[float, FakeYearRange]
+    )
+
+    # Verify the result matches the expected result
+    assert result == expected_result
+
+
+@pytest.mark.parametrize(
+        ["input", "expected"],
+        [["None", None], ["1", [1]], [["1", "2"], [1, 2]], [[], []]],
+    )
+def test_deserialize_optional_collection(
+    client_env, input, expected: Optional[List[int]]
+) -> None:
+    """Ensure an optional collection can be deserialzed.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#538
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Exercise by calling deserialize
+    result = task_gen.deserialize(obj=input, obj_type=Optional[List[int]])
+
+    # Verify the result matches the expected result
+    assert result == expected
+
+def test_deserialize_multi_dimensional_collection_raises_error(client_env) -> None:
+    """Ensure an error is raised if a multi-dimensional collection is passed.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#552
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func,
+        serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
+        tool=tool,
+    )
+
+    # Define the items to deserialize
+    items_to_deserialize = [("0", "1"), ("2", "3")]
+
+    # Exercise & Verify an error is raised
+    with pytest.raises(TypeError, match="Cannot deserialize multi-dimensional collection"):
+        task_gen.deserialize(
+            obj=items_to_deserialize, obj_type=List[Tuple[int, ...]]
+        )  # pytype: disable=wrong-arg-types
+
+
+def test_deserialize_collection_without_item_annotation_raises_error(
+    client_env,
+) -> None:
+    """Ensure a collection without an item annotation like ``list`` raises an error.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#572
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Exercise by calling deserialize & Verify an error is raised
+    with pytest.raises(
+        TypeError,
+        match=f"annotation ``<class 'list'>`` does not provide enough information",
+    ):
+        task_gen.deserialize(obj=["1", "2", "3"], obj_type=list)
+
+
+@pytest.mark.parametrize(
+        ["optional_type", "serialized", "expected"],
+        [
+            [Optional[int], "None", None],
+            [Optional[int], "1", 1],
+            [Optional[str], "None", None],
+            [Optional[str], "foo", "foo"],
+            [Optional[float], "None", None],
+            [Optional[float], "1.0", 1.0],
+            [type(None), "None", None],
+            [Optional[List[int]], "None", None],
+            [Optional[List[int]], ["1", "2"], [1, 2]],
+            [Optional[FakeYearRange], "None", None],
+            [Optional[FakeYearRange], "1990:2020:2050", FakeYearRange(1990)],
+        ],
+    )
+def test_deserialize_optional(
+    client_env, optional_type: Any, serialized: str, expected: Any
+) -> None:
+    """Ensure an optional type can be deserialized.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#588
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func,
+        serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
+        tool=tool,
+    )
+
+    # Exercise by calling deserialize
+    result = task_gen.deserialize(obj=serialized, obj_type=optional_type)
+
+    # Verify the result was deserialized correctly
+    assert result == expected
+
+def test_deserialize_empty_collection(client_env) -> None:
+    """Ensure empty collections are returned still empty.
+
+    converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#602
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool()
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool=tool
+    )
+
+    # Define the expected result
+    expected_result = list()
+
+    # Exercise
+    result = task_gen.deserialize(obj=list(), obj_type=List[str])
+
+    # Verify
+    assert result == expected_result
