@@ -5,7 +5,7 @@ from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
 from flask import jsonify, request
-from sqlalchemy import func, insert, literal_column, select, text, update
+from sqlalchemy import case, func, insert, literal_column, select, update
 import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
@@ -239,34 +239,43 @@ def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> No
 @api_v2_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
 def log_array_distributor_id(array_id: int) -> Any:
     """Add distributor_id, stderr/stdout paths to the DB for all TIs in an array."""
-    data = cast(Dict, request.get_json())
+    data = request.get_json()
 
-    # Create a list of dicts out of the distributor id map.
-    # (maps task_instance_ids to distributor_ids)
-    params = [
-        {"task_instance_id": key, "distributor_id": val} for key, val in data.items()
-    ]
+    id_lst = list(data.keys())
 
-    # Convert params to a format that can be used in a CTE
-    values_clause = ", ".join(
-        f"({item['task_instance_id']}, '{item['distributor_id']}')" for item in params
+    # Prepare to acquire locks on the task instances
+    task_instance_ids_query = (
+        select(TaskInstance.id)
+        .where(
+            TaskInstance.id.in_(id_lst),
+        )
+        .with_for_update()
+        .execution_options(synchronize_session=False)
     )
 
-    # CTE allows a single set operation for the update instead of multiple updates
-    update_cte = f"""
-    WITH distributor_updates(task_instance_id, distributor_id) AS (
-        VALUES {values_clause}
+    # Prepare the case statement for dynamic updating based on conditions
+    case_stmt = case(
+        *[
+            (TaskInstance.id == int(task_instance_id), distributor_id)
+            for task_instance_id, distributor_id in data.items()
+        ],
+        else_=TaskInstance.distributor_id,
     )
-    UPDATE task_instance
-    SET distributor_id = distributor_updates.distributor_id
-    FROM distributor_updates
-    WHERE task_instance.id = distributor_updates.task_instance_id;
-    """
 
+    # Acquire locks and update TaskInstances
     session = SessionLocal()
     with session.begin():
-        # wrap raw SQL strings in text() function
-        session.execute(text(update_cte))
+        # Acquire a lock and update tasks to launched
+        session.execute(task_instance_ids_query).scalars()
+
+        # Using the session to construct an update statement for ORM objects
+        update_stmt = (
+            update(TaskInstance)
+            .filter(TaskInstance.id.in_(id_lst))
+            .values(distributor_id=case_stmt)
+            .execution_options(synchronize_session="fetch")
+        )
+        session.execute(update_stmt)
 
     resp = jsonify(success=True)
     resp.status_code = StatusCodes.OK
