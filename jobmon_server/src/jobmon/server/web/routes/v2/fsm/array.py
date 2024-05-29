@@ -265,7 +265,7 @@ def log_array_distributor_id(array_id: int) -> Any:
     # Acquire locks and update TaskInstances
     session = SessionLocal()
     with session.begin():
-        # Acquire a lock and update taskInstance.distributor_ids
+        # locks for the updates
         session.execute(task_instance_ids_query).scalars()
 
         # Using the session to construct an update statement for ORM objects
@@ -275,6 +275,7 @@ def log_array_distributor_id(array_id: int) -> Any:
             .values(distributor_id=case_stmt)
             .execution_options(synchronize_session="fetch")
         )
+        # updates
         session.execute(update_stmt)
 
     resp = jsonify(success=True)
