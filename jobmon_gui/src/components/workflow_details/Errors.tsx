@@ -4,13 +4,13 @@ import filterFactory, { textFilter, dateFilter } from 'react-bootstrap-table2-fi
 import DOMPurify from 'dompurify';
 import paginationFactory from "react-bootstrap-table2-paginator";
 import 'react-bootstrap-table2-paginator/dist/react-bootstrap-table2-paginator.min.css';
-import { HashLink } from 'react-router-hash-link';
 
 export const sanitize = (html: string): string => DOMPurify.sanitize(html);
 import '@jobmon_gui/styles/jobmon_gui.css';
 import { convertDatePST } from '@jobmon_gui/utils/formatters';
 import { safe_rum_start_span, safe_rum_unit_end } from '@jobmon_gui/utils/rum';
 import CustomModal from '@jobmon_gui/components/Modal';
+import {Link, useLocation} from "react-router-dom";
 
 export default function Errors({ errorLogs, tt_name, loading, apm }) {
 
@@ -22,6 +22,7 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
     const [helper, setHelper] = useState("");
     const [showModal, setShowModal] = useState(false)
     const [justRecentErrors, setRecentErrors] = useState(false)
+    const location = useLocation();
 
     function handleToggle() {
         setRecentErrors(!justRecentErrors)
@@ -82,11 +83,12 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
             headerStyle: { width: "15%" },
             sort: true,
             formatter: (cell, row) => <nav>
-                <HashLink
-                    to={`/task_details/${row.task_id}#${cell}`}
+                <Link
+                    to={{ pathname: `/task_details/${cell}`, search: location.search }}
+                    key={cell}
                 >
                     {cell}
-                </HashLink>
+                </Link>
             </nav>
         },
         {
