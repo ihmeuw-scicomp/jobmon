@@ -10,8 +10,6 @@ import Spinner from 'react-bootstrap/Spinner';
 import { Link } from "react-router-dom";
 import { convertDate, convertDatePST } from '@jobmon_gui/utils/formatters';
 import { FaCaretDown, FaCaretUp, FaCircle } from "react-icons/fa";
-
-// @ts-ignore
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar.tsx';
 
 

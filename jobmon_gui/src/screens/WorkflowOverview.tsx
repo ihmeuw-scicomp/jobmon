@@ -135,6 +135,19 @@ function WorkflowOverview() {
         navigate(0)
     });
 
+    const ShowWFTable = () => {
+        return (
+            <div id="wftable" className="div-level-2">
+                {/*If there are no workflows and at least one URL search param is not empty*/}
+                {workflows.length === 0 && ![...searchParams.values()].every(param => param === '') ? (
+                    <p>No workflows found for specified filters.</p>
+                ) : workflows.length !== 0 ? (
+                    <WorkflowTable allData={workflows}/>
+                ) : null}
+            </div>
+        )
+    }
+
     return (
         <div id="div-main" className="App">
             <div id="div-header" className="div-level-2">
@@ -215,10 +228,7 @@ function WorkflowOverview() {
                     </div>
                 </form>
             </div>
-            <div id="wftable" className="div-level-2">
-                {workflows.length !== 0 && <WorkflowTable allData={workflows}/>}
-                {workflows.length === 0 && <p>No workflows found for specified filters.</p>}
-            </div>
+            <ShowWFTable/>
         </div>
     );
 }
