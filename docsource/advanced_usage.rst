@@ -256,12 +256,6 @@ The "workflow_resume" CLI has two optional flags:
   will be a cold resume i.e. currently running jobs are also terminated and rerun. Default is set to False.
 * ``--timeout`` or ``-t`` - Allows users to set the Workflow timeout. Default is 180.
 
-or the following code fragment::
-
-    resume_factory = WorkflowRunFactory(workflow_id)
-    resume_factory.set_workflow_resume()
-    resume_factory.reset_task_statuses()
-    resume_wfr = resume_factory.create_workflow_run()
 
 Important caveat: if resuming a workflow by ID, you will not have the ability to change certain parameters that have been
 bound to the database, such as the workflow attributes or the compute resources. To run a workflow with updated resources,
@@ -740,11 +734,12 @@ invoked from the command line in the same way as the status commands, see :ref:`
 
 concurrency_limit
 *****************
-    Entering ``jobmon concurrency_limit`` changes the maximum running task
-    instances allowed in a workflow. When a workflow is instantiated, you can specify a
-    maximum limit to the number of concurrent tasks in case a very wide workflow threatens to
-    resource-throttle the cluster. While running, you can use this command to change the
-    maximum allowed concurrency as needed if cluster busyness starts to wax or wane.
+    Upon initiating a workflow, users have the capability to set an upper limit on the number of tasks that can run
+    concurrently. This feature is particularly beneficial in preventing a resource-intensive workflow from overloading
+    the cluster.  Users are able to dynamically change this value as their workflow is running via the CLI.
+
+   To modify this value, use the following command:
+    ``jobmon concurrency_limit --workflow_id [workflow_id] --max_tasks [maximum number of concurrently running tasks]``
 
 workflow_reset
 **************
