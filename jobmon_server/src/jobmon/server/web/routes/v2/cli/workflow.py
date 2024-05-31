@@ -486,7 +486,8 @@ def workflows_by_user_form() -> Any:
     tool = arguments.get("tool")
     wf_name = arguments.get("wf_name")
     wf_args = arguments.get("wf_args")
-    wf_attribute = arguments.get("wf_attribute")
+    wf_attribute_value = arguments.get("wf_attribute_value")
+    wf_attribute_key = arguments.get("wf_attribute_key")
     wf_id = arguments.get("wf_id")
     date_submitted = arguments.get("date_submitted")
     status = arguments.get("status")
@@ -507,9 +508,11 @@ def workflows_by_user_form() -> Any:
         if wf_args:
             where_clauses.append("workflow.workflow_args = :wf_args")
             substitution_dict["wf_args"] = wf_args
-        if wf_attribute:
-            where_clauses.append("workflow_attribute.value = :wf_attribute")
-            substitution_dict["wf_attribute"] = wf_attribute
+        if wf_attribute_value and wf_attribute_key:
+            where_clauses.append("workflow_attribute.value = :wf_attribute_value AND workflow_attribute_type.name = "
+                                 ":wf_attribute_key")
+            substitution_dict["wf_attribute_value"] = wf_attribute_value
+            substitution_dict["wf_attribute_key"] = wf_attribute_key
         if wf_id:
             where_clauses.append("workflow.id = :wf_id")
             substitution_dict["wf_id"] = wf_id
@@ -556,6 +559,8 @@ def workflows_by_user_form() -> Any:
                                 JOIN workflow_run ON workflow.id = workflow_run.workflow_id
                                 LEFT JOIN workflow_attribute
                                     ON workflow.id = workflow_attribute.workflow_id
+                                JOIN workflow_attribute_type
+                                    ON workflow_attribute.workflow_attribute_type_id = workflow_attribute_type.id
                             {inner_where_clause}
                         )
                     GROUP BY
