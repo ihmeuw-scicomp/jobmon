@@ -508,11 +508,12 @@ def workflows_by_user_form() -> Any:
         if wf_args:
             where_clauses.append("workflow.workflow_args = :wf_args")
             substitution_dict["wf_args"] = wf_args
-        if wf_attribute_value and wf_attribute_key:
-            where_clauses.append("workflow_attribute.value = :wf_attribute_value AND workflow_attribute_type.name = "
-                                 ":wf_attribute_key")
-            substitution_dict["wf_attribute_value"] = wf_attribute_value
+        if wf_attribute_key:
+            where_clauses.append("workflow_attribute_type.name = :wf_attribute_key")
             substitution_dict["wf_attribute_key"] = wf_attribute_key
+        if wf_attribute_value:
+            where_clauses.append("workflow_attribute.value = :wf_attribute_value")
+            substitution_dict["wf_attribute_value"] = wf_attribute_value
         if wf_id:
             where_clauses.append("workflow.id = :wf_id")
             substitution_dict["wf_id"] = wf_id
