@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
-import TaskInstanceTable from '../components/task_details/TaskInstanceTable';
-import NodeLists from '../components/task_details/NodeLists';
-import TaskFSM from '../components/task_details/TaskFSM';
-import { convertDatePST } from '../utils/formatters'
+import TaskInstanceTable from '@jobmon_gui/components/task_details/TaskInstanceTable';
+import NodeLists from '@jobmon_gui/components/task_details/NodeLists';
+import TaskFSM from '@jobmon_gui/components/task_details/TaskFSM';
+import { convertDatePST } from '@jobmon_gui/utils/formatters'
 import { HiInformationCircle } from "react-icons/hi";
-import CustomModal from '../components/Modal';
+import CustomModal from '@jobmon_gui/components/Modal';
 
 function getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId) {
     // Returns task status and workflow ID
-    const url = process.env.REACT_APP_BASE_URL + "/task/get_task_details_viz/" + taskId;
+    const url = import.meta.env.VITE_APP_BASE_URL + "/task/get_task_details_viz/" + taskId;
     const fetchData = async () => {
         const result: any = await axios({
             method: 'get',
@@ -36,7 +36,7 @@ function getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskComman
 
 function getTIDetails(setTIDetails, taskId) {
     // Data for the TaskInstance table
-    const url = process.env.REACT_APP_BASE_URL + "/task/get_ti_details_viz/" + taskId;
+    const url = import.meta.env.VITE_APP_BASE_URL + "/task/get_ti_details_viz/" + taskId;
     const fetchData = async () => {
         const result: any = await axios({
             method: 'get',
@@ -55,7 +55,7 @@ function getTIDetails(setTIDetails, taskId) {
 
 function getTaskDependencies(setUpstreamTasks, setDownstreamTasks, taskId) {
     // Data for upstream and downstream task lists
-    const url = process.env.REACT_APP_BASE_URL + "/task_dependencies/" + taskId;
+    const url = import.meta.env.VITE_APP_BASE_URL + "/task_dependencies/" + taskId;
     const fetchData = async () => {
         const result: any = await axios({
             method: 'get',

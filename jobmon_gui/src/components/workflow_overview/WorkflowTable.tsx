@@ -8,11 +8,9 @@ import ToolkitProvider, { CSVExport } from 'react-bootstrap-table2-toolkit/dist/
 import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import Spinner from 'react-bootstrap/Spinner';
 import { Link } from "react-router-dom";
-import { convertDate, convertDatePST } from '../../utils/formatters';
+import { convertDate, convertDatePST } from '@jobmon_gui/utils/formatters';
 import { FaCaretDown, FaCaretUp, FaCircle } from "react-icons/fa";
-
-// @ts-ignore
-import JobmonProgressBar from '../JobmonProgressBar.tsx';
+import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar.tsx';
 
 
 const customCaret = (order, column) => {
@@ -24,7 +22,7 @@ const customCaret = (order, column) => {
 
 // Get task status count for specified workflows
 function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_ids, wf_ids: number[]) {
-    const url = process.env.REACT_APP_BASE_URL + "/workflow_status_viz";
+    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_status_viz";
     const fetchData = async () => {
         let unfinished_wf_ids: number[] = [];
         let finished_wf_ids: number[] = [];

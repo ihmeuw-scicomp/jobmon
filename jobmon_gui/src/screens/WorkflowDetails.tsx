@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import '../styles/jobmon_gui.css';
+import '@jobmon_gui/styles/jobmon_gui.css';
 import { useParams, Link, Outlet, useNavigate } from 'react-router-dom';
 import { useForm } from "react-hook-form";
 import axios from 'axios';
@@ -11,16 +11,16 @@ import humanizeDuration from 'humanize-duration';
 
 
 // @ts-ignore
-import JobmonProgressBar from '../components/JobmonProgressBar.tsx';
-import Tasks from '../components/workflow_details/Tasks';
-import Usage from '../components/workflow_details/Usage';
-import Errors from '../components/workflow_details/Errors';
-import WorkflowHeader from "../components/workflow_details/WorkflowHeader"
-import { convertDatePST } from '../utils/formatters';
-import { init_apm, safe_rum_add_label, safe_rum_transaction } from '../utils/rum';
+import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar.tsx';
+import Tasks from '@jobmon_gui/components/workflow_details/Tasks';
+import Usage from '@jobmon_gui/components/workflow_details/Usage';
+import Errors from '@jobmon_gui/components/workflow_details/Errors';
+import WorkflowHeader from "@jobmon_gui/components/workflow_details/WorkflowHeader"
+import { convertDatePST } from '@jobmon_gui/utils/formatters';
+import { init_apm, safe_rum_add_label, safe_rum_transaction } from '@jobmon_gui/utils/rum';
 
 function getAsyncWFdetail(setWFDict, wf_id: string) {
-    const url = process.env.REACT_APP_BASE_URL + "/workflow_status_viz";
+    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_status_viz";
     const wf_ids = [wf_id];
     const fetchData = async () => {
         const result: any = await axios({
@@ -51,7 +51,7 @@ function getWorkflowAttributes(
     setWFElapsedTime,
     setJobmonVersion
 ) {
-    const url = process.env.REACT_APP_BASE_URL + "/workflow_details_viz/" + wf_id;
+    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_details_viz/" + wf_id;
     const fetchData = async () => {
         const result: any = await axios({
             method: 'get',
@@ -78,7 +78,7 @@ function getWorkflowAttributes(
 }
 
 function getAsyncTTdetail(setTTDict, wf_id: string, setTTLoaded) {
-    const url = process.env.REACT_APP_BASE_URL + "/workflow_tt_status_viz/" + wf_id;
+    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_tt_status_viz/" + wf_id;
     const fetchData = async () => {
         const result: any = await axios({
             method: 'get',
@@ -96,6 +96,26 @@ function getAsyncTTdetail(setTTDict, wf_id: string, setTTLoaded) {
         }
         setTTDict(return_array);
         setTTLoaded(true);
+    };
+    return fetchData
+}
+
+function getAsyncErrorLogs(setErrorLogs, wf_id: string, setErrorLoading, tt_id?: string) {
+    setErrorLoading(true);
+    const url = import.meta.env.VITE_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
+    const fetchData = async () => {
+        const result: any = await axios({
+            method: 'get',
+            url: url,
+            data: null,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+          }
+        )
+        setErrorLogs(result.data);
+        setErrorLoading(false);
     };
     return fetchData
 }
@@ -164,7 +184,7 @@ function WorkflowDetails({ subpage }) {
             return
         }
         setTaskLoading(true);
-        let task_table_url = process.env.REACT_APP_BASE_URL + "/task_table_viz/" + workflowId;
+        let task_table_url = import.meta.env.VITE_APP_BASE_URL + "/task_table_viz/" + workflowId;
         const fetchData = async () => {
             const result: any = await axios({
                 method: 'get',
@@ -189,7 +209,7 @@ function WorkflowDetails({ subpage }) {
         if (!task_template_version_id) {
             return
         }
-        let usage_url = process.env.REACT_APP_BASE_URL + "/task_template_resource_usage";
+        let usage_url = import.meta.env.VITE_APP_BASE_URL + "/task_template_resource_usage";
 
         const fetchData = async () => {
             const result: any = await axios({

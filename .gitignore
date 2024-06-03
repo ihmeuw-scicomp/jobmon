@@ -39,3 +39,4 @@ docsource/api
 # ignore ide settings
 .idea/
 
+/jobmon_gui/node_modules/

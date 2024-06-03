@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import MemoryHistogram from './MemoryHistogram';
-import RuntimeHistogram from './RuntimeHistogram';
-import { formatBytes, bytes_to_gib } from '../../utils/formatters'
-import { safe_rum_start_span, safe_rum_unit_end } from '../../utils/rum'
+import MemoryHistogram from '@jobmon_gui/components/workflow_details/MemoryHistogram';
+import RuntimeHistogram from '@jobmon_gui/components/workflow_details/RuntimeHistogram';
+import { formatBytes, bytes_to_gib } from '@jobmon_gui/utils/formatters'
+import { safe_rum_start_span, safe_rum_unit_end } from '@jobmon_gui/utils/rum'
 import humanizeDuration from 'humanize-duration';
 
 export default function Usage({ taskTemplateName, taskTemplateVersionId, usageInfo, apm}) {
