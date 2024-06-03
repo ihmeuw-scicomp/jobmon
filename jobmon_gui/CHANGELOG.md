@@ -15,6 +15,12 @@ All notable changes to the Jobmon GUI will be documented in this file.
 - Added MetricMind and ImageLauncher links to left-hand navigation bar.
 - Added a new resources column to the TaskInstance table on the `Task Details` page that shows the requested and 
 utilized resources.
+- Users are now able to filter their workflows by both workflow attribute key and workflow attribute value on the 
+`Workflow Overview` page
+
+#### Fixed
+- Fixed bug in the breadcrumb navigation where the buttons would occasionally take users to the wrong page
+- Fixed bug where it shows "No Workflows Found" even if no filters were passed
 
 #### Changed 
 - Default to showing only Workflows that were submitted in the last two weeks on the `Workflow Overview` page.
