@@ -561,7 +561,8 @@ def workflows_by_user_form() -> Any:
                                 LEFT JOIN workflow_attribute
                                     ON workflow.id = workflow_attribute.workflow_id
                                 JOIN workflow_attribute_type
-                                    ON workflow_attribute.workflow_attribute_type_id = workflow_attribute_type.id
+                                    ON workflow_attribute.workflow_attribute_type_id =
+                                        workflow_attribute_type.id
                             {inner_where_clause}
                         )
                     GROUP BY
