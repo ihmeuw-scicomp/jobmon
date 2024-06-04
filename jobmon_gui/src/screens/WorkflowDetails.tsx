@@ -135,8 +135,6 @@ function WorkflowDetails({ subpage }) {
         'num_attempts_avg': 0, 'num_attempts_min': 0, 'num_attempts_max': 0, 'MAXC': 0
     });
     const [ttDict, setTTDict] = useState([]);
-    const [errorLogs, setErrorLogs] = useState([]);
-    const [error_loading, setErrorLoading] = useState(false);
     const [task_loading, setTaskLoading] = useState(false);
     const [wf_status, setWFStatus] = useState([]);
     const [wf_status_desc, setWFStatusDesc] = useState([]);
@@ -156,6 +154,7 @@ function WorkflowDetails({ subpage }) {
             getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime, setJobmonVersion)();
         }
     }, [params.workflowId]);
+
     useEffect(() => {
         if (typeof params.workflowId !== 'undefined') {
             getAsyncWFdetail(setWFDict, params.workflowId)();
@@ -163,12 +162,13 @@ function WorkflowDetails({ subpage }) {
             safe_rum_add_label(rum_t, "wf_id", params.workflowId);
         }
     }, [params.workflowId, rum_t]);
+
     // Update the progress bar every 60 seconds
     useEffect(() => {
         const interval = setInterval(() => {
             if (wfDict['PENDING'] + wfDict['SCHEDULED'] + wfDict['RUNNING'] !== 0) {
                 if (typeof params.workflowId !== 'undefined') {
-                    //only query server when wf is unfinised
+                    // only query server when wf is unfinished
                     getAsyncWFdetail(setWFDict, params.workflowId)();
                     getAsyncTTdetail(setTTDict, params.workflowId, setTTLoaded)();
                     getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime, setJobmonVersion)();
@@ -203,13 +203,8 @@ function WorkflowDetails({ subpage }) {
         };
         fetchData();
     }, [task_template_name, workflowId]);
-    useEffect(() => {
-        if (typeof params.workflowId !== 'undefined' && tt_id !== 'undefined' && tt_id !== '') {
-            getAsyncErrorLogs(setErrorLogs, params.workflowId, setErrorLoading, tt_id)();
-        }
-    }, [tt_id, params.workflowId]);
 
-    // Get resource usage information
+
     useEffect(() => {
         if (!task_template_version_id) {
             return
@@ -350,7 +345,7 @@ function WorkflowDetails({ subpage }) {
                         }
                     </ul>
                 }
-                {tt_loaded === false &&
+                {!tt_loaded &&
                     <div className="loader" />
                 }
 
@@ -390,7 +385,7 @@ function WorkflowDetails({ subpage }) {
 
                 {(subpage === "tasks") && <Tasks tasks={tasks} onSubmit={onSubmit} register={register} loading={task_loading} apm={apm} />}
                 {(subpage === "usage") && <Usage taskTemplateName={task_template_name} taskTemplateVersionId={task_template_version_id} usageInfo={usage_info} apm={apm} />}
-                {(subpage === "errors") && <Errors errorLogs={errorLogs} tt_name={task_template_name} loading={error_loading} apm={apm} />}
+                {(subpage === "errors") && <Errors taskTemplateName={task_template_name} taskTemplateId={tt_id} workflowId={params.workflowId} apm={apm} />}
 
             </div>
 

@@ -839,7 +839,7 @@ def test_get_tt_error_log_viz(client_env, db_engine):
     return_code, msg = wf1.requester.send_request(
         app_route=app_route, message={}, request_type="get"
     )
-    assert len(msg) == 0
+    assert len(msg["error_logs"]) == 0
 
     # test error
     wf2 = t.create_workflow(name=f"i_am_another_fake_wf")
@@ -858,9 +858,9 @@ def test_get_tt_error_log_viz(client_env, db_engine):
     _, msg = wf2.requester.send_request(
         app_route=app_route, message={}, request_type="get"
     )
-    assert len(msg) == 1
-    assert msg[0]["task_id"] == t2.task_id
-    assert "not found" in msg[0]["error"]
+    assert len(msg["error_logs"]) == 1
+    assert msg["error_logs"][0]["task_id"] == t2.task_id
+    assert "not found" in msg["error_logs"][0]["error"]
 
 
 def test_task_details_by_wf_id(client_env, db_engine):
