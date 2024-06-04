@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import '@jobmon_gui/styles/jobmon_gui.css';
-import { useParams, Link, Outlet, useNavigate } from 'react-router-dom';
-import { useForm } from "react-hook-form";
+import {useParams, Link, Outlet, useNavigate, useLocation} from 'react-router-dom';
+import {useForm} from "react-hook-form";
 import axios from 'axios';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
-import { OverlayTrigger } from "react-bootstrap";
+import {OverlayTrigger} from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
-import { FaLightbulb } from "react-icons/fa";
+import {FaLightbulb} from "react-icons/fa";
 import humanizeDuration from 'humanize-duration';
 
 
@@ -16,23 +16,23 @@ import Tasks from '@jobmon_gui/components/workflow_details/Tasks';
 import Usage from '@jobmon_gui/components/workflow_details/Usage';
 import Errors from '@jobmon_gui/components/workflow_details/Errors';
 import WorkflowHeader from "@jobmon_gui/components/workflow_details/WorkflowHeader"
-import { convertDatePST } from '@jobmon_gui/utils/formatters';
-import { init_apm, safe_rum_add_label, safe_rum_transaction } from '@jobmon_gui/utils/rum';
+import {convertDatePST} from '@jobmon_gui/utils/formatters';
+import {init_apm, safe_rum_add_label, safe_rum_transaction} from '@jobmon_gui/utils/rum';
 
 function getAsyncWFdetail(setWFDict, wf_id: string) {
     const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_status_viz";
     const wf_ids = [wf_id];
     const fetchData = async () => {
         const result: any = await axios({
-            method: 'get',
-            url: url,
-            data: null,
-            params: { workflow_ids: wf_ids },
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                method: 'get',
+                url: url,
+                data: null,
+                params: {workflow_ids: wf_ids},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
             }
-          }
         )
         setWFDict(result.data[wf_id]);
     };
@@ -54,14 +54,14 @@ function getWorkflowAttributes(
     const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_details_viz/" + wf_id;
     const fetchData = async () => {
         const result: any = await axios({
-            method: 'get',
-            url: url,
-            data: null,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                method: 'get',
+                url: url,
+                data: null,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
             }
-          }
         )
         const data = result.data[0]
         setWFTool(data["tool_name"]);
@@ -81,14 +81,14 @@ function getAsyncTTdetail(setTTDict, wf_id: string, setTTLoaded) {
     const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_tt_status_viz/" + wf_id;
     const fetchData = async () => {
         const result: any = await axios({
-            method: 'get',
-            url: url,
-            data: null,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                method: 'get',
+                url: url,
+                data: null,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
             }
-          }
         )
         let return_array: any = [];
         for (let t in result.data) {
@@ -105,14 +105,14 @@ function getAsyncErrorLogs(setErrorLogs, wf_id: string, setErrorLoading, tt_id?:
     const url = import.meta.env.VITE_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
     const fetchData = async () => {
         const result: any = await axios({
-            method: 'get',
-            url: url,
-            data: null,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                method: 'get',
+                url: url,
+                data: null,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
             }
-          }
         )
         setErrorLogs(result.data);
         setErrorLoading(false);
@@ -120,7 +120,7 @@ function getAsyncErrorLogs(setErrorLogs, wf_id: string, setErrorLoading, tt_id?:
     return fetchData
 }
 
-function WorkflowDetails({ subpage }) {
+function WorkflowDetails({subpage}) {
     const apm = init_apm("wf_detail_page");
     let rum_t: any = safe_rum_transaction(apm);
     let params = useParams();
@@ -187,15 +187,15 @@ function WorkflowDetails({ subpage }) {
         let task_table_url = import.meta.env.VITE_APP_BASE_URL + "/task_table_viz/" + workflowId;
         const fetchData = async () => {
             const result: any = await axios({
-                method: 'get',
-                url: task_table_url,
-                data: null,
-                params: { tt_name: task_template_name },
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
+                    method: 'get',
+                    url: task_table_url,
+                    data: null,
+                    params: {tt_name: task_template_name},
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
                 }
-              }
             )
             let tasks = result.data.tasks;
             setTasks(tasks);
@@ -233,10 +233,11 @@ function WorkflowDetails({ subpage }) {
 
     //*******************event handling****************************
     // TaskTemplate name form
-    const { register, handleSubmit } = useForm();
+    const {register, handleSubmit} = useForm();
     const onSubmit = handleSubmit((d) => {
         setTaskTemplateName(d["task_template_name"]);
     });
+
     //TaskTemplate link click function
     function clickTaskTemplate(name, tt_id, tt_version_id) {
         setTaskTemplateName(name);
@@ -245,26 +246,40 @@ function WorkflowDetails({ subpage }) {
     }
 
     const navigate = useNavigate();
+    const location = useLocation();
+
+    const handleHomeClick = () => {
+        const searchParams = new URLSearchParams(location.search);
+        const search = searchParams.toString();
+        navigate({
+            pathname: '/',
+            search: search ? `?${search}` : ''
+        });
+    };
     //********************html page*************************************
     return (
         <div>
             <Breadcrumb>
-                <Breadcrumb.Item><button className="breadcrumb-button" onClick={() => navigate(-1)}>Home</button></Breadcrumb.Item>
+                <Breadcrumb.Item>
+                    <button className="breadcrumb-button"
+                            onClick={handleHomeClick}>Home
+                    </button>
+                </Breadcrumb.Item>
                 <Breadcrumb.Item active>Workflow ID {workflowId} </Breadcrumb.Item>
             </Breadcrumb>
             <div className='d-flex justify-content-start pt-3'>
                 <WorkflowHeader
-                      wf_id={workflowId}
-                      wf_status={wf_status}
-                      wf_status_desc={wf_status_desc}
-                      wf_tool={wf_tool}
-                      wf_name={wf_name}
-                      wf_args={wf_args}
-                      wf_submitted_date={wf_submitted_date}
-                      wf_status_date={wf_status_date}
-                      wf_elapsed_time={wf_elapsed_time}
-                      jobmon_version={jobmon_version}
-                 />
+                    wf_id={workflowId}
+                    wf_status={wf_status}
+                    wf_status_desc={wf_status_desc}
+                    wf_tool={wf_tool}
+                    wf_name={wf_name}
+                    wf_args={wf_args}
+                    wf_submitted_date={wf_submitted_date}
+                    wf_status_date={wf_status_date}
+                    wf_elapsed_time={wf_elapsed_time}
+                    jobmon_version={jobmon_version}
+                />
             </div>
 
             <div id="wf_progress" className="div-level-2">
@@ -292,7 +307,8 @@ function WorkflowDetails({ subpage }) {
                             trigger={["hover", "focus"]}
                             overlay={(
                                 <Popover id="task_count">
-                                    The list of task templates with status bar, ordered by the submitted time of the first task associated with the task template.
+                                    The list of task templates with status bar, ordered by the submitted time of the
+                                    first task associated with the task template.
                                 </Popover>
                             )}
                         >
@@ -338,8 +354,8 @@ function WorkflowDetails({ subpage }) {
                                             style={{}}
                                         />
                                     </div>
-                                    <br />
-                                    <hr className="hr-dot" />
+                                    <br/>
+                                    <hr className="hr-dot"/>
                                 </li>
                             ))
                         }
@@ -351,7 +367,7 @@ function WorkflowDetails({ subpage }) {
 
             </div>
             <div id="tt_search" className="div-level-2">
-                <hr className="hr-2" />
+                <hr className="hr-2"/>
                 <div className="div-full">
                     <ul className="nav nav-pills">
                         <li className="nav-item">
@@ -380,7 +396,7 @@ function WorkflowDetails({ subpage }) {
                             </Link>
                         </li>
                     </ul>
-                    <Outlet />
+                    <Outlet/>
                 </div>
 
                 {(subpage === "tasks") && <Tasks tasks={tasks} onSubmit={onSubmit} register={register} loading={task_loading} apm={apm} />}

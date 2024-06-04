@@ -26,7 +26,7 @@ function WorkflowOverview() {
     const [two_weeks_ago_date, setTwoWeeksAgoDate] = useState('');
     const [status, setStatus] = useState('');
     const [workflows, setWorkflows] = useState([]);
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -74,6 +74,7 @@ function WorkflowOverview() {
             status
         });
         let workflow_status_url = import.meta.env.VITE_APP_BASE_URL + "/workflow_overview_viz";
+        setSearchParams(params)
 
         const fetchData = async () => {
             const result: any = await axios({
@@ -134,6 +135,7 @@ function WorkflowOverview() {
         setWFID(wf_id);
         setDateSubmitted(date_submitted);
         setStatus(status);
+        setSearchParams(queryParams)
     });
 
     const handleClear = handleSubmit((d) => {

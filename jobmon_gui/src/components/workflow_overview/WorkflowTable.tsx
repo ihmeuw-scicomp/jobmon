@@ -7,7 +7,7 @@ import Popover from 'react-bootstrap/Popover';
 import ToolkitProvider, { CSVExport } from 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit';
 import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import Spinner from 'react-bootstrap/Spinner';
-import { Link } from "react-router-dom";
+import {Link, useLocation} from "react-router-dom";
 import { convertDate, convertDatePST } from '@jobmon_gui/utils/formatters';
 import { FaCaretDown, FaCaretUp, FaCircle } from "react-icons/fa";
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar.tsx';
@@ -88,6 +88,7 @@ export default function WorkflowTable({ allData }) {
     //suspect sync issue, but not sure.
     const [finishedWF, setFinishedWF] = useState<number[]>([]);
     const [helper, setHelper] = useState("");
+    const location = useLocation();
 
     // Specify table columns
     const columns = [
@@ -106,7 +107,7 @@ export default function WorkflowTable({ allData }) {
             },
             formatter: (cell, row) => <nav>
                 <Link
-                    to={{ pathname: `/workflow/${cell}/tasks` }}
+                    to={{ pathname: `/workflow/${cell}/tasks`, search: location.search }}
                     key={cell}
                 >
                     {cell}

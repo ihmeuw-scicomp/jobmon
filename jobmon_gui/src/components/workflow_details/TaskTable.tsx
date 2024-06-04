@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import BootstrapTable from "react-bootstrap-table-next";
 import paginationFactory from "react-bootstrap-table2-paginator";
 import ToolkitProvider, { CSVExport } from 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit';
@@ -21,6 +21,7 @@ const customCaret = (order, column) => {
 export default function TaskTable({ taskData, loading }) {
     const { ExportCSVButton } = CSVExport;
     const [helper, setHelper] = useState("");
+    const location = useLocation();
 
     const workflow_status_renders = {
         "PENDING": (<div>< label className="label-middle" > <FaCircle className="bar-pp" /> </label><label className="label-left">PENDING  </label></div >),
@@ -47,7 +48,7 @@ export default function TaskTable({ taskData, loading }) {
             filter: textFilter(),
             formatter: (cell, row) => <nav>
                 <Link
-                    to={{ pathname: `/task_details/${cell}` }}
+                    to={{ pathname: `/task_details/${cell}`, search: location.search }}
                     key={cell}
                 >
                     {cell}

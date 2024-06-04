@@ -11,6 +11,7 @@ import '@jobmon_gui/styles/jobmon_gui.css';
 import { convertDatePST } from '@jobmon_gui/utils/formatters';
 import { safe_rum_start_span, safe_rum_unit_end } from '@jobmon_gui/utils/rum';
 import CustomModal from '@jobmon_gui/components/Modal';
+import {Link, useLocation} from "react-router-dom";
 
 export default function Errors({taskTemplateName, taskTemplateId, workflowId, apm}) {
 
@@ -22,6 +23,7 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
     const [helper, setHelper] = useState("");
     const [showModal, setShowModal] = useState(false)
     const [justRecentErrors, setRecentErrors] = useState(false)
+    const location = useLocation();
     const [errorLoading, setErrorLoading] = useState(false);
     const [errorLogs, setErrorLogs] = useState([]);
     const [page, setPage] = useState(1);
@@ -112,11 +114,12 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
             headerStyle: {width: "15%"},
             sort: true,
             formatter: (cell, row) => <nav>
-                <HashLink
-                    to={`/task_details/${row.task_id}#${cell}`}
+                <Link
+                    to={{ pathname: `/task_details/${cell}`, search: location.search }}
+                    key={cell}
                 >
                     {cell}
-                </HashLink>
+                </Link>
             </nav>
         },
         {
