@@ -19,7 +19,8 @@ function WorkflowOverview() {
     const [tool, setTool] = useState('');
     const [wf_name, setWFName] = useState('');
     const [wf_args, setWFArgs] = useState('');
-    const [wf_attribute, setWFAttribute] = useState('');
+    const [wf_attribute_key, setWFAttributeKey] = useState('');
+    const [wf_attribute_value, setWFAttributeValue] = useState('');
     const [wf_id, setWFID] = useState('')
     const [date_submitted, setDateSubmitted] = useState('');
     const [two_weeks_ago_date, setTwoWeeksAgoDate] = useState('');
@@ -34,7 +35,8 @@ function WorkflowOverview() {
             tool: setTool,
             wf_name: setWFName,
             wf_args: setWFArgs,
-            wf_attribute: setWFAttribute,
+            wf_attribute_key: setWFAttributeKey,
+            wf_attribute_value: setWFAttributeValue,
             wf_id: setWFID,
             date_submitted: setDateSubmitted,
             status: setStatus
@@ -65,7 +67,8 @@ function WorkflowOverview() {
             tool,
             wf_name,
             wf_args,
-            wf_attribute,
+            wf_attribute_key,
+            wf_attribute_value,
             wf_id,
             date_submitted,
             status
@@ -93,7 +96,7 @@ function WorkflowOverview() {
         };
         fetchData();
         safe_rum_unit_end(rum_s1);
-    }, [user, tool, wf_name, wf_args, wf_attribute, date_submitted, status, wf_id, apm]);
+    }, [user, tool, wf_name, wf_args, wf_attribute_key, wf_attribute_value, date_submitted, status, wf_id, apm]);
 
 
     const {register, handleSubmit} = useForm();
@@ -102,7 +105,8 @@ function WorkflowOverview() {
                                        tool_input: tool,
                                        wf_name_input: wf_name,
                                        wf_args_input: wf_args,
-                                       wf_attribute_input: wf_attribute,
+                                       wf_attribute_key_input: wf_attribute_key,
+                                       wf_attribute_value_input: wf_attribute_value,
                                        wf_id: wf_id,
                                        date_submitted_input: date_submitted,
                                        status: status
@@ -115,7 +119,8 @@ function WorkflowOverview() {
             tool,
             wf_name,
             wf_args,
-            wf_attribute,
+            wf_attribute_key,
+            wf_attribute_value,
             wf_id,
             date_submitted,
             status
@@ -125,7 +130,8 @@ function WorkflowOverview() {
         setTool(tool);
         setWFName(wf_name);
         setWFArgs(wf_args);
-        setWFAttribute(wf_attribute);
+        setWFAttributeKey(wf_attribute_key);
+        setWFAttributeValue(wf_attribute_value)
         setWFID(wf_id);
         setDateSubmitted(date_submitted);
         setStatus(status);
@@ -136,6 +142,19 @@ function WorkflowOverview() {
         navigate("/")
         navigate(0)
     });
+
+    const ShowWFTable = () => {
+        return (
+            <div id="wftable" className="div-level-2">
+                {/*If there are no workflows and at least one URL search param is not empty*/}
+                {workflows.length === 0 && ![...searchParams.values()].every(param => param === '') ? (
+                    <p>No workflows found for specified filters.</p>
+                ) : workflows.length !== 0 ? (
+                    <WorkflowTable allData={workflows}/>
+                ) : null}
+            </div>
+        )
+    }
 
     return (
         <div id="div-main" className="App">
@@ -159,10 +178,17 @@ function WorkflowOverview() {
                                           defaultValue={wf_args} {...register("wf_args_input")} />
                         </Form.Group>
 
-                        <Form.Group as={Col} controlId="formWFAttribute">
-                            <Form.Label><span className='m-2'> Workflow Attribute Value</span></Form.Label>
+                        <Form.Group as={Row} controlId="formWFAttribute">
+                          <Col md={6}>
+                            <Form.Label><span className='m-2'>Workflow Attribute Key</span></Form.Label>
+                            <Form.Control type="text" placeholder="Workflow Attribute Key"
+                                          defaultValue={wf_attribute_key} {...register("wf_attribute_key_input")} />
+                          </Col>
+                          <Col md={6}>
+                            <Form.Label><span className='m-2'>Workflow Attribute Value</span></Form.Label>
                             <Form.Control type="text" placeholder="Workflow Attribute Value"
-                                          defaultValue={wf_attribute} {...register("wf_attribute_input")} />
+                                          defaultValue={wf_attribute_value} {...register("wf_attribute_value_input")} />
+                          </Col>
                         </Form.Group>
 
                         <Form.Group as={Col} controlId="formTool">
@@ -217,10 +243,7 @@ function WorkflowOverview() {
                     </div>
                 </form>
             </div>
-            <div id="wftable" className="div-level-2">
-                {workflows.length !== 0 && <WorkflowTable allData={workflows}/>}
-                {workflows.length === 0 && <p>No workflows found for specified filters.</p>}
-            </div>
+            <ShowWFTable/>
         </div>
     );
 }

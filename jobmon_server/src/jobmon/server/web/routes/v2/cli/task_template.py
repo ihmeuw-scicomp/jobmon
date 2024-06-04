@@ -497,8 +497,14 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
 @cross_origin()
 def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
     """Get the error logs for a task template id for GUI."""
-    # return DS
     return_list: List[Any] = []
+
+    arguments = request.args
+    page = int(arguments.get("page", 1))
+    page_size = int(arguments.get("page_size", 10))
+    just_recent_errors = arguments.get("just_recent_errors", "false")
+    recent_errors = just_recent_errors.lower() == "true"
+    offset = (page - 1) * page_size
 
     session = SessionLocal()
     with session.begin():
@@ -511,6 +517,35 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
         ]
 
+        where_conditions = query_filter[:]
+        if recent_errors:
+            where_conditions.extend(
+                [
+                    (
+                        TaskInstance.id
+                        == select(func.max(TaskInstance.id))
+                        .where(TaskInstance.task_id == Task.id)
+                        .correlate(Task)
+                        .scalar_subquery()
+                    ),
+                    (
+                        TaskInstance.workflow_run_id
+                        == select(func.max(WorkflowRun.id))
+                        .where(WorkflowRun.workflow_id == Task.workflow_id)
+                        .correlate(Task)
+                        .scalar_subquery()
+                    ),
+                ]
+            )
+
+        total_count_query = (
+            select(func.count(TaskInstanceErrorLog.id))
+            .join(TaskInstance, Task.id == TaskInstance.task_id)
+            .join(WorkflowRun, WorkflowRun.id == TaskInstance.workflow_run_id)
+            .where(*where_conditions)
+        )
+        total_count = session.execute(total_count_query).scalar()
+
         sql = (
             select(
                 Task.id,
@@ -519,14 +554,17 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 TaskInstanceErrorLog.error_time,
                 TaskInstanceErrorLog.description,
                 TaskInstance.stderr_log,
+                TaskInstance.workflow_run_id,
+                Task.workflow_id,
             )
-            .where(*query_filter)
+            .join(TaskInstance, Task.id == TaskInstance.task_id)
+            .join(WorkflowRun, WorkflowRun.id == TaskInstance.workflow_run_id)
+            .where(*where_conditions)
             .order_by(TaskInstanceErrorLog.id.desc())
-            .limit(2000)
+            .offset(offset)
+            .limit(page_size)
         )
-        # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
-        # the optimizer may choose a suboptimal execution plan for large datasets.
-        # Has to be conditional since not all database engines support STRAIGHT_JOIN.
+
         if (
             SessionLocal
             and SessionLocal.bind
@@ -535,8 +573,8 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
         session.commit()
+
     for r in rows:
-        # dict: {<error log id>: [<tid>, <tiid>, <error time>, <error log>}
         return_list.append(
             {
                 "task_id": r[0],
@@ -545,22 +583,19 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 "error_time": r[3],
                 "error": r[4],
                 "task_instance_stderr_log": r[5],
+                "workflow_run_id": r[6],
+                "workflow_id": r[7],
             }
         )
     errors_df = pd.DataFrame(return_list)
 
-    # Add the 'most_recent_attempt' column to the DataFrame, defaulting to False
-    errors_df["most_recent_attempt"] = False
-
-    if not errors_df.empty:
-        # Identify the most recent task_instance_id for each task_id
-        idx = (
-            errors_df.groupby("task_id")["task_instance_id"].transform(max)
-            == errors_df["task_instance_id"]
-        )
-        # Update 'most_recent_attempt' based on the identified most recent task_instance_ids
-        errors_df.loc[idx, "most_recent_attempt"] = True
-
-    resp = jsonify(errors_df.to_dict(orient="records"))
+    resp = jsonify(
+        {
+            "error_logs": errors_df.to_dict(orient="records"),
+            "total_count": total_count,
+            "page": page,
+            "page_size": page_size,
+        }
+    )
     resp.status_code = 200
     return resp

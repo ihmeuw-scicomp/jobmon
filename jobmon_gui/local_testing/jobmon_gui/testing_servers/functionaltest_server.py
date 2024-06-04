@@ -11,6 +11,7 @@ from jobmon.server.web.app_factory import AppFactory  # noqa F401
 from sqlalchemy.orm import Session
 from jobmon.client.api import Tool
 
+
 class WebServerProcess:
     def __init__(self, filepath: str) -> None:
         if sys.platform == "darwin":
@@ -43,6 +44,7 @@ class WebServerProcess:
         with app.app_context():
             app.run(host="0.0.0.0", port=self.web_port)
 
+
 def create_multiple_status_wf():
     """Create wf with:
            1. Multiple tt
@@ -74,6 +76,7 @@ def create_multiple_status_wf():
             name=f"wf_{i}",
             default_cluster_name=C,
             default_compute_resources_set={"queue": Q, "num_cores": 1},
+            workflow_attributes={"test_attribute": "test"}
         )
 
         tasks = []
@@ -95,7 +98,7 @@ def create_multiple_status_wf():
             # half of the tasks fail
             t_or_f = "true" if j % 2 else "false"
             # first half has group 1 upstream, so that they wait
-            if j < g2_total/2:
+            if j < g2_total / 2:
                 t = delay_random_tt.create_task(
                     name=f"wf_{i}-group2-task_{j}",
                     arg1=randint(1, 20),
@@ -118,9 +121,9 @@ def create_multiple_status_wf():
         tasks_g3 = []
         g3_total = randint(5, 50)
         new_tt = tool.get_task_template(
-                        template_name=f"tt_for_wf_{i}",
-                        command_template="echo {arg}",
-                        node_args=["arg"],
+            template_name=f"tt_for_wf_{i}",
+            command_template="echo {arg}",
+            node_args=["arg"],
         )
         for j in range(g3_total):
             t = new_tt.create_task(
@@ -152,19 +155,23 @@ def create_large_workflow():
     C = "dummy"
     Q = "null.q"
 
-    TOTAL_TASK = 50000 # refer to production wf 53630
+    TOTAL_TASK = 50000  # refer to production wf 53630
     tool = Tool("large_wf_tool")
     tt_base = tool.get_task_template(
         template_name=f"tt_for_large_wf_base",
         command_template="true || echo {arg}",
         node_args=["arg"]
     )
-    wf = tool.create_workflow(name="i_am_huge", default_cluster_name=C)
+    wf = tool.create_workflow(
+        name="i_am_huge",
+        default_cluster_name=C,
+        workflow_attributes={"test_attribute": "test"}
+    )
     tasks = []
     task = tt_base.create_task(name=f"base",
-                arg="I_am_the_one_everyone_else_depends_on",
-                upstream_tasks=[],
-                compute_resources={"queue": Q, "num_cores": 1},)
+                               arg="I_am_the_one_everyone_else_depends_on",
+                               upstream_tasks=[],
+                               compute_resources={"queue": Q, "num_cores": 1}, )
     tasks.append(task)
     tt = tool.get_task_template(
         template_name=f"tt_for_large_wf",
@@ -173,17 +180,19 @@ def create_large_workflow():
     )
     for i in range(TOTAL_TASK):
         t = tt.create_task(name=f"a_task_{i}",
-                arg=f"whatever{i}",
-                upstream_tasks=[task],
-                compute_resources={"queue": Q, "num_cores": 1},)
+                           arg=f"whatever{i}",
+                           upstream_tasks=[task],
+                           compute_resources={"queue": Q, "num_cores": 1}, )
         tasks.append(t)
     wf.add_tasks(tasks)
     wf.run()
     # fill in fake resource usage data
 
+
 def start_web_service(filepath='/tmp/jobmon.db'):
     server = WebServerProcess(filepath=filepath)
     server.start_web_service()
+
 
 if __name__ == "__main__":
     ctx = mp.get_context("fork")

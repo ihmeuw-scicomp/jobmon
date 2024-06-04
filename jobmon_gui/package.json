@@ -1,6 +1,6 @@
 {
   "name": "jobmon_gui",
-  "version": "0.1.0",
+  "version": "1.14.0",
   "private": true,
   "dependencies": {
     "@elastic/apm-rum": "5.12.0",
