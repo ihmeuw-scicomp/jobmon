@@ -253,7 +253,7 @@ export default function WorkflowTable({ allData }) {
                 </div>
             )
         },
-
+        // @ts-ignore
         expanded: expandedRows,
         onExpand: (row, isExpand, rowIndex, e) => {
 
