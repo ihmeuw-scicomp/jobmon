@@ -933,7 +933,7 @@ def test_workflow_overview_viz(client_env, db_engine):
     app_route = f"/workflow_overview_viz"
     return_code, msg = wf.requester.send_request(
         app_route=app_route,
-        message={"tool": "task_detail_tool", "attribute": "test"},
+        message={"tool": "task_detail_tool", "wf_attribute_key": "test_attribute", "wf_attribute_value": "test"},
         request_type="get",
     )
 
