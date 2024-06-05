@@ -5,7 +5,7 @@ from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
 from flask import jsonify, request
-from sqlalchemy import case, func, insert, literal_column, select, update
+from sqlalchemy import and_, case, func, insert, literal_column, select, update
 import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
@@ -78,18 +78,17 @@ def record_array_batch_num(array_id: int) -> Any:
     task_ids = [int(task_id) for task_id in data["task_ids"]]
     task_resources_id = int(data["task_resources_id"])
     workflow_run_id = int(data["workflow_run_id"])
+    task_condition = and_(
+        Task.id.in_(task_ids),
+        Task.status.in_([TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]),
+    )
 
     session = SessionLocal()
     with session.begin():
         # Acquire locks on tasks to be updated
         task_locks = (
             select(Task.id)
-            .where(
-                Task.id.in_(task_ids),
-                Task.status.in_(
-                    [TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]
-                ),
-            )
+            .where(task_condition)
             .with_for_update()
             .execution_options(synchronize_session=False)
         )
@@ -98,12 +97,7 @@ def record_array_batch_num(array_id: int) -> Any:
         # update task status to acquire lock
         update_stmt = (
             update(Task)
-            .where(
-                Task.id.in_(task_ids),
-                Task.status.in_(
-                    [TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]
-                ),
-            )
+            .where(task_condition)
             .values(
                 status=TaskStatus.QUEUED,
                 status_date=func.now(),
