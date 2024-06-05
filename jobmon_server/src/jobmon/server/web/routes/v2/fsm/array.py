@@ -258,12 +258,15 @@ def log_array_distributor_id(array_id: int) -> Any:
 
     id_lst = list(data.keys())
 
+    where_condition = and_(
+        TaskInstance.id.in_(id_lst),
+        TaskInstance.array_id == array_id,
+    )
+
     # Prepare to acquire locks on the task instances
     task_instance_ids_query = (
         select(TaskInstance.id)
-        .where(
-            TaskInstance.id.in_(id_lst),
-        )
+        .where(where_condition)
         .with_for_update()
         .execution_options(synchronize_session=False)
     )
@@ -286,7 +289,7 @@ def log_array_distributor_id(array_id: int) -> Any:
         # Using the session to construct an update statement for ORM objects
         update_stmt = (
             update(TaskInstance)
-            .filter(TaskInstance.id.in_(id_lst))
+            .where(where_condition)
             .values(distributor_id=case_stmt)
             .execution_options(synchronize_session="fetch")
         )
