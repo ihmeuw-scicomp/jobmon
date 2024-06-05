@@ -510,11 +510,7 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
     with session.begin():
         query_filter = [
             TaskTemplateVersion.task_template_id == tt_id,
-            Node.task_template_version_id == TaskTemplateVersion.id,
-            Task.node_id == Node.id,
             Task.workflow_id == wf_id,
-            TaskInstance.task_id == Task.id,
-            TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
         ]
 
         where_conditions = query_filter[:]
