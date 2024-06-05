@@ -540,8 +540,12 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
 
         total_count_query = (
             select(func.count(TaskInstanceErrorLog.id))
-            .join(TaskInstance, Task.id == TaskInstance.task_id)
-            .join(WorkflowRun, WorkflowRun.id == TaskInstance.workflow_run_id)
+            .join(TaskInstance, TaskInstanceErrorLog.task_instance_id == TaskInstance.id)
+            .join(Task, TaskInstance.task_id == Task.id)
+            .join(WorkflowRun, TaskInstance.workflow_run_id == WorkflowRun.id)
+            .join(Node, Task.node_id == Node.id)
+            .join(TaskTemplateVersion, Node.task_template_version_id == TaskTemplateVersion.id)
+            .join(TaskTemplate, TaskTemplateVersion.task_template_id == TaskTemplate.id)
             .where(*where_conditions)
         )
         total_count = session.execute(total_count_query).scalar()
@@ -557,8 +561,12 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 TaskInstance.workflow_run_id,
                 Task.workflow_id,
             )
-            .join(TaskInstance, TaskInstance.task_id == Task.id)
-            .join(WorkflowRun, WorkflowRun.id == TaskInstance.workflow_run_id)
+            .join(TaskInstance, TaskInstanceErrorLog.task_instance_id == TaskInstance.id)
+            .join(Task, TaskInstance.task_id == Task.id)
+            .join(WorkflowRun, TaskInstance.workflow_run_id == WorkflowRun.id)
+            .join(Node, Task.node_id == Node.id)
+            .join(TaskTemplateVersion, Node.task_template_version_id == TaskTemplateVersion.id)
+            .join(TaskTemplate, TaskTemplateVersion.task_template_id == TaskTemplate.id)
             .where(*where_conditions)
             .order_by(TaskInstanceErrorLog.id.desc())
             .offset(offset)
