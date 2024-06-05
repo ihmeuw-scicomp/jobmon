@@ -36,7 +36,7 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
 
     function getAsyncErrorLogs(wf_id: string, tt_id?: string) {
         setErrorLoading(true);
-        const url = process.env.REACT_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
+        const url = import.meta.env.VITE_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
         const fetchData = async () => {
             const result: any = await axios({
                     method: 'get',
