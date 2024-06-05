@@ -55,9 +55,21 @@ def add_array() -> Any:
             )
             session.add(array)
         else:
+            array_condition = and_(Array.id == array.id)
+
+            # take a lock on the array that will be updated
+            array_locks = (
+                select(Array.id)
+                .where(array_condition)
+                .with_for_update()
+                .execution_options(synchronize_session=False)
+            )
+            session.execute(array_locks)
+
+            # update the array with the new max_concurrently_running
             update_stmt = (
                 update(Array)
-                .where(Array.id == array.id)
+                .where(array_condition)
                 .values(max_concurrently_running=data["max_concurrently_running"])
             )
             session.execute(update_stmt)
