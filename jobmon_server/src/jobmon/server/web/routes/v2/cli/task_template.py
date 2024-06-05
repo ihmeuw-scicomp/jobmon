@@ -522,29 +522,25 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             where_conditions.extend(
                 [
                     (
-                        TaskInstance.id
-                        == select(func.max(TaskInstance.id))
-                        .where(TaskInstance.task_id == Task.id)
-                        .correlate(Task)
-                        .scalar_subquery()
+                            TaskInstance.id
+                            == select(func.max(TaskInstance.id))
+                            .where(TaskInstance.task_id == Task.id)
+                            .correlate(Task)
+                            .scalar_subquery()
                     ),
                     (
-                        TaskInstance.workflow_run_id
-                        == select(func.max(WorkflowRun.id))
-                        .where(WorkflowRun.workflow_id == Task.workflow_id)
-                        .correlate(Task)
-                        .scalar_subquery()
+                            TaskInstance.workflow_run_id
+                            == select(func.max(WorkflowRun.id))
+                            .where(WorkflowRun.workflow_id == Task.workflow_id)
+                            .correlate(Task)
+                            .scalar_subquery()
                     ),
                 ]
             )
 
         total_count_query = (
             select(func.count(TaskInstanceErrorLog.id))
-            .select_from(TaskInstanceErrorLog)
-            .join(TaskInstance, TaskInstanceErrorLog.task_instance_id == TaskInstance.id)
-            .join(Task, TaskInstance.task_id == Task.id)
-            .join(Node, Task.node_id == Node.id)
-            .join(TaskTemplateVersion, Node.task_template_version_id == TaskTemplateVersion.id)
+            .join(TaskInstance, Task.id == TaskInstance.task_id)
             .join(WorkflowRun, WorkflowRun.id == TaskInstance.workflow_run_id)
             .where(*where_conditions)
         )
@@ -561,11 +557,7 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 TaskInstance.workflow_run_id,
                 Task.workflow_id,
             )
-            .select_from(TaskInstanceErrorLog)
-            .join(TaskInstance, TaskInstanceErrorLog.task_instance_id == TaskInstance.id)
-            .join(Task, TaskInstance.task_id == Task.id)
-            .join(Node, Task.node_id == Node.id)
-            .join(TaskTemplateVersion, Node.task_template_version_id == TaskTemplateVersion.id)
+            .join(TaskInstance, TaskInstance.task_id == Task.id)
             .join(WorkflowRun, WorkflowRun.id == TaskInstance.workflow_run_id)
             .where(*where_conditions)
             .order_by(TaskInstanceErrorLog.id.desc())
@@ -574,9 +566,9 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         )
 
         if (
-            SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
         ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
