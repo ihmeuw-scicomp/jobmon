@@ -81,6 +81,20 @@ def record_array_batch_num(array_id: int) -> Any:
 
     session = SessionLocal()
     with session.begin():
+        # Acquire locks on tasks to be updated
+        task_locks = (
+            select(Task.id)
+            .where(
+                Task.id.in_(task_ids),
+                Task.status.in_(
+                    [TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]
+                ),
+            )
+            .with_for_update()
+            .execution_options(synchronize_session=False)
+        )
+        session.execute(task_locks)
+
         # update task status to acquire lock
         update_stmt = (
             update(Task)
