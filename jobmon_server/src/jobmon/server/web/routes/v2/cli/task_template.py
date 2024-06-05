@@ -557,7 +557,7 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 TaskInstance.workflow_run_id,
                 Task.workflow_id,
             )
-            .join(TaskInstance, Task.id == TaskInstance.task_id)
+            .join(TaskInstance, TaskInstance.task_id == Task.id)
             .join(WorkflowRun, WorkflowRun.id == TaskInstance.workflow_run_id)
             .where(*where_conditions)
             .order_by(TaskInstanceErrorLog.id.desc())
