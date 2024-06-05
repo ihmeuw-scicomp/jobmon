@@ -284,7 +284,7 @@ def log_array_distributor_id(array_id: int) -> Any:
     session = SessionLocal()
     with session.begin():
         # locks for the updates
-        session.execute(task_instance_ids_query).scalars()
+        session.execute(task_instance_ids_query)
 
         # Using the session to construct an update statement for ORM objects
         update_stmt = (
