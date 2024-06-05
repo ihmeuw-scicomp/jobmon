@@ -181,19 +181,28 @@ def transition_array_to_launched(array_id: int) -> Any:
                 TaskInstance.array_id == array_id,
                 TaskInstance.array_batch_num == batch_num,
             )
-            .with_for_update()
             .execution_options(synchronize_session=False)
         )
 
         task_ids = session.execute(task_ids_query).scalars()
 
+        task_condition = and_(
+            Task.array_id == array_id,
+            Task.id.in_(task_ids),
+            Task.status == TaskStatus.INSTANTIATING,
+        )
+
+        task_locks = (
+            select(Task.id)
+            .where(task_condition)
+            .with_for_update()
+            .execution_options(synchronize_session=False)
+        )
+        session.execute(task_locks)
+
         update_task_stmt = (
             update(Task)
-            .where(
-                Task.array_id == array_id,
-                Task.id.in_(task_ids),
-                Task.status == TaskStatus.INSTANTIATING,
-            )
+            .where(task_condition)
             .values(status=TaskStatus.LAUNCHED, status_date=func.now())
         ).execution_options(synchronize_session=False)
         session.execute(update_task_stmt)
