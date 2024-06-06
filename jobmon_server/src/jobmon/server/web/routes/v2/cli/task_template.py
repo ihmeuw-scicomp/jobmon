@@ -569,12 +569,6 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             .limit(page_size)
         )
 
-        if (
-                SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
-        ):
-            sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
         session.commit()
 
