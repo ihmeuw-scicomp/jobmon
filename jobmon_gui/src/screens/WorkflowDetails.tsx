@@ -339,7 +339,6 @@ function WorkflowDetails({subpage}) {
                                     </div>
                                     <div className="div_floatright">
                                         <JobmonProgressBar
-                                            id={d["id"]}
                                             tasks={d["tasks"]}
                                             pending={d["PENDING"]}
                                             scheduled={d["SCHEDULED"]}
@@ -351,7 +350,6 @@ function WorkflowDetails({subpage}) {
                                             num_attempts_max={d["num_attempts_max"]}
                                             maxc={d["MAXC"]}
                                             placement="left"
-                                            style={{}}
                                         />
                                     </div>
                                     <br/>

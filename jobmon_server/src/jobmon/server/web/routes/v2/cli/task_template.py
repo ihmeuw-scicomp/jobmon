@@ -510,11 +510,7 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
     with session.begin():
         query_filter = [
             TaskTemplateVersion.task_template_id == tt_id,
-            Node.task_template_version_id == TaskTemplateVersion.id,
-            Task.node_id == Node.id,
             Task.workflow_id == wf_id,
-            TaskInstance.task_id == Task.id,
-            TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
         ]
 
         where_conditions = query_filter[:]
@@ -540,8 +536,28 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
 
         total_count_query = (
             select(func.count(TaskInstanceErrorLog.id))
-            .join(TaskInstance, Task.id == TaskInstance.task_id)
-            .join(WorkflowRun, WorkflowRun.id == TaskInstance.workflow_run_id)
+            .join_from(
+                TaskInstanceErrorLog,
+                TaskInstance,
+                TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+            )
+            .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+            .join_from(
+                TaskInstance,
+                WorkflowRun,
+                TaskInstance.workflow_run_id == WorkflowRun.id,
+            )
+            .join_from(Task, Node, Task.node_id == Node.id)
+            .join_from(
+                Node,
+                TaskTemplateVersion,
+                Node.task_template_version_id == TaskTemplateVersion.id,
+            )
+            .join_from(
+                TaskTemplateVersion,
+                TaskTemplate,
+                TaskTemplateVersion.task_template_id == TaskTemplate.id,
+            )
             .where(*where_conditions)
         )
         total_count = session.execute(total_count_query).scalar()
@@ -557,20 +573,34 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                 TaskInstance.workflow_run_id,
                 Task.workflow_id,
             )
-            .join(TaskInstance, Task.id == TaskInstance.task_id)
-            .join(WorkflowRun, WorkflowRun.id == TaskInstance.workflow_run_id)
+            .join_from(
+                TaskInstanceErrorLog,
+                TaskInstance,
+                TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+            )
+            .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+            .join_from(
+                TaskInstance,
+                WorkflowRun,
+                TaskInstance.workflow_run_id == WorkflowRun.id,
+            )
+            .join_from(Task, Node, Task.node_id == Node.id)
+            .join_from(
+                Node,
+                TaskTemplateVersion,
+                Node.task_template_version_id == TaskTemplateVersion.id,
+            )
+            .join_from(
+                TaskTemplateVersion,
+                TaskTemplate,
+                TaskTemplateVersion.task_template_id == TaskTemplate.id,
+            )
             .where(*where_conditions)
             .order_by(TaskInstanceErrorLog.id.desc())
             .offset(offset)
             .limit(page_size)
         )
 
-        if (
-            SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
-        ):
-            sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
         session.commit()
 

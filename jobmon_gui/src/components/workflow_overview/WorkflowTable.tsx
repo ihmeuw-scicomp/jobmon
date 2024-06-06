@@ -10,7 +10,7 @@ import Spinner from 'react-bootstrap/Spinner';
 import {Link, useLocation} from "react-router-dom";
 import { convertDate, convertDatePST } from '@jobmon_gui/utils/formatters';
 import { FaCaretDown, FaCaretUp, FaCircle } from "react-icons/fa";
-import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar.tsx';
+import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
 
 
 const customCaret = (order, column) => {
@@ -253,7 +253,7 @@ export default function WorkflowTable({ allData }) {
                 </div>
             )
         },
-
+        // @ts-ignore
         expanded: expandedRows,
         onExpand: (row, isExpand, rowIndex, e) => {
 
