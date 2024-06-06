@@ -24,7 +24,6 @@ utilized resources.
 
 #### Changed 
 - Default to showing only Workflows that were submitted in the last two weeks on the `Workflow Overview` page.
-- Switched to server side pagination for the errors table on the `Workflow Details` page.
 - Toggle button on `Task Details` error table toggles for the latest TaskInstance errors associated with the latest 
 WorkflowRun.
 - Changed workflow information on `Workflow Details` page from a hover zoom to an information button that will show a 

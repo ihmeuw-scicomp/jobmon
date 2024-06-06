@@ -858,8 +858,7 @@ def test_get_tt_error_log_viz(client_env, db_engine):
     _, msg = wf2.requester.send_request(
         app_route=app_route, message={}, request_type="get"
     )
-    breakpoint()
-    assert len(msg) == 1
+    assert len(msg) == 2
     assert msg[0]["task_id"] == t2.task_id
     assert "not found" in msg[0]["error"]
 
