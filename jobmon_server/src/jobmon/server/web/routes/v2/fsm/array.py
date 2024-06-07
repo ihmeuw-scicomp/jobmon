@@ -5,7 +5,7 @@ from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
 from flask import jsonify, request
-from sqlalchemy import bindparam, func, insert, literal_column, select, update
+from sqlalchemy import and_, case, func, insert, literal_column, select, update
 import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
@@ -55,9 +55,21 @@ def add_array() -> Any:
             )
             session.add(array)
         else:
+            array_condition = and_(Array.id == array.id)
+
+            # take a lock on the array that will be updated
+            array_locks = (
+                select(Array.id)
+                .where(array_condition)
+                .with_for_update()
+                .execution_options(synchronize_session=False)
+            )
+            session.execute(array_locks)
+
+            # update the array with the new max_concurrently_running
             update_stmt = (
                 update(Array)
-                .where(Array.id == array.id)
+                .where(array_condition)
                 .values(max_concurrently_running=data["max_concurrently_running"])
             )
             session.execute(update_stmt)
@@ -78,18 +90,26 @@ def record_array_batch_num(array_id: int) -> Any:
     task_ids = [int(task_id) for task_id in data["task_ids"]]
     task_resources_id = int(data["task_resources_id"])
     workflow_run_id = int(data["workflow_run_id"])
+    task_condition = and_(
+        Task.id.in_(task_ids),
+        Task.status.in_([TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]),
+    )
 
     session = SessionLocal()
     with session.begin():
+        # Acquire locks on tasks to be updated
+        task_locks = (
+            select(Task.id)
+            .where(task_condition)
+            .with_for_update()
+            .execution_options(synchronize_session=False)
+        )
+        session.execute(task_locks)
+
         # update task status to acquire lock
         update_stmt = (
             update(Task)
-            .where(
-                Task.id.in_(task_ids),
-                Task.status.in_(
-                    [TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]
-                ),
-            )
+            .where(task_condition)
             .values(
                 status=TaskStatus.QUEUED,
                 status_date=func.now(),
@@ -127,7 +147,9 @@ def record_array_batch_num(array_id: int) -> Any:
                 # status columns
                 literal_column(f"'{TaskInstanceStatus.QUEUED}'").label("status"),
                 func.now().label("status_date"),
-            ).where(Task.id.in_(task_ids), Task.status == TaskStatus.QUEUED),
+            )
+            .where(Task.id.in_(task_ids), Task.status == TaskStatus.QUEUED)
+            .with_for_update(),
             # no python side defaults. Server defaults only
             include_defaults=False,
         )
@@ -137,6 +159,7 @@ def record_array_batch_num(array_id: int) -> Any:
         tasks_by_status_query = (
             select(Task.status, Task.id)
             .where(Task.id.in_(task_ids))
+            .with_for_update()
             .order_by(
                 Task.status
             )  # This line is optional but helps in organizing the result
@@ -175,26 +198,60 @@ def transition_array_to_launched(array_id: int) -> Any:
 
         task_ids = session.execute(task_ids_query).scalars()
 
+        task_condition = and_(
+            Task.array_id == array_id,
+            Task.id.in_(task_ids),
+            Task.status == TaskStatus.INSTANTIATING,
+        )
+
+        task_locks = (
+            select(Task.id)
+            .where(task_condition)
+            .with_for_update()
+            .execution_options(synchronize_session=False)
+        )
+        session.execute(task_locks)
+
         update_task_stmt = (
             update(Task)
-            .where(
-                Task.array_id == array_id,
-                Task.id.in_(task_ids),
-                Task.status == TaskStatus.INSTANTIATING,
-            )
+            .where(task_condition)
             .values(status=TaskStatus.LAUNCHED, status_date=func.now())
         ).execution_options(synchronize_session=False)
         session.execute(update_task_stmt)
+
+    # Update the task instances in a separate session
+    _update_task_instance(array_id, batch_num, next_report)
+
+    resp = jsonify()
+    resp.status_code = StatusCodes.OK
+    return resp
+
+
+def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> None:
+
+    task_instance_condition = and_(
+        TaskInstance.array_id == array_id,
+        TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
+        TaskInstance.array_batch_num == batch_num,
+    )
+
+    session = SessionLocal()
+    with session.begin():
+        # Acquire a lock and update tasks to launched
+        task_instance_ids_query = (
+            select(TaskInstance.id)
+            .where(task_instance_condition)
+            .with_for_update()
+            .execution_options(synchronize_session=False)
+        )
+
+        session.execute(task_instance_ids_query)
 
         # Transition all the task instances in the batch
         # Bypassing the ORM for performance reasons.
         update_stmt = (
             update(TaskInstance)
-            .where(
-                TaskInstance.array_id == array_id,
-                TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
-                TaskInstance.array_batch_num == batch_num,
-            )
+            .where(task_instance_condition)
             .values(
                 status=TaskInstanceStatus.LAUNCHED,
                 submitted_date=func.now(),
@@ -202,42 +259,55 @@ def transition_array_to_launched(array_id: int) -> Any:
                 report_by_date=add_time(next_report),
             )
         ).execution_options(synchronize_session=False)
-
         session.execute(update_stmt)
-
-    resp = jsonify()
-    resp.status_code = StatusCodes.OK
-    return resp
 
 
 @api_v1_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
 @api_v2_blueprint.route("/array/<array_id>/log_distributor_id", methods=["POST"])
 def log_array_distributor_id(array_id: int) -> Any:
     """Add distributor_id, stderr/stdout paths to the DB for all TIs in an array."""
-    data = cast(Dict, request.get_json())
+    data = request.get_json()
 
-    # Create a list of dicts out of the distributor id map.
-    params = [
-        {"task_instance_id": key, "distributor_id": val} for key, val in data.items()
-    ]
+    id_lst = list(data.keys())
 
+    where_condition = and_(
+        TaskInstance.id.in_(id_lst),
+        TaskInstance.array_id == array_id,
+    )
+
+    # Prepare to acquire locks on the task instances
+    task_instance_ids_query = (
+        select(TaskInstance.id)
+        .where(where_condition)
+        .with_for_update()
+        .execution_options(synchronize_session=False)
+    )
+
+    # Prepare the case statement for dynamic updating based on conditions
+    case_stmt = case(
+        *[
+            (TaskInstance.id == int(task_instance_id), distributor_id)
+            for task_instance_id, distributor_id in data.items()
+        ],
+        else_=TaskInstance.distributor_id,
+    )
+
+    # Acquire locks and update TaskInstances
     session = SessionLocal()
     with session.begin():
-        # Acquire a lock and update the task instance table
-        # Using bindparam only issues one query; unfortunately, the MariaDB optimizer actually
-        # performs this operation iteratively. The update is fairly slow despite the fact that
-        # we are issuing a single bulk query.
+        # locks for the updates
+        session.execute(task_instance_ids_query)
+
+        # Using the session to construct an update statement for ORM objects
         update_stmt = (
             update(TaskInstance)
-            .where(
-                TaskInstance.array_id == array_id,
-                TaskInstance.id == bindparam("task_instance_id"),
-            )
-            .values(distributor_id=bindparam("distributor_id"))
-            .execution_options(synchronize_session=False)
+            .where(where_condition)
+            .values(distributor_id=case_stmt)
+            .execution_options(synchronize_session="fetch")
         )
-        session.connection().execute(update_stmt, params)
+        # updates
+        session.execute(update_stmt)
 
-    resp = jsonify()
+    resp = jsonify(success=True)
     resp.status_code = StatusCodes.OK
     return resp
