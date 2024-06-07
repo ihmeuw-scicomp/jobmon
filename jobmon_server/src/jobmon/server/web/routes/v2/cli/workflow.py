@@ -560,7 +560,7 @@ def workflows_by_user_form() -> Any:
                                 JOIN workflow_run ON workflow.id = workflow_run.workflow_id
                                 LEFT JOIN workflow_attribute
                                     ON workflow.id = workflow_attribute.workflow_id
-                                JOIN workflow_attribute_type
+                                LEFT JOIN workflow_attribute_type
                                     ON workflow_attribute.workflow_attribute_type_id =
                                         workflow_attribute_type.id
                             {inner_where_clause}
