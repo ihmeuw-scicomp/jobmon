@@ -115,7 +115,7 @@ export default function Errors({taskTemplateName, taskTemplateId, workflowId, ap
             sort: true,
             formatter: (cell, row) => <nav>
                 <Link
-                    to={{ pathname: `/task_details/${cell}`, search: location.search }}
+                    to={{ pathname: `/task_details/${row.task_id}`, search: location.search }}
                     key={cell}
                 >
                     {cell}
