@@ -9,7 +9,7 @@ All notable changes to the Jobmon GUI will be documented in this file.
 ### Deprecated
 ### Removed
 
-## [1.14.0] - 2024-05-28
+## [1.14.0] - 2024-06-07
 ### User-Facing
 #### Added
 - Added MetricMind and ImageLauncher links to left-hand navigation bar.
