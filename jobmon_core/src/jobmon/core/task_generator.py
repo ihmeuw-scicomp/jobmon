@@ -206,6 +206,7 @@ class TaskGenerator:
         tool: Tool,
         naming_args: Optional[List[str]] = None,
         max_attempts: Optional[int] = None,
+        module_source_path: Optional[str] = None,
     ) -> None:
         """Initialize TaskGenerator.
 
@@ -227,6 +228,7 @@ class TaskGenerator:
         self.mod_name = f"{task_function.__module__}"
         self.name = task_function.__name__
         self.full_path = f"{task_function.__module__}:{self.name}"
+        self.module_source_path = module_source_path
         self.params = {
             name: details.annotation
             for name, details in inspect.signature(self.task_function).parameters.items()
@@ -294,16 +296,29 @@ class TaskGenerator:
 
     def _generate_task_template(self) -> None:
         """Generate and store the task template."""
-        self._task_template = self.tool.get_task_template(
-            template_name=self.name,
-            command_template="{executable} " +
-                             " --expected_jobmon_version " + core_version +
-                             " --module_name " + self.mod_name +
-                             " --func_name " + self.name +
-                             " --args {tgargs}",
-            node_args=["tgargs"],
-            op_args=["executable"],
-        )
+        if self.module_source_path:
+            self._task_template = self.tool.get_task_template(
+                template_name=self.name,
+                command_template="{executable} " +
+                                 " --expected_jobmon_version " + core_version +
+                                 " --module_name " + self.mod_name +
+                                 " --func_name " + self.name +
+                                 " --module_source_path " + self.module_source_path +
+                                 " --args {tgargs}",
+                node_args=["tgargs"],
+                op_args=["executable"],
+            )
+        else:
+            self._task_template = self.tool.get_task_template(
+                template_name=self.name,
+                command_template="{executable} " +
+                                 " --expected_jobmon_version " + core_version +
+                                 " --module_name " + self.mod_name +
+                                 " --func_name " + self.name +
+                                 " --args {tgargs}",
+                node_args=["tgargs"],
+                op_args=["executable"],
+            )
 
     def _is_valid_type(self, obj: Any, expected_type: Type) -> bool:
         """Check that the obj type matches the expected type."""
@@ -435,19 +450,6 @@ class TaskGenerator:
 
         return deserialized_result
 
-    def _verify_task_command_is_valid(self, command: str) -> None:
-        """Ensure the generated task command is valid.
-
-        Currently we check:
-        - that the command has an even number of arguments
-        """
-        pass
-        # Split the command on spaces and remove elements from the beginning of the command
-        # until we find the first argument (i.e. the first item which starts with ``--``)
-        cleaned_command = command.split()
-        #while not cleaned_command[0].startswith(ARGUMENT_NAME_PREFIX):
-        #    cleaned_command.pop(0)
-
     def create_task(self, compute_resources: Dict, **kwargs: Any) -> Task:
         """Create a task for the task_function with the given kwargs."""
         executable_path = _find_executable_path(executable=TASK_RUNNER_NAME)
@@ -489,7 +491,6 @@ class TaskGenerator:
             executable=executable_path,
             tgargs=f"'{tg_arg_string}'",
         )
-        self._verify_task_command_is_valid(task.command)
 
         return task
 
@@ -596,6 +597,7 @@ def task_generator(
     tool: Tool,
     naming_args: Optional[List[str]] = None,
     max_attempts: Optional[int] = None,
+    module_source_path: Optional[str] = None,
 ) -> Callable:
     """Decorator for generating jobmon tasks from a python function."""
 
@@ -607,6 +609,7 @@ def task_generator(
             tool=tool,
             naming_args=naming_args,
             max_attempts=max_attempts,
+            module_source_path=module_source_path,
         )
 
     return wrapper
@@ -641,3 +644,5 @@ def get_tasks_by_node_args(
         raise ValueError(f"There were no tasks in the workflow that matched {node_args_dict}")
 
     return result
+
+

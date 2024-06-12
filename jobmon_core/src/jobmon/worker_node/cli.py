@@ -3,7 +3,10 @@
 import argparse
 import ast
 import importlib
+import importlib.util
+import importlib.machinery
 import logging
+import os
 import sys
 from typing import Optional
 
@@ -107,7 +110,18 @@ class WorkerNodeCLI(CLI):
 
         # Import the module and get the task generator we've been pointed to, raise an error
         # if it's not a TaskGenerator
-        mod = importlib.import_module(args.module_name)
+        # if the user used the --module_dir flag, add the module directory to the path
+        if args.module_source_path:
+            # Create a module spec from the source file
+            loader = importlib.machinery.SourceFileLoader(args.module_name,
+                                                          os.path.expanduser(args.module_source_path))
+            spec = importlib.util.spec_from_loader(loader.name, loader)
+            # Create a new module based on the spec
+            mod = importlib.util.module_from_spec(spec)
+            # Add the module to sys.modules
+            sys.modules[args.module_name] = mod
+        else:
+            mod = importlib.import_module(args.module_name)
         task_generator = getattr(mod, args.func_name)
         if not isinstance(task_generator, TaskGenerator):
             raise ValueError(f"{args.module_name}:{args.func_name} doesn't point to a runnable jobmon task.")
@@ -149,6 +163,12 @@ class WorkerNodeCLI(CLI):
             type=str,
             help="expected_jobmon_version of the work node.",
             required=True,
+        )
+        generator_parser.add_argument(
+            "--module_source_path",
+            type=str,
+            help="The directory the module source code located; you do not need this if the module is installed in your system.",
+            required=False,
         )
 
     def _add_worker_node_job_parser(self) -> None:
