@@ -34,7 +34,7 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} "
         f" --expected_jobmon_version {core_version}"
-        f" --module_name worker_node.test_task_generator"
+        f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
         " --args 'foo=1;bar=baz'"
     )
@@ -71,7 +71,7 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} "
         f" --expected_jobmon_version {core_version}"
-        f" --module_name worker_node.test_task_generator"
+        f" --module_name tests.worker_node.test_task_generator"
         " --func_name list_function"
         " --args 'foo=[a, b];bar=[c, d]'"
     )
@@ -120,7 +120,7 @@ def test_naming_args(
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} "
         f" --expected_jobmon_version {core_version}"
-        f" --module_name worker_node.test_task_generator"
+        f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
         " --args 'foo=1;bar=baz'"
     )

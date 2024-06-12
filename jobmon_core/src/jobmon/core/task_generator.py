@@ -452,7 +452,7 @@ class TaskGenerator:
 
     def create_task(self, compute_resources: Dict, **kwargs: Any) -> Task:
         """Create a task for the task_function with the given kwargs."""
-        executable_path = _find_executable_path(executable=TASK_RUNNER_NAME)
+        executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
 
         # Serialize the kwargs
         serialized_kwargs = {

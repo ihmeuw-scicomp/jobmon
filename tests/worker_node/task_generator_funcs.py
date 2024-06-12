@@ -23,9 +23,9 @@ def simple_function(foo: int) -> None:
 def simple_tasks() -> None:
     """Simple task."""
     wf = tool.create_workflow()
-    computer_resource = {"queue": "null.q"}
+    compute_resources = {"queue": "null.q"}
     for i in range(5):
-        task = simple_function.create_task(computer_resource=computer_resource, foo=i)
+        task = simple_function.create_task(compute_resources=compute_resources, foo=i)
         wf.add_tasks([task])
     r = wf.run()
     assert r == "D"
