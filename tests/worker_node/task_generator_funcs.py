@@ -23,8 +23,9 @@ def simple_function(foo: int) -> None:
 def simple_tasks() -> None:
     """Simple task."""
     wf = tool.create_workflow()
+    computer_resource = {"queue": "null.q"}
     for i in range(5):
-        task = simple_function.create_task(foo=i)
+        task = simple_function.create_task(computer_resource=computer_resource, foo=i)
         wf.add_tasks([task])
     r = wf.run()
     assert r == "D"
@@ -33,3 +34,4 @@ def main():
     simple_tasks()
 
 if __name__ == "__main__":
+    main()
