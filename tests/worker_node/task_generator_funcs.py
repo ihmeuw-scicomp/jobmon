@@ -13,3 +13,20 @@ full_script_path = os.path.realpath(script_path)
 def simple_function(foo: int) -> None:
     """Simple task_function."""
     print(f"foo: {foo}")
+
+
+def simple_tasks() -> None:
+    """Simple task."""
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "null.q"}
+    for i in range(5):
+        task = simple_function.create_task(compute_resources=compute_resources, foo=i)
+        wf.add_tasks([task])
+    r = wf.run()
+    assert r == "D"
+
+def main():
+    simple_tasks()
+
+if __name__ == "__main__":
+    main()
