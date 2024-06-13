@@ -13,7 +13,8 @@ SIMPLE_TYPES = {str, int, float, bool}
 BUILT_IN_COLLECTIONS = {list, tuple, set}
 OPTIONAL_TYPES = {Optional, type(None)}
 
-TASK_RUNNER_NAME = "worker_node_entry_point task_generator "
+TASK_RUNNER_NAME = "worker_node_entry_point"
+TASK_RUNNER_SUB_COMMAND = "task_generator"
 HELP_TEXT_INTRO_FORMAT = "Command Line Documentation for {full_path}"
 
 SERIALIZED_EMPTY_STRING = '""'
@@ -299,7 +300,7 @@ class TaskGenerator:
         if self.module_source_path:
             self._task_template = self.tool.get_task_template(
                 template_name=self.name,
-                command_template="{executable} " +
+                command_template="{executable} " + TASK_RUNNER_SUB_COMMAND +
                                  " --expected_jobmon_version " + core_version +
                                  " --module_name " + self.mod_name +
                                  " --func_name " + self.name +
