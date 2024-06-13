@@ -9,7 +9,11 @@ script_path = os.path.abspath(__file__)
 # Resolve any symbolic links (if necessary)
 full_script_path = os.path.realpath(script_path)
 
-@task_generator.task_generator(serializers={}, tool_name="test_tool", module_source_path=full_script_path, max_attempts=1)
+@task_generator.task_generator(serializers={},
+                               tool_name="test_tool",
+                               module_source_path=full_script_path,
+                               max_attempts=1,
+                               naming_args=["foo"])
 def simple_function(foo: int) -> None:
     """Simple task_function."""
     print(f"foo: {foo}")

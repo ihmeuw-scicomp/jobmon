@@ -131,7 +131,7 @@ class WorkerNodeCLI(CLI):
         if args.arghelp:
             print(task_generator.help())
             return ReturnCodes.SUCCESS
-        task_generator.run(**arg_dict)
+        task_generator.run(arg_dict)
 
     def _add_run_task_generator_parser(self) -> None:
         generator_parser = self._subparsers.add_parser("task_generator")
