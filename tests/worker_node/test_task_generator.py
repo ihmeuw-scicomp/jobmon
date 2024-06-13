@@ -14,8 +14,8 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
     monkeypatch.setattr(
         task_generator, "_find_executable_path", Mock(return_value=task_generator.TASK_RUNNER_NAME)
     )
-    tool = Tool()
-    @task_generator.task_generator(serializers={}, tool=tool)
+    tool = Tool("test_tool")
+    @task_generator.task_generator(serializers={}, tool_name="test_tool")
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
         pass
@@ -51,8 +51,8 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
     monkeypatch.setattr(
         task_generator, "_find_executable_path", Mock(return_value=task_generator.TASK_RUNNER_NAME)
     )
-    tool = Tool()
-    @task_generator.task_generator(serializers={}, tool=tool)
+    tool = Tool("test_tool")
+    @task_generator.task_generator(serializers={}, tool_name="test_tool")
     def list_function(foo: List[str], bar: List[str]) -> None:
         """Example task_function."""
         pass
@@ -98,9 +98,9 @@ def test_naming_args(
     monkeypatch.setattr(
         task_generator, "_find_executable_path", Mock(return_value=task_generator.TASK_RUNNER_NAME)
     )
-    tool = Tool()
+    tool = Tool("test_tool")
     @task_generator.task_generator(
-        serializers={}, tool=tool, naming_args=naming_args
+        serializers={}, tool_name="test_tool", naming_args=naming_args
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
@@ -139,9 +139,9 @@ def test_max_attempts(client_env, monkeypatch: pytest.fixture) -> None:
     )
 
     max_attempts = 40
-    tool = Tool()
+    tool = Tool("test_tool")
     @task_generator.task_generator(
-        serializers={}, tool=tool, max_attempts=max_attempts
+        serializers={}, tool_name="test_tool", max_attempts=max_attempts
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
@@ -175,9 +175,9 @@ def test_simple_type(client_env, simple_type: Any) -> None:
     """
     # Instantiate the TaskGenerator
 
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Exercise by calling serialize
@@ -208,11 +208,11 @@ def test_serializer_specified_type(client_env) -> None:
     Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#255
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
         task_function=my_func,
         serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
-        tool=tool,
+        tool_name="test_tool",
     )
 
     # Instantiate a serializer-specified type
@@ -229,9 +229,9 @@ def test_unknown_type_raises_error(client_env) -> None:
     Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#269
     """
     # Instantiate the TaskGenerator without a serializer for YearRange
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Instantiate an unknown, non-simple type
@@ -248,11 +248,11 @@ def test_built_in_collections(client_env) -> None:
     Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#292
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
         task_function=my_func,
         serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
-        tool=tool,
+        tool_name="test_tool",
     )
 
     # Cast the items as the collection_type
@@ -276,9 +276,9 @@ def test_multidimensional_collection_raises_error(client_env) -> None:
     Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#318
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Define the items to serialize
@@ -297,9 +297,9 @@ def test_serialize_optional(client_env) -> None:
     Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#335
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Exercise by calling serialize
@@ -314,9 +314,9 @@ def test_empty_collection(client_env) -> None:
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#349
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Define the expected result
@@ -334,9 +334,9 @@ def test_optional_collection(client_env) -> None:
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#363
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Define the items to serialize
@@ -360,9 +360,9 @@ def test_no_internal_type_raises_error(client_env) -> None:
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#398
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Exercise & Verify an error is raised
@@ -385,9 +385,9 @@ def test_deserialize_simple_type(client_env, simple_type: str, expected_result: 
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#410
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Exercise by calling deserialize
@@ -402,11 +402,11 @@ def test_deserializer_specified_type(client_env) -> None:
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#423
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
         task_function=my_func,
         serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
-        tool=tool,
+        tool_name="test_tool",
     )
 
     # Instantiate a serializer-specified type
@@ -425,9 +425,9 @@ def test_deserializer_unknown_type_raises_error(client_env) -> None:
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#455
     """
     # Instantiate the TaskGenerator without a serializer for YearRange
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Instantiate an unknown, non-simple type
@@ -466,11 +466,11 @@ def test_deserialize_built_in_collections(
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#469
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
         task_function=my_func,
         serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
-        tool=tool,
+        tool_name="test_tool",
     )
 
     # Exercise by calling deserialize on the items_to_deserialize, having cast them to
@@ -488,11 +488,11 @@ def test_deserialize_multi_annotated_collection(client_env) -> None:
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#511
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
         task_function=my_func,
         serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
-        tool=tool,
+        tool_name="test_tool",
     )
 
     # Define the items to deserialize
@@ -522,9 +522,9 @@ def test_deserialize_optional_collection(
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#538
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Exercise by calling deserialize
@@ -539,11 +539,11 @@ def test_deserialize_multi_dimensional_collection_raises_error(client_env) -> No
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#552
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
         task_function=my_func,
         serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
-        tool=tool,
+        tool_name="test_tool",
     )
 
     # Define the items to deserialize
@@ -564,9 +564,9 @@ def test_deserialize_collection_without_item_annotation_raises_error(
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#572
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Exercise by calling deserialize & Verify an error is raised
@@ -601,11 +601,11 @@ def test_deserialize_optional(
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#588
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
         task_function=my_func,
         serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
-        tool=tool,
+        tool_name="test_tool",
     )
 
     # Exercise by calling deserialize
@@ -620,9 +620,9 @@ def test_deserialize_empty_collection(client_env) -> None:
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#602
     """
     # Instantiate the TaskGenerator
-    tool = Tool()
+    tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool=tool
+        task_function=my_func, serializers={}, tool_name="test_tool"
     )
 
     # Define the expected result
