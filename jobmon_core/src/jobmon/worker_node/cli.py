@@ -120,6 +120,7 @@ class WorkerNodeCLI(CLI):
             mod = importlib.util.module_from_spec(spec)
             # Add the module to sys.modules
             sys.modules[args.module_name] = mod
+            loader.exec_module(mod)
         else:
             mod = importlib.import_module(args.module_name)
         task_generator = getattr(mod, args.func_name)
