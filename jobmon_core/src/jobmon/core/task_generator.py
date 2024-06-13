@@ -203,7 +203,7 @@ class TaskGenerator:
         self,
         task_function: Callable,
         serializers: Dict,
-        tool: Tool,
+        tool_name: str,
         naming_args: Optional[List[str]] = None,
         max_attempts: Optional[int] = None,
         module_source_path: Optional[str] = None,
@@ -217,13 +217,13 @@ class TaskGenerator:
             serializers: A dict mapping types to two callables. The first callable is the
                 serializer, which converts an object of the type to a string. And the second is
                 a deserializer, which converts a string to an object of the type.
-            tool: A jobmon tool for generating tasks.
+            tool_name: A jobmon tool name for generating tasks.
             naming_args: A list of arguments to use in the task name. If not provided, uses all
             max_attempts: The max number of attempts jobmon will make on the tasks
         """
         self.task_function = task_function
         self.serializers = serializers
-        self.tool = tool
+        self.tool = Tool(tool_name)
         self.max_attempts = max_attempts
         self.mod_name = f"{task_function.__module__}"
         self.name = task_function.__name__
@@ -594,7 +594,7 @@ class TaskGenerator:
 
 def task_generator(
     serializers: Dict,
-    tool: Tool,
+    tool_name: str,
     naming_args: Optional[List[str]] = None,
     max_attempts: Optional[int] = None,
     module_source_path: Optional[str] = None,
@@ -606,7 +606,7 @@ def task_generator(
         return TaskGenerator(
             task_function=task_function,
             serializers=serializers,
-            tool=tool,
+            tool_name=tool_name,
             naming_args=naming_args,
             max_attempts=max_attempts,
             module_source_path=module_source_path,
