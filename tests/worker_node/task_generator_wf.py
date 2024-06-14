@@ -74,8 +74,9 @@ def simple_tasks_serializer_seq() -> None:
     task_generator_funcs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.simple_function_with_serializer
+    test_year = task_generator_funcs.TestYear
     for i in range(2020, 2024):
-        task = simple_function.create_task(compute_resources=compute_resources, year=str(i))
+        task = simple_function.create_task(compute_resources=compute_resources, year=test_year(i))
         wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
