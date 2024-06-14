@@ -57,4 +57,49 @@ def simple_tasks_slurm() -> None:
     assert r == "D"
 
 
-simple_tasks_slurm()
+#simple_tasks_seq()
+#simple_tasks_slurm()
+
+def simple_tasks_serializer_seq() -> None:
+    """Simple task."""
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="sequential", compute_resources={"queue": "null.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "null.q"}
+
+    # Import the task_generator_funcs.py module
+    spec = importlib.util.spec_from_file_location("task_generator_funcs", task_generator_funcs_path)
+    task_generator_funcs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(task_generator_funcs)
+    simple_function = task_generator_funcs.simple_function_with_serializer
+    for i in range(2020, 2024):
+        task = simple_function.create_task(compute_resources=compute_resources, year=str(i))
+        wf.add_tasks([task])
+    r = wf.run(configure_logging=True)
+    assert r == "D"
+
+
+def simple_tasks_serializer_slurm() -> None:
+    """Simple task."""
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="slurm", compute_resources={"queue": "all.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
+
+    # Import the task_generator_funcs.py module
+    spec = importlib.util.spec_from_file_location("task_generator_funcs", task_generator_funcs_path)
+    task_generator_funcs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(task_generator_funcs)
+    simple_function = task_generator_funcs.simple_function_with_serializer
+    for i in range(2020, 2024):
+        task = simple_function.create_task(compute_resources=compute_resources, year=str(i))
+        wf.add_tasks([task])
+    r = wf.run(configure_logging=True)
+    assert r == "D"
+
+simple_tasks_serializer_seq()
+#simple_tasks_serializer_slurm()
