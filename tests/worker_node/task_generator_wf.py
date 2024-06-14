@@ -15,7 +15,7 @@ full_script_path = os.path.realpath(script_path)
 # get the task_generator_funcs.py path
 task_generator_funcs_path = os.path.join(os.path.dirname(script_path), 'task_generator_funcs.py')
 
-def simple_tasks() -> None:
+def simple_tasks_seq() -> None:
     """Simple task."""
     tool = Tool("test_tool")
     tool.set_default_compute_resources_from_dict(
@@ -32,8 +32,29 @@ def simple_tasks() -> None:
     for i in range(5):
         task = simple_function.create_task(compute_resources=compute_resources, foo=i)
         wf.add_tasks([task])
-    r = wf.run()
+    r = wf.run(configure_logging=True)
     assert r == "D"
 
 
-simple_tasks()
+def simple_tasks_slurm() -> None:
+    """Simple task."""
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="slurm", compute_resources={"queue": "all.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "all.q"}
+
+    # Import the task_generator_funcs.py module
+    spec = importlib.util.spec_from_file_location("task_generator_funcs", task_generator_funcs_path)
+    task_generator_funcs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(task_generator_funcs)
+    simple_function = task_generator_funcs.simple_function
+    for i in range(5):
+        task = simple_function.create_task(compute_resources=compute_resources, foo=i)
+        wf.add_tasks([task])
+    r = wf.run(configure_logging=True)
+    assert r == "D"
+
+
+simple_tasks_seq()
