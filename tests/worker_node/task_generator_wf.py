@@ -43,7 +43,7 @@ def simple_tasks_slurm() -> None:
         cluster_name="slurm", compute_resources={"queue": "all.q"}
     )
     wf = tool.create_workflow()
-    compute_resources = {"queue": "all.q"}
+    compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
 
     # Import the task_generator_funcs.py module
     spec = importlib.util.spec_from_file_location("task_generator_funcs", task_generator_funcs_path)
@@ -57,4 +57,4 @@ def simple_tasks_slurm() -> None:
     assert r == "D"
 
 
-simple_tasks_seq()
+simple_tasks_slurm()
