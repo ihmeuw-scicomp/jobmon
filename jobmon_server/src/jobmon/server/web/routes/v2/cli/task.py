@@ -20,6 +20,7 @@ from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
+from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.routes.v1 import api_v1_blueprint
 from jobmon.server.web.routes.v2 import api_v2_blueprint
@@ -556,11 +557,18 @@ def get_task_details(task_id: int) -> Any:
                 TaskInstance.distributor_id,
                 TaskInstance.nodename,
                 TaskInstanceErrorLog.description,
+                TaskInstance.wallclock,
+                TaskInstance.maxrss,
+                TaskResources.requested_resources,
             )
             .outerjoin_from(
                 TaskInstance,
                 TaskInstanceErrorLog,
                 TaskInstance.id == TaskInstanceErrorLog.task_instance_id,
+            )
+            .join(
+                TaskResources,
+                TaskInstance.task_resources_id == TaskResources.id,
             )
             .where(
                 TaskInstance.task_id == task_id,
@@ -579,6 +587,9 @@ def get_task_details(task_id: int) -> Any:
         "ti_distributor_id",
         "ti_nodename",
         "ti_error_log_description",
+        "ti_wallclock",
+        "ti_maxrss",
+        "ti_resources",
     )
     result = [dict(zip(column_names, row)) for row in rows]
     resp = jsonify(taskinstances=result)

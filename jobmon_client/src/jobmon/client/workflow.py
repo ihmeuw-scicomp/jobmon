@@ -25,6 +25,7 @@ from jobmon.client.task_resources import TaskResources
 from jobmon.client.tool_version import ToolVersion
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.cluster import Cluster
+from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import (
     MaxConcurrentlyRunning,
     TaskStatus,
@@ -32,6 +33,7 @@ from jobmon.core.constants import (
     WorkflowStatus,
 )
 from jobmon.core.exceptions import (
+    ConfigError,
     DistributorStartupTimeout,
     DuplicateNodeArgsError,
     WorkflowAlreadyComplete,
@@ -502,7 +504,17 @@ class Workflow(object):
         # bind to database
         logger.info("Adding Workflow metadata to database")
         self.bind()
-        logger.info(f"Workflow ID {self.workflow_id} assigned")
+
+        config = JobmonConfig()
+        try:
+            gui_url = config.get("http", "gui_url")
+        except ConfigError:
+            gui_url = ""
+
+        logger.info(
+            f"Workflow ID {self.workflow_id} assigned. Progress can be monitored at "
+            f"{gui_url}/#/workflow/{self.workflow_id}/tasks"
+        )
 
         # Check if this workflow is already complete and is runnable
         if self._status == WorkflowStatus.DONE:
