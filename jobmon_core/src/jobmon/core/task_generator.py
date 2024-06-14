@@ -344,7 +344,7 @@ class TaskGenerator:
     def _is_valid_type(self, obj: Any, expected_type: Type) -> bool:
         """Check that the obj type matches the expected type."""
         if _get_collection_type(expected_type) in BUILT_IN_COLLECTIONS:
-            matches = isinstance(obj, _get_collection_type(expected_type))
+            matches = isinstance(obj, _get_collection_type(expected_type))  # type: ignore
         elif is_optional_type(expected_type):
             if obj is None:
                 matches = True
@@ -400,7 +400,7 @@ class TaskGenerator:
                 )
 
             serialized_result = [
-                self.serialize(obj=item, expected_type=item_type)
+                self.serialize(obj=item, expected_type=item_type)  # type: ignore
                 for item, item_type in _zip_collection_items_and_types(
                     obj, internal_type
                 )
@@ -428,7 +428,7 @@ class TaskGenerator:
             # the way Python thinks about truthiness. So instead we use ``ast.literal_eval``
             # to evaluate the string as a Python literal.
             if obj_type == bool:
-                deserialized_result = ast.literal_eval(obj)
+                deserialized_result = ast.literal_eval(obj)  # type: ignore
 
             # For all other simple types, we can simply call the type on ``obj``
             else:
@@ -465,7 +465,7 @@ class TaskGenerator:
             item_type_pairs = _zip_collection_items_and_types(
                 obj, collection_items_type
             )
-            deserialized_result = _get_collection_type(obj_type)(
+            deserialized_result = _get_collection_type(obj_type)(  # type: ignore
                 [
                     self.deserialize(obj=item, obj_type=item_type)
                     for item, item_type in item_type_pairs
@@ -557,7 +557,9 @@ class TaskGenerator:
     def help(self) -> str:
         """Return help text for the task_function."""
         # Parse the task function's docstring - Note that there may be nothing!
-        task_function_docstring = docstring_parser.parse(self.task_function.__doc__)
+        task_function_docstring = docstring_parser.parse(  # type: ignore
+            self.task_function.__doc__  # type: ignore
+        )  # type: ignore
 
         # Map the parameter names to their annotations and descriptions
         task_function_docstring_param_names_to_annotations = {
@@ -660,12 +662,9 @@ def get_tasks_by_node_args(
     This method does some value serialization and formatting before handing the node argument
     string over to ``workflow.get_tasks_by_node_args``.
     """
-    # Re-serialize the node args dict and format them as CLI arguments
-    serialized_node_args = {make_cli_argument_string(node_args_dict)}
-
     try:
         result = workflow.get_tasks_by_node_args(
-            task_template_name=task_generator.name, **serialized_node_args
+            task_template_name=task_generator.name, **node_args_dict  # type: ignore
         )
     except ValueError as err:
         if error_on_empty:

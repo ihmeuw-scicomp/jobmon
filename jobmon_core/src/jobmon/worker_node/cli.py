@@ -119,7 +119,7 @@ class WorkerNodeCLI(CLI):
             )
             spec = importlib.util.spec_from_loader(loader.name, loader)
             # Create a new module based on the spec
-            mod = importlib.util.module_from_spec(spec)
+            mod = importlib.util.module_from_spec(spec)  # type: ignore
             # Add the module to sys.modules
             sys.modules[args.module_name] = mod
             loader.exec_module(mod)
@@ -134,8 +134,9 @@ class WorkerNodeCLI(CLI):
         # if the user used the --arghelp flag, print the help message for the task generator
         if args.arghelp:
             print(task_generator.help())
-            return ReturnCodes.SUCCESS
+            return ReturnCodes.OK
         task_generator.run(arg_dict)
+        return ReturnCodes.OK
 
     def _add_run_task_generator_parser(self) -> None:
         generator_parser = self._subparsers.add_parser("task_generator")
