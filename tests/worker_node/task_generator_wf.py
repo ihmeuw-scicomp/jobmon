@@ -64,8 +64,8 @@ def simple_tasks_slurm() -> None:
     assert r == "D"
 
 
-# simple_tasks_seq()
-# simple_tasks_slurm()
+simple_tasks_seq()
+simple_tasks_slurm()
 
 
 def simple_tasks_serializer_seq() -> None:
@@ -121,4 +121,4 @@ def simple_tasks_serializer_slurm() -> None:
 
 
 simple_tasks_serializer_seq()
-# simple_tasks_serializer_slurm()
+simple_tasks_serializer_slurm()
