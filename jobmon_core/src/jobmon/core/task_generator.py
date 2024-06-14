@@ -312,7 +312,7 @@ class TaskGenerator:
         else:
             self._task_template = self.tool.get_task_template(
                 template_name=self.name,
-                command_template="{executable} " +
+                command_template="{executable} " + TASK_RUNNER_SUB_COMMAND +
                                  " --expected_jobmon_version " + core_version +
                                  " --module_name " + self.mod_name +
                                  " --func_name " + self.name +
