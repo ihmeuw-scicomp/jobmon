@@ -36,7 +36,7 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Verify command
     expected_command = (
-        f"{task_generator.TASK_RUNNER_NAME} "
+        f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --expected_jobmon_version {core_version}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
@@ -76,7 +76,7 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Verify command
     expected_command = (
-        f"{task_generator.TASK_RUNNER_NAME} "
+        f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --expected_jobmon_version {core_version}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name list_function"
@@ -129,7 +129,7 @@ def test_naming_args(
 
     # Verify command
     expected_command = (
-        f"{task_generator.TASK_RUNNER_NAME} "
+        f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --expected_jobmon_version {core_version}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
