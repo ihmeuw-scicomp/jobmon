@@ -13,7 +13,10 @@ script_path = os.path.abspath(__file__)
 full_script_path = os.path.realpath(script_path)
 
 # get the task_generator_funcs.py path
-task_generator_funcs_path = os.path.join(os.path.dirname(script_path), 'task_generator_funcs.py')
+task_generator_funcs_path = os.path.join(
+    os.path.dirname(script_path), "task_generator_funcs.py"
+)
+
 
 def simple_tasks_seq() -> None:
     """Simple task."""
@@ -25,7 +28,9 @@ def simple_tasks_seq() -> None:
     compute_resources = {"queue": "null.q"}
 
     # Import the task_generator_funcs.py module
-    spec = importlib.util.spec_from_file_location("task_generator_funcs", task_generator_funcs_path)
+    spec = importlib.util.spec_from_file_location(
+        "task_generator_funcs", task_generator_funcs_path
+    )
     task_generator_funcs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.simple_function
@@ -46,7 +51,9 @@ def simple_tasks_slurm() -> None:
     compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
 
     # Import the task_generator_funcs.py module
-    spec = importlib.util.spec_from_file_location("task_generator_funcs", task_generator_funcs_path)
+    spec = importlib.util.spec_from_file_location(
+        "task_generator_funcs", task_generator_funcs_path
+    )
     task_generator_funcs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.simple_function
@@ -57,8 +64,9 @@ def simple_tasks_slurm() -> None:
     assert r == "D"
 
 
-#simple_tasks_seq()
-#simple_tasks_slurm()
+# simple_tasks_seq()
+# simple_tasks_slurm()
+
 
 def simple_tasks_serializer_seq() -> None:
     """Simple task."""
@@ -70,13 +78,17 @@ def simple_tasks_serializer_seq() -> None:
     compute_resources = {"queue": "null.q"}
 
     # Import the task_generator_funcs.py module
-    spec = importlib.util.spec_from_file_location("task_generator_funcs", task_generator_funcs_path)
+    spec = importlib.util.spec_from_file_location(
+        "task_generator_funcs", task_generator_funcs_path
+    )
     task_generator_funcs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.simple_function_with_serializer
     test_year = task_generator_funcs.TestYear
     for i in range(2020, 2024):
-        task = simple_function.create_task(compute_resources=compute_resources, year=test_year(i))
+        task = simple_function.create_task(
+            compute_resources=compute_resources, year=test_year(i)
+        )
         wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
@@ -92,16 +104,21 @@ def simple_tasks_serializer_slurm() -> None:
     compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
 
     # Import the task_generator_funcs.py module
-    spec = importlib.util.spec_from_file_location("task_generator_funcs", task_generator_funcs_path)
+    spec = importlib.util.spec_from_file_location(
+        "task_generator_funcs", task_generator_funcs_path
+    )
     task_generator_funcs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.simple_function_with_serializer
     test_year = task_generator_funcs.TestYear
     for i in range(2020, 2024):
-        task = simple_function.create_task(compute_resources=compute_resources, year=test_year(i))
+        task = simple_function.create_task(
+            compute_resources=compute_resources, year=test_year(i)
+        )
         wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
 
+
 simple_tasks_serializer_seq()
-#simple_tasks_serializer_slurm()
+# simple_tasks_serializer_slurm()

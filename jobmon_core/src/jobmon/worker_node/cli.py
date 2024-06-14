@@ -3,8 +3,8 @@
 import argparse
 import ast
 import importlib
-import importlib.util
 import importlib.machinery
+import importlib.util
 import logging
 import os
 import sys
@@ -89,14 +89,15 @@ class WorkerNodeCLI(CLI):
     def run_task_generator(self, args: argparse.Namespace) -> int:
         from jobmon.core.exceptions import ReturnCodes
         from jobmon.worker_node import __version__
+
         # if the user used the --args flag, parse the args and run the task generator
         if args.args:
             arg_dict = {}
-            pairs = args.args.split(';')
+            pairs = args.args.split(";")
 
             for pair in pairs:
-                key, value = pair.split('=')
-                if value.startswith('[') and value.endswith(']'):
+                key, value = pair.split("=")
+                if value.startswith("[") and value.endswith("]"):
                     value = ast.literal_eval(value)
                 arg_dict[key] = value
 
@@ -113,8 +114,9 @@ class WorkerNodeCLI(CLI):
         # if the user used the --module_dir flag, add the module directory to the path
         if args.module_source_path:
             # Create a module spec from the source file
-            loader = importlib.machinery.SourceFileLoader(args.module_name,
-                                                          os.path.expanduser(args.module_source_path))
+            loader = importlib.machinery.SourceFileLoader(
+                args.module_name, os.path.expanduser(args.module_source_path)
+            )
             spec = importlib.util.spec_from_loader(loader.name, loader)
             # Create a new module based on the spec
             mod = importlib.util.module_from_spec(spec)
@@ -125,7 +127,9 @@ class WorkerNodeCLI(CLI):
             mod = importlib.import_module(args.module_name)
         task_generator = getattr(mod, args.func_name)
         if not isinstance(task_generator, TaskGenerator):
-            raise ValueError(f"{args.module_name}:{args.func_name} doesn't point to a runnable jobmon task.")
+            raise ValueError(
+                f"{args.module_name}:{args.func_name} doesn't point to a runnable jobmon task."
+            )
 
         # if the user used the --arghelp flag, print the help message for the task generator
         if args.arghelp:
@@ -150,7 +154,8 @@ class WorkerNodeCLI(CLI):
         generator_parser.add_argument(
             "--args",
             type=str,
-            help="Pair the args with the params of the function, seperated by `;`. For example: --args \"arg1=1; arg2=[2, 3]\"",
+            help="Pair the args with the params of the function, seperated by `;`. "
+            'For example: --args "arg1=1; arg2=[2, 3]"',
             required=False,
         )
         generator_parser.add_argument(
@@ -168,7 +173,8 @@ class WorkerNodeCLI(CLI):
         generator_parser.add_argument(
             "--module_source_path",
             type=str,
-            help="The directory the module source code located; you do not need this if the module is installed in your system.",
+            help="The directory the module source code located; "
+            "you do not need this if the module is installed in your system.",
             required=False,
         )
 

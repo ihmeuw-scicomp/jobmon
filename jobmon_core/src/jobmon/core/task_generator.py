@@ -1,9 +1,10 @@
 import ast
 import inspect
-from typing import Any, Callable, Collection, Dict, List, Optional, Set, Type, Tuple, Union
 import shutil
+from typing import Any, Callable, Collection, Dict, List, Optional, Type, Union
 
 import docstring_parser
+
 from jobmon.client.api import Tool
 from jobmon.client.task import Task
 from jobmon.client.workflow import Workflow
@@ -19,12 +20,15 @@ HELP_TEXT_INTRO_FORMAT = "Command Line Documentation for {full_path}"
 
 SERIALIZED_EMPTY_STRING = '""'
 
-def _find_executable_path(executable_name):
+
+def _find_executable_path(executable_name: str) -> str:
     path = shutil.which(executable_name)
     if path is not None:
         return path
     else:
-        raise FileNotFoundError(f"The executable '{executable_name}' was not found in the system PATH.")
+        raise FileNotFoundError(
+            f"The executable '{executable_name}' was not found in the system PATH."
+        )
 
 
 def _is_unannotated_built_in_collection_type(obj_type: Any) -> bool:
@@ -59,7 +63,6 @@ def _get_generic_type_parameters(obj_type: Any) -> Any:
     ``tuple[int, str]``, returns ``(int, str)``, and a ``Union[str, None]`` returns
     ``(str, NoneType)``.
     """
-
     return getattr(obj_type, "__args__", None)
 
 
@@ -104,7 +107,7 @@ def is_optional_type(obj_type: Any) -> bool:
     Ex. ``Optional[str]`` would return ``True``, ``NoneType`` would return ``True``,
     ``str | None`` would return ``True``, ``str`` would return ``False``.
     """
-    matches: list[bool] = []
+    matches: List[bool] = []
 
     # This is true if ``obj_type=NoneType``
     exact_type_match = obj_type in OPTIONAL_TYPES
@@ -157,12 +160,12 @@ def _get_short_description(task_function_docstring: docstring_parser.Docstring) 
     return short_description
 
 
-def make_cli_argument_string(serialized_kwargs) -> str:
+def make_cli_argument_string(serialized_kwargs: Any) -> str:
     """Make a CLI argument string from an argument name and value.
 
     Be aware that args ard passed in as a list of strings leading by "--args",
     with format key=value or key=[value1, value2], separated by ";".
-    This function will return a string with the format "--args \"arg1=1;arg2=[2, 3]\""".
+    This function will return a string with the format '--args "arg1=1;arg2=[2, 3]"'.
     Note: there should be no space after the ";".
     """
     result_elements = []
@@ -221,6 +224,8 @@ class TaskGenerator:
             tool_name: A jobmon tool name for generating tasks.
             naming_args: A list of arguments to use in the task name. If not provided, uses all
             max_attempts: The max number of attempts jobmon will make on the tasks
+            module_source_path: The path to the module source code. If not provided,
+                                the module is assumed to be installed in the system.
         """
         self.task_function = task_function
         self.serializers = serializers
@@ -232,9 +237,13 @@ class TaskGenerator:
         self.module_source_path = module_source_path
         self.params = {
             name: details.annotation
-            for name, details in inspect.signature(self.task_function).parameters.items()
+            for name, details in inspect.signature(
+                self.task_function
+            ).parameters.items()
         }
-        self._naming_args = naming_args if naming_args is not None else self.params.keys()
+        self._naming_args = (
+            naming_args if naming_args is not None else self.params.keys()
+        )
 
         self._validate_task_function()
 
@@ -249,7 +258,9 @@ class TaskGenerator:
         """
         # Verify that all parameters have type annotations
         unannotated_params = [
-            name for name, annotation in self.params.items() if annotation == inspect._empty
+            name
+            for name, annotation in self.params.items()
+            if annotation == inspect._empty
         ]
         if unannotated_params:
             raise TypeError(
@@ -300,23 +311,32 @@ class TaskGenerator:
         if self.module_source_path:
             self._task_template = self.tool.get_task_template(
                 template_name=self.name,
-                command_template="{executable} " + TASK_RUNNER_SUB_COMMAND +
-                                 " --expected_jobmon_version " + core_version +
-                                 " --module_name " + self.mod_name +
-                                 " --func_name " + self.name +
-                                 " --module_source_path " + self.module_source_path +
-                                 " --args {tgargs}",
+                command_template="{executable} "
+                + TASK_RUNNER_SUB_COMMAND
+                + " --expected_jobmon_version "
+                + core_version
+                + " --module_name "
+                + self.mod_name
+                + " --func_name "
+                + self.name
+                + " --module_source_path "
+                + self.module_source_path
+                + " --args {tgargs}",
                 node_args=["tgargs"],
                 op_args=["executable"],
             )
         else:
             self._task_template = self.tool.get_task_template(
                 template_name=self.name,
-                command_template="{executable} " + TASK_RUNNER_SUB_COMMAND +
-                                 " --expected_jobmon_version " + core_version +
-                                 " --module_name " + self.mod_name +
-                                 " --func_name " + self.name +
-                                 " --args {tgargs}",
+                command_template="{executable} "
+                + TASK_RUNNER_SUB_COMMAND
+                + " --expected_jobmon_version "
+                + core_version
+                + " --module_name "
+                + self.mod_name
+                + " --func_name "
+                + self.name
+                + " --args {tgargs}",
                 node_args=["tgargs"],
                 op_args=["executable"],
             )
@@ -329,7 +349,9 @@ class TaskGenerator:
             if obj is None:
                 matches = True
             else:
-                matches = self._is_valid_type(obj, get_optional_type_parameter(expected_type))
+                matches = self._is_valid_type(
+                    obj, get_optional_type_parameter(expected_type)
+                )
         else:
             matches = isinstance(obj, expected_type)
 
@@ -343,7 +365,7 @@ class TaskGenerator:
                 f"type ``{type(obj)}``."
             )
 
-        serialized_result: Union[str, list[str]]
+        serialized_result: Union[str, List[str]]
 
         if expected_type in self.serializers.keys():
             # The 0'th index of the serializers dict is the serialization function
@@ -367,7 +389,9 @@ class TaskGenerator:
         elif _get_collection_type(expected_type) in BUILT_IN_COLLECTIONS:
             # Raise an error if we've been given a multi-dimensional collection
             if any(type(item) in BUILT_IN_COLLECTIONS for item in obj):
-                raise TypeError(f"Cannot serialize multi-dimensional collection: {obj}.")
+                raise TypeError(
+                    f"Cannot serialize multi-dimensional collection: {obj}."
+                )
 
             internal_type = _get_generic_type_parameters(expected_type)
             if internal_type is None:
@@ -377,7 +401,9 @@ class TaskGenerator:
 
             serialized_result = [
                 self.serialize(obj=item, expected_type=item_type)
-                for item, item_type in _zip_collection_items_and_types(obj, internal_type)
+                for item, item_type in _zip_collection_items_and_types(
+                    obj, internal_type
+                )
             ]
 
         else:
@@ -432,9 +458,13 @@ class TaskGenerator:
                 or _is_annotated_built_in_collection_type(item_type)
                 for item_type in collection_items_type
             ):
-                raise TypeError(f"Cannot deserialize multi-dimensional collection: {obj}.")
+                raise TypeError(
+                    f"Cannot deserialize multi-dimensional collection: {obj}."
+                )
 
-            item_type_pairs = _zip_collection_items_and_types(obj, collection_items_type)
+            item_type_pairs = _zip_collection_items_and_types(
+                obj, collection_items_type
+            )
             deserialized_result = _get_collection_type(obj_type)(
                 [
                     self.deserialize(obj=item, obj_type=item_type)
@@ -482,7 +512,8 @@ class TaskGenerator:
             + ":".join(f"{name}={value}" for name, value in kwargs_for_name.items())
         )
         # trim ending :
-        if name[-1] == ":": name = name[:-1]
+        if name[-1] == ":":
+            name = name[:-1]
 
         # Create the task
         task = self._task_template.create_task(
@@ -497,7 +528,6 @@ class TaskGenerator:
 
     def run(self, parsed_arg_value_pairs: Dict) -> Any:
         """Run the task_function with the given args and return any result."""
-
         # Raise an error if the user did not provide all of the arguments for the task_function
         if parsed_arg_value_pairs.keys() != self.params.keys():
             raise ValueError(
@@ -534,7 +564,8 @@ class TaskGenerator:
             param.arg_name: param.type_name for param in task_function_docstring.params
         }
         task_function_docstring_param_names_to_descriptions = {
-            param.arg_name: param.description for param in task_function_docstring.params
+            param.arg_name: param.description
+            for param in task_function_docstring.params
         }
 
         # Get the short description
@@ -565,7 +596,9 @@ class TaskGenerator:
         for param, annotation in self.params.items():
             # If the parameter has an annotation, use that for the text.
             if param in task_function_docstring_param_names_to_annotations.keys():
-                annotation_string = task_function_docstring_param_names_to_annotations[param]
+                annotation_string = task_function_docstring_param_names_to_annotations[
+                    param
+                ]
 
             else:
                 # Otherwise try to pull the annotation from the self.params annotation (this
@@ -628,9 +661,7 @@ def get_tasks_by_node_args(
     string over to ``workflow.get_tasks_by_node_args``.
     """
     # Re-serialize the node args dict and format them as CLI arguments
-    serialized_node_args = {
-        make_cli_argument_string(node_args_dict)
-    }
+    serialized_node_args = {make_cli_argument_string(node_args_dict)}
 
     try:
         result = workflow.get_tasks_by_node_args(
@@ -642,8 +673,8 @@ def get_tasks_by_node_args(
         result = []
 
     if not result and error_on_empty:
-        raise ValueError(f"There were no tasks in the workflow that matched {node_args_dict}")
+        raise ValueError(
+            f"There were no tasks in the workflow that matched {node_args_dict}"
+        )
 
     return result
-
-

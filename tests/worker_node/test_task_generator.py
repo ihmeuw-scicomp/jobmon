@@ -5,6 +5,7 @@ from unittest.mock import Mock
 from jobmon.core import task_generator, __version__ as core_version
 from jobmon.client.api import Tool
 
+
 def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
     """Verify that we get a good looking command string.
 
@@ -12,9 +13,12 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
     """
     # Set up function
     monkeypatch.setattr(
-        task_generator, "_find_executable_path", Mock(return_value=task_generator.TASK_RUNNER_NAME)
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
     )
     tool = Tool("test_tool")
+
     @task_generator.task_generator(serializers={}, tool_name="test_tool")
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
@@ -49,9 +53,12 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
     """
     # Set up functino
     monkeypatch.setattr(
-        task_generator, "_find_executable_path", Mock(return_value=task_generator.TASK_RUNNER_NAME)
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
     )
     tool = Tool("test_tool")
+
     @task_generator.task_generator(serializers={}, tool_name="test_tool")
     def list_function(foo: List[str], bar: List[str]) -> None:
         """Example task_function."""
@@ -78,17 +85,18 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
 
+
 @pytest.mark.parametrize(
-        ["naming_args", "expected_name"],
-        [
-            [["foo", "bar"], "simple_function:foo=1:bar=baz"],
-            [None, "simple_function:foo=1:bar=baz"],
-            [["foo"], "simple_function:foo=1"],
-            [[], "simple_function"],
-        ],
-    )
+    ["naming_args", "expected_name"],
+    [
+        [["foo", "bar"], "simple_function:foo=1:bar=baz"],
+        [None, "simple_function:foo=1:bar=baz"],
+        [["foo"], "simple_function:foo=1"],
+        [[], "simple_function"],
+    ],
+)
 def test_naming_args(
-        client_env, naming_args, expected_name, monkeypatch: pytest.fixture
+    client_env, naming_args, expected_name, monkeypatch: pytest.fixture
 ) -> None:
     """Verify that the name only includes the expected naming args.
 
@@ -96,9 +104,12 @@ def test_naming_args(
     """
     # Set up function
     monkeypatch.setattr(
-        task_generator, "_find_executable_path", Mock(return_value=task_generator.TASK_RUNNER_NAME)
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
     )
     tool = Tool("test_tool")
+
     @task_generator.task_generator(
         serializers={}, tool_name="test_tool", naming_args=naming_args
     )
@@ -135,11 +146,14 @@ def test_max_attempts(client_env, monkeypatch: pytest.fixture) -> None:
     """
     # Set up function
     monkeypatch.setattr(
-        task_generator, "_find_executable_path", Mock(return_value=task_generator.TASK_RUNNER_NAME)
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
     )
 
     max_attempts = 40
     tool = Tool("test_tool")
+
     @task_generator.task_generator(
         serializers={}, tool_name="test_tool", max_attempts=max_attempts
     )
@@ -186,8 +200,10 @@ def test_simple_type(client_env, simple_type: Any) -> None:
     # Verify the result is simply the stringified simple_type
     assert result == str(simple_type)
 
+
 class FakeYearRange:
     """A fake YearRange class for testing"""
+
     def __init__(self, year: int) -> None:
         self.year = year
 
@@ -201,6 +217,7 @@ class FakeYearRange:
 
     def __eq__(self, other):
         return self.year == other.year
+
 
 def test_serializer_specified_type(client_env) -> None:
     """Ensure a serializer-specified type is properly serialized.
@@ -223,6 +240,7 @@ def test_serializer_specified_type(client_env) -> None:
     # Verify the result is the stringified object
     assert result == str(my_obj)
 
+
 def test_unknown_type_raises_error(client_env) -> None:
     """Ensure an unknown type raises an error.
 
@@ -241,7 +259,6 @@ def test_unknown_type_raises_error(client_env) -> None:
         task_gen.serialize(my_obj, FakeYearRange)
 
 
-
 def test_built_in_collections(client_env) -> None:
     """Ensure the built-in collection types can be serialized.
 
@@ -256,7 +273,12 @@ def test_built_in_collections(client_env) -> None:
     )
 
     # Cast the items as the collection_type
-    items_to_serialize = [1.0, False, "something", FakeYearRange.parse_year_range("2010:2020:2030")]
+    items_to_serialize = [
+        1.0,
+        False,
+        "something",
+        FakeYearRange.parse_year_range("2010:2020:2030"),
+    ]
 
     for item_to_serialize in items_to_serialize:
         # Define the expected serialized result
@@ -288,8 +310,11 @@ def test_multidimensional_collection_raises_error(client_env) -> None:
     items_to_serialize = [items_to_serialize]
 
     # Exercise & Verify an error is raised
-    with pytest.raises(TypeError, match="Cannot serialize multi-dimensional collection"):
+    with pytest.raises(
+        TypeError, match="Cannot serialize multi-dimensional collection"
+    ):
         task_gen.serialize(obj=items_to_serialize, expected_type=List[List[str]])
+
 
 def test_serialize_optional(client_env) -> None:
     """Ensure an optional type can be serialized.
@@ -307,6 +332,7 @@ def test_serialize_optional(client_env) -> None:
 
     # Verify the result is simply the stringified None
     assert result == "None"
+
 
 def test_empty_collection(client_env) -> None:
     """Ensure empty collections are returned as an empty list.
@@ -327,6 +353,7 @@ def test_empty_collection(client_env) -> None:
 
     # Verify
     assert result == expected_result
+
 
 def test_optional_collection(client_env) -> None:
     """Ensure an optional collection with data is serialized.
@@ -354,6 +381,7 @@ def test_optional_collection(client_env) -> None:
     # Verify the result is simply the stringified None
     assert result == "None"
 
+
 def test_no_internal_type_raises_error(client_env) -> None:
     """Ensure a collection with no internal type raises an error (``tuple``).
 
@@ -371,15 +399,17 @@ def test_no_internal_type_raises_error(client_env) -> None:
 
 
 @pytest.mark.parametrize(
-        "simple_type, expected_result",
-        [
-            ["something", "something"],  # Test instances of the SIMPLE_TYPES
-            ["10", 10],
-            ["1.5", 1.5],
-            ["True", True],
-        ],
-    )
-def test_deserialize_simple_type(client_env, simple_type: str, expected_result: Any) -> None:
+    "simple_type, expected_result",
+    [
+        ["something", "something"],  # Test instances of the SIMPLE_TYPES
+        ["10", 10],
+        ["1.5", 1.5],
+        ["True", True],
+    ],
+)
+def test_deserialize_simple_type(
+    client_env, simple_type: str, expected_result: Any
+) -> None:
     """Ensure a known simple type is properly deserialized.
 
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#410
@@ -395,6 +425,7 @@ def test_deserialize_simple_type(client_env, simple_type: str, expected_result: 
 
     # Verify the result matches the expected result
     assert result == expected_result
+
 
 def test_deserializer_specified_type(client_env) -> None:
     """Ensure a serializer-specified type is properly deserialized.
@@ -434,7 +465,9 @@ def test_deserializer_unknown_type_raises_error(client_env) -> None:
     my_obj = FakeYearRange.parse_year_range("2010:2020:2030")
 
     # Exercise by calling deserialize & Verify an error is raised
-    with pytest.raises(TypeError, match="Cannot deserialize unknown type FakeYearRange"):
+    with pytest.raises(
+        TypeError, match="Cannot deserialize unknown type FakeYearRange"
+    ):
         task_gen.deserialize(obj=str(my_obj), obj_type=FakeYearRange)
 
 
@@ -475,12 +508,11 @@ def test_deserialize_built_in_collections(
 
     # Exercise by calling deserialize on the items_to_deserialize, having cast them to
     # the collection_type
-    result = task_gen.deserialize(
-        obj=items_to_deserialize, obj_type=List[item_type]
-    )
+    result = task_gen.deserialize(obj=items_to_deserialize, obj_type=List[item_type])
 
     # Verify the result matches the expected result (cast as the collection type)
     assert result == expected_result
+
 
 def test_deserialize_multi_annotated_collection(client_env) -> None:
     """Ensure a multi-annotated collection can be deserialized.
@@ -511,9 +543,9 @@ def test_deserialize_multi_annotated_collection(client_env) -> None:
 
 
 @pytest.mark.parametrize(
-        ["input", "expected"],
-        [["None", None], ["1", [1]], [["1", "2"], [1, 2]], [[], []]],
-    )
+    ["input", "expected"],
+    [["None", None], ["1", [1]], [["1", "2"], [1, 2]], [[], []]],
+)
 def test_deserialize_optional_collection(
     client_env, input, expected: Optional[List[int]]
 ) -> None:
@@ -533,6 +565,7 @@ def test_deserialize_optional_collection(
     # Verify the result matches the expected result
     assert result == expected
 
+
 def test_deserialize_multi_dimensional_collection_raises_error(client_env) -> None:
     """Ensure an error is raised if a multi-dimensional collection is passed.
 
@@ -550,7 +583,9 @@ def test_deserialize_multi_dimensional_collection_raises_error(client_env) -> No
     items_to_deserialize = [("0", "1"), ("2", "3")]
 
     # Exercise & Verify an error is raised
-    with pytest.raises(TypeError, match="Cannot deserialize multi-dimensional collection"):
+    with pytest.raises(
+        TypeError, match="Cannot deserialize multi-dimensional collection"
+    ):
         task_gen.deserialize(
             obj=items_to_deserialize, obj_type=List[Tuple[int, ...]]
         )  # pytype: disable=wrong-arg-types
@@ -578,21 +613,21 @@ def test_deserialize_collection_without_item_annotation_raises_error(
 
 
 @pytest.mark.parametrize(
-        ["optional_type", "serialized", "expected"],
-        [
-            [Optional[int], "None", None],
-            [Optional[int], "1", 1],
-            [Optional[str], "None", None],
-            [Optional[str], "foo", "foo"],
-            [Optional[float], "None", None],
-            [Optional[float], "1.0", 1.0],
-            [type(None), "None", None],
-            [Optional[List[int]], "None", None],
-            [Optional[List[int]], ["1", "2"], [1, 2]],
-            [Optional[FakeYearRange], "None", None],
-            [Optional[FakeYearRange], "1990:2020:2050", FakeYearRange(1990)],
-        ],
-    )
+    ["optional_type", "serialized", "expected"],
+    [
+        [Optional[int], "None", None],
+        [Optional[int], "1", 1],
+        [Optional[str], "None", None],
+        [Optional[str], "foo", "foo"],
+        [Optional[float], "None", None],
+        [Optional[float], "1.0", 1.0],
+        [type(None), "None", None],
+        [Optional[List[int]], "None", None],
+        [Optional[List[int]], ["1", "2"], [1, 2]],
+        [Optional[FakeYearRange], "None", None],
+        [Optional[FakeYearRange], "1990:2020:2050", FakeYearRange(1990)],
+    ],
+)
 def test_deserialize_optional(
     client_env, optional_type: Any, serialized: str, expected: Any
 ) -> None:
@@ -614,6 +649,7 @@ def test_deserialize_optional(
     # Verify the result was deserialized correctly
     assert result == expected
 
+
 def test_deserialize_empty_collection(client_env) -> None:
     """Ensure empty collections are returned still empty.
 
@@ -633,4 +669,3 @@ def test_deserialize_empty_collection(client_env) -> None:
 
     # Verify
     assert result == expected_result
-

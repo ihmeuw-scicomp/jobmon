@@ -9,11 +9,14 @@ script_path = os.path.abspath(__file__)
 # Resolve any symbolic links (if necessary)
 full_script_path = os.path.realpath(script_path)
 
-@task_generator.task_generator(serializers={},
-                               tool_name="test_tool",
-                               module_source_path=full_script_path,
-                               max_attempts=1,
-                               naming_args=["foo"])
+
+@task_generator.task_generator(
+    serializers={},
+    tool_name="test_tool",
+    module_source_path=full_script_path,
+    max_attempts=1,
+    naming_args=["foo"],
+)
 def simple_function(foo: int) -> None:
     """Simple task_function."""
     print(f"foo: {foo}")
@@ -21,6 +24,7 @@ def simple_function(foo: int) -> None:
 
 class TestYear:
     """A fake YearRange class for testing"""
+
     def __init__(self, year: int) -> None:
         self.year = year
 
@@ -38,11 +42,14 @@ class TestYear:
 
 test_year_serializer = {TestYear: (str, TestYear.parse_year)}
 
-@task_generator.task_generator(serializers=test_year_serializer,
-                                 tool_name="test_tool",
-                                 module_source_path=full_script_path,
-                                 max_attempts=1,
-                                 naming_args=["year"])
+
+@task_generator.task_generator(
+    serializers=test_year_serializer,
+    tool_name="test_tool",
+    module_source_path=full_script_path,
+    max_attempts=1,
+    naming_args=["year"],
+)
 def simple_function_with_serializer(year: TestYear) -> None:
     """Simple task_function."""
     print(f"year: {year}")
