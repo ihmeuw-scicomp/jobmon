@@ -17,21 +17,3 @@ full_script_path = os.path.realpath(script_path)
 def simple_function(foo: int) -> None:
     """Simple task_function."""
     print(f"foo: {foo}")
-
-
-def simple_tasks() -> None:
-    """Simple task."""
-    tool = Tool("test_tool")
-    tool.set_default_compute_resources_from_dict(
-        cluster_name="sequential", compute_resources={"queue": "null.q"}
-    )
-    wf = tool.create_workflow()
-    compute_resources = {"queue": "null.q"}
-    for i in range(5):
-        task = simple_function.create_task(compute_resources=compute_resources, foo=i)
-        wf.add_tasks([task])
-    r = wf.run()
-    assert r == "D"
-
-
-simple_tasks()
