@@ -13,7 +13,7 @@ from nox.sessions import Session
 src_locations = ["jobmon_client/src", "jobmon_core/src", "jobmon_server/src"]
 test_locations = ["tests"]
 
-python = "3.8"
+python = "3.9"
 
 
 @nox.session(python=python, venv_backend="conda")
