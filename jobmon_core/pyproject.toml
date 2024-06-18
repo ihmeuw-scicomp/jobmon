@@ -5,11 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jobmon_core"
 description="Shared functionality for Jobmon Namespace Packages"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     'aiohttp',
@@ -17,7 +18,8 @@ dependencies = [
     'psutil',
     'requests',
     'tenacity>=8.1',
-    'typing_extensions; python_version<"3.8"'
+    'typing_extensions; python_version<"3.9"',
+    'docstring-parser'
 ]
 dynamic = ["version"]
 

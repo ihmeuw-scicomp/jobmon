@@ -317,7 +317,7 @@ def get_task_template_resource_usage() -> Any:
 
                 def _calculate_ci(d: List, ci: float) -> List[Any]:
                     interval = st.t.interval(
-                        alpha=ci, df=len(d) - 1, loc=np.mean(d), scale=st.sem(d)
+                        confidence=ci, df=len(d) - 1, loc=np.mean(d), scale=st.sem(d)
                     )
                     return [round(float(interval[0]), 2), round(float(interval[1]), 2)]
 
