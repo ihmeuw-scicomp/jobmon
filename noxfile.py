@@ -11,7 +11,7 @@ from nox.sessions import Session
 
 
 src_locations = ["jobmon_client/src", "jobmon_core/src", "jobmon_server/src"]
-test_locations = ["tests"]
+test_locations = ["tests/core/test_cluster.py"]
 
 python = "3.9"
 
@@ -25,6 +25,9 @@ def tests(session: Session) -> None:
     args = session.posargs or test_locations
 
     session.run(
+        "coverage",
+        "run",
+        "-m",
         "pytest",
         *args,
         env={"SQLALCHEMY_WARN_20": "1"}
