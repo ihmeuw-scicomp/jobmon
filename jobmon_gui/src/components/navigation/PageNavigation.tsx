@@ -18,16 +18,16 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import {PropsWithChildren, useState} from "react";
 import {Link, useNavigate} from "react-router-dom";
-import {IhmeIcon} from "../../assets/logo/logo";
+import {IhmeIcon} from "@jobmon_gui/assets/logo/logo";
 
 import FeedIcon from "@mui/icons-material/Feed";
 import Typography from "@mui/material/Typography";
 
 import MediationIcon from '@mui/icons-material/Mediation';
-import BifrostLinks from "./BifrostLinks";
+import BifrostLinks from "@jobmon_gui/components/navigation/BifrostLinks";
 import BatchPredictionIcon from '@mui/icons-material/BatchPrediction';
 import {Tooltip} from "@mui/material";
-import bifrostEnabled from "./Bifrost";
+import bifrostEnabled from "@jobmon_gui/components/navigation/Bifrost";
 import "@fontsource/archivo"
 
 const drawerWidth = 260;
@@ -207,7 +207,7 @@ export default function PageNavigation({children}: PropsWithChildren) {
                     display: "flex",
                     alignItems: "flex-end"
                 }}></Box>
-                <Typography color={"#ccc"} align={"center"}>v: {process.env.REACT_APP_VERSION}</Typography>
+                <Typography color={"#ccc"} align={"center"}>v: {import.meta.env.VITE_APP_VERSION}</Typography>
 
 
             </Drawer>

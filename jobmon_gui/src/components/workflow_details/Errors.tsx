@@ -1,18 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import BootstrapTable from "react-bootstrap-table-next";
 import filterFactory, { textFilter, dateFilter } from 'react-bootstrap-table2-filter';
-import { sanitize } from 'dompurify';
+import DOMPurify from 'dompurify';
 import paginationFactory from "react-bootstrap-table2-paginator";
 import 'react-bootstrap-table2-paginator/dist/react-bootstrap-table2-paginator.min.css';
-import { HashLink } from 'react-router-hash-link';
+import {HashLink} from 'react-router-hash-link';
+import axios from "axios";
+export const sanitize = (html: string): string => DOMPurify.sanitize(html);
+import '@jobmon_gui/styles/jobmon_gui.css';
+import { convertDatePST } from '@jobmon_gui/utils/formatters';
+import { safe_rum_start_span, safe_rum_unit_end } from '@jobmon_gui/utils/rum';
+import CustomModal from '@jobmon_gui/components/Modal';
+import {Link, useLocation} from "react-router-dom";
 
-
-import '../../styles/jobmon_gui.css';
-import { convertDatePST } from '../../utils/formatters';
-import { safe_rum_start_span, safe_rum_unit_end } from '../../utils/rum';
-import CustomModal from '../Modal';
-
-export default function Errors({ errorLogs, tt_name, loading, apm }) {
+export default function Errors({taskTemplateName, taskTemplateId, workflowId, apm}) {
 
     const [errorDetail, setErrorDetail] = useState({
         'error': '', 'error_time': '', 'task_id': '',
@@ -22,9 +23,41 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
     const [helper, setHelper] = useState("");
     const [showModal, setShowModal] = useState(false)
     const [justRecentErrors, setRecentErrors] = useState(false)
+    const location = useLocation();
+    const [errorLoading, setErrorLoading] = useState(false);
+    const [errorLogs, setErrorLogs] = useState([]);
+    const [page, setPage] = useState(1);
+    const [sizePerPage, setSizePerPage] = useState(10);
+    const [totalSize, setTotalSize] = useState(0);
 
     function handleToggle() {
         setRecentErrors(!justRecentErrors)
+    }
+
+    function getAsyncErrorLogs(wf_id: string, tt_id?: string) {
+        setErrorLoading(true);
+        const url = import.meta.env.VITE_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
+        const fetchData = async () => {
+            const result: any = await axios({
+                    method: 'get',
+                    url: url,
+                    data: null,
+                    params: {
+                        page: page,
+                        page_size: sizePerPage,
+                        just_recent_errors: justRecentErrors,
+                    },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                }
+            )
+            setErrorLogs(result.data.error_logs);
+            setErrorLoading(false);
+            setTotalSize(result.data.total_count);
+        };
+        return fetchData
     }
 
     function get_error_brief(errors) {
@@ -33,35 +66,34 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
         for (let i in errors) {
 
             let e = errors[i];
-            if (!justRecentErrors || (justRecentErrors && e.most_recent_attempt)) {
-
-                let date_display = `
-            <div class="error-time">
-            <span>${convertDatePST(e.error_time)}</span>
-            </div>
+            let date_display = `
+                <div class="error-time">
+                    <span>${convertDatePST(e.error_time)}</span>
+                </div>
             `;
-                let error_display = `
-            <div class="error-log">${e.error.trim().split("\n").slice(-1)}</div>
+            let error_display = `
+                <div class="error-log">
+                    ${e.error.trim().split("\n").slice(-1)}
+                </div>
             `;
 
-                r.push({
-                    "id": e.task_instance_err_id,
-                    "task_id": e.task_id,
-                    "task_instance_id": e.task_instance_id,
-                    "brief": error_display,
-                    "date": date_display,
-                    "time": e.error_time,
-                    "error": e.error,
-                    "task_instance_stderr_log": e.task_instance_stderr_log
-                })
-            }
+            r.push({
+                "id": e.task_instance_err_id,
+                "task_id": e.task_id,
+                "task_instance_id": e.task_instance_id,
+                "brief": error_display,
+                "date": date_display,
+                "time": e.error_time,
+                "error": e.error,
+                "task_instance_stderr_log": e.task_instance_stderr_log
+            })
         }
         return r;
     }
 
     const htmlFormatter = cell => {
         // add sanitize to prevent xss attack
-        return <div dangerouslySetInnerHTML={{ __html: sanitize(`${cell}`) }} />;
+        return <div dangerouslySetInnerHTML={{__html: sanitize(`${cell}`)}}/>;
     };
 
     const error_brief = get_error_brief(errorLogs);
@@ -74,30 +106,30 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
         {
             dataField: "task_id",
             text: "Task ID",
-            headerStyle: { width: "10%" },
+            headerStyle: {width: "10%"},
         },
         {
             dataField: "task_instance_id",
             text: "Task Instance ID",
-            headerStyle: { width: "15%" },
+            headerStyle: {width: "15%"},
             sort: true,
             formatter: (cell, row) => <nav>
-                <HashLink
-                    to={`/task_details/${row.task_id}#${cell}`}
+                <Link
+                    to={{ pathname: `/task_details/${row.task_id}`, search: location.search }}
+                    key={cell}
                 >
                     {cell}
-                </HashLink>
+                </Link>
             </nav>
         },
         {
             dataField: "date",
             text: "Error Date",
             formatter: htmlFormatter,
-            headerStyle: { width: "20%" },
+            headerStyle: {width: "20%"},
             filter: dateFilter()
 
         },
-
         {
             dataField: "brief",
             text: "Error Log",
@@ -119,8 +151,12 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
             }
         }
     ];
+    useEffect(() => {
+        if (typeof workflowId !== 'undefined' && taskTemplateId !== 'undefined' && taskTemplateId !== '') {
+            getAsyncErrorLogs(workflowId, taskTemplateId)();
+        }
+    }, [taskTemplateId, workflowId, page, sizePerPage, justRecentErrors]);
 
-    //hook
     useEffect(() => {
         // clean the error log detail display (right side) when task template changes
         let temp = {
@@ -139,25 +175,30 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
         };
     }, [apm]);
 
+    const handleTableChange = (type, {page, sizePerPage}) => {
+        setPage(page);
+        setSizePerPage(sizePerPage);
+    };
+
+
     // logic: when task template name selected, show a loading spinner; when loading finished and there is no error, show a no error message; when loading finished and there are errors, show error logs
     return (
         <div>
             <div>
                 <span className="span-helper"><i>{helper}</i></span>
-                <br />
-                {errorLogs.length !== 0 && loading === false &&
+                <br/>
+                {errorLogs.length !== 0 && !errorLoading &&
                     <>
                         <div className="d-flex pt-4">
-                            <p className=''>Show only most recent task instances</p>
+                            <p className=''>Show latest TaskInstances for latest WorkflowRun</p>
                             <div className='px-4' onClick={handleToggle}>
                                 <div className={"toggle-switch " + (justRecentErrors ? "active" : "")}>
-                                    <div />
-                                    <span className={"toggle-slider " + (justRecentErrors ? "active" : "")}
-                                    ></span>
+                                    <div/>
+                                    <span className={"toggle-slider " + (justRecentErrors ? "active" : "")}></span>
                                 </div>
                             </div>
                         </div>
-                        <hr />
+                        <hr/>
 
                         <BootstrapTable
                             keyField="id"
@@ -167,7 +208,15 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
                             data={error_brief}
                             columns={columns}
                             filter={filterFactory()}
-                            pagination={error_brief.length === 0 ? undefined : paginationFactory({ sizePerPage: 10 })}
+                            pagination={paginationFactory({
+                                page,
+                                sizePerPage,
+                                totalSize,
+                                onPageChange: (page) => setPage(page),
+                                onSizePerPageChange: (sizePerPage) => setSizePerPage(sizePerPage),
+                            })}
+                            remote={{pagination: true}}
+                            onTableChange={handleTableChange}
                             selectRow={{
                                 mode: "radio",
                                 hideSelectColumn: true,
@@ -197,17 +246,17 @@ export default function Errors({ errorLogs, tt_name, loading, apm }) {
             />
 
 
-            {errorLogs.length === 0 && tt_name !== "" && loading === false &&
+            {errorLogs.length === 0 && taskTemplateName !== "" && !errorLoading &&
                 <div>
-                    <br />
-                    There is no error log associated with task template <i>{tt_name}</i>.
+                    <br/>
+                    There is no error log associated with task template <i>{taskTemplateName}</i>.
                 </div>
             }
 
-            {tt_name !== "" && loading &&
+            {taskTemplateName !== "" && errorLoading &&
                 <div>
-                    <br />
-                    <div className="loader" />
+                    <br/>
+                    <div className="loader"/>
                 </div>
             }
         </div>

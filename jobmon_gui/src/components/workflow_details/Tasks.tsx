@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import TaskTable from './TaskTable';
+import TaskTable from '@jobmon_gui/components/workflow_details/TaskTable';
 import { FaSearch } from "react-icons/fa";
 
-import { safe_rum_start_span, safe_rum_unit_end } from '../../utils/rum'
+import { safe_rum_start_span, safe_rum_unit_end } from '@jobmon_gui/utils/rum'
 
 export default function Tasks({ tasks, onSubmit, register, loading, apm }) {
     useEffect(() => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import {FaCircle} from "react-icons/fa";
-import '../../styles/jobmon_gui.css';
+import '@jobmon_gui/styles/jobmon_gui.css';
 
 const WorkflowStatus = ({status}) => {
     const statusRenderMap = {

@@ -1,4 +1,4 @@
-import "../../styles/jobmon_gui.css";
+import "@jobmon_gui/styles/jobmon_gui.css";
 
 
 import {BiRun} from "react-icons/bi";
@@ -8,7 +8,7 @@ import {TbHandStop} from "react-icons/tb";
 import {HiRocketLaunch} from "react-icons/hi2";
 import {HiInformationCircle} from "react-icons/hi";
 import React, {useState} from "react";
-import CustomModal from '../../components/Modal';
+import CustomModal from '@jobmon_gui/components/Modal';
 
 export default function WorkflowHeader({
                                            wf_id,
