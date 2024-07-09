@@ -85,10 +85,7 @@ export default function TaskTable({taskData, loading}) {
                 </div>
             }
             {loading === false &&
-                <Box p={2}>
-                    <Typography variant="h4" gutterBottom>
-                        My Table
-                    </Typography>
+                <Box p={2} display="flex" justifyContent="center" width="100%">
                     <MaterialReactTable columns={columns} data={taskData}/>
                 </Box>
             }
