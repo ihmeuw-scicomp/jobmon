@@ -7,7 +7,7 @@ import {convertDate, convertDatePST} from '@jobmon_gui/utils/formatters'
 import '@jobmon_gui/styles/jobmon_gui.css';
 import {FaCircle} from "react-icons/fa";
 import {MaterialReactTable} from 'material-react-table';
-import {Box, Typography} from '@mui/material';
+import {Box} from '@mui/material';
 
 
 export default function TaskTable({taskData, loading}) {
