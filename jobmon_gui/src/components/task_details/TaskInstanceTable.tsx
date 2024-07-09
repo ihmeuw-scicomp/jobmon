@@ -1,9 +1,7 @@
 import React, {useState} from 'react';
 import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
-import {FaCaretDown, FaCaretUp} from "react-icons/fa";
 import {HiInformationCircle} from "react-icons/hi";
 import CustomModal from '@jobmon_gui/components/Modal';
-import DOMPurify from 'dompurify';
 import {formatBytes} from "@jobmon_gui/utils/formatters";
 import humanizeDuration from 'humanize-duration';
 import {MaterialReactTable} from "material-react-table";
