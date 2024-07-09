@@ -8,6 +8,8 @@ import CustomModal from '@jobmon_gui/components/Modal';
 import DOMPurify from 'dompurify';
 import {formatBytes} from "@jobmon_gui/utils/formatters";
 import humanizeDuration from 'humanize-duration';
+import {MaterialReactTable, useMaterialReactTable} from "material-react-table";
+
 
 export const sanitize = (html: string): string => DOMPurify.sanitize(html);
 const customCaret = (order, column) => {

@@ -1,199 +1,96 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import BootstrapTable from "react-bootstrap-table-next";
-import paginationFactory from "react-bootstrap-table2-paginator";
-import ToolkitProvider, { CSVExport } from 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit';
-import filterFactory, { textFilter, numberFilter } from 'react-bootstrap-table2-filter';
+import React from 'react';
+import {Link, useLocation} from 'react-router-dom';
 import 'react-bootstrap-table2-filter/dist/react-bootstrap-table2-filter.min.css';
 import 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit.min.css';
 
-import { convertDate, convertDatePST } from '@jobmon_gui/utils/formatters'
+import {convertDate, convertDatePST} from '@jobmon_gui/utils/formatters'
 import '@jobmon_gui/styles/jobmon_gui.css';
-import { FaCaretDown, FaCaretUp, FaCircle } from "react-icons/fa";
+import {FaCircle} from "react-icons/fa";
+import {MaterialReactTable} from 'material-react-table';
+import {Box, Typography} from '@mui/material';
 
-const customCaret = (order, column) => {
-    if (!order) return (<span><FaCaretUp style={{ marginLeft: "5px" }} /></span>);
-    else if (order === 'asc') return (<span><FaCaretUp style={{ marginLeft: "5px" }} /></span>);
-    else if (order === 'desc') return (<span><FaCaretDown style={{ marginLeft: "5px" }} /></span>);
-    return null;
-}
 
-export default function TaskTable({ taskData, loading }) {
-    const { ExportCSVButton } = CSVExport;
-    const [helper, setHelper] = useState("");
+export default function TaskTable({taskData, loading}) {
     const location = useLocation();
 
-    const workflow_status_renders = {
-        "PENDING": (<div>< label className="label-middle" > <FaCircle className="bar-pp" /> </label><label className="label-left">PENDING  </label></div >),
-        "SCHEDULED": (<div><label className="label-middle"><FaCircle className="bar-ss" /> </label><label className="label-left">SCHEDULED  </label></div>),
-        "RUNNING": (<div>< label className="label-middle" > <FaCircle className="bar-rr" /> </label><label className="label-left">RUNNING  </label></div >),
-        "FATAL": (<div>< label className="label-middle" > <FaCircle className="bar-ff" /> </label><label className="label-left">FATAL  </label></div >),
-        "DONE": (<div>< label className="label-middle" > <FaCircle className="bar-dd" /> </label><label className="label-left">DONE  </label></div >)
-    }
+    const workflow_status = [
+        {status: "PENDING", circleClass: "bar-pp", label: "PENDING"},
+        {status: "SCHEDULED", circleClass: "bar-ss", label: "SCHEDULED"},
+        {status: "RUNNING", circleClass: "bar-rr", label: "RUNNING"},
+        {status: "FATAL", circleClass: "bar-ff", label: "FATAL"},
+        {status: "DONE", circleClass: "bar-dd", label: "DONE"}
+    ];
 
     const columns = [
         {
-            dataField: "task_id",
-            text: "Task ID",
-            sort: true,
-            sortCaret: customCaret,
-            headerEvents: {
-                    onMouseEnter: (e, column, columnIndex) => {
-                        setHelper("The ID column in TASK table. Unique identifier.");
-                    },
-                    onMouseLeave: (e, column, columnIndex) => {
-                        setHelper("");
-                    }
-            },
-            filter: textFilter(),
-            formatter: (cell, row) => <nav>
-                <Link
-                    to={{ pathname: `/task_details/${cell}`, search: location.search }}
-                    key={cell}
-                >
-                    {cell}
-                </Link>
-            </nav>
+            header: "Task ID",
+            accessorKey: "task_id",
+            Cell: ({renderedCellValue, row}) => (
+                <nav>
+                    <Link
+                        to={{pathname: `/task_details/${row.original.task_id}`, search: location.search}}
+                        key={row.original.task_id}
+                    >
+                        {renderedCellValue}
+                    </Link>
+                </nav>
+            ),
         },
         {
-            dataField: "task_name",
-            text: "Task Name",
-            sort: true,
-            sortCaret: customCaret,
-
-            style: { overflowWrap: 'break-word' },
-            headerEvents: {
-                    onMouseEnter: (e, column, columnIndex) => {
-                        setHelper("The NAME column in TASK table. The user assigned name of the task.");
-                    },
-                    onMouseLeave: (e, column, columnIndex) => {
-                        setHelper("");
-                    }
-            },
-            filter: textFilter()
+            header: "Task Name",
+            accessorKey: "task_name",
         },
         {
-            dataField: "task_status",
-            text: "Status",
-            sort: true,
-            sortCaret: customCaret,
-            headerEvents: {
-                    onMouseEnter: (e, column, columnIndex) => {
-                        setHelper("The STATUS column in TASK table. The current status of the task.");
-                    },
-                    onMouseLeave: (e, column, columnIndex) => {
-                        setHelper("");
-                    }
+            header: "Status",
+            accessorKey: "task_status",
+            Cell: ({row}) => {
+                const status = row.original.task_status;
+                const statusData = workflow_status.find(item => item.status === status);
+                return (
+                    <div>
+                        <label className="label-middle"><FaCircle className={statusData.circleClass}/> </label>
+                        <label className="label-left">{statusData.label}</label>
+                    </div>
+                );
             },
-            filter: textFilter(),
-            formatter: (cell, row, rowIndex) => workflow_status_renders[cell]
         },
         {
-            dataField: "task_command",
-            text: "Command",
-            sort: true,
-            sortCaret: customCaret,
-            style: { overflowWrap: 'break-word' },
-            headerEvents: {
-                    onMouseEnter: (e, column, columnIndex) => {
-                        setHelper("The COMMAND column in TASK table. The command the jobmon uses to submit the task to the cluster.");
-                    },
-                    onMouseLeave: (e, column, columnIndex) => {
-                        setHelper("");
-                    }
-            },
-            filter: textFilter()
+            header: "Command",
+            accessorKey: "task_command",
         },
         {
-            dataField: "task_num_attempts",
-            text: "Num Attempts",
-            sort: true,
-            sortCaret: customCaret,
-            headerEvents: {
-                    onMouseEnter: (e, column, columnIndex) => {
-                        setHelper("The NUM_ATTEMPTS column in TASK table. The number of attempts the jobmon has tried for this task.");
-                    },
-                    onMouseLeave: (e, column, columnIndex) => {
-                        setHelper("");
-                    }
-            },
-            filter: numberFilter()
+            header: "Num Attempts",
+            accessorKey: "task_num_attempts",
         },
         {
-            dataField: "task_max_attempts",
-            text: "Max Attempts",
-            sort: true,
-            sortCaret: customCaret,
-            headerEvents: {
-                    onMouseEnter: (e, column, columnIndex) => {
-                        setHelper("The MAX_ATTEMPTS column in TASK table. The max number of attempts the jobmon will retry this task.");
-                    },
-                    onMouseLeave: (e, column, columnIndex) => {
-                        setHelper("");
-                    }
-            },
-            filter: numberFilter()
+            header: "Max Attempts",
+            accessorKey: "task_max_attempts",
         },
         {
-            dataField: "task_status_date",
-            text: "Status Date",
-            sort: true,
-            sortCaret: customCaret,
-            sortValue: (cell, row) => convertDate(cell).getTime(),
-            formatter: (cell, row, rowIndex) => convertDatePST(cell),
-            headerEvents: {
-                    onMouseEnter: (e, column, columnIndex) => {
-                        setHelper("The STATUS_DATE column in TASK table displayed in PST. The time stamp that the task status was last updated.");
-                    },
-                    onMouseLeave: (e, column, columnIndex) => {
-                        setHelper("");
-                    }
-            },
-            filter: numberFilter()
+            header: "Status Date",
+            accessorKey: "task_status_date",
+            Cell: ({renderedCellValue}) => (
+                convertDatePST(convertDate(renderedCellValue).toISOString())
+            )
         },
     ];
+
 
     return (
         <div>
             {loading &&
                 <div>
-                    <br />
-                    <div className="loader" />
+                    <br/>
+                    <div className="loader"/>
                 </div>
             }
             {loading === false &&
-                <ToolkitProvider
-                    keyField="task_id"
-                    data={taskData}
-                    columns={columns}
-                    exportCSV={{
-                        onlyExportFiltered: true,
-                        fileName: 'jobmon_tasks.csv',
-                        exportAll: true
-                    }}
-                >
-                    {
-                        props => (
-                            <>
-                            <div>
-                                <ExportCSVButton {...props.csvProps} className="btn btn-custom">Export CSV</ExportCSVButton>
-                                </div><div className=''>
-                                    <p className="span-helper"><i>{helper}</i></p>
-                                <br/>
-                                <BootstrapTable
-                                    keyField="task_id"
-                                    {...props.baseProps}
-                                    bootstrap4
-                                    headerClasses="thead-dark"
-                                    filter={filterFactory()}
-                                    striped
-                                    pagination={taskData.length === 0 ? undefined : paginationFactory({ sizePerPage: 10 })}
-                                    />
-                            </div>
-                            </>
-                        )
-                    }
-                </ToolkitProvider>
+                <Box p={2}>
+                    <Typography variant="h4" gutterBottom>
+                        My Table
+                    </Typography>
+                    <MaterialReactTable columns={columns} data={taskData}/>
+                </Box>
             }
         </div>
     );
