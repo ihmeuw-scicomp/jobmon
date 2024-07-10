@@ -160,21 +160,17 @@ def _get_short_description(task_function_docstring: docstring_parser.Docstring) 
     return short_description
 
 
-def make_cli_argument_string(serialized_kwargs: Any) -> str:
+def make_cli_argument_string(arg_value: Union[str, List]) -> str:
     """Make a CLI argument string from an argument name and value.
 
-    Be aware that args ard passed in as a list of strings leading by "--args",
-    with format key=value or key=[value1, value2], separated by ";".
-    This function will return a string with the format '--args "arg1=1;arg2=[2, 3]"'.
-    Note: there should be no space after the ";".
+    For string, return itself.
+    For list, say ["a", "b", "c"], return "[a,b,c]"
     """
-    result_elements = []
-    for key, value in serialized_kwargs.items():
-        if isinstance(value, list):
-            result_elements.append(f"{key}=[{', '.join(value)}]")
-        else:
-            result_elements.append(f"{key}={value}")
-    return ";".join(result_elements)
+    if isinstance(arg_value, list):
+        no_space_string = ",".join(arg_value)
+        return f"[{no_space_string}]"
+
+    return arg_value
 
 
 class TaskGenerator:
@@ -308,6 +304,8 @@ class TaskGenerator:
 
     def _generate_task_template(self) -> None:
         """Generate and store the task template."""
+        # split tgargs by ";" to get the key-value pairs
+        args_template = ";".join(f"{arg_name}={{{arg_name}}}" for arg_name in self.params)
         if self.module_source_path:
             self._task_template = self.tool.get_task_template(
                 template_name=self.name,
@@ -321,8 +319,9 @@ class TaskGenerator:
                 + self.name
                 + " --module_source_path "
                 + self.module_source_path
-                + " --args {tgargs}",
-                node_args=["tgargs"],
+                + " --args "
+                + args_template,
+                node_args=self.params.keys(),
                 op_args=["executable"],
             )
         else:
@@ -336,8 +335,9 @@ class TaskGenerator:
                 + self.mod_name
                 + " --func_name "
                 + self.name
-                + " --args {tgargs}",
-                node_args=["tgargs"],
+                + " --args "
+                + args_template,
+                node_args=self.params.keys(),
                 op_args=["executable"],
             )
 
@@ -492,7 +492,10 @@ class TaskGenerator:
         }
 
         # Format the kwargs for the task
-        tg_arg_string = make_cli_argument_string(serialized_kwargs)
+        kwargs_for_task = {
+            name: make_cli_argument_string(arg_value=value)
+            for name, value in serialized_kwargs.items()
+        }
         # We want a slightly different format to put list kwargs into the name
         kwargs_for_name = {
             name: ",".join(value) if isinstance(value, list) else value
@@ -521,7 +524,7 @@ class TaskGenerator:
             compute_resources=compute_resources,
             max_attempts=self.max_attempts,
             executable=executable_path,
-            tgargs=f"'{tg_arg_string}'",
+            **kwargs_for_task
         )
 
         return task
