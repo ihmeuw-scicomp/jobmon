@@ -38,6 +38,10 @@ const defaultSettings = {
 
 export type WorkflowSearchSettingsStore = {
     settings: WorkflowSearchSettings
+    refreshData: boolean
+    getRefreshData: () => boolean
+    triggerDataRefresh: () => void
+    clearDataRefresh: () => void
     updateUrlSearchParams: () => void
     set: (newSettings: WorkflowSearchSettings) => void
     setUser: (newValue: string) => void
@@ -59,8 +63,10 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
         persist(
             (set, get) => ({
                 settings: defaultSettings,
-
-
+                refreshData: false,
+                triggerDataRefresh: () => set({...get(), refreshData: true}),
+                clearDataRefresh: () => set({...get(), refreshData: false}),
+                getRefreshData: () => get().refreshData,
                 updateUrlSearchParams: () => {
                     const currentSettings = get().settings
                     const date_submitted = dayjs(currentSettings?.date_submitted).format("YYYY-MM-DD") || dayjs().format("YYYY-MM-DD")
