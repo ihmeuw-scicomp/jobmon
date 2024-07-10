@@ -1,13 +1,13 @@
 import React from 'react';
 import {Link, useLocation} from 'react-router-dom';
-import 'react-bootstrap-table2-filter/dist/react-bootstrap-table2-filter.min.css';
-import 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit.min.css';
 
 import {convertDate, convertDatePST} from '@jobmon_gui/utils/formatters'
 import '@jobmon_gui/styles/jobmon_gui.css';
 import {FaCircle} from "react-icons/fa";
 import {MaterialReactTable} from 'material-react-table';
-import {Box} from '@mui/material';
+import {Box, Button} from '@mui/material';
+import {mkConfig, generateCsv, download} from "export-to-csv";
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 
 
 export default function TaskTable({taskData, loading}) {
@@ -75,6 +75,16 @@ export default function TaskTable({taskData, loading}) {
         },
     ];
 
+    const csvConfig = mkConfig({
+        fieldSeparator: ',',
+        decimalSeparator: '.',
+        useKeysAsHeaders: true,
+    });
+
+    const exportToCSV = () => {
+        const csv = generateCsv(csvConfig)(taskData);
+        download(csvConfig)(csv);
+    };
 
     return (
         <div>
@@ -84,6 +94,12 @@ export default function TaskTable({taskData, loading}) {
                     <div className="loader"/>
                 </div>
             }
+            <Button
+                onClick={exportToCSV}
+                startIcon={<FileDownloadIcon/>}
+            >
+                Export All Data
+            </Button>
             {loading === false &&
                 <Box p={2} display="flex" justifyContent="center" width="100%">
                     <MaterialReactTable columns={columns} data={taskData}/>
