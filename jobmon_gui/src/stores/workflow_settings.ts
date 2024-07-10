@@ -193,7 +193,10 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                     })
 
                 },
-                clear: () => set(() => ({settings: defaultSettings}))
+                clear: () => {
+                    set(() => ({settings: defaultSettings}))
+                    get().updateUrlSearchParams()
+                }
             }),
             {
                 name: 'WorkflowSearchSettings',
