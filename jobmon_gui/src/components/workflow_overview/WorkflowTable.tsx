@@ -294,6 +294,11 @@ export default function WorkflowTable({ allData }) {
 
     // Create and return the React Bootstrap Table
     const { ExportCSVButton } = CSVExport;
+
+    if(!allData){
+        return
+    }
+
     return (
         <div>
 

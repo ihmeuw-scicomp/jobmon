@@ -16,61 +16,46 @@ import {DatePicker, LocalizationProvider} from "@mui/x-date-pickers";
 import {AdapterDayjs} from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 import {useWorkflowSearchSettings} from "@jobmon_gui/stores/workflow_settings";
+import {useQuery} from "@tanstack/react-query";
+import {workflow_status_url} from "@jobmon_gui/configs/ApiUrls";
+import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
+import Typography from "@mui/material/Typography";
 
 
 function WorkflowOverview() {
     const apm: any = init_apm("workflow_overview_page");
     const [refresh, setRefresh] = useState(false)
     const workflowSettings = useWorkflowSearchSettings()
-    const [workflows, setWorkflows] = useState([])
+    // const [workflows, setWorkflows] = useState([])
     const [searchParams, setSearchParams] = useSearchParams();
-    const navigate = useNavigate();
+
+    const workflows = useQuery({
+        queryKey: ["workflow_overview", "workflows"],
+        queryFn: async () => {
+            setRefresh(false)
+            const params = new URLSearchParams({
+                user: workflowSettings.get().user,
+                tool: workflowSettings.get().tool,
+                wf_name: workflowSettings.get().wf_name,
+                wf_args: workflowSettings.get().wf_args,
+                wf_attribute_key: workflowSettings.get().wf_attribute_key,
+                wf_attribute_value: workflowSettings.get().wf_attribute_value,
+                wf_id: workflowSettings.get().wf_id,
+                date_submitted: dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
+                status: workflowSettings.get().status
+            });
+            return axios.get(workflow_status_url, {...jobmonAxiosConfig, params: params}).then((response) => {
+                response.data?.workflows?.forEach((workflow) => {
+                    workflow.wf_status = <WorkflowStatus status={workflow.wf_status}/>;
+                })
+
+                return response.data?.workflows
+            })
+        },
+        enabled: refresh
+    })
 
     useEffect(() => workflowSettings.loadValuesFromSearchParams(searchParams), [])
-
-
-    useEffect(() => {
-        console.log("refreshing data")
-        if (!refresh) {
-            return
-        }
-        setRefresh(false)
-        const rum_s1: any = safe_rum_start_span(apm, "landing_page", "external.http");
-        // safe_rum_add_label(rum_s1, "user", user);
-        const params = new URLSearchParams({
-            user: workflowSettings.get().user,
-            tool: workflowSettings.get().tool,
-            wf_name: workflowSettings.get().wf_name,
-            wf_args: workflowSettings.get().wf_args,
-            wf_attribute_key: workflowSettings.get().wf_attribute_key,
-            wf_attribute_value: workflowSettings.get().wf_attribute_value,
-            wf_id: workflowSettings.get().wf_id,
-            date_submitted: dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
-            status: workflowSettings.get().status
-        });
-        const workflow_status_url = import.meta.env.VITE_APP_BASE_URL + "/workflow_overview_viz";
-        const fetchData = async () => {
-            const result: any = await axios({
-                    method: 'get',
-                    url: workflow_status_url,
-                    params: params,
-                    data: null,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                }
-            );
-            let wfs = result.data.workflows;
-            wfs.forEach((workflow) => {
-                workflow.wf_status = <WorkflowStatus status={workflow.wf_status}/>;
-            });
-            setWorkflows(wfs)
-        };
-        fetchData();
-        safe_rum_unit_end(rum_s1);
-    }, [refresh]);
-
 
     const handleClear = () => {
         workflowSettings.clear()
@@ -81,10 +66,10 @@ function WorkflowOverview() {
         return (
             <div id="wftable" className="div-level-2">
                 {/*If there are no workflows and at least one URL search param is not empty*/}
-                {workflows.length === 0 ? (
-                    <p>No workflows found for specified filters.</p>
-                ) : workflows.length !== 0 ? (
-                    <WorkflowTable allData={workflows}/>
+                {workflows?.data?.length === 0 ? (
+                    <Typography>No workflows found for specified filters.</Typography>
+                ) : workflows?.data?.length !== 0 ? (
+                    <WorkflowTable allData={workflows?.data}/>
                 ) : null}
             </div>
         )
@@ -183,7 +168,8 @@ function WorkflowOverview() {
                         </Grid>
                         <Grid item xs={3}>
                             <TextField label="Workflow ID" fullWidth={true}
-                                       value={workflowSettings.get().wf_id} onChange={(e) => workflowSettings.setWfId(e.target.value)}/>
+                                       value={workflowSettings.get().wf_id}
+                                       onChange={(e) => workflowSettings.setWfId(e.target.value)}/>
 
                         </Grid>
                         <Grid item xs={12}>
