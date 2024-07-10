@@ -23,7 +23,10 @@ function WorkflowOverview() {
     const [refresh, setRefresh] = useState(false)
     const workflowSettings = useWorkflowSearchSettings()
     const [workflows, setWorkflows] = useState([])
+    const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
+
+    useEffect(() => workflowSettings.loadValuesFromSearchParams(searchParams), [])
 
 
     useEffect(() => {
@@ -42,7 +45,7 @@ function WorkflowOverview() {
             wf_attribute_key: workflowSettings.get().wf_attribute_key,
             wf_attribute_value: workflowSettings.get().wf_attribute_value,
             wf_id: workflowSettings.get().wf_id,
-            date_submitted: workflowSettings.get().date_submitted.format("YYYY-MM-DD"),
+            date_submitted: dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
             status: workflowSettings.get().status
         });
         const workflow_status_url = import.meta.env.VITE_APP_BASE_URL + "/workflow_overview_viz";
@@ -87,6 +90,11 @@ function WorkflowOverview() {
         )
     }
 
+    const handleSubmit = (event) => {
+        setRefresh(true)
+        event.preventDefault();
+    }
+
     return (
         <div id="div-main" className="App">
             <div id="div-header" className="div-level-2">
@@ -95,7 +103,7 @@ function WorkflowOverview() {
             </div>
 
             <div className="div-level-2">
-                <form>
+                <form onSubmit={handleSubmit}>
                     <Grid container spacing={2}>
                         <Grid item xs={3}>
                             <TextField label="Username"
@@ -135,7 +143,7 @@ function WorkflowOverview() {
                             <LocalizationProvider dateAdapter={AdapterDayjs}>
                                 <DatePicker
                                     label={"Submitted Workflow Date - On or After"}
-                                    value={workflowSettings.get().date_submitted}
+                                    value={dayjs(workflowSettings.get().date_submitted) || dayjs("1970-01-01")}
                                     onChange={(value) => workflowSettings.setDateSubmitted(value)}
                                     sx={{width: "100%"}}
 
@@ -175,14 +183,14 @@ function WorkflowOverview() {
                         </Grid>
                         <Grid item xs={3}>
                             <TextField label="Workflow ID" fullWidth={true}
-                                       defaultValue={workflowSettings.get().wf_id}/>
+                                       value={workflowSettings.get().wf_id} onChange={(e) => workflowSettings.setWfId(e.target.value)}/>
 
                         </Grid>
                         <Grid item xs={12}>
                             <Grid container spacing={2}>
                                 <Grid item xs={4}/>
                                 <Grid item xs={2}>
-                                    <Button variant="contained" onClick={() => setRefresh(true)}>
+                                    <Button variant="contained" type="submit">
                                         Submit
                                     </Button>
                                 </Grid>
@@ -196,12 +204,6 @@ function WorkflowOverview() {
                             </Grid>
                         </Grid>
                     </Grid>
-
-                    <div className="text-center">
-                        <div className="btn-toolbar d-inline-block">
-
-                        </div>
-                    </div>
                 </form>
             </div>
             <ShowWFTable/>
