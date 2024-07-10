@@ -8,10 +8,7 @@ import {useSearchParams} from "react-router-dom";
 import {useQueryClient} from "@tanstack/react-query";
 import Box from "@mui/material/Box";
 
-type WorkflowFiltersProps = {
-    setRefreshData: (newValue: boolean) => void
-}
-export default function WorkflowFilters({setRefreshData}: WorkflowFiltersProps) {
+export default function WorkflowFilters() {
     const queryClient = useQueryClient()
     const workflowSettings = useWorkflowSearchSettings()
     const [searchParams, setSearchParams] = useSearchParams();

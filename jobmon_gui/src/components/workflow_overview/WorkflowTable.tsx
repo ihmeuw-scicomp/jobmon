@@ -87,11 +87,7 @@ interface Data {
     wfr_count: number
 }
 
-type WorkflowTableProps = {
-    refreshData: boolean
-    setRefreshData: (newValue: boolean) => void
-}
-export default function WorkflowTable({refreshData, setRefreshData}: WorkflowTableProps) {
+export default function WorkflowTable() {
     const [expandedRows, setExpandedRows] = useState([]);
     const [statusDict, setStatusDict] = useState({});
     //TODO: get rid of finishedWF

@@ -18,8 +18,8 @@ function WorkflowOverview() {
 
     return (
         <Box>
-            <WorkflowFilters setRefreshData={setRefreshData}/>
-            <WorkflowTable refreshData={refreshData} setRefreshData={setRefreshData}/>
+            <WorkflowFilters />
+            <WorkflowTable/>
         </Box>
     );
 }
