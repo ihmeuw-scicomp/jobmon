@@ -7,7 +7,7 @@
     "@elastic/apm-rum-react": "1.4.2",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
-    "@fontsource/archivo": "^5.0.17",
+    "@fontsource/archivo": "^5.0.18",
     "@mui/icons-material": "^5.15.13",
     "@mui/material": "^5.15.13",
     "@mui/types": "^7.2.13",
