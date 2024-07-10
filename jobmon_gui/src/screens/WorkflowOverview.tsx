@@ -11,71 +11,41 @@ import WorkflowStatus from '@jobmon_gui/components/workflow_overview/WorkflowSta
 
 import {init_apm, safe_rum_add_label, safe_rum_start_span, safe_rum_unit_end} from '@jobmon_gui/utils/rum';
 import '@jobmon_gui/styles/jobmon_gui.css';
+import {Button, FormControl, Grid, InputLabel, MenuItem, Select, TextField} from "@mui/material";
+import {DatePicker, LocalizationProvider} from "@mui/x-date-pickers";
+import {AdapterDayjs} from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs from "dayjs";
+import {useWorkflowSearchSettings} from "@jobmon_gui/stores/workflow_settings";
 
 
 function WorkflowOverview() {
     const apm: any = init_apm("workflow_overview_page");
-    const [user, setUser] = useState('');
-    const [tool, setTool] = useState('');
-    const [wf_name, setWFName] = useState('');
-    const [wf_args, setWFArgs] = useState('');
-    const [wf_attribute_key, setWFAttributeKey] = useState('');
-    const [wf_attribute_value, setWFAttributeValue] = useState('');
-    const [wf_id, setWFID] = useState('')
-    const [date_submitted, setDateSubmitted] = useState('');
-    const [two_weeks_ago_date, setTwoWeeksAgoDate] = useState('');
-    const [status, setStatus] = useState('');
-    const [workflows, setWorkflows] = useState([]);
-    const [searchParams, setSearchParams] = useSearchParams();
+    const [refresh, setRefresh] = useState(false)
+    const workflowSettings = useWorkflowSearchSettings()
+    const [workflows, setWorkflows] = useState([])
     const navigate = useNavigate();
 
-    useEffect(() => {
-        const queryParams = {
-            user: setUser,
-            tool: setTool,
-            wf_name: setWFName,
-            wf_args: setWFArgs,
-            wf_attribute_key: setWFAttributeKey,
-            wf_attribute_value: setWFAttributeValue,
-            wf_id: setWFID,
-            date_submitted: setDateSubmitted,
-            status: setStatus
-        };
 
-        Object.keys(queryParams).forEach(key => {
-            const value = searchParams.get(key);
-            if (value) {
-                queryParams[key](value);
-            }
-        });
-    }, [searchParams]);
-
-    const firstUpdate = useRef(true);
     useEffect(() => {
-        if (firstUpdate.current) {
-            // By default, only show workflows that were submitted in the last two weeks
-            const twoWeeksAgo = new Date(Date.now() - 12096e5); // 2 weeks in milliseconds
-            const formattedDate = twoWeeksAgo.toISOString().split('T')[0];
-            setTwoWeeksAgoDate(formattedDate);
-            firstUpdate.current = false;
-            return;
+        console.log("refreshing data")
+        if (!refresh) {
+            return
         }
+        setRefresh(false)
         const rum_s1: any = safe_rum_start_span(apm, "landing_page", "external.http");
-        safe_rum_add_label(rum_s1, "user", user);
+        // safe_rum_add_label(rum_s1, "user", user);
         const params = new URLSearchParams({
-            user,
-            tool,
-            wf_name,
-            wf_args,
-            wf_attribute_key,
-            wf_attribute_value,
-            wf_id,
-            date_submitted,
-            status
+            user: workflowSettings.get().user,
+            tool: workflowSettings.get().tool,
+            wf_name: workflowSettings.get().wf_name,
+            wf_args: workflowSettings.get().wf_args,
+            wf_attribute_key: workflowSettings.get().wf_attribute_key,
+            wf_attribute_value: workflowSettings.get().wf_attribute_value,
+            wf_id: workflowSettings.get().wf_id,
+            date_submitted: workflowSettings.get().date_submitted.format("YYYY-MM-DD"),
+            status: workflowSettings.get().status
         });
-        let workflow_status_url = import.meta.env.VITE_APP_BASE_URL + "/workflow_overview_viz";
-        setSearchParams(params)
-
+        const workflow_status_url = import.meta.env.VITE_APP_BASE_URL + "/workflow_overview_viz";
         const fetchData = async () => {
             const result: any = await axios({
                     method: 'get',
@@ -92,62 +62,23 @@ function WorkflowOverview() {
             wfs.forEach((workflow) => {
                 workflow.wf_status = <WorkflowStatus status={workflow.wf_status}/>;
             });
-            setWorkflows(wfs);
+            setWorkflows(wfs)
         };
         fetchData();
         safe_rum_unit_end(rum_s1);
-    }, [user, tool, wf_name, wf_args, wf_attribute_key, wf_attribute_value, date_submitted, status, wf_id, apm]);
+    }, [refresh]);
 
 
-    const {register, handleSubmit} = useForm();
-    const onSubmit = handleSubmit(({
-                                       user_input: user,
-                                       tool_input: tool,
-                                       wf_name_input: wf_name,
-                                       wf_args_input: wf_args,
-                                       wf_attribute_key_input: wf_attribute_key,
-                                       wf_attribute_value_input: wf_attribute_value,
-                                       wf_id: wf_id,
-                                       date_submitted_input: date_submitted,
-                                       status: status
-                                   }) => {
-        if (!date_submitted) {
-            date_submitted = two_weeks_ago_date;
-        }
-        const queryParams = new URLSearchParams({
-            user,
-            tool,
-            wf_name,
-            wf_args,
-            wf_attribute_key,
-            wf_attribute_value,
-            wf_id,
-            date_submitted,
-            status
-        });
-        navigate('/?' + queryParams.toString());
-        setUser(user);
-        setTool(tool);
-        setWFName(wf_name);
-        setWFArgs(wf_args);
-        setWFAttributeKey(wf_attribute_key);
-        setWFAttributeValue(wf_attribute_value)
-        setWFID(wf_id);
-        setDateSubmitted(date_submitted);
-        setStatus(status);
-        setSearchParams(queryParams)
-    });
-
-    const handleClear = handleSubmit((d) => {
-        navigate("/")
-        navigate(0)
-    });
+    const handleClear = () => {
+        workflowSettings.clear()
+        setRefresh(true)
+    }
 
     const ShowWFTable = () => {
         return (
             <div id="wftable" className="div-level-2">
                 {/*If there are no workflows and at least one URL search param is not empty*/}
-                {workflows.length === 0 && ![...searchParams.values()].every(param => param === '') ? (
+                {workflows.length === 0 ? (
                     <p>No workflows found for specified filters.</p>
                 ) : workflows.length !== 0 ? (
                     <WorkflowTable allData={workflows}/>
@@ -165,80 +96,110 @@ function WorkflowOverview() {
 
             <div className="div-level-2">
                 <form>
-                    <Row className="mb-3">
-                        <Form.Group as={Col} controlId="formUsername">
-                            <Form.Label><span className='m-2'> Username</span></Form.Label>
-                            <Form.Control type="text" placeholder="Username"
-                                          defaultValue={user} {...register("user_input")} />
-                        </Form.Group>
+                    <Grid container spacing={2}>
+                        <Grid item xs={3}>
+                            <TextField label="Username"
+                                       fullWidth={true}
+                                       value={workflowSettings.get().user}
+                                       onChange={(e) => workflowSettings.setUser(e.target.value)}/>
+                        </Grid>
+                        <Grid item xs={3}>
+                            <TextField label="Workflow Args"
+                                       fullWidth={true}
+                                       value={workflowSettings.get().wf_args}
+                                       onChange={(e) => workflowSettings.setWfArgs(e.target.value)}/>
+                        </Grid>
+                        <Grid item xs={1.5}>
+                            <TextField label="Workflow Attribute Key"
+                                       fullWidth={true}
+                                       value={workflowSettings.get().wf_attribute_key}
+                                       onChange={(e) => workflowSettings.setWfAttributeKey(e.target.value)}/>
 
-                        <Form.Group as={Col} controlId="formWFArgs">
-                            <Form.Label><span className='m-2'> Workflow Args</span></Form.Label>
-                            <Form.Control type="text" placeholder="Workflow Args"
-                                          defaultValue={wf_args} {...register("wf_args_input")} />
-                        </Form.Group>
+                        </Grid>
+                        <Grid item xs={1.5}>
+                            <TextField label="Workflow Attribute Value" fullWidth={true}
+                                       value={workflowSettings.get().wf_attribute_value}
+                                       onChange={(e) => workflowSettings.setWfAttributeValue(e.target.value)}/>
 
-                        <Form.Group as={Row} controlId="formWFAttribute">
-                          <Col md={6}>
-                            <Form.Label><span className='m-2'>Workflow Attribute Key</span></Form.Label>
-                            <Form.Control type="text" placeholder="Workflow Attribute Key"
-                                          defaultValue={wf_attribute_key} {...register("wf_attribute_key_input")} />
-                          </Col>
-                          <Col md={6}>
-                            <Form.Label><span className='m-2'>Workflow Attribute Value</span></Form.Label>
-                            <Form.Control type="text" placeholder="Workflow Attribute Value"
-                                          defaultValue={wf_attribute_value} {...register("wf_attribute_value_input")} />
-                          </Col>
-                        </Form.Group>
+                        </Grid>
+                        <Grid item xs={3}>
+                            <TextField label="Tool"
+                                       fullWidth={true}
+                                       value={workflowSettings.get().tool}
+                                       onChange={(e) => workflowSettings.setTool(e.target.value)}/>
 
-                        <Form.Group as={Col} controlId="formTool">
-                            <Form.Label><span className='m-2'> Tool</span></Form.Label>
-                            <Form.Control type="text" placeholder="Tool"
-                                          defaultValue={tool} {...register("tool_input")} />
-                        </Form.Group>
-                    </Row>
+                        </Grid>
+                        <Grid item xs={3}>
+                            {/*fullWidth={true}*/}
+                            {/*          defaultValue={two_weeks_ago_date}*/}
+                            <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                <DatePicker
+                                    label={"Submitted Workflow Date - On or After"}
+                                    value={workflowSettings.get().date_submitted}
+                                    onChange={(value) => workflowSettings.setDateSubmitted(value)}
+                                    sx={{width: "100%"}}
 
-                    <Row className="mb-3">
-                        <Form.Group as={Col} controlId="formWFDate">
-                            <Form.Label><span className='m-2'> Submitted Workflow Date - On or After</span></Form.Label>
-                            <Form.Control type="date"
-                                          defaultValue={two_weeks_ago_date} {...register("date_submitted_input")} />
-                        </Form.Group>
+                                />
+                            </LocalizationProvider>
 
-                        <Form.Group as={Col} controlId="formWFName">
-                            <Form.Label><span className='m-2'> Workflow Name</span></Form.Label>
-                            <Form.Control type="text" placeholder="Workflow Name"
-                                          defaultValue={wf_name} {...register("wf_name_input")} />
-                        </Form.Group>
+                        </Grid>
+                        <Grid item xs={3}>
+                            <TextField label="Workflow Name"
+                                       fullWidth={true}
+                                       value={workflowSettings.get().wf_name}
+                                       onChange={(e) => workflowSettings.setWfName(e.target.value)}/>
 
-                        <Form.Group as={Col} controlId="status">
-                            <Form.Label>Workflow Status</Form.Label>
-                            <Form.Control as="select" defaultValue={undefined} {...register("status")} >
-                                <option>{undefined}</option>
-                                <option value="A">Aborted</option>
-                                <option value="D">Done</option>
-                                <option value="F">Failed</option>
-                                <option value="G">Registering</option>
-                                <option value="H">Halted</option>
-                                <option value="I">Instantiating</option>
-                                <option value="O">Launched</option>
-                                <option value="Q">Queued</option>
-                                <option value="R">Running</option>
-                            </Form.Control>
-                        </Form.Group>
+                        </Grid>
+                        <Grid item xs={3}>
+                            <FormControl fullWidth={true}>
+                                <InputLabel id="LABEL-workflow-status">Workflow Status</InputLabel>
+                                <Select labelId="LABEL-workflow-status"
 
-                        <Form.Group as={Col} controlId="formWFID">
-                            <Form.Label><span className='m-2'> Workflow ID</span></Form.Label>
-                            <Form.Control type="text" placeholder="Workflow ID"
-                                          defaultValue={wf_id} {...register("wf_id")} />
-                        </Form.Group>
-                    </Row>
+                                        label="Workflow Status"
+                                        id={"SELECT-workflow-status"}
+                                        onChange={(e) => workflowSettings.setStatus(e.target.value)}
+                                        value={workflowSettings.get().status}
+                                        fullWidth={true}>
+                                    <MenuItem>{undefined}</MenuItem>
+                                    <MenuItem value="A">Aborted</MenuItem>
+                                    <MenuItem value="D">Done</MenuItem>
+                                    <MenuItem value="F">Failed</MenuItem>
+                                    <MenuItem value="G">Registering</MenuItem>
+                                    <MenuItem value="H">Halted</MenuItem>
+                                    <MenuItem value="I">Instantiating</MenuItem>
+                                    <MenuItem value="O">Launched</MenuItem>
+                                    <MenuItem value="Q">Queued</MenuItem>
+                                    <MenuItem value="R">Running</MenuItem>
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                        <Grid item xs={3}>
+                            <TextField label="Workflow ID" fullWidth={true}
+                                       defaultValue={workflowSettings.get().wf_id}/>
+
+                        </Grid>
+                        <Grid item xs={12}>
+                            <Grid container spacing={2}>
+                                <Grid item xs={4}/>
+                                <Grid item xs={2}>
+                                    <Button variant="contained" onClick={() => setRefresh(true)}>
+                                        Submit
+                                    </Button>
+                                </Grid>
+                                <Grid item xs={2}>
+
+                                    <Button variant="contained" onClick={() => handleClear()}>Clear
+                                        All
+                                    </Button>
+                                </Grid>
+                                <Grid item xs={4}/>
+                            </Grid>
+                        </Grid>
+                    </Grid>
 
                     <div className="text-center">
                         <div className="btn-toolbar d-inline-block">
-                            <button type="submit" className="btn btn-custom mr-1" onClick={onSubmit}>Submit</button>
-                            <button type="submit" className="btn btn-custom mr-1" onClick={handleClear}>Clear All
-                            </button>
+
                         </div>
                     </div>
                 </form>
