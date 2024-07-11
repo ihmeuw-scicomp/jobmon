@@ -40,8 +40,10 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
         f" --expected_jobmon_version {core_version}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args foo=1;bar=baz"
+        " --args foo=1"
+        " --args bar=baz"
     )
+
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
 
@@ -80,7 +82,8 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
         f" --expected_jobmon_version {core_version}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name list_function"
-        " --args foo=[a,b];bar=[c,d]"
+        " --args foo=[a,b]"
+        " --args bar=[c,d]"
     )
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
@@ -133,7 +136,8 @@ def test_naming_args(
         f" --expected_jobmon_version {core_version}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args foo=1;bar=baz"
+        " --args foo=1"
+        " --args bar=baz"
     )
     assert task.command == expected_command
     assert task.compute_resources == compute_resources

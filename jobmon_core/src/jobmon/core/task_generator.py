@@ -304,8 +304,9 @@ class TaskGenerator:
 
     def _generate_task_template(self) -> None:
         """Generate and store the task template."""
-        # split tgargs by ";" to get the key-value pairs
-        args_template = ";".join(f"{arg_name}={{{arg_name}}}" for arg_name in self.params)
+        # args convert to --args foo=1 --args bar=2
+        args_template = " --args ".join(f"{arg_name}={{{arg_name}}}" for arg_name in self.params)
+        args_template = " --args " + args_template
         if self.module_source_path:
             self._task_template = self.tool.get_task_template(
                 template_name=self.name,
@@ -319,7 +320,6 @@ class TaskGenerator:
                 + self.name
                 + " --module_source_path "
                 + self.module_source_path
-                + " --args "
                 + args_template,
                 node_args=self.params.keys(),
                 op_args=["executable"],
@@ -335,7 +335,6 @@ class TaskGenerator:
                 + self.mod_name
                 + " --func_name "
                 + self.name
-                + " --args "
                 + args_template,
                 node_args=self.params.keys(),
                 op_args=["executable"],

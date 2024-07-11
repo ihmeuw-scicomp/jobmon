@@ -101,14 +101,6 @@ class WorkerNodeCLI(CLI):
                     value = ast.literal_eval(value)
                 arg_dict[key] = value
 
-        if __version__ != args.expected_jobmon_version:
-            msg = (
-                f"Your expected Jobmon version is {args.expected_jobmon_version} and your "
-                f"worker node is using {__version__}. Please check your bash profile "
-            )
-            logger.error(msg)
-            sys.exit(ReturnCodes.WORKER_NODE_ENV_FAILURE)
-
         # Import the module and get the task generator we've been pointed to, raise an error
         # if it's not a TaskGenerator
         # if the user used the --module_dir flag, add the module directory to the path
@@ -155,6 +147,7 @@ class WorkerNodeCLI(CLI):
         generator_parser.add_argument(
             "--args",
             type=str,
+            action="append",
             help="Pair the args with the params of the function, seperated by `;`. "
             'For example: --args "arg1=1; arg2=[2, 3]"',
             required=False,
@@ -164,12 +157,6 @@ class WorkerNodeCLI(CLI):
             type=str,
             help="Show the help message for the task generator. For example: --arghelp",
             required=False,
-        )
-        generator_parser.add_argument(
-            "--expected_jobmon_version",
-            type=str,
-            help="expected_jobmon_version of the work node.",
-            required=True,
         )
         generator_parser.add_argument(
             "--module_source_path",
