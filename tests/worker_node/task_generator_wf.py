@@ -1,4 +1,5 @@
 import os
+import sys
 import importlib
 import importlib.util
 import importlib.machinery
@@ -64,10 +65,6 @@ def simple_tasks_slurm() -> None:
     assert r == "D"
 
 
-simple_tasks_seq()
-simple_tasks_slurm()
-
-
 def simple_tasks_serializer_seq() -> None:
     """Simple task."""
     tool = Tool("test_tool")
@@ -120,5 +117,23 @@ def simple_tasks_serializer_slurm() -> None:
     assert r == "D"
 
 
-simple_tasks_serializer_seq()
-simple_tasks_serializer_slurm()
+def main():
+    if len(sys.argv) > 1:
+        try:
+            input_value = int(sys.argv[1])
+        except ValueError:
+            input_value = None
+    else:
+        input_value = None
+
+    if input_value == 2:
+        simple_tasks_slurm()
+    elif input_value == 3:
+        simple_tasks_serializer_seq()
+    elif input_value == 4:
+        simple_tasks_serializer_slurm()
+    else:
+        simple_tasks_seq()
+
+if __name__ == "__main__":
+    main()

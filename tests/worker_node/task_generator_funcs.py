@@ -1,4 +1,5 @@
 import os
+from typing import List
 
 from jobmon.core import task_generator, __version__ as core_version
 from jobmon.client.api import Tool
@@ -17,7 +18,7 @@ full_script_path = os.path.realpath(script_path)
     max_attempts=1,
     naming_args=["foo"],
 )
-def simple_function(foo: int, bar: list = []) -> None:
+def simple_function(foo: int, bar: List[str] = []) -> None:
     """Simple task_function."""
     print(f"foo: {foo}")
     print(f"bar: {bar}")
