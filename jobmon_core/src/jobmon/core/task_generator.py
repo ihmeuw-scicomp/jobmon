@@ -540,6 +540,8 @@ class TaskGenerator:
                         parsed_arg_value_pairs[arg_name],
                         arg_value,
                     ]
+            else:
+                parsed_arg_value_pairs[arg_name] = arg_value
 
         # Raise an error if the user did not provide all of the arguments for the task_function
         if parsed_arg_value_pairs.keys() != self.params.keys():

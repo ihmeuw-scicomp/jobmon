@@ -1,3 +1,4 @@
+import ast
 import os
 from typing import List
 
@@ -31,7 +32,7 @@ class TestYear:
         self.year = year
 
     @staticmethod
-    def parse_year(year: str) -> "FakeYearRange":
+    def parse_year(year: str):
         """Parse a year range."""
         return TestYear(int(year))
 

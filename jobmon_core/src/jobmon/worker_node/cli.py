@@ -140,8 +140,12 @@ class WorkerNodeCLI(CLI):
             "--args",
             type=str,
             action="append",
-            help="Pair the args with the params of the function, seperated by `;`. "
-            'For example: --args "arg1=1; arg2=[2, 3]"',
+            help="Followed by the key=value; you can have multiple args by using multiple --args.\n"
+                 "For example: \n"
+                 "If you method has two argument: def func(foo: int, bar: str), pass\n"
+                 "    --args foo=1 --args bar='test'\n"
+                 "If you method has two argument: def func(foo: int, bar: List[str), pass\n"
+                 "    --args foo=1 --args bar='a' --args bar='b'\n",
             required=False,
         )
         generator_parser.add_argument(
