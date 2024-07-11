@@ -35,7 +35,7 @@ def simple_tasks_seq() -> None:
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.simple_function
     for i in range(5):
-        task = simple_function.create_task(compute_resources=compute_resources, foo=i)
+        task = simple_function.create_task(compute_resources=compute_resources, foo=i, bar=["a", "b"])
         wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
@@ -58,7 +58,7 @@ def simple_tasks_slurm() -> None:
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.simple_function
     for i in range(5):
-        task = simple_function.create_task(compute_resources=compute_resources, foo=i)
+        task = simple_function.create_task(compute_resources=compute_resources, foo=i, bar=["a", "b"])
         wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
