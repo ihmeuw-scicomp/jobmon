@@ -63,6 +63,11 @@ function getWorkflowAttributes(
             }
         )
         const data = result.data[0]
+
+        const submittedDate = new Date(data["wf_created_date"])
+        const statusDate = new Date(data["wf_status_date"])
+        const elapsedTime = statusDate.getTime() - submittedDate.getTime();
+
         setWFTool(data["tool_name"]);
         setWFName(data["wf_name"]);
         setWFArgs(data["wf_args"]);
@@ -70,7 +75,7 @@ function getWorkflowAttributes(
         setWFStatusDesc(data["wf_status"] + " -- " + data["wf_status_desc"])
         setWFSubmitted(convertDatePST(data["wf_created_date"]));
         setWFStatusDate(convertDatePST(data["wf_status_date"]));
-        setWFElapsedTime(humanizeDuration(new Date().getTime() - new Date(data["wf_status_date"]).getTime()))
+        setWFElapsedTime(humanizeDuration(elapsedTime))
         setJobmonVersion(data["wfr_jobmon_version"]);
     };
     return fetchData
@@ -354,7 +359,7 @@ function WorkflowDetails({subpage}) {
                     </ul>
                 }
                 {!tt_loaded &&
-                    <div className="loader" />
+                    <div className="loader"/>
                 }
 
             </div>
@@ -391,9 +396,13 @@ function WorkflowDetails({subpage}) {
                     <Outlet/>
                 </div>
 
-                {(subpage === "tasks") && <Tasks tasks={tasks} loading={task_loading} apm={apm} />}
-                {(subpage === "usage") && <Usage taskTemplateName={task_template_name} taskTemplateVersionId={task_template_version_id} usageInfo={usage_info} apm={apm} />}
-                {(subpage === "errors") && <Errors taskTemplateName={task_template_name} taskTemplateId={tt_id} workflowId={params.workflowId} apm={apm} />}
+                {(subpage === "tasks") && <Tasks tasks={tasks} loading={task_loading} apm={apm}/>}
+                {(subpage === "usage") &&
+                    <Usage taskTemplateName={task_template_name} taskTemplateVersionId={task_template_version_id}
+                           usageInfo={usage_info} apm={apm}/>}
+                {(subpage === "errors") &&
+                    <Errors taskTemplateName={task_template_name} taskTemplateId={tt_id} workflowId={params.workflowId}
+                            apm={apm}/>}
 
             </div>
 

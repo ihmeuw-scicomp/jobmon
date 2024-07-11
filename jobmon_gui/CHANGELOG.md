@@ -9,6 +9,21 @@ All notable changes to the Jobmon GUI will be documented in this file.
 ### Deprecated
 ### Removed
 
+## [1.15.0] - TBD
+
+### User-Facing
+#### Changed
+- Changed look of filters on `Workflow Overview` page
+- Changed the Task and TaskInstance tables to use the `react-material-table` component
+- Persist users' filters on `Workflow Overview` page
+
+#### Fixed
+- Fixed bug where workflow elapsed time was wrong. It's now workflow status date - workflow submitted date
+
+### Developer
+#### Changed
+- Added zustand store to filters on `Workflow Overview` page
+
 ## [1.14.0] - 2024-06-07
 ### User-Facing
 #### Added
