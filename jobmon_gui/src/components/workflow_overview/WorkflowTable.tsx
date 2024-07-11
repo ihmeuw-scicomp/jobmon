@@ -87,6 +87,26 @@ interface Data {
     wfr_count: number
 }
 
+type WorkflowType = {
+    DONE: number,
+    FATAL: number,
+    PENDING: number,
+    RUNNING: number,
+    SCHEDULED: number,
+    wf_args: string,
+    wf_id: number,
+    wf_name: string,
+    wf_status: string,
+    wf_status_date: string,
+    wf_submitted_date: string,
+    wf_tool: string,
+    wfr_count: number
+}
+
+type WorkflowsQueryResponse = {
+    workflows: WorkflowType[]
+}
+
 export default function WorkflowTable() {
     const [expandedRows, setExpandedRows] = useState([]);
     const [statusDict, setStatusDict] = useState({});
@@ -114,7 +134,7 @@ export default function WorkflowTable() {
                 date_submitted: dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
                 status: workflowSettings.get().status
             });
-            return axios.get(workflow_status_url, {...jobmonAxiosConfig, params: params}).then((response) => {
+            return axios.get<WorkflowsQueryResponse>(workflow_status_url, {...jobmonAxiosConfig, params: params}).then((response) => {
                 response.data?.workflows?.forEach((workflow) => {
                     workflow.wf_status = <WorkflowStatus status={workflow.wf_status}/>;
                 })
@@ -337,7 +357,7 @@ export default function WorkflowTable() {
         return (<Typography>Error loading workflows. Please refresh and try again</Typography>)
     }
 
-    if(!workflows.data){
+    if (!workflows.data) {
         return (<></>)
     }
 
