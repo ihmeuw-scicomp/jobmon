@@ -1,7 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import '@jobmon_gui/styles/jobmon_gui.css';
 import {useParams, Link, Outlet, useNavigate, useLocation} from 'react-router-dom';
-import {useForm} from "react-hook-form";
 import axios from 'axios';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import {OverlayTrigger} from "react-bootstrap";
@@ -232,11 +231,6 @@ function WorkflowDetails({subpage}) {
     }, [task_template_version_id, workflowId]);
 
     //*******************event handling****************************
-    // TaskTemplate name form
-    const {register, handleSubmit} = useForm();
-    const onSubmit = handleSubmit((d) => {
-        setTaskTemplateName(d["task_template_name"]);
-    });
 
     //TaskTemplate link click function
     function clickTaskTemplate(name, tt_id, tt_version_id) {
@@ -397,7 +391,7 @@ function WorkflowDetails({subpage}) {
                     <Outlet/>
                 </div>
 
-                {(subpage === "tasks") && <Tasks tasks={tasks} onSubmit={onSubmit} register={register} loading={task_loading} apm={apm} />}
+                {(subpage === "tasks") && <Tasks tasks={tasks} loading={task_loading} apm={apm} />}
                 {(subpage === "usage") && <Usage taskTemplateName={task_template_name} taskTemplateVersionId={task_template_version_id} usageInfo={usage_info} apm={apm} />}
                 {(subpage === "errors") && <Errors taskTemplateName={task_template_name} taskTemplateId={tt_id} workflowId={params.workflowId} apm={apm} />}
 
