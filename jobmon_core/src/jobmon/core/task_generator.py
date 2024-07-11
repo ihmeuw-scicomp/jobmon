@@ -312,8 +312,6 @@ class TaskGenerator:
                 template_name=self.name,
                 command_template="{executable} "
                 + TASK_RUNNER_SUB_COMMAND
-                + " --expected_jobmon_version "
-                + core_version
                 + " --module_name "
                 + self.mod_name
                 + " --func_name "
@@ -329,8 +327,6 @@ class TaskGenerator:
                 template_name=self.name,
                 command_template="{executable} "
                 + TASK_RUNNER_SUB_COMMAND
-                + " --expected_jobmon_version "
-                + core_version
                 + " --module_name "
                 + self.mod_name
                 + " --func_name "
@@ -528,8 +524,23 @@ class TaskGenerator:
 
         return task
 
-    def run(self, parsed_arg_value_pairs: Dict) -> Any:
+    def run(self, args: List[str]) -> Any:
         """Run the task_function with the given args and return any result."""
+        # Parse the args
+        parsed_arg_value_pairs = dict()
+        # args is a list of string like ["arg1=1", "arg2=[2, 3]", "arg1=4]
+        for arg in args:
+            arg_name, arg_value = arg.split("=")
+            # if the arg_name key, already exists, append the value to the list
+            if arg_name in parsed_arg_value_pairs.keys():
+                if isinstance(parsed_arg_value_pairs[arg_name], list):
+                    parsed_arg_value_pairs[arg_name].append(arg_value)
+                else:
+                    parsed_arg_value_pairs[arg_name] = [
+                        parsed_arg_value_pairs[arg_name],
+                        arg_value,
+                    ]
+
         # Raise an error if the user did not provide all of the arguments for the task_function
         if parsed_arg_value_pairs.keys() != self.params.keys():
             raise ValueError(
