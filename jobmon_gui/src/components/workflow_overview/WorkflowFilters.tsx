@@ -64,8 +64,6 @@ export default function WorkflowFilters() {
 
                 </Grid>
                 <Grid item xs={3}>
-                    {/*fullWidth={true}*/}
-                    {/*          defaultValue={two_weeks_ago_date}*/}
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DatePicker
                             label={"Submitted Workflow Date - On or After"}

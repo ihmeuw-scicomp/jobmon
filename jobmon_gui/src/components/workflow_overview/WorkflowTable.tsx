@@ -4,7 +4,6 @@ import BootstrapTable, {ExpandRowProps} from "react-bootstrap-table-next";
 import paginationFactory from "react-bootstrap-table2-paginator";
 import {OverlayTrigger} from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
-import ToolkitProvider, {CSVExport} from 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit';
 import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import Spinner from 'react-bootstrap/Spinner';
 import {Link, useLocation} from "react-router-dom";
@@ -18,7 +17,14 @@ import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import WorkflowStatus from "@jobmon_gui/components/workflow_overview/WorkflowStatus";
 import {useWorkflowSearchSettings} from "@jobmon_gui/stores/workflow_settings";
 import {CircularProgress} from "@mui/material";
-import Typography from "@mui/material/Typography";
+import {Box, List, ListItem, ListItemIcon, ListItemText, Typography} from '@mui/material';
+import {HiInformationCircle} from "react-icons/hi";
+import CustomModal from "@jobmon_gui/components/Modal";
+import {IoMdCloseCircle, IoMdCloseCircleOutline} from "react-icons/io";
+import {AiFillSchedule, AiFillCheckCircle} from "react-icons/ai";
+import {BiRun} from "react-icons/bi";
+import {TbHandStop} from "react-icons/tb";
+import {HiRocketLaunch} from "react-icons/hi2";
 
 
 const customCaret = (order, column) => {
@@ -116,6 +122,22 @@ export default function WorkflowTable() {
     //suspect sync issue, but not sure.
     const [finishedWF, setFinishedWF] = useState<number[]>([]);
     const [helper, setHelper] = useState("");
+    const [showWorkflowInfo, setShowWorkflowInfo] = useState(false)
+    const [workflowDetails, setWorkflowDetails] = useState<WorkflowType>({
+        DONE: 0,
+        FATAL: 0,
+        PENDING: 0,
+        RUNNING: 0,
+        SCHEDULED: 0,
+        wf_args: '',
+        wf_id: 0,
+        wf_name: '',
+        wf_status: '',
+        wf_status_date: '',
+        wf_submitted_date: '',
+        wf_tool: '',
+        wfr_count: 0
+    });
     const location = useLocation();
     const workflowSettings = useWorkflowSearchSettings()
 
@@ -134,11 +156,10 @@ export default function WorkflowTable() {
                 date_submitted: dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
                 status: workflowSettings.get().status
             });
-            return axios.get<WorkflowsQueryResponse>(workflow_status_url, {...jobmonAxiosConfig, params: params}).then((response) => {
-                response.data?.workflows?.forEach((workflow) => {
-                    workflow.wf_status = <WorkflowStatus status={workflow.wf_status}/>;
-                })
-
+            return axios.get<WorkflowsQueryResponse>(workflow_status_url, {
+                ...jobmonAxiosConfig,
+                params: params
+            }).then((response) => {
                 return response.data?.workflows
             })
         },
@@ -347,9 +368,6 @@ export default function WorkflowTable() {
     }, [expandedRows, finishedWF, statusDict]);
 
 
-    // Create and return the React Bootstrap Table
-    const {ExportCSVButton} = CSVExport;
-
     if (workflows.isLoading) {
         return (<CircularProgress/>)
     }
@@ -362,103 +380,101 @@ export default function WorkflowTable() {
     }
 
     if (workflows.data.length < 1) {
-        return (<Typography>
-            No workflows found for your current search.
-            Please update your search parameters and try again
-        </Typography>)
+        return (
+            <Typography>
+                No workflows found for your current search.
+                Please update your search parameters and try again
+            </Typography>
+        )
     }
 
+    const handleInfoClick = (workflowDetails) => {
+        setWorkflowDetails(workflowDetails)
+        setShowWorkflowInfo(true)
+    }
 
+    const statuses = [
+        {className: 'bar-pp', label: 'Pending'},
+        {className: 'bar-ss', label: 'Scheduled'},
+        {className: 'bar-rr', label: 'Running'},
+        {className: 'bar-ff', label: 'Fatal'},
+        {className: 'bar-aa', label: 'Aborted'},
+        {className: 'bar-dd', label: 'Done'},
+    ];
+
+    const statusMap = {
+        'ABORTED': {icon: <IoMdCloseCircleOutline/>, className: 'icon-aa'},
+        'DONE': {icon: <AiFillCheckCircle/>, className: 'icon-dd'},
+        'FAILED': {icon: <IoMdCloseCircle/>, className: 'icon-ff'},
+        'REGISTERING': {icon: <AiFillSchedule/>, className: 'icon-pp'},
+        'HALTED': {icon: <TbHandStop/>, className: 'icon-aa'},
+        'INSTANTIATING': {icon: <AiFillSchedule/>, className: 'icon-pp'},
+        'LAUNCHED': {icon: <HiRocketLaunch/>, className: 'icon-ss'},
+        'QUEUED': {icon: <AiFillSchedule/>, className: 'icon-pp'},
+        'RUNNING': {icon: <BiRun/>, className: 'icon-rr'},
+    };
     return (
         <div>
-
-            <ToolkitProvider
-                keyField="wf_id"
-                data={workflows?.data}
-                columns={columns}
-                exportCSV={{
-                    onlyExportFiltered: true,
-                    fileName: 'jobmon_workflow.csv',
-                    exportAll: true
-                }}
-            >
-                {
-                    props => (
-                        <div>
-                            <div>
-                                <OverlayTrigger
-                                    placement='bottom'
-                                    trigger={["hover", "focus"]}
-                                    overlay={(
-                                        <Popover>
-                                            <FaCircle className="bar-pp"/>
-                                            <span className='font-weight-bold'>Pending:</span>
-                                            Tasks that are queued in Jobmon. <br/>
-                                            <FaCircle className="bar-ss"/>
-                                            <span className='font-weight-bold'>Scheduled:</span>
-                                            Tasks that are submitted to the cluster and were queued by the cluster
-                                            scheduler.<br/>
-                                            <FaCircle className="bar-rr"/>
-                                            <span className='font-weight-bold'>Running:</span>
-                                            Tasks that are running on cluster nodes. <br/>
-                                            <FaCircle className="bar-ff"/>
-                                            <span className='font-weight-bold'>Fatal:</span>
-                                            Tasks that did not finish because of an error. <br/>
-                                            <FaCircle className="bar-aa"/>
-                                            <span className='font-weight-bold'>Aborted:</span>
-                                            Workflow encountered an error before a WorkflowRun was created. <br/>
-                                            <FaCircle className="bar-dd"/>
-                                            <span className='font-weight-bold'>Done:</span>
-                                            Tasks that completed successfully.
-                                        </Popover>
-                                    )}>
-                                    <div id="legend" className="legend">
-                                        <form className='d-flex justify-content-around w-100 mx-auto py-3'>
-                                            <div>
-                                                <label className="label-middle"><FaCircle className="bar-pp"/> </label>
-                                                <label className="label-left">Pending </label>
-                                            </div>
-                                            <div>
-                                                <label className="label-middle"><FaCircle className="bar-ss"/> </label>
-                                                <label className="label-left">Scheduled </label>
-                                            </div>
-                                            <div>
-                                                <label className="label-middle"><FaCircle className="bar-rr"/> </label>
-                                                <label className="label-left">Running </label>
-                                            </div>
-                                            <div>
-                                                <label className="label-middle"><FaCircle className="bar-ff"/> </label>
-                                                <label className="label-left">Fatal </label>
-                                            </div>
-                                            <div>
-                                                <label className="label-middle"><FaCircle className="bar-aa"/> </label>
-                                                <label className="label-left">Aborted </label>
-                                            </div>
-                                            <div>
-                                                <label className="label-middle"><FaCircle className="bar-dd"/> </label>
-                                                <label className="label-left">Done </label>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </OverlayTrigger>
+            <div>
+                <div id="legend" className="legend">
+                    <form className='d-flex justify-content-around w-100 mx-auto py-3'>
+                        {statuses.map((status, index) => (
+                            <div key={index}>
+                                <label className="label-middle">
+                                    <FaCircle className={status.className}/>
+                                </label>
+                                <label className="label-left">{status.label}</label>
                             </div>
-                            <ExportCSVButton {...props.csvProps} className="btn btn-custom mb-2 ml-2">Export
-                                CSV</ExportCSVButton>
-                            <span className="span-helper"><i>{helper}</i></span>
-                            <br/>
-                            <BootstrapTable
-                                keyField="wf_id"
-                                {...props.baseProps}
-                                bootstrap4
-                                expandRow={expandRow}
-                                headerClasses="thead-dark"
-                                striped
-                                pagination={workflows?.data?.length === 0 ? undefined : paginationFactory({sizePerPage: 50})}
-                            />
-                        </div>
-                    )
+                        ))}
+                    </form>
+                </div>
+                <Typography variant="h4" component="h1">Workflow List</Typography>
+                <List>
+                    {workflows.data.map((workflow) => (
+                        <ListItem key={workflow.wf_id}>
+                            <Box sx={{display: 'flex', alignItems: 'center'}}>
+                                <span className={statusMap[workflow.wf_status].className} style={{marginRight: '8px'}}>
+                                    {statusMap[workflow.wf_status].icon}
+                                </span>
+                                <ListItemText
+                                    primary={
+                                        <Typography variant="h6">
+                                            <Link
+                                                to={`/workflow/${workflow.wf_id}/tasks${location.search}`}
+                                            >
+                                                ID: {workflow.wf_id} - Name: {workflow.wf_name}
+                                            </Link>
+                                        </Typography>
+                                    }
+                                />
+                                <ListItemIcon sx={{marginLeft: '12px', fontSize: '32px'}}>
+                                    <HiInformationCircle onClick={() => handleInfoClick(workflow)}/>
+                                </ListItemIcon>
+                            </Box>
+                        </ListItem>
+                    ))}
+                </List>
+            </div>
+            <CustomModal
+                className="workflow_info_modal"
+                headerContent={
+                    <h5>Workflow Information</h5>
                 }
-            </ToolkitProvider>
+                bodyContent={
+                    <p>
+                        <b>Workflow Name:</b> {workflowDetails.wf_name}<br/>
+                        <b>Workflow ID:</b> {workflowDetails.wf_id}<br/>
+                        <b>Workflow Status:</b> {workflowDetails.wf_status}<br/>
+                        <b>Tool:</b> {workflowDetails.wf_tool}<br/>
+                        <b>Workflow Args:</b> {workflowDetails.wf_args} <br/>
+                        <b>Date Submitted:</b> {workflowDetails.wf_submitted_date}<br/>
+                        <b>Status Date: </b> {workflowDetails.wf_status_date}<br/>
+                        <b>Number of WorkflowRuns: </b> {workflowDetails.wfr_count}<br/>
+                    </p>
+                }
+                showModal={showWorkflowInfo}
+                setShowModal={setShowWorkflowInfo}
+            />
         </div>
     );
 }
