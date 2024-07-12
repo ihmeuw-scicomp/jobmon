@@ -554,35 +554,11 @@ class TaskGenerator:
         }
 
         # Format the kwargs for the task
-        kwargs_for_task = {
-            name: make_cli_argument_string(arg_value=value)
-            for name, value in serialized_kwargs.items()
-        }
-        # We want a slightly different format to put list kwargs into the name
-        kwargs_for_name = {
-            name: ",".join(value) if isinstance(value, list) else value
-            for name, value in serialized_kwargs.items()
-            if name in self._naming_args
-        }
-
-        # Handle the case where we have an empty string placeholder in the name by making it
-        # empty in the name; Jobmon will not accept quotes in the name
-        for key, value in kwargs_for_name.items():
-            if value == SERIALIZED_EMPTY_STRING:
-                kwargs_for_name[key] = ""
-
-        name = (
-            self.name
-            + ":"
-            + ":".join(f"{name}={value}" for name, value in kwargs_for_name.items())
-        )
-        # trim ending :
-        if name[-1] == ":":
-            name = name[:-1]
+        kwargs_for_task = serialized_kwargs
+        # name is auto for array
 
         # Create the task
         tasks = self._task_template.create_tasks(
-            name=name,
             compute_resources=compute_resources,
             max_attempts=self.max_attempts,
             executable=executable_path,

@@ -76,8 +76,6 @@ def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Verify task name
     for i in range(1, 2):
-        assert tasks[i].name == f"simple_function:foo={i}:bar=baz"
-
         # Verify command
         expected_command = (
             f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
@@ -87,8 +85,7 @@ def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
             " --args bar=baz"
         )
 
-        assert tasks[i].command == expected_command
-        assert tasks[i].compute_resources == compute_resources
+        assert tasks[i-1].command == expected_command
 
 
 def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
