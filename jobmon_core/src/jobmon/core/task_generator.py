@@ -410,7 +410,14 @@ class TaskGenerator:
 
         return serialized_result
 
-    def deserialize(self, obj: Union[str, List], obj_type: Type) -> Any:
+    def serialize_array(self, obj: Any, expected_type: Type) -> List:
+        """Serialize obj into a list of serialized string."""
+        if isinstance(obj, list):
+            return [self.serialize(item, expected_type) for item in obj]
+        else:
+            return [self.serialize(obj, expected_type)]
+
+    def deserialize(self, obj: Union[str, List[str]], obj_type: Type) -> Any:
         """Deserialize ``obj``."""
         deserialized_result: Any
 
@@ -445,27 +452,40 @@ class TaskGenerator:
             )
 
         elif _is_annotated_built_in_collection_type(obj_type):
-            collection_items_type = _get_generic_type_parameters(obj_type)
+            if not isinstance(obj, list):
+                # when input is a string, convert it to a list
+                try:
+                    middle_result = ast.literal_eval(obj)
+                except Exception:
+                    # handle input like "[a,b,c]"
+                    # remove leading and tailing space
+                    obj = obj.strip()
+                    # remove leading and tailing brackets
+                    obj = obj[1:-1]
+                    middle_result = obj.split(",")
+                deserialized_result = [self.deserialize(item, obj_type.__args__[0]) for item in middle_result]
+            else:
+                collection_items_type = _get_generic_type_parameters(obj_type)
 
-            # Raise an error if we've been given a multi-dimensional collection
-            if any(
-                _is_unannotated_built_in_collection_type(item_type)
-                or _is_annotated_built_in_collection_type(item_type)
-                for item_type in collection_items_type
-            ):
-                raise TypeError(
-                    f"Cannot deserialize multi-dimensional collection: {obj}."
+                # Raise an error if we've been given a multi-dimensional collection
+                if any(
+                    _is_unannotated_built_in_collection_type(item_type)
+                    or _is_annotated_built_in_collection_type(item_type)
+                    for item_type in collection_items_type
+                ):
+                    raise TypeError(
+                        f"Cannot deserialize multi-dimensional collection: {obj}."
+                    )
+
+                item_type_pairs = _zip_collection_items_and_types(
+                    obj, collection_items_type
                 )
-
-            item_type_pairs = _zip_collection_items_and_types(
-                obj, collection_items_type
-            )
-            deserialized_result = _get_collection_type(obj_type)(  # type: ignore
-                [
-                    self.deserialize(obj=item, obj_type=item_type)
-                    for item, item_type in item_type_pairs
-                ]
-            )
+                deserialized_result = _get_collection_type(obj_type)(  # type: ignore
+                    [
+                        self.deserialize(obj=item, obj_type=item_type)
+                        for item, item_type in item_type_pairs
+                    ]
+                )
 
         else:
             raise TypeError(
@@ -523,6 +543,53 @@ class TaskGenerator:
         )
 
         return task
+
+    def create_tasks(self, compute_resources: Dict, **kwargs: Any) -> List[Task]:
+        """Create a task array for the task_function with the given kwargs."""
+        executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
+        # Serialize the kwargs
+        serialized_kwargs = {
+            name: self.serialize_array(obj=value, expected_type=self.params[name])
+            for name, value in kwargs.items()
+        }
+
+        # Format the kwargs for the task
+        kwargs_for_task = {
+            name: make_cli_argument_string(arg_value=value)
+            for name, value in serialized_kwargs.items()
+        }
+        # We want a slightly different format to put list kwargs into the name
+        kwargs_for_name = {
+            name: ",".join(value) if isinstance(value, list) else value
+            for name, value in serialized_kwargs.items()
+            if name in self._naming_args
+        }
+
+        # Handle the case where we have an empty string placeholder in the name by making it
+        # empty in the name; Jobmon will not accept quotes in the name
+        for key, value in kwargs_for_name.items():
+            if value == SERIALIZED_EMPTY_STRING:
+                kwargs_for_name[key] = ""
+
+        name = (
+            self.name
+            + ":"
+            + ":".join(f"{name}={value}" for name, value in kwargs_for_name.items())
+        )
+        # trim ending :
+        if name[-1] == ":":
+            name = name[:-1]
+
+        # Create the task
+        tasks = self._task_template.create_tasks(
+            name=name,
+            compute_resources=compute_resources,
+            max_attempts=self.max_attempts,
+            executable=executable_path,
+            **kwargs_for_task
+        )
+
+        return tasks
 
     def run(self, args: List[str]) -> Any:
         """Run the task_function with the given args and return any result."""

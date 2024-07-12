@@ -1,6 +1,7 @@
 import pytest
 from typing import Any, List, Optional, Tuple
 from unittest.mock import Mock
+from random import randint
 
 from jobmon.core import task_generator, __version__ as core_version
 from jobmon.client.api import Tool
@@ -45,6 +46,49 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
 
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
+
+
+def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
+    """Verify that we get a good looking command string for an array task.
+
+    """
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool_name = f"test_tool_array_{randint(0, 1000)}"
+
+    @task_generator.task_generator(serializers={}, tool_name=tool_name)
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    compute_resources = {}
+
+    # Exercise
+    tasks = simple_function.create_tasks(
+        compute_resources=compute_resources, foo=[1, 2], bar="baz"
+    )
+    # verify there are two tasks
+    assert len(tasks) == 2
+
+    # Verify task name
+    for i in range(1, 2):
+        assert tasks[i].name == f"simple_function:foo={i}:bar=baz"
+
+        # Verify command
+        expected_command = (
+            f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
+            f" --module_name tests.worker_node.test_task_generator"
+            " --func_name simple_function"
+            f" --args foo={i}"
+            " --args bar=baz"
+        )
+
+        assert tasks[i].command == expected_command
+        assert tasks[i].compute_resources == compute_resources
 
 
 def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
@@ -670,3 +714,24 @@ def test_deserialize_empty_collection(client_env) -> None:
 
     # Verify
     assert result == expected_result
+
+
+def test_deserialize_built_in_collections_in_str(
+    client_env,
+) -> None:
+    """Ensure the built-in collection types can be deserialized.
+    """
+    # Instantiate the TaskGenerator
+    tool = Tool("test_tool")
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool_name="test_tool"
+    )
+
+    # Exercise by calling deserialize on the items_to_deserialize, having cast them to
+    # the collection_type
+    result = task_gen.deserialize(obj='["a","b"]', obj_type=List[str])
+    # Verify the result matches the expected result (cast as the collection type)
+    assert result == ["a", "b"]
+
+    result = task_gen.deserialize(obj='[1,2]', obj_type=List[int])
+    assert result == [1, 2]
