@@ -724,7 +724,9 @@ def test_deserialize_built_in_collections_in_str(
     # Instantiate the TaskGenerator
     tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool_name="test_tool"
+        task_function=my_func,
+        serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
+        tool_name="test_tool"
     )
 
     # Exercise by calling deserialize on the items_to_deserialize, having cast them to
@@ -735,3 +737,6 @@ def test_deserialize_built_in_collections_in_str(
 
     result = task_gen.deserialize(obj='[1,2]', obj_type=List[int])
     assert result == [1, 2]
+
+    result = task_gen.deserialize(obj='["1990:2020:2050", "1990:2020:2050"]', obj_type=List[FakeYearRange])
+    assert result == [FakeYearRange(1990), FakeYearRange(1990)]
