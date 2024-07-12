@@ -735,6 +735,9 @@ def test_deserialize_built_in_collections_in_str(
     # Verify the result matches the expected result (cast as the collection type)
     assert result == ["a", "b"]
 
+    result = task_gen.deserialize(obj='[a,b]', obj_type=List[str])
+    assert result == ["a", "b"]
+
     result = task_gen.deserialize(obj='[1,2]', obj_type=List[int])
     assert result == [1, 2]
 
