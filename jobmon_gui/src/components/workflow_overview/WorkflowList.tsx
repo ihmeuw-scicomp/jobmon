@@ -87,7 +87,7 @@ type WorkflowsQueryResponse = {
     workflows: WorkflowType[]
 }
 
-export default function WorkflowTable() {
+export default function WorkflowList() {
     const [expandedRows, setExpandedRows] = useState([]);
     const [statusDict, setStatusDict] = useState({});
     //TODO: get rid of finishedWF
