@@ -1,20 +1,14 @@
 import React, {useEffect, useState} from 'react';
 import axios from 'axios';
-import BootstrapTable, {ExpandRowProps} from "react-bootstrap-table-next";
-import paginationFactory from "react-bootstrap-table2-paginator";
-import {OverlayTrigger} from "react-bootstrap";
-import Popover from 'react-bootstrap/Popover';
 import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
-import Spinner from 'react-bootstrap/Spinner';
 import {Link, useLocation} from "react-router-dom";
-import {convertDate, convertDatePST} from '@jobmon_gui/utils/formatters';
-import {FaCaretDown, FaCaretUp, FaCircle} from "react-icons/fa";
+import {convertDatePST} from '@jobmon_gui/utils/formatters';
+import {FaCircle} from "react-icons/fa";
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
 import {useQuery} from "@tanstack/react-query";
 import dayjs from "dayjs";
 import {workflow_status_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
-import WorkflowStatus from "@jobmon_gui/components/workflow_overview/WorkflowStatus";
 import {useWorkflowSearchSettings} from "@jobmon_gui/stores/workflow_settings";
 import {CircularProgress} from "@mui/material";
 import {Box, List, ListItem, ListItemIcon, ListItemText, Typography} from '@mui/material';
@@ -26,13 +20,6 @@ import {BiRun} from "react-icons/bi";
 import {TbHandStop} from "react-icons/tb";
 import {HiRocketLaunch} from "react-icons/hi2";
 
-
-const customCaret = (order, column) => {
-    if (!order) return (<span><FaCaretUp style={{marginLeft: "5px"}}/></span>);
-    else if (order === 'asc') return (<span><FaCaretUp style={{marginLeft: "5px"}}/></span>);
-    else if (order === 'desc') return (<span><FaCaretDown style={{marginLeft: "5px"}}/></span>);
-    return null;
-}
 
 // Get task status count for specified workflows
 function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_ids, wf_ids: number[], setFetchCompleted) {
@@ -83,17 +70,6 @@ function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_i
     return fetchData
 }
 
-interface Data {
-    wf_id: number
-    wf_tool: string
-    wf_name: string
-    wf_args: string
-    wf_submitted_date: string
-    wf_status_date: string
-    wf_status: string
-    wfr_count: number
-}
-
 type WorkflowType = {
     DONE: number,
     FATAL: number,
@@ -122,9 +98,9 @@ export default function WorkflowTable() {
     //the console.log shows the progress bar gets its info though
     //suspect sync issue, but not sure.
     const [finishedWF, setFinishedWF] = useState<number[]>([]);
-    const [helper, setHelper] = useState("");
     const [showWorkflowInfo, setShowWorkflowInfo] = useState(false)
     const [fetchCompleted, setFetchCompleted] = useState(false);
+    const [workflowIds, setWorkflowIds] = useState([])
 
     const [workflowDetails, setWorkflowDetails] = useState<WorkflowType>({
         DONE: 0,
@@ -164,214 +140,21 @@ export default function WorkflowTable() {
                 params: params
             }).then((response) => {
                 const workflowIds = response.data?.workflows.map((workflow) => workflow.wf_id);
+                setWorkflowIds(workflowIds)
                 getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, workflowIds, setFetchCompleted)();
-                console.log("STATUS DICT", statusDict)
                 return response.data?.workflows
             })
         },
         enabled: workflowSettings.getRefreshData()
     })
-    // Specify table columns
-    const columns = [
-        {
-            dataField: "wf_id",
-            text: "Workflow ID",
-            sort: true,
-            sortCaret: customCaret,
-            headerEvents: {
-                onMouseEnter: (e, column, columnIndex) => {
-                    setHelper("The ID column in WORKFLOW table. Unique identifier.");
-                },
-                onMouseLeave: (e, column, columnIndex) => {
-                    setHelper("");
-                }
-            },
-            formatter: (cell, row) => <nav>
-                <Link
-                    to={{pathname: `/workflow/${cell}/tasks`, search: location.search}}
-                    key={cell}
-                >
-                    {cell}
-                </Link>
-            </nav>
-        },
-        {
-            dataField: "wf_tool",
-            text: "Tool",
-            sort: true,
-            sortCaret: customCaret,
-
-            headerEvents: {
-                onMouseEnter: (e, column, columnIndex) => {
-                    setHelper("The NAME column in TOOL table. The name of the tool used to create the workflow.");
-                },
-                onMouseLeave: (e, column, columnIndex) => {
-                    setHelper("");
-                }
-            },
-            style: {overflowWrap: 'break-word'}
-        },
-        {
-            dataField: "wf_name",
-            text: "Workflow Name",
-            sort: true,
-            sortCaret: customCaret,
-
-            headerEvents: {
-                onMouseEnter: (e, column, columnIndex) => {
-                    setHelper("The NAME column in WORKFLOW table. The user assigned name of the workflow.");
-                },
-                onMouseLeave: (e, column, columnIndex) => {
-                    setHelper("");
-                }
-            },
-            style: {overflowWrap: 'break-word'}
-        },
-        {
-            dataField: "wf_args",
-            text: "Workflow Args",
-            sort: true,
-            sortCaret: customCaret,
-            headerStyle: {width: "15%"},
-            headerEvents: {
-                onMouseEnter: (e, column, columnIndex) => {
-                    setHelper("The WORKFLOW_ARGS column in WORKFLOW table. The value of workflow_args used to create the workflow.");
-                },
-                onMouseLeave: (e, column, columnIndex) => {
-                    setHelper("");
-                }
-            },
-            style: {overflowWrap: 'break-word'}
-        },
-        {
-            dataField: "wf_submitted_date",
-            text: "Date Submitted",
-            sort: true,
-            sortCaret: customCaret,
-
-            headerEvents: {
-                onMouseEnter: (e, column, columnIndex) => {
-                    setHelper("The CREATED_DATE column in WORKFLOW table in PST. The time stamp that the workflow was created.");
-                },
-                onMouseLeave: (e, column, columnIndex) => {
-                    setHelper("");
-                }
-            },
-            // sortValue: (cell, row) => convertDate(cell).getTime(),
-            formatter: (cell, row, rowIndex) => convertDatePST(cell)
-        },
-        {
-            dataField: "wf_status_date",
-            text: "Status Date",
-            sort: true,
-            sortCaret: customCaret,
-
-            headerEvents: {
-                onMouseEnter: (e, column, columnIndex) => {
-                    setHelper("The STATUS_DATE column in WORKFLOW table in PST. The time stamp that the workflow status was last updated.");
-                },
-                onMouseLeave: (e, column, columnIndex) => {
-                    setHelper("");
-                }
-            },
-            // sortValue: (cell, row) => convertDate(cell).getTime(),
-            formatter: (cell, row, rowIndex) => convertDatePST(cell)
-        },
-        {
-            dataField: "wf_status",
-            text: "Workflow Status",
-            sort: true,
-            sortCaret: customCaret,
-            headerEvents: {
-                onMouseEnter: (e, column, columnIndex) => {
-                    setHelper("The STATUS column in WORKFLOW table. The current status of the workflow.");
-                },
-                onMouseLeave: (e, column, columnIndex) => {
-                    setHelper("");
-                }
-            },
-        },
-        {
-            dataField: "wfr_count",
-            text: "Number of WorkflowRuns",
-            sort: true,
-            sortCaret: customCaret,
-            headerEvents: {
-                onMouseEnter: (e, column, columnIndex) => {
-                    setHelper("The number of runs of the workflow.");
-                },
-                onMouseLeave: (e, column, columnIndex) => {
-                    setHelper("");
-                }
-            },
-        }
-    ];
-
-    // Render the progress bar when row is expanded
-    const expandRow: ExpandRowProps<Data, never> = {
-        renderer: row => {
-            const entry = statusDict[row.wf_id]
-            if (entry === undefined) {
-                return (
-                    <div>
-                        <Spinner animation="border" role="status" variant="primary">
-                            <span className="visually-hidden"></span>
-                        </Spinner>
-                    </div>)
-            }
-
-            const tasks = entry["tasks"]
-            const pending = entry["PENDING"]
-            const scheduled = entry["SCHEDULED"]
-            const running = entry["RUNNING"]
-            const done = entry["DONE"]
-            const fatal = entry["FATAL"]
-            const maxc = entry["MAXC"]
-
-            return (
-                <div>
-                    <JobmonProgressBar tasks={tasks} pending={pending} scheduled={scheduled} running={running}
-                                       done={done} fatal={fatal} maxc={maxc} placement="top"/>
-                </div>
-            )
-        },
-        // @ts-ignore
-        expanded: expandedRows,
-        onExpand: (row, isExpand, rowIndex, e) => {
-
-            var newExpandedRows: any = isExpand
-                ? [...expandedRows, row.wf_id]
-                : expandedRows.filter(x => x !== row.wf_id)
-
-            let wf_ids = newExpandedRows;
-
-            getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, wf_ids, setFetchCompleted)();
-            setExpandedRows(newExpandedRows)
-        },
-
-        showExpandColumn: true,
-        expandByColumnOnly: true,
-        expandHeaderColumnRenderer: (isAnyExpands) => (<></>),
-        expandColumnRenderer: ({expanded}) => {
-            if (expanded) {
-                return (
-                    <b>-</b>
-                );
-            }
-            return (
-                <b>+</b>
-            );
-        }
-    };
 
     // Update the progress bar every 60 seconds
     useEffect(() => {
         const interval = setInterval(() => {
-            let wf_ids = expandedRows;
-            getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, wf_ids, setFetchCompleted)();
+            getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, workflowIds, setFetchCompleted)();
         }, 60000);
         return () => clearInterval(interval);
-    }, [expandedRows, finishedWF, statusDict]);
+    }, [expandedRows, finishedWF, statusDict, workflowIds]);
 
 
     if (workflows.isLoading) {
