@@ -121,10 +121,10 @@ def simple_tasks_array() -> None:
     """Simple tasks in array with list input."""
     tool = Tool("test_tool")
     tool.set_default_compute_resources_from_dict(
-        cluster_name="sequential", compute_resources={"queue": "null.q"}
+        cluster_name="slurm", compute_resources={"queue": "all.q"}
     )
     wf = tool.create_workflow()
-    compute_resources = {"queue": "null.q"}
+    compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
 
     # Import the task_generator_funcs.py module
     spec = importlib.util.spec_from_file_location(
