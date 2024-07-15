@@ -118,6 +118,28 @@ def simple_tasks_serializer_slurm() -> None:
 
 
 def simple_tasks_array() -> None:
+    """Simple tasks in array with list input."""
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="sequential", compute_resources={"queue": "null.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "null.q"}
+
+    # Import the task_generator_funcs.py module
+    spec = importlib.util.spec_from_file_location(
+        "task_generator_funcs", task_generator_funcs_path
+    )
+    task_generator_funcs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(task_generator_funcs)
+    simple_function = task_generator_funcs.simple_function
+    task = simple_function.create_task(compute_resources=compute_resources, foo=[1, 2], bar=[["a", "b"]])
+    wf.add_tasks([task])
+    r = wf.run(configure_logging=True)
+    assert r == "D"
+
+
+def simple_tasks_serializer_array() -> None:
     """Simple tasks in array."""
     tool = Tool("test_tool")
     tool.set_default_compute_resources_from_dict(
@@ -159,6 +181,8 @@ def main():
         simple_tasks_serializer_slurm()
     elif input_value == 5:
         simple_tasks_array()
+    elif input_value == 6:
+        simple_tasks_serializer_array()
     else:
         simple_tasks_seq()
 
