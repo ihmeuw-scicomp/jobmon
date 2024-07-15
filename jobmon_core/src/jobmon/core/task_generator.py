@@ -456,12 +456,16 @@ class TaskGenerator:
                 # when input is a string, convert it to a list
                 try:
                     middle_result = ast.literal_eval(obj)
+                    # if the input is a single item, convert it to a list
+                    if type(middle_result) not in BUILT_IN_COLLECTIONS:
+                        middle_result = [middle_result]
                 except Exception:
                     # handle input like "[a,b,c]"
                     # remove leading and tailing space
                     obj = obj.strip()
                     # remove leading and tailing brackets
-                    obj = obj[1:-1]
+                    if obj[0] in ["[", "("] and obj[-1] in ["]", ")"]:
+                        obj = obj[1:-1]
                     middle_result = obj.split(",")
                 deserialized_result = [self.deserialize(item, obj_type.__args__[0]) for item in middle_result]
             else:
