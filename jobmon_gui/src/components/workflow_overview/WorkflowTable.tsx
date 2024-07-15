@@ -7,7 +7,7 @@ import {FaCircle} from "react-icons/fa";
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
 import {useQuery} from "@tanstack/react-query";
 import dayjs from "dayjs";
-import {workflow_status_url} from "@jobmon_gui/configs/ApiUrls";
+import {workflow_overview_url, workflow_status_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import {useWorkflowSearchSettings} from "@jobmon_gui/stores/workflow_settings";
 import {CircularProgress} from "@mui/material";
@@ -23,15 +23,13 @@ import {HiRocketLaunch} from "react-icons/hi2";
 
 // Get task status count for specified workflows
 function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_ids, wf_ids: number[], setFetchCompleted) {
-    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_status_viz";
     const fetchData = async () => {
         let unfinished_wf_ids: number[] = [];
         let finished_wf_ids: number[] = [];
         // have to convert the unknown type to any to operate
         let all_status: any = statusD;
 
-        for (let i = 0; i < wf_ids.length; i++) {
-            let w = wf_ids[i];
+        for (const w of wf_ids) {
             if (statusD[w] === undefined || statusD[w]["PENDING"] + statusD[w]["SCHEDULED"] + statusD[w]["RUNNING"] > 0) {
                 unfinished_wf_ids.push(w);
             } else {
@@ -43,7 +41,7 @@ function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_i
         if (unfinished_wf_ids.length > 0) {
             const result = await axios({
                     method: 'get',
-                    url: url,
+                    url: workflow_status_url,
                     data: null,
                     params: {workflow_ids: unfinished_wf_ids},
                     headers: {
@@ -55,8 +53,7 @@ function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_i
             // have to convert the unknown type to any to operate
             let temp_data: any = result.data;
 
-            for (let i = 0; i < unfinished_wf_ids.length; i++) {
-                let wf_id = unfinished_wf_ids[i];
+            for (const wf_id of unfinished_wf_ids) {
                 if (temp_data[wf_id]["PENDING"] + temp_data[wf_id]["SCHEDULED"] + temp_data[wf_id]["RUNNING"] === 0) {
                     finished_wf_ids.push(wf_id);
                 }
@@ -135,7 +132,7 @@ export default function WorkflowTable() {
                 date_submitted: dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
                 status: workflowSettings.get().status
             });
-            return axios.get<WorkflowsQueryResponse>(workflow_status_url, {
+            return axios.get<WorkflowsQueryResponse>(workflow_overview_url, {
                 ...jobmonAxiosConfig,
                 params: params
             }).then((response) => {
@@ -223,9 +220,9 @@ export default function WorkflowTable() {
                         <ListItem key={workflow.wf_id}>
                             <div style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
                                 <Box sx={{display: 'flex', alignItems: 'center'}}>
-                    <span className={statusMap[workflow.wf_status].className} style={{marginRight: '8px'}}>
-                        {statusMap[workflow.wf_status].icon}
-                    </span>
+                                    <span className={statusMap[workflow.wf_status].className} style={{marginRight: '8px'}}>
+                                        {statusMap[workflow.wf_status].icon}
+                                    </span>
                                     <ListItemText
                                         primary={
                                             <Typography variant="h6">
