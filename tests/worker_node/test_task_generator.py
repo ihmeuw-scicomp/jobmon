@@ -48,44 +48,7 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
     assert task.compute_resources == compute_resources
 
 
-def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
-    """Verify that we get a good looking command string for an array task.
 
-    """
-    # Set up function
-    monkeypatch.setattr(
-        task_generator,
-        "_find_executable_path",
-        Mock(return_value=task_generator.TASK_RUNNER_NAME),
-    )
-    tool_name = f"test_tool_array_{randint(0, 1000)}"
-
-    @task_generator.task_generator(serializers={}, tool_name=tool_name)
-    def simple_function(foo: int, bar: str) -> None:
-        """Simple task_function."""
-        pass
-
-    compute_resources = {}
-
-    # Exercise
-    tasks = simple_function.create_tasks(
-        compute_resources=compute_resources, foo=[1, 2], bar="baz"
-    )
-    # verify there are two tasks
-    assert len(tasks) == 2
-
-    # Verify task name
-    for i in range(1, 2):
-        # Verify command
-        expected_command = (
-            f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
-            f" --module_name tests.worker_node.test_task_generator"
-            " --func_name simple_function"
-            f" --args foo={i}"
-            " --args bar=baz"
-        )
-
-        assert tasks[i-1].command == expected_command
 
 
 def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
@@ -740,3 +703,83 @@ def test_deserialize_built_in_collections_in_str(
 
     result = task_gen.deserialize(obj='["1990:2020:2050", "1990:2020:2050"]', obj_type=List[FakeYearRange])
     assert result == [FakeYearRange(1990), FakeYearRange(1990)]
+
+
+def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
+    """Verify that we get a good looking command string for an array task.
+
+    """
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool_name = f"test_tool_array_{randint(0, 1000)}"
+
+    @task_generator.task_generator(serializers={}, tool_name=tool_name)
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    compute_resources = {}
+
+    # Exercise
+    tasks = simple_function.create_tasks(
+        compute_resources=compute_resources, foo=[1, 2], bar="baz"
+    )
+    # verify there are two tasks
+    assert len(tasks) == 2
+
+    # Verify task name
+    for i in range(1, 2):
+        # Verify command
+        expected_command = (
+            f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
+            f" --module_name tests.worker_node.test_task_generator"
+            " --func_name simple_function"
+            f" --args foo={i}"
+            " --args bar=baz"
+        )
+
+        assert tasks[i-1].command == expected_command
+
+
+def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
+    """Verify that we get a good looking command string for an array task.
+
+    """
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool_name = f"test_tool_array_{randint(0, 1000)}"
+
+    @task_generator.task_generator(serializers={}, tool_name=tool_name)
+    def simple_function(foo: int, bar: List[str]) -> None:
+        """Simple task_function."""
+        pass
+
+    compute_resources = {}
+
+    # Exercise
+    tasks = simple_function.create_tasks(
+        compute_resources=compute_resources, foo=[1, 2], bar=[["a", "b"]]
+    )
+    # verify there are two tasks
+    assert len(tasks) == 2
+
+    # Verify task name
+    for i in range(1, 2):
+        # Verify command
+        expected_command = (
+            f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
+            f" --module_name tests.worker_node.test_task_generator"
+            " --func_name simple_function"
+            f" --args foo={i}"
+            " --args bar=[a,b]"
+        )
+
+        assert tasks[i-1].command == expected_command

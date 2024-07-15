@@ -133,8 +133,8 @@ def simple_tasks_array() -> None:
     task_generator_funcs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.simple_function
-    task = simple_function.create_task(compute_resources=compute_resources, foo=[1, 2], bar=[["a", "b"]])
-    wf.add_tasks([task])
+    tasks = simple_function.create_tasks(compute_resources=compute_resources, foo=[1, 2], bar=[["a", "b"]])
+    wf.add_tasks(tasks)
     r = wf.run(configure_logging=True)
     assert r == "D"
 

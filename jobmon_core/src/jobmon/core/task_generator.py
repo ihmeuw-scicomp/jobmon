@@ -558,7 +558,16 @@ class TaskGenerator:
         }
 
         # Format the kwargs for the task
-        kwargs_for_task = serialized_kwargs
+        # Each individual element in the array should be formatted before sending to the cli
+        kwargs_for_task = {}
+        for name, value in serialized_kwargs.items():
+            if isinstance(value, list):
+                kwargs_for_task[name] = [
+                    make_cli_argument_string(arg_value=item) for item in value
+                ]
+            else:
+                kwargs_for_task[name] = make_cli_argument_string(arg_value=value)
+
         # name is auto for array
 
         # Create the task
