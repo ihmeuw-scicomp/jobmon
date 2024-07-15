@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "jobmon_server"
-description="Web Service and Model for Jobmon"
+description = "Web Service and Model for Jobmon"
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3.9",
@@ -16,12 +16,14 @@ dependencies = [
     'jobmon_core',
     'flask',
     'flask_cors',
-    'pymysql',  # install MySQLdb/mysqlclient for more performance
+    'pymysql', # install MySQLdb/mysqlclient for more performance
     'sqlalchemy',
     'sqlalchemy_utils',
     'structlog',
     'scipy',
     'pandas',
+    'nltk',
+    'scikit-learn',
     'alembic',
     'importlib_resources; python_version<="3.12"'
 ]
@@ -54,5 +56,5 @@ git_describe_command = [
     '--tags',
     '--long',
     '--match',
-    'server-[0-9]*',  # only match on tags prefixed with this subdirectory tags
+    'server-[0-9]*', # only match on tags prefixed with this subdirectory tags
 ]

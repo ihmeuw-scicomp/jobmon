@@ -14,6 +14,7 @@ from sqlalchemy.sql import func
 import structlog
 
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
+from jobmon.server.web.error_log_clustering import cluster_error_logs
 from jobmon.server.web.models.arg import Arg
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.node import Node
@@ -410,9 +411,9 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
         # the optimizer may choose a suboptimal execution plan for large datasets.
         # Has to be conditional since not all database engines support STRAIGHT_JOIN.
         if (
-            SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
         ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
@@ -444,9 +445,9 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             .group_by(TaskTemplate.id)
         )
         if (
-            SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
         ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         attempts0 = session.execute(sql).all()
@@ -497,12 +498,14 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
 @cross_origin()
 def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
     """Get the error logs for a task template id for GUI."""
+
     return_list: List[Any] = []
 
     arguments = request.args
     page = int(arguments.get("page", 1))
     page_size = int(arguments.get("page_size", 10))
     just_recent_errors = arguments.get("just_recent_errors", "false")
+    output_clustered_errors = int(request.args.get('cluster_errors')) == 1 if request.args.get('cluster_errors') else 0
     recent_errors = just_recent_errors.lower() == "true"
     offset = (page - 1) * page_size
 
@@ -518,18 +521,18 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             where_conditions.extend(
                 [
                     (
-                        TaskInstance.id
-                        == select(func.max(TaskInstance.id))
-                        .where(TaskInstance.task_id == Task.id)
-                        .correlate(Task)
-                        .scalar_subquery()
+                            TaskInstance.id
+                            == select(func.max(TaskInstance.id))
+                            .where(TaskInstance.task_id == Task.id)
+                            .correlate(Task)
+                            .scalar_subquery()
                     ),
                     (
-                        TaskInstance.workflow_run_id
-                        == select(func.max(WorkflowRun.id))
-                        .where(WorkflowRun.workflow_id == Task.workflow_id)
-                        .correlate(Task)
-                        .scalar_subquery()
+                            TaskInstance.workflow_run_id
+                            == select(func.max(WorkflowRun.id))
+                            .where(WorkflowRun.workflow_id == Task.workflow_id)
+                            .correlate(Task)
+                            .scalar_subquery()
                     ),
                 ]
             )
@@ -619,13 +622,23 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         )
     errors_df = pd.DataFrame(return_list)
 
-    resp = jsonify(
-        {
+    if output_clustered_errors:
+        errors_df = cluster_error_logs(errors_df)
+        total_count = errors_df.shape[0]
+        resp = jsonify({
             "error_logs": errors_df.to_dict(orient="records"),
             "total_count": total_count,
             "page": page,
             "page_size": page_size,
-        }
-    )
+        })
+    else:
+        resp = jsonify(
+            {
+                "error_logs": errors_df.to_dict(orient="records"),
+                "total_count": total_count,
+                "page": page,
+                "page_size": page_size,
+            }
+        )
     resp.status_code = 200
     return resp
