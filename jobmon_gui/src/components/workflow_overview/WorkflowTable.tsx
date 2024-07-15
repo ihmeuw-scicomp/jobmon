@@ -151,7 +151,7 @@ export default function WorkflowTable() {
             getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, workflowIds, setFetchCompleted)();
         }, 60000);
         return () => clearInterval(interval);
-    }, [expandedRows, finishedWF, statusDict, workflowIds]);
+    }, [finishedWF, statusDict, workflowIds]);
 
 
     if (workflows.isLoading) {
@@ -220,7 +220,8 @@ export default function WorkflowTable() {
                         <ListItem key={workflow.wf_id}>
                             <div style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
                                 <Box sx={{display: 'flex', alignItems: 'center'}}>
-                                    <span className={statusMap[workflow.wf_status].className} style={{marginRight: '8px'}}>
+                                    <span className={statusMap[workflow.wf_status].className}
+                                          style={{marginRight: '8px'}}>
                                         {statusMap[workflow.wf_status].icon}
                                     </span>
                                     <ListItemText
