@@ -65,28 +65,6 @@ def simple_tasks_slurm() -> None:
     assert r == "D"
 
 
-def simple_tasks_array() -> None:
-    """Simple tasks in array."""
-    tool = Tool("test_tool")
-    tool.set_default_compute_resources_from_dict(
-        cluster_name="slurm", compute_resources={"queue": "all.q"}
-    )
-    wf = tool.create_workflow()
-    compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
-
-    # Import the task_generator_funcs.py module
-    spec = importlib.util.spec_from_file_location(
-        "task_generator_funcs", task_generator_funcs_path
-    )
-    task_generator_funcs = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(task_generator_funcs)
-    simple_function = task_generator_funcs.simple_function
-    tasks = simple_function.create_task(compute_resources=compute_resources, foo=[1, 2, 3], bar=["a", "b"])
-    wf.add_tasks(tasks)
-    r = wf.run(configure_logging=True)
-    assert r == "D"
-
-
 def simple_tasks_serializer_seq() -> None:
     """Simple task."""
     tool = Tool("test_tool")
@@ -135,6 +113,31 @@ def simple_tasks_serializer_slurm() -> None:
             compute_resources=compute_resources, year=test_year(i)
         )
         wf.add_tasks([task])
+    r = wf.run(configure_logging=True)
+    assert r == "D"
+
+
+def simple_tasks_array() -> None:
+    """Simple tasks in array."""
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="slurm", compute_resources={"queue": "all.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
+
+    # Import the task_generator_funcs.py module
+    spec = importlib.util.spec_from_file_location(
+        "task_generator_funcs", task_generator_funcs_path
+    )
+    task_generator_funcs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(task_generator_funcs)
+    simple_function = task_generator_funcs.simple_function_with_serializer
+    test_year = task_generator_funcs.TestYear
+    tasks = simple_function.create_tasks(
+            compute_resources=compute_resources, year=[test_year(2023), test_year(2024)]
+        )
+    wf.add_tasks(tasks)
     r = wf.run(configure_logging=True)
     assert r == "D"
 
