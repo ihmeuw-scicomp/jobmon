@@ -35,7 +35,7 @@ const customCaret = (order, column) => {
 }
 
 // Get task status count for specified workflows
-function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_ids, wf_ids: number[]) {
+function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_ids, wf_ids: number[], setFetchCompleted) {
     const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_status_viz";
     const fetchData = async () => {
         let unfinished_wf_ids: number[] = [];
@@ -78,6 +78,7 @@ function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_i
         }
         setStatusDict(all_status);
         setFinishedWF(finished_wf_ids);
+        setFetchCompleted(true);
     };
     return fetchData
 }
@@ -123,6 +124,8 @@ export default function WorkflowTable() {
     const [finishedWF, setFinishedWF] = useState<number[]>([]);
     const [helper, setHelper] = useState("");
     const [showWorkflowInfo, setShowWorkflowInfo] = useState(false)
+    const [fetchCompleted, setFetchCompleted] = useState(false);
+
     const [workflowDetails, setWorkflowDetails] = useState<WorkflowType>({
         DONE: 0,
         FATAL: 0,
@@ -160,6 +163,9 @@ export default function WorkflowTable() {
                 ...jobmonAxiosConfig,
                 params: params
             }).then((response) => {
+                const workflowIds = response.data?.workflows.map((workflow) => workflow.wf_id);
+                getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, workflowIds, setFetchCompleted)();
+                console.log("STATUS DICT", statusDict)
                 return response.data?.workflows
             })
         },
@@ -251,7 +257,7 @@ export default function WorkflowTable() {
                     setHelper("");
                 }
             },
-            sortValue: (cell, row) => convertDate(cell).getTime(),
+            // sortValue: (cell, row) => convertDate(cell).getTime(),
             formatter: (cell, row, rowIndex) => convertDatePST(cell)
         },
         {
@@ -268,7 +274,7 @@ export default function WorkflowTable() {
                     setHelper("");
                 }
             },
-            sortValue: (cell, row) => convertDate(cell).getTime(),
+            // sortValue: (cell, row) => convertDate(cell).getTime(),
             formatter: (cell, row, rowIndex) => convertDatePST(cell)
         },
         {
@@ -339,7 +345,7 @@ export default function WorkflowTable() {
 
             let wf_ids = newExpandedRows;
 
-            getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, wf_ids)();
+            getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, wf_ids, setFetchCompleted)();
             setExpandedRows(newExpandedRows)
         },
 
@@ -362,7 +368,7 @@ export default function WorkflowTable() {
     useEffect(() => {
         const interval = setInterval(() => {
             let wf_ids = expandedRows;
-            getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, wf_ids)();
+            getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, wf_ids, setFetchCompleted)();
         }, 60000);
         return () => clearInterval(interval);
     }, [expandedRows, finishedWF, statusDict]);
@@ -432,28 +438,41 @@ export default function WorkflowTable() {
                 <List>
                     {workflows.data.map((workflow) => (
                         <ListItem key={workflow.wf_id}>
-                            <Box sx={{display: 'flex', alignItems: 'center'}}>
-                                <span className={statusMap[workflow.wf_status].className} style={{marginRight: '8px'}}>
-                                    {statusMap[workflow.wf_status].icon}
-                                </span>
-                                <ListItemText
-                                    primary={
-                                        <Typography variant="h6">
-                                            <Link
-                                                to={`/workflow/${workflow.wf_id}/tasks${location.search}`}
-                                            >
-                                                ID: {workflow.wf_id} - Name: {workflow.wf_name}
-                                            </Link>
-                                        </Typography>
-                                    }
-                                />
-                                <ListItemIcon sx={{marginLeft: '12px', fontSize: '32px'}}>
-                                    <HiInformationCircle onClick={() => handleInfoClick(workflow)}/>
-                                </ListItemIcon>
-                            </Box>
+                            <div style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
+                                <Box sx={{display: 'flex', alignItems: 'center'}}>
+                    <span className={statusMap[workflow.wf_status].className} style={{marginRight: '8px'}}>
+                        {statusMap[workflow.wf_status].icon}
+                    </span>
+                                    <ListItemText
+                                        primary={
+                                            <Typography variant="h6">
+                                                <Link to={`/workflow/${workflow.wf_id}/tasks${location.search}`}>
+                                                    ID: {workflow.wf_id} - Name: {workflow.wf_name}
+                                                </Link>
+                                            </Typography>
+                                        }
+                                    />
+                                    <ListItemIcon sx={{marginLeft: '12px', fontSize: '32px'}}>
+                                        <HiInformationCircle onClick={() => handleInfoClick(workflow)}/>
+                                    </ListItemIcon>
+                                </Box>
+                                {fetchCompleted && (
+                                    <JobmonProgressBar
+                                        tasks={statusDict[workflow.wf_id]["tasks"]}
+                                        pending={statusDict[workflow.wf_id]["PENDING"]}
+                                        scheduled={statusDict[workflow.wf_id]["SCHEDULED"]}
+                                        running={statusDict[workflow.wf_id]["RUNNING"]}
+                                        done={statusDict[workflow.wf_id]["DONE"]}
+                                        fatal={statusDict[workflow.wf_id]["FATAL"]}
+                                        maxc={statusDict[workflow.wf_id]["MAXC"]}
+                                        placement="top"
+                                    />
+                                )}
+                            </div>
                         </ListItem>
                     ))}
                 </List>
+
             </div>
             <CustomModal
                 className="workflow_info_modal"
@@ -467,8 +486,8 @@ export default function WorkflowTable() {
                         <b>Workflow Status:</b> {workflowDetails.wf_status}<br/>
                         <b>Tool:</b> {workflowDetails.wf_tool}<br/>
                         <b>Workflow Args:</b> {workflowDetails.wf_args} <br/>
-                        <b>Date Submitted:</b> {workflowDetails.wf_submitted_date}<br/>
-                        <b>Status Date: </b> {workflowDetails.wf_status_date}<br/>
+                        <b>Date Submitted:</b> {convertDatePST(workflowDetails.wf_submitted_date)}<br/>
+                        <b>Status Date: </b> {convertDatePST(workflowDetails.wf_status_date)}<br/>
                         <b>Number of WorkflowRuns: </b> {workflowDetails.wfr_count}<br/>
                     </p>
                 }
