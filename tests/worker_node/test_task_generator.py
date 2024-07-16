@@ -3,7 +3,7 @@ from typing import Any, List, Optional, Tuple
 from unittest.mock import Mock
 from random import randint
 
-from jobmon.core import task_generator, __version__ as core_version
+from jobmon.core import task_generator
 from jobmon.client.api import Tool
 
 
