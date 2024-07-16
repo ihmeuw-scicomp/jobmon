@@ -32,7 +32,7 @@ type WfDetailsResponse = Record<string | number, WfDetails>
 
 type JobmonProgressBarProps = {
     workflowId: number | string
-    ttId?: string|number
+    ttId?: string | number
     placement?: "top" | "bottom" | "left" | "right"
     style?: "striped" | "animated"
 }
@@ -91,7 +91,7 @@ export default function JobmonProgressBar({
 
     const data = !!ttId ? wfTTStatus.data[ttId] : workflow_status.data
 
-    if(!data){
+    if (!data) {
         return (<CircularProgress/>)
     }
 
@@ -108,6 +108,7 @@ export default function JobmonProgressBar({
                 overlay={(
                     <Popover id="task_count">
                         <table id="tt-tasks">
+                            <tbody>
                             <tr>
                                 <th className="scheduled">Scheduled:</th>
                                 <td>{data.SCHEDULED}</td>
@@ -132,9 +133,11 @@ export default function JobmonProgressBar({
                                 <th> Total:</th>
                                 <td>{data.tasks}</td>
                             </tr>
+                            </tbody>
                         </table>
                         <hr/>
                         <table id="tt-stats">
+                            <tbody>
                             <tr>
                                 <th># Attempts:</th>
                                 <td>{num_attempts_avg} ({data.num_attempts_min} - {data.num_attempts_max})</td>
@@ -143,6 +146,7 @@ export default function JobmonProgressBar({
                                 <th>Concurrency Limit:</th>
                                 <td>{maxc.toLocaleString()}</td>
                             </tr>
+                            </tbody>
                         </table>
                     </Popover>
                 )}
@@ -180,6 +184,7 @@ export default function JobmonProgressBar({
             overlay={(
                 <Popover id="task_count">
                     <table id="tt-tasks">
+                        <tbody>
                         <tr>
                             <th className="scheduled">Scheduled:</th>
                             <td>{data.SCHEDULED}</td>
@@ -204,9 +209,11 @@ export default function JobmonProgressBar({
                             <th className='bg-dark text-light'> Total:</th>
                             <td>{data.tasks}</td>
                         </tr>
+                        </tbody>
                     </table>
                     <hr/>
                     <table id="tt-stats">
+                        <tbody>
                         <tr>
                             <th># Attempts:</th>
                             <td>{num_attempts_avg} ({data.num_attempts_min} - {data.num_attempts_max})</td>
@@ -215,6 +222,7 @@ export default function JobmonProgressBar({
                             <th>Concurrency Limit:</th>
                             <td>{maxc.toLocaleString()}</td>
                         </tr>
+                        </tbody>
                     </table>
                 </Popover>
             )}

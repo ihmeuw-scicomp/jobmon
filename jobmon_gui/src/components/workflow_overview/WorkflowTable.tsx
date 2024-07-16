@@ -15,7 +15,6 @@ import {useQuery} from "@tanstack/react-query";
 import dayjs from "dayjs";
 import {workflow_status_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
-import WorkflowStatus from "@jobmon_gui/components/workflow_overview/WorkflowStatus";
 import {useWorkflowSearchSettings} from "@jobmon_gui/stores/workflow_settings";
 import {CircularProgress} from "@mui/material";
 import Typography from "@mui/material/Typography";
@@ -135,10 +134,6 @@ export default function WorkflowTable() {
                 status: workflowSettings.get().status
             });
             return axios.get<WorkflowsQueryResponse>(workflow_status_url, {...jobmonAxiosConfig, params: params}).then((response) => {
-                response.data?.workflows?.forEach((workflow) => {
-                    workflow.wf_status = <WorkflowStatus status={workflow.wf_status}/>;
-                })
-
                 return response.data?.workflows
             })
         },
