@@ -1,6 +1,6 @@
 from typing import Optional, Callable, Type, Dict, List, Any, Union
 
-from jobmon.core import task_generator
+from jobmon.core.task_generator import task_generator
 from jobmon.client.api import Tool
 
 class YearRange:
@@ -46,6 +46,16 @@ def versions_from_list(versions: Union[List[str], str]) -> Versions:
 
     return Versions(*versions)
 
+
+class Quantiles:
+    """A Fake class representing a range of quantiles."""
+
+    def __init__(self, lower: float, upper: float) -> None:
+        self.lower = lower
+        self.upper = upper
+
+    def __eq__(self, other: Any) -> bool:
+        return self.lower == other.lower and self.upper == other.upper
 
 def quantiles_to_list(quantiles: Quantiles) -> list[str]:
     """Serializer for Quantiles that produces a list of strings."""
@@ -101,19 +111,10 @@ class VersionMetadata:
     def __eq__(self, other: Any) -> bool:
         return self.version == other.version
 
-class Quantiles:
-    """A Fake class representing a range of quantiles."""
-
-    def __init__(self, lower: float, upper: float) -> None:
-        self.lower = lower
-        self.upper = upper
-
-    def __eq__(self, other: Any) -> bool:
-        return self.lower == other.lower and self.upper == other.upper
 
 def fhs_task_generator(
     tool_name: str,
-    serializers: Optional[Dict[Type, tuple[Callable, Callable]]] = None,
+    serializers: Optional[Any] = None,
     naming_args: Optional[List[str]] = None,
     max_attempts: Optional[int] = None,
 ) -> Callable:
@@ -179,12 +180,12 @@ def create_wf():
     compute_resources = {"queue": "null.q"}
     task = simple_function.create_task(
             compute_resources=compute_resources,
-            year_range=YearRange(2020, 2021),
-            versions=Versions("1.0", "2.0"),
-            fhs_file_spec=FHSFileSpec("/path/to/file"),
-            fhs_dir_spec=FHSDirSpec("/path/to/dir"),
-            version_metadata=VersionMetadata("1.0"),
-            quantiles=Quantiles(0.1, 0.9)
+            yr=YearRange(2020, 2021),
+            v=Versions("1.0", "2.0"),
+            fSpec=FHSFileSpec("/path/to/file"),
+            dSpec=FHSDirSpec("/path/to/dir"),
+            vm=VersionMetadata("1.0"),
+            q=Quantiles(0.1, 0.9)
         )
     wf.add_tasks([task])
     s = wf.run()
@@ -195,3 +196,4 @@ def main():
     create_wf()
 
 if __name__ == "__main__":
+    main()
