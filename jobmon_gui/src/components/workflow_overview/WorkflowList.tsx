@@ -39,15 +39,10 @@ function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_i
 
         //don't query empty list
         if (unfinished_wf_ids.length > 0) {
-            const result = await axios({
-                    method: 'get',
-                    url: workflow_status_url,
+            const result = await axios.get(workflow_overview_url, {
+                    ...jobmonAxiosConfig,
                     data: null,
                     params: {workflow_ids: unfinished_wf_ids},
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
                 }
             )
             // have to convert the unknown type to any to operate
@@ -237,18 +232,11 @@ export default function WorkflowList() {
                                         <HiInformationCircle onClick={() => handleInfoClick(workflow)}/>
                                     </ListItemIcon>
                                 </Box>
-                                {fetchCompleted && (
-                                    <JobmonProgressBar
-                                        tasks={statusDict[workflow.wf_id]["tasks"]}
-                                        pending={statusDict[workflow.wf_id]["PENDING"]}
-                                        scheduled={statusDict[workflow.wf_id]["SCHEDULED"]}
-                                        running={statusDict[workflow.wf_id]["RUNNING"]}
-                                        done={statusDict[workflow.wf_id]["DONE"]}
-                                        fatal={statusDict[workflow.wf_id]["FATAL"]}
-                                        maxc={statusDict[workflow.wf_id]["MAXC"]}
-                                        placement="top"
-                                    />
-                                )}
+                                <JobmonProgressBar
+                                    workflowId={workflow.wf_id}
+                                    // placement="top"
+                                />
+
                             </div>
                         </ListItem>
                     ))}
