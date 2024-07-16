@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 
-import WorkflowTable from '@jobmon_gui/components/workflow_overview/WorkflowTable';
+import WorkflowList from '@jobmon_gui/components/workflow_overview/WorkflowList';
 
 import {init_apm} from '@jobmon_gui/utils/rum';
 import '@jobmon_gui/styles/jobmon_gui.css';
@@ -19,7 +19,7 @@ function WorkflowOverview() {
     return (
         <Box>
             <WorkflowFilters />
-            <WorkflowTable/>
+            <WorkflowList/>
         </Box>
     );
 }
