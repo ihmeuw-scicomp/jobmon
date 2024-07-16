@@ -1,103 +1,25 @@
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import '@jobmon_gui/styles/jobmon_gui.css';
-import {useParams, Link, Outlet, useNavigate, useLocation} from 'react-router-dom';
+import {useParams, useNavigate, useLocation} from 'react-router-dom';
 import axios from 'axios';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import {OverlayTrigger} from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
 import {FaLightbulb} from "react-icons/fa";
 import humanizeDuration from 'humanize-duration';
+import Tab from '@mui/material/Tab';
 
-
-// @ts-ignore
-import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar.tsx';
-import Tasks from '@jobmon_gui/components/workflow_details/Tasks';
+import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
 import Usage from '@jobmon_gui/components/workflow_details/Usage';
-import Errors from '@jobmon_gui/components/workflow_details/Errors';
 import WorkflowHeader from "@jobmon_gui/components/workflow_details/WorkflowHeader"
-import {convertDatePST} from '@jobmon_gui/utils/formatters';
-import {init_apm, safe_rum_add_label, safe_rum_transaction} from '@jobmon_gui/utils/rum';
-
-function getAsyncWFdetail(setWFDict, wf_id: string) {
-    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_status_viz";
-    const wf_ids = [wf_id];
-    const fetchData = async () => {
-        const result: any = await axios({
-                method: 'get',
-                url: url,
-                data: null,
-                params: {workflow_ids: wf_ids},
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            }
-        )
-        setWFDict(result.data[wf_id]);
-    };
-    return fetchData
-}
-
-function getWorkflowAttributes(
-    wf_id: string,
-    setWFTool,
-    setWFName,
-    setWFArgs,
-    setWFSubmitted,
-    setWFStatusDate,
-    setWFStatus,
-    setWFStatusDesc,
-    setWFElapsedTime,
-    setJobmonVersion
-) {
-    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_details_viz/" + wf_id;
-    const fetchData = async () => {
-        const result: any = await axios({
-                method: 'get',
-                url: url,
-                data: null,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            }
-        )
-        const data = result.data[0]
-        setWFTool(data["tool_name"]);
-        setWFName(data["wf_name"]);
-        setWFArgs(data["wf_args"]);
-        setWFStatus(data["wf_status"]);
-        setWFStatusDesc(data["wf_status"] + " -- " + data["wf_status_desc"])
-        setWFSubmitted(convertDatePST(data["wf_created_date"]));
-        setWFStatusDate(convertDatePST(data["wf_status_date"]));
-        setWFElapsedTime(humanizeDuration(new Date().getTime() - new Date(data["wf_status_date"]).getTime()))
-        setJobmonVersion(data["wfr_jobmon_version"]);
-    };
-    return fetchData
-}
-
-function getAsyncTTdetail(setTTDict, wf_id: string, setTTLoaded) {
-    const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_tt_status_viz/" + wf_id;
-    const fetchData = async () => {
-        const result: any = await axios({
-                method: 'get',
-                url: url,
-                data: null,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            }
-        )
-        let return_array: any = [];
-        for (let t in result.data) {
-            return_array.push(result.data[t]);
-        }
-        setTTDict(return_array);
-        setTTLoaded(true);
-    };
-    return fetchData
-}
+import Box from "@mui/material/Box";
+import {CircularProgress, Tabs} from "@mui/material";
+import TaskTable from "@jobmon_gui/components/workflow_details/TaskTable";
+import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
+import {useQuery} from "@tanstack/react-query";
+import {workflow_details_url, workflow_tt_status_url} from "@jobmon_gui/configs/ApiUrls";
+import Typography from "@mui/material/Typography";
+import {TTStatusResponse} from "@jobmon_gui/types/TaskTemplateStatus";
 
 function getAsyncErrorLogs(setErrorLogs, wf_id: string, setErrorLoading, tt_id?: string) {
     setErrorLoading(true);
@@ -119,116 +41,59 @@ function getAsyncErrorLogs(setErrorLogs, wf_id: string, setErrorLoading, tt_id?:
     return fetchData
 }
 
-function WorkflowDetails({subpage}) {
-    const apm = init_apm("wf_detail_page");
-    let rum_t: any = safe_rum_transaction(apm);
+type WorkflowDetailsProps = {
+    subpage: number
+}
+
+type WorkflowDetails = {
+    tool_name: string
+    wf_args: string
+    wf_created_date: string
+    wf_name: string
+    wf_status: string
+    wf_status_date: string
+    wf_status_desc: string
+    wfr_jobmon_version: string
+}
+type WorkflowDetailsResponse = WorkflowDetails[]
+
+
+function WorkflowDetails({subpage}: WorkflowDetailsProps) {
     let params = useParams();
     let workflowId = params.workflowId;
     const [task_template_name, setTaskTemplateName] = useState('');
     const [tt_id, setTTID] = useState('');
     const [task_template_version_id, setTaskTemplateVersionId] = useState('');
-    const [usage_info, setUsageInfo] = useState([]);
-    const [tasks, setTasks] = useState([]);
-    const [wfDict, setWFDict] = useState({
-        'tasks': 0, 'PENDING': 0, 'SCHEDULED': 0, 'RUNNING': 0, 'DONE': 0, 'FATAL': 0,
-        'num_attempts_avg': 0, 'num_attempts_min': 0, 'num_attempts_max': 0, 'MAXC': 0
-    });
-    const [ttDict, setTTDict] = useState([]);
-    const [task_loading, setTaskLoading] = useState(false);
-    const [wf_status, setWFStatus] = useState([]);
-    const [wf_status_desc, setWFStatusDesc] = useState([]);
-    const [wf_tool, setWFTool] = useState([]);
-    const [wf_name, setWFName] = useState([]);
-    const [wf_args, setWFArgs] = useState([]);
-    const [wf_submitted_date, setWFSubmitted] = useState([]);
-    const [wf_status_date, setWFStatusDate] = useState([]);
-    const [wf_elapsed_time, setWFElapsedTime] = useState([])
-    const [jobmon_version, setJobmonVersion] = useState([])
-    // only show the loading circle the first time
-    const [tt_loaded, setTTLoaded] = useState(false);
 
-    //***********************hooks******************************
-    useEffect(() => {
-        if (typeof params.workflowId !== 'undefined') {
-            getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime, setJobmonVersion)();
-        }
-    }, [params.workflowId]);
+    const wfDetails = useQuery({
+        queryKey: ["workflow_details", "details", params.workflowId],
+        queryFn: async () => {
 
-    useEffect(() => {
-        if (typeof params.workflowId !== 'undefined') {
-            getAsyncWFdetail(setWFDict, params.workflowId)();
-            getAsyncTTdetail(setTTDict, params.workflowId, setTTLoaded)();
-            safe_rum_add_label(rum_t, "wf_id", params.workflowId);
-        }
-    }, [params.workflowId, rum_t]);
-
-    // Update the progress bar every 60 seconds
-    useEffect(() => {
-        const interval = setInterval(() => {
-            if (wfDict['PENDING'] + wfDict['SCHEDULED'] + wfDict['RUNNING'] !== 0) {
-                if (typeof params.workflowId !== 'undefined') {
-                    // only query server when wf is unfinished
-                    getAsyncWFdetail(setWFDict, params.workflowId)();
-                    getAsyncTTdetail(setTTDict, params.workflowId, setTTLoaded)();
-                    getWorkflowAttributes(params.workflowId, setWFTool, setWFName, setWFArgs, setWFSubmitted, setWFStatusDate, setWFStatus, setWFStatusDesc, setWFElapsedTime, setJobmonVersion)();
-                }
-            }
-        }, 60000);
-        return () => clearInterval(interval);
-    }, [wfDict, params.workflowId]);
-
-    // Get information to populate the Tasks table
-    useEffect(() => {
-        if (task_template_name === null || task_template_name === "") {
-            return
-        }
-        setTaskLoading(true);
-        let task_table_url = import.meta.env.VITE_APP_BASE_URL + "/task_table_viz/" + workflowId;
-        const fetchData = async () => {
-            const result: any = await axios({
-                    method: 'get',
-                    url: task_table_url,
+            return axios.get<WorkflowDetailsResponse>(workflow_details_url + params.workflowId, {
+                    ...jobmonAxiosConfig,
                     data: null,
-                    params: {tt_name: task_template_name},
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
                 }
-            )
-            let tasks = result.data.tasks;
-            setTasks(tasks);
-            setTaskLoading(false);
-        };
-        fetchData();
-    }, [task_template_name, workflowId]);
-
-
-    useEffect(() => {
-        if (!task_template_version_id) {
-            return
-        }
-        let usage_url = import.meta.env.VITE_APP_BASE_URL + "/task_template_resource_usage";
-
-        const fetchData = async () => {
-            const result: any = await axios({
-                method: 'post',
-                url: usage_url,
-                data: {
-                    task_template_version_id: task_template_version_id,
-                    workflows: [workflowId],
-                    viz: true
-                },
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
+            ).then((r) => {
+                return r.data[0]
             })
-            let usage = result.data;
-            setUsageInfo(usage);
-        };
-        fetchData();
-    }, [task_template_version_id, workflowId]);
+        },
+        staleTime: 60000, // 60 seconds
+    })
+
+    const wfTTStatus = useQuery({
+        queryKey: ["workflow_details", "tt_status", workflowId],
+        queryFn: async () => {
+
+            return axios.get<TTStatusResponse>(workflow_tt_status_url + params.workflowId, {
+                    ...jobmonAxiosConfig,
+                    data: null,
+                }
+            ).then((r) => {
+                return r.data
+            })
+        },
+    })
+
 
     //*******************event handling****************************
 
@@ -250,9 +115,40 @@ function WorkflowDetails({subpage}) {
             search: search ? `?${search}` : ''
         });
     };
-    //********************html page*************************************
+
+    interface TabPanelProps {
+        children?: React.ReactNode;
+        index: number;
+        value: number;
+    }
+
+    function TabPanel(props: TabPanelProps) {
+        const {children, value, index, ...other} = props;
+
+        return (
+            <div
+                role="tabpanel"
+                hidden={value !== index}
+                id={`tabpanel-${index}`}
+                aria-labelledby={`tabpanel-${index}`}
+                {...other}
+            >
+                {children}
+            </div>
+        );
+    }
+
+    console.log(`subpage: ${subpage}`)
+
+    if (wfTTStatus.isLoading) {
+        return (<CircularProgress/>)
+    }
+    if (wfTTStatus.isError) {
+        return (<Typography>Error loading workflow task template details. Please refresh and try again.</Typography>)
+    }
+
     return (
-        <div>
+        <Box>
             <Breadcrumb>
                 <Breadcrumb.Item>
                     <button className="breadcrumb-button"
@@ -261,38 +157,27 @@ function WorkflowDetails({subpage}) {
                 </Breadcrumb.Item>
                 <Breadcrumb.Item active>Workflow ID {workflowId} </Breadcrumb.Item>
             </Breadcrumb>
-            <div className='d-flex justify-content-start pt-3'>
+            <Box sx={{justifyContent: 'start', pt: 3}}>
                 <WorkflowHeader
                     wf_id={workflowId}
-                    wf_status={wf_status}
-                    wf_status_desc={wf_status_desc}
-                    wf_tool={wf_tool}
-                    wf_name={wf_name}
-                    wf_args={wf_args}
-                    wf_submitted_date={wf_submitted_date}
-                    wf_status_date={wf_status_date}
-                    wf_elapsed_time={wf_elapsed_time}
-                    jobmon_version={jobmon_version}
+                    wf_status={wfDetails?.data?.wf_status}
+                    wf_status_desc={wfDetails?.data?.wf_status_desc}
+                    wf_tool={wfDetails?.data?.tool_name}
+                    wf_name={wfDetails?.data?.wf_name}
+                    wf_args={wfDetails?.data?.wf_args}
+                    wf_submitted_date={wfDetails?.data?.wf_created_date}
+                    wf_status_date={wfDetails?.data?.wf_status_date}
+                    wf_elapsed_time={humanizeDuration(new Date().getTime() - new Date(wfDetails?.data?.wf_status_date).getTime())}
+                    jobmon_version={wfDetails?.data?.wfr_jobmon_version}
                 />
-            </div>
+            </Box>
 
-            <div id="wf_progress" className="div-level-2">
-                <JobmonProgressBar
-                    tasks={wfDict.tasks}
-                    pending={wfDict.PENDING}
-                    scheduled={wfDict.SCHEDULED}
-                    running={wfDict.RUNNING}
-                    done={wfDict.DONE}
-                    fatal={wfDict.FATAL}
-                    num_attempts_avg={wfDict.num_attempts_avg}
-                    num_attempts_min={wfDict.num_attempts_min}
-                    num_attempts_max={wfDict.num_attempts_max}
-                    maxc={wfDict.MAXC}
-                    placement="bottom"
-                />
-            </div>
+            <Box id="wf_progress" className="div-level-2">
+                <JobmonProgressBar workflowId={workflowId}
+                                   placement="bottom"/>
+            </Box>
 
-            <div id="tt_title" className="div-level-2">
+            <Box id="tt_title" className="div-level-2">
                 <header className="header-1 d-flex align-items-center">
                     <p className='mr-5'>
                         Task Templates&nbsp;
@@ -316,88 +201,59 @@ function WorkflowDetails({subpage}) {
                     }
 
                 </header>
-            </div>
+            </Box>
 
-            <div id="tt_progress" className="div-scroll">
-                {tt_loaded &&
-                    <ul>
-                        {
-                            ttDict.map(d => (
-                                <li
-                                    className={`tt-container ${tt_id === d["id"] ? "selected" : ""}`}
-                                    id={d["id"]}
-                                    onClick={() => clickTaskTemplate(d["name"], d["id"], d["task_template_version_id"])}
-                                >
-                                    <div className="div_floatleft">
-                                        <span className="tt-name">{d["name"]}</span>
-                                    </div>
-                                    <div className="div_floatright">
-                                        <JobmonProgressBar
-                                            tasks={d["tasks"]}
-                                            pending={d["PENDING"]}
-                                            scheduled={d["SCHEDULED"]}
-                                            running={d["RUNNING"]}
-                                            done={d["DONE"]}
-                                            fatal={d["FATAL"]}
-                                            num_attempts_avg={d["num_attempts_avg"]}
-                                            num_attempts_min={d["num_attempts_min"]}
-                                            num_attempts_max={d["num_attempts_max"]}
-                                            maxc={d["MAXC"]}
-                                            placement="left"
-                                        />
-                                    </div>
-                                    <br/>
-                                    <hr className="hr-dot"/>
-                                </li>
-                            ))
-                        }
-                    </ul>
-                }
-                {!tt_loaded &&
-                    <div className="loader" />
-                }
+            <Box id="tt_progress" className="div-scroll">
+                <ul>
+                    {
+                        Object.keys(wfTTStatus?.data).map(key => (
+                            <li
+                                className={`tt-container ${tt_id == wfTTStatus?.data[key]["id"].toString() ? "selected" : ""}`}
+                                id={wfTTStatus?.data[key]["id"].toString()}
+                                onClick={() => clickTaskTemplate(wfTTStatus?.data[key]["name"], wfTTStatus?.data[key]["id"], wfTTStatus?.data[key]["task_template_version_id"])}
+                            >
+                                <div className="div_floatleft">
+                                    <span className="tt-name">{wfTTStatus?.data[key]["name"]}</span>
+                                </div>
+                                <div className="div_floatright">
+                                    <JobmonProgressBar
+                                        workflowId={workflowId}
+                                        ttId={key}
+                                        placement="left"
+                                    />
+                                </div>
+                                <br/>
+                                <hr className="hr-dot"/>
+                            </li>
+                        ))
+                    }
+                </ul>
 
-            </div>
-            <div id="tt_search" className="div-level-2">
-                <hr className="hr-2"/>
-                <div className="div-full">
-                    <ul className="nav nav-pills">
-                        <li className="nav-item">
-                            <Link
-                                className={`nav-link ${subpage === "tasks" ? "active" : ""}`}
-                                aria-current="page"
-                                to={`/workflow/${workflowId}/tasks`}
-                                replace={true}>
-                                Tasks
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link
-                                className={`nav-link ${subpage === "usage" ? "active" : ""}`}
-                                to={`/workflow/${workflowId}/usage`}
-                                replace={true}>
-                                Resource Usage
-                            </Link>
-                        </li>
-                        <li className="nav-item">
-                            <Link
-                                className={`nav-link ${subpage === "errors" ? "active" : ""}`}
-                                to={`/workflow/${workflowId}/errors`}
-                                replace={true}>
-                                Errors
-                            </Link>
-                        </li>
-                    </ul>
-                    <Outlet/>
-                </div>
+            </Box>
+            <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
+                <Tabs onChange={(event, value) => {
+                    if (value == 0) {
+                        navigate(`/workflow/${workflowId}/tasks`)
+                    }
+                    if (value == 1) {
+                        navigate(`/workflow/${workflowId}/usage`)
+                    }
 
-                {(subpage === "tasks") && <Tasks tasks={tasks} loading={task_loading} apm={apm} />}
-                {(subpage === "usage") && <Usage taskTemplateName={task_template_name} taskTemplateVersionId={task_template_version_id} usageInfo={usage_info} apm={apm} />}
-                {(subpage === "errors") && <Errors taskTemplateName={task_template_name} taskTemplateId={tt_id} workflowId={params.workflowId} apm={apm} />}
-
-            </div>
-
-        </div>
+                }} aria-label="Tab selection" value={subpage}>
+                    <Tab label="Tasks" value={0}/>
+                    <Tab label="Resource Usage" value={1}/>
+                </Tabs>
+            </Box>
+            <TabPanel value={subpage} index={0}>
+                <TaskTable taskTemplateName={task_template_name} workflowId={workflowId}/>
+            </TabPanel>
+            <TabPanel value={subpage} index={1}>
+                <Usage taskTemplateName={task_template_name}
+                       taskTemplateVersionId={task_template_version_id}
+                       workflowId={workflowId}
+                />
+            </TabPanel>
+        </Box>
 
     );
 

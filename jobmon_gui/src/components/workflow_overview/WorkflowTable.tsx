@@ -303,8 +303,7 @@ export default function WorkflowTable() {
 
             return (
                 <div>
-                    <JobmonProgressBar tasks={tasks} pending={pending} scheduled={scheduled} running={running}
-                                       done={done} fatal={fatal} maxc={maxc} placement="top"/>
+                    <JobmonProgressBar workflowId={row.wf_id} placement="top"/>
                 </div>
             )
         },

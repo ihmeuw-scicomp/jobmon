@@ -5,13 +5,53 @@ import {convertDate, convertDatePST} from '@jobmon_gui/utils/formatters'
 import '@jobmon_gui/styles/jobmon_gui.css';
 import {FaCircle} from "react-icons/fa";
 import {MaterialReactTable} from 'material-react-table';
-import {Box, Button} from '@mui/material';
+import {Box, Button, CircularProgress} from '@mui/material';
 import {mkConfig, generateCsv, download} from "export-to-csv";
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import {useQuery} from "@tanstack/react-query";
+import axios from "axios";
+import {task_table_url} from "@jobmon_gui/configs/ApiUrls";
+import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
+import Typography from "@mui/material/Typography";
+
+type TaskTableProps = {
+    taskTemplateName: string
+    workflowId: number | string
+}
+
+type Task = {
+    task_command: string
+    task_id: number
+    task_max_attempts: number
+    task_name: string
+    task_num_attempts: number
+    task_status: string
+    task_status_date: string
+}
+type Tasks = {
+    tasks: Task[]
+}
 
 
-export default function TaskTable({taskData, loading}) {
+export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps) {
     const location = useLocation();
+
+    const tasks = useQuery({
+        queryKey: ["workflow_details", "tasks", taskTemplateName, workflowId],
+        queryFn: async () => {
+            return axios.get<Tasks>(
+                task_table_url + workflowId,
+                {
+                    ...jobmonAxiosConfig,
+                    data: null,
+                    params: {tt_name: taskTemplateName}
+                }
+            ).then((r) => {
+                return r.data.tasks
+            })
+        },
+        staleTime: 5000,
+    })
 
     const workflow_status = [
         {status: "PENDING", circleClass: "bar-pp", label: "PENDING"},
@@ -82,29 +122,37 @@ export default function TaskTable({taskData, loading}) {
     });
 
     const exportToCSV = () => {
-        const csv = generateCsv(csvConfig)(taskData);
+        const csv = generateCsv(csvConfig)(tasks?.data);
         download(csvConfig)(csv);
     };
 
+    if (!taskTemplateName) {
+        return (<Typography sx={{pt: 5}}>Select a task template from above to view tasks</Typography>)
+    }
+
+    if (tasks.isLoading) {
+        return (<CircularProgress/>)
+    }
+
+
+    if (tasks.isError) {
+        return (<Typography sx={{pt: 5}}>Error loading tasks. Please refresh and try again.</Typography>)
+    }
+
+
     return (
-        <div>
-            {loading &&
-                <div>
-                    <br/>
-                    <div className="loader"/>
-                </div>
-            }
-            <Button
-                onClick={exportToCSV}
-                startIcon={<FileDownloadIcon/>}
-            >
-                Export All Data
-            </Button>
-            {loading === false &&
-                <Box p={2} display="flex" justifyContent="center" width="100%">
-                    <MaterialReactTable columns={columns} data={taskData}/>
-                </Box>
-            }
-        </div>
+        <Box p={2} display="flex" justifyContent="center" width="100%">
+            <MaterialReactTable columns={columns}
+                                data={tasks?.data}
+                                renderTopToolbarCustomActions={(table) => {
+                                    return (<Box>
+                                        <Button
+                                            onClick={exportToCSV}
+                                            startIcon={<FileDownloadIcon/>}>
+                                            Export All Data
+                                        </Button>
+                                    </Box>)
+                                }}/>
+        </Box>
     );
 }

@@ -35,9 +35,9 @@ root.render(
                 <PageNavigation>
                     <Routes>
                         <Route path="workflow">
-                            <Route path=":workflowId/tasks" element={<WorkflowDetails subpage="tasks"/>}/>
-                            <Route path=":workflowId/usage" element={<WorkflowDetails subpage="usage"/>}/>
-                            <Route path=":workflowId/errors" element={<WorkflowDetails subpage="errors"/>}/>
+                            <Route path=":workflowId/tasks" element={<WorkflowDetails subpage={0}/>}/>
+                            <Route path=":workflowId/usage" element={<WorkflowDetails subpage={1}/>}/>
+                            {/*<Route path=":workflowId/errors" element={<WorkflowDetails subpage="errors"/>}/>*/}
                         </Route>
                         <Route path="task_details/:taskId" element={<TaskDetails/>}></Route>
                         <Route path="help" element={<Help/>}></Route>
