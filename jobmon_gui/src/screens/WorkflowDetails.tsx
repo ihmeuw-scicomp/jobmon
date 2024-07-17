@@ -35,7 +35,9 @@ type WorkflowDetails = {
     wf_status_date: string
     wf_status_desc: string
     wfr_jobmon_version: string
+
 }
+
 type WorkflowDetailsResponse = WorkflowDetails[]
 
 const task_template_tooltip_text = (<Box>
@@ -223,7 +225,6 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
                     if (value == 1) {
                         navigate(`/workflow/${workflowId}/usage`)
                     }
-
                 }} aria-label="Tab selection" value={subpage}>
                     <Tab label="Errors and Tasks" value={0}/>
                     <Tab label="Resource Usage" value={1}/>
@@ -246,6 +247,7 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
                 />
             </TabPanel>
         </Box>
+
 
     );
 
