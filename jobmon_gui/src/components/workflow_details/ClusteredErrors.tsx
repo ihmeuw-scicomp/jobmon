@@ -74,6 +74,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         {
             header: "Sample Error",
             accessorKey: "sample_error",
+            size:750,
             Cell: ({renderedCellValue, row}) => (
                 <Button sx={{textTransform: 'none', textAlign: "left"}}
                         onClick={() => setErrorDetailIndex({
@@ -118,6 +119,8 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         data: errors?.data?.error_logs || [],
         columns: columns,
         initialState: {density: 'compact'},
+        enableColumnResizing: true,
+        layoutMode: "grid",
     });
 
 

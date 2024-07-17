@@ -97,9 +97,9 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
             enableClickToCopy: true,
             size: 200,
             Cell: ({row}) => {
-                if(row.original.task_command.length < 65){
+                // if(row.original.task_command.length < 65){
                     return (<div>{row.original.task_command}</div>)
-                }
+                // }
                 return (
                     <div>
                         {row.original.task_command.substring(0, 30)}
@@ -158,6 +158,8 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
             },
 
         },
+        enableColumnResizing: true,
+        layoutMode: "grid",
         onColumnFiltersChange: setColumnFilters,
         onSortingChange: setSorting,
         onPaginationChange: setPagination,
