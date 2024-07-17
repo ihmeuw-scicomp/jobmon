@@ -9,7 +9,7 @@ import {CircularProgress, Grid} from "@mui/material";
 import {MaterialReactTable, useMaterialReactTable} from "material-react-table";
 import {Button} from '@mui/material';
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal";
-import ScrollableTextArea from "@jobmon_gui/components/ScrollableTextArea";
+import ScrollableTextArea, {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea";
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import IconButton from "@mui/material/IconButton";
@@ -163,15 +163,6 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
             fontWeight: "bold",
         }
 
-        const scrollableTextAreaStyles = {
-            fontFamily: 'Roboto Mono Variable',
-            backgroundColor: "#eee",
-            pl: 2,
-            pr: 2,
-            pt: 2,
-            pb: 2
-        }
-
         return (<Box>
             <Box>
                 <Typography sx={labelStyles}>Error Sample:
@@ -199,18 +190,16 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
 
                 <Grid item xs={12}><Typography sx={labelStyles}>Error Message:</Typography></Grid>
                 <Grid item xs={12}>
-                    <ScrollableTextArea
-                        sx={scrollableTextAreaStyles}>
+                    <ScrollableCodeBlock>
                         {error.error}
-                    </ScrollableTextArea>
+                    </ScrollableCodeBlock>
                 </Grid>
 
                 <Grid item xs={12}><Typography sx={labelStyles}>Task Instance stderr:</Typography></Grid>
                 <Grid item xs={12}>
-                    <ScrollableTextArea
-                        sx={scrollableTextAreaStyles}>
+                    <ScrollableCodeBlock>
                         {error.task_instance_stderr_log || "No stderr output found"}
-                    </ScrollableTextArea>
+                    </ScrollableCodeBlock>
                 </Grid>
             </Grid>
         </Box>)
