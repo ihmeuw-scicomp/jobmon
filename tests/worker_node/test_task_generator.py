@@ -783,3 +783,46 @@ def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
         )
 
         assert tasks[i-1].command == expected_command
+
+
+def test_fhs_serializers(client_env) -> None:
+    """Test the serializers for the FHS task generator."""
+    from tests.worker_node.task_generator_fhs import YearRange, Versions, FHSFileSpec, FHSDirSpec, VersionMetadata, Quantiles, versions_to_list, versions_from_list, quantiles_to_list, quantiles_from_list
+    yr = YearRange(2020, 2021)
+    v = Versions("1.0", "2.0")
+    fSpec = FHSFileSpec("/path/to/file")
+    dSpec = FHSDirSpec("/path/to/dir")
+    vm = VersionMetadata("1.0")
+    q = Quantiles(0.1, 0.9)
+
+    tool = Tool("test_tool")
+    testing_serializer = {
+        YearRange: (str, YearRange.parse_year_range),
+        Versions: (versions_to_list, versions_from_list),
+        FHSFileSpec: (str, FHSFileSpec.parse),
+        FHSDirSpec: (str, FHSDirSpec.parse),
+        VersionMetadata: (str, VersionMetadata.parse_version),
+        Quantiles: (quantiles_to_list, quantiles_from_list),
+    }
+
+    def simple_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDirSpec, vm: VersionMetadata, q: Optional[Quantiles]) -> None:
+        """Simple task_function."""
+        pass
+
+    tg = task_generator.TaskGenerator(
+        task_function=my_func,
+        serializers=testing_serializer,
+        tool_name="test_tool"
+    )
+    r1 = tg.serialize(yr, YearRange)
+    assert r1 == "2020-2021"
+    r2 = tg.serialize(v, Versions)
+    assert r2 == ["1.0", "2.0"]
+    r3 = tg.serialize(fSpec, FHSFileSpec)
+    assert r3 == "/path/to/file"
+    r4 = tg.serialize(dSpec, FHSDirSpec)
+    assert r4 == "/path/to/dir"
+    r5 = tg.serialize(vm, VersionMetadata)
+    assert r5 == "1.0"
+    r6 = tg.serialize(q, Quantiles)
+    assert r6 == ["0.1", "0.9"]

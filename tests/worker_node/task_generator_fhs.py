@@ -1,3 +1,5 @@
+import pytest
+
 from typing import Optional, Callable, Type, Dict, List, Any, Union
 
 from jobmon.core.task_generator import task_generator
@@ -27,7 +29,10 @@ class Versions:
     """A Fake class representing a list of versions."""
 
     def __init__(self, *version: Any) -> None:
-        self._version = str(version)
+        if type(version) in [list, tuple, set]:
+            self._version = [v for v in version]
+        else:
+            self._version = [str(version)]
     def __eq__(self, other: Any) -> bool:
         return self._version == other._version
 
@@ -74,12 +79,15 @@ class FHSFileSpec:
         self.path = path
 
     @staticmethod
-    def parse(file_spec: str) -> "FHSFileSpec":
+    def parse(file_spec: str):
         """Parse a file specification."""
         return FHSFileSpec(file_spec)
 
     def __eq__(self, other: Any) -> bool:
         return self.path == other.path
+
+    def __str__(self):
+        return self.path
 
 
 class FHSDirSpec:
@@ -96,6 +104,9 @@ class FHSDirSpec:
     def __eq__(self, other: Any) -> bool:
         return self.path == other.path
 
+    def __str__(self):
+        return self.path
+
 
 class VersionMetadata:
     """A Fake class representing metadata about a version."""
@@ -110,6 +121,9 @@ class VersionMetadata:
 
     def __eq__(self, other: Any) -> bool:
         return self.version == other.version
+
+    def __str__(self):
+        return self.version
 
 
 def fhs_task_generator(

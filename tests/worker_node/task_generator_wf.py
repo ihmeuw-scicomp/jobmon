@@ -7,6 +7,8 @@ import importlib.machinery
 from jobmon.core import task_generator, __version__ as core_version
 from jobmon.client.api import Tool
 
+from task_generator_fhs import YearRange, Versions, FHSFileSpec, FHSDirSpec, VersionMetadata, Quantiles, fhs_simple_function
+
 # Get the full path of the current script
 script_path = os.path.abspath(__file__)
 
@@ -175,20 +177,8 @@ def fhs_seq():
     )
     wf = tool.create_workflow()
     compute_resources = {"queue": "null.q"}
-    # Import the task_generator_funcs.py module
-    spec = importlib.util.spec_from_file_location(
-        "task_generator_fhs", fhs_generator_funcs_path
-    )
-    task_generator_funcs = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(task_generator_funcs)
-    simple_function = task_generator_funcs.fhs_simple_function
-    YearRange = task_generator_funcs.YearRange
-    Versions = task_generator_funcs.Versions
-    FHSFileSpec = task_generator_funcs.FHSFileSpec
-    FHSDirSpec = task_generator_funcs.FHSDirSpec
-    VersionMetadata = task_generator_funcs.VersionMetadata
-    Quantiles = task_generator_funcs.Quantiles
-    task = simple_function.create_task(
+
+    task = fhs_simple_function.create_task(
             compute_resources=compute_resources,
             yr=YearRange(2020, 2021),
             v=Versions("1.0", "2.0"),
