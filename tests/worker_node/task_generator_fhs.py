@@ -160,7 +160,7 @@ def fhs_task_generator(
     )
 
 @fhs_task_generator(tool_name="test_tool", naming_args=["version"])
-def simple_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDirSpec, vm: VersionMetadata, q: Optional[Quantiles]) -> None:
+def fhs_simple_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDirSpec, vm: VersionMetadata, q: Optional[Quantiles]) -> None:
     """Simple task_function."""
     print(f"YearRange: {yr}")
     print(f"Version: {v}")
@@ -168,32 +168,3 @@ def simple_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDi
     print(f"FHSDirSpec: {dSpec}")
     print(f"VersionMetadata: {vm}")
     print(f"Quantiles: {q}")
-
-
-def create_wf():
-    tool = Tool("test_tool")
-    wf = tool.create_workflow()
-    tool.set_default_compute_resources_from_dict(
-        cluster_name="sequential", compute_resources={"queue": "null.q"}
-    )
-    wf = tool.create_workflow()
-    compute_resources = {"queue": "null.q"}
-    task = simple_function.create_task(
-            compute_resources=compute_resources,
-            yr=YearRange(2020, 2021),
-            v=Versions("1.0", "2.0"),
-            fSpec=FHSFileSpec("/path/to/file"),
-            dSpec=FHSDirSpec("/path/to/dir"),
-            vm=VersionMetadata("1.0"),
-            q=Quantiles(0.1, 0.9)
-        )
-    wf.add_tasks([task])
-    s = wf.run()
-    assert s == "D"
-
-
-def main():
-    create_wf()
-
-if __name__ == "__main__":
-    main()

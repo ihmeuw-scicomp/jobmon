@@ -17,6 +17,9 @@ full_script_path = os.path.realpath(script_path)
 task_generator_funcs_path = os.path.join(
     os.path.dirname(script_path), "task_generator_funcs.py"
 )
+fhs_generator_funcs_path = os.path.join(
+    os.path.dirname(script_path), "task_generator_fhs.py"
+)
 
 
 def simple_tasks_seq() -> None:
@@ -163,6 +166,40 @@ def simple_tasks_serializer_array() -> None:
     r = wf.run(configure_logging=True)
     assert r == "D"
 
+
+def fhs_seq():
+    tool = Tool("test_tool")
+    wf = tool.create_workflow()
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="sequential", compute_resources={"queue": "null.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "null.q"}
+    # Import the task_generator_funcs.py module
+    spec = importlib.util.spec_from_file_location(
+        "task_generator_fhs", fhs_generator_funcs_path
+    )
+    task_generator_funcs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(task_generator_funcs)
+    simple_function = task_generator_funcs.fhs_simple_function
+    YearRange = task_generator_funcs.YearRange
+    Versions = task_generator_funcs.Versions
+    FHSFileSpec = task_generator_funcs.FHSFileSpec
+    FHSDirSpec = task_generator_funcs.FHSDirSpec
+    VersionMetadata = task_generator_funcs.VersionMetadata
+    Quantiles = task_generator_funcs.Quantiles
+    task = simple_function.create_task(
+            compute_resources=compute_resources,
+            yr=YearRange(2020, 2021),
+            v=Versions("1.0", "2.0"),
+            fSpec=FHSFileSpec("/path/to/file"),
+            dSpec=FHSDirSpec("/path/to/dir"),
+            vm=VersionMetadata("1.0"),
+            q=Quantiles(0.1, 0.9)
+        )
+    wf.add_tasks([task])
+    s = wf.run()
+    assert s == "D"
 
 def main():
     if len(sys.argv) > 1:
