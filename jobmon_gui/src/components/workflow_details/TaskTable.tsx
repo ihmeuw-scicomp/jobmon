@@ -96,18 +96,6 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
             accessorKey: "task_command",
             enableClickToCopy: true,
             size: 200,
-            Cell: ({row}) => {
-                // if(row.original.task_command.length < 65){
-                    return (<div>{row.original.task_command}</div>)
-                // }
-                return (
-                    <div>
-                        {row.original.task_command.substring(0, 30)}
-                        &nbsp; ... &nbsp;
-                        {row.original.task_command.slice(-30)}
-                    </div>
-                );
-            },
         },
         {
             header: "Num Attempts",
