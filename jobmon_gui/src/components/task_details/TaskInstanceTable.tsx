@@ -1,5 +1,4 @@
 import React, {useState} from 'react';
-import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import {HiInformationCircle} from "react-icons/hi";
 import CustomModal from '@jobmon_gui/components/Modal';
 import {formatBytes} from "@jobmon_gui/utils/formatters";

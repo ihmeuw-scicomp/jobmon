@@ -1,6 +1,5 @@
 import React, {useEffect, useState} from 'react';
 import axios from 'axios';
-import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import {Link, useLocation} from "react-router-dom";
 import {convertDatePST} from '@jobmon_gui/utils/formatters';
 import {FaCircle} from "react-icons/fa";
@@ -12,14 +11,16 @@ import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import {useWorkflowSearchSettings} from "@jobmon_gui/stores/workflow_settings";
 import {CircularProgress} from "@mui/material";
 import {Box, List, ListItem, ListItemIcon, ListItemText, Typography} from '@mui/material';
-import {HiInformationCircle} from "react-icons/hi";
+import InfoIcon from '@mui/icons-material/Info';
 import CustomModal from "@jobmon_gui/components/Modal";
-import {IoMdCloseCircle, IoMdCloseCircleOutline} from "react-icons/io";
-import {AiFillSchedule, AiFillCheckCircle} from "react-icons/ai";
-import {BiRun} from "react-icons/bi";
-import {TbHandStop} from "react-icons/tb";
-import {HiRocketLaunch} from "react-icons/hi2";
-
+import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
+import ErrorIcon from '@mui/icons-material/Error';
+import PanToolIcon from '@mui/icons-material/PanTool';
+import CancelIcon from '@mui/icons-material/Cancel';
+import DoneIcon from '@mui/icons-material/Done';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import IconButton from '@mui/material/IconButton';
 
 // Get task status count for specified workflows
 function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_ids, wf_ids: number[], setFetchCompleted) {
@@ -184,15 +185,15 @@ export default function WorkflowList() {
     ];
 
     const statusMap = {
-        'ABORTED': {icon: <IoMdCloseCircleOutline/>, className: 'icon-aa'},
-        'DONE': {icon: <AiFillCheckCircle/>, className: 'icon-dd'},
-        'FAILED': {icon: <IoMdCloseCircle/>, className: 'icon-ff'},
-        'REGISTERING': {icon: <AiFillSchedule/>, className: 'icon-pp'},
-        'HALTED': {icon: <TbHandStop/>, className: 'icon-aa'},
-        'INSTANTIATING': {icon: <AiFillSchedule/>, className: 'icon-pp'},
-        'LAUNCHED': {icon: <HiRocketLaunch/>, className: 'icon-ss'},
-        'QUEUED': {icon: <AiFillSchedule/>, className: 'icon-pp'},
-        'RUNNING': {icon: <BiRun/>, className: 'icon-rr'},
+        'ABORTED': {icon: <CancelIcon/>, className: 'icon-aa'},
+        'DONE': {icon: <DoneIcon/>, className: 'icon-dd'},
+        'FAILED': {icon: <ErrorIcon/>, className: 'icon-ff'},
+        'REGISTERING': {icon: <CalendarMonthIcon/>, className: 'icon-pp'},
+        'HALTED': {icon: <PanToolIcon/>, className: 'icon-aa'},
+        'INSTANTIATING': {icon: <CalendarMonthIcon/>, className: 'icon-pp'},
+        'LAUNCHED': {icon: <RocketLaunchIcon/>, className: 'icon-ss'},
+        'QUEUED': {icon: <CalendarMonthIcon/>, className: 'icon-pp'},
+        'RUNNING': {icon: <DirectionsRunIcon/>, className: 'icon-rr'},
     };
     return (
         <div>
@@ -229,7 +230,10 @@ export default function WorkflowList() {
                                         }
                                     />
                                     <ListItemIcon sx={{marginLeft: '12px', fontSize: '32px'}}>
-                                        <HiInformationCircle onClick={() => handleInfoClick(workflow)}/>
+                                        <IconButton>
+                                            <InfoIcon onClick={() => handleInfoClick(workflow)}/>
+                                        </IconButton>
+
                                     </ListItemIcon>
                                 </Box>
                                 <JobmonProgressBar

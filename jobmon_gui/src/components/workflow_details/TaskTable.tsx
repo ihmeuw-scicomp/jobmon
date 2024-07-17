@@ -37,7 +37,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
     const location = useLocation();
 
     const tasks = useQuery({
-        queryKey: ["workflow_details", "tasks", taskTemplateName, workflowId],
+        queryKey: ["workflow_details", "tasks", workflowId, taskTemplateName],
         queryFn: async () => {
             return axios.get<Tasks>(
                 task_table_url + workflowId,
@@ -51,6 +51,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
             })
         },
         staleTime: 5000,
+        enabled: !!taskTemplateName
     })
 
     const workflow_status = [
@@ -97,6 +98,16 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         {
             header: "Command",
             accessorKey: "task_command",
+            enableClickToCopy: true,
+            Cell: ({row}) => {
+                return (
+                    <div>
+                        {row.original.task_command.substring(0,75)}
+                        ...
+                        {row.original.task_command.slice(-75)}
+                    </div>
+                );
+            },
         },
         {
             header: "Num Attempts",

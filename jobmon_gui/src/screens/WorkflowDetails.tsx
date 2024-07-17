@@ -3,8 +3,6 @@ import '@jobmon_gui/styles/jobmon_gui.css';
 import {useParams, useNavigate, useLocation} from 'react-router-dom';
 import axios from 'axios';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
-import {OverlayTrigger} from "react-bootstrap";
-import Popover from 'react-bootstrap/Popover';
 import {FaLightbulb} from "react-icons/fa";
 import humanizeDuration from 'humanize-duration';
 import Tab from '@mui/material/Tab';
@@ -13,33 +11,15 @@ import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
 import Usage from '@jobmon_gui/components/workflow_details/Usage';
 import WorkflowHeader from "@jobmon_gui/components/workflow_details/WorkflowHeader"
 import Box from "@mui/material/Box";
-import {CircularProgress, Tabs} from "@mui/material";
+import {CircularProgress, Tabs, Tooltip} from "@mui/material";
 import TaskTable from "@jobmon_gui/components/workflow_details/TaskTable";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import {useQuery} from "@tanstack/react-query";
 import {workflow_details_url, workflow_tt_status_url} from "@jobmon_gui/configs/ApiUrls";
 import Typography from "@mui/material/Typography";
 import {TTStatusResponse} from "@jobmon_gui/types/TaskTemplateStatus";
-
-function getAsyncErrorLogs(setErrorLogs, wf_id: string, setErrorLoading, tt_id?: string) {
-    setErrorLoading(true);
-    const url = import.meta.env.VITE_APP_BASE_URL + "/tt_error_log_viz/" + wf_id + "/" + tt_id;
-    const fetchData = async () => {
-        const result: any = await axios({
-                method: 'get',
-                url: url,
-                data: null,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            }
-        )
-        setErrorLogs(result.data);
-        setErrorLoading(false);
-    };
-    return fetchData
-}
+import HtmlTooltip from "@jobmon_gui/components/HtmlToolTip";
+import ClusteredErrors from "@jobmon_gui/components/workflow_details/ClusteredErrors";
 
 type WorkflowDetailsProps = {
     subpage: number
@@ -57,6 +37,14 @@ type WorkflowDetails = {
 }
 type WorkflowDetailsResponse = WorkflowDetails[]
 
+const task_template_tooltip_text = (<Box>
+    <Typography sx={{fontWeight: "bold"}}>Task Templates</Typography>
+    <Typography variant={"body2"}>
+        The list of task templates with status bar, ordered by the
+        submitted time of the first task associated with the task template.
+    </Typography>
+</Box>)
+
 
 function WorkflowDetails({subpage}: WorkflowDetailsProps) {
     let params = useParams();
@@ -64,6 +52,7 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
     const [task_template_name, setTaskTemplateName] = useState('');
     const [tt_id, setTTID] = useState('');
     const [task_template_version_id, setTaskTemplateVersionId] = useState('');
+
 
     const wfDetails = useQuery({
         queryKey: ["workflow_details", "details", params.workflowId],
@@ -147,6 +136,7 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
         return (<Typography>Error loading workflow task template details. Please refresh and try again.</Typography>)
     }
 
+
     return (
         <Box>
             <Breadcrumb>
@@ -178,29 +168,21 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
             </Box>
 
             <Box id="tt_title" className="div-level-2">
-                <header className="header-1 d-flex align-items-center">
-                    <p className='mr-5'>
-                        Task Templates&nbsp;
-                        <OverlayTrigger
-                            placement="right"
-                            trigger={["hover", "focus"]}
-                            overlay={(
-                                <Popover id="task_count">
-                                    The list of task templates with status bar, ordered by the submitted time of the
-                                    first task associated with the task template.
-                                </Popover>
-                            )}
-                        >
-                            <span><FaLightbulb/></span>
-                        </OverlayTrigger>
-                    </p>
-                    {tt_id === "" &&
-                        <div className="div-hint">
-                            <i> Please select a Task Template to see its Tasks, Resource Usage, and Errors. </i>
-                        </div>
-                    }
+                <Typography sx={{
+                    textAlign: "left",
+                    fontSize: "calc(16px + 1vmin)",
+                    color: "var(--color-title)",
+                    width: "90%"
+                }}>Task Templates&nbsp;
+                    <HtmlTooltip title={task_template_tooltip_text}
+                                 arrow={true}
+                                 placement={"right"}>
+                        <span>
+                            <FaLightbulb/>
+                        </span>
+                    </HtmlTooltip>
+                </Typography>
 
-                </header>
             </Box>
 
             <Box id="tt_progress" className="div-scroll">
@@ -240,12 +222,19 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
                     }
 
                 }} aria-label="Tab selection" value={subpage}>
-                    <Tab label="Tasks" value={0}/>
+                    <Tab label="Errors and Tasks" value={0}/>
                     <Tab label="Resource Usage" value={1}/>
                 </Tabs>
             </Box>
             <TabPanel value={subpage} index={0}>
-                <TaskTable taskTemplateName={task_template_name} workflowId={workflowId}/>
+                <Box>
+                    <Typography variant={"h5"} sx={{pt:3}}>Clustered Errors</Typography>
+                    <ClusteredErrors taskTemplateId={tt_id} workflowId={workflowId}/>
+                </Box>
+                <Box>
+                    <Typography variant={"h5"} sx={{pt:3}}>Tasks</Typography>
+                    <TaskTable taskTemplateName={task_template_name} workflowId={workflowId}/>
+                </Box>
             </TabPanel>
             <TabPanel value={subpage} index={1}>
                 <Usage taskTemplateName={task_template_name}

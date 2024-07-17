@@ -7,3 +7,4 @@ export const workflow_details_url = api_base_url + "/workflow_details_viz/"
 export const workflow_tt_status_url = api_base_url + "/workflow_tt_status_viz/";
 export const workflow_overview_url = api_base_url + "/workflow_overview_viz";
 export const workflow_status_url = api_base_url + "/workflow_status_viz";
+export const error_log_viz_url = api_base_url + "/tt_error_log_viz/"

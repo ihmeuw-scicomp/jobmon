@@ -53,7 +53,7 @@ def cluster_error_logs(df: DataFrame) -> DataFrame:
     df['error_score'] = per_log_score
     df = df.groupby(["error_score"]).agg({
         'error_score': 'count',
-        'task_instance_id': 'first',
+        'task_instance_id': lambda x: list(x),
         'task_id': lambda x: list(x),
         'error': 'first',
         'workflow_run_id': 'first',
@@ -62,7 +62,7 @@ def cluster_error_logs(df: DataFrame) -> DataFrame:
 
 
     })
-    df.rename(columns={'error': "sample_error", 'error_score': 'group_instance_count', 'task_id': 'task_ids', 'error_time': 'first_error_time'},
+    df.rename(columns={'error': "sample_error", 'error_score': 'group_instance_count', 'task_id': 'task_ids', 'error_time': 'first_error_time', 'task_instance_id': 'task_instance_ids'},
               inplace=True)
     df.sort_values(by=['group_instance_count'], ascending=False, inplace=True)
     return df

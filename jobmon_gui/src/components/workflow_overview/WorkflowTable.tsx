@@ -5,7 +5,6 @@ import paginationFactory from "react-bootstrap-table2-paginator";
 import {OverlayTrigger} from "react-bootstrap";
 import Popover from 'react-bootstrap/Popover';
 import ToolkitProvider, {CSVExport} from 'react-bootstrap-table2-toolkit/dist/react-bootstrap-table2-toolkit';
-import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import Spinner from 'react-bootstrap/Spinner';
 import {Link, useLocation} from "react-router-dom";
 import {convertDate, convertDatePST} from '@jobmon_gui/utils/formatters';
