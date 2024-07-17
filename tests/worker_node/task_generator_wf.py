@@ -220,6 +220,8 @@ def main():
         simple_tasks_array()
     elif input_value == 6:
         simple_tasks_serializer_array()
+    elif input_value == 7:
+        fhs_seq()
     else:
         simple_tasks_seq()
 
