@@ -6,7 +6,7 @@ import {error_log_viz_url, task_table_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import Typography from "@mui/material/Typography";
 import {CircularProgress, Grid} from "@mui/material";
-import {MaterialReactTable} from "material-react-table";
+import {MaterialReactTable, useMaterialReactTable} from "material-react-table";
 import {Button} from '@mui/material';
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal";
 import ScrollableTextArea from "@jobmon_gui/components/ScrollableTextArea";
@@ -67,17 +67,6 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         enabled: !!taskTemplateId && errorDetailIndex !== false && errorDetailIndex !== true
     })
 
-
-    if (!taskTemplateId) {
-        return (<Typography sx={{pt: 5}}>Select a task template from above to clustered errors</Typography>)
-    }
-    if (errors.isLoading) {
-        return (<CircularProgress/>)
-    }
-    if (errors.isError) {
-        return (<Typography>Unable to retrieve clustered errors. Please refresh and try again</Typography>)
-    }
-
     const columns = [
         {
             header: "Sample Error",
@@ -103,8 +92,27 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         },
     ];
 
+    const table = useMaterialReactTable({
+        data: errors?.data?.error_logs || [],
+        columns: columns,
+        initialState: {density: 'compact'},
+    });
+
+
+    if (!taskTemplateId) {
+        return (<Typography sx={{pt: 5}}>Select a task template from above to clustered errors</Typography>)
+    }
+    if (errors.isLoading) {
+        return (<CircularProgress/>)
+    }
+    if (errors.isError) {
+        return (<Typography>Unable to retrieve clustered errors. Please refresh and try again</Typography>)
+    }
+
+
+
     const nextSample = () => {
-        if (errorDetailIndex === false || errorDetailIndex === true ) {
+        if (errorDetailIndex === false || errorDetailIndex === true) {
             return;
         }
         setErrorDetailIndex({
@@ -134,13 +142,24 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
             fontWeight: "bold",
         }
 
+        const scrollableTextAreaStyles = {
+            fontFamily: 'Roboto Mono Variable',
+            backgroundColor: "#eee",
+            pl: 2,
+            pr: 2,
+            pt: 2,
+            pb: 2
+        }
+
         return (<Box>
             <Box>
-            <Typography sx={labelStyles}>Error Sample:
-                <IconButton onClick={previousSample} disabled={errorDetailIndex?.sample_index == 0}><NavigateBeforeIcon/></IconButton> {errorDetailIndex?.sample_index+1} of {errorDetailIndex?.sample_ids?.length}
-            <IconButton onClick={nextSample} disabled={errorDetailIndex?.sample_index == errorDetailIndex?.sample_ids?.length-1}><NavigateNextIcon/></IconButton>
-            </Typography>
-                </Box>
+                <Typography sx={labelStyles}>Error Sample:
+                    <IconButton onClick={previousSample}
+                                disabled={errorDetailIndex?.sample_index == 0}><NavigateBeforeIcon/></IconButton> {errorDetailIndex?.sample_index + 1} of {errorDetailIndex?.sample_ids?.length}
+                    <IconButton onClick={nextSample}
+                                disabled={errorDetailIndex?.sample_index == errorDetailIndex?.sample_ids?.length - 1}><NavigateNextIcon/></IconButton>
+                </Typography>
+            </Box>
             <Grid container spacing={2}>
                 <Grid item xs={3}><Typography sx={labelStyles}>Error Time:</Typography></Grid>
                 <Grid item xs={9}>{error.error_time}</Grid>
@@ -158,10 +177,20 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
                 <Grid item xs={9}>{error.workflow_run_id}</Grid>
 
                 <Grid item xs={12}><Typography sx={labelStyles}>Error Message:</Typography></Grid>
-                <Grid item xs={12}><ScrollableTextArea sx={{backgroundColor:"#ccc", pl:2, pr: 2, pt: 2, pb:2}}>{error.error}</ScrollableTextArea></Grid>
+                <Grid item xs={12}>
+                    <ScrollableTextArea
+                        sx={scrollableTextAreaStyles}>
+                        {error.error}
+                    </ScrollableTextArea>
+                </Grid>
 
-                <Grid item xs={12}><Typography sx={labelStyles}>task_instance_stderr_log:</Typography></Grid>
-                <Grid item xs={12}><ScrollableTextArea sx={{backgroundColor:"#ccc", pl:2, pr: 2, pt: 2, pb:2}}>{error.task_instance_stderr_log}</ScrollableTextArea></Grid>
+                <Grid item xs={12}><Typography sx={labelStyles}>Task Instance stderr:</Typography></Grid>
+                <Grid item xs={12}>
+                    <ScrollableTextArea
+                        sx={scrollableTextAreaStyles}>
+                        {error.task_instance_stderr_log || "No stderr output found"}
+                    </ScrollableTextArea>
+                </Grid>
             </Grid>
         </Box>)
     }
@@ -176,8 +205,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
 
     return (
         <Box p={2} display="flex" justifyContent="center" width="100%">
-            <MaterialReactTable columns={columns}
-                                data={errors?.data.error_logs}/>
+            <MaterialReactTable table={table}/>
             <JobmonModal
                 title={`Error Sample for Task Instance ID: ${currentTiID()}`}
                 open={errorDetailIndex !== false}

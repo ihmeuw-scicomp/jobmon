@@ -1,6 +1,5 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import '@jobmon_gui/styles/index.css';
 import WorkflowOverview from '@jobmon_gui/screens/WorkflowOverview';
 import {
     HashRouter,
@@ -14,6 +13,9 @@ import JobmonAtIHME from '@jobmon_gui/screens/JobmonAtIhme'
 import PageNavigation from '@jobmon_gui/components/navigation/PageNavigation';
 import CustomThemeProvider from "@jobmon_gui/contexts/CustomThemeProvider";
 import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
+import '@fontsource-variable/roboto-mono';
+import "@fontsource/archivo";
+
 
 const queryClient = new QueryClient({
     defaultOptions: {

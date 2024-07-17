@@ -4,8 +4,8 @@ import {Link, useLocation} from 'react-router-dom';
 import {convertDate, convertDatePST} from '@jobmon_gui/utils/formatters'
 import '@jobmon_gui/styles/jobmon_gui.css';
 import {FaCircle} from "react-icons/fa";
-import {MaterialReactTable} from 'material-react-table';
-import {Box, Button, CircularProgress} from '@mui/material';
+import {MaterialReactTable, useMaterialReactTable} from 'material-react-table';
+import {Box, Button, CircularProgress, MenuItem} from '@mui/material';
 import {mkConfig, generateCsv, download} from "export-to-csv";
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import {useQuery} from "@tanstack/react-query";
@@ -54,14 +54,6 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         enabled: !!taskTemplateName
     })
 
-    const workflow_status = [
-        {status: "PENDING", circleClass: "bar-pp", label: "PENDING"},
-        {status: "SCHEDULED", circleClass: "bar-ss", label: "SCHEDULED"},
-        {status: "RUNNING", circleClass: "bar-rr", label: "RUNNING"},
-        {status: "FATAL", circleClass: "bar-ff", label: "FATAL"},
-        {status: "DONE", circleClass: "bar-dd", label: "DONE"}
-    ];
-
     const columns = [
         {
             header: "Task ID",
@@ -76,6 +68,20 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
                     </Link>
                 </nav>
             ),
+            renderColumnFilterModeMenuItems: ({column, onSelectFilterMode}) => [
+                <MenuItem
+                    key="startsWith"
+                    onClick={() => onSelectFilterMode('startsWith')}
+                >
+                    Start With
+                </MenuItem>,
+                <MenuItem
+                    key="endsWith"
+                    onClick={() => onSelectFilterMode('yourCustomFilterFn')}
+                >
+                    Your Custom Filter Fn
+                </MenuItem>,
+            ],
         },
         {
             header: "Task Name",
@@ -102,7 +108,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
             Cell: ({row}) => {
                 return (
                     <div>
-                        {row.original.task_command.substring(0,75)}
+                        {row.original.task_command.substring(0, 75)}
                         ...
                         {row.original.task_command.slice(-75)}
                     </div>
@@ -125,6 +131,31 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
             )
         },
     ];
+
+    const table = useMaterialReactTable({
+        data: tasks?.data || [],
+        columns: columns,
+        initialState: {density: 'compact'},
+        renderTopToolbarCustomActions: (table) => {
+            return (<Box>
+                <Button
+                    onClick={exportToCSV}
+                    startIcon={<FileDownloadIcon/>}>
+                    Export All Data
+                </Button>
+            </Box>)
+        }
+    });
+
+
+    const workflow_status = [
+        {status: "PENDING", circleClass: "bar-pp", label: "PENDING"},
+        {status: "SCHEDULED", circleClass: "bar-ss", label: "SCHEDULED"},
+        {status: "RUNNING", circleClass: "bar-rr", label: "RUNNING"},
+        {status: "FATAL", circleClass: "bar-ff", label: "FATAL"},
+        {status: "DONE", circleClass: "bar-dd", label: "DONE"}
+    ];
+
 
     const csvConfig = mkConfig({
         fieldSeparator: ',',
@@ -153,17 +184,8 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
 
     return (
         <Box p={2} display="flex" justifyContent="center" width="100%">
-            <MaterialReactTable columns={columns}
-                                data={tasks?.data}
-                                renderTopToolbarCustomActions={(table) => {
-                                    return (<Box>
-                                        <Button
-                                            onClick={exportToCSV}
-                                            startIcon={<FileDownloadIcon/>}>
-                                            Export All Data
-                                        </Button>
-                                    </Box>)
-                                }}/>
+            <MaterialReactTable table={table}
+            />
         </Box>
     );
 }
