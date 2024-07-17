@@ -22,6 +22,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import IconButton from '@mui/material/IconButton';
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal";
+import ScrollableTextArea from "@jobmon_gui/components/ScrollableTextArea";
 
 type WorkflowType = {
     DONE: number,
@@ -151,6 +152,14 @@ export default function WorkflowList() {
         fontFamily: 'Roboto Mono Variable',
     }
 
+    const scrollableTextAreaStyles = {
+        fontFamily: 'Roboto Mono Variable',
+        backgroundColor: "#eee",
+        pl: 2,
+        pr: 2,
+        pt: 2,
+        pb: 2
+    }
     return (
         <Box>
             <Box>
@@ -232,28 +241,34 @@ export default function WorkflowList() {
                             <Typography sx={modalValuesStyles}>{workflowDetails.wf_tool}</Typography>
                         </Grid>
                         <Grid item xs={4}>
-                            <Typography sx={modalTitleStyles}>Workflow Args:</Typography>
-                        </Grid>
-                        <Grid item xs={8}>
-                            <Typography sx={modalValuesStyles}>{workflowDetails.wf_args}</Typography>
-                        </Grid>
-                        <Grid item xs={4}>
                             <Typography sx={modalTitleStyles}>Date Submitted:</Typography>
                         </Grid>
                         <Grid item xs={8}>
-                            <Typography sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date)}</Typography>
+                            <Typography
+                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date)}</Typography>
                         </Grid>
                         <Grid item xs={4}>
                             <Typography sx={modalTitleStyles}>Status Date:</Typography>
                         </Grid>
                         <Grid item xs={8}>
-                            <Typography sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_status_date)}</Typography>
+                            <Typography
+                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_status_date)}</Typography>
                         </Grid>
                         <Grid item xs={4}>
                             <Typography sx={modalTitleStyles}>Number of WorkflowRuns:</Typography>
                         </Grid>
                         <Grid item xs={8}>
                             <Typography sx={modalValuesStyles}>{workflowDetails.wfr_count}</Typography>
+                        </Grid>
+
+                        <Grid item xs={12}>
+                            <Typography sx={modalTitleStyles}>Workflow Args:</Typography>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <ScrollableTextArea
+                                sx={scrollableTextAreaStyles}>
+                                {workflowDetails.wf_args}
+                            </ScrollableTextArea>
                         </Grid>
                     </Grid>
                 }
