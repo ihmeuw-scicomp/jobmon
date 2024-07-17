@@ -826,3 +826,11 @@ def test_fhs_serializers(client_env) -> None:
     assert r5 == "1.0"
     r6 = tg.serialize(q, Quantiles)
     assert r6 == ["0.1", "0.9"]
+
+    # verify deserialization
+    assert yr == tg.deserialize(r1, YearRange)
+    assert v == tg.deserialize(r2, Versions)
+    assert fSpec == tg.deserialize(r3, FHSFileSpec)
+    assert dSpec == tg.deserialize(r4, FHSDirSpec)
+    assert vm == tg.deserialize(r5, VersionMetadata)
+    assert q == tg.deserialize(r6, Quantiles)

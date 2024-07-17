@@ -55,9 +55,9 @@ def versions_from_list(versions: Union[List[str], str]) -> Versions:
 class Quantiles:
     """A Fake class representing a range of quantiles."""
 
-    def __init__(self, lower: float, upper: float) -> None:
-        self.lower = lower
-        self.upper = upper
+    def __init__(self, lower: Union[float, str], upper: [float, str]) -> None:
+        self.lower = float(lower)
+        self.upper = float(upper)
 
     def __eq__(self, other: Any) -> bool:
         return self.lower == other.lower and self.upper == other.upper
