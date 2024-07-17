@@ -13,6 +13,9 @@ import ScrollableTextArea from "@jobmon_gui/components/ScrollableTextArea";
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import IconButton from "@mui/material/IconButton";
+import {useTaskTableColumnsStore} from "@jobmon_gui/stores/task_table";
+import FilterAltIcon from '@mui/icons-material/FilterAlt';
+import HtmlTooltip from "@jobmon_gui/components/HtmlToolTip";
 
 type ClusteredErrorsProps = {
     taskTemplateId: string | number
@@ -24,7 +27,7 @@ type ErrorSampleModalDetails = {
     sample_ids: number[]
 }
 export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredErrorsProps) {
-
+    const taskTableColumnFilters = useTaskTableColumnsStore()
     const [errorDetailIndex, setErrorDetailIndex] = useState<boolean | ErrorSampleModalDetails>(false)
     const errors = useQuery({
         queryKey: ["workflow_details", "clustered_errors", workflowId, taskTemplateId],
@@ -90,6 +93,25 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
             accessorKey: "group_instance_count",
             desc: true,
         },
+        {
+            header: "Actions",
+            accessorKey: "actions",
+            Cell: ({renderedCellValue, row}) => (
+                <HtmlTooltip title={"Filter tasks table for tasks with this error"}
+                             arrow={true}
+                             placement={"right"}>
+                    <IconButton sx={{textTransform: 'none', textAlign: "left"}}
+                                onClick={() => {
+                                    taskTableColumnFilters.set([{
+                                        id: "task_id",
+                                        value: row.original.task_ids.join(",")
+                                    }])
+                                }}>
+                        <FilterAltIcon/>
+                    </IconButton>
+                </HtmlTooltip>
+            ),
+        },
     ];
 
     const table = useMaterialReactTable({
@@ -108,7 +130,6 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
     if (errors.isError) {
         return (<Typography>Unable to retrieve clustered errors. Please refresh and try again</Typography>)
     }
-
 
 
     const nextSample = () => {

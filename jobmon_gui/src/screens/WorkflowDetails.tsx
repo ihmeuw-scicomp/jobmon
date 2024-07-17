@@ -20,6 +20,7 @@ import Typography from "@mui/material/Typography";
 import {TTStatusResponse} from "@jobmon_gui/types/TaskTemplateStatus";
 import HtmlTooltip from "@jobmon_gui/components/HtmlToolTip";
 import ClusteredErrors from "@jobmon_gui/components/workflow_details/ClusteredErrors";
+import {useTaskTableColumnsStore} from "@jobmon_gui/stores/task_table";
 
 type WorkflowDetailsProps = {
     subpage: number
@@ -49,6 +50,8 @@ const task_template_tooltip_text = (<Box>
 function WorkflowDetails({subpage}: WorkflowDetailsProps) {
     let params = useParams();
     let workflowId = params.workflowId;
+    const taskTableColumnFilters = useTaskTableColumnsStore()
+
     const [task_template_name, setTaskTemplateName] = useState('');
     const [tt_id, setTTID] = useState('');
     const [task_template_version_id, setTaskTemplateVersionId] = useState('');
@@ -173,14 +176,11 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
                     fontSize: "calc(16px + 1vmin)",
                     color: "var(--color-title)",
                     width: "90%"
-                }}>Task Templates&nbsp;
-                    <HtmlTooltip title={task_template_tooltip_text}
-                                 arrow={true}
-                                 placement={"right"}>
-                        <span>
-                            <FaLightbulb/>
-                        </span>
-                    </HtmlTooltip>
+                }}><HtmlTooltip title={task_template_tooltip_text}
+                                arrow={true}
+                                placement={"right"}>
+                    <span>Task Templates&nbsp;<FaLightbulb/></span>
+                </HtmlTooltip>
                 </Typography>
 
             </Box>
@@ -192,7 +192,10 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
                             <li
                                 className={`tt-container ${tt_id == wfTTStatus?.data[key]["id"].toString() ? "selected" : ""}`}
                                 id={wfTTStatus?.data[key]["id"].toString()}
-                                onClick={() => clickTaskTemplate(wfTTStatus?.data[key]["name"], wfTTStatus?.data[key]["id"], wfTTStatus?.data[key]["task_template_version_id"])}
+                                onClick={() => {
+                                    taskTableColumnFilters.clear()
+                                    clickTaskTemplate(wfTTStatus?.data[key]["name"], wfTTStatus?.data[key]["id"], wfTTStatus?.data[key]["task_template_version_id"])
+                                }}
                             >
                                 <div className="div_floatleft">
                                     <span className="tt-name">{wfTTStatus?.data[key]["name"]}</span>
@@ -228,11 +231,11 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
             </Box>
             <TabPanel value={subpage} index={0}>
                 <Box>
-                    <Typography variant={"h5"} sx={{pt:3}}>Clustered Errors</Typography>
+                    <Typography variant={"h5"} sx={{pt: 3}}>Clustered Errors</Typography>
                     <ClusteredErrors taskTemplateId={tt_id} workflowId={workflowId}/>
                 </Box>
                 <Box>
-                    <Typography variant={"h5"} sx={{pt:3}}>Tasks</Typography>
+                    <Typography variant={"h5"} sx={{pt: 3}}>Tasks</Typography>
                     <TaskTable taskTemplateName={task_template_name} workflowId={workflowId}/>
                 </Box>
             </TabPanel>

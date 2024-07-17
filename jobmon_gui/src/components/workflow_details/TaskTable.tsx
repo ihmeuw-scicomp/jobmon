@@ -1,10 +1,10 @@
-import React from 'react';
+import React, {useCallback, useState} from 'react';
 import {Link, useLocation} from 'react-router-dom';
 
 import {convertDate, convertDatePST} from '@jobmon_gui/utils/formatters'
 import '@jobmon_gui/styles/jobmon_gui.css';
 import {FaCircle} from "react-icons/fa";
-import {MaterialReactTable, useMaterialReactTable} from 'material-react-table';
+import {MaterialReactTable, MRT_RowData, useMaterialReactTable} from 'material-react-table';
 import {Box, Button, CircularProgress, MenuItem} from '@mui/material';
 import {mkConfig, generateCsv, download} from "export-to-csv";
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
@@ -13,6 +13,8 @@ import axios from "axios";
 import {task_table_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import Typography from "@mui/material/Typography";
+import {type Row, filterFns} from '@tanstack/react-table';
+import {useTaskTableColumnsStore} from "@jobmon_gui/stores/task_table";
 
 type TaskTableProps = {
     taskTemplateName: string
@@ -35,7 +37,7 @@ type Tasks = {
 
 export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps) {
     const location = useLocation();
-
+    const columnFilters = useTaskTableColumnsStore()
     const tasks = useQuery({
         queryKey: ["workflow_details", "tasks", workflowId, taskTemplateName],
         queryFn: async () => {
@@ -54,6 +56,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         enabled: !!taskTemplateName
     })
 
+
     const columns = [
         {
             header: "Task ID",
@@ -68,20 +71,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
                     </Link>
                 </nav>
             ),
-            renderColumnFilterModeMenuItems: ({column, onSelectFilterMode}) => [
-                <MenuItem
-                    key="startsWith"
-                    onClick={() => onSelectFilterMode('startsWith')}
-                >
-                    Start With
-                </MenuItem>,
-                <MenuItem
-                    key="endsWith"
-                    onClick={() => onSelectFilterMode('yourCustomFilterFn')}
-                >
-                    Your Custom Filter Fn
-                </MenuItem>,
-            ],
+            filterFn: 'listFilter',
         },
         {
             header: "Task Name",
@@ -132,10 +122,53 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         },
     ];
 
+
+    const [sorting, setSorting] = useState([{
+        id: 'task_id',
+        desc: false, //sort by age in descending order by default
+    }])
+    const [pagination, setPagination] = useState({pageIndex: 0, pageSize: 15})
+
+    const setColumnFilters = (updater) => {
+        const newColumnFilters = typeof updater === "function" ? updater(columnFilters.get()) : updater;
+        columnFilters.set(newColumnFilters)
+    }
+
+
     const table = useMaterialReactTable({
         data: tasks?.data || [],
         columns: columns,
-        initialState: {density: 'compact'},
+        initialState: {density: 'compact', showColumnFilters: true,},
+        enableColumnFilterModes: true,
+
+        state: {
+
+            get columnFilters() {
+                return columnFilters.get() //pass controlled state back to the table (overrides internal state)
+            },
+            get sorting() {
+                return sorting
+            },
+            get pagination() {
+                return pagination
+            },
+
+        },
+        onColumnFiltersChange: setColumnFilters,
+        onSortingChange: setSorting,
+        onPaginationChange: setPagination,
+        filterFns: {
+            listFilter: <TData extends MRT_RowData>(
+                row: Row<TData>,
+                id: string,
+                filterValue: number | string,
+            ) => {
+                return filterValue.toString().toLowerCase().trim().split(',').map((item) => item.trim()).includes(row.getValue<number | string>(id)
+                    .toString()
+                    .toLowerCase()
+                    .trim())
+            }
+        },
         renderTopToolbarCustomActions: (table) => {
             return (<Box>
                 <Button
@@ -180,7 +213,6 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
     if (tasks.isError) {
         return (<Typography sx={{pt: 5}}>Error loading tasks. Please refresh and try again.</Typography>)
     }
-
 
     return (
         <Box p={2} display="flex" justifyContent="center" width="100%">
