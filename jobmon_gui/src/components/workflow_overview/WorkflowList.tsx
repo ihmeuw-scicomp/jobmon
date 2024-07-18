@@ -1,6 +1,5 @@
 import React, {useEffect, useState} from 'react';
 import axios from 'axios';
-import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
 import {Link, useLocation} from "react-router-dom";
 import {convertDatePST} from '@jobmon_gui/utils/formatters';
 import {FaCircle} from "react-icons/fa";
@@ -10,62 +9,20 @@ import dayjs from "dayjs";
 import {workflow_overview_url, workflow_status_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import {useWorkflowSearchSettings} from "@jobmon_gui/stores/workflow_settings";
-import {CircularProgress} from "@mui/material";
+import {CircularProgress, Grid} from "@mui/material";
 import {Box, List, ListItem, ListItemIcon, ListItemText, Typography} from '@mui/material';
-import {HiInformationCircle} from "react-icons/hi";
+import InfoIcon from '@mui/icons-material/Info';
 import CustomModal from "@jobmon_gui/components/Modal";
-import {IoMdCloseCircle, IoMdCloseCircleOutline} from "react-icons/io";
-import {AiFillSchedule, AiFillCheckCircle} from "react-icons/ai";
-import {BiRun} from "react-icons/bi";
-import {TbHandStop} from "react-icons/tb";
-import {HiRocketLaunch} from "react-icons/hi2";
-
-
-// Get task status count for specified workflows
-function getAsyncFetchData(setStatusDict, setFinishedWF, statusD, pre_finished_ids, wf_ids: number[], setFetchCompleted) {
-    const fetchData = async () => {
-        let unfinished_wf_ids: number[] = [];
-        let finished_wf_ids: number[] = [];
-        // have to convert the unknown type to any to operate
-        let all_status: any = statusD;
-
-        for (const w of wf_ids) {
-            if (statusD[w] === undefined || statusD[w]["PENDING"] + statusD[w]["SCHEDULED"] + statusD[w]["RUNNING"] > 0) {
-                unfinished_wf_ids.push(w);
-            } else {
-                finished_wf_ids.push(w);
-            }
-        }
-
-        //don't query empty list
-        if (unfinished_wf_ids.length > 0) {
-            const result = await axios({
-                    method: 'get',
-                    url: workflow_status_url,
-                    data: null,
-                    params: {workflow_ids: unfinished_wf_ids},
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                }
-            )
-            // have to convert the unknown type to any to operate
-            let temp_data: any = result.data;
-
-            for (const wf_id of unfinished_wf_ids) {
-                if (temp_data[wf_id]["PENDING"] + temp_data[wf_id]["SCHEDULED"] + temp_data[wf_id]["RUNNING"] === 0) {
-                    finished_wf_ids.push(wf_id);
-                }
-                all_status[wf_id] = temp_data[wf_id];
-            }
-        }
-        setStatusDict(all_status);
-        setFinishedWF(finished_wf_ids);
-        setFetchCompleted(true);
-    };
-    return fetchData
-}
+import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
+import ErrorIcon from '@mui/icons-material/Error';
+import PanToolIcon from '@mui/icons-material/PanTool';
+import CancelIcon from '@mui/icons-material/Cancel';
+import DoneIcon from '@mui/icons-material/Done';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import IconButton from '@mui/material/IconButton';
+import {JobmonModal} from "@jobmon_gui/components/JobmonModal";
+import ScrollableTextArea, {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea";
 
 type WorkflowType = {
     DONE: number,
@@ -88,17 +45,7 @@ type WorkflowsQueryResponse = {
 }
 
 export default function WorkflowList() {
-    const [expandedRows, setExpandedRows] = useState([]);
-    const [statusDict, setStatusDict] = useState({});
-    //TODO: get rid of finishedWF
-    //without this extra parameter, the progress bar keeps spinning until next row extension
-    //the console.log shows the progress bar gets its info though
-    //suspect sync issue, but not sure.
-    const [finishedWF, setFinishedWF] = useState<number[]>([]);
     const [showWorkflowInfo, setShowWorkflowInfo] = useState(false)
-    const [fetchCompleted, setFetchCompleted] = useState(false);
-    const [workflowIds, setWorkflowIds] = useState([])
-
     const [workflowDetails, setWorkflowDetails] = useState<WorkflowType>({
         DONE: 0,
         FATAL: 0,
@@ -118,7 +65,16 @@ export default function WorkflowList() {
     const workflowSettings = useWorkflowSearchSettings()
 
     const workflows = useQuery({
-        queryKey: ["workflow_overview", "workflows", workflowSettings.get().user, workflowSettings.get().tool, workflowSettings.get().wf_name, workflowSettings.get().wf_args, workflowSettings.get().wf_attribute_key, workflowSettings.get().wf_attribute_value, workflowSettings.get().wf_id, dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"), workflowSettings.get().status],
+        queryKey: [
+            "workflow_overview", "workflows", workflowSettings.get().user,
+            workflowSettings.get().tool, workflowSettings.get().wf_name,
+            workflowSettings.get().wf_args,
+            workflowSettings.get().wf_attribute_key,
+            workflowSettings.get().wf_attribute_value,
+            workflowSettings.get().wf_id,
+            dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
+            workflowSettings.get().status
+        ],
         queryFn: async () => {
             workflowSettings.clearDataRefresh()
             const params = new URLSearchParams({
@@ -136,22 +92,11 @@ export default function WorkflowList() {
                 ...jobmonAxiosConfig,
                 params: params
             }).then((response) => {
-                const workflowIds = response.data?.workflows.map((workflow) => workflow.wf_id);
-                setWorkflowIds(workflowIds)
-                getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, workflowIds, setFetchCompleted)();
                 return response.data?.workflows
             })
         },
         enabled: workflowSettings.getRefreshData()
     })
-
-    // Update the progress bar every 60 seconds
-    useEffect(() => {
-        const interval = setInterval(() => {
-            getAsyncFetchData(setStatusDict, setFinishedWF, statusDict, finishedWF, workflowIds, setFetchCompleted)();
-        }, 60000);
-        return () => clearInterval(interval);
-    }, [finishedWF, statusDict, workflowIds]);
 
 
     if (workflows.isLoading) {
@@ -189,36 +134,45 @@ export default function WorkflowList() {
     ];
 
     const statusMap = {
-        'ABORTED': {icon: <IoMdCloseCircleOutline/>, className: 'icon-aa'},
-        'DONE': {icon: <AiFillCheckCircle/>, className: 'icon-dd'},
-        'FAILED': {icon: <IoMdCloseCircle/>, className: 'icon-ff'},
-        'REGISTERING': {icon: <AiFillSchedule/>, className: 'icon-pp'},
-        'HALTED': {icon: <TbHandStop/>, className: 'icon-aa'},
-        'INSTANTIATING': {icon: <AiFillSchedule/>, className: 'icon-pp'},
-        'LAUNCHED': {icon: <HiRocketLaunch/>, className: 'icon-ss'},
-        'QUEUED': {icon: <AiFillSchedule/>, className: 'icon-pp'},
-        'RUNNING': {icon: <BiRun/>, className: 'icon-rr'},
+        'ABORTED': {icon: <CancelIcon/>, className: 'icon-aa'},
+        'DONE': {icon: <DoneIcon/>, className: 'icon-dd'},
+        'FAILED': {icon: <ErrorIcon/>, className: 'icon-ff'},
+        'REGISTERING': {icon: <CalendarMonthIcon/>, className: 'icon-pp'},
+        'HALTED': {icon: <PanToolIcon/>, className: 'icon-aa'},
+        'INSTANTIATING': {icon: <CalendarMonthIcon/>, className: 'icon-pp'},
+        'LAUNCHED': {icon: <RocketLaunchIcon/>, className: 'icon-ss'},
+        'QUEUED': {icon: <CalendarMonthIcon/>, className: 'icon-pp'},
+        'RUNNING': {icon: <DirectionsRunIcon/>, className: 'icon-rr'},
     };
+
+    const modalTitleStyles = {
+        fontWeight: "bold"
+    }
+    const modalValuesStyles = {
+        fontFamily: 'Roboto Mono Variable',
+    }
+
+
     return (
-        <div>
-            <div>
-                <div id="legend" className="legend">
+        <Box>
+            <Box>
+                <Box id="legend" className="legend">
                     <form className='d-flex justify-content-around w-100 mx-auto py-3'>
                         {statuses.map((status, index) => (
-                            <div key={index}>
+                            <Box key={index}>
                                 <label className="label-middle">
                                     <FaCircle className={status.className}/>
                                 </label>
                                 <label className="label-left">{status.label}</label>
-                            </div>
+                            </Box>
                         ))}
                     </form>
-                </div>
+                </Box>
                 <Typography variant="h4" component="h1">Workflow List</Typography>
                 <List>
                     {workflows.data.map((workflow) => (
                         <ListItem key={workflow.wf_id}>
-                            <div style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
+                            <Box style={{display: 'flex', flexDirection: 'column', width: '100%'}}>
                                 <Box sx={{display: 'flex', alignItems: 'center'}}>
                                     <span className={statusMap[workflow.wf_status].className}
                                           style={{marginRight: '8px'}}>
@@ -234,47 +188,85 @@ export default function WorkflowList() {
                                         }
                                     />
                                     <ListItemIcon sx={{marginLeft: '12px', fontSize: '32px'}}>
-                                        <HiInformationCircle onClick={() => handleInfoClick(workflow)}/>
+                                        <IconButton>
+                                            <InfoIcon onClick={() => handleInfoClick(workflow)}/>
+                                        </IconButton>
+
                                     </ListItemIcon>
                                 </Box>
-                                {fetchCompleted && (
-                                    <JobmonProgressBar
-                                        tasks={statusDict[workflow.wf_id]["tasks"]}
-                                        pending={statusDict[workflow.wf_id]["PENDING"]}
-                                        scheduled={statusDict[workflow.wf_id]["SCHEDULED"]}
-                                        running={statusDict[workflow.wf_id]["RUNNING"]}
-                                        done={statusDict[workflow.wf_id]["DONE"]}
-                                        fatal={statusDict[workflow.wf_id]["FATAL"]}
-                                        maxc={statusDict[workflow.wf_id]["MAXC"]}
-                                        placement="top"
-                                    />
-                                )}
-                            </div>
+                                <JobmonProgressBar
+                                    workflowId={workflow.wf_id}
+                                    // placement="top"
+                                />
+
+                            </Box>
                         </ListItem>
                     ))}
                 </List>
 
-            </div>
-            <CustomModal
-                className="workflow_info_modal"
-                headerContent={
-                    <h5>Workflow Information</h5>
+            </Box>
+            <JobmonModal
+                title="Workflow Details"
+                children={
+                    <Grid container spacing={2}>
+                        <Grid item xs={4}>
+                            <Typography sx={modalTitleStyles}>Workflow Name:</Typography>
+                        </Grid>
+                        <Grid item xs={8}>
+                            <Typography sx={modalValuesStyles}>{workflowDetails.wf_name}</Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                            <Typography sx={modalTitleStyles}>Workflow ID:</Typography>
+                        </Grid>
+                        <Grid item xs={8}>
+                            <Typography sx={modalValuesStyles}>{workflowDetails.wf_id}</Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                            <Typography sx={modalTitleStyles}>Workflow Status:</Typography>
+                        </Grid>
+                        <Grid item xs={8}>
+                            <Typography sx={modalValuesStyles}>{workflowDetails.wf_status}</Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                            <Typography sx={modalTitleStyles}>Tool:</Typography>
+                        </Grid>
+                        <Grid item xs={8}>
+                            <Typography sx={modalValuesStyles}>{workflowDetails.wf_tool}</Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                            <Typography sx={modalTitleStyles}>Date Submitted:</Typography>
+                        </Grid>
+                        <Grid item xs={8}>
+                            <Typography
+                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date)}</Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                            <Typography sx={modalTitleStyles}>Status Date:</Typography>
+                        </Grid>
+                        <Grid item xs={8}>
+                            <Typography
+                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_status_date)}</Typography>
+                        </Grid>
+                        <Grid item xs={4}>
+                            <Typography sx={modalTitleStyles}>Number of Workflow Runs:</Typography>
+                        </Grid>
+                        <Grid item xs={8}>
+                            <Typography sx={modalValuesStyles}>{workflowDetails.wfr_count}</Typography>
+                        </Grid>
+
+                        <Grid item xs={12}>
+                            <Typography sx={modalTitleStyles}>Workflow Args:</Typography>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <ScrollableCodeBlock>
+                                {workflowDetails.wf_args}
+                            </ScrollableCodeBlock>
+                        </Grid>
+                    </Grid>
                 }
-                bodyContent={
-                    <p>
-                        <b>Workflow Name:</b> {workflowDetails.wf_name}<br/>
-                        <b>Workflow ID:</b> {workflowDetails.wf_id}<br/>
-                        <b>Workflow Status:</b> {workflowDetails.wf_status}<br/>
-                        <b>Tool:</b> {workflowDetails.wf_tool}<br/>
-                        <b>Workflow Args:</b> {workflowDetails.wf_args} <br/>
-                        <b>Date Submitted:</b> {convertDatePST(workflowDetails.wf_submitted_date)}<br/>
-                        <b>Status Date: </b> {convertDatePST(workflowDetails.wf_status_date)}<br/>
-                        <b>Number of WorkflowRuns: </b> {workflowDetails.wfr_count}<br/>
-                    </p>
-                }
-                showModal={showWorkflowInfo}
-                setShowModal={setShowWorkflowInfo}
+                open={showWorkflowInfo}
+                onClose={() => setShowWorkflowInfo(false)}
             />
-        </div>
+        </Box>
     );
 }

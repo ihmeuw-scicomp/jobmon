@@ -1,6 +1,5 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import '@jobmon_gui/styles/index.css';
 import WorkflowOverview from '@jobmon_gui/screens/WorkflowOverview';
 import {
     HashRouter,
@@ -14,6 +13,9 @@ import JobmonAtIHME from '@jobmon_gui/screens/JobmonAtIhme'
 import PageNavigation from '@jobmon_gui/components/navigation/PageNavigation';
 import CustomThemeProvider from "@jobmon_gui/contexts/CustomThemeProvider";
 import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
+import '@fontsource-variable/roboto-mono';
+import "@fontsource/archivo";
+
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -35,9 +37,8 @@ root.render(
                 <PageNavigation>
                     <Routes>
                         <Route path="workflow">
-                            <Route path=":workflowId/tasks" element={<WorkflowDetails subpage="tasks"/>}/>
-                            <Route path=":workflowId/usage" element={<WorkflowDetails subpage="usage"/>}/>
-                            <Route path=":workflowId/errors" element={<WorkflowDetails subpage="errors"/>}/>
+                            <Route path=":workflowId/tasks" element={<WorkflowDetails subpage={0}/>}/>
+                            <Route path=":workflowId/usage" element={<WorkflowDetails subpage={1}/>}/>
                         </Route>
                         <Route path="task_details/:taskId" element={<TaskDetails/>}></Route>
                         <Route path="help" element={<Help/>}></Route>

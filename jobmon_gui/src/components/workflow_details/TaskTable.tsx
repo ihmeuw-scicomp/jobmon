@@ -1,25 +1,61 @@
-import React from 'react';
+import React, {useCallback, useState} from 'react';
 import {Link, useLocation} from 'react-router-dom';
 
 import {convertDate, convertDatePST} from '@jobmon_gui/utils/formatters'
 import '@jobmon_gui/styles/jobmon_gui.css';
 import {FaCircle} from "react-icons/fa";
-import {MaterialReactTable} from 'material-react-table';
-import {Box, Button} from '@mui/material';
+import {MaterialReactTable, MRT_RowData, useMaterialReactTable} from 'material-react-table';
+import {Box, Button, CircularProgress, MenuItem} from '@mui/material';
 import {mkConfig, generateCsv, download} from "export-to-csv";
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import {useQuery} from "@tanstack/react-query";
+import axios from "axios";
+import {task_table_url} from "@jobmon_gui/configs/ApiUrls";
+import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
+import Typography from "@mui/material/Typography";
+import {type Row, filterFns} from '@tanstack/react-table';
+import {useTaskTableColumnsStore} from "@jobmon_gui/stores/task_table";
+
+type TaskTableProps = {
+    taskTemplateName: string
+    workflowId: number | string
+}
+
+type Task = {
+    task_command: string
+    task_id: number
+    task_max_attempts: number
+    task_name: string
+    task_num_attempts: number
+    task_status: string
+    task_status_date: string
+}
+type Tasks = {
+    tasks: Task[]
+}
 
 
-export default function TaskTable({taskData, loading}) {
+export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps) {
     const location = useLocation();
+    const columnFilters = useTaskTableColumnsStore()
+    const tasks = useQuery({
+        queryKey: ["workflow_details", "tasks", workflowId, taskTemplateName],
+        queryFn: async () => {
+            return axios.get<Tasks>(
+                task_table_url + workflowId,
+                {
+                    ...jobmonAxiosConfig,
+                    data: null,
+                    params: {tt_name: taskTemplateName}
+                }
+            ).then((r) => {
+                return r.data.tasks
+            })
+        },
+        staleTime: 5000,
+        enabled: !!taskTemplateName
+    })
 
-    const workflow_status = [
-        {status: "PENDING", circleClass: "bar-pp", label: "PENDING"},
-        {status: "SCHEDULED", circleClass: "bar-ss", label: "SCHEDULED"},
-        {status: "RUNNING", circleClass: "bar-rr", label: "RUNNING"},
-        {status: "FATAL", circleClass: "bar-ff", label: "FATAL"},
-        {status: "DONE", circleClass: "bar-dd", label: "DONE"}
-    ];
 
     const columns = [
         {
@@ -35,6 +71,7 @@ export default function TaskTable({taskData, loading}) {
                     </Link>
                 </nav>
             ),
+            filterFn: 'listFilter',
         },
         {
             header: "Task Name",
@@ -57,6 +94,8 @@ export default function TaskTable({taskData, loading}) {
         {
             header: "Command",
             accessorKey: "task_command",
+            enableClickToCopy: true,
+            size: 200,
         },
         {
             header: "Num Attempts",
@@ -75,6 +114,76 @@ export default function TaskTable({taskData, loading}) {
         },
     ];
 
+
+    const [sorting, setSorting] = useState([{
+        id: 'task_id',
+        desc: false, //sort by age in descending order by default
+    }])
+    const [pagination, setPagination] = useState({pageIndex: 0, pageSize: 15})
+
+    const setColumnFilters = (updater) => {
+        const newColumnFilters = typeof updater === "function" ? updater(columnFilters.get()) : updater;
+        columnFilters.set(newColumnFilters)
+    }
+
+
+    const table = useMaterialReactTable({
+        data: tasks?.data || [],
+        columns: columns,
+        initialState: {density: 'compact', showColumnFilters: true,},
+        enableColumnFilterModes: true,
+
+        state: {
+
+            get columnFilters() {
+                return columnFilters.get() //pass controlled state back to the table (overrides internal state)
+            },
+            get sorting() {
+                return sorting
+            },
+            get pagination() {
+                return pagination
+            },
+
+        },
+        enableColumnResizing: true,
+        layoutMode: "grid",
+        onColumnFiltersChange: setColumnFilters,
+        onSortingChange: setSorting,
+        onPaginationChange: setPagination,
+        filterFns: {
+            listFilter: <TData extends MRT_RowData>(
+                row: Row<TData>,
+                id: string,
+                filterValue: number | string,
+            ) => {
+                return filterValue.toString().toLowerCase().trim().split(',').map((item) => item.trim()).includes(row.getValue<number | string>(id)
+                    .toString()
+                    .toLowerCase()
+                    .trim())
+            }
+        },
+        renderTopToolbarCustomActions: (table) => {
+            return (<Box>
+                <Button
+                    onClick={exportToCSV}
+                    startIcon={<FileDownloadIcon/>}>
+                    Export All Data
+                </Button>
+            </Box>)
+        }
+    });
+
+
+    const workflow_status = [
+        {status: "PENDING", circleClass: "bar-pp", label: "PENDING"},
+        {status: "SCHEDULED", circleClass: "bar-ss", label: "SCHEDULED"},
+        {status: "RUNNING", circleClass: "bar-rr", label: "RUNNING"},
+        {status: "FATAL", circleClass: "bar-ff", label: "FATAL"},
+        {status: "DONE", circleClass: "bar-dd", label: "DONE"}
+    ];
+
+
     const csvConfig = mkConfig({
         fieldSeparator: ',',
         decimalSeparator: '.',
@@ -82,29 +191,26 @@ export default function TaskTable({taskData, loading}) {
     });
 
     const exportToCSV = () => {
-        const csv = generateCsv(csvConfig)(taskData);
+        const csv = generateCsv(csvConfig)(tasks?.data);
         download(csvConfig)(csv);
     };
 
+    if (!taskTemplateName) {
+        return (<Typography sx={{pt: 5}}>Select a task template from above to view tasks</Typography>)
+    }
+
+    if (tasks.isLoading) {
+        return (<CircularProgress/>)
+    }
+
+
+    if (tasks.isError) {
+        return (<Typography sx={{pt: 5}}>Error loading tasks. Please refresh and try again.</Typography>)
+    }
+
     return (
-        <div>
-            {loading &&
-                <div>
-                    <br/>
-                    <div className="loader"/>
-                </div>
-            }
-            <Button
-                onClick={exportToCSV}
-                startIcon={<FileDownloadIcon/>}
-            >
-                Export All Data
-            </Button>
-            {loading === false &&
-                <Box p={2} display="flex" justifyContent="center" width="100%">
-                    <MaterialReactTable columns={columns} data={taskData}/>
-                </Box>
-            }
-        </div>
+        <Box p={2} display="flex" justifyContent="center" width="100%">
+            <MaterialReactTable table={table}/>
+        </Box>
     );
 }

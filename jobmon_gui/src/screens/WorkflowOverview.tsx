@@ -13,9 +13,6 @@ import WorkflowFilters from "@jobmon_gui/components/workflow_overview/WorkflowFi
 function WorkflowOverview() {
     const apm: any = init_apm("workflow_overview_page");
 
-    const [refreshData, setRefreshData] = useState(false)
-
-
     return (
         <Box>
             <WorkflowFilters />
