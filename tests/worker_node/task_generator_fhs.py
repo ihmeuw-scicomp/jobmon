@@ -2,9 +2,21 @@ import pytest
 
 from typing import Optional, Callable, Type, Dict, List, Any, Union
 import sys
+import os
+import importlib
 
 from jobmon.core.task_generator import task_generator
 from jobmon.client.api import Tool
+
+# Get the full path of the current script
+script_path = os.path.abspath(__file__)
+
+# Resolve any symbolic links (if necessary)
+full_script_path = os.path.realpath(script_path)
+
+fhs_generator_funcs_path = os.path.join(
+    os.path.dirname(script_path), "task_generator_fhs.py"
+)
 
 class YearRange:
     """A Fake class representing a range of years."""
@@ -193,8 +205,14 @@ def fhs_seq():
     )
     wf = tool.create_workflow()
     compute_resources = {"queue": "null.q"}
-
-    task = fhs_simple_function.create_task(
+    # Import the task_generator_funcs.py module
+    spec = importlib.util.spec_from_file_location(
+        "task_generator_fhs", fhs_generator_funcs_path
+    )
+    task_generator_fhs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(task_generator_fhs)
+    simple_function = task_generator_fhs.fhs_simple_function
+    task = simple_function.create_task(
             compute_resources=compute_resources,
             yr=YearRange(2020, 2021),
             v=Versions("1.0", "2.0"),
