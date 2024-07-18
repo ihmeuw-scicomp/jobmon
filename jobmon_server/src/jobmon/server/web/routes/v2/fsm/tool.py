@@ -187,8 +187,8 @@ def get_tool_resource_usage(tool_name: str) -> Any:
         "node_arg_val",
         "ti_requested_resources",
     )
-    results = [dict(zip(column_names, result)) for result in results]
+    results_formatted: list[Dict[str, Any]] = [dict(zip(column_names, result)) for result in results]
 
-    resp = jsonify(results)
+    resp = jsonify(results_formatted)
     resp.status_code = StatusCodes.OK
     return resp
