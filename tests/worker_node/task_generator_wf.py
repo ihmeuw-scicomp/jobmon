@@ -230,6 +230,27 @@ def fhs_seq():
     assert s == "D"
 
 
+def fhs_slurm():
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="slurm", compute_resources={"queue": "all.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
+    # Import the task_generator_funcs.py module
+
+    task = fhs_simple_function.create_task(
+            compute_resources=compute_resources,
+            yr=YearRange(2020, 2021),
+            v=Versions("1.0", "2.0"),
+            fSpec=FHSFileSpec("/path/to/file"),
+            dSpec=FHSDirSpec("/path/to/dir"),
+            vm=VersionMetadata("1.0"),
+        )
+    wf.add_tasks([task])
+    s = wf.run()
+    assert s == "D"
+
 def main():
     if len(sys.argv) > 1:
         try:
@@ -251,6 +272,8 @@ def main():
         simple_tasks_serializer_array()
     elif input_value == 7:
         fhs_seq()
+    elif input_value == 8:
+        fhs_slurm()
     else:
         simple_tasks_seq()
 
