@@ -167,6 +167,67 @@ def simple_tasks_serializer_array() -> None:
     assert r == "D"
 
 
+## ------------FHS tests-----------------
+spec = importlib.util.spec_from_file_location(
+        "task_generator_fhs", fhs_generator_funcs_path
+    )
+task_generator_fhs = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(task_generator_fhs)
+YearRange = task_generator_fhs.YearRange
+Versions = task_generator_fhs.Versions
+FHSFileSpec = task_generator_fhs.FHSFileSpec
+FHSDirSpec = task_generator_fhs.FHSDirSpec
+VersionMetadata = task_generator_fhs.VersionMetadata
+Quantiles = task_generator_fhs.Quantiles
+version_to_list = task_generator_fhs.versions_to_list
+version_from_list = task_generator_fhs.versions_from_list
+quantiles_to_list = task_generator_fhs.quantiles_to_list
+quantiles_from_list = task_generator_fhs.quantiles_from_list
+
+fhs_serializer = {
+        YearRange: (str, YearRange.parse_year_range),
+        Versions: (versions_to_list, versions_from_list),
+        FHSFileSpec: (str, FHSFileSpec.parse),
+        FHSDirSpec: (str, FHSDirSpec.parse),
+        VersionMetadata: (str, VersionMetadata.parse_version),
+        Quantiles: (quantiles_to_list, quantiles_from_list),
+    }
+
+@task_generator(tool_name="test_tool", naming_args=["version"], serializers=fhs_serializer, module_source_path=fhs_generator_funcs_path)
+def fhs_simple_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDirSpec, vm: VersionMetadata, q: Optional[Quantiles]) -> None:
+    """Simple task_function."""
+    print(f"YearRange: {yr}")
+    print(f"Version: {v}")
+    print(f"FHSFileSpec: {fSpec}")
+    print(f"FHSDirSpec: {dSpec}")
+    print(f"VersionMetadata: {vm}")
+    print(f"Quantiles: {q}")
+
+
+def fhs_seq():
+    tool = Tool("test_tool")
+    wf = tool.create_workflow()
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="sequential", compute_resources={"queue": "null.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "null.q"}
+    # Import the task_generator_funcs.py module
+
+    task = fhs_simple_function.create_task(
+            compute_resources=compute_resources,
+            yr=YearRange(2020, 2021),
+            v=Versions("1.0", "2.0"),
+            fSpec=FHSFileSpec("/path/to/file"),
+            dSpec=FHSDirSpec("/path/to/dir"),
+            vm=VersionMetadata("1.0"),
+            q=Quantiles(0.1, 0.9)
+        )
+    wf.add_tasks([task])
+    s = wf.run()
+    assert s == "D"
+
+
 def main():
     if len(sys.argv) > 1:
         try:
@@ -186,6 +247,8 @@ def main():
         simple_tasks_array()
     elif input_value == 6:
         simple_tasks_serializer_array()
+    elif input_value == 7:
+        pass
     else:
         simple_tasks_seq()
 
