@@ -1,6 +1,7 @@
 import pytest
 
 from typing import Optional, Callable, Type, Dict, List, Any, Union
+import sys
 
 from jobmon.core.task_generator import task_generator
 from jobmon.client.api import Tool
@@ -182,3 +183,51 @@ def fhs_simple_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: F
     print(f"FHSDirSpec: {dSpec}")
     print(f"VersionMetadata: {vm}")
     print(f"Quantiles: {q}")
+
+
+def fhs_seq():
+    tool = Tool("test_tool")
+    wf = tool.create_workflow()
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="sequential", compute_resources={"queue": "null.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "null.q"}
+
+    task = fhs_simple_function.create_task(
+            compute_resources=compute_resources,
+            yr=YearRange(2020, 2021),
+            v=Versions("1.0", "2.0"),
+            fSpec=FHSFileSpec("/path/to/file"),
+            dSpec=FHSDirSpec("/path/to/dir"),
+            vm=VersionMetadata("1.0"),
+            q=Quantiles(0.1, 0.9)
+        )
+    wf.add_tasks([task])
+    s = wf.run()
+    assert s == "D"
+
+def main():
+    if len(sys.argv) > 1:
+        try:
+            input_value = int(sys.argv[1])
+        except ValueError:
+            input_value = None
+    else:
+        input_value = None
+
+    if input_value == 2:
+        pass
+    elif input_value == 3:
+        pass
+    elif input_value == 4:
+        pass
+    elif input_value == 5:
+        pass
+    elif input_value == 6:
+        pass
+    else:
+        fhs_seq()
+
+if __name__ == "__main__":
+    main()

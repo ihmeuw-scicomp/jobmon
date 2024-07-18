@@ -7,8 +7,6 @@ import importlib.machinery
 from jobmon.core import task_generator, __version__ as core_version
 from jobmon.client.api import Tool
 
-from task_generator_fhs import YearRange, Versions, FHSFileSpec, FHSDirSpec, VersionMetadata, Quantiles, fhs_simple_function
-
 # Get the full path of the current script
 script_path = os.path.abspath(__file__)
 
@@ -169,28 +167,6 @@ def simple_tasks_serializer_array() -> None:
     assert r == "D"
 
 
-def fhs_seq():
-    tool = Tool("test_tool")
-    wf = tool.create_workflow()
-    tool.set_default_compute_resources_from_dict(
-        cluster_name="sequential", compute_resources={"queue": "null.q"}
-    )
-    wf = tool.create_workflow()
-    compute_resources = {"queue": "null.q"}
-
-    task = fhs_simple_function.create_task(
-            compute_resources=compute_resources,
-            yr=YearRange(2020, 2021),
-            v=Versions("1.0", "2.0"),
-            fSpec=FHSFileSpec("/path/to/file"),
-            dSpec=FHSDirSpec("/path/to/dir"),
-            vm=VersionMetadata("1.0"),
-            q=Quantiles(0.1, 0.9)
-        )
-    wf.add_tasks([task])
-    s = wf.run()
-    assert s == "D"
-
 def main():
     if len(sys.argv) > 1:
         try:
@@ -210,8 +186,6 @@ def main():
         simple_tasks_array()
     elif input_value == 6:
         simple_tasks_serializer_array()
-    elif input_value == 7:
-        fhs_seq()
     else:
         simple_tasks_seq()
 
