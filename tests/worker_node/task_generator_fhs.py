@@ -141,6 +141,7 @@ class VersionMetadata:
 
 def fhs_task_generator(
     tool_name: str,
+    module_source_path: str = full_script_path,
     serializers: Optional[Any] = None,
     naming_args: Optional[List[str]] = None,
     max_attempts: Optional[int] = None,
@@ -184,6 +185,7 @@ def fhs_task_generator(
         tool_name=tool_name,
         naming_args=naming_args,
         max_attempts=max_attempts,
+        module_source_path=module_source_path,
     )
 
 @fhs_task_generator(tool_name="test_tool", naming_args=["version"])
