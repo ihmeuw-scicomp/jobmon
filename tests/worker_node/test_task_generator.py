@@ -834,3 +834,123 @@ def test_fhs_serializers(client_env) -> None:
     assert dSpec == tg.deserialize(r4, FHSDirSpec)
     assert vm == tg.deserialize(r5, VersionMetadata)
     assert q == tg.deserialize(r6, Quantiles)
+
+
+def test_fhs_task(client_env, monkeypatch) -> None:
+    """Test the serializers for the FHS task generator."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    from tests.worker_node.task_generator_fhs import YearRange, Versions, FHSFileSpec, FHSDirSpec, VersionMetadata, \
+        Quantiles, versions_to_list, versions_from_list, quantiles_to_list, quantiles_from_list
+    yr = YearRange(2020, 2021)
+    v = Versions("1.0", "2.0")
+    fSpec = FHSFileSpec("/path/to/file")
+    dSpec = FHSDirSpec("/path/to/dir")
+    vm = VersionMetadata("1.0")
+    q = Quantiles(0.1, 0.9)
+
+    tool = Tool("test_tool")
+    testing_serializer = {
+        YearRange: (str, YearRange.parse_year_range),
+        Versions: (versions_to_list, versions_from_list),
+        FHSFileSpec: (str, FHSFileSpec.parse),
+        FHSDirSpec: (str, FHSDirSpec.parse),
+        VersionMetadata: (str, VersionMetadata.parse_version),
+        Quantiles: (quantiles_to_list, quantiles_from_list),
+    }
+
+    @task_generator.task_generator(tool_name="test_tool", serializers=testing_serializer, naming_args=["yr", "v"])
+    def simple_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDirSpec, vm: VersionMetadata,
+                        q: Optional[Quantiles]) -> None:
+        """Simple task_function."""
+        pass
+
+    task1 = simple_function.create_task(
+        compute_resources={},
+        yr=yr,
+        v=v,
+        fSpec=fSpec,
+        dSpec=dSpec,
+        vm=vm,
+        q=q
+    )
+    # Verify command
+    expected_command = (
+        f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
+        f" --module_name tests.worker_node.test_task_generator"
+        " --func_name simple_function"
+        " --args yr=2020-2021"
+        " --args v=[1.0,2.0]"
+        " --args fSpec=/path/to/file"
+        " --args dSpec=/path/to/dir"
+        " --args vm=1.0"
+        " --args q=[0.1,0.9]"
+    )
+    assert task1.name == "simple_function:yr=2020-2021:v=1.0,2.0"
+    assert task1.command == expected_command
+
+    # test optional args
+    task2 = simple_function.create_task(
+        compute_resources={},
+        yr=yr,
+        v=v,
+        fSpec=fSpec,
+        dSpec=dSpec,
+        vm=vm,
+    )
+    # Verify command
+    expected_command = (
+        f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
+        f" --module_name tests.worker_node.test_task_generator"
+        " --func_name simple_function"
+        " --args yr=2020-2021"
+        " --args v=[1.0,2.0]"
+        " --args fSpec=/path/to/file"
+        " --args dSpec=/path/to/dir"
+        " --args vm=1.0"
+        " --args q=None"
+    )
+    assert task2.name == "simple_function:yr=2020-2021:v=1.0,2.0"
+    assert task2.command == expected_command
+
+    # test array task
+    tasks = simple_function.create_tasks(
+        compute_resources={},
+        yr=yr,
+        v=v,
+        fSpec=fSpec,
+        dSpec=dSpec,
+        vm=vm,
+        q=[q, None]
+    )
+    assert len(tasks) == 2
+    # Verify command
+    expected_command1 = (
+        f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
+        f" --module_name tests.worker_node.test_task_generator"
+        " --func_name simple_function"
+        " --args yr=2020-2021"
+        " --args v=[1.0,2.0]"
+        " --args fSpec=/path/to/file"
+        " --args dSpec=/path/to/dir"
+        " --args vm=1.0"
+        " --args q=[0.1,0.9]"
+    )
+    assert tasks[0].command == expected_command1
+    # Verify command
+    expected_command2 = (
+        f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
+        f" --module_name tests.worker_node.test_task_generator"
+        " --func_name simple_function"
+        " --args yr=2020-2021"
+        " --args v=[1.0,2.0]"
+        " --args fSpec=/path/to/file"
+        " --args dSpec=/path/to/dir"
+        " --args vm=1.0"
+        " --args q=None"
+    )
+    assert tasks[1].command == expected_command2

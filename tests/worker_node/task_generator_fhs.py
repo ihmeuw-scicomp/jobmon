@@ -189,11 +189,12 @@ def fhs_task_generator(
     )
 
 @fhs_task_generator(tool_name="test_tool", naming_args=["version"])
-def fhs_simple_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDirSpec, vm: VersionMetadata, q: Optional[Quantiles]) -> None:
+def fhs_simple_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDirSpec, vm: VersionMetadata, q: Optional[Quantiles]=None) -> None:
     """Simple task_function."""
     print(f"YearRange: {yr}")
     print(f"Version: {v}")
     print(f"FHSFileSpec: {fSpec}")
     print(f"FHSDirSpec: {dSpec}")
     print(f"VersionMetadata: {vm}")
-    print(f"Quantiles: {q}")
+    if q is not None:
+        print(f"Quantiles: {q}")

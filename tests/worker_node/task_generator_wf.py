@@ -4,7 +4,9 @@ import importlib
 import importlib.util
 import importlib.machinery
 
-from jobmon.core import task_generator, __version__ as core_version
+from typing import Optional
+
+from jobmon.core.task_generator import task_generator
 from jobmon.client.api import Tool
 
 # Get the full path of the current script
@@ -179,8 +181,8 @@ FHSFileSpec = task_generator_fhs.FHSFileSpec
 FHSDirSpec = task_generator_fhs.FHSDirSpec
 VersionMetadata = task_generator_fhs.VersionMetadata
 Quantiles = task_generator_fhs.Quantiles
-version_to_list = task_generator_fhs.versions_to_list
-version_from_list = task_generator_fhs.versions_from_list
+versions_to_list = task_generator_fhs.versions_to_list
+versions_from_list = task_generator_fhs.versions_from_list
 quantiles_to_list = task_generator_fhs.quantiles_to_list
 quantiles_from_list = task_generator_fhs.quantiles_from_list
 
@@ -248,7 +250,7 @@ def main():
     elif input_value == 6:
         simple_tasks_serializer_array()
     elif input_value == 7:
-        pass
+        fhs_seq()
     else:
         simple_tasks_seq()
 

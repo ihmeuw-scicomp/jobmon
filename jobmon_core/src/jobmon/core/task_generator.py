@@ -503,12 +503,16 @@ class TaskGenerator:
     def create_task(self, compute_resources: Dict, **kwargs: Any) -> Task:
         """Create a task for the task_function with the given kwargs."""
         executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
-
         # Serialize the kwargs
         serialized_kwargs = {
             name: self.serialize(obj=value, expected_type=self.params[name])
             for name, value in kwargs.items()
         }
+
+        # assign the None value to args in self.params.keys() but not in serialized_kwargs.keys()
+        for name in self.params.keys():
+            if name not in serialized_kwargs.keys():
+                serialized_kwargs[name] = None
 
         # Format the kwargs for the task
         kwargs_for_task = {
