@@ -3,6 +3,7 @@
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
+from datetime import datetime, timedelta
 from flask import jsonify, request
 import sqlalchemy
 from sqlalchemy import select
@@ -81,24 +82,54 @@ def get_tool_versions(tool_id: int) -> Any:
     return resp
 
 
-@api_v1_blueprint.route("/tool/<tool_id>/tool_resource_usage", methods=["GET"])
-@api_v2_blueprint.route("/tool/<tool_id>/tool_resource_usage", methods=["GET"])
-def get_tool_resource_usage(tool_id: int) -> Any:
+def validate_date(date_str):
+    """ Validate if the date string is in 'YYYY-MM-DD' format. """
+    try:
+        datetime.strptime(date_str, '%Y-%m-%d')
+        return True
+    except ValueError:
+        return False
+
+
+@api_v1_blueprint.route("/tool/<tool_name>/tool_resource_usage", methods=["GET"])
+@api_v2_blueprint.route("/tool/<tool_name>/tool_resource_usage", methods=["GET"])
+def get_tool_resource_usage(tool_name: str) -> Any:
     """
     Returns requested and utilized resource usage and node args for every task instance associated with a given tool.
 
     We limit this by date to not overwhelm the database.
 
     Parameters:
-        tool_id: ID of the tool
+        tool_name: name of the tool
 
     Returns:
         A list ?
     """
-    # arguments = request.args
-    # start_date = arguments.get("start_date")
-    #
-    # return f"start date: {start_date}"
+    arguments = request.args
+    start_date = arguments.get("start_date")
+    end_date = arguments.get("end_date")
+
+    # Validate that user passed in both dates
+    if not start_date or not end_date:
+        return jsonify({
+            'error': 'Both start_date and end_date are required.'
+        }), StatusCodes.BAD_REQUEST
+
+    try:
+        start_date_object = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end_date_object = datetime.strptime(end_date, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({
+            'error': 'Dates must be in the format YYYY-MM-DD.'
+        }), StatusCodes.BAD_REQUEST
+
+    date_difference = end_date_object - start_date_object
+
+    # Check if the difference exceeds one week
+    if date_difference > timedelta(weeks=1):
+        return jsonify({
+            'error': 'The difference between start_date and end_date cannot exceed one week.'
+        }), StatusCodes.BAD_REQUEST
 
     session = SessionLocal()
     with session.begin():
@@ -140,8 +171,8 @@ def get_tool_resource_usage(tool_id: int) -> Any:
                 Task.task_resources_id == TaskResources.id
             )
             .where(
-                Tool.name == 'large_wf_tool',
-                Workflow.created_date >= '2024-06-15',
+                Tool.name == tool_name,
+                Workflow.created_date.between(start_date, end_date),
                 Task.status == 'D',
                 TaskInstance.status == 'D'
             )
