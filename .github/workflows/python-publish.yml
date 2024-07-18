@@ -3,6 +3,7 @@ name: Build & Upload Python Package
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 permissions:
   contents: read
