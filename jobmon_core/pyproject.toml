@@ -17,7 +17,8 @@ dependencies = [
     'psutil',
     'requests',
     'tenacity>=8.1',
-    'typing_extensions; python_version<"3.8"'
+    'typing_extensions; python_version<"3.8"',
+    'grpcio<=1.64.1'
 ]
 dynamic = ["version"]
 
