@@ -2,7 +2,7 @@ import ast
 import os
 from typing import List
 
-from jobmon.core import task_generator, __version__ as core_version
+from jobmon.core import task_generator
 from jobmon.client.api import Tool
 
 # Get the full path of the current script
