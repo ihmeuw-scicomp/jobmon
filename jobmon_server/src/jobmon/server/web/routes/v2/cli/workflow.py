@@ -491,7 +491,6 @@ def workflows_by_user_form() -> Any:
     wf_id = arguments.get("wf_id")
     date_submitted = arguments.get("date_submitted")
     date_submitted_end = arguments.get("date_submitted_end")
-    print(f"DATE SUBMITTED END: {date_submitted_end}")
     status = arguments.get("status")
 
     session = SessionLocal()
