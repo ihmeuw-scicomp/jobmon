@@ -19,7 +19,8 @@ dependencies = [
     'requests',
     'tenacity>=8.1',
     'typing_extensions; python_version<"3.9"',
-    'docstring-parser'
+    'docstring-parser',
+    'grpcio<=1.64.1'
 ]
 dynamic = ["version"]
 
