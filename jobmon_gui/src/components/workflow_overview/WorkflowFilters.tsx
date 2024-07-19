@@ -63,12 +63,24 @@ export default function WorkflowFilters() {
                                onChange={(e) => workflowSettings.setTool(e.target.value)}/>
 
                 </Grid>
-                <Grid item xs={3}>
+                <Grid item xs={1.5}>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DatePicker
-                            label={"Submitted Workflow Date - On or After"}
+                            label={"Submitted Date Start"}
                             value={dayjs(workflowSettings.get().date_submitted) || dayjs("1970-01-01")}
                             onChange={(value) => workflowSettings.setDateSubmitted(value)}
+                            sx={{width: "100%"}}
+
+                        />
+                    </LocalizationProvider>
+
+                </Grid>
+                <Grid item xs={1.5}>
+                    <LocalizationProvider dateAdapter={AdapterDayjs}>
+                        <DatePicker
+                            label={"Submitted Date End"}
+                            value={dayjs(workflowSettings.get().date_submitted_end) || dayjs("1970-01-01")}
+                            onChange={(value) => workflowSettings.setDateSubmittedEnd(value)}
                             sx={{width: "100%"}}
 
                         />

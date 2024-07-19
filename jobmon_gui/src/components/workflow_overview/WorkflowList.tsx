@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useState} from 'react';
 import axios from 'axios';
 import {Link, useLocation} from "react-router-dom";
 import {convertDatePST} from '@jobmon_gui/utils/formatters';
@@ -6,13 +6,12 @@ import {FaCircle} from "react-icons/fa";
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
 import {useQuery} from "@tanstack/react-query";
 import dayjs from "dayjs";
-import {workflow_overview_url, workflow_status_url} from "@jobmon_gui/configs/ApiUrls";
+import {workflow_overview_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import {useWorkflowSearchSettings} from "@jobmon_gui/stores/workflow_settings";
 import {CircularProgress, Grid} from "@mui/material";
 import {Box, List, ListItem, ListItemIcon, ListItemText, Typography} from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
-import CustomModal from "@jobmon_gui/components/Modal";
 import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
 import ErrorIcon from '@mui/icons-material/Error';
 import PanToolIcon from '@mui/icons-material/PanTool';
@@ -22,7 +21,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import IconButton from '@mui/material/IconButton';
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal";
-import ScrollableTextArea, {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea";
+import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea";
 
 type WorkflowType = {
     DONE: number,
@@ -36,6 +35,7 @@ type WorkflowType = {
     wf_status: string,
     wf_status_date: string,
     wf_submitted_date: string,
+    wf_submitted_date_end: string,
     wf_tool: string,
     wfr_count: number
 }
@@ -58,6 +58,7 @@ export default function WorkflowList() {
         wf_status: '',
         wf_status_date: '',
         wf_submitted_date: '',
+        wf_submitted_date_end: '',
         wf_tool: '',
         wfr_count: 0
     });
@@ -73,6 +74,7 @@ export default function WorkflowList() {
             workflowSettings.get().wf_attribute_value,
             workflowSettings.get().wf_id,
             dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
+            dayjs(workflowSettings.get().date_submitted_end).format("YYYY-MM-DD"),
             workflowSettings.get().status
         ],
         queryFn: async () => {
@@ -86,6 +88,7 @@ export default function WorkflowList() {
                 wf_attribute_value: workflowSettings.get().wf_attribute_value,
                 wf_id: workflowSettings.get().wf_id,
                 date_submitted: dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
+                date_submitted_end: dayjs(workflowSettings.get().date_submitted_end).format("YYYY-MM-DD"),
                 status: workflowSettings.get().status
             });
             return axios.get<WorkflowsQueryResponse>(workflow_overview_url, {
@@ -196,7 +199,6 @@ export default function WorkflowList() {
                                 </Box>
                                 <JobmonProgressBar
                                     workflowId={workflow.wf_id}
-                                    // placement="top"
                                 />
 
                             </Box>
@@ -239,6 +241,10 @@ export default function WorkflowList() {
                         <Grid item xs={8}>
                             <Typography
                                 sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date)}</Typography>
+                        </Grid>
+                        <Grid item xs={8}>
+                            <Typography
+                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date_end)}</Typography>
                         </Grid>
                         <Grid item xs={4}>
                             <Typography sx={modalTitleStyles}>Status Date:</Typography>
