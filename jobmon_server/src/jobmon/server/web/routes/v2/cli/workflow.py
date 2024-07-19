@@ -490,6 +490,8 @@ def workflows_by_user_form() -> Any:
     wf_attribute_key = arguments.get("wf_attribute_key")
     wf_id = arguments.get("wf_id")
     date_submitted = arguments.get("date_submitted")
+    date_submitted_end = arguments.get("date_submitted_end")
+    print(f"DATE SUBMITTED END: {date_submitted_end}")
     status = arguments.get("status")
 
     session = SessionLocal()
@@ -520,6 +522,9 @@ def workflows_by_user_form() -> Any:
         if date_submitted:
             where_clauses.append("workflow.created_date >= :date_submitted")
             substitution_dict["date_submitted"] = date_submitted
+        if date_submitted_end:
+            where_clauses.append("workflow.created_date <= :date_submitted_end")
+            substitution_dict["date_submitted_end"] = date_submitted_end
         if status:
             where_clauses.append("workflow.status = :status")
             substitution_dict["status"] = status

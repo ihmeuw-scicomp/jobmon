@@ -16,6 +16,7 @@ export type WorkflowSearchSettings = {
     wf_attribute_value: string,
     wf_id: string
     date_submitted: Dayjs
+    date_submitted_end: Dayjs
     "status": string
 }
 
@@ -33,6 +34,7 @@ const defaultSettings = {
     wf_attribute_value: "",
     wf_id: "",
     date_submitted: dayjs().subtract(2, "weeks"),
+    date_submitted_end: dayjs(),
     "status": "",
 }
 
@@ -52,6 +54,7 @@ export type WorkflowSearchSettingsStore = {
     setWfAttributeValue: (newValue: string) => void
     setWfId: (newValue: string) => void
     setDateSubmitted: (newValue: Dayjs) => void
+    setDateSubmittedEnd: (newValue: Dayjs) => void
     setStatus: (newValue: string) => void
     get: () => WorkflowSearchSettings
     loadValuesFromSearchParams: (searchParams: URLSearchParams) => void
@@ -70,6 +73,7 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                 updateUrlSearchParams: () => {
                     const currentSettings = get().settings
                     const date_submitted = dayjs(currentSettings?.date_submitted).format("YYYY-MM-DD") || dayjs().format("YYYY-MM-DD")
+                    const date_submitted_end = dayjs(currentSettings?.date_submitted_end).format("YYYY-MM-DD") || dayjs().format("YYYY-MM-DD")
 
                     const searchParams = new URLSearchParams({
                         user: currentSettings.user,
@@ -80,6 +84,7 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                         wf_attribute_value: currentSettings.wf_attribute_value,
                         wf_id: currentSettings.wf_id,
                         date_submitted: date_submitted,
+                        date_submitted_end: date_submitted_end,
                         "status": currentSettings.status,
                     })
                     location.hash = "?" + searchParams.toString()
@@ -161,6 +166,15 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                     }))
                     get().updateUrlSearchParams()
                 },
+                setDateSubmittedEnd: (newValue: Dayjs) => {
+                    set(() => ({
+                        settings: {
+                            ...get().settings,
+                            date_submitted_end: dayjs(newValue)
+                        }
+                    }))
+                    get().updateUrlSearchParams()
+                },
                 setStatus: (newValue: string) => {
                     set(() => ({
                         settings: {
@@ -181,6 +195,7 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                     const urlWfAttributeValue = searchParams.get("wf_attribute_value") || ""
                     const urlWfId = searchParams.get("wf_id") || ""
                     const urlDateSubmitted = searchParams.get("date_submitted") ? dayjs(searchParams.get("date_submitted")) : dayjs().subtract(2, 'weeks')
+                    const urlDateSubmittedEnd = searchParams.get("date_submitted_end") ? dayjs(searchParams.get("date_submitted_end")) : dayjs()
                     const urlStatus = searchParams.get("status") || ""
 
 
@@ -194,6 +209,7 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                             wf_attribute_value: urlWfAttributeValue,
                             wf_id: urlWfId,
                             date_submitted: urlDateSubmitted || dayjs().subtract(2, 'weeks'),
+                            date_submitted_end: urlDateSubmittedEnd || dayjs(),
                             status: urlStatus,
                         }
                     })
