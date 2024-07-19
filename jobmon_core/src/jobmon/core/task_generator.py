@@ -8,7 +8,6 @@ import docstring_parser
 from jobmon.client.api import Tool
 from jobmon.client.task import Task
 from jobmon.client.workflow import Workflow
-from jobmon.core import __version__ as core_version
 
 SIMPLE_TYPES = {str, int, float, bool}
 BUILT_IN_COLLECTIONS = {list, tuple, set}
@@ -305,7 +304,9 @@ class TaskGenerator:
     def _generate_task_template(self) -> None:
         """Generate and store the task template."""
         # args convert to --args foo=1 --args bar=2
-        args_template = " --args ".join(f"{arg_name}={{{arg_name}}}" for arg_name in self.params)
+        args_template = " --args ".join(
+            f"{arg_name}={{{arg_name}}}" for arg_name in self.params
+        )
         args_template = " --args " + args_template
         if self.module_source_path:
             self._task_template = self.tool.get_task_template(
@@ -319,7 +320,7 @@ class TaskGenerator:
                 + " --module_source_path "
                 + self.module_source_path
                 + args_template,
-                node_args=self.params.keys(),
+                node_args=self.params.keys(),  # type: ignore
                 op_args=["executable"],
             )
         else:
@@ -332,7 +333,7 @@ class TaskGenerator:
                 + " --func_name "
                 + self.name
                 + args_template,
-                node_args=self.params.keys(),
+                node_args=self.params.keys(),  # type: ignore
                 op_args=["executable"],
             )
 
@@ -467,7 +468,10 @@ class TaskGenerator:
                     if obj[0] in ["[", "("] and obj[-1] in ["]", ")"]:
                         obj = obj[1:-1]
                     middle_result = obj.split(",")
-                deserialized_result = [self.deserialize(item, obj_type.__args__[0]) for item in middle_result]
+                deserialized_result = [
+                    self.deserialize(item, obj_type.__args__[0])
+                    for item in middle_result
+                ]
             else:
                 collection_items_type = _get_generic_type_parameters(obj_type)
 
@@ -509,10 +513,10 @@ class TaskGenerator:
             for name, value in kwargs.items()
         }
 
-        # assign the None value to args in self.params.keys() but not in serialized_kwargs.keys()
+        # assign the None value to args in self.params.keys but not in serialized_kwargs.keys
         for name in self.params.keys():
             if name not in serialized_kwargs.keys():
-                serialized_kwargs[name] = None
+                serialized_kwargs[name] = str(None)
 
         # Format the kwargs for the task
         kwargs_for_task = {
@@ -547,7 +551,7 @@ class TaskGenerator:
             compute_resources=compute_resources,
             max_attempts=self.max_attempts,
             executable=executable_path,
-            **kwargs_for_task
+            **kwargs_for_task,  # type: ignore
         )
 
         return task
@@ -579,7 +583,7 @@ class TaskGenerator:
             compute_resources=compute_resources,
             max_attempts=self.max_attempts,
             executable=executable_path,
-            **kwargs_for_task
+            **kwargs_for_task,  # type: ignore
         )
 
         return tasks
@@ -587,21 +591,21 @@ class TaskGenerator:
     def run(self, args: List[str]) -> Any:
         """Run the task_function with the given args and return any result."""
         # Parse the args
-        parsed_arg_value_pairs = dict()
+        parsed_arg_value_pairs: Dict[str, Union[str, List[str]]] = dict()
         # args is a list of string like ["arg1=1", "arg2=[2, 3]", "arg1=4]
         for arg in args:
             arg_name, arg_value = arg.split("=")
             # if the arg_name key, already exists, append the value to the list
             if arg_name in parsed_arg_value_pairs.keys():
                 if isinstance(parsed_arg_value_pairs[arg_name], list):
-                    parsed_arg_value_pairs[arg_name].append(arg_value)
+                    parsed_arg_value_pairs[arg_name].append(arg_value)  # type: ignore
                 else:
                     parsed_arg_value_pairs[arg_name] = [
-                        parsed_arg_value_pairs[arg_name],
+                        parsed_arg_value_pairs[arg_name],  # type: ignore
                         arg_value,
                     ]
             else:
-                parsed_arg_value_pairs[arg_name] = arg_value
+                parsed_arg_value_pairs[arg_name] = arg_value  # type: ignore
 
         # Raise an error if the user did not provide all of the arguments for the task_function
         if parsed_arg_value_pairs.keys() != self.params.keys():
@@ -613,7 +617,7 @@ class TaskGenerator:
 
         # Deserialize the args, catching any errors that may come from the deserialization fn
         deserialized_args = dict()
-        for arg_name, arg_value in parsed_arg_value_pairs.items():
+        for arg_name, arg_value in parsed_arg_value_pairs.items():  # type: ignore
             try:
                 deserialized_args[arg_name] = self.deserialize(
                     obj=arg_value, obj_type=self.params[arg_name]

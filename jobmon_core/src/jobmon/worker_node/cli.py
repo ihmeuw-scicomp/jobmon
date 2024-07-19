@@ -1,7 +1,6 @@
 """Command line interface for Execution."""
 
 import argparse
-import ast
 import importlib
 import importlib.machinery
 import importlib.util
@@ -140,11 +139,11 @@ class WorkerNodeCLI(CLI):
             "--args",
             type=str,
             help="Followed by the key=value; .\n"
-                 "For example: \n"
-                 "If you method has two argument: def func(foo: int, bar: str), pass\n"
-                 "    --args foo=1 --args bar='test'\n"
-                 "If you method has two argument: def func(foo: int, bar: List[str), pass\n"
-                 "    --args foo=1 --args bar=[a,b]\n",
+            "For example: \n"
+            "If you method has two argument: def func(foo: int, bar: str), pass\n"
+            "    --args foo=1 --args bar='test'\n"
+            "If you method has two argument: def func(foo: int, bar: List[str), pass\n"
+            "    --args foo=1 --args bar=[a,b]\n",
             required=False,
         )
         generator_parser.add_argument(
