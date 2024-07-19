@@ -15,7 +15,7 @@ import CustomThemeProvider from "@jobmon_gui/contexts/CustomThemeProvider";
 import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
 import '@fontsource-variable/roboto-mono';
 import "@fontsource/archivo";
-
+import { ApmRoutes } from '@elastic/apm-rum-react'
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -35,7 +35,7 @@ root.render(
         <HashRouter>
             <CustomThemeProvider>
                 <PageNavigation>
-                    <Routes>
+                    <ApmRoutes>
                         <Route path="workflow">
                             <Route path=":workflowId/tasks" element={<WorkflowDetails subpage={0}/>}/>
                             <Route path=":workflowId/usage" element={<WorkflowDetails subpage={1}/>}/>
@@ -52,7 +52,7 @@ root.render(
                                 </main>
                             }
                         />
-                    </Routes>
+                    </ApmRoutes>
                 </PageNavigation>
             </CustomThemeProvider>
         </HashRouter>
