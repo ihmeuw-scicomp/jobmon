@@ -1,11 +1,11 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import Box from "@mui/material/Box";
 import axios from "axios";
-import {useQuery} from "@tanstack/react-query";
+import {useQuery, useQueryClient} from "@tanstack/react-query";
 import {error_log_viz_url, task_table_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import Typography from "@mui/material/Typography";
-import {CircularProgress, Grid} from "@mui/material";
+import {CircularProgress, Fade, Grid} from "@mui/material";
 import {MaterialReactTable, useMaterialReactTable} from "material-react-table";
 import {Button} from '@mui/material';
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal";
@@ -44,6 +44,7 @@ interface ErrorDetails {
 }
 
 export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredErrorsProps) {
+    const queryClient = useQueryClient()
     const taskTableColumnFilters = useTaskTableColumnsStore()
     const [errorDetailIndex, setErrorDetailIndex] = useState<boolean | ErrorSampleModalDetails>(false)
     const errors = useQuery({
@@ -62,6 +63,31 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         },
         enabled: !!taskTemplateId
     })
+    const prefetchErrorDetails = async (nextErrorDetailIndex: boolean | ErrorSampleModalDetails) => {
+        /*
+        Pre-fetch the next error detail to provide a better ux to the user, cache the results in the
+        react-query cache
+        */
+        await queryClient.prefetchQuery({
+            queryKey: ["workflow_details", "error_details", workflowId, taskTemplateId, nextErrorDetailIndex],
+            queryFn: async () => {
+                if (nextErrorDetailIndex === false || nextErrorDetailIndex === true) {
+                    return;
+                }
+                const ti_id = nextErrorDetailIndex.sample_ids[nextErrorDetailIndex.sample_index]
+                return axios.get(
+                    `${error_log_viz_url}${workflowId}/${taskTemplateId}/${ti_id}`,
+                    {
+                        ...jobmonAxiosConfig,
+                        data: null,
+                    }
+                ).then((r) => {
+                    return r.data
+                })
+            },
+        })
+
+    }
 
     const errorDetails = useQuery({
         queryKey: ["workflow_details", "error_details", workflowId, taskTemplateId, errorDetailIndex],
@@ -69,8 +95,6 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
             if (errorDetailIndex === false || errorDetailIndex === true) {
                 return;
             }
-            console.log("errorDetailIndex")
-            console.log(errorDetailIndex)
             const ti_id = errorDetailIndex.sample_ids[errorDetailIndex.sample_index]
             return axios.get(
                 `${error_log_viz_url}${workflowId}/${taskTemplateId}/${ti_id}`,
@@ -79,13 +103,22 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
                     data: null,
                 }
             ).then((r) => {
-                console.log('r.data')
-                console.log(r.data)
+
                 return r.data
             })
         },
         enabled: !!taskTemplateId && errorDetailIndex !== false && errorDetailIndex !== true
     })
+
+    useEffect(() => {
+        if (errorDetailIndex === false || errorDetailIndex === true) {
+            return;
+        }
+        if (errorDetailIndex.sample_index < errorDetailIndex.sample_ids.length-1) {
+            const nextErrorDetails = {...errorDetailIndex, sample_index: errorDetailIndex.sample_index + 1}
+            void prefetchErrorDetails(nextErrorDetails)
+        }
+    }, [errorDetailIndex]);
 
     const columns = [
         {
@@ -185,64 +218,69 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
             fontWeight: "bold",
         }
 
-        return (<Box>
+        return (<Box minHeight={"80%"}>
+            {/*<Fade in={true}>*/}
             <Box>
-                <Typography sx={labelStyles}>Error Sample:
-                    <IconButton
-                        onClick={previousSample}
-                        disabled={typeof errorDetailIndex !== 'boolean' && errorDetailIndex?.sample_index === 0}
-                    >
-                        <NavigateBeforeIcon/>
-                    </IconButton>
+                <Box>
 
-                    {
-                        errorDetailIndex && typeof errorDetailIndex !== 'boolean' ? (
-                            `${errorDetailIndex.sample_index + 1} of ${errorDetailIndex.sample_ids?.length}`
-                        ) : (
-                            'No error logs available'
-                        )
-                    }
-                    <IconButton
-                        onClick={nextSample}
-                        disabled={
-                            typeof errorDetailIndex !== 'boolean' &&
-                            errorDetailIndex?.sample_index === errorDetailIndex?.sample_ids?.length - 1
+                    <Typography sx={labelStyles}>Error Sample:
+                        <IconButton
+                            onClick={previousSample}
+                            disabled={typeof errorDetailIndex !== 'boolean' && errorDetailIndex?.sample_index === 0}
+                        >
+                            <NavigateBeforeIcon/>
+                        </IconButton>
+
+                        {
+                            errorDetailIndex && typeof errorDetailIndex !== 'boolean' ? (
+                                `${errorDetailIndex.sample_index + 1} of ${errorDetailIndex.sample_ids?.length}`
+                            ) : (
+                                'No error logs available'
+                            )
                         }
-                    >
-                        <NavigateNextIcon/>
-                    </IconButton>
-                </Typography>
+                        <IconButton
+                            onClick={nextSample}
+                            disabled={
+                                typeof errorDetailIndex !== 'boolean' &&
+                                errorDetailIndex?.sample_index === errorDetailIndex?.sample_ids?.length - 1
+                            }
+                        >
+                            <NavigateNextIcon/>
+                        </IconButton>
+                    </Typography>
+                </Box>
+                <Grid container spacing={2}>
+                    <Grid item xs={3}><Typography sx={labelStyles}>Error Time:</Typography></Grid>
+                    <Grid item xs={9}>{error.error_time}</Grid>
+
+                    <Grid item xs={3}><Typography sx={labelStyles}>task_id:</Typography></Grid>
+                    <Grid item xs={9}>{error.task_id}</Grid>
+
+                    <Grid item xs={3}><Typography sx={labelStyles}>Task Instance Error ID:</Typography></Grid>
+                    <Grid item xs={9}>{error.task_instance_err_id}</Grid>
+
+                    <Grid item xs={3}><Typography sx={labelStyles}>workflow_id:</Typography></Grid>
+                    <Grid item xs={9}>{error.workflow_id}</Grid>
+
+                    <Grid item xs={3}><Typography sx={labelStyles}>workflow_run_id:</Typography></Grid>
+                    <Grid item xs={9}>{error.workflow_run_id}</Grid>
+
+                    <Grid item xs={12}><Typography sx={labelStyles}>Error Message:</Typography></Grid>
+                    <Grid item xs={12}>
+                        <ScrollableCodeBlock>
+                            {error.error}
+                        </ScrollableCodeBlock>
+                    </Grid>
+
+                    <Grid item xs={12}><Typography sx={labelStyles}>Task Instance stderr:</Typography></Grid>
+                    <Grid item xs={12}>
+                        <ScrollableCodeBlock>
+                            {error.task_instance_stderr_log || "No stderr output found"}
+                        </ScrollableCodeBlock>
+                    </Grid>
+                </Grid>
             </Box>
-            <Grid container spacing={2}>
-                <Grid item xs={3}><Typography sx={labelStyles}>Error Time:</Typography></Grid>
-                <Grid item xs={9}>{error.error_time}</Grid>
-
-                <Grid item xs={3}><Typography sx={labelStyles}>task_id:</Typography></Grid>
-                <Grid item xs={9}>{error.task_id}</Grid>
-
-                <Grid item xs={3}><Typography sx={labelStyles}>Task Instance Error ID:</Typography></Grid>
-                <Grid item xs={9}>{error.task_instance_err_id}</Grid>
-
-                <Grid item xs={3}><Typography sx={labelStyles}>workflow_id:</Typography></Grid>
-                <Grid item xs={9}>{error.workflow_id}</Grid>
-
-                <Grid item xs={3}><Typography sx={labelStyles}>workflow_run_id:</Typography></Grid>
-                <Grid item xs={9}>{error.workflow_run_id}</Grid>
-
-                <Grid item xs={12}><Typography sx={labelStyles}>Error Message:</Typography></Grid>
-                <Grid item xs={12}>
-                    <ScrollableCodeBlock>
-                        {error.error}
-                    </ScrollableCodeBlock>
-                </Grid>
-
-                <Grid item xs={12}><Typography sx={labelStyles}>Task Instance stderr:</Typography></Grid>
-                <Grid item xs={12}>
-                    <ScrollableCodeBlock>
-                        {error.task_instance_stderr_log || "No stderr output found"}
-                    </ScrollableCodeBlock>
-                </Grid>
-            </Grid>
+            {/*</Fade>*/}
         </Box>)
     }
 
@@ -261,7 +299,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
                 title={`Error Sample for Task Instance ID: ${currentTiID()}`}
                 open={errorDetailIndex !== false}
                 onClose={() => setErrorDetailIndex(false)} children={modalChildren()}
-                width={"80%"}
+                width={"80%"} minHeight={"80%"}
             />
         </Box>
     )
