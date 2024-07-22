@@ -29,6 +29,7 @@ def cluster_error_logs(df: DataFrame) -> DataFrame:
         stopwords.extend(["could", "might", "must", "need", "sha", "wo", "would"])
         return stopwords
 
+    nltk.download("punkt", quiet=True)
     # Get input data
     stopwords = get_stop_words()
 
