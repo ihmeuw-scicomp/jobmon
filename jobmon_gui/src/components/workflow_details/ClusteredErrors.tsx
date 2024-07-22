@@ -93,13 +93,15 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
             accessorKey: "sample_error",
             size: 750,
             Cell: ({renderedCellValue, row}) => (
-                <Button sx={{textTransform: 'none', textAlign: "left"}}
-                        onClick={() => setErrorDetailIndex({
-                            sample_index: 0,
-                            sample_ids: row.original.task_instance_ids
-                        })}>
-                    {renderedCellValue}
-                </Button>
+                <Typography>
+                    <Button sx={{textTransform: 'none', textAlign: "left"}}
+                            onClick={() => setErrorDetailIndex({
+                                sample_index: 0,
+                                sample_ids: row.original.task_instance_ids
+                            })}>
+                        {renderedCellValue}
+                    </Button>
+                </Typography>
             ),
         },
         {
@@ -137,7 +139,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         columns: columns,
         initialState: {density: 'compact'},
         enableColumnResizing: true,
-        layoutMode: "grid",
+        layoutMode: "grid-no-grow",
     });
 
 
