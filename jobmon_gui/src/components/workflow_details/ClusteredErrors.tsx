@@ -114,7 +114,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         if (errorDetailIndex === false || errorDetailIndex === true) {
             return;
         }
-        if (errorDetailIndex.sample_index < errorDetailIndex.sample_ids.length-1) {
+        if (errorDetailIndex.sample_index < errorDetailIndex.sample_ids.length - 1) {
             const nextErrorDetails = {...errorDetailIndex, sample_index: errorDetailIndex.sample_index + 1}
             void prefetchErrorDetails(nextErrorDetails)
         }
@@ -219,68 +219,68 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         }
 
         return (<Box minHeight={"80%"}>
-            {/*<Fade in={true}>*/}
-            <Box>
+            <Fade in={true}>
                 <Box>
+                    <Box>
 
-                    <Typography sx={labelStyles}>Error Sample:
-                        <IconButton
-                            onClick={previousSample}
-                            disabled={typeof errorDetailIndex !== 'boolean' && errorDetailIndex?.sample_index === 0}
-                        >
-                            <NavigateBeforeIcon/>
-                        </IconButton>
+                        <Typography sx={labelStyles}>Error Sample:
+                            <IconButton
+                                onClick={previousSample}
+                                disabled={typeof errorDetailIndex !== 'boolean' && errorDetailIndex?.sample_index === 0}
+                            >
+                                <NavigateBeforeIcon/>
+                            </IconButton>
 
-                        {
-                            errorDetailIndex && typeof errorDetailIndex !== 'boolean' ? (
-                                `${errorDetailIndex.sample_index + 1} of ${errorDetailIndex.sample_ids?.length}`
-                            ) : (
-                                'No error logs available'
-                            )
-                        }
-                        <IconButton
-                            onClick={nextSample}
-                            disabled={
-                                typeof errorDetailIndex !== 'boolean' &&
-                                errorDetailIndex?.sample_index === errorDetailIndex?.sample_ids?.length - 1
+                            {
+                                errorDetailIndex && typeof errorDetailIndex !== 'boolean' ? (
+                                    `${errorDetailIndex.sample_index + 1} of ${errorDetailIndex.sample_ids?.length}`
+                                ) : (
+                                    'No error logs available'
+                                )
                             }
-                        >
-                            <NavigateNextIcon/>
-                        </IconButton>
-                    </Typography>
+                            <IconButton
+                                onClick={nextSample}
+                                disabled={
+                                    typeof errorDetailIndex !== 'boolean' &&
+                                    errorDetailIndex?.sample_index === errorDetailIndex?.sample_ids?.length - 1
+                                }
+                            >
+                                <NavigateNextIcon/>
+                            </IconButton>
+                        </Typography>
+                    </Box>
+                    <Grid container spacing={2}>
+                        <Grid item xs={3}><Typography sx={labelStyles}>Error Time:</Typography></Grid>
+                        <Grid item xs={9}>{error.error_time}</Grid>
+
+                        <Grid item xs={3}><Typography sx={labelStyles}>task_id:</Typography></Grid>
+                        <Grid item xs={9}>{error.task_id}</Grid>
+
+                        <Grid item xs={3}><Typography sx={labelStyles}>Task Instance Error ID:</Typography></Grid>
+                        <Grid item xs={9}>{error.task_instance_err_id}</Grid>
+
+                        <Grid item xs={3}><Typography sx={labelStyles}>workflow_id:</Typography></Grid>
+                        <Grid item xs={9}>{error.workflow_id}</Grid>
+
+                        <Grid item xs={3}><Typography sx={labelStyles}>workflow_run_id:</Typography></Grid>
+                        <Grid item xs={9}>{error.workflow_run_id}</Grid>
+
+                        <Grid item xs={12}><Typography sx={labelStyles}>Error Message:</Typography></Grid>
+                        <Grid item xs={12}>
+                            <ScrollableCodeBlock>
+                                {error.error}
+                            </ScrollableCodeBlock>
+                        </Grid>
+
+                        <Grid item xs={12}><Typography sx={labelStyles}>Task Instance stderr:</Typography></Grid>
+                        <Grid item xs={12}>
+                            <ScrollableCodeBlock>
+                                {error.task_instance_stderr_log || "No stderr output found"}
+                            </ScrollableCodeBlock>
+                        </Grid>
+                    </Grid>
                 </Box>
-                <Grid container spacing={2}>
-                    <Grid item xs={3}><Typography sx={labelStyles}>Error Time:</Typography></Grid>
-                    <Grid item xs={9}>{error.error_time}</Grid>
-
-                    <Grid item xs={3}><Typography sx={labelStyles}>task_id:</Typography></Grid>
-                    <Grid item xs={9}>{error.task_id}</Grid>
-
-                    <Grid item xs={3}><Typography sx={labelStyles}>Task Instance Error ID:</Typography></Grid>
-                    <Grid item xs={9}>{error.task_instance_err_id}</Grid>
-
-                    <Grid item xs={3}><Typography sx={labelStyles}>workflow_id:</Typography></Grid>
-                    <Grid item xs={9}>{error.workflow_id}</Grid>
-
-                    <Grid item xs={3}><Typography sx={labelStyles}>workflow_run_id:</Typography></Grid>
-                    <Grid item xs={9}>{error.workflow_run_id}</Grid>
-
-                    <Grid item xs={12}><Typography sx={labelStyles}>Error Message:</Typography></Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            {error.error}
-                        </ScrollableCodeBlock>
-                    </Grid>
-
-                    <Grid item xs={12}><Typography sx={labelStyles}>Task Instance stderr:</Typography></Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            {error.task_instance_stderr_log || "No stderr output found"}
-                        </ScrollableCodeBlock>
-                    </Grid>
-                </Grid>
-            </Box>
-            {/*</Fade>*/}
+            </Fade>
         </Box>)
     }
 
