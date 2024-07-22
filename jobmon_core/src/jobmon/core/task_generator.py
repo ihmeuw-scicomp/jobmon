@@ -8,7 +8,6 @@ import docstring_parser
 from jobmon.client.api import Tool
 from jobmon.client.task import Task
 from jobmon.client.workflow import Workflow
-from jobmon.core import __version__ as core_version
 
 SIMPLE_TYPES = {str, int, float, bool}
 BUILT_IN_COLLECTIONS = {list, tuple, set}
@@ -160,21 +159,17 @@ def _get_short_description(task_function_docstring: docstring_parser.Docstring) 
     return short_description
 
 
-def make_cli_argument_string(serialized_kwargs: Any) -> str:
+def make_cli_argument_string(arg_value: Union[str, List]) -> str:
     """Make a CLI argument string from an argument name and value.
 
-    Be aware that args ard passed in as a list of strings leading by "--args",
-    with format key=value or key=[value1, value2], separated by ";".
-    This function will return a string with the format '--args "arg1=1;arg2=[2, 3]"'.
-    Note: there should be no space after the ";".
+    For string, return itself.
+    For list, say ["a", "b", "c"], return "[a,b,c]"
     """
-    result_elements = []
-    for key, value in serialized_kwargs.items():
-        if isinstance(value, list):
-            result_elements.append(f"{key}=[{', '.join(value)}]")
-        else:
-            result_elements.append(f"{key}={value}")
-    return ";".join(result_elements)
+    if isinstance(arg_value, list):
+        no_space_string = ",".join(arg_value)
+        return f"[{no_space_string}]"
+
+    return arg_value
 
 
 class TaskGenerator:
@@ -308,21 +303,24 @@ class TaskGenerator:
 
     def _generate_task_template(self) -> None:
         """Generate and store the task template."""
+        # args convert to --args foo=1 --args bar=2
+        args_template = " --args ".join(
+            f"{arg_name}={{{arg_name}}}" for arg_name in self.params
+        )
+        args_template = " --args " + args_template
         if self.module_source_path:
             self._task_template = self.tool.get_task_template(
                 template_name=self.name,
                 command_template="{executable} "
                 + TASK_RUNNER_SUB_COMMAND
-                + " --expected_jobmon_version "
-                + core_version
                 + " --module_name "
                 + self.mod_name
                 + " --func_name "
                 + self.name
                 + " --module_source_path "
                 + self.module_source_path
-                + " --args {tgargs}",
-                node_args=["tgargs"],
+                + args_template,
+                node_args=self.params.keys(),  # type: ignore
                 op_args=["executable"],
             )
         else:
@@ -330,14 +328,12 @@ class TaskGenerator:
                 template_name=self.name,
                 command_template="{executable} "
                 + TASK_RUNNER_SUB_COMMAND
-                + " --expected_jobmon_version "
-                + core_version
                 + " --module_name "
                 + self.mod_name
                 + " --func_name "
                 + self.name
-                + " --args {tgargs}",
-                node_args=["tgargs"],
+                + args_template,
+                node_args=self.params.keys(),  # type: ignore
                 op_args=["executable"],
             )
 
@@ -415,7 +411,14 @@ class TaskGenerator:
 
         return serialized_result
 
-    def deserialize(self, obj: Union[str, List], obj_type: Type) -> Any:
+    def serialize_array(self, obj: Any, expected_type: Type) -> List:
+        """Serialize obj into a list of serialized string."""
+        if isinstance(obj, list):
+            return [self.serialize(item, expected_type) for item in obj]
+        else:
+            return [self.serialize(obj, expected_type)]
+
+    def deserialize(self, obj: Union[str, List[str]], obj_type: Type) -> Any:
         """Deserialize ``obj``."""
         deserialized_result: Any
 
@@ -450,27 +453,47 @@ class TaskGenerator:
             )
 
         elif _is_annotated_built_in_collection_type(obj_type):
-            collection_items_type = _get_generic_type_parameters(obj_type)
-
-            # Raise an error if we've been given a multi-dimensional collection
-            if any(
-                _is_unannotated_built_in_collection_type(item_type)
-                or _is_annotated_built_in_collection_type(item_type)
-                for item_type in collection_items_type
-            ):
-                raise TypeError(
-                    f"Cannot deserialize multi-dimensional collection: {obj}."
-                )
-
-            item_type_pairs = _zip_collection_items_and_types(
-                obj, collection_items_type
-            )
-            deserialized_result = _get_collection_type(obj_type)(  # type: ignore
-                [
-                    self.deserialize(obj=item, obj_type=item_type)
-                    for item, item_type in item_type_pairs
+            if not isinstance(obj, list):
+                # when input is a string, convert it to a list
+                try:
+                    middle_result = ast.literal_eval(obj)
+                    # if the input is a single item, convert it to a list
+                    if type(middle_result) not in BUILT_IN_COLLECTIONS:
+                        middle_result = [middle_result]
+                except Exception:
+                    # handle input like "[a,b,c]"
+                    # remove leading and tailing space
+                    obj = obj.strip()
+                    # remove leading and tailing brackets
+                    if obj[0] in ["[", "("] and obj[-1] in ["]", ")"]:
+                        obj = obj[1:-1]
+                    middle_result = obj.split(",")
+                deserialized_result = [
+                    self.deserialize(item, obj_type.__args__[0])
+                    for item in middle_result
                 ]
-            )
+            else:
+                collection_items_type = _get_generic_type_parameters(obj_type)
+
+                # Raise an error if we've been given a multi-dimensional collection
+                if any(
+                    _is_unannotated_built_in_collection_type(item_type)
+                    or _is_annotated_built_in_collection_type(item_type)
+                    for item_type in collection_items_type
+                ):
+                    raise TypeError(
+                        f"Cannot deserialize multi-dimensional collection: {obj}."
+                    )
+
+                item_type_pairs = _zip_collection_items_and_types(
+                    obj, collection_items_type
+                )
+                deserialized_result = _get_collection_type(obj_type)(  # type: ignore
+                    [
+                        self.deserialize(obj=item, obj_type=item_type)
+                        for item, item_type in item_type_pairs
+                    ]
+                )
 
         else:
             raise TypeError(
@@ -484,15 +507,22 @@ class TaskGenerator:
     def create_task(self, compute_resources: Dict, **kwargs: Any) -> Task:
         """Create a task for the task_function with the given kwargs."""
         executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
-
         # Serialize the kwargs
         serialized_kwargs = {
             name: self.serialize(obj=value, expected_type=self.params[name])
             for name, value in kwargs.items()
         }
 
+        # assign the None value to args in self.params.keys but not in serialized_kwargs.keys
+        for name in self.params.keys():
+            if name not in serialized_kwargs.keys():
+                serialized_kwargs[name] = str(None)
+
         # Format the kwargs for the task
-        tg_arg_string = make_cli_argument_string(serialized_kwargs)
+        kwargs_for_task = {
+            name: make_cli_argument_string(arg_value=value)
+            for name, value in serialized_kwargs.items()
+        }
         # We want a slightly different format to put list kwargs into the name
         kwargs_for_name = {
             name: ",".join(value) if isinstance(value, list) else value
@@ -521,13 +551,62 @@ class TaskGenerator:
             compute_resources=compute_resources,
             max_attempts=self.max_attempts,
             executable=executable_path,
-            tgargs=f"'{tg_arg_string}'",
+            **kwargs_for_task,  # type: ignore
         )
 
         return task
 
-    def run(self, parsed_arg_value_pairs: Dict) -> Any:
+    def create_tasks(self, compute_resources: Dict, **kwargs: Any) -> List[Task]:
+        """Create a task array for the task_function with the given kwargs."""
+        executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
+        # Serialize the kwargs
+        serialized_kwargs = {
+            name: self.serialize_array(obj=value, expected_type=self.params[name])
+            for name, value in kwargs.items()
+        }
+
+        # Format the kwargs for the task
+        # Each individual element in the array should be formatted before sending to the cli
+        kwargs_for_task = {}
+        for name, value in serialized_kwargs.items():
+            if isinstance(value, list):
+                kwargs_for_task[name] = [
+                    make_cli_argument_string(arg_value=item) for item in value
+                ]
+            else:
+                kwargs_for_task[name] = make_cli_argument_string(arg_value=value)
+
+        # name is auto for array
+
+        # Create the task
+        tasks = self._task_template.create_tasks(
+            compute_resources=compute_resources,
+            max_attempts=self.max_attempts,
+            executable=executable_path,
+            **kwargs_for_task,  # type: ignore
+        )
+
+        return tasks
+
+    def run(self, args: List[str]) -> Any:
         """Run the task_function with the given args and return any result."""
+        # Parse the args
+        parsed_arg_value_pairs: Dict[str, Union[str, List[str]]] = dict()
+        # args is a list of string like ["arg1=1", "arg2=[2, 3]", "arg1=4]
+        for arg in args:
+            arg_name, arg_value = arg.split("=")
+            # if the arg_name key, already exists, append the value to the list
+            if arg_name in parsed_arg_value_pairs.keys():
+                if isinstance(parsed_arg_value_pairs[arg_name], list):
+                    parsed_arg_value_pairs[arg_name].append(arg_value)  # type: ignore
+                else:
+                    parsed_arg_value_pairs[arg_name] = [
+                        parsed_arg_value_pairs[arg_name],  # type: ignore
+                        arg_value,
+                    ]
+            else:
+                parsed_arg_value_pairs[arg_name] = arg_value  # type: ignore
+
         # Raise an error if the user did not provide all of the arguments for the task_function
         if parsed_arg_value_pairs.keys() != self.params.keys():
             raise ValueError(
@@ -538,7 +617,7 @@ class TaskGenerator:
 
         # Deserialize the args, catching any errors that may come from the deserialization fn
         deserialized_args = dict()
-        for arg_name, arg_value in parsed_arg_value_pairs.items():
+        for arg_name, arg_value in parsed_arg_value_pairs.items():  # type: ignore
             try:
                 deserialized_args[arg_name] = self.deserialize(
                     obj=arg_value, obj_type=self.params[arg_name]

@@ -102,4 +102,6 @@ their compute resources: ``"constraints": "archive"``.
     the Workflow timeout period if your tasks combined run longer than 10 hours.
 
 
+.. include:: task-generator.rst
+
 .. include:: help-ihme.rst

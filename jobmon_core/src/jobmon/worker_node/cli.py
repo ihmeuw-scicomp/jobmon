@@ -1,7 +1,6 @@
 """Command line interface for Execution."""
 
 import argparse
-import ast
 import importlib
 import importlib.machinery
 import importlib.util
@@ -88,26 +87,6 @@ class WorkerNodeCLI(CLI):
 
     def run_task_generator(self, args: argparse.Namespace) -> int:
         from jobmon.core.exceptions import ReturnCodes
-        from jobmon.worker_node import __version__
-
-        # if the user used the --args flag, parse the args and run the task generator
-        if args.args:
-            arg_dict = {}
-            pairs = args.args.split(";")
-
-            for pair in pairs:
-                key, value = pair.split("=")
-                if value.startswith("[") and value.endswith("]"):
-                    value = ast.literal_eval(value)
-                arg_dict[key] = value
-
-        if __version__ != args.expected_jobmon_version:
-            msg = (
-                f"Your expected Jobmon version is {args.expected_jobmon_version} and your "
-                f"worker node is using {__version__}. Please check your bash profile "
-            )
-            logger.error(msg)
-            sys.exit(ReturnCodes.WORKER_NODE_ENV_FAILURE)
 
         # Import the module and get the task generator we've been pointed to, raise an error
         # if it's not a TaskGenerator
@@ -135,8 +114,12 @@ class WorkerNodeCLI(CLI):
         if args.arghelp:
             print(task_generator.help())
             return ReturnCodes.OK
-        task_generator.run(arg_dict)
-        return ReturnCodes.OK
+        try:
+            task_generator.run(args.args)
+            return ReturnCodes.OK
+        except Exception as e:
+            print(e)
+            return ReturnCodes.WORKER_NODE_CLI_FAILURE
 
     def _add_run_task_generator_parser(self) -> None:
         generator_parser = self._subparsers.add_parser("task_generator")
@@ -155,8 +138,12 @@ class WorkerNodeCLI(CLI):
         generator_parser.add_argument(
             "--args",
             type=str,
-            help="Pair the args with the params of the function, seperated by `;`. "
-            'For example: --args "arg1=1; arg2=[2, 3]"',
+            help="Followed by the key=value; .\n"
+            "For example: \n"
+            "If you method has two argument: def func(foo: int, bar: str), pass\n"
+            "    --args foo=1 --args bar='test'\n"
+            "If you method has two argument: def func(foo: int, bar: List[str), pass\n"
+            "    --args foo=1 --args bar=[a,b]\n",
             required=False,
         )
         generator_parser.add_argument(
@@ -164,12 +151,6 @@ class WorkerNodeCLI(CLI):
             type=str,
             help="Show the help message for the task generator. For example: --arghelp",
             required=False,
-        )
-        generator_parser.add_argument(
-            "--expected_jobmon_version",
-            type=str,
-            help="expected_jobmon_version of the work node.",
-            required=True,
         )
         generator_parser.add_argument(
             "--module_source_path",

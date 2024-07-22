@@ -1,6 +1,8 @@
+import ast
 import os
+from typing import List
 
-from jobmon.core import task_generator, __version__ as core_version
+from jobmon.core import task_generator
 from jobmon.client.api import Tool
 
 # Get the full path of the current script
@@ -17,9 +19,10 @@ full_script_path = os.path.realpath(script_path)
     max_attempts=1,
     naming_args=["foo"],
 )
-def simple_function(foo: int) -> None:
+def simple_function(foo: int, bar: List[str] = []) -> None:
     """Simple task_function."""
     print(f"foo: {foo}")
+    print(f"bar: {bar}")
 
 
 class TestYear:
@@ -29,7 +32,7 @@ class TestYear:
         self.year = year
 
     @staticmethod
-    def parse_year(year: str) -> "FakeYearRange":
+    def parse_year(year: str):
         """Parse a year range."""
         return TestYear(int(year))
 
