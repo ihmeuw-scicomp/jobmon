@@ -1,11 +1,11 @@
-import React, {useCallback, useState} from 'react';
+import React, {useState} from 'react';
 import {Link, useLocation} from 'react-router-dom';
 
 import {convertDate, convertDatePST} from '@jobmon_gui/utils/formatters'
 import '@jobmon_gui/styles/jobmon_gui.css';
 import {FaCircle} from "react-icons/fa";
 import {MaterialReactTable, MRT_RowData, useMaterialReactTable} from 'material-react-table';
-import {Box, Button, CircularProgress, MenuItem} from '@mui/material';
+import {Box, Button, CircularProgress} from '@mui/material';
 import {mkConfig, generateCsv, download} from "export-to-csv";
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import {useQuery} from "@tanstack/react-query";
@@ -13,7 +13,7 @@ import axios from "axios";
 import {task_table_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import Typography from "@mui/material/Typography";
-import {type Row, filterFns} from '@tanstack/react-table';
+import {type Row} from '@tanstack/react-table';
 import {useTaskTableColumnsStore} from "@jobmon_gui/stores/task_table";
 
 type TaskTableProps = {
