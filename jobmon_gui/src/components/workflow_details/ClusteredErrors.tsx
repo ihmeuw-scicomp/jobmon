@@ -9,7 +9,7 @@ import {CircularProgress, Grid} from "@mui/material";
 import {MaterialReactTable, useMaterialReactTable} from "material-react-table";
 import {Button} from '@mui/material';
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal";
-import ScrollableTextArea, {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea";
+import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea";
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import IconButton from "@mui/material/IconButton";
@@ -26,6 +26,23 @@ type ErrorSampleModalDetails = {
     sample_index: number
     sample_ids: number[]
 }
+
+interface ErrorLog {
+    task_id: number
+    workflow_id: number
+    workflow_run_id: number
+    task_instance_err_id: number
+    task_instance_stderr_log: string
+    error_time: string
+    error: string
+}
+
+interface ErrorDetails {
+    data?: {
+        error_logs?: ErrorLog[];
+    };
+}
+
 export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredErrorsProps) {
     const taskTableColumnFilters = useTaskTableColumnsStore()
     const [errorDetailIndex, setErrorDetailIndex] = useState<boolean | ErrorSampleModalDetails>(false)
@@ -74,7 +91,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         {
             header: "Sample Error",
             accessorKey: "sample_error",
-            size:750,
+            size: 750,
             Cell: ({renderedCellValue, row}) => (
                 <Button sx={{textTransform: 'none', textAlign: "left"}}
                         onClick={() => setErrorDetailIndex({
@@ -97,7 +114,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         {
             header: "Actions",
             accessorKey: "actions",
-            Cell: ({renderedCellValue, row}) => (
+            Cell: ({row}) => (
                 <HtmlTooltip title={"Filter tasks table for tasks with this error"}
                              arrow={true}
                              placement={"right"}>
@@ -116,7 +133,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
     ];
 
     const table = useMaterialReactTable({
-        data: errors?.data?.error_logs || [],
+        data: (errors as ErrorDetails)?.data?.error_logs || [],
         columns: columns,
         initialState: {density: 'compact'},
         enableColumnResizing: true,
@@ -157,7 +174,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         if (errorDetails.isLoading) {
             return (<CircularProgress/>)
         }
-        const error = errorDetails?.data?.error_logs[0] || false
+        const error = (errorDetails as ErrorDetails)?.data?.error_logs?.[0] || false;
         if (errorDetails.isError || !error) {
             return (<Typography>Failed to retrieve error details. Please refresh and try again</Typography>)
         }
@@ -169,10 +186,29 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         return (<Box>
             <Box>
                 <Typography sx={labelStyles}>Error Sample:
-                    <IconButton onClick={previousSample}
-                                disabled={errorDetailIndex?.sample_index == 0}><NavigateBeforeIcon/></IconButton> {errorDetailIndex?.sample_index + 1} of {errorDetailIndex?.sample_ids?.length}
-                    <IconButton onClick={nextSample}
-                                disabled={errorDetailIndex?.sample_index == errorDetailIndex?.sample_ids?.length - 1}><NavigateNextIcon/></IconButton>
+                    <IconButton
+                        onClick={previousSample}
+                        disabled={typeof errorDetailIndex !== 'boolean' && errorDetailIndex?.sample_index === 0}
+                    >
+                        <NavigateBeforeIcon/>
+                    </IconButton>
+
+                    {
+                        errorDetailIndex && typeof errorDetailIndex !== 'boolean' ? (
+                            `${errorDetailIndex.sample_index + 1} of ${errorDetailIndex.sample_ids?.length}`
+                        ) : (
+                            'No error logs available'
+                        )
+                    }
+                    <IconButton
+                        onClick={nextSample}
+                        disabled={
+                            typeof errorDetailIndex !== 'boolean' &&
+                            errorDetailIndex?.sample_index === errorDetailIndex?.sample_ids?.length - 1
+                        }
+                    >
+                        <NavigateNextIcon/>
+                    </IconButton>
                 </Typography>
             </Box>
             <Grid container spacing={2}>
@@ -222,8 +258,9 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
             <JobmonModal
                 title={`Error Sample for Task Instance ID: ${currentTiID()}`}
                 open={errorDetailIndex !== false}
-                onClose={() => setErrorDetailIndex(false)} children={modalChildren()}/>
-
+                onClose={() => setErrorDetailIndex(false)} children={modalChildren()}
+                width={"80%"}
+            />
         </Box>
     )
 }

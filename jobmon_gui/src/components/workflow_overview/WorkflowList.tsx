@@ -272,6 +272,7 @@ export default function WorkflowList() {
                 }
                 open={showWorkflowInfo}
                 onClose={() => setShowWorkflowInfo(false)}
+                width={"80%"}
             />
         </Box>
     );
