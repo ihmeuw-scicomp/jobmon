@@ -12,17 +12,26 @@ All notable changes to the Jobmon GUI will be documented in this file.
 ## [1.15.0] - TBD
 
 ### User-Facing
+#### Added
+- Added a `Clustered Errors` table to the `Workflow Details` page.
+- Added a modal that shows users the details of their clustered errors.
+- Workflow submitted date end time filter to `Workflow Overview` page.
+
 #### Changed
-- Changed look of filters on `Workflow Overview` page
-- Changed the Task and TaskInstance tables to use the `react-material-table` component
-- Persist users' filters on `Workflow Overview` page
+- Removed table from `Workflow Overview` page; now show a list of progress bars with information buttons.
+- Changed look of filters on `Workflow Overview` page.
+- Changed the Task and TaskInstance tables to use the `react-material-table` component.
+- Persist users' filters on `Workflow Overview` page.
 
 #### Fixed
-- Fixed bug where workflow elapsed time was wrong. It's now workflow status date - workflow submitted date
+- Fixed bug where workflow elapsed time was wrong. It's now workflow status date - workflow submitted date.
+
+#### Removed
+- Removed `Errors` tab on `Workflow Details` page; information is now on `Errors and Tasks` tab.
 
 ### Developer
 #### Changed
-- Added zustand store to filters on `Workflow Overview` page
+- Added zustand store to filters on `Workflow Overview` page.
 
 ## [1.14.0] - 2024-06-07
 ### User-Facing
@@ -31,11 +40,11 @@ All notable changes to the Jobmon GUI will be documented in this file.
 - Added a new resources column to the TaskInstance table on the `Task Details` page that shows the requested and 
 utilized resources.
 - Users are now able to filter their workflows by both workflow attribute key and workflow attribute value on the 
-`Workflow Overview` page
+`Workflow Overview` page.
 
 #### Fixed
 - Fixed bug in the breadcrumb navigation where the buttons would occasionally take users to the wrong page
-- Fixed bug where it shows "No Workflows Found" even if no filters were passed
+- Fixed bug where it shows "No Workflows Found" even if no filters were passed.
 
 #### Changed 
 - Default to showing only Workflows that were submitted in the last two weeks on the `Workflow Overview` page.
@@ -50,7 +59,7 @@ modal when clicked.
 - Change file structure to include assets, components, configs, screens, styles, and utils folders.
 - Switched to Vite for local development server.
 - Changed import paths to be relative instead of absolute.
-- Show Jobmon GUI version number on the bottom of left of GUI
+- Show Jobmon GUI version number on the bottom of left of GUI.
 
 ## [1.13.0] - 2023-10-11
 ### Changed
