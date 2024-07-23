@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jobmon_core"
 description="Shared functionality for Jobmon Namespace Packages"
-readme="../README.md"
+readme="README.md"
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3.9",
