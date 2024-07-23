@@ -88,7 +88,7 @@ export default function WorkflowList() {
                 wf_attribute_value: workflowSettings.get().wf_attribute_value,
                 wf_id: workflowSettings.get().wf_id,
                 date_submitted: dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
-                date_submitted_end: dayjs(workflowSettings.get().date_submitted_end).format("YYYY-MM-DD"),
+                date_submitted_end: dayjs(workflowSettings.get().date_submitted_end).add(1, 'day').format("YYYY-MM-DD"),
                 status: workflowSettings.get().status
             });
             return axios.get<WorkflowsQueryResponse>(workflow_overview_url, {
