@@ -5,6 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jobmon_server"
 description = "Web Service and Model for Jobmon"
+readme="README.md"
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3.9",
