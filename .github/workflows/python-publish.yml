@@ -29,7 +29,7 @@ jobs:
     - name: Build package
       #ToDo Restrict to Jobmon-client?
       run: |
-        nox -s build
+        python -m build --outdir dist --sdist --wheel jobmon_client  
         ls
         ls -l dist
   publish:
