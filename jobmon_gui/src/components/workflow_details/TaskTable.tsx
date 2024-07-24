@@ -130,7 +130,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
     const table = useMaterialReactTable({
         data: tasks?.data || [],
         columns: columns,
-        initialState: {density: 'compact', showColumnFilters: true,},
+        initialState: {density: 'comfortable', showColumnFilters: true,},
         enableColumnFilterModes: true,
 
         state: {
