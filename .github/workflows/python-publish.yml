@@ -10,7 +10,10 @@ permissions:
 
 jobs:
   build:
+    environment: 'deploy'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -22,18 +25,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install build nox setuptools wheel
     - name: Build package
-      #ToDo Restrict to Jobmon-client?
       run: |
         python -m build --sdist --wheel --outdir dist/ jobmon_client  
         ls
         ls -l dist
-  publish:
-      needs: ['build']
-      environment: 'deploy'
-      name: upload release to PyPI
-      runs-on: ubuntu-latest
-      permissions:
-        id-token: write
-      steps:
-      - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
