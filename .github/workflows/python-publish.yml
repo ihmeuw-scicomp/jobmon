@@ -10,12 +10,7 @@ permissions:
 
 jobs:
   build:
-    # Nox probably does what we need
-#    strategy:
-#      matrix: { products: [ "jobmon-core", "jobmon-server", "jobmon-client" ] }
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
@@ -29,7 +24,7 @@ jobs:
     - name: Build package
       #ToDo Restrict to Jobmon-client?
       run: |
-        python -m build --outdir dist --sdist --wheel jobmon_client  
+        python -m build --sdist --wheel --outdir dist/ jobmon_client  
         ls
         ls -l dist
   publish:
