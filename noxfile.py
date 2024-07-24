@@ -114,7 +114,7 @@ def build(session: Session) -> None:
 
     for src_dir in args:
         namespace_dir = str(Path(src_dir).parent)
-        session.run("python", "-m", "build", "--sdist", "--wheel", "--outdir", "dist", namespace_dir)
+        session.run("python", "-m", "build", "--outdir", "dist", namespace_dir)
 
 
 @nox.session(python=python, venv_backend="conda")
