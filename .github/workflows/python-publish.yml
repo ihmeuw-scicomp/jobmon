@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  deploy:
+  build:
     # Nox probably does what we need
 #    strategy:
 #      matrix: { products: [ "jobmon-core", "jobmon-server", "jobmon-client" ] }
@@ -27,10 +27,17 @@ jobs:
         python -m pip install --upgrade pip
         pip install build nox
     - name: Build package
+      #ToDo Restrict to Jobmon-client?
       run: nox -s build
-    - name: Publish package
-      uses: pypa/gh-action-pypi-publish@27b31702a0e7fc50959f5ad993c78deac1bdfc29
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
-        packages_dir: dist
+  publish:
+      needs: ['build']
+      environment: 'deploy''
+      name: upload release to PyPI
+      runs-on: ubuntu-latest
+      permissions:
+        id-token: write
+      steps:
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages_dir: artifact/
