@@ -31,7 +31,7 @@ jobs:
       run: nox -s build
   publish:
       needs: ['build']
-      environment: 'deploy''
+      environment: 'deploy'
       name: upload release to PyPI
       runs-on: ubuntu-latest
       permissions:
