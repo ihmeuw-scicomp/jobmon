@@ -28,7 +28,10 @@ jobs:
         pip install build nox
     - name: Build package
       #ToDo Restrict to Jobmon-client?
-      run: nox -s build
+      run: |
+        nox -s build
+        ls
+        ls -l dist
   publish:
       needs: ['build']
       environment: 'deploy'
@@ -40,4 +43,4 @@ jobs:
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: jobmon/dist/
+          packages-dir: dist/
