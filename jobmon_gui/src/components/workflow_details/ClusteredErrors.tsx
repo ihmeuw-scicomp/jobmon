@@ -170,7 +170,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
     const table = useMaterialReactTable({
         data: (errors as ErrorDetails)?.data?.error_logs || [],
         columns: columns,
-        initialState: {density: 'compact'},
+        initialState: {density: 'comfortable'},
         enableColumnResizing: true,
         layoutMode: "grid-no-grow",
     });
