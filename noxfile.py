@@ -1,4 +1,9 @@
-"""Nox Configuration for Jobmon."""
+"""
+Nox Configuration for Jobmon.
+
+Docs are built in github  using readthedocs. See .readthedocs.yml for configuration.
+
+"""
 import glob
 import os
 from pathlib import Path
@@ -115,7 +120,6 @@ def build(session: Session) -> None:
     for src_dir in args:
         namespace_dir = str(Path(src_dir).parent)
         session.run("python", "-m", "build", "--outdir", "dist", namespace_dir)
-
 
 @nox.session(python=python, venv_backend="conda")
 def clean(session: Session) -> None:
