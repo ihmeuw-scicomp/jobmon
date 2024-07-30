@@ -120,7 +120,7 @@ and a task generator, simple_function_with_serializer.
 
 To create a single task workflow:
 
-..code-block:: python
+.. code-block:: python
 
     tool = Tool("test_tool")
     tool.set_default_compute_resources_from_dict(
