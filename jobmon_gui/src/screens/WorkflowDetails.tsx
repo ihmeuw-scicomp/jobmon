@@ -21,6 +21,7 @@ import {TTStatusResponse} from "@jobmon_gui/types/TaskTemplateStatus";
 import HtmlTooltip from "@jobmon_gui/components/HtmlToolTip";
 import ClusteredErrors from "@jobmon_gui/components/workflow_details/ClusteredErrors";
 import {useTaskTableColumnsStore} from "@jobmon_gui/stores/task_table";
+import {convertDatePST} from "@jobmon_gui/utils/formatters";
 
 type WorkflowDetailsProps = {
     subpage: number
@@ -160,9 +161,9 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
                     wf_tool={wfDetails?.data?.tool_name}
                     wf_name={wfDetails?.data?.wf_name}
                     wf_args={wfDetails?.data?.wf_args}
-                    wf_submitted_date={wfDetails?.data?.wf_created_date}
-                    wf_status_date={wfDetails?.data?.wf_status_date}
-                    wf_elapsed_time={humanizeDuration(new Date().getTime() - new Date(wfDetails?.data?.wf_status_date).getTime())}
+                    wf_submitted_date={convertDatePST(wfDetails?.data?.wf_created_date)}
+                    wf_status_date={convertDatePST(wfDetails?.data?.wf_status_date)}
+                    wf_elapsed_time={humanizeDuration(new Date(wfDetails?.data?.wf_status_date).getTime() - new Date(wfDetails?.data?.wf_created_date).getTime())}
                     jobmon_version={wfDetails?.data?.wfr_jobmon_version}
                 />
             </Box>
