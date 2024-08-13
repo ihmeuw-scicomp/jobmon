@@ -732,17 +732,27 @@ def task_generator(
 def get_tasks_by_node_args(
     workflow: Workflow,
     task_generator: TaskGenerator,
-    node_args_dict: Dict,
+    node_args_dict: dict[str, Any],
     error_on_empty: bool = True,
-) -> List[Task]:
+) -> list[Task]:
     """Get the tasks of a TaskGenerator in a workflow that have the given node arguments.
 
     This method does some value serialization and formatting before handing the node argument
     string over to ``workflow.get_tasks_by_node_args``.
     """
+    # Re-serialize the node args dict and format them as CLI arguments
+    serialized_node_args = {
+        arg_name: make_cli_argument_string(
+            arg_value=task_generator.serialize(
+                obj=arg_value, expected_type=task_generator.params[arg_name]
+            ),
+        )
+        for arg_name, arg_value in node_args_dict.items()
+    }
+
     try:
         result = workflow.get_tasks_by_node_args(
-            task_template_name=task_generator.name, **node_args_dict  # type: ignore
+            task_template_name=task_generator.name, **serialized_node_args
         )
     except ValueError as err:
         if error_on_empty:
@@ -750,8 +760,6 @@ def get_tasks_by_node_args(
         result = []
 
     if not result and error_on_empty:
-        raise ValueError(
-            f"There were no tasks in the workflow that matched {node_args_dict}"
-        )
+        raise ValueError(f"There were no tasks in the workflow that matched {node_args_dict}")
 
     return result

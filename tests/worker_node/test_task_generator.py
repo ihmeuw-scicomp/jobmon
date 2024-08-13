@@ -988,3 +988,125 @@ def test_task_template_only_generated_once(client_env, monkeypatch) -> None:
     # verify the task_template is the same
     assert tg._task_template is tg_task_template
     assert tg_task_template_id == tg._task_template.id
+
+
+def test_get_tasks_by_node_args_simple(client_env, monkeypatch):
+    """Test the get_tasks_by_node_args method with simple input."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="sequential", compute_resources={"queue": "null.q"}
+    )
+    wf = tool.create_workflow()
+
+    def test_func(foo: int) -> None:
+        """Simple task_function."""
+        pass
+
+    tg = task_generator.TaskGenerator(
+        task_function=test_func,
+        serializers={},
+        tool_name="test_tool"
+    )
+
+    # create a task
+    t1 = tg.create_task(compute_resources={}, foo=1)
+    # create another task
+    t2 = tg.create_task(compute_resources={}, foo=2)
+    wf.add_tasks([t1, t2])
+
+    # use get_tasks_by_node_args to find t1
+    tasks = task_generator.get_tasks_by_node_args(workflow=wf, node_args_dict={"foo": 1}, task_generator=tg)
+    assert len(tasks) == 1
+    assert t1 in tasks
+    # use get_tasks_by_node_args to find t2
+    tasks = task_generator.get_tasks_by_node_args(workflow=wf, node_args_dict={"foo": 2}, task_generator=tg)
+    assert len(tasks) == 1
+    assert t2 in tasks
+
+
+def test_get_tasks_by_node_args_list(client_env, monkeypatch):
+    """Test the get_tasks_by_node_args method with list input."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="sequential", compute_resources={"queue": "null.q"}
+    )
+    wf = tool.create_workflow()
+
+    def test_func(foo: List[int]) -> None:
+        """Simple task_function."""
+        pass
+
+    tg = task_generator.TaskGenerator(
+        task_function=test_func,
+        serializers={},
+        tool_name="test_tool"
+    )
+
+    # create a task
+    t1 = tg.create_task(compute_resources={}, foo=[1, 2])
+    # create another task
+    t2 = tg.create_task(compute_resources={}, foo=[2])
+    wf.add_tasks([t1, t2])
+
+    # use get_tasks_by_node_args to find t1
+    tasks = task_generator.get_tasks_by_node_args(workflow=wf, node_args_dict={"foo": [1, 2]}, task_generator=tg)
+    assert len(tasks) == 1
+    assert t1 in tasks
+    # use get_tasks_by_node_args to find t2
+    tasks = task_generator.get_tasks_by_node_args(workflow=wf, node_args_dict={"foo": [2]}, task_generator=tg)
+    assert len(tasks) == 1
+    assert t2 in tasks
+
+
+def test_get_tasks_by_node_args_obj(client_env, monkeypatch):
+    """Test the get_tasks_by_node_args method with serializers."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="sequential", compute_resources={"queue": "null.q"}
+    )
+    wf = tool.create_workflow()
+
+    def test_func(foo: FakeYearRange) -> None:
+        """Simple task_function."""
+        pass
+
+    tg = task_generator.TaskGenerator(
+        task_function=test_func,
+        serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
+        tool_name="test_tool"
+    )
+
+    # create a task
+    fake_year_range1 = FakeYearRange.parse_year_range("2010:2020:2030")
+    fake_year_range2 = FakeYearRange.parse_year_range("2020:2030:2040")
+    t1 = tg.create_task(compute_resources={}, foo=fake_year_range1)
+    # create another task
+    t2 = tg.create_task(compute_resources={}, foo=fake_year_range2)
+    wf.add_tasks([t1, t2])
+
+    # use get_tasks_by_node_args to find t1
+    tasks = task_generator.get_tasks_by_node_args(workflow=wf, node_args_dict={"foo": fake_year_range1}, task_generator=tg)
+    assert len(tasks) == 1
+    assert t1 in tasks
+    # use get_tasks_by_node_args to find t2
+    tasks = task_generator.get_tasks_by_node_args(workflow=wf, node_args_dict={"foo": fake_year_range2}, task_generator=tg)
+    assert len(tasks) == 1
+    assert t2 in tasks
