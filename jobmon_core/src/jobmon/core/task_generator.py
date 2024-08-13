@@ -549,7 +549,7 @@ class TaskGenerator:
             name = name[:-1]
 
         # Create the task
-        task = self._task_template.create_task(
+        task = self._task_template.create_task(  # type: ignore
             name=name,
             compute_resources=compute_resources,
             max_attempts=self.max_attempts,
@@ -584,7 +584,7 @@ class TaskGenerator:
         # name is auto for array
 
         # Create the task
-        tasks = self._task_template.create_tasks(
+        tasks = self._task_template.create_tasks(  # type: ignore
             compute_resources=compute_resources,
             max_attempts=self.max_attempts,
             executable=executable_path,
