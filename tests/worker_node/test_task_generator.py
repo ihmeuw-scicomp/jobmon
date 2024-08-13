@@ -954,3 +954,37 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         " --args q=None"
     )
     assert tasks[1].command == expected_command2
+
+
+def test_task_template_only_generated_once(client_env, monkeypatch) -> None:
+    """Test the self._task_template only gererate once."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    def test_func(foo: int) -> None:
+        """Simple task_function."""
+        pass
+
+    tg = task_generator.TaskGenerator(
+        task_function=test_func,
+        serializers={},
+        tool_name="test_tool"
+    )
+    assert tg._task_template is not None
+    tg_task_template = tg._task_template
+    tg_task_template_id = tg_task_template.id
+
+    # create a task
+    tg.create_task(compute_resources={}, foo=1)
+    # verify the task_template is the same
+    assert tg._task_template is tg_task_template
+    assert tg_task_template_id == tg._task_template.id
+    # create a taskn
+    tg.create_task(compute_resources={}, foo=2)
+    # verify the task_template is the same
+    assert tg._task_template is tg_task_template
+    assert tg_task_template_id == tg._task_template.id
