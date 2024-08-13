@@ -217,7 +217,10 @@ class TaskGenerator:
                 serializer, which converts an object of the type to a string. And the second is
                 a deserializer, which converts a string to an object of the type.
             tool_name: A jobmon tool name for generating tasks.
-            naming_args: A list of arguments to use in the task name. If not provided, uses all
+            naming_args: A list of arguments to use in the task name. If not provided (or
+                ``None``), it uses all the arguments. If ``[]`` is provided, it uses no naming
+                arguments, and the name of the task will just be the name of the task function.
+            max_attempts: The max number of attempts jobmon will make on the tasks
             max_attempts: The max number of attempts jobmon will make on the tasks
             module_source_path: The path to the module source code. If not provided,
                                 the module is assumed to be installed in the system.
@@ -236,9 +239,7 @@ class TaskGenerator:
                 self.task_function
             ).parameters.items()
         }
-        self._naming_args = (
-            naming_args if naming_args is not None else self.params.keys()
-        )
+        self._naming_args = naming_args if naming_args is not None else self.params.keys()
 
         self._validate_task_function()
 
@@ -536,10 +537,8 @@ class TaskGenerator:
             if value == SERIALIZED_EMPTY_STRING:
                 kwargs_for_name[key] = ""
 
-        name = (
-            self.name
-            + ":"
-            + ":".join(f"{name}={value}" for name, value in kwargs_for_name.items())
+        name = ":".join(
+            [self.name] + [f"{name}={value}" for name, value in kwargs_for_name.items()]
         )
         # trim ending :
         if name[-1] == ":":
