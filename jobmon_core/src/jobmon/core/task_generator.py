@@ -239,11 +239,13 @@ class TaskGenerator:
                 self.task_function
             ).parameters.items()
         }
-        self._naming_args = naming_args if naming_args is not None else self.params.keys()
+        self._naming_args = (
+            naming_args if naming_args is not None else self.params.keys()
+        )
 
         self._validate_task_function()
 
-        self._generate_task_template()
+        self._task_template = None
 
     def _validate_task_function(self) -> None:
         """Check that a task can be generated from the task_function.
@@ -507,6 +509,8 @@ class TaskGenerator:
 
     def create_task(self, compute_resources: Dict, **kwargs: Any) -> Task:
         """Create a task for the task_function with the given kwargs."""
+        if self._task_template is None:
+            self._generate_task_template()
         executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
         # Serialize the kwargs
         serialized_kwargs = {
@@ -557,6 +561,8 @@ class TaskGenerator:
 
     def create_tasks(self, compute_resources: Dict, **kwargs: Any) -> List[Task]:
         """Create a task array for the task_function with the given kwargs."""
+        if self._task_template is None:
+            self._generate_task_template()
         executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
         # Serialize the kwargs
         serialized_kwargs = {
@@ -760,6 +766,8 @@ def get_tasks_by_node_args(
         result = []
 
     if not result and error_on_empty:
-        raise ValueError(f"There were no tasks in the workflow that matched {node_args_dict}")
+        raise ValueError(
+            f"There were no tasks in the workflow that matched {node_args_dict}"
+        )
 
     return result

@@ -956,7 +956,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
     assert tasks[1].command == expected_command2
 
 
-def test_task_template_only_generated_once(client_env, monkeypatch) -> None:
+def test_task_template_not_generated_when_instance_only_generated_once(client_env, monkeypatch) -> None:
     """Test the self._task_template only gererate once."""
     # Set up function
     monkeypatch.setattr(
@@ -974,19 +974,19 @@ def test_task_template_only_generated_once(client_env, monkeypatch) -> None:
         serializers={},
         tool_name="test_tool"
     )
-    assert tg._task_template is not None
-    tg_task_template = tg._task_template
-    tg_task_template_id = tg_task_template.id
+    # test
+    assert tg._task_template is None
 
     # create a task
     tg.create_task(compute_resources={}, foo=1)
     # verify the task_template is the same
-    assert tg._task_template is tg_task_template
-    assert tg_task_template_id == tg._task_template.id
-    # create a taskn
+    tt = tg._task_template
+    assert tt is not None
+    tg_task_template_id = tt.id
+    # create another task
     tg.create_task(compute_resources={}, foo=2)
     # verify the task_template is the same
-    assert tg._task_template is tg_task_template
+    assert tg._task_template is tt
     assert tg_task_template_id == tg._task_template.id
 
 
