@@ -163,11 +163,17 @@ def make_cli_argument_string(arg_value: Union[str, List]) -> str:
     """Make a CLI argument string from an argument name and value.
 
     For string, return itself.
-    For list, say ["a", "b", "c"], return "[a,b,c]"
+    For list, say ["a", "b", "c"], return string '[a,b,c]'
     """
     if isinstance(arg_value, list):
         no_space_string = ",".join(arg_value)
-        return f"[{no_space_string}]"
+        # we can not take single quote in the string, throw an error
+        if "'" in no_space_string:
+            raise ValueError(
+                f"This version of TaskGenertor cannot serialize list with single quote in it: "
+                f"{arg_value}."
+            )
+        return f"\'[{no_space_string}]\'"
 
     return arg_value
 
