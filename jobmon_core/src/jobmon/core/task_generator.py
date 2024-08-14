@@ -431,6 +431,12 @@ class TaskGenerator:
         """Deserialize ``obj``."""
         deserialized_result: Any
 
+        if is_optional_type(obj_type):
+            if obj == str(None):
+                return None
+            else:
+                obj_type = get_optional_type_parameter(obj_type)
+
         if obj_type in self.serializers.keys():
             # The 1'st index of the serializers dict is the deserialization function
             deserialized_result = self.serializers[obj_type][1](obj)
@@ -445,14 +451,6 @@ class TaskGenerator:
             # For all other simple types, we can simply call the type on ``obj``
             else:
                 deserialized_result = obj_type(obj)
-
-        elif is_optional_type(obj_type):
-            if obj == str(None):
-                deserialized_result = None
-            else:
-                deserialized_result = self.deserialize(
-                    obj=obj, obj_type=get_optional_type_parameter(obj_type)
-                )
 
         elif _is_unannotated_built_in_collection_type(obj_type):
             raise TypeError(
