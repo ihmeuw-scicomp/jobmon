@@ -836,6 +836,44 @@ def test_fhs_serializers(client_env) -> None:
     assert q == tg.deserialize(r6, Quantiles)
 
 
+def test_fhs_serizalizers(client_env, monkeypatch) -> None:
+    """Test the serializers for the FHS task generator."""
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    tool = Tool("test_tool")
+
+    from tests.worker_node.task_generator_fhs import YearRange, Versions, FHSFileSpec, FHSDirSpec, VersionMetadata, \
+        Quantiles, versions_to_list, versions_from_list, quantiles_to_list, quantiles_from_list
+
+    testing_serializer = {
+        YearRange: (str, YearRange.parse_year_range),
+        Versions: (versions_to_list, versions_from_list),
+        FHSFileSpec: (str, FHSFileSpec.parse),
+        FHSDirSpec: (str, FHSDirSpec.parse),
+        VersionMetadata: (str, VersionMetadata.parse_version),
+        Quantiles: (quantiles_to_list, quantiles_from_list),
+    }
+
+    def test_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDirSpec, vm: VersionMetadata, q: Optional[Quantiles]) -> None:
+        """Simple task_function."""
+        pass
+
+    tg = task_generator.TaskGenerator(
+        task_function=test_function,
+        serializers=testing_serializer,
+        tool_name="test_tool"
+    )
+
+    q = Quantiles(0.1, 0.9)
+    q_s = tg.serialize(q, Quantiles)
+    assert q_s == ["0.1", "0.9"]
+    assert q == tg.deserialize(q_s, Quantiles)
+
+
 def test_fhs_task(client_env, monkeypatch) -> None:
     """Test the serializers for the FHS task generator."""
     # Set up function
