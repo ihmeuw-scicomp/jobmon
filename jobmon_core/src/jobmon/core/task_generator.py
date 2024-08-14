@@ -553,6 +553,12 @@ class TaskGenerator:
         # trim ending :
         if name[-1] == ":":
             name = name[:-1]
+        # remove illegal characters: '/\\'\" ' from name
+        name = (name.replace("/", "_")
+                .replace("\\", "_")
+                .replace('"', "_")
+                .replace("'", "_")
+                .replace(" ", "_"))
 
         # Create the task
         task = self._task_template.create_task(  # type: ignore

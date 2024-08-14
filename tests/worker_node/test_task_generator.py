@@ -73,19 +73,19 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Exercise
     task = list_function.create_task(
-        compute_resources=compute_resources, foo=["a", "b"], bar=["c", "d"]
+        compute_resources=compute_resources, foo=["a", "b b"], bar=["c\""]
     )
 
     # Verify task name
-    assert task.name == "list_function:foo=a,b:bar=c,d"
+    assert task.name == "list_function:foo=a,b_b:bar=c_"
 
     # Verify command
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name list_function"
-        " --args foo=[a,b]"
-        " --args bar=[c,d]"
+        " --args foo='[a,b b]'"
+        " --args bar='[c\"]'"
     )
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
@@ -779,7 +779,7 @@ def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
             f" --module_name tests.worker_node.test_task_generator"
             " --func_name simple_function"
             f" --args foo={i}"
-            " --args bar=[a,b]"
+            " --args bar='[a,b]'"
         )
 
         assert tasks[i-1].command == expected_command
@@ -884,11 +884,11 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
         " --args yr=2020-2021"
-        " --args v=[1.0,2.0]"
+        " --args v='[1.0,2.0]'"
         " --args fSpec=/path/to/file"
         " --args dSpec=/path/to/dir"
         " --args vm=1.0"
-        " --args q=[0.1,0.9]"
+        " --args q='[0.1,0.9]'"
     )
     assert task1.name == "simple_function:yr=2020-2021:v=1.0,2.0"
     assert task1.command == expected_command
@@ -908,7 +908,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
         " --args yr=2020-2021"
-        " --args v=[1.0,2.0]"
+        " --args v='[1.0,2.0]'"
         " --args fSpec=/path/to/file"
         " --args dSpec=/path/to/dir"
         " --args vm=1.0"
@@ -934,11 +934,11 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
         " --args yr=2020-2021"
-        " --args v=[1.0,2.0]"
+        " --args v='[1.0,2.0]'"
         " --args fSpec=/path/to/file"
         " --args dSpec=/path/to/dir"
         " --args vm=1.0"
-        " --args q=[0.1,0.9]"
+        " --args q='[0.1,0.9]'"
     )
     assert tasks[0].command == expected_command1
     # Verify command
@@ -947,7 +947,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
         " --args yr=2020-2021"
-        " --args v=[1.0,2.0]"
+        " --args v='[1.0,2.0]'"
         " --args fSpec=/path/to/file"
         " --args dSpec=/path/to/dir"
         " --args vm=1.0"
