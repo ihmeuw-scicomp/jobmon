@@ -473,9 +473,13 @@ class TaskGenerator:
                     # handle input like "[a,b,c]"
                     # remove leading and tailing space
                     obj = obj.strip()
+                    # handle input like "'[a,b,c]'"
+                    if obj[0] == "'" and obj[-1] == "'":
+                        obj = obj[1:-1]
                     # remove leading and tailing brackets
                     if obj[0] in ["[", "("] and obj[-1] in ["]", ")"]:
                         obj = obj[1:-1]
+
                     middle_result = obj.split(",")
                 deserialized_result = [
                     self.deserialize(item, obj_type.__args__[0])
