@@ -169,14 +169,14 @@ def simple_tasks_serializer_array() -> None:
     assert r == "D"
 
 
-def special_char_tasks_serializer_seq() -> None:
+def special_char_tasks_serializer_slurm() -> None:
     """Simple task."""
     tool = Tool("test_tool")
     tool.set_default_compute_resources_from_dict(
-        cluster_name="sequential", compute_resources={"queue": "null.q"}
+        cluster_name="slurm", compute_resources={"queue": "all.q"}
     )
     wf = tool.create_workflow()
-    compute_resources = {"queue": "null.q"}
+    compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
 
     # Import the task_generator_funcs.py module
     spec = importlib.util.spec_from_file_location(
@@ -299,7 +299,7 @@ def main():
     elif input_value == 8:
         fhs_slurm()
     elif input_value == 9:
-        special_char_tasks_serializer_seq()
+        special_char_tasks_serializer_slurm()
     else:
         simple_tasks_seq()
 
