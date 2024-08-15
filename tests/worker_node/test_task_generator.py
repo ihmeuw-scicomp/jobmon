@@ -829,15 +829,15 @@ def test_fhs_serializers(client_env) -> None:
 
     # verify deserialization
     assert yr == tg.deserialize(r1, YearRange)
-    assert v == tg.deserialize(r2, Versions)
+    assert v == tg.deserialize('["1.0", "2.0"]', Versions)
     assert fSpec == tg.deserialize(r3, FHSFileSpec)
     assert dSpec == tg.deserialize(r4, FHSDirSpec)
     assert vm == tg.deserialize(r5, VersionMetadata)
-    assert q == tg.deserialize(r6, Quantiles)
+    assert q == tg.deserialize('["0.1", "0.9"]', Quantiles)
 
 
-def test_fhs_serizalizers(client_env, monkeypatch) -> None:
-    """Test the serializers for the FHS task generator."""
+def test_fhs_deserizalizers(client_env, monkeypatch) -> None:
+    """Test special case for FHS after forcing deserizatizer to take str only."""
     monkeypatch.setattr(
         task_generator,
         "_find_executable_path",
@@ -871,7 +871,12 @@ def test_fhs_serizalizers(client_env, monkeypatch) -> None:
     q = Quantiles(0.1, 0.9)
     q_s = tg.serialize(q, Quantiles)
     assert q_s == ["0.1", "0.9"]
-    assert q == tg.deserialize(q_s, Quantiles)
+    assert q == tg.deserialize('["0.1", "0.9"]', Quantiles)
+
+    v = Versions("1.0")
+    v_s = tg.serialize(v, Versions)
+    assert v_s == ["1.0"]
+    assert v == tg.deserialize("1.0", Versions)
 
 
 def test_fhs_task(client_env, monkeypatch) -> None:

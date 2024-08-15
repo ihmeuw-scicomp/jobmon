@@ -1,4 +1,5 @@
 import pytest
+import ast
 
 from typing import Optional, Callable, Type, Dict, List, Any, Union
 import sys
@@ -57,10 +58,11 @@ def versions_to_list(versions: Versions) -> list[str]:
         return versions._version
 
 
-def versions_from_list(versions: Union[List[str], str]) -> Versions:
+def versions_from_list(versions: str) -> Versions:
     """Deserializer for VersionMetadata that takes a list of strings."""
-    if isinstance(versions, str):
-        versions = [versions]
+    versions = ast.literal_eval(versions)
+    if not isinstance(versions, list) and not isinstance(versions, tuple):
+        versions = [str(versions)]
 
     return Versions(*versions)
 
@@ -80,8 +82,9 @@ def quantiles_to_list(quantiles: Quantiles) -> list[str]:
     return [str(quantiles.lower), str(quantiles.upper)]
 
 
-def quantiles_from_list(quantiles: list[str]) -> Quantiles:
+def quantiles_from_list(q: str) -> Quantiles:
     """Deserializer for Quantiles that takes a list of strings."""
+    quantiles = ast.literal_eval(q)
     return Quantiles(quantiles[0], quantiles[1])
 
 

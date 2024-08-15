@@ -427,7 +427,7 @@ class TaskGenerator:
         else:
             return [self.serialize(obj, expected_type)]
 
-    def deserialize(self, obj: Union[str, List[str]], obj_type: Type) -> Any:
+    def deserialize(self, obj: str, obj_type: Type) -> Any:
         """Deserialize ``obj``."""
         deserialized_result: Any
 
@@ -438,6 +438,9 @@ class TaskGenerator:
                 obj_type = get_optional_type_parameter(obj_type)
 
         if obj_type in self.serializers.keys():
+            # To support dynamic length list input, the deserializer should only take string as input
+            if not isinstance(obj, str):
+                raise TypeError(f"Expected a string to deserialize, but got {type(obj)}.")
             # The 1'st index of the serializers dict is the deserialization function
             deserialized_result = self.serializers[obj_type][1](obj)
 
