@@ -136,3 +136,45 @@ To create a single task workflow:
 
 The above code creates a workflow with a single task named
 "simple_function_with_serializer:year=2021" and runs it.
+
+To create a workflow with function input containing special characters like a single quote:
+
+.. code-block:: python
+
+    import html
+
+    def special_char_encodeing(input: str) -> str:
+    """Encode special characters."""
+    return html.escape(input)
+
+
+    def special_char_decoding(input: str) -> str:
+        """Decode special characters."""
+        return html.unescape(input)
+
+
+    @task_generator.task_generator(
+        serializers={str: (special_char_encodeing, special_char_decoding)},
+        tool_name="test_tool",
+        module_source_path=full_script_path,
+        max_attempts=1,
+        naming_args=["foo"],
+    )
+    def special_chars_function(foo: str) -> None:
+        """Simple task_function."""
+        print(f"foo: {foo}")
+
+
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="slurm", compute_resources={"queue": "all.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
+    task = special_chars_function.create_task(wf,
+               foo="string with \'special\' characters",
+               compute_resources=compute_resources)
+    wf.add_task(task)
+    wf.run()
+
+The above code creates a workflow with a single task what requests special characters in the input.

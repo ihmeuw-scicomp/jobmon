@@ -185,9 +185,10 @@ def special_char_tasks_serializer_seq() -> None:
     task_generator_funcs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.special_chars_function
-    for i in range(5):
-        task = simple_function.create_task(compute_resources=compute_resources, foo=f"{i}\'a\'")
-        wf.add_tasks([task])
+    task = simple_function.create_task(wf,
+                                       foo="string with \'special\' characters",
+                                       compute_resources=compute_resources)
+    wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
 

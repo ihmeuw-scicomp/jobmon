@@ -175,7 +175,7 @@ def make_cli_argument_string(arg_value: Union[str, List]) -> str:
             )
         return f"\'[{no_space_string}]\'"
 
-    return arg_value
+    return f"\'{arg_value}\'"
 
 
 class TaskGenerator:

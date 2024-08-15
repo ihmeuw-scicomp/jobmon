@@ -47,15 +47,6 @@ class TestYear:
 test_year_serializer = {TestYear: (str, TestYear.parse_year)}
 
 
-def special_char_encodeing(input: str) -> str:
-    """Encode special characters."""
-    return html.escape(input)
-
-
-def special_char_decoding(input: str) -> str:
-    """Decode special characters."""
-    return html.unescape(input)
-
 @task_generator.task_generator(
     serializers=test_year_serializer,
     tool_name="test_tool",
@@ -68,6 +59,14 @@ def simple_function_with_serializer(year: TestYear) -> None:
     print(f"year: {year}")
 
 
+def special_char_encodeing(input: str) -> str:
+    """Encode special characters."""
+    return html.escape(input)
+
+
+def special_char_decoding(input: str) -> str:
+    """Decode special characters."""
+    return html.unescape(input)
 
 
 @task_generator.task_generator(
