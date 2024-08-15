@@ -171,9 +171,8 @@ To create a workflow with function input containing special characters like a si
     )
     wf = tool.create_workflow()
     compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
-    task = special_chars_function.create_task(wf,
-               foo="string with \'special\' characters",
-               compute_resources=compute_resources)
+    simple_function = task_generator_funcs.special_chars_function
+    task = simple_function.create_task(compute_resources=compute_resources, foo=f"\'aaa\'")
     wf.add_task(task)
     wf.run()
 
