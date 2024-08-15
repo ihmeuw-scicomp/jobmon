@@ -552,18 +552,18 @@ class TaskGenerator:
             if value == SERIALIZED_EMPTY_STRING:
                 kwargs_for_name[key] = ""
 
-        name = ":".join(
-            [self.name] + [f"{name}={value}" for name, value in kwargs_for_name.items()]
-        )
-        # trim ending :
-        if name[-1] == ":":
-            name = name[:-1]
-        # remove illegal characters: '/\\'\" ' from name
-        name = (name.replace("/", "_")
-                .replace("\\", "_")
-                .replace('"', "_")
-                .replace("'", "_")
-                .replace(" ", "_"))
+        name = self.name
+        for item_name, value in kwargs_for_name.items():
+            # trim leading and ending single quote added by make_cli_argument_string
+            if value[0] == "'" and value[-1] == "'":
+                value = value[1:-1]
+            # remove illegal characters: '/\\'\" ' from name
+            value = (value.replace("/", "_")
+                     .replace("\\", "_")
+                     .replace('"', "_")
+                     .replace("\'", "_")
+                     .replace(" ", "_"))
+            name += f":{item_name}={value}"
 
         # Create the task
         task = self._task_template.create_task(  # type: ignore
