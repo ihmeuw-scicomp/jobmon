@@ -77,6 +77,6 @@ def simple_function_with_serializer(year: TestYear) -> None:
     max_attempts=1,
     naming_args=["foo"],
 )
-def special_chars_function(foo: int) -> None:
+def special_chars_function(foo: str) -> None:
     """Simple task_function."""
     print(f"foo: {foo}")
