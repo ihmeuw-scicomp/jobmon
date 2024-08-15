@@ -186,7 +186,7 @@ def special_char_tasks_serializer_seq() -> None:
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.special_chars_function
     for i in range(5):
-        task = simple_function.create_task(compute_resources=compute_resources, foo=f"{i}a")
+        task = simple_function.create_task(compute_resources=compute_resources, foo=f"{i}\'a\'")
         wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
