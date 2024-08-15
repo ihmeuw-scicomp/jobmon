@@ -145,7 +145,7 @@ class WorkerNodeCLI(CLI):
             "If you method has two argument: def func(foo: int, bar: List[str), pass\n"
             "    --args foo=1 --args bar=[a,b]\n",
             required=False,
-            action='append',
+            action="append",
         )
         generator_parser.add_argument(
             "--arghelp",

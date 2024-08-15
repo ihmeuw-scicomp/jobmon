@@ -173,9 +173,9 @@ def make_cli_argument_string(arg_value: Union[str, List]) -> str:
                 f"This version of TaskGenertor cannot serialize list with single quote in it: "
                 f"{arg_value}."
             )
-        return f"\'[{no_space_string}]\'"
+        return f"'[{no_space_string}]'"
 
-    return f"\'{arg_value}\'"
+    return f"'{arg_value}'"
 
 
 class TaskGenerator:
@@ -438,9 +438,11 @@ class TaskGenerator:
                 obj_type = get_optional_type_parameter(obj_type)
 
         if obj_type in self.serializers.keys():
-            # To support dynamic length list input, the deserializer should only take string as input
+            # To support dynamic length list input, the deserializer only takes string
             if not isinstance(obj, str):
-                raise TypeError(f"Expected a string to deserialize, but got {type(obj)}.")
+                raise TypeError(
+                    f"Expected a string to deserialize, but got {type(obj)}."
+                )
             # The 1'st index of the serializers dict is the deserialization function
             deserialized_result = self.serializers[obj_type][1](obj)
 
@@ -558,11 +560,13 @@ class TaskGenerator:
             if value[0] == "'" and value[-1] == "'":
                 value = value[1:-1]
             # remove illegal characters: '/\\'\" ' from name
-            value = (value.replace("/", "_")
-                     .replace("\\", "_")
-                     .replace('"', "_")
-                     .replace("\'", "_")
-                     .replace(" ", "_"))
+            value = (
+                value.replace("/", "_")
+                .replace("\\", "_")
+                .replace('"', "_")
+                .replace("'", "_")
+                .replace(" ", "_")
+            )
             name += f":{item_name}={value}"
 
         # Create the task
