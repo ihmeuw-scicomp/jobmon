@@ -1,4 +1,5 @@
 import ast
+import html
 import os
 from typing import List
 
@@ -46,6 +47,15 @@ class TestYear:
 test_year_serializer = {TestYear: (str, TestYear.parse_year)}
 
 
+def special_char_encodeing(input: str) -> str:
+    """Encode special characters."""
+    return html.escape(input)
+
+
+def special_char_decoding(input: str) -> str:
+    """Decode special characters."""
+    return html.unescape(input)
+
 @task_generator.task_generator(
     serializers=test_year_serializer,
     tool_name="test_tool",
@@ -56,3 +66,17 @@ test_year_serializer = {TestYear: (str, TestYear.parse_year)}
 def simple_function_with_serializer(year: TestYear) -> None:
     """Simple task_function."""
     print(f"year: {year}")
+
+
+
+
+@task_generator.task_generator(
+    serializers={str: (special_char_encodeing, special_char_decoding)},
+    tool_name="test_tool",
+    module_source_path=full_script_path,
+    max_attempts=1,
+    naming_args=["foo"],
+)
+def special_chars_function(foo: int) -> None:
+    """Simple task_function."""
+    print(f"foo: {foo}")
