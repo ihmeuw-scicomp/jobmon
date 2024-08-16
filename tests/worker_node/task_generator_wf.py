@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 import importlib
@@ -193,7 +192,7 @@ def special_char_tasks_serializer_seq() -> None:
 
 
 
-def json_serializer_seq() -> None:
+def pickle_serializer_seq() -> None:
     """Simple task."""
     tool = Tool("test_tool")
     tool.set_default_compute_resources_from_dict(
@@ -208,8 +207,8 @@ def json_serializer_seq() -> None:
     )
     task_generator_funcs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(task_generator_funcs)
-    simple_function = task_generator_funcs.json_function
-    task = simple_function.create_task(compute_resources=compute_resources, input=task_generator_funcs.child("test"))
+    simple_function = task_generator_funcs.pickle_function
+    task = simple_function.create_task(compute_resources=compute_resources, foo=task_generator_funcs.child("test"))
     wf.add_task(task)
     r = wf.run(configure_logging=True)
     assert r == "D"

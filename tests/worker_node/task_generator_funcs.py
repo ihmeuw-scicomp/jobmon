@@ -1,7 +1,7 @@
 import ast
-import json
 import html
 import os
+import pickle
 from typing import List
 
 from jobmon.core import task_generator
@@ -93,23 +93,23 @@ class child:
         return self.name
 
 
-def json_serializer(input: child) -> str:
+def pickle_serializer(input: child) -> str:
     """Serialize input to json."""
-    return json.dumps(input)
+    return pickle.dumps(input)
 
 
-def json_deserializer(input: str) -> child:
+def pickle_deserializer(input: str) -> child:
     """Deserialize input from json."""
-    return child(json.loads(input))
+    return child(pickle.loads(input))
 
 
 @task_generator.task_generator(
-    serializers={child: (json_serializer, json_deserializer)},
+    serializers={child: (pickle_serializer, pickle_deserializer)},
     tool_name="test_tool",
     module_source_path=full_script_path,
     max_attempts=1,
     naming_args=["foo"],
 )
-def json_function(foo: child) -> None:
+def pickle_function(foo: child) -> None:
     """Simple task_function."""
     print(f"foo: {foo.name}")
