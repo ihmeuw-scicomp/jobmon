@@ -1,7 +1,17 @@
 import ast
 import inspect
 import shutil
-from typing import Any, Callable, Collection, Dict, List, Optional, Type, Union
+from typing import (
+    Any,
+    Callable,
+    Collection,
+    Dict,
+    get_args,
+    List,
+    Optional,
+    Type,
+    Union,
+)
 
 import docstring_parser
 
@@ -18,6 +28,60 @@ TASK_RUNNER_SUB_COMMAND = "task_generator"
 HELP_TEXT_INTRO_FORMAT = "Command Line Documentation for {full_path}"
 
 SERIALIZED_EMPTY_STRING = '""'
+
+
+def create_task_name(
+    kwargs_for_name: dict,
+    prefix: str = "",
+    name_func: Optional[Callable] = None,
+) -> str:
+    """Create a task name from the kwargs."""
+    if name_func:
+        return name_func(prefix, kwargs_for_name)
+    else:
+        # use FHS default if no name_func is provided
+        # Handle the case where we have an empty string placeholder in the name by making it
+        # empty in the name; Jobmon will not accept quotes in the name
+        for key, value in kwargs_for_name.items():
+            if value == SERIALIZED_EMPTY_STRING:
+                kwargs_for_name[key] = ""
+
+        name = prefix
+        for item_name, value in kwargs_for_name.items():
+            # trim leading and ending single quote added by make_cli_argument_string
+            if value[0] == "'" and value[-1] == "'":
+                value = value[1:-1]
+            # trim leading [ and ending ] when converting a list to string
+            if value[0] == "[" and value[-1] == "]":
+                value = value[1:-1]
+            # remove illegal characters: '/\\'\" ' from name
+            value = (
+                value.replace("/", "_")
+                .replace("\\", "_")
+                .replace('"', "_")
+                .replace("'", "_")
+                .replace(" ", "_")
+            )
+            name += f":{item_name}={value}"
+        return name
+
+
+def _is_multidimensional_type(type_hint: Any) -> bool:
+    # Check if the type hint is a List
+    if (
+        hasattr(type_hint, "__origin__")
+        and type_hint.__origin__ in BUILT_IN_COLLECTIONS  # type: ignore
+    ):
+        # Get the arguments inside the List
+        args = get_args(type_hint)
+        # Check if the first argument is also a List
+        if (
+            args
+            and hasattr(args[0], "__origin__")
+            and args[0].__origin__ in BUILT_IN_COLLECTIONS  # type: ignore
+        ):
+            return True
+    return False
 
 
 def _find_executable_path(executable_name: str) -> str:
@@ -212,6 +276,7 @@ class TaskGenerator:
         naming_args: Optional[List[str]] = None,
         max_attempts: Optional[int] = None,
         module_source_path: Optional[str] = None,
+        name_func: Optional[Callable] = None,
     ) -> None:
         """Initialize TaskGenerator.
 
@@ -230,6 +295,8 @@ class TaskGenerator:
             max_attempts: The max number of attempts jobmon will make on the tasks
             module_source_path: The path to the module source code. If not provided,
                                 the module is assumed to be installed in the system.
+            name_func: A function that takes in the task name prefix and the kwargs to generate
+                the task name. If not provided, the FHS default is used.
         """
         self.task_function = task_function
         self.serializers = serializers
@@ -252,6 +319,10 @@ class TaskGenerator:
         self._validate_task_function()
 
         self._task_template = None
+
+        # If the user provides a name_func, use that to generate the task name
+        # otherwise, use FHS default
+        self.name_func = name_func
 
     def _validate_task_function(self) -> None:
         """Check that a task can be generated from the task_function.
@@ -362,7 +433,7 @@ class TaskGenerator:
 
         return matches
 
-    def serialize(self, obj: Any, expected_type: Type) -> Union[str, List]:
+    def serialize(self, obj: Any, expected_type: Type) -> str:
         """Serialize ``obj``, validating that it is actually of type ``expected_type``."""
         if not self._is_valid_type(obj, expected_type):
             raise TypeError(
@@ -370,7 +441,14 @@ class TaskGenerator:
                 f"type ``{type(obj)}``."
             )
 
-        serialized_result: Union[str, List[str]]
+        serialized_result: str
+
+        # raise an error if the expected_type is a multi-dimensional collection
+        if _is_multidimensional_type(expected_type):
+            raise TypeError(
+                f"This version of Task Generator cannot "
+                f"serialize multi-dimensional collection: {expected_type}."
+            )
 
         if expected_type in self.serializers.keys():
             # The 0'th index of the serializers dict is the serialization function
@@ -392,11 +470,6 @@ class TaskGenerator:
                 )
 
         elif _get_collection_type(expected_type) in BUILT_IN_COLLECTIONS:
-            # Raise an error if we've been given a multi-dimensional collection
-            if any(type(item) in BUILT_IN_COLLECTIONS for item in obj):
-                raise TypeError(
-                    f"Cannot serialize multi-dimensional collection: {obj}."
-                )
 
             internal_type = _get_generic_type_parameters(expected_type)
             if internal_type is None:
@@ -410,6 +483,9 @@ class TaskGenerator:
                     obj, internal_type
                 )
             ]
+            # convert list to string
+            if isinstance(serialized_result, list):
+                serialized_result = f"[{','.join(serialized_result)}]"
 
         else:
             raise TypeError(
@@ -418,6 +494,11 @@ class TaskGenerator:
                 "deserialization functions for this type in the ``serializers`` dictionary."
             )
 
+        # error out if the output is not a string
+        if not isinstance(serialized_result, str):
+            raise TypeError(
+                f"Expected a string to serialize, but got {type(serialized_result)}."
+            )
         return serialized_result
 
     def serialize_array(self, obj: Any, expected_type: Type) -> List:
@@ -430,6 +511,16 @@ class TaskGenerator:
     def deserialize(self, obj: str, obj_type: Type) -> Any:
         """Deserialize ``obj``."""
         deserialized_result: Any
+        # error out if the input is not a string
+        if not isinstance(obj, str):
+            raise TypeError(f"Expected a string to deserialize, but got {type(obj)}.")
+
+        # raise an error if the expected_type is a multi-dimensional collection
+        if _is_multidimensional_type(obj_type):
+            raise TypeError(
+                f"This version of Task Generator cannot "
+                f"serialize multi-dimensional collection: {obj_type}."
+            )
 
         if is_optional_type(obj_type):
             if obj == str(None):
@@ -465,51 +556,33 @@ class TaskGenerator:
             )
 
         elif _is_annotated_built_in_collection_type(obj_type):
-            if not isinstance(obj, list):
-                # when input is a string, convert it to a list
-                try:
-                    middle_result = ast.literal_eval(obj)
-                    # if the input is a single item, convert it to a list
-                    if type(middle_result) not in BUILT_IN_COLLECTIONS:
-                        middle_result = [middle_result]
-                except Exception:
-                    # handle input like "[a,b,c]"
-                    # remove leading and tailing space
-                    obj = obj.strip()
-                    # handle input like "'[a,b,c]'"
-                    if obj[0] == "'" and obj[-1] == "'":
-                        obj = obj[1:-1]
-                    # remove leading and tailing brackets
-                    if obj[0] in ["[", "("] and obj[-1] in ["]", ")"]:
-                        obj = obj[1:-1]
+            # input is a string, convert it to a list
+            try:
+                middle_result = ast.literal_eval(obj)
+                # if the input is a single item, convert it to a list
+                if type(middle_result) not in BUILT_IN_COLLECTIONS:
+                    middle_result = [middle_result]
+            except Exception:
+                # handle input like "[a,b,c]"
+                # remove leading and tailing space
+                obj = obj.strip()
+                # handle input like "'[a,b,c]'"
+                if obj[0] == "'" and obj[-1] == "'":
+                    obj = obj[1:-1]
+                # remove leading and tailing brackets
+                if obj[0] in ["[", "("] and obj[-1] in ["]", ")"]:
+                    obj = obj[1:-1]
 
-                    middle_result = obj.split(",")
-                deserialized_result = [
-                    self.deserialize(item, obj_type.__args__[0])
-                    for item in middle_result
-                ]
-            else:
-                collection_items_type = _get_generic_type_parameters(obj_type)
+                middle_result = obj.split(",")
 
-                # Raise an error if we've been given a multi-dimensional collection
-                if any(
-                    _is_unannotated_built_in_collection_type(item_type)
-                    or _is_annotated_built_in_collection_type(item_type)
-                    for item_type in collection_items_type
-                ):
-                    raise TypeError(
-                        f"Cannot deserialize multi-dimensional collection: {obj}."
+            deserialized_result = []
+            for item in middle_result:
+                if obj_type.__args__[0] in self.serializers.keys():
+                    deserialized_result.append(
+                        self.serializers[obj_type.__args__[0]][1](item)
                     )
-
-                item_type_pairs = _zip_collection_items_and_types(
-                    obj, collection_items_type
-                )
-                deserialized_result = _get_collection_type(obj_type)(  # type: ignore
-                    [
-                        self.deserialize(obj=item, obj_type=item_type)
-                        for item, item_type in item_type_pairs
-                    ]
-                )
+                else:
+                    deserialized_result.append(obj_type.__args__[0](item))
 
         else:
             raise TypeError(
@@ -543,31 +616,14 @@ class TaskGenerator:
         }
         # We want a slightly different format to put list kwargs into the name
         kwargs_for_name = {
-            name: ",".join(value) if isinstance(value, list) else value
+            name: value
             for name, value in serialized_kwargs.items()
             if name in self._naming_args
         }
 
-        # Handle the case where we have an empty string placeholder in the name by making it
-        # empty in the name; Jobmon will not accept quotes in the name
-        for key, value in kwargs_for_name.items():
-            if value == SERIALIZED_EMPTY_STRING:
-                kwargs_for_name[key] = ""
-
-        name = self.name
-        for item_name, value in kwargs_for_name.items():
-            # trim leading and ending single quote added by make_cli_argument_string
-            if value[0] == "'" and value[-1] == "'":
-                value = value[1:-1]
-            # remove illegal characters: '/\\'\" ' from name
-            value = (
-                value.replace("/", "_")
-                .replace("\\", "_")
-                .replace('"', "_")
-                .replace("'", "_")
-                .replace(" ", "_")
-            )
-            name += f":{item_name}={value}"
+        name = create_task_name(
+            kwargs_for_name=kwargs_for_name, prefix=self.name, name_func=self.name_func
+        )
 
         # Create the task
         task = self._task_template.create_task(  # type: ignore

@@ -312,7 +312,7 @@ def test_multidimensional_collection_raises_error(client_env) -> None:
 
     # Exercise & Verify an error is raised
     with pytest.raises(
-        TypeError, match="Cannot serialize multi-dimensional collection"
+        TypeError, match="This version of Task Generator cannot serialize multi-dimensional collection"
     ):
         task_gen.serialize(obj=items_to_serialize, expected_type=List[List[str]])
 
@@ -347,7 +347,7 @@ def test_empty_collection(client_env) -> None:
     )
 
     # Define the expected result
-    expected_result = []
+    expected_result = '[]'
 
     # Exercise
     result = task_gen.serialize(list(), List[str])
@@ -374,13 +374,19 @@ def test_optional_collection(client_env) -> None:
     result = task_gen.serialize(items_to_serialize, Optional[List[int]])
 
     # Verify the result matches the expected result
-    assert result == ["1", "2", "3"]
+    assert result == '[1,2,3]'
+    # verify the serialized obj can be deserialized back
+    de_result = task_gen.deserialize(result, Optional[List[int]])
+    assert de_result == items_to_serialize
 
     # Exercise
     result = task_gen.serialize(None, Optional[List[int]])
 
     # Verify the result is simply the stringified None
     assert result == "None"
+    # verify the serialized obj can be deserialized back
+    de_result = task_gen.deserialize(result, Optional[List[int]])
+    assert de_result == None
 
 
 def test_no_internal_type_raises_error(client_env) -> None:
@@ -475,13 +481,13 @@ def test_deserializer_unknown_type_raises_error(client_env) -> None:
 @pytest.mark.parametrize(
     "item_type, items_to_deserialize, expected_result",
     [
-        [int, ["1", "3", "5"], [1, 3, 5]],
-        [float, ["1.0", "3.0", "5.0"], [1.0, 3.0, 5.0]],
-        [str, ["one", "three", "five"], ["one", "three", "five"]],
-        [bool, ["True", "False"], [True, False]],
+        [int, '["1", "3", "5"]', [1, 3, 5]],
+        [float, '["1.0", "3.0", "5.0"]', [1.0, 3.0, 5.0]],
+        [str, '["one", "three", "five"]', ["one", "three", "five"]],
+        [bool, '[True, False]', [True, False]],
         [
             FakeYearRange,
-            ["2010:2020:2030", "2040:2050:2060"],
+            '["2010:2020:2030", "2040:2050:2060"]',
             [
                 FakeYearRange.parse_year_range("2010:2020:2030"),
                 FakeYearRange.parse_year_range("2040:2050:2060"),
@@ -520,32 +526,13 @@ def test_deserialize_multi_annotated_collection(client_env) -> None:
 
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#511
     """
-    # Instantiate the TaskGenerator
-    tool = Tool("test_tool")
-    task_gen = task_generator.TaskGenerator(
-        task_function=my_func,
-        serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
-        tool_name="test_tool",
-    )
-
-    # Define the items to deserialize
-    items_to_deserialize = ["0.1", "2010:2020:2030"]
-
-    # Define the expected result
-    expected_result = (0.1, FakeYearRange.parse_year_range("2010:2020:2030"))
-
-    # Exercise
-    result = task_gen.deserialize(
-        obj=items_to_deserialize, obj_type=Tuple[float, FakeYearRange]
-    )
-
-    # Verify the result matches the expected result
-    assert result == expected_result
+    # this is no longer supported as deserialize will only take str
+    pass
 
 
 @pytest.mark.parametrize(
     ["input", "expected"],
-    [["None", None], ["1", [1]], [["1", "2"], [1, 2]], [[], []]],
+    [["None", None], ["1", [1]], ['["1", "2"]', [1, 2]], ['[]', []]],
 )
 def test_deserialize_optional_collection(
     client_env, input, expected: Optional[List[int]]
@@ -581,11 +568,11 @@ def test_deserialize_multi_dimensional_collection_raises_error(client_env) -> No
     )
 
     # Define the items to deserialize
-    items_to_deserialize = [("0", "1"), ("2", "3")]
+    items_to_deserialize = '[("0", "1"), ("2", "3")]'
 
     # Exercise & Verify an error is raised
     with pytest.raises(
-        TypeError, match="Cannot deserialize multi-dimensional collection"
+        TypeError, match="This version of Task Generator cannot serialize multi-dimensional collection"
     ):
         task_gen.deserialize(
             obj=items_to_deserialize, obj_type=List[Tuple[int, ...]]
@@ -610,7 +597,7 @@ def test_deserialize_collection_without_item_annotation_raises_error(
         TypeError,
         match=f"annotation ``<class 'list'>`` does not provide enough information",
     ):
-        task_gen.deserialize(obj=["1", "2", "3"], obj_type=list)
+        task_gen.deserialize(obj='["1", "2", "3"]', obj_type=list)
 
 
 @pytest.mark.parametrize(
@@ -624,7 +611,7 @@ def test_deserialize_collection_without_item_annotation_raises_error(
         [Optional[float], "1.0", 1.0],
         [type(None), "None", None],
         [Optional[List[int]], "None", None],
-        [Optional[List[int]], ["1", "2"], [1, 2]],
+        [Optional[List[int]], '["1", "2"]', [1, 2]],
         [Optional[FakeYearRange], "None", None],
         [Optional[FakeYearRange], "1990:2020:2050", FakeYearRange(1990)],
     ],
@@ -666,7 +653,7 @@ def test_deserialize_empty_collection(client_env) -> None:
     expected_result = list()
 
     # Exercise
-    result = task_gen.deserialize(obj=list(), obj_type=List[str])
+    result = task_gen.deserialize(obj=str(list()), obj_type=List[str])
 
     # Verify
     assert result == expected_result
@@ -785,7 +772,7 @@ def test_fhs_serializers(client_env) -> None:
     """Test the serializers for the FHS task generator."""
     from tests.worker_node.task_generator_fhs import YearRange, Versions, FHSFileSpec, FHSDirSpec, VersionMetadata, Quantiles, versions_to_list, versions_from_list, quantiles_to_list, quantiles_from_list
     yr = YearRange(2020, 2021)
-    v = Versions("1.0", "2.0")
+    v = v = Versions("1.0", "2.0")
     fSpec = FHSFileSpec("/path/to/file")
     dSpec = FHSDirSpec("/path/to/dir")
     vm = VersionMetadata("1.0")
@@ -813,7 +800,7 @@ def test_fhs_serializers(client_env) -> None:
     r1 = tg.serialize(yr, YearRange)
     assert r1 == "2020-2021"
     r2 = tg.serialize(v, Versions)
-    assert r2 == ["1.0", "2.0"]
+    assert r2 == "[1.0, 2.0]"
     r3 = tg.serialize(fSpec, FHSFileSpec)
     assert r3 == "/path/to/file"
     r4 = tg.serialize(dSpec, FHSDirSpec)
@@ -821,15 +808,15 @@ def test_fhs_serializers(client_env) -> None:
     r5 = tg.serialize(vm, VersionMetadata)
     assert r5 == "1.0"
     r6 = tg.serialize(q, Quantiles)
-    assert r6 == ["0.1", "0.9"]
+    assert r6 == "[0.1, 0.9]"
 
     # verify deserialization
     assert yr == tg.deserialize(r1, YearRange)
-    assert v == tg.deserialize('["1.0", "2.0"]', Versions)
+    assert v == tg.deserialize(r2, Versions)
     assert fSpec == tg.deserialize(r3, FHSFileSpec)
     assert dSpec == tg.deserialize(r4, FHSDirSpec)
     assert vm == tg.deserialize(r5, VersionMetadata)
-    assert q == tg.deserialize('["0.1", "0.9"]', Quantiles)
+    assert q == tg.deserialize(r6, Quantiles)
 
 
 def test_fhs_deserizalizers(client_env, monkeypatch) -> None:
@@ -866,13 +853,13 @@ def test_fhs_deserizalizers(client_env, monkeypatch) -> None:
 
     q = Quantiles(0.1, 0.9)
     q_s = tg.serialize(q, Quantiles)
-    assert q_s == ["0.1", "0.9"]
-    assert q == tg.deserialize('["0.1", "0.9"]', Quantiles)
+    assert q_s == "[0.1, 0.9]"
+    assert q == tg.deserialize(q_s, Quantiles)
 
     v = Versions("1.0")
     v_s = tg.serialize(v, Versions)
-    assert v_s == ["1.0"]
-    assert v == tg.deserialize("1.0", Versions)
+    assert v_s == "[1.0]"
+    assert v == tg.deserialize(v_s, Versions)
 
 
 def test_fhs_task(client_env, monkeypatch) -> None:
@@ -923,13 +910,13 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
         " --args yr='2020-2021'"
-        " --args v='[1.0,2.0]'"
+        " --args v='[1.0, 2.0]'"
         " --args fSpec='/path/to/file'"
         " --args dSpec='/path/to/dir'"
         " --args vm='1.0'"
-        " --args q='[0.1,0.9]'"
+        " --args q='[0.1, 0.9]'"
     )
-    assert task1.name == "simple_function:yr=2020-2021:v=1.0,2.0"
+    assert task1.name == "simple_function:yr=2020-2021:v=1.0,_2.0"
     assert task1.command == expected_command
 
     # test optional args
@@ -947,13 +934,13 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
         " --args yr='2020-2021'"
-        " --args v='[1.0,2.0]'"
+        " --args v='[1.0, 2.0]'"
         " --args fSpec='/path/to/file'"
         " --args dSpec='/path/to/dir'"
         " --args vm='1.0'"
         " --args q='None'"
     )
-    assert task2.name == "simple_function:yr=2020-2021:v=1.0,2.0"
+    assert task2.name == "simple_function:yr=2020-2021:v=1.0,_2.0"
     assert task2.command == expected_command
 
     # test array task
@@ -973,11 +960,11 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
         " --args yr='2020-2021'"
-        " --args v='[1.0,2.0]'"
+        " --args v='[1.0, 2.0]'"
         " --args fSpec='/path/to/file'"
         " --args dSpec='/path/to/dir'"
         " --args vm='1.0'"
-        " --args q='[0.1,0.9]'"
+        " --args q='[0.1, 0.9]'"
     )
     assert tasks[0].command == expected_command1
     # Verify command
@@ -986,7 +973,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
         " --args yr='2020-2021'"
-        " --args v='[1.0,2.0]'"
+        " --args v='[1.0, 2.0]'"
         " --args fSpec='/path/to/file'"
         " --args dSpec='/path/to/dir'"
         " --args vm='1.0'"
@@ -1149,3 +1136,60 @@ def test_get_tasks_by_node_args_obj(client_env, monkeypatch):
     tasks = task_generator.get_tasks_by_node_args(workflow=wf, node_args_dict={"foo": fake_year_range2}, task_generator=tg)
     assert len(tasks) == 1
     assert t2 in tasks
+
+
+def test_is_multidimensional_type():
+    from jobmon.core.task_generator import _is_multidimensional_type
+    assert _is_multidimensional_type(List[int]) is False
+    assert _is_multidimensional_type(List[List[int]]) is True
+    assert _is_multidimensional_type(List[Tuple[int]]) is True
+    assert _is_multidimensional_type(List[Tuple[int, int]]) is True
+    assert _is_multidimensional_type(List[Tuple[int, ...]]) is True
+    assert _is_multidimensional_type(Tuple[Tuple[List[int]]]) is True
+
+
+def test_naming_func(
+    client_env, monkeypatch: pytest.fixture
+) -> None:
+    """Verify that the name only includes the expected naming args.
+
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#711
+    """
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool = Tool("test_tool")
+
+    def naming_func(prefix, kwargs_for_name) -> str:
+        return f"{prefix}:foo={kwargs_for_name['foo']}"
+
+    @task_generator.task_generator(
+        serializers={}, tool_name="test_tool",
+        naming_args=["foo"]
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    compute_resources = {}
+
+    # Exercise
+    task = simple_function.create_task(
+        compute_resources=compute_resources, foo=1, bar="baz"
+    )
+    # Verify task name matches the expected
+    assert task.name == "simple_function:foo=1"
+
+    # Verify command
+    expected_command = (
+        f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
+        f" --module_name tests.worker_node.test_task_generator"
+        " --func_name simple_function"
+        " --args foo=\'1\'"
+        " --args bar=\'baz\'"
+    )
+    assert task.command == expected_command
+    assert task.compute_resources == compute_resources
