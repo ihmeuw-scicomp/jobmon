@@ -81,35 +81,3 @@ def special_chars_function(foo: str) -> None:
     """Simple task_function."""
     print(f"foo: {foo}")
 
-
-class child:
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-    def __eq__(self, other: "child") -> bool:
-        return self.name == other.name
-
-    def __str__(self) -> str:
-        return self.name
-
-
-def pickle_serializer(input: child) -> str:
-    """Serialize input to json."""
-    return pickle.dumps(input)
-
-
-def pickle_deserializer(input: str) -> child:
-    """Deserialize input from json."""
-    return child(pickle.loads(input))
-
-
-@task_generator.task_generator(
-    serializers={child: (pickle_serializer, pickle_deserializer)},
-    tool_name="test_tool",
-    module_source_path=full_script_path,
-    max_attempts=1,
-    naming_args=["foo"],
-)
-def pickle_function(foo: child) -> None:
-    """Simple task_function."""
-    print(f"foo: {foo.name}")

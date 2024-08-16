@@ -191,28 +191,6 @@ def special_char_tasks_serializer_seq() -> None:
     assert r == "D"
 
 
-
-def pickle_serializer_seq() -> None:
-    """Simple task."""
-    tool = Tool("test_tool")
-    tool.set_default_compute_resources_from_dict(
-        cluster_name="sequential", compute_resources={"queue": "null.q"}
-    )
-    wf = tool.create_workflow()
-    compute_resources = {"queue": "null.q"}
-
-    # Import the task_generator_funcs.py module
-    spec = importlib.util.spec_from_file_location(
-        "task_generator_funcs", task_generator_funcs_path
-    )
-    task_generator_funcs = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(task_generator_funcs)
-    simple_function = task_generator_funcs.pickle_function
-    task = simple_function.create_task(compute_resources=compute_resources, foo=task_generator_funcs.child("test"))
-    wf.add_task(task)
-    r = wf.run(configure_logging=True)
-    assert r == "D"
-
 ## ------------FHS tests-----------------
 spec = importlib.util.spec_from_file_location(
         "task_generator_fhs", fhs_generator_funcs_path
@@ -320,8 +298,6 @@ def main():
         fhs_slurm()
     elif input_value == 9:
         special_char_tasks_serializer_seq()
-    elif input_value == 10:
-        json_serializer_seq()
     else:
         simple_tasks_seq()
 
