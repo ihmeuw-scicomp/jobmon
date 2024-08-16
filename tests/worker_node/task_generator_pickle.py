@@ -28,7 +28,7 @@ def pickle_serializer(input: child) -> str:
 def pickle_deserializer(input: str) -> child:
     """Deserialize input from json."""
     byte_input = base64.b64decode(input.encode('utf-8'))
-    return child(pickle.loads(byte_input)
+    return child(pickle.loads(byte_input))
 
 
 @task_generator.task_generator(
