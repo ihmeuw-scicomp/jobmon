@@ -20,12 +20,12 @@ class child:
 
 def pickle_serializer(input: child) -> str:
     """Serialize input to json."""
-    return pickle.dumps(input)
+    return pickle.dumps(input).decode('utf-8')
 
 
 def pickle_deserializer(input: str) -> child:
     """Deserialize input from json."""
-    return child(pickle.loads(input))
+    return child(pickle.loads(input.encode('utf-8')))
 
 
 @task_generator.task_generator(
