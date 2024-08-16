@@ -1,4 +1,5 @@
 import ast
+import base64
 import html
 import os
 import pickle
@@ -20,12 +21,14 @@ class child:
 
 def pickle_serializer(input: child) -> str:
     """Serialize input to json."""
-    return pickle.dumps(input).decode('utf-8')
+    pr =  pickle.dumps(input)
+    return base64.b64encode(pr).decode('utf-8')
 
 
 def pickle_deserializer(input: str) -> child:
     """Deserialize input from json."""
-    return child(pickle.loads(input.encode('utf-8')))
+    byte_input = base64.b64decode(input.encode('utf-8'))
+    return child(pickle.loads(byte_input)
 
 
 @task_generator.task_generator(
