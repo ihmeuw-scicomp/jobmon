@@ -177,3 +177,31 @@ To create a workflow with function input containing special characters like a si
     wf.run()
 
 The above code creates a workflow with a single task what requests special characters in the input.
+Please note that this makes the Jobmon command harder to read and understand; thus, SciComp is not
+responsible to debug it.
+
+You can pass your own function to name your task. The function should take two arguments:
+    prefix: str - this will be your function name
+    kwargs_for_name: Dict[str, Any] - the arguments of the task
+    and return a string.
+
+.. code-block:: python
+
+        def custom_naming(prefix: str, kwargs_for_name: Dict[str, Any]) -> str:
+            return f"Lala_{kwargs_for_name['foo']}"
+
+        @task_generator(
+            serializers={},
+            tool_name="test_tool",
+            module_source_path=full_script_path,
+            max_attempts=1,
+            naming_args=["foo"],
+            custom_naming=custom_naming,
+        )
+        def simple_function(foo: int, bar: List[str] = []) -> None:
+            """Simple task_function."""
+            print(f"foo: {foo}")
+            print(f"bar: {bar}")
+
+The above code creates a task generator with a custom naming function. The task will be
+named "Lala_1" instead of "simple_function:foo=1".
