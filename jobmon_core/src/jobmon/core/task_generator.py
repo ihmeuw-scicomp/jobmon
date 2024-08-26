@@ -1,12 +1,16 @@
 import ast
+import importlib
 import inspect
 import shutil
+import traceback
+from types import ModuleType
 from typing import (
     Any,
     Callable,
     Collection,
     Dict,
     get_args,
+    Iterable,
     List,
     Optional,
     Type,
@@ -14,6 +18,10 @@ from typing import (
 )
 
 import docstring_parser
+from docutils import nodes, statemachine  # type: ignore
+from docutils.parsers.rst import Directive  # type: ignore
+from sphinx import application  # type: ignore
+from sphinx.util import nodes as sphinx_nodes  # type: ignore
 
 from jobmon.client.api import Tool
 from jobmon.client.task import Task
@@ -848,3 +856,243 @@ def get_tasks_by_node_args(
         )
 
     return result
+
+
+class TaskGeneratorDocumenter(Directive):
+    """Directive for generating documentation for a single task generator."""
+
+    required_arguments = 1
+
+    def run(self) -> list[nodes.Node]:
+        """The function sphinx/docutils use to generate documentation for the directive."""
+        task_generator = self._load_task_generator(self.arguments[0])
+
+        return _generate_nodes(task_generator, self.state)
+
+    def _load_task_generator(self, task_generator_path: str) -> TaskGenerator:
+        """Load the task generator from the given path."""
+        try:
+            module_name, attr_name = task_generator_path.split(":", 1)
+        except ValueError:
+            raise self.error(
+                f'"{task_generator_path}" is not of format "module:parser"'
+            )
+
+        try:
+            mod = __import__(module_name, globals(), locals(), [attr_name])
+        except (Exception, SystemExit) as exc:
+            err_msg = f'Failed to import "{attr_name}" from "{module_name}". '
+            if isinstance(exc, SystemExit):
+                err_msg += "The module appeared to call sys.exit()"
+            else:
+                err_msg += (
+                    f"The following exception was raised:\n{traceback.format_exc()}"
+                )
+            raise self.error(err_msg)
+
+        if not hasattr(mod, attr_name):
+            raise self.error(f'Module "{module_name}" has no attribute "{attr_name}"')
+
+        task_generator = getattr(mod, attr_name)
+
+        if not isinstance(task_generator, TaskGenerator):
+            raise self.error(
+                f'Attribute "{attr_name}" of module "{module_name}" is not a TaskGenerator'
+            )
+
+        return task_generator
+
+
+class TaskGeneratorModuleDocumenter(Directive):
+    """Directive for generating documentation for all the task generators in a module."""
+
+    required_arguments = 1
+
+    def run(self) -> list[nodes.Node]:
+        """The function sphinx/docutils use to generate documentation for the directive."""
+        module_name = self.arguments[0]
+        module, task_generators = self._load_module_task_generators(module_name)
+
+        section = self._generate_module_section(module_name, module, task_generators)
+
+        for task_generator in task_generators:
+            section.extend(_generate_nodes(task_generator, self.state))
+
+        return [section]
+
+    def _load_module_task_generators(
+        self, module_name: str
+    ) -> tuple[ModuleType, list[TaskGenerator]]:
+        """Load all the task generators in a given module."""
+        task_generators = []
+
+        try:
+            mod = importlib.import_module(module_name)
+        except (Exception, SystemExit) as exc:
+            err_msg = f'Failed to import "{module_name}". '
+            if isinstance(exc, SystemExit):
+                err_msg += "The module appeared to call sys.exit()"
+            else:
+                err_msg += (
+                    f"The following exception was raised:\n{traceback.format_exc()}"
+                )
+            raise self.error(err_msg)
+
+        for attr_name in dir(mod):
+            if attr_name.startswith("_"):
+                continue
+
+            attr = getattr(mod, attr_name)
+
+            if isinstance(attr, TaskGenerator):
+                task_generators.append(attr)
+
+        return mod, task_generators
+
+    def _generate_module_section(
+        self,
+        module_name: str,
+        module: ModuleType,
+        task_generators: Iterable[TaskGenerator],
+    ) -> nodes.Node:
+        """Makes the docutils node for the module section.
+
+        Includes the docstring for the module, and a list of task generator names. Doesn't
+        include any task generator detailed documentation.
+        """
+        # Set up base node
+        section = nodes.section(
+            "",
+            nodes.title(text=module_name),
+            ids=[nodes.make_id(module_name)],
+            names=[nodes.fully_normalize_name(module_name)],
+        )
+
+        # Use sphinx and docutils tooling to format the docstring into rST and then parse it
+        # into a docutils node.
+        result = statemachine.ViewList()
+        for line in statemachine.string2lines(
+            module.__doc__, tab_width=4, convert_whitespace=True
+        ):
+            result.append(line, module_name)
+
+        task_generator_path_lines = [""]
+        for task_generator in task_generators:
+            task_generator_path_lines.append(".. code-block:: shell")
+            task_generator_path_lines.append("")
+            task_generator_path_lines.append(
+                f"    {TASK_RUNNER_NAME} {task_generator.full_path}"
+            )
+            task_generator_path_lines.append("")
+
+        for line in task_generator_path_lines:
+            result.append(line, module_name)
+
+        sphinx_nodes.nested_parse_with_titles(self.state, result, section)
+
+        return section
+
+
+def _generate_nodes(task_generator: TaskGenerator, state: Any) -> nodes.Node:
+    """Makes a docutils node with the documentation for a task generator.
+
+    Includes the docstring description for the task generator and all the arguments.
+    """
+    # Set up base node
+    section = nodes.section(
+        "",
+        nodes.title(text=task_generator.name),
+        ids=[nodes.make_id(task_generator.full_path)],
+        names=[nodes.fully_normalize_name(task_generator.full_path)],
+    )
+
+    # Get rST lines for the description and options
+    parsed_docstring = docstring_parser.parse(str(task_generator.task_function.__doc__))
+    lines = []
+    lines.extend(
+        _format_description(
+            task_generator=task_generator, parsed_docstring=parsed_docstring
+        )
+    )
+    lines.extend(
+        _format_options(
+            task_generator=task_generator, parsed_docstring=parsed_docstring
+        )
+    )
+
+    # Convert the rST lines into a docutils node
+    result = statemachine.ViewList()
+    for line in lines:
+        result.append(line, task_generator.name)
+    sphinx_nodes.nested_parse_with_titles(state, result, section)
+
+    return [section]
+
+
+def _format_description(
+    task_generator: TaskGenerator, parsed_docstring: docstring_parser.Docstring
+) -> list[str]:
+    """Format the description of the task generator into proper rST."""
+    lines = []
+
+    # Description from the docstring
+    if parsed_docstring.short_description:
+        lines.append(parsed_docstring.short_description)
+        lines.append("")
+
+    if parsed_docstring.long_description:
+        for line in statemachine.string2lines(
+            parsed_docstring.long_description, tab_width=4, convert_whitespace=True
+        ):
+            lines.append(line)
+        lines.append("")
+
+    # How to run on the cli
+    lines.append(".. code-block:: shell")
+    lines.append("")
+    lines.append(f"    {TASK_RUNNER_NAME} {task_generator.full_path} [OPTIONS]")
+    lines.append("")
+
+    return lines
+
+
+def _format_options(
+    task_generator: TaskGenerator, parsed_docstring: docstring_parser.Docstring
+) -> list[str]:
+    """Format the options of the task generator into proper rST."""
+    param_docs = {param.arg_name: param for param in parsed_docstring.params}
+    lines = []
+
+    # we use rubric to provide some separation without exploding the table
+    # of contents
+    lines.append(".. rubric:: Options")
+    lines.append("")
+    for param, annotation in task_generator.params.items():
+        if is_optional_type(annotation):
+            underlying_optional_type = get_optional_type_parameter(annotation)
+            annotation_name = f"OPTIONAL[{underlying_optional_type.__name__.upper()}]"
+        else:
+            annotation_name = annotation.__name__.upper()
+
+        lines.append(f".. option:: --{param} <{annotation_name}>")
+        lines.append("")
+        if param in param_docs and param_docs[param].description:
+            for line in statemachine.string2lines(
+                param_docs[param].description, tab_width=4, convert_whitespace=True
+            ):
+                lines.append(line)
+            lines.append("")
+
+    return lines
+
+
+def setup(app: application.Sphinx) -> dict:
+    """The function that registers the extension with sphinx."""
+    app.add_directive("task_generator", TaskGeneratorDocumenter)
+    app.add_directive("task_generator_module", TaskGeneratorModuleDocumenter)
+
+    return {
+        "version": "0.1",
+        "parallel_read_safe": True,
+        "parallel_write_safe": True,
+    }
