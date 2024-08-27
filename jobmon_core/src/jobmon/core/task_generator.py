@@ -907,6 +907,7 @@ class TaskGeneratorModuleDocumenter(Directive):
     """Directive for generating documentation for all the task generators in a module."""
 
     required_arguments = 1
+    optional_arguments = 1
 
     def run(self) -> list[nodes.Node]:
         """The function sphinx/docutils use to generate documentation for the directive."""

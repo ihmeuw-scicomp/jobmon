@@ -275,14 +275,22 @@ def fhs_slurm():
 
 
 def simple_tasks_doc() -> None:
-    """Simple task."""
-    # get an instance TaskGeneratorModuleDocumenter
-    doc = TaskGeneratorModuleDocumenter()
-    # run sphinx autodoc on the task_generator_funcs.py module
-    nodes = doc.run(
-        "task_generator_funcs", task_generator_funcs_path
-    )
-    print(nodes)
+    """Simple doc."""
+    from docutils.parsers.rst import directives
+    from docutils import nodes
+    from docutils.core import publish_string
+    directives.register_directive("task_generator", TaskGeneratorModuleDocumenter)
+    rst = f"""
+    This is a simple document.
+
+    .. task_generator:: task_generator_funcs
+       :optional: {task_generator_funcs_path}
+    
+    This is more content after the directive.
+    """
+    output = publish_string(rst, writer_name='html')
+    print(output.decode('utf-8'))
+
 
 
 def main():
