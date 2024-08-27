@@ -217,7 +217,10 @@ class TaskGenerator:
                 serializer, which converts an object of the type to a string. And the second is
                 a deserializer, which converts a string to an object of the type.
             tool_name: A jobmon tool name for generating tasks.
-            naming_args: A list of arguments to use in the task name. If not provided, uses all
+            naming_args: A list of arguments to use in the task name. If not provided (or
+                ``None``), it uses all the arguments. If ``[]`` is provided, it uses no naming
+                arguments, and the name of the task will just be the name of the task function.
+            max_attempts: The max number of attempts jobmon will make on the tasks
             max_attempts: The max number of attempts jobmon will make on the tasks
             module_source_path: The path to the module source code. If not provided,
                                 the module is assumed to be installed in the system.
@@ -242,7 +245,7 @@ class TaskGenerator:
 
         self._validate_task_function()
 
-        self._generate_task_template()
+        self._task_template = None
 
     def _validate_task_function(self) -> None:
         """Check that a task can be generated from the task_function.
@@ -506,6 +509,8 @@ class TaskGenerator:
 
     def create_task(self, compute_resources: Dict, **kwargs: Any) -> Task:
         """Create a task for the task_function with the given kwargs."""
+        if self._task_template is None:
+            self._generate_task_template()
         executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
         # Serialize the kwargs
         serialized_kwargs = {
@@ -536,17 +541,15 @@ class TaskGenerator:
             if value == SERIALIZED_EMPTY_STRING:
                 kwargs_for_name[key] = ""
 
-        name = (
-            self.name
-            + ":"
-            + ":".join(f"{name}={value}" for name, value in kwargs_for_name.items())
+        name = ":".join(
+            [self.name] + [f"{name}={value}" for name, value in kwargs_for_name.items()]
         )
         # trim ending :
         if name[-1] == ":":
             name = name[:-1]
 
         # Create the task
-        task = self._task_template.create_task(
+        task = self._task_template.create_task(  # type: ignore
             name=name,
             compute_resources=compute_resources,
             max_attempts=self.max_attempts,
@@ -558,6 +561,8 @@ class TaskGenerator:
 
     def create_tasks(self, compute_resources: Dict, **kwargs: Any) -> List[Task]:
         """Create a task array for the task_function with the given kwargs."""
+        if self._task_template is None:
+            self._generate_task_template()
         executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
         # Serialize the kwargs
         serialized_kwargs = {
@@ -579,7 +584,7 @@ class TaskGenerator:
         # name is auto for array
 
         # Create the task
-        tasks = self._task_template.create_tasks(
+        tasks = self._task_template.create_tasks(  # type: ignore
             compute_resources=compute_resources,
             max_attempts=self.max_attempts,
             executable=executable_path,
@@ -733,17 +738,27 @@ def task_generator(
 def get_tasks_by_node_args(
     workflow: Workflow,
     task_generator: TaskGenerator,
-    node_args_dict: Dict,
+    node_args_dict: dict[str, Any],
     error_on_empty: bool = True,
-) -> List[Task]:
+) -> list[Task]:
     """Get the tasks of a TaskGenerator in a workflow that have the given node arguments.
 
     This method does some value serialization and formatting before handing the node argument
     string over to ``workflow.get_tasks_by_node_args``.
     """
+    # Re-serialize the node args dict and format them as CLI arguments
+    serialized_node_args = {
+        arg_name: make_cli_argument_string(
+            arg_value=task_generator.serialize(
+                obj=arg_value, expected_type=task_generator.params[arg_name]
+            ),
+        )
+        for arg_name, arg_value in node_args_dict.items()
+    }
+
     try:
         result = workflow.get_tasks_by_node_args(
-            task_template_name=task_generator.name, **node_args_dict  # type: ignore
+            task_template_name=task_generator.name, **serialized_node_args
         )
     except ValueError as err:
         if error_on_empty:
