@@ -6,7 +6,7 @@ import importlib.machinery
 
 from typing import Optional
 
-from jobmon.core.task_generator import task_generator
+from jobmon.core.task_generator import task_generator, TaskGeneratorModuleDocumenter
 from jobmon.client.api import Tool
 
 # Get the full path of the current script
@@ -273,6 +273,18 @@ def fhs_slurm():
     s = wf.run()
     assert s == "D"
 
+
+def simple_tasks_doc() -> None:
+    """Simple task."""
+    # get an instance TaskGeneratorModuleDocumenter
+    doc = TaskGeneratorModuleDocumenter()
+    # run sphinx autodoc on the task_generator_funcs.py module
+    nodes = doc.run(
+        "task_generator_funcs", task_generator_funcs_path
+    )
+    print(nodes)
+
+
 def main():
     if len(sys.argv) > 1:
         try:
@@ -298,6 +310,8 @@ def main():
         fhs_slurm()
     elif input_value == 9:
         special_char_tasks_serializer_seq()
+    elif input_value == 10:
+        simple_tasks_doc()
     else:
         simple_tasks_seq()
 

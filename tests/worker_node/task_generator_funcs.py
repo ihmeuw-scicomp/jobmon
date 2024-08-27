@@ -56,7 +56,7 @@ test_year_serializer = {TestYear: (str, TestYear.parse_year)}
     naming_args=["year"],
 )
 def simple_function_with_serializer(year: TestYear) -> None:
-    """Simple task_function."""
+    """Simple task_function with a serializer."""
     print(f"year: {year}")
 
 
@@ -78,6 +78,6 @@ def special_char_decoding(input: str) -> str:
     naming_args=["foo"],
 )
 def special_chars_function(foo: str) -> None:
-    """Simple task_function."""
+    """Simple task_function with special chars."""
     print(f"foo: {foo}")
 

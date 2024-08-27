@@ -911,7 +911,14 @@ class TaskGeneratorModuleDocumenter(Directive):
     def run(self) -> list[nodes.Node]:
         """The function sphinx/docutils use to generate documentation for the directive."""
         module_name = self.arguments[0]
-        module, task_generators = self._load_module_task_generators(module_name)
+        # if there are more than one module, the second will be module path
+        if len(self.arguments) > 1:
+            module_path = self.arguments[1]
+        else:
+            module_path = None
+        module, task_generators = self._load_module_task_generators(
+            module_name, module_path
+        )
 
         section = self._generate_module_section(module_name, module, task_generators)
 
@@ -921,13 +928,20 @@ class TaskGeneratorModuleDocumenter(Directive):
         return [section]
 
     def _load_module_task_generators(
-        self, module_name: str
+        self, module_name: str, module_path: Optional[str] = None
     ) -> tuple[ModuleType, list[TaskGenerator]]:
         """Load all the task generators in a given module."""
         task_generators = []
 
         try:
-            mod = importlib.import_module(module_name)
+            if module_path:
+                spec = importlib.util.spec_from_file_location(
+                    module_name, module_path
+                )  # type: ignore
+                mod = importlib.util.module_from_spec(spec)  # type: ignore
+                spec.loader.exec_module(mod)  # type: ignore
+            else:
+                mod = importlib.import_module(module_name)
         except (Exception, SystemExit) as exc:
             err_msg = f'Failed to import "{module_name}". '
             if isinstance(exc, SystemExit):
