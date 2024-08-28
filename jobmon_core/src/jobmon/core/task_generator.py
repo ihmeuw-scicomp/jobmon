@@ -908,6 +908,10 @@ class TaskGeneratorModuleDocumenter(Directive):
 
     required_arguments = 1
     optional_arguments = 1
+    final_argument_whitespace = True
+    option_spec = {
+        'optional': lambda x: x  # Defines the 'optional' option
+    }
 
     def run(self) -> list[nodes.Node]:
         """The function sphinx/docutils use to generate documentation for the directive."""
@@ -986,10 +990,11 @@ class TaskGeneratorModuleDocumenter(Directive):
         # Use sphinx and docutils tooling to format the docstring into rST and then parse it
         # into a docutils node.
         result = statemachine.ViewList()
-        for line in statemachine.string2lines(
-            module.__doc__, tab_width=4, convert_whitespace=True
-        ):
-            result.append(line, module_name)
+        if module.__doc__:
+            for line in statemachine.string2lines(
+                module.__doc__, tab_width=4, convert_whitespace=True
+            ):
+                result.append(line, module_name)
 
         task_generator_path_lines = [""]
         for task_generator in task_generators:
