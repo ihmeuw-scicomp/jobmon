@@ -64,12 +64,20 @@ To create a single task workflow:
     )
     wf = tool.create_workflow()
     compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
-    task = simple_function.create_task(compute_resources=compute_resources, foo=1, bar=["a", "b"])
+    task_1 = simple_function.create_task(compute_resources=compute_resources, foo=1, bar=["a", "b"])
+    task_2 = simple_function.create_task(compute_resources=compute_resources, foo=1, bar=["a", "b"])
+    task_2.add_upstream(task_1)
     wf.add_task(task)
     wf.run()
 
 The above code creates a workflow with a single task named "simple_function:foo=1" and runs it.
 The order of arguments is important, compute_resources must be the first argument.
+
+The original python function can be called using an extra indirection through task_function as follows:
+
+.. code-block:: python
+
+    simple_function.task_function(1, ["a", "b"])
 
 To create a task array workflow:
 
