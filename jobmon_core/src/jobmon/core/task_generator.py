@@ -15,7 +15,6 @@ from typing import (
     Optional,
     Type,
     Union,
-    _GenericAlias,
 )
 
 import docstring_parser
@@ -910,9 +909,7 @@ class TaskGeneratorModuleDocumenter(Directive):
     required_arguments = 1
     optional_arguments = 1
     final_argument_whitespace = True
-    option_spec = {
-        'optional': lambda x: x  # Defines the 'optional' option
-    }
+    option_spec = {"optional": lambda x: x}  # Defines the 'optional' option
 
     def run(self) -> list[nodes.Node]:
         """The function sphinx/docutils use to generate documentation for the directive."""
@@ -1092,10 +1089,11 @@ def _format_options(
         if is_optional_type(annotation):
             underlying_optional_type = get_optional_type_parameter(annotation)
             annotation_name = f"OPTIONAL[{underlying_optional_type.__name__.upper()}]"
-        elif isinstance(annotation, _GenericAlias):
-            annotation_name = str(annotation).upper()
-        else:
+        elif isinstance(annotation, type):
             annotation_name = annotation.__name__.upper()
+        else:
+            # it can be typing._GenericAlias for list type annotation
+            annotation_name = str(annotation).upper()
 
         lines.append(f".. option:: --{param} <{annotation_name}>")
         lines.append("")
