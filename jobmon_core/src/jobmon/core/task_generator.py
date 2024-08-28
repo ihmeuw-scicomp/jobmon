@@ -15,6 +15,7 @@ from typing import (
     Optional,
     Type,
     Union,
+    _GenericAlias,
 )
 
 import docstring_parser
@@ -1091,6 +1092,8 @@ def _format_options(
         if is_optional_type(annotation):
             underlying_optional_type = get_optional_type_parameter(annotation)
             annotation_name = f"OPTIONAL[{underlying_optional_type.__name__.upper()}]"
+        elif isinstance(annotation, _GenericAlias):
+            annotation_name = str(annotation).upper()
         else:
             annotation_name = annotation.__name__.upper()
 
