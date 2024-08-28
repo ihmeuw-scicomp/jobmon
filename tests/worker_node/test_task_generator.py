@@ -4,6 +4,7 @@ from unittest.mock import Mock
 from random import randint
 
 from jobmon.core import task_generator
+from jobmon.core.task_generator import TaskGeneratorDocumenter, TaskGeneratorModuleDocumenter
 from jobmon.client.api import Tool
 
 
@@ -1193,3 +1194,96 @@ def test_naming_func(
     )
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
+
+
+def test_computer_resource_type_protection(client_env, monkeypatch):
+    """Verify that the compute_resources parameter is a dict."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool = Tool("test_tool")
+
+    @task_generator.task_generator(
+        serializers={}, tool_name="test_tool",
+        naming_args=["foo"]
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    # Exercise & Verify an error is raised
+    with pytest.raises(TypeError, match="Expected a dictionary for compute_resources, but got <class 'str'>."):
+        simple_function.create_task(
+            compute_resources="whatever", foo=1, bar="baz"
+        )
+
+    # Exercise & Verify an error is raised
+    with pytest.raises(TypeError, match="Expected a dictionary for compute_resources, but got <class 'str'>."):
+        simple_function.create_tasks(
+            compute_resources="whatever", foo=[1, 2], bar="baz"
+        )
+
+
+def test_task_generator_doc(client_env, monkeypatch):
+    """Test the doc feature."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    import os
+    func_path = script_dir = os.path.dirname(os.path.abspath(__file__)) + "/task_generator_funcs.py"
+
+    tool = Tool("test_tool")
+
+    from docutils.parsers.rst import directives
+    from docutils.core import publish_string
+    directives.register_directive("task_generator", TaskGeneratorDocumenter)
+    rst = f"""
+        This is a simple document.
+
+        .. task_generator:: task_generator_funcs:simple_function
+           :optional: {func_path}
+
+        This is more content after the directive.
+        """
+    output = publish_string(rst, writer_name='html')
+    assert "Simple task_function." in output.decode('utf-8')
+
+
+
+def test_task_generator_docs(client_env, monkeypatch):
+    """Test the doc feature."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    import os
+    func_path = script_dir = os.path.dirname(os.path.abspath(__file__)) + "/task_generator_funcs.py"
+
+    tool = Tool("test_tool")
+
+    from docutils.parsers.rst import directives
+    from docutils.core import publish_string
+    directives.register_directive("task_generator_module", TaskGeneratorModuleDocumenter)
+
+    rst = f"""
+        This is a simple document.
+
+        .. task_generator_module:: task_generator_funcs
+           :optional: {func_path}
+
+        This is more content after the directive.
+        """
+    output = publish_string(rst, writer_name='html')
+    assert "Simple task_function." in output.decode('utf-8')
+    assert "Simple task_function with special chars." in output.decode('utf-8')
+    assert "Simple task_function with a serializer." in output.decode('utf-8')

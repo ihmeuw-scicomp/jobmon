@@ -6,7 +6,7 @@ import importlib.machinery
 
 from typing import Optional
 
-from jobmon.core.task_generator import task_generator, TaskGeneratorModuleDocumenter
+from jobmon.core.task_generator import task_generator, TaskGeneratorModuleDocumenter, TaskGeneratorDocumenter
 from jobmon.client.api import Tool
 
 # Get the full path of the current script
@@ -274,25 +274,6 @@ def fhs_slurm():
     assert s == "D"
 
 
-def simple_tasks_doc() -> None:
-    """Simple doc."""
-    from docutils.parsers.rst import directives
-    from docutils import nodes
-    from docutils.core import publish_string
-    directives.register_directive("task_generator", TaskGeneratorModuleDocumenter)
-    rst = f"""
-    This is a simple document.
-
-    .. task_generator:: task_generator_funcs
-       :optional: {task_generator_funcs_path}
-    
-    This is more content after the directive.
-    """
-    output = publish_string(rst, writer_name='html')
-    print(output.decode('utf-8'))
-
-
-
 def main():
     if len(sys.argv) > 1:
         try:
@@ -318,8 +299,6 @@ def main():
         fhs_slurm()
     elif input_value == 9:
         special_char_tasks_serializer_seq()
-    elif input_value == 10:
-        simple_tasks_doc()
     else:
         simple_tasks_seq()
 

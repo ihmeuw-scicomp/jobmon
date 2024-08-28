@@ -603,6 +603,12 @@ class TaskGenerator:
 
     def create_task(self, compute_resources: Dict, **kwargs: Any) -> Task:
         """Create a task for the task_function with the given kwargs."""
+        # add compute_resources type protection
+        if not isinstance(compute_resources, dict):
+            raise TypeError(
+                f"Expected a dictionary for compute_resources, "
+                f"but got {type(compute_resources)}."
+            )
         if self._task_template is None:
             self._generate_task_template()
         executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
@@ -646,6 +652,12 @@ class TaskGenerator:
 
     def create_tasks(self, compute_resources: Dict, **kwargs: Any) -> List[Task]:
         """Create a task array for the task_function with the given kwargs."""
+        # add compute_resources type protection
+        if not isinstance(compute_resources, dict):
+            raise TypeError(
+                f"Expected a dictionary for compute_resources, "
+                f"but got {type(compute_resources)}."
+            )
         if self._task_template is None:
             self._generate_task_template()
         executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
@@ -862,14 +874,22 @@ class TaskGeneratorDocumenter(Directive):
     """Directive for generating documentation for a single task generator."""
 
     required_arguments = 1
+    optional_arguments = 1
+    final_argument_whitespace = True
+    option_spec = {"optional": lambda x: x}  # Defines the 'optional' option
 
     def run(self) -> list[nodes.Node]:
         """The function sphinx/docutils use to generate documentation for the directive."""
-        task_generator = self._load_task_generator(self.arguments[0])
+        module_name = self.arguments[0]
+        # if there are more than one arg, the second will be module path
+        module_path = self.options.get("optional", None)
+        task_generator = self._load_task_generator(module_name, module_path)
 
         return _generate_nodes(task_generator, self.state)
 
-    def _load_task_generator(self, task_generator_path: str) -> TaskGenerator:
+    def _load_task_generator(
+        self, task_generator_path: str, module_path: Optional[str] = None
+    ) -> TaskGenerator:
         """Load the task generator from the given path."""
         try:
             module_name, attr_name = task_generator_path.split(":", 1)
@@ -879,7 +899,14 @@ class TaskGeneratorDocumenter(Directive):
             )
 
         try:
-            mod = __import__(module_name, globals(), locals(), [attr_name])
+            if module_path:
+                spec = importlib.util.spec_from_file_location(
+                    module_name, module_path
+                )  # type: ignore
+                mod = importlib.util.module_from_spec(spec)  # type: ignore
+                spec.loader.exec_module(mod)  # type: ignore
+            else:
+                mod = __import__(module_name, globals(), locals(), [attr_name])
         except (Exception, SystemExit) as exc:
             err_msg = f'Failed to import "{attr_name}" from "{module_name}". '
             if isinstance(exc, SystemExit):
@@ -914,11 +941,8 @@ class TaskGeneratorModuleDocumenter(Directive):
     def run(self) -> list[nodes.Node]:
         """The function sphinx/docutils use to generate documentation for the directive."""
         module_name = self.arguments[0]
-        # if there are more than one module, the second will be module path
-        if len(self.arguments) > 1:
-            module_path = self.arguments[1]
-        else:
-            module_path = None
+        # if there are more than one arg, the second will be module path
+        module_path = self.options.get("optional", None)
         module, task_generators = self._load_module_task_generators(
             module_name, module_path
         )
