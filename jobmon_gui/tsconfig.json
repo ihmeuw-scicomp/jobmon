@@ -1,27 +1,33 @@
 {
   "compilerOptions": {
-    "target": "es5",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
-    "allowJs": true,
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
     "skipLibCheck": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "strict": true,
-    "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true,
-    "module": "esnext",
+    "paths": {
+      "@jobmon_gui/*": ["./src/*"],
+    },
+
+    /* Bundler mode */
     "moduleResolution": "node",
+//    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "preserve",
-    "noImplicitAny": false
+    "jsx": "react-jsx",
+
+    /* Linting */
+//    Eventually uncomment these
+//    "strict": true,
+//    "noUnusedLocals": false,
+//    "noUnusedParameters": true,
+//    "noFallthroughCasesInSwitch": true,
+//    "noImplicitAny": true
+
+//    Eventually remove this
+    "allowSyntheticDefaultImports": true
   },
-  "include": [
-    "src"
-  ]
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
 }
