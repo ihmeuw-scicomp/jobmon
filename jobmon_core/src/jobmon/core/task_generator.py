@@ -1,6 +1,7 @@
 import ast
 import importlib
 import inspect
+import logging
 import shutil
 import traceback
 from types import ModuleType
@@ -36,6 +37,8 @@ TASK_RUNNER_SUB_COMMAND = "task_generator"
 HELP_TEXT_INTRO_FORMAT = "Command Line Documentation for {full_path}"
 
 SERIALIZED_EMPTY_STRING = '""'
+
+logger = logging.getLogger(__name__)
 
 
 def create_task_name(
@@ -285,6 +288,10 @@ class TaskGenerator:
         max_attempts: Optional[int] = None,
         module_source_path: Optional[str] = None,
         name_func: Optional[Callable] = None,
+        default_cluster_name: str = "",
+        default_compute_resources: Optional[Dict[str, Any]] = None,
+        default_resource_scales: Optional[Dict[str, float]] = None,
+        yaml_file: Optional[str] = None,
     ) -> None:
         """Initialize TaskGenerator.
 
@@ -305,6 +312,14 @@ class TaskGenerator:
                                 the module is assumed to be installed in the system.
             name_func: A function that takes in the task name prefix and the kwargs to generate
                 the task name. If not provided, the FHS default is used.
+            default_cluster_name: The default cluster name to use when creating tasks. If not
+                provided, an empty string is used.
+            default_compute_resources: The default compute resources when creating tasks.
+                If not provided, an empty dictionary is used.
+            default_resource_scales: The default resource scales to use when creating tasks.
+                If not provided, an empty dictionary is used.
+            yaml_file: The path to the yaml file that contains the task template. If not
+                provided, the default template is used.
         """
         self.task_function = task_function
         self.serializers = serializers
@@ -327,6 +342,10 @@ class TaskGenerator:
         self._validate_task_function()
 
         self._task_template = None
+        self._default_cluster_name = default_cluster_name
+        self._default_compute_resources = default_compute_resources
+        self._default_resource_scales = default_resource_scales
+        self._yaml_file = yaml_file
 
         # If the user provides a name_func, use that to generate the task name
         # otherwise, use FHS default
@@ -410,6 +429,10 @@ class TaskGenerator:
                 + args_template,
                 node_args=self.params.keys(),  # type: ignore
                 op_args=["executable"],
+                default_cluster_name=self._default_cluster_name,
+                default_compute_resources=self._default_compute_resources,
+                default_resource_scales=self._default_resource_scales,
+                yaml_file=self._yaml_file,
             )
         else:
             self._task_template = self.tool.get_task_template(
@@ -423,6 +446,10 @@ class TaskGenerator:
                 + args_template,
                 node_args=self.params.keys(),  # type: ignore
                 op_args=["executable"],
+                default_cluster_name=self._default_cluster_name,
+                default_compute_resources=self._default_compute_resources,
+                default_resource_scales=self._default_resource_scales,
+                yaml_file=self._yaml_file,
             )
 
     def _is_valid_type(self, obj: Any, expected_type: Type) -> bool:
@@ -601,16 +628,48 @@ class TaskGenerator:
 
         return deserialized_result
 
-    def create_task(self, compute_resources: Dict, **kwargs: Any) -> Task:
-        """Create a task for the task_function with the given kwargs."""
+    def _cluster_resource_check(
+        self, cluster_name: str, compute_resources: Optional[Dict]
+    ) -> str:
+        """Make sure a cluster name is available to use, and compute_resource is a dict."""
         # add compute_resources type protection
-        if not isinstance(compute_resources, dict):
-            raise TypeError(
-                f"Expected a dictionary for compute_resources, "
-                f"but got {type(compute_resources)}."
-            )
+        if compute_resources:
+            if not isinstance(compute_resources, dict):
+                raise TypeError(
+                    f"Expected a dictionary for compute_resources, "
+                    f"but got {type(compute_resources)}."
+                )
+        # if cluster_name is "", but computer_resources has cluster_name key, use it
+        if (
+            cluster_name == ""
+            and compute_resources
+            and "cluster_name" in compute_resources.keys()
+        ):
+            cluster_name = compute_resources["cluster_name"]
+        # if cluster_name is still an empty string, use the default cluster name
+        if cluster_name == "":
+            cluster_name = self._default_cluster_name
+        # if cluster_name is still an empty string, leave to wf to handle
+        logger.info(
+            "Cluster name is empty. Will use the wf default if one is provided."
+        )
+        return cluster_name
+
+    def create_task(
+        self,
+        cluster_name: str = "",
+        compute_resources: Optional[Dict] = None,
+        resource_scales: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> Task:
+        """Create a task for the task_function with the given kwargs."""
+        # if the task template is not generated, generate it
         if self._task_template is None:
             self._generate_task_template()
+
+        # check input and adjust the cluster_name value
+        cluster_name = self._cluster_resource_check(cluster_name, compute_resources)
+
         executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
         # Serialize the kwargs
         serialized_kwargs = {
@@ -642,7 +701,9 @@ class TaskGenerator:
         # Create the task
         task = self._task_template.create_task(  # type: ignore
             name=name,
+            cluster_name=cluster_name,
             compute_resources=compute_resources,
+            resource_scales=resource_scales,
             max_attempts=self.max_attempts,
             executable=executable_path,
             **kwargs_for_task,  # type: ignore
@@ -650,16 +711,21 @@ class TaskGenerator:
 
         return task
 
-    def create_tasks(self, compute_resources: Dict, **kwargs: Any) -> List[Task]:
+    def create_tasks(
+        self,
+        cluster_name: str = "",
+        compute_resources: Optional[Dict] = None,
+        resource_scales: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> List[Task]:
         """Create a task array for the task_function with the given kwargs."""
-        # add compute_resources type protection
-        if not isinstance(compute_resources, dict):
-            raise TypeError(
-                f"Expected a dictionary for compute_resources, "
-                f"but got {type(compute_resources)}."
-            )
+        # if the task template is not generated, generate it
         if self._task_template is None:
             self._generate_task_template()
+
+        # check input and adjust the cluster_name value
+        cluster_name = self._cluster_resource_check(cluster_name, compute_resources)
+
         executable_path = _find_executable_path(executable_name=TASK_RUNNER_NAME)
         # Serialize the kwargs
         serialized_kwargs = {
@@ -682,7 +748,9 @@ class TaskGenerator:
 
         # Create the task
         tasks = self._task_template.create_tasks(  # type: ignore
+            cluster_name=cluster_name,
             compute_resources=compute_resources,
+            resource_scales=resource_scales,
             max_attempts=self.max_attempts,
             executable=executable_path,
             **kwargs_for_task,  # type: ignore
@@ -815,6 +883,10 @@ def task_generator(
     naming_args: Optional[List[str]] = None,
     max_attempts: Optional[int] = None,
     module_source_path: Optional[str] = None,
+    default_cluster_name: str = "",
+    default_compute_resources: Optional[Dict[str, Any]] = None,
+    default_resource_scales: Optional[Dict[str, float]] = None,
+    yaml_file: Optional[str] = None,
 ) -> Callable:
     """Decorator for generating jobmon tasks from a python function."""
 
@@ -827,6 +899,10 @@ def task_generator(
             naming_args=naming_args,
             max_attempts=max_attempts,
             module_source_path=module_source_path,
+            default_cluster_name=default_cluster_name,
+            default_compute_resources=default_compute_resources,
+            default_resource_scales=default_resource_scales,
+            yaml_file=yaml_file,
         )
 
     return wrapper

@@ -21,7 +21,7 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
     )
     tool = Tool("test_tool")
 
-    @task_generator.task_generator(serializers={}, tool_name="test_tool")
+    @task_generator.task_generator(serializers={}, tool_name="test_tool", default_cluster_name="sequential")
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
         pass
@@ -62,7 +62,7 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
     )
     tool = Tool("test_tool")
 
-    @task_generator.task_generator(serializers={}, tool_name="test_tool")
+    @task_generator.task_generator(serializers={}, tool_name="test_tool", default_cluster_name="sequential")
     def list_function(foo: List[str], bar: List[str]) -> None:
         """Example task_function."""
         pass
@@ -114,7 +114,7 @@ def test_naming_args(
     tool = Tool("test_tool")
 
     @task_generator.task_generator(
-        serializers={}, tool_name="test_tool", naming_args=naming_args
+        serializers={}, tool_name="test_tool", naming_args=naming_args, default_cluster_name="sequential"
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
@@ -167,7 +167,7 @@ def test_max_attempts(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Exercise
     task = simple_function.create_task(
-        compute_resources=compute_resources, foo=1, bar="baz"
+        cluster_name="sequential", compute_resources=compute_resources, foo=1, bar="baz"
     )
 
     assert task.max_attempts == max_attempts
@@ -193,7 +193,7 @@ def test_simple_type(client_env, simple_type: Any) -> None:
 
     tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool_name="test_tool"
+        task_function=my_func, serializers={}, tool_name="test_tool", default_cluster_name="sequential"
     )
 
     # Exercise by calling serialize
@@ -710,6 +710,7 @@ def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Exercise
     tasks = simple_function.create_tasks(
+        cluster_name="sequential",
         compute_resources=compute_resources, foo=[1, 2], bar="baz"
     )
     # verify there are two tasks
@@ -750,7 +751,7 @@ def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Exercise
     tasks = simple_function.create_tasks(
-        compute_resources=compute_resources, foo=[1, 2], bar=[["a", "b"]]
+        cluster_name="sequential", compute_resources=compute_resources, foo=[1, 2], bar=[["a", "b"]]
     )
     # verify there are two tasks
     assert len(tasks) == 2
@@ -796,7 +797,8 @@ def test_fhs_serializers(client_env) -> None:
     tg = task_generator.TaskGenerator(
         task_function=my_func,
         serializers=testing_serializer,
-        tool_name="test_tool"
+        tool_name="test_tool",
+        default_cluster_name="sequential"
     )
     r1 = tg.serialize(yr, YearRange)
     assert r1 == "2020-2021"
@@ -897,6 +899,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         pass
 
     task1 = simple_function.create_task(
+        cluster_name="sequential",
         compute_resources={},
         yr=yr,
         v=v,
@@ -922,6 +925,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
 
     # test optional args
     task2 = simple_function.create_task(
+        cluster_name="sequential",
         compute_resources={},
         yr=yr,
         v=v,
@@ -946,6 +950,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
 
     # test array task
     tasks = simple_function.create_tasks(
+        cluster_name="sequential",
         compute_resources={},
         yr=yr,
         v=v,
@@ -997,6 +1002,7 @@ def test_task_template_not_generated_when_instance_only_generated_once(client_en
         pass
 
     tg = task_generator.TaskGenerator(
+        default_cluster_name="sequential",
         task_function=test_func,
         serializers={},
         tool_name="test_tool"
@@ -1005,7 +1011,7 @@ def test_task_template_not_generated_when_instance_only_generated_once(client_en
     assert tg._task_template is None
 
     # create a task
-    tg.create_task(compute_resources={}, foo=1)
+    tg.create_task(cluster_name="sequential", compute_resources={}, foo=1)
     # verify the task_template is the same
     tt = tg._task_template
     assert tt is not None
@@ -1036,6 +1042,7 @@ def test_get_tasks_by_node_args_simple(client_env, monkeypatch):
         pass
 
     tg = task_generator.TaskGenerator(
+        default_cluster_name="sequential",
         task_function=test_func,
         serializers={},
         tool_name="test_tool"
@@ -1076,6 +1083,7 @@ def test_get_tasks_by_node_args_list(client_env, monkeypatch):
         pass
 
     tg = task_generator.TaskGenerator(
+        default_cluster_name="sequential",
         task_function=test_func,
         serializers={},
         tool_name="test_tool"
@@ -1116,6 +1124,7 @@ def test_get_tasks_by_node_args_obj(client_env, monkeypatch):
         pass
 
     tg = task_generator.TaskGenerator(
+        default_cluster_name="sequential",
         task_function=test_func,
         serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
         tool_name="test_tool"
@@ -1168,6 +1177,7 @@ def test_naming_func(
         return f"{prefix}:foo={kwargs_for_name['foo']}"
 
     @task_generator.task_generator(
+        default_cluster_name="sequential",
         serializers={}, tool_name="test_tool",
         naming_args=["foo"]
     )
@@ -1207,6 +1217,7 @@ def test_computer_resource_type_protection(client_env, monkeypatch):
     tool = Tool("test_tool")
 
     @task_generator.task_generator(
+        default_cluster_name="sequential",
         serializers={}, tool_name="test_tool",
         naming_args=["foo"]
     )
@@ -1287,3 +1298,151 @@ def test_task_generator_docs(client_env, monkeypatch):
     assert "Simple task_function." in output.decode('utf-8')
     assert "Simple task_function with special chars." in output.decode('utf-8')
     assert "Simple task_function with a serializer." in output.decode('utf-8')
+
+
+def test_default_computer_resource(client_env, monkeypatch):
+    """Test the default compute resource."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    tool = Tool("test_tool")
+
+    @task_generator.task_generator(
+        serializers={},
+        tool_name="test_tool",
+        naming_args=["foo"],
+        default_cluster_name="sequential",
+        default_compute_resources={"cluster_name": "sequential", "queue": "null.q"}
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+    # create a task
+    t1 = simple_function.create_task(cluster_name="sequential", foo=1, bar="baz")
+    # create a workflow
+    wf = tool.create_workflow()
+    wf.add_task(t1)
+    wf.bind()
+    wf._bind_tasks()
+    # verify the default compute resources are set at the task_template level
+    assert simple_function._task_template._active_task_template_version.default_cluster_name == "sequential"
+    assert simple_function._task_template._active_task_template_version.default_compute_resources_set == {'sequential': {'cluster_name': 'sequential', 'queue': 'null.q'}}
+
+    # verify the task has the default compute resources
+    assert t1.compute_resources == {'cluster_name': 'sequential', 'queue': 'null.q'}
+    assert t1.resource_scales == {'memory': 0.5, 'runtime': 0.5}
+
+
+def test_default_computer_resource_yaml(client_env, monkeypatch):
+    """Test the default compute resource."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    import os
+
+    rsc_path = os.path.dirname(os.path.abspath(__file__)) + "/cluster_resources.yaml"
+
+    tool = Tool("test_tool")
+
+    @task_generator.task_generator(
+        serializers={},
+        tool_name="test_tool",
+        naming_args=["foo"],
+        yaml_file=rsc_path,
+        default_cluster_name="sequential",
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    # create a task
+    t1 = simple_function.create_task(cluster_name="sequential", foo=1, bar="baz")
+    # create a workflow
+    wf = tool.create_workflow()
+    wf.add_task(t1)
+    wf.bind()
+    wf._bind_tasks()
+    # verify the task has the default compute resources
+    assert t1.compute_resources == {'m_mem_free': '3G', 'max_runtime_seconds': '(60 * 60 * 4)', 'num_cores': 1, 'queue': 'null.q'}
+    assert t1.resource_scales == {'memory': 0.2, 'runtime': 0.3}
+
+
+def test_rsc_overide(client_env, monkeypatch):
+    """Test the default compute resource."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    tool = Tool("test_tool1")
+
+    @task_generator.task_generator(
+        default_cluster_name="dummy",
+        default_compute_resources={"queue": "null.q", "core": 1},
+        serializers={},
+        tool_name="test_tool1",
+        naming_args=["foo"],
+    )
+    def simple_function1(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    # task without cluster name should use the tg cluster name
+    t1 = simple_function1.create_task(foo=1, bar="baz")
+    wf1 = tool.create_workflow()
+    wf1.add_task(t1)
+    wf1.bind()
+    wf1._bind_tasks()
+    # verify the task has the default compute resources
+    assert t1.cluster_name == "dummy"
+    assert t1.compute_resources == {'queue': 'null.q', 'core': 1}
+
+    # task with cluster name should use the task cluster name
+    t2 = simple_function1.create_task(cluster_name="sequential",
+                                      compute_resources={"queue": "null.q", "core": 2},
+                                      foo=1,
+                                      bar="baz")
+    wf2 = tool.create_workflow()
+    wf2.add_task(t2)
+    wf2.bind()
+    wf2._bind_tasks()
+    # verify the task has the default compute resources
+    assert t2.cluster_name == "sequential"
+    assert t2.compute_resources == {'queue': 'null.q', 'core': 2}
+
+    # task with the same cluster name as the tg should use the tg resources
+    t3 = simple_function1.create_task(cluster_name="dummy",
+                                      foo=1,
+                                      bar="baz")
+    wf3 = tool.create_workflow()
+    wf3.add_task(t3)
+    wf3.bind()
+    wf3._bind_tasks()
+    # verify the task has the default compute resources
+    assert t3.cluster_name == "dummy"
+    assert t3.compute_resources == {'queue': 'null.q', 'core': 1}
+
+    # task without cluster name uses the cluster name in resource
+    t4 = simple_function1.create_task(compute_resources={"cluster_name": "sequential", "queue": "null.q", "core": 2},
+                                      foo=1,
+                                      bar="baz")
+    wf4 = tool.create_workflow()
+    wf4.add_task(t4)
+    wf4.bind()
+    wf4._bind_tasks()
+    # verify the task has the default compute resources
+    assert t4.cluster_name == "sequential"
+    assert t4.compute_resources == {"cluster_name": "sequential", 'queue': 'null.q', 'core': 2}
+
+
+
