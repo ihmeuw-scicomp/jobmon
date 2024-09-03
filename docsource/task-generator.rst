@@ -205,3 +205,39 @@ You can pass your own function to name your task. The function should take two a
 
 The above code creates a task generator with a custom naming function. The task will be
 named "Lala_1" instead of "simple_function:foo=1".
+
+.. code-block:: python
+
+    @task_generator(
+        default_cluster_name="slurm",
+        default_compute_resources={"queue": "all.q"},
+        serializers={},
+        tool_name="test_tool",
+        module_source_path=full_script_path,
+        max_attempts=1,
+        naming_args=["foo"],
+    )
+    def simple_function(foo: int, bar: List[str] = []) -> None:
+        """Simple task_function."""
+        print(f"foo: {foo}")
+        print(f"bar: {bar}")
+
+The above code creates a task generator with default cluster name and compute resources, so you do not need to
+specify them when creating a task.
+
+.. code-block:: python
+
+    @task_generator(
+        yaml_file="/tmp/task_generator.yaml",
+        serializers={},
+        tool_name="test_tool",
+        module_source_path=full_script_path,
+        max_attempts=1,
+        naming_args=["foo"],
+    )
+    def simple_function(foo: int, bar: List[str] = []) -> None:
+        """Simple task_function."""
+        print(f"foo: {foo}")
+        print(f"bar: {bar}")
+
+The above code creates a task generator with a yaml file that contains the default cluster name and compute resources,

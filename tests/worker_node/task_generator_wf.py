@@ -281,7 +281,7 @@ def fhs_seq():
             q=Quantiles(0.1, 0.9)
         )
     wf.add_tasks([task])
-    s = wf.run()
+    s = wf.run(configure_logging=True)
     assert s == "D"
 
 
@@ -303,7 +303,7 @@ def fhs_slurm():
             vm=VersionMetadata("1.0"),
         )
     wf.add_tasks([task])
-    s = wf.run()
+    s = wf.run(configure_logging=True)
     assert s == "D"
 
 
@@ -323,7 +323,7 @@ def fhs_slurmz_rsc():
             vm=VersionMetadata("1.0"),
         )
     wf.add_tasks([task])
-    s = wf.run()
+    s = wf.run(configure_logging=True)
     assert s == "D"
 
 
