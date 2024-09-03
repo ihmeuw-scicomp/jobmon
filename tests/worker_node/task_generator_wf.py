@@ -354,6 +354,8 @@ def main():
         special_char_tasks_serializer_seq()
     elif input_value == 10:
         fhs_slurmz_rsc()
+    elif input_value == 11:
+        simple_tasks_serializer_slurm_src()
     else:
         simple_tasks_seq()
 
