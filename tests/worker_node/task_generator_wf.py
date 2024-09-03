@@ -133,9 +133,6 @@ def simple_tasks_serializer_slurm() -> None:
 def simple_tasks_serializer_slurm_src() -> None:
     """Simple task."""
     tool = Tool("test_tool")
-    tool.set_default_compute_resources_from_dict(
-        cluster_name="slurm", compute_resources={"queue": "all.q"}
-    )
     wf = tool.create_workflow()
 
     # Import the task_generator_funcs.py module
