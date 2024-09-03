@@ -639,13 +639,6 @@ class TaskGenerator:
                     f"Expected a dictionary for compute_resources, "
                     f"but got {type(compute_resources)}."
                 )
-        # if cluster_name is "", but computer_resources has cluster_name key, use it
-        if (
-            cluster_name == ""
-            and compute_resources
-            and "cluster_name" in compute_resources.keys()
-        ):
-            cluster_name = compute_resources["cluster_name"]
         # if cluster_name is still an empty string, use the default cluster name
         if cluster_name == "":
             cluster_name = self._default_cluster_name

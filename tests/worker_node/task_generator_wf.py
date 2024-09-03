@@ -130,6 +130,31 @@ def simple_tasks_serializer_slurm() -> None:
     assert r == "D"
 
 
+def simple_tasks_serializer_slurm_src() -> None:
+    """Simple task."""
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="slurm", compute_resources={"queue": "all.q"}
+    )
+    wf = tool.create_workflow()
+
+    # Import the task_generator_funcs.py module
+    spec = importlib.util.spec_from_file_location(
+        "task_generator_funcs", task_generator_funcs_path
+    )
+    task_generator_funcs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(task_generator_funcs)
+    simple_function = task_generator_funcs.simple_function_with_serializer_rsc
+    test_year = task_generator_funcs.TestYear
+    for i in range(2020, 2024):
+        task = simple_function.create_task(
+           year=test_year(i)
+        )
+        wf.add_tasks([task])
+    r = wf.run(configure_logging=True)
+    assert r == "D"
+
+
 def simple_tasks_array() -> None:
     """Simple tasks in array with list input."""
     tool = Tool("test_tool")
@@ -282,6 +307,26 @@ def fhs_slurm():
     assert s == "D"
 
 
+def fhs_slurmz_rsc():
+    tool = Tool("test_tool")
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
+    # Import the task_generator_funcs.py module
+
+    task = fhs_simple_function.create_task(
+            cluster_name="slurm",
+            compute_resources=compute_resources,
+            yr=YearRange(2020, 2021),
+            v=Versions("1.0", "2.0"),
+            fSpec=FHSFileSpec("/path/to/file"),
+            dSpec=FHSDirSpec("/path/to/dir"),
+            vm=VersionMetadata("1.0"),
+        )
+    wf.add_tasks([task])
+    s = wf.run()
+    assert s == "D"
+
+
 def main():
     if len(sys.argv) > 1:
         try:
@@ -307,6 +352,8 @@ def main():
         fhs_slurm()
     elif input_value == 9:
         special_char_tasks_serializer_seq()
+    elif input_value == 10:
+        fhs_slurmz_rsc()
     else:
         simple_tasks_seq()
 

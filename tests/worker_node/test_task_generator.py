@@ -1432,17 +1432,16 @@ def test_rsc_overide(client_env, monkeypatch):
     assert t3.cluster_name == "dummy"
     assert t3.compute_resources == {'queue': 'null.q', 'core': 1}
 
-    # task without cluster name uses the cluster name in resource
-    t4 = simple_function1.create_task(compute_resources={"cluster_name": "sequential", "queue": "null.q", "core": 2},
-                                      foo=1,
+    # task use default compute resources
+    t4 = simple_function1.create_task(foo=1,
                                       bar="baz")
     wf4 = tool.create_workflow()
     wf4.add_task(t4)
     wf4.bind()
     wf4._bind_tasks()
     # verify the task has the default compute resources
-    assert t4.cluster_name == "sequential"
-    assert t4.compute_resources == {"cluster_name": "sequential", 'queue': 'null.q', 'core': 2}
+    assert t4.cluster_name == "dummy"
+    assert t4.compute_resources == {'queue': 'null.q', 'core': 1}
 
 
 

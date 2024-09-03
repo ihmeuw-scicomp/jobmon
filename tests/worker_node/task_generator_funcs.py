@@ -60,6 +60,20 @@ def simple_function_with_serializer(year: TestYear) -> None:
     print(f"year: {year}")
 
 
+@task_generator.task_generator(
+    default_cluster_name="slurm",
+    default_compute_resources={"cpu": 1, "mem": 1, "queue": "all.q"},
+    serializers=test_year_serializer,
+    tool_name="test_tool",
+    module_source_path=full_script_path,
+    max_attempts=1,
+    naming_args=["year"],
+)
+def simple_function_with_serializer_rsc(year: TestYear) -> None:
+    """Simple task_function with a serializer."""
+    print(f"year: {year}")
+
+
 def special_char_encodeing(input: str) -> str:
     """Encode special characters."""
     return html.escape(input)
