@@ -17,7 +17,7 @@ dependencies = [
     'flask',
     'flask_cors',
     'pymysql', # install MySQLdb/mysqlclient for more performance
-    'sqlalchemy',
+    'sqlalchemy>=2.0.0',
     'sqlalchemy_utils',
     'structlog',
     'scipy',

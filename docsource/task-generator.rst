@@ -210,7 +210,7 @@ named "Lala_1" instead of "simple_function:foo=1".
 
     @task_generator(
         default_cluster_name="slurm",
-        default_compute_resources={"queue": "all.q"},
+        default_compute_resources={"queue": "all.q", "project": "proj_scicomp"},
         serializers={},
         tool_name="test_tool",
         module_source_path=full_script_path,

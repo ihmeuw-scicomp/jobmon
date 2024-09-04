@@ -62,7 +62,7 @@ def simple_function_with_serializer(year: TestYear) -> None:
 
 @task_generator.task_generator(
     default_cluster_name="slurm",
-    default_compute_resources={"cpu": 1, "mem": 1, "queue": "all.q", "project": "proj_scicomp"},
+    default_compute_resources={"queue": "all.q", "project": "proj_scicomp"},
     serializers=test_year_serializer,
     tool_name="test_tool",
     module_source_path=full_script_path,
