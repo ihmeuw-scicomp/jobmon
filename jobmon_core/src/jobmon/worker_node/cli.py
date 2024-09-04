@@ -119,7 +119,7 @@ class WorkerNodeCLI(CLI):
             return ReturnCodes.OK
         except Exception as e:
             print(e)
-            return ReturnCodes.WORKER_NODE_CLI_FAILURE
+            raise e
 
     def _add_run_task_generator_parser(self) -> None:
         generator_parser = self._subparsers.add_parser("task_generator")
@@ -145,6 +145,7 @@ class WorkerNodeCLI(CLI):
             "If you method has two argument: def func(foo: int, bar: List[str), pass\n"
             "    --args foo=1 --args bar=[a,b]\n",
             required=False,
+            action="append",
         )
         generator_parser.add_argument(
             "--arghelp",

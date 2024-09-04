@@ -136,3 +136,108 @@ To create a single task workflow:
 
 The above code creates a workflow with a single task named
 "simple_function_with_serializer:year=2021" and runs it.
+
+To create a workflow with function input containing special characters like a single quote:
+
+.. code-block:: python
+
+    import html
+
+    def special_char_encodeing(input: str) -> str:
+    """Encode special characters."""
+    return html.escape(input)
+
+
+    def special_char_decoding(input: str) -> str:
+        """Decode special characters."""
+        return html.unescape(input)
+
+
+    @task_generator.task_generator(
+        serializers={str: (special_char_encodeing, special_char_decoding)},
+        tool_name="test_tool",
+        module_source_path=full_script_path,
+        max_attempts=1,
+        naming_args=["foo"],
+    )
+    def special_chars_function(foo: str) -> None:
+        """Simple task_function."""
+        print(f"foo: {foo}")
+
+
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="slurm", compute_resources={"queue": "all.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
+    simple_function = task_generator_funcs.special_chars_function
+    task = simple_function.create_task(compute_resources=compute_resources, foo=f"\'aaa\'")
+    wf.add_task(task)
+    wf.run()
+
+The above code creates a workflow with a single task what requests special characters in the input.
+Please note that this makes the Jobmon command harder to read and understand; thus, SciComp is not
+responsible to debug it.
+
+You can pass your own function to name your task. The function should take two arguments:
+    prefix: str - this will be your function name
+    kwargs_for_name: Dict[str, Any] - the arguments of the task
+    and return a string.
+
+.. code-block:: python
+
+        def custom_naming(prefix: str, kwargs_for_name: Dict[str, Any]) -> str:
+            return f"Lala_{kwargs_for_name['foo']}"
+
+        @task_generator(
+            serializers={},
+            tool_name="test_tool",
+            module_source_path=full_script_path,
+            max_attempts=1,
+            naming_args=["foo"],
+            custom_naming=custom_naming,
+        )
+        def simple_function(foo: int, bar: List[str] = []) -> None:
+            """Simple task_function."""
+            print(f"foo: {foo}")
+            print(f"bar: {bar}")
+
+The above code creates a task generator with a custom naming function. The task will be
+named "Lala_1" instead of "simple_function:foo=1".
+
+.. code-block:: python
+
+    @task_generator(
+        default_cluster_name="slurm",
+        default_compute_resources={"queue": "all.q", "project": "proj_scicomp"},
+        serializers={},
+        tool_name="test_tool",
+        module_source_path=full_script_path,
+        max_attempts=1,
+        naming_args=["foo"],
+    )
+    def simple_function(foo: int, bar: List[str] = []) -> None:
+        """Simple task_function."""
+        print(f"foo: {foo}")
+        print(f"bar: {bar}")
+
+The above code creates a task generator with default cluster name and compute resources, so you do not need to
+specify them when creating a task.
+
+.. code-block:: python
+
+    @task_generator(
+        yaml_file="/tmp/task_generator.yaml",
+        serializers={},
+        tool_name="test_tool",
+        module_source_path=full_script_path,
+        max_attempts=1,
+        naming_args=["foo"],
+    )
+    def simple_function(foo: int, bar: List[str] = []) -> None:
+        """Simple task_function."""
+        print(f"foo: {foo}")
+        print(f"bar: {bar}")
+
+The above code creates a task generator with a yaml file that contains the default cluster name and compute resources,

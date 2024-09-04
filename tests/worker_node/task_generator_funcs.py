@@ -1,5 +1,7 @@
 import ast
+import html
 import os
+import pickle
 from typing import List
 
 from jobmon.core import task_generator
@@ -54,5 +56,42 @@ test_year_serializer = {TestYear: (str, TestYear.parse_year)}
     naming_args=["year"],
 )
 def simple_function_with_serializer(year: TestYear) -> None:
-    """Simple task_function."""
+    """Simple task_function with a serializer."""
     print(f"year: {year}")
+
+
+@task_generator.task_generator(
+    default_cluster_name="slurm",
+    default_compute_resources={"queue": "all.q", "project": "proj_scicomp"},
+    serializers=test_year_serializer,
+    tool_name="test_tool",
+    module_source_path=full_script_path,
+    max_attempts=1,
+    naming_args=["year"],
+)
+def simple_function_with_serializer_rsc(year: TestYear) -> None:
+    """Simple task_function with a serializer."""
+    print(f"year: {year}")
+
+
+def special_char_encodeing(input: str) -> str:
+    """Encode special characters."""
+    return html.escape(input)
+
+
+def special_char_decoding(input: str) -> str:
+    """Decode special characters."""
+    return html.unescape(input)
+
+
+@task_generator.task_generator(
+    serializers={str: (special_char_encodeing, special_char_decoding)},
+    tool_name="test_tool",
+    module_source_path=full_script_path,
+    max_attempts=1,
+    naming_args=["foo"],
+)
+def special_chars_function(foo: str) -> None:
+    """Simple task_function with special chars."""
+    print(f"foo: {foo}")
+

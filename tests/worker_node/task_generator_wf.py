@@ -6,7 +6,7 @@ import importlib.machinery
 
 from typing import Optional
 
-from jobmon.core.task_generator import task_generator
+from jobmon.core.task_generator import task_generator, TaskGeneratorModuleDocumenter, TaskGeneratorDocumenter
 from jobmon.client.api import Tool
 
 # Get the full path of the current script
@@ -41,7 +41,11 @@ def simple_tasks_seq() -> None:
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.simple_function
     for i in range(5):
-        task = simple_function.create_task(compute_resources=compute_resources, foo=i, bar=["a", "b"])
+        task = simple_function.create_task(
+            cluster_name="sequential",
+            compute_resources=compute_resources,
+            foo=i,
+            bar=["a a", "b\"c\"b"])
         wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
@@ -64,7 +68,11 @@ def simple_tasks_slurm() -> None:
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.simple_function
     for i in range(5):
-        task = simple_function.create_task(compute_resources=compute_resources, foo=i, bar=["a", "b"])
+        task = simple_function.create_task(
+            cluster_name="slurm",
+            compute_resources=compute_resources,
+            foo=i,
+            bar=["a", "b"])
         wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
@@ -122,6 +130,28 @@ def simple_tasks_serializer_slurm() -> None:
     assert r == "D"
 
 
+def simple_tasks_serializer_slurm_src() -> None:
+    """Simple task."""
+    tool = Tool("test_tool")
+    wf = tool.create_workflow()
+
+    # Import the task_generator_funcs.py module
+    spec = importlib.util.spec_from_file_location(
+        "task_generator_funcs", task_generator_funcs_path
+    )
+    task_generator_funcs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(task_generator_funcs)
+    simple_function = task_generator_funcs.simple_function_with_serializer_rsc
+    test_year = task_generator_funcs.TestYear
+    for i in range(2020, 2024):
+        task = simple_function.create_task(
+           year=test_year(i)
+        )
+        wf.add_tasks([task])
+    r = wf.run(configure_logging=True)
+    assert r == "D"
+
+
 def simple_tasks_array() -> None:
     """Simple tasks in array with list input."""
     tool = Tool("test_tool")
@@ -165,6 +195,28 @@ def simple_tasks_serializer_array() -> None:
             compute_resources=compute_resources, year=[test_year(2023), test_year(2024)]
         )
     wf.add_tasks(tasks)
+    r = wf.run(configure_logging=True)
+    assert r == "D"
+
+
+def special_char_tasks_serializer_seq() -> None:
+    """Simple task."""
+    tool = Tool("test_tool")
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="sequential", compute_resources={"queue": "null.q"}
+    )
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "null.q"}
+
+    # Import the task_generator_funcs.py module
+    spec = importlib.util.spec_from_file_location(
+        "task_generator_funcs", task_generator_funcs_path
+    )
+    task_generator_funcs = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(task_generator_funcs)
+    simple_function = task_generator_funcs.special_chars_function
+    task = simple_function.create_task(compute_resources=compute_resources, foo=f"\'aaa\'")
+    wf.add_task(task)
     r = wf.run(configure_logging=True)
     assert r == "D"
 
@@ -226,7 +278,7 @@ def fhs_seq():
             q=Quantiles(0.1, 0.9)
         )
     wf.add_tasks([task])
-    s = wf.run()
+    s = wf.run(configure_logging=True)
     assert s == "D"
 
 
@@ -248,8 +300,29 @@ def fhs_slurm():
             vm=VersionMetadata("1.0"),
         )
     wf.add_tasks([task])
-    s = wf.run()
+    s = wf.run(configure_logging=True)
     assert s == "D"
+
+
+def fhs_slurmz_rsc():
+    tool = Tool("test_tool")
+    wf = tool.create_workflow()
+    compute_resources = {"queue": "all.q", "project": "proj_scicomp"}
+    # Import the task_generator_funcs.py module
+
+    task = fhs_simple_function.create_task(
+            cluster_name="slurm",
+            compute_resources=compute_resources,
+            yr=YearRange(2020, 2021),
+            v=Versions("1.0", "2.0"),
+            fSpec=FHSFileSpec("/path/to/file"),
+            dSpec=FHSDirSpec("/path/to/dir"),
+            vm=VersionMetadata("1.0"),
+        )
+    wf.add_tasks([task])
+    s = wf.run(configure_logging=True)
+    assert s == "D"
+
 
 def main():
     if len(sys.argv) > 1:
@@ -274,6 +347,12 @@ def main():
         fhs_seq()
     elif input_value == 8:
         fhs_slurm()
+    elif input_value == 9:
+        special_char_tasks_serializer_seq()
+    elif input_value == 10:
+        fhs_slurmz_rsc()
+    elif input_value == 11:
+        simple_tasks_serializer_slurm_src()
     else:
         simple_tasks_seq()
 

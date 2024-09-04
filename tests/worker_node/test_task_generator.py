@@ -4,6 +4,7 @@ from unittest.mock import Mock
 from random import randint
 
 from jobmon.core import task_generator
+from jobmon.core.task_generator import TaskGeneratorDocumenter, TaskGeneratorModuleDocumenter
 from jobmon.client.api import Tool
 
 
@@ -20,7 +21,7 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
     )
     tool = Tool("test_tool")
 
-    @task_generator.task_generator(serializers={}, tool_name="test_tool")
+    @task_generator.task_generator(serializers={}, tool_name="test_tool", default_cluster_name="sequential")
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
         pass
@@ -29,26 +30,23 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Exercise
     task = simple_function.create_task(
-        compute_resources=compute_resources, foo=1, bar="baz"
+        compute_resources=compute_resources, foo=1, bar="b a z"
     )
 
     # Verify task name
-    assert task.name == "simple_function:foo=1:bar=baz"
+    assert task.name == "simple_function:foo=1:bar=b_a_z"
 
     # Verify command
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args foo=1"
-        " --args bar=baz"
+        " --args foo=\'1\'"
+        " --args bar=\'b a z\'"
     )
 
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
-
-
-
 
 
 def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
@@ -64,7 +62,7 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
     )
     tool = Tool("test_tool")
 
-    @task_generator.task_generator(serializers={}, tool_name="test_tool")
+    @task_generator.task_generator(serializers={}, tool_name="test_tool", default_cluster_name="sequential")
     def list_function(foo: List[str], bar: List[str]) -> None:
         """Example task_function."""
         pass
@@ -73,19 +71,19 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Exercise
     task = list_function.create_task(
-        compute_resources=compute_resources, foo=["a", "b"], bar=["c", "d"]
+        compute_resources=compute_resources, foo=["a", "b b"], bar=["c\""]
     )
 
     # Verify task name
-    assert task.name == "list_function:foo=a,b:bar=c,d"
+    assert task.name == "list_function:foo=a,b_b:bar=c_"
 
     # Verify command
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name list_function"
-        " --args foo=[a,b]"
-        " --args bar=[c,d]"
+        " --args foo='[a,b b]'"
+        " --args bar='[c\"]'"
     )
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
@@ -116,7 +114,7 @@ def test_naming_args(
     tool = Tool("test_tool")
 
     @task_generator.task_generator(
-        serializers={}, tool_name="test_tool", naming_args=naming_args
+        serializers={}, tool_name="test_tool", naming_args=naming_args, default_cluster_name="sequential"
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
@@ -128,7 +126,6 @@ def test_naming_args(
     task = simple_function.create_task(
         compute_resources=compute_resources, foo=1, bar="baz"
     )
-
     # Verify task name matches the expected
     assert task.name == expected_name
 
@@ -137,8 +134,8 @@ def test_naming_args(
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args foo=1"
-        " --args bar=baz"
+        " --args foo=\'1\'"
+        " --args bar=\'baz\'"
     )
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
@@ -170,7 +167,7 @@ def test_max_attempts(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Exercise
     task = simple_function.create_task(
-        compute_resources=compute_resources, foo=1, bar="baz"
+        cluster_name="sequential", compute_resources=compute_resources, foo=1, bar="baz"
     )
 
     assert task.max_attempts == max_attempts
@@ -196,7 +193,7 @@ def test_simple_type(client_env, simple_type: Any) -> None:
 
     tool = Tool("test_tool")
     task_gen = task_generator.TaskGenerator(
-        task_function=my_func, serializers={}, tool_name="test_tool"
+        task_function=my_func, serializers={}, tool_name="test_tool", default_cluster_name="sequential"
     )
 
     # Exercise by calling serialize
@@ -316,7 +313,7 @@ def test_multidimensional_collection_raises_error(client_env) -> None:
 
     # Exercise & Verify an error is raised
     with pytest.raises(
-        TypeError, match="Cannot serialize multi-dimensional collection"
+        TypeError, match="This version of Task Generator cannot serialize multi-dimensional collection"
     ):
         task_gen.serialize(obj=items_to_serialize, expected_type=List[List[str]])
 
@@ -351,7 +348,7 @@ def test_empty_collection(client_env) -> None:
     )
 
     # Define the expected result
-    expected_result = []
+    expected_result = '[]'
 
     # Exercise
     result = task_gen.serialize(list(), List[str])
@@ -378,13 +375,19 @@ def test_optional_collection(client_env) -> None:
     result = task_gen.serialize(items_to_serialize, Optional[List[int]])
 
     # Verify the result matches the expected result
-    assert result == ["1", "2", "3"]
+    assert result == '[1,2,3]'
+    # verify the serialized obj can be deserialized back
+    de_result = task_gen.deserialize(result, Optional[List[int]])
+    assert de_result == items_to_serialize
 
     # Exercise
     result = task_gen.serialize(None, Optional[List[int]])
 
     # Verify the result is simply the stringified None
     assert result == "None"
+    # verify the serialized obj can be deserialized back
+    de_result = task_gen.deserialize(result, Optional[List[int]])
+    assert de_result == None
 
 
 def test_no_internal_type_raises_error(client_env) -> None:
@@ -479,13 +482,13 @@ def test_deserializer_unknown_type_raises_error(client_env) -> None:
 @pytest.mark.parametrize(
     "item_type, items_to_deserialize, expected_result",
     [
-        [int, ["1", "3", "5"], [1, 3, 5]],
-        [float, ["1.0", "3.0", "5.0"], [1.0, 3.0, 5.0]],
-        [str, ["one", "three", "five"], ["one", "three", "five"]],
-        [bool, ["True", "False"], [True, False]],
+        [int, '["1", "3", "5"]', [1, 3, 5]],
+        [float, '["1.0", "3.0", "5.0"]', [1.0, 3.0, 5.0]],
+        [str, '["one", "three", "five"]', ["one", "three", "five"]],
+        [bool, '[True, False]', [True, False]],
         [
             FakeYearRange,
-            ["2010:2020:2030", "2040:2050:2060"],
+            '["2010:2020:2030", "2040:2050:2060"]',
             [
                 FakeYearRange.parse_year_range("2010:2020:2030"),
                 FakeYearRange.parse_year_range("2040:2050:2060"),
@@ -524,32 +527,13 @@ def test_deserialize_multi_annotated_collection(client_env) -> None:
 
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#511
     """
-    # Instantiate the TaskGenerator
-    tool = Tool("test_tool")
-    task_gen = task_generator.TaskGenerator(
-        task_function=my_func,
-        serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
-        tool_name="test_tool",
-    )
-
-    # Define the items to deserialize
-    items_to_deserialize = ["0.1", "2010:2020:2030"]
-
-    # Define the expected result
-    expected_result = (0.1, FakeYearRange.parse_year_range("2010:2020:2030"))
-
-    # Exercise
-    result = task_gen.deserialize(
-        obj=items_to_deserialize, obj_type=Tuple[float, FakeYearRange]
-    )
-
-    # Verify the result matches the expected result
-    assert result == expected_result
+    # this is no longer supported as deserialize will only take str
+    pass
 
 
 @pytest.mark.parametrize(
     ["input", "expected"],
-    [["None", None], ["1", [1]], [["1", "2"], [1, 2]], [[], []]],
+    [["None", None], ["1", [1]], ['["1", "2"]', [1, 2]], ['[]', []]],
 )
 def test_deserialize_optional_collection(
     client_env, input, expected: Optional[List[int]]
@@ -585,11 +569,11 @@ def test_deserialize_multi_dimensional_collection_raises_error(client_env) -> No
     )
 
     # Define the items to deserialize
-    items_to_deserialize = [("0", "1"), ("2", "3")]
+    items_to_deserialize = '[("0", "1"), ("2", "3")]'
 
     # Exercise & Verify an error is raised
     with pytest.raises(
-        TypeError, match="Cannot deserialize multi-dimensional collection"
+        TypeError, match="This version of Task Generator cannot serialize multi-dimensional collection"
     ):
         task_gen.deserialize(
             obj=items_to_deserialize, obj_type=List[Tuple[int, ...]]
@@ -614,7 +598,7 @@ def test_deserialize_collection_without_item_annotation_raises_error(
         TypeError,
         match=f"annotation ``<class 'list'>`` does not provide enough information",
     ):
-        task_gen.deserialize(obj=["1", "2", "3"], obj_type=list)
+        task_gen.deserialize(obj='["1", "2", "3"]', obj_type=list)
 
 
 @pytest.mark.parametrize(
@@ -628,7 +612,7 @@ def test_deserialize_collection_without_item_annotation_raises_error(
         [Optional[float], "1.0", 1.0],
         [type(None), "None", None],
         [Optional[List[int]], "None", None],
-        [Optional[List[int]], ["1", "2"], [1, 2]],
+        [Optional[List[int]], '["1", "2"]', [1, 2]],
         [Optional[FakeYearRange], "None", None],
         [Optional[FakeYearRange], "1990:2020:2050", FakeYearRange(1990)],
     ],
@@ -670,7 +654,7 @@ def test_deserialize_empty_collection(client_env) -> None:
     expected_result = list()
 
     # Exercise
-    result = task_gen.deserialize(obj=list(), obj_type=List[str])
+    result = task_gen.deserialize(obj=str(list()), obj_type=List[str])
 
     # Verify
     assert result == expected_result
@@ -726,6 +710,7 @@ def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Exercise
     tasks = simple_function.create_tasks(
+        cluster_name="sequential",
         compute_resources=compute_resources, foo=[1, 2], bar="baz"
     )
     # verify there are two tasks
@@ -738,8 +723,8 @@ def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
             f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
             f" --module_name tests.worker_node.test_task_generator"
             " --func_name simple_function"
-            f" --args foo={i}"
-            " --args bar=baz"
+            f" --args foo=\'{i}\'"
+            " --args bar=\'baz\'"
         )
 
         assert tasks[i-1].command == expected_command
@@ -766,7 +751,7 @@ def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
 
     # Exercise
     tasks = simple_function.create_tasks(
-        compute_resources=compute_resources, foo=[1, 2], bar=[["a", "b"]]
+        cluster_name="sequential", compute_resources=compute_resources, foo=[1, 2], bar=[["a", "b"]]
     )
     # verify there are two tasks
     assert len(tasks) == 2
@@ -778,8 +763,8 @@ def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
             f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
             f" --module_name tests.worker_node.test_task_generator"
             " --func_name simple_function"
-            f" --args foo={i}"
-            " --args bar=[a,b]"
+            f" --args foo=\'{i}\'"
+            " --args bar='[a,b]'"
         )
 
         assert tasks[i-1].command == expected_command
@@ -789,7 +774,7 @@ def test_fhs_serializers(client_env) -> None:
     """Test the serializers for the FHS task generator."""
     from tests.worker_node.task_generator_fhs import YearRange, Versions, FHSFileSpec, FHSDirSpec, VersionMetadata, Quantiles, versions_to_list, versions_from_list, quantiles_to_list, quantiles_from_list
     yr = YearRange(2020, 2021)
-    v = Versions("1.0", "2.0")
+    v = v = Versions("1.0", "2.0")
     fSpec = FHSFileSpec("/path/to/file")
     dSpec = FHSDirSpec("/path/to/dir")
     vm = VersionMetadata("1.0")
@@ -812,12 +797,13 @@ def test_fhs_serializers(client_env) -> None:
     tg = task_generator.TaskGenerator(
         task_function=my_func,
         serializers=testing_serializer,
-        tool_name="test_tool"
+        tool_name="test_tool",
+        default_cluster_name="sequential"
     )
     r1 = tg.serialize(yr, YearRange)
     assert r1 == "2020-2021"
     r2 = tg.serialize(v, Versions)
-    assert r2 == ["1.0", "2.0"]
+    assert r2 == "[1.0, 2.0]"
     r3 = tg.serialize(fSpec, FHSFileSpec)
     assert r3 == "/path/to/file"
     r4 = tg.serialize(dSpec, FHSDirSpec)
@@ -825,7 +811,7 @@ def test_fhs_serializers(client_env) -> None:
     r5 = tg.serialize(vm, VersionMetadata)
     assert r5 == "1.0"
     r6 = tg.serialize(q, Quantiles)
-    assert r6 == ["0.1", "0.9"]
+    assert r6 == "[0.1, 0.9]"
 
     # verify deserialization
     assert yr == tg.deserialize(r1, YearRange)
@@ -834,6 +820,49 @@ def test_fhs_serializers(client_env) -> None:
     assert dSpec == tg.deserialize(r4, FHSDirSpec)
     assert vm == tg.deserialize(r5, VersionMetadata)
     assert q == tg.deserialize(r6, Quantiles)
+
+
+def test_fhs_deserizalizers(client_env, monkeypatch) -> None:
+    """Test special case for FHS after forcing deserizatizer to take str only."""
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    tool = Tool("test_tool")
+
+    from tests.worker_node.task_generator_fhs import YearRange, Versions, FHSFileSpec, FHSDirSpec, VersionMetadata, \
+        Quantiles, versions_to_list, versions_from_list, quantiles_to_list, quantiles_from_list
+
+    testing_serializer = {
+        YearRange: (str, YearRange.parse_year_range),
+        Versions: (versions_to_list, versions_from_list),
+        FHSFileSpec: (str, FHSFileSpec.parse),
+        FHSDirSpec: (str, FHSDirSpec.parse),
+        VersionMetadata: (str, VersionMetadata.parse_version),
+        Quantiles: (quantiles_to_list, quantiles_from_list),
+    }
+
+    def test_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDirSpec, vm: VersionMetadata, q: Optional[Quantiles]) -> None:
+        """Simple task_function."""
+        pass
+
+    tg = task_generator.TaskGenerator(
+        task_function=test_function,
+        serializers=testing_serializer,
+        tool_name="test_tool"
+    )
+
+    q = Quantiles(0.1, 0.9)
+    q_s = tg.serialize(q, Quantiles)
+    assert q_s == "[0.1, 0.9]"
+    assert q == tg.deserialize(q_s, Quantiles)
+
+    v = Versions("1.0")
+    v_s = tg.serialize(v, Versions)
+    assert v_s == "[1.0]"
+    assert v == tg.deserialize(v_s, Versions)
 
 
 def test_fhs_task(client_env, monkeypatch) -> None:
@@ -870,6 +899,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         pass
 
     task1 = simple_function.create_task(
+        cluster_name="sequential",
         compute_resources={},
         yr=yr,
         v=v,
@@ -883,18 +913,19 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args yr=2020-2021"
-        " --args v=[1.0,2.0]"
-        " --args fSpec=/path/to/file"
-        " --args dSpec=/path/to/dir"
-        " --args vm=1.0"
-        " --args q=[0.1,0.9]"
+        " --args yr='2020-2021'"
+        " --args v='[1.0, 2.0]'"
+        " --args fSpec='/path/to/file'"
+        " --args dSpec='/path/to/dir'"
+        " --args vm='1.0'"
+        " --args q='[0.1, 0.9]'"
     )
-    assert task1.name == "simple_function:yr=2020-2021:v=1.0,2.0"
+    assert task1.name == "simple_function:yr=2020-2021:v=1.0,_2.0"
     assert task1.command == expected_command
 
     # test optional args
     task2 = simple_function.create_task(
+        cluster_name="sequential",
         compute_resources={},
         yr=yr,
         v=v,
@@ -907,18 +938,19 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args yr=2020-2021"
-        " --args v=[1.0,2.0]"
-        " --args fSpec=/path/to/file"
-        " --args dSpec=/path/to/dir"
-        " --args vm=1.0"
-        " --args q=None"
+        " --args yr='2020-2021'"
+        " --args v='[1.0, 2.0]'"
+        " --args fSpec='/path/to/file'"
+        " --args dSpec='/path/to/dir'"
+        " --args vm='1.0'"
+        " --args q='None'"
     )
-    assert task2.name == "simple_function:yr=2020-2021:v=1.0,2.0"
+    assert task2.name == "simple_function:yr=2020-2021:v=1.0,_2.0"
     assert task2.command == expected_command
 
     # test array task
     tasks = simple_function.create_tasks(
+        cluster_name="sequential",
         compute_resources={},
         yr=yr,
         v=v,
@@ -933,12 +965,12 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args yr=2020-2021"
-        " --args v=[1.0,2.0]"
-        " --args fSpec=/path/to/file"
-        " --args dSpec=/path/to/dir"
-        " --args vm=1.0"
-        " --args q=[0.1,0.9]"
+        " --args yr='2020-2021'"
+        " --args v='[1.0, 2.0]'"
+        " --args fSpec='/path/to/file'"
+        " --args dSpec='/path/to/dir'"
+        " --args vm='1.0'"
+        " --args q='[0.1, 0.9]'"
     )
     assert tasks[0].command == expected_command1
     # Verify command
@@ -946,12 +978,12 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args yr=2020-2021"
-        " --args v=[1.0,2.0]"
-        " --args fSpec=/path/to/file"
-        " --args dSpec=/path/to/dir"
-        " --args vm=1.0"
-        " --args q=None"
+        " --args yr='2020-2021'"
+        " --args v='[1.0, 2.0]'"
+        " --args fSpec='/path/to/file'"
+        " --args dSpec='/path/to/dir'"
+        " --args vm='1.0'"
+        " --args q='None'"
     )
     assert tasks[1].command == expected_command2
 
@@ -970,6 +1002,7 @@ def test_task_template_not_generated_when_instance_only_generated_once(client_en
         pass
 
     tg = task_generator.TaskGenerator(
+        default_cluster_name="sequential",
         task_function=test_func,
         serializers={},
         tool_name="test_tool"
@@ -978,7 +1011,7 @@ def test_task_template_not_generated_when_instance_only_generated_once(client_en
     assert tg._task_template is None
 
     # create a task
-    tg.create_task(compute_resources={}, foo=1)
+    tg.create_task(cluster_name="sequential", compute_resources={}, foo=1)
     # verify the task_template is the same
     tt = tg._task_template
     assert tt is not None
@@ -1009,6 +1042,7 @@ def test_get_tasks_by_node_args_simple(client_env, monkeypatch):
         pass
 
     tg = task_generator.TaskGenerator(
+        default_cluster_name="sequential",
         task_function=test_func,
         serializers={},
         tool_name="test_tool"
@@ -1049,6 +1083,7 @@ def test_get_tasks_by_node_args_list(client_env, monkeypatch):
         pass
 
     tg = task_generator.TaskGenerator(
+        default_cluster_name="sequential",
         task_function=test_func,
         serializers={},
         tool_name="test_tool"
@@ -1089,6 +1124,7 @@ def test_get_tasks_by_node_args_obj(client_env, monkeypatch):
         pass
 
     tg = task_generator.TaskGenerator(
+        default_cluster_name="sequential",
         task_function=test_func,
         serializers={FakeYearRange: (str, FakeYearRange.parse_year_range)},
         tool_name="test_tool"
@@ -1110,3 +1146,302 @@ def test_get_tasks_by_node_args_obj(client_env, monkeypatch):
     tasks = task_generator.get_tasks_by_node_args(workflow=wf, node_args_dict={"foo": fake_year_range2}, task_generator=tg)
     assert len(tasks) == 1
     assert t2 in tasks
+
+
+def test_is_multidimensional_type():
+    from jobmon.core.task_generator import _is_multidimensional_type
+    assert _is_multidimensional_type(List[int]) is False
+    assert _is_multidimensional_type(List[List[int]]) is True
+    assert _is_multidimensional_type(List[Tuple[int]]) is True
+    assert _is_multidimensional_type(List[Tuple[int, int]]) is True
+    assert _is_multidimensional_type(List[Tuple[int, ...]]) is True
+    assert _is_multidimensional_type(Tuple[Tuple[List[int]]]) is True
+
+
+def test_naming_func(
+    client_env, monkeypatch: pytest.fixture
+) -> None:
+    """Verify that the name only includes the expected naming args.
+
+    Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#711
+    """
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool = Tool("test_tool")
+
+    def naming_func(prefix, kwargs_for_name) -> str:
+        return f"{prefix}:foo={kwargs_for_name['foo']}"
+
+    @task_generator.task_generator(
+        default_cluster_name="sequential",
+        serializers={}, tool_name="test_tool",
+        naming_args=["foo"]
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    compute_resources = {}
+
+    # Exercise
+    task = simple_function.create_task(
+        compute_resources=compute_resources, foo=1, bar="baz"
+    )
+    # Verify task name matches the expected
+    assert task.name == "simple_function:foo=1"
+
+    # Verify command
+    expected_command = (
+        f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
+        f" --module_name tests.worker_node.test_task_generator"
+        " --func_name simple_function"
+        " --args foo=\'1\'"
+        " --args bar=\'baz\'"
+    )
+    assert task.command == expected_command
+    assert task.compute_resources == compute_resources
+
+
+def test_computer_resource_type_protection(client_env, monkeypatch):
+    """Verify that the compute_resources parameter is a dict."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool = Tool("test_tool")
+
+    @task_generator.task_generator(
+        default_cluster_name="sequential",
+        serializers={}, tool_name="test_tool",
+        naming_args=["foo"]
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    # Exercise & Verify an error is raised
+    with pytest.raises(TypeError, match="Expected a dictionary for compute_resources, but got <class 'str'>."):
+        simple_function.create_task(
+            compute_resources="whatever", foo=1, bar="baz"
+        )
+
+    # Exercise & Verify an error is raised
+    with pytest.raises(TypeError, match="Expected a dictionary for compute_resources, but got <class 'str'>."):
+        simple_function.create_tasks(
+            compute_resources="whatever", foo=[1, 2], bar="baz"
+        )
+
+
+def test_task_generator_doc(client_env, monkeypatch):
+    """Test the doc feature."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    import os
+    func_path = script_dir = os.path.dirname(os.path.abspath(__file__)) + "/task_generator_funcs.py"
+
+    tool = Tool("test_tool")
+
+    from docutils.parsers.rst import directives
+    from docutils.core import publish_string
+    directives.register_directive("task_generator", TaskGeneratorDocumenter)
+    rst = f"""
+        This is a simple document.
+
+        .. task_generator:: task_generator_funcs:simple_function
+           :optional: {func_path}
+
+        This is more content after the directive.
+        """
+    output = publish_string(rst, writer_name='html')
+    assert "Simple task_function." in output.decode('utf-8')
+
+
+
+def test_task_generator_docs(client_env, monkeypatch):
+    """Test the doc feature."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    import os
+    func_path = script_dir = os.path.dirname(os.path.abspath(__file__)) + "/task_generator_funcs.py"
+
+    tool = Tool("test_tool")
+
+    from docutils.parsers.rst import directives
+    from docutils.core import publish_string
+    directives.register_directive("task_generator_module", TaskGeneratorModuleDocumenter)
+
+    rst = f"""
+        This is a simple document.
+
+        .. task_generator_module:: task_generator_funcs
+           :optional: {func_path}
+
+        This is more content after the directive.
+        """
+    output = publish_string(rst, writer_name='html')
+    assert "Simple task_function." in output.decode('utf-8')
+    assert "Simple task_function with special chars." in output.decode('utf-8')
+    assert "Simple task_function with a serializer." in output.decode('utf-8')
+
+
+def test_default_computer_resource(client_env, monkeypatch):
+    """Test the default compute resource."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    tool = Tool("test_tool")
+
+    @task_generator.task_generator(
+        serializers={},
+        tool_name="test_tool",
+        naming_args=["foo"],
+        default_cluster_name="sequential",
+        default_compute_resources={"cluster_name": "sequential", "queue": "null.q"}
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+    # create a task
+    t1 = simple_function.create_task(cluster_name="sequential", foo=1, bar="baz")
+    # create a workflow
+    wf = tool.create_workflow()
+    wf.add_task(t1)
+    wf.bind()
+    wf._bind_tasks()
+    # verify the default compute resources are set at the task_template level
+    assert simple_function._task_template._active_task_template_version.default_cluster_name == "sequential"
+    assert simple_function._task_template._active_task_template_version.default_compute_resources_set == {'sequential': {'cluster_name': 'sequential', 'queue': 'null.q'}}
+
+    # verify the task has the default compute resources
+    assert t1.compute_resources == {'cluster_name': 'sequential', 'queue': 'null.q'}
+    assert t1.resource_scales == {'memory': 0.5, 'runtime': 0.5}
+
+
+def test_default_computer_resource_yaml(client_env, monkeypatch):
+    """Test the default compute resource."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    import os
+
+    rsc_path = os.path.dirname(os.path.abspath(__file__)) + "/cluster_resources.yaml"
+
+    tool = Tool("test_tool")
+
+    @task_generator.task_generator(
+        serializers={},
+        tool_name="test_tool",
+        naming_args=["foo"],
+        yaml_file=rsc_path,
+        default_cluster_name="sequential",
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    # create a task
+    t1 = simple_function.create_task(cluster_name="sequential", foo=1, bar="baz")
+    # create a workflow
+    wf = tool.create_workflow()
+    wf.add_task(t1)
+    wf.bind()
+    wf._bind_tasks()
+    # verify the task has the default compute resources
+    assert t1.compute_resources == {'m_mem_free': '3G', 'max_runtime_seconds': '(60 * 60 * 4)', 'num_cores': 1, 'queue': 'null.q'}
+    assert t1.resource_scales == {'memory': 0.2, 'runtime': 0.3}
+
+
+def test_rsc_overide(client_env, monkeypatch):
+    """Test the default compute resource."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+
+    tool = Tool("test_tool1")
+
+    @task_generator.task_generator(
+        default_cluster_name="dummy",
+        default_compute_resources={"queue": "null.q", "core": 1},
+        serializers={},
+        tool_name="test_tool1",
+        naming_args=["foo"],
+    )
+    def simple_function1(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    # task without cluster name should use the tg cluster name
+    t1 = simple_function1.create_task(foo=1, bar="baz")
+    wf1 = tool.create_workflow()
+    wf1.add_task(t1)
+    wf1.bind()
+    wf1._bind_tasks()
+    # verify the task has the default compute resources
+    assert t1.cluster_name == "dummy"
+    assert t1.compute_resources == {'queue': 'null.q', 'core': 1}
+
+    # task with cluster name should use the task cluster name
+    t2 = simple_function1.create_task(cluster_name="sequential",
+                                      compute_resources={"queue": "null.q", "core": 2},
+                                      foo=1,
+                                      bar="baz")
+    wf2 = tool.create_workflow()
+    wf2.add_task(t2)
+    wf2.bind()
+    wf2._bind_tasks()
+    # verify the task has the default compute resources
+    assert t2.cluster_name == "sequential"
+    assert t2.compute_resources == {'queue': 'null.q', 'core': 2}
+
+    # task with the same cluster name as the tg should use the tg resources
+    t3 = simple_function1.create_task(cluster_name="dummy",
+                                      foo=1,
+                                      bar="baz")
+    wf3 = tool.create_workflow()
+    wf3.add_task(t3)
+    wf3.bind()
+    wf3._bind_tasks()
+    # verify the task has the default compute resources
+    assert t3.cluster_name == "dummy"
+    assert t3.compute_resources == {'queue': 'null.q', 'core': 1}
+
+    # task use default compute resources
+    t4 = simple_function1.create_task(foo=1,
+                                      bar="baz")
+    wf4 = tool.create_workflow()
+    wf4.add_task(t4)
+    wf4.bind()
+    wf4._bind_tasks()
+    # verify the task has the default compute resources
+    assert t4.cluster_name == "dummy"
+    assert t4.compute_resources == {'queue': 'null.q', 'core': 1}
+
+
+

@@ -1,4 +1,5 @@
 import pytest
+import ast
 
 from typing import Optional, Callable, Type, Dict, List, Any, Union
 import sys
@@ -43,24 +44,33 @@ class Versions:
 
     def __init__(self, *version: Any) -> None:
         if type(version) in [list, tuple, set]:
-            self._version = [v for v in version]
+            self._version = [ast.literal_eval(str(v)) for v in version]
         else:
             self._version = [str(version)]
     def __eq__(self, other: Any) -> bool:
         return self._version == other._version
 
-def versions_to_list(versions: Versions) -> list[str]:
+def versions_to_list(versions: Versions) -> str:
     """Serializer for VersionMetadata that produces a list of strings."""
     if isinstance(versions._version, str):
-        return [versions._version]
+        return f"[{versions._version}]"
     if isinstance(versions._version, list):
-        return versions._version
+        v_str = []
+        for v in versions._version:
+            v_str.append(str(v))
+        return f"[{', '.join(v_str)}]"
 
 
-def versions_from_list(versions: Union[List[str], str]) -> Versions:
+def versions_from_list(versions: str) -> Versions:
     """Deserializer for VersionMetadata that takes a list of strings."""
-    if isinstance(versions, str):
-        versions = [versions]
+
+    if versions[0] == "[" and versions[-1] == "]":
+        versions = versions[1:-1]
+    vs = versions.split(", ")
+    versions = []
+
+    for v in vs:
+        versions.append(ast.literal_eval(v))
 
     return Versions(*versions)
 
@@ -75,13 +85,14 @@ class Quantiles:
     def __eq__(self, other: Any) -> bool:
         return self.lower == other.lower and self.upper == other.upper
 
-def quantiles_to_list(quantiles: Quantiles) -> list[str]:
+def quantiles_to_list(quantiles: Quantiles) -> str:
     """Serializer for Quantiles that produces a list of strings."""
-    return [str(quantiles.lower), str(quantiles.upper)]
+    return f"[{quantiles.lower}, {quantiles.upper}]"
 
 
-def quantiles_from_list(quantiles: list[str]) -> Quantiles:
+def quantiles_from_list(q: str) -> Quantiles:
     """Deserializer for Quantiles that takes a list of strings."""
+    quantiles = ast.literal_eval(q)
     return Quantiles(quantiles[0], quantiles[1])
 
 
