@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
-from flask import jsonify, request
+from fastapi import Request
+from starlette.responses import JSONResponse
 import sqlalchemy
 from sqlalchemy import select
 import structlog
@@ -24,14 +25,14 @@ logger = structlog.get_logger(__name__)
 
 
 @api_v3_router.post("/tool")
-def add_tool() -> Any:
+async def add_tool(request: Request) -> Any:
     """Add a tool to the database."""
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
     try:
         tool_name = data["name"]
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     # add tool to db
@@ -48,12 +49,12 @@ def add_tool() -> Any:
             tool = session.execute(select_stmt).scalars().one()
     wire_format = tool.to_wire_as_client_tool()
 
-    resp = jsonify(tool=wire_format)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"tool": wire_format},
+                        status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.get("/tool/<tool_id>/tool_versions")
+@api_v3_router.get("/tool/{tool_id}/tool_versions")
 def get_tool_versions(tool_id: int) -> Any:
     """Get the Tool Version."""
     # check input variable

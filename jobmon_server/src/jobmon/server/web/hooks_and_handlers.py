@@ -52,7 +52,9 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
         if isinstance(error, StarletteHTTPException):
             if error.status_code == HTTP_404_NOT_FOUND:
                 logger.warning("Route not found:", route=request.url)
-                return f"This route does not exist: {request.url}", 404
+                return JSONResponse(content={"error": f"Route {request.url} not found"},
+                                    status_code=HTTP_404_NOT_FOUND)
+            return _handle_error(request, error, error.status_code)
         if isinstance(error, InvalidUsage) or isinstance(error, ServerError):
             return _handle_error(request, error, error.status_code)
         return _handle_error(request, error)
