@@ -23,7 +23,7 @@ from jobmon.server.web.db_admin import init_db
 
 logger = logging.getLogger(__name__)
 
-_api_prefix = "/api/v2"
+_api_prefix = "/api/v3"
 
 
 @pytest.fixture(scope="session")
@@ -89,8 +89,8 @@ class WebServerProcess:
                 }
             )
             app = get_app(config)
-            with app.app_context():
-                app.run(host="0.0.0.0", port=self.web_port)
+            import uvicorn
+            uvicorn.run(app, host="0.0.0.0", port=self.web_port)
 
         ctx = mp.get_context("fork")
         self.p1 = ctx.Process(target=run_server_with_handler)

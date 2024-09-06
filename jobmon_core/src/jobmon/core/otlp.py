@@ -186,9 +186,10 @@ class OtlpAPI:
     @classmethod
     def instrument_app(cls: Type[OtlpAPI], app: Flask) -> None:
         """Instrument Flask app."""
-        from opentelemetry.instrumentation.flask import FlaskInstrumentor
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
-        FlaskInstrumentor().instrument_app(app)
+        # Instrument FastAPI with OpenTelemetry
+        FastAPIInstrumentor.instrument_app(app)
 
     @classmethod
     def instrument_requests(cls: Type[OtlpAPI]) -> None:

@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any, List, Optional, Type
+from typing import Any, Type
 
-from flask import Flask
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import sqlalchemy
+import structlog
 
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web import session_factory
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 from jobmon.server.web.server_side_exception import ServerError
 
+logger = structlog.get_logger(__name__)
 
 class AppFactory:
     """Factory for creating Flask apps."""
@@ -82,26 +85,41 @@ class AppFactory:
         cls._structlog_configured = True
 
     def get_app(
-        self, blueprints: Optional[List[str]] = None, url_prefix: str = "/api"
-    ) -> Flask:
+        self, url_prefix: str = "/api"
+    ) -> FastAPI:
         """Create and configure the Flask app.
 
         Args:
             blueprints: The blueprints to register with the app.
             url_prefix: The URL prefix for the app.
         """
-        if blueprints is None:
-            blueprints = ["fsm", "cli", "reaper"]
-        app = Flask(__name__)
-        app.config["CORS_HEADERS"] = "Content-Type"
+        app = FastAPI()
 
-        # Register the versions, reverse order
-        for version in ["v2", "v1"]:
+        # Add CORS middleware to the FastAPI app
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],  # Adjust the origins as needed
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["Content-Type"],
+        )
+
+        for version in ["v3"]:
             mod = import_module(f"jobmon.server.web.routes.{version}")
-            app.register_blueprint(
-                getattr(mod, f"api_{version}_blueprint"),
-                url_prefix=f"{url_prefix}/{version}",
-            )
+            # Get the router dynamically from the module (assuming it's an APIRouter)
+            api_router = getattr(mod, f"api_{version}_router")
+
+            # Include the router with a version-specific prefix
+            logger.info(f"Adding router for version {version}")
+            app.include_router(api_router, prefix=f"{url_prefix}/{version}")
+
+            # include fsm, cli, and reapper
+            for r in ["fsm_router"]:
+                logger.info(f"Adding router for {r}")
+                mod = import_module(f"jobmon.server.web.routes.{version}.fsm")
+                router = getattr(mod, r)
+                app.include_router(router, prefix=f"{url_prefix}/{version}")
+
 
         if self.otlp_api:
             self.otlp_api.instrument_app(app)
