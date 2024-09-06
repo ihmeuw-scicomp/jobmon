@@ -521,8 +521,8 @@ def get_wf_resource_usage(workflow_id: int) -> Any:
         workflow_id (int): ID of the Workflow
 
     Returns:
-        List[Dict[str, Any]]: A list of dictionaries containing the Task ID, name, status and num of attempts and the
-        TaskInstance ID, status and resource usage.
+        List[Dict[str, Any]]: A list of dictionaries containing the Task ID, name, status and
+        num of attempts and the TaskInstance ID, status and resource usage.
 
     Example Call:
         /workflow/123412/wf_resource_usage
@@ -535,7 +535,7 @@ def get_wf_resource_usage(workflow_id: int) -> Any:
                 "task_status": "D",
                 "task_num_attempts": 2,
                 "task_instance_id": 91823412,
-                "ti_usage_str": "wallclock=08:00:00, cpu=01:00:00, mem=0.00000 GBs, io=5.00000 GB"
+                "ti_usage_str": "wallclock=8 cpu=1, mem=7 GBs, io=5 GB"
                 "ti_wallclock": 8
                 "ti_maxrss": 7
                 "ti_maxpss": 5
@@ -561,13 +561,11 @@ def get_wf_resource_usage(workflow_id: int) -> Any:
                 TaskInstance.maxpss,
                 TaskInstance.cpu,
                 TaskInstance.io,
-                TaskInstance.status
+                TaskInstance.status,
             )
             .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
             .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
-            .where(
-                Task.workflow_id == workflow_id
-            )
+            .where(Task.workflow_id == workflow_id)
         )
         results = session.execute(sql).all()
 
@@ -583,7 +581,7 @@ def get_wf_resource_usage(workflow_id: int) -> Any:
         "ti_maxpss",
         "ti_cpu",
         "ti_io",
-        "ti_status"
+        "ti_status",
     )
 
     results_formatted: list[Dict[str, Any]] = [
