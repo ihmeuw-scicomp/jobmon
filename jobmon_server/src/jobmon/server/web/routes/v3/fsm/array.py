@@ -4,8 +4,9 @@ from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
-from flask import jsonify, request
+from fastapi import Request
 from sqlalchemy import and_, case, func, insert, literal_column, select, update
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
@@ -20,12 +21,12 @@ from jobmon.server.web.api import SessionLocal
 logger = structlog.get_logger(__name__)
 
 @api_v3_router.post("/array")
-def add_array() -> Any:
+async def add_array(request: Request) -> Any:
     """Return an array ID by workflow and task template version ID.
 
     If not found, bind the array.
     """
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
     workflow_id = int(data["workflow_id"])
     task_template_version_id = int(data["task_template_version_id"])
 
@@ -73,15 +74,14 @@ def add_array() -> Any:
         session.commit()
 
     # return result
-    resp = jsonify(array_id=array.id)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"array_id": array.id}, status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.post("/array/<array_id>/queue_task_batch")
-def record_array_batch_num(array_id: int) -> Any:
+@api_v3_router.post("/array/{array_id}/queue_task_batch")
+async def record_array_batch_num(array_id: int, request) -> Any:
     """Record a batch number to associate sets of task instances with an array submission."""
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
     array_id = int(array_id)
     task_ids = [int(task_id) for task_id in data["task_ids"]]
     task_resources_id = int(data["task_resources_id"])
@@ -165,17 +165,16 @@ def record_array_batch_num(array_id: int) -> Any:
         for row in session.execute(tasks_by_status_query):
             result_dict[row[0]].append(row[1])
 
-    resp = jsonify(tasks_by_status=result_dict)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"tasks_by_status": result_dict}, status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.post("/array/<array_id>/transition_to_launched")
-def transition_array_to_launched(array_id: int) -> Any:
+@api_v3_router.post("/array/{array_id}/transition_to_launched")
+async def transition_array_to_launched(array_id: int, request: Request) -> Any:
     """Transition TIs associated with an array_id and batch_num to launched."""
     structlog.contextvars.bind_contextvars(array_id=array_id)
 
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
     batch_num = data["batch_number"]
     next_report = data["next_report_increment"]
 
@@ -217,8 +216,7 @@ def transition_array_to_launched(array_id: int) -> Any:
     # Update the task instances in a separate session
     _update_task_instance(array_id, batch_num, next_report)
 
-    resp = jsonify()
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 
 
@@ -257,10 +255,10 @@ def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> No
         session.execute(update_stmt)
 
 
-@api_v3_router.post("/array/<array_id>/log_distributor_id")
-def log_array_distributor_id(array_id: int) -> Any:
+@api_v3_router.post("/array/{array_id}/log_distributor_id")
+async def log_array_distributor_id(array_id: int, request: Request) -> Any:
     """Add distributor_id, stderr/stdout paths to the DB for all TIs in an array."""
-    data = request.get_json()
+    data = await request.json()
 
     id_lst = list(data.keys())
 
@@ -302,6 +300,5 @@ def log_array_distributor_id(array_id: int) -> Any:
         # updates
         session.execute(update_stmt)
 
-    resp = jsonify(success=True)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"success": True}, status_code=StatusCodes.OK)
     return resp

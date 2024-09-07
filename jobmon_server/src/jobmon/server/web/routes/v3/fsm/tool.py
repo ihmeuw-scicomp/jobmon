@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict
+from typing import Any, cast, Dict, Optional
 
 from fastapi import Request
 from starlette.responses import JSONResponse
@@ -55,7 +55,7 @@ async def add_tool(request: Request) -> Any:
 
 
 @api_v3_router.get("/tool/{tool_id}/tool_versions")
-def get_tool_versions(tool_id: int) -> Any:
+def get_tool_versions(tool_id: int, request: Request) -> Any:
     """Get the Tool Version."""
     # check input variable
     structlog.contextvars.bind_contextvars(tool_id=tool_id)
@@ -64,7 +64,7 @@ def get_tool_versions(tool_id: int) -> Any:
         tool_id = int(tool_id)
     except Exception as e:
         raise InvalidUsage(
-            f"Variable tool_id must be an int in {request.path}", status_code=400
+            f"Variable tool_id must be an int in {request.url.path}", status_code=400
         ) from e
 
     # get data from db
@@ -75,13 +75,17 @@ def get_tool_versions(tool_id: int) -> Any:
     wire_format = [t.to_wire_as_client_tool_version() for t in tool_versions]
 
     logger.info(f"Tool version for {tool_id} is {wire_format}")
-    resp = jsonify(tool_versions=wire_format)
-    resp.status_code = StatusCodes.OK
+
+    resp = JSONResponse(content={"tool_versions": wire_format},
+                        status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.get("/tool/<tool_name>/tool_resource_usage")
-def get_tool_resource_usage(tool_name: str) -> Any:
+@api_v3_router.get("/tool/{tool_name}/tool_resource_usage")
+def get_tool_resource_usage(tool_name: str,
+                            start_date: Optional[str] = None,
+                            end_date: Optional[str] = None,
+                            ) -> Any:
     """Gets resource usage and node args for all TaskInstances associated with a given tool.
 
     We limit this to one week time spans to not overwhelm the database.
@@ -117,15 +121,11 @@ def get_tool_resource_usage(tool_name: str) -> Any:
             }
         ]
     """
-    arguments = request.args
-    start_date = arguments.get("start_date")
-    end_date = arguments.get("end_date")
-
     # Validate that user passed in both dates
     if not start_date or not end_date:
         return (
-            jsonify({"error": "Both start_date and end_date are required."}),
-            StatusCodes.BAD_REQUEST,
+            JSONResponse(content={"error": "Both start_date and end_date are required."},
+                         status_code=StatusCodes.BAD_REQUEST)
         )
 
     try:
@@ -133,8 +133,8 @@ def get_tool_resource_usage(tool_name: str) -> Any:
         end_date_object = datetime.strptime(end_date, "%Y-%m-%d").date()
     except ValueError:
         return (
-            jsonify({"error": "Dates must be in the format YYYY-MM-DD."}),
-            StatusCodes.BAD_REQUEST,
+            JSONResponse(content={"error": "Dates must be in 'YYYY-MM-DD' format."},
+                         status_code=StatusCodes.BAD_REQUEST)
         )
 
     date_difference = end_date_object - start_date_object
@@ -142,12 +142,8 @@ def get_tool_resource_usage(tool_name: str) -> Any:
     # Check if the difference exceeds one week
     if date_difference > timedelta(weeks=1):
         return (
-            jsonify(
-                {
-                    "error": "Time between start_date and end_date cannot exceed one week."
-                }
-            ),
-            StatusCodes.BAD_REQUEST,
+            JSONResponse(content={"error": "Date range must be within one week."},
+                            status_code=StatusCodes.BAD_REQUEST)
         )
 
     session = SessionLocal()
@@ -188,6 +184,5 @@ def get_tool_resource_usage(tool_name: str) -> Any:
         dict(zip(column_names, result)) for result in results
     ]
 
-    resp = jsonify(results_formatted)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content=results_formatted, status_code=StatusCodes.OK)
     return resp

@@ -3,9 +3,10 @@
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
-from flask import jsonify, request
+from fastapi import Request
 import sqlalchemy
 from sqlalchemy import select
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.server.web.models.task_template import TaskTemplate
@@ -19,16 +20,16 @@ logger = structlog.get_logger(__name__)
 
 
 @api_v3_router.post("/tool_version")
-def add_tool_version() -> Any:
+async def add_tool_version(request: Request) -> Any:
     """Add a new version for a Tool."""
     # check input variable
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
 
     try:
         tool_id = int(data["tool_id"])
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     session = SessionLocal()
@@ -43,13 +44,12 @@ def add_tool_version() -> Any:
 
     wire_format = tool_version.to_wire_as_client_tool_version()
 
-    resp = jsonify(tool_version=wire_format)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"tool_version": wire_format}, status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.get(
-    "/tool_version/<tool_version_id>/task_templates"
+    "/tool_version/{tool_version_id}/task_templates"
 )
 def get_task_templates(tool_version_id: int) -> Any:
     """Get the Tool Version."""
@@ -65,6 +65,6 @@ def get_task_templates(tool_version_id: int) -> Any:
         task_templates = session.execute(select_stmt).scalars().all()
         wire_format = [t.to_wire_as_client_task_template() for t in task_templates]
 
-    resp = jsonify(task_templates=wire_format)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"task_templates": wire_format},
+                        status_code=StatusCodes.OK)
     return resp

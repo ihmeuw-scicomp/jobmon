@@ -3,11 +3,12 @@
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
-from flask import jsonify, request
+from fastapi import Request
 import sqlalchemy
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core import constants
@@ -24,16 +25,16 @@ logger = structlog.get_logger(__name__)
 
 
 @api_v3_router.post("/task_template")
-def get_task_template() -> Any:
+async def get_task_template(request: Request) -> Any:
     """Add a task template for a given tool to the database."""
     # check input variable
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
     try:
         tool_version_id = int(data["tool_version_id"])
         name = data["task_template_name"]
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     structlog.contextvars.bind_contextvars(tool_version_id=tool_version_id)
@@ -53,12 +54,12 @@ def get_task_template() -> Any:
             )
             task_template = session.execute(select_stmt).scalars().one()
 
-    resp = jsonify(task_template_id=task_template.id)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"task_template_id": task_template.id},
+                        status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.get("/task_template/<task_template_id>/versions")
+@api_v3_router.get("/task_template/{task_template_id}/versions")
 def get_task_template_versions(task_template_id: int) -> Any:
     """Get the task_template_version."""
     # get task template version object
@@ -73,8 +74,8 @@ def get_task_template_versions(task_template_id: int) -> Any:
         ttvs = session.execute(select_stmt).scalars().all()
         wire_obj = [ttv.to_wire_as_client_task_template_version() for ttv in ttvs]
 
-    resp = jsonify(task_template_versions=wire_obj)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"task_template_versions": wire_obj},
+                        status_code=StatusCodes.OK)
     return resp
 
 
@@ -103,11 +104,11 @@ def _add_or_get_arg(name: str, session: Session) -> Arg:
 @api_v3_router.post(
     "/task_template/<task_template_id>/add_version"
 )
-def add_task_template_version(task_template_id: int) -> Any:
+async def add_task_template_version(task_template_id: int, request: Request) -> Any:
     """Add a tool to the database."""
     # check input variables
     structlog.contextvars.bind_contextvars(task_template_id=task_template_id)
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
     try:
         task_template_id = int(task_template_id)
         node_args = data["node_args"]
@@ -117,7 +118,7 @@ def add_task_template_version(task_template_id: int) -> Any:
         arg_mapping_hash = str(data["arg_mapping_hash"]).strip()
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     session = SessionLocal()
@@ -177,6 +178,6 @@ def add_task_template_version(task_template_id: int) -> Any:
 
             task_template_version = ttv.to_wire_as_client_task_template_version()
 
-    resp = jsonify(task_template_version=task_template_version)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"task_template_version": task_template_version},
+                        status_code=StatusCodes.OK)
     return resp

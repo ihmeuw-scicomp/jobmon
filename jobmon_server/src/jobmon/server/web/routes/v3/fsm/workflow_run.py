@@ -4,8 +4,9 @@ from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict, List
 
-from flask import jsonify, request
+from faskapi import Request
 from sqlalchemy import and_, case, func, insert, select, update
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core import constants
@@ -24,10 +25,10 @@ logger = structlog.get_logger(__name__)
 
 
 @api_v3_router.post("/workflow_run")
-def add_workflow_run() -> Any:
+async def add_workflow_run(request: Request) -> Any:
     """Add a workflow run to the db."""
     try:
-        data = cast(Dict, request.get_json())
+        data = cast(Dict, await request.json())
         workflow_id = int(data["workflow_id"])
         user = data["user"]
         jobmon_version = data["jobmon_version"]
@@ -51,8 +52,8 @@ def add_workflow_run() -> Any:
         if not workflow:
             # Binding to a non-existent workflow, exit early
             err_msg = f"No workflow exists for ID {workflow_id}"
-            resp = jsonify(workflow_run_id=None, err_msg=err_msg)
-            resp.status_code = StatusCodes.OK
+            resp = JSONResponse(content={"workflow_run_id": None, "err_msg": err_msg},
+                                status_code=StatusCodes.OK)
             return resp
 
         workflow_run = WorkflowRun(
@@ -84,19 +85,22 @@ def add_workflow_run() -> Any:
 
     session.commit()
     if err_msg:
-        logger.warning(f"Possible race condition in adding workflowrun: {err_msg}")
-        resp = jsonify(workflow_run_id=None, err_msg=err_msg)
+        resp = JSONResponse(content={"workflow_run_id": None, "err_msg": err_msg},
+                            status_code=StatusCodes.OK)
     else:
         logger.info(f"Add workflow_run:{workflow_run.id} for workflow.")
-        resp = jsonify(workflow_run_id=workflow_run.id, status=workflow_run.status)
+        resp = JSONResponse(
+            content={"workflow_run_id": workflow_run.id, "status": workflow_run.status},
+            status_code=StatusCodes.OK
+        )
     resp.status_code = StatusCodes.OK
     return resp
 
 
 @api_v3_router.put(
-    "/workflow_run/<workflow_run_id>/terminate_task_instances"
+    "/workflow_run/{workflow_run_id}/terminate_task_instances"
 )
-def terminate_workflow_run(workflow_run_id: int) -> Any:
+async def terminate_workflow_run(workflow_run_id: int, request: Request) -> Any:
     """Terminate a workflow run and get its tasks in order."""
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
     logger.info("Terminate workflow_run")
@@ -104,7 +108,7 @@ def terminate_workflow_run(workflow_run_id: int) -> Any:
         workflow_run_id = int(workflow_run_id)
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     session = SessionLocal()
@@ -157,15 +161,14 @@ def terminate_workflow_run(workflow_run_id: int) -> Any:
 
         session.execute(update_task_instance_stmt)
 
-    resp = jsonify()
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"workflow_run_id": workflow_run_id}, status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.post(
-    "/workflow_run/<workflow_run_id>/log_heartbeat"
+    "/workflow_run/{workflow_run_id}/log_heartbeat"
 )
-def log_workflow_run_heartbeat(workflow_run_id: int) -> Any:
+async def log_workflow_run_heartbeat(workflow_run_id: int, request: Request) -> Any:
     """Log a heartbeat for the workflow run to show that the client side is still alive."""
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
     try:
@@ -175,7 +178,7 @@ def log_workflow_run_heartbeat(workflow_run_id: int) -> Any:
         status = data["status"]
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     logger.debug(f"WFR {workflow_run_id} heartbeat data")
@@ -191,20 +194,21 @@ def log_workflow_run_heartbeat(workflow_run_id: int) -> Any:
         except InvalidStateTransition as e:
             logger.debug(f"wfr {workflow_run_id} heartbeat rolled back, reason: {e}")
 
-    resp = jsonify(status=str(workflow_run.status))
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"status": str(workflow_run.status)},
+                        status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.put(
-    "/workflow_run/<workflow_run_id>/update_status"
+    "/workflow_run/{workflow_run_id}/update_status"
 )
-def log_workflow_run_status_update(workflow_run_id: int) -> Any:
+async def log_workflow_run_status_update(workflow_run_id: int,
+                                         request: Request) -> Any:
     """Update the status of the workflow run."""
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
     try:
         workflow_run_id = int(workflow_run_id)
-        data = cast(Dict, request.get_json())
+        data = cast(Dict, await request.json())
         status = data["status"]
     except Exception as e:
         raise InvalidUsage(
@@ -226,23 +230,22 @@ def log_workflow_run_status_update(workflow_run_id: int) -> Any:
         # Return the status
         status = workflow_run.status
 
-    resp = jsonify(status=status)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"status": status}, status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.post("/workflow_run/<workflow_run_id>/sync_status")
-def task_instances_status_check(workflow_run_id: int) -> Any:
+@api_v3_router.post("/workflow_run/{workflow_run_id}/sync_status")
+async def task_instances_status_check(workflow_run_id: int, request: Request) -> Any:
     """Sync status of given task intance IDs."""
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
     try:
         workflow_run_id = int(workflow_run_id)
-        data = cast(Dict, request.get_json())
+        data = cast(Dict, await request.json())
         task_instance_ids = data["task_instance_ids"]
         status = data["status"]
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     session = SessionLocal()
@@ -282,15 +285,15 @@ def task_instances_status_check(workflow_run_id: int) -> Any:
         for row in session.execute(select_stmt):
             return_dict[row[0]].append(int(row[1]))
 
-    resp = jsonify(status_updates=dict(return_dict), time=str_time)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"status_updates": dict(return_dict), "time": str_time},
+                        status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.post(
-    "/workflow_run/<workflow_run_id>/set_status_for_triaging"
+    "/workflow_run/{workflow_run_id}/set_status_for_triaging"
 )
-def set_status_for_triaging(workflow_run_id: int) -> Any:
+async def set_status_for_triaging(workflow_run_id: int, request: Request) -> Any:
     """Two triaging related status sets.
 
     Query all task instances that are submitted to distributor or running which haven't
@@ -302,7 +305,7 @@ def set_status_for_triaging(workflow_run_id: int) -> Any:
         workflow_run_id = int(workflow_run_id)
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
     logger.info(f"Set to triaging those overdue tis for wfr {workflow_run_id}")
 
@@ -344,4 +347,5 @@ def set_status_for_triaging(workflow_run_id: int) -> Any:
         session.execute(update_stmt)
     resp = jsonify()
     resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp

@@ -4,8 +4,8 @@ import ast
 from http import HTTPStatus as StatusCodes
 from typing import Any
 
-from flask import jsonify
 from sqlalchemy import select
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.server.web.models.queue import Queue
@@ -37,6 +37,7 @@ def get_task_resources(task_resources_id: int) -> Any:
             else None
         )
 
-    resp = jsonify(requested_resources=requested_resources, queue_name=queue_name)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"requested_resources": requested_resources,
+                                 "queue_name": queue_name},
+                        status_code=StatusCodes.OK)
     return resp

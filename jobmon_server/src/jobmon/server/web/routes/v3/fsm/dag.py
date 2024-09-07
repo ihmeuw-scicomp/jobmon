@@ -3,10 +3,11 @@
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
-from flask import jsonify, request
+from fastapi import Request
 import sqlalchemy
 from sqlalchemy import insert, select, update
 from sqlalchemy.sql import func
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.server.web.models.dag import Dag
@@ -20,13 +21,13 @@ from jobmon.server.web.server_side_exception import InvalidUsage
 logger = structlog.get_logger(__name__)
 
 @api_v3_router.post("/dag")
-def add_dag() -> Any:
+async  def add_dag(request: Request) -> Any:
     """Add a new dag to the database.
 
     Args:
         dag_hash: unique identifier of the dag, included in route
     """
-    data = cast(Dict, request.get_json())
+    data = await cast(Dict, request.json())
 
     # add dag
     dag_hash = data.pop("dag_hash")
@@ -46,18 +47,18 @@ def add_dag() -> Any:
             dag = session.execute(select_stmt).scalar_one()
 
     # return result
-    resp = jsonify(dag_id=dag.id, created_date=dag.created_date)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"dag_id": dag.id, "created_date": dag.created_date},
+                        status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.post("/dag/<dag_id>/edges")
-def add_edges(dag_id: int) -> Any:
+@api_v3_router.post("/dag/{dag_id}/edges")
+async def add_edges(dag_id: int, request: Request) -> Any:
     """Add edges to the edge table."""
     structlog.contextvars.bind_contextvars(dag_id=dag_id)
     logger.info(f"Add edges for dag {dag_id}")
     try:
-        data = cast(Dict, request.get_json())
+        data = cast(Dict, await request.json())
         edges_to_add = data.pop("edges_to_add")
         mark_created = bool(data.pop("mark_created"))
     except KeyError as e:
@@ -105,6 +106,5 @@ def add_edges(dag_id: int) -> Any:
             session.execute(update_stmt)
 
     # return result
-    resp = jsonify()
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp

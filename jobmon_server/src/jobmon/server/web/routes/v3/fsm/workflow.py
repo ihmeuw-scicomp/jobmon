@@ -4,12 +4,13 @@ from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict, List, Optional, Tuple
 
-from flask import jsonify, request
+from fastapi import Request
 import sqlalchemy
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.server.web.models.array import Array
@@ -50,10 +51,10 @@ def _add_workflow_attributes(
 
 
 @api_v3_router.post("/workflow")
-def bind_workflow() -> Any:
+async def bind_workflow(request: Request) -> Any:
     """Bind a workflow to the database."""
     try:
-        data = cast(Dict, request.get_json())
+        data = cast(Dict, await request.json())
         tv_id = int(data["tool_version_id"])
         dag_id = int(data["dag_id"])
         whash = str(data["workflow_args_hash"])
@@ -66,7 +67,7 @@ def bind_workflow() -> Any:
 
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     structlog.contextvars.bind_contextvars(
@@ -122,25 +123,24 @@ def bind_workflow() -> Any:
                             _upsert_wf_attribute(workflow.id, name, val, session)
             newly_created = False
 
-    resp = jsonify(
-        {
+    content = {
             "workflow_id": workflow.id,
             "status": workflow.status,
             "newly_created": newly_created,
         }
-    )
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content=content, status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.get("/workflow/<workflow_args_hash>")
-def get_matching_workflows_by_workflow_args(workflow_args_hash: str) -> Any:
+@api_v3_router.get("/workflow/{workflow_args_hash}")
+async def get_matching_workflows_by_workflow_args(workflow_args_hash: str,
+                                                  request: Request) -> Any:
     """Return any dag hashes that are assigned to workflows with identical workflow args."""
     try:
         workflow_args_hash = str(int(workflow_args_hash))
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     structlog.contextvars.bind_contextvars(workflow_args_hash=str(workflow_args_hash))
@@ -162,8 +162,7 @@ def get_matching_workflows_by_workflow_args(workflow_args_hash: str) -> Any:
             f"Found {res} workflow for " f"workflow_args_hash {workflow_args_hash}"
         )
 
-    resp = jsonify(matching_workflows=res)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"matching_workflows": res}, status_code=StatusCodes.OK)
     return resp
 
 
@@ -221,15 +220,15 @@ def _upsert_wf_attribute(
         session.execute(upsert_stmt)
 
 
-@api_v3_router.put("/workflow/<workflow_id>/workflow_attributes")
-def update_workflow_attribute(workflow_id: int) -> Any:
+@api_v3_router.put("/workflow/{workflow_id}/workflow_attributes")
+async def update_workflow_attribute(workflow_id: int, request: Request) -> Any:
     """Update the attributes for a given workflow."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
     try:
         workflow_id = int(workflow_id)
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
     """ Add/update attributes for a workflow """
     data = cast(Dict, request.get_json())
@@ -242,17 +241,16 @@ def update_workflow_attribute(workflow_id: int) -> Any:
             for name, val in attributes.items():
                 _upsert_wf_attribute(workflow_id, name, val, session)
 
-    resp = jsonify()
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.post("/workflow/<workflow_id>/set_resume")
-def set_resume(workflow_id: int) -> Any:
+@api_v3_router.post("/workflow/{workflow_id}/set_resume")
+async def set_resume(workflow_id: int, request: Request) -> Any:
     """Set resume on a workflow."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
     try:
-        data = cast(Dict, request.get_json())
+        data = cast(Dict, await request.json())
         logger.info("Set resume for workflow")
         reset_running_jobs = bool(data["reset_running_jobs"])
     except Exception as e:
@@ -270,12 +268,11 @@ def set_resume(workflow_id: int) -> Any:
             session.flush()
             logger.info(f"Resume set for wf {workflow_id}")
 
-    resp = jsonify()
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.get("/workflow/<workflow_id>/is_resumable")
+@api_v3_router.get("/workflow/{workflow_id}/is_resumable")
 def workflow_is_resumable(workflow_id: int) -> Any:
     """Check if a workflow is in a resumable state."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
@@ -286,15 +283,15 @@ def workflow_is_resumable(workflow_id: int) -> Any:
         workflow = session.execute(select_stmt).scalars().one()
 
     logger.info(f"Workflow is resumable: {workflow.is_resumable}")
-    resp = jsonify(workflow_is_resumable=workflow.is_resumable)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"workflow_is_resumable": workflow.is_resumable},
+                        status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.get(
-    "/workflow/<workflow_id>/get_max_concurrently_running"
+    "/workflow/{workflow_id}/get_max_concurrently_running"
 )
-def get_max_concurrently_running(workflow_id: int) -> Any:
+async def get_max_concurrently_running(workflow_id: int, request: Request) -> Any:
     """Return the maximum concurrency of this workflow."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
 
@@ -303,17 +300,19 @@ def get_max_concurrently_running(workflow_id: int) -> Any:
         select_stmt = select(Workflow).where(Workflow.id == workflow_id)
         workflow = session.execute(select_stmt).scalars().one()
 
-    resp = jsonify(max_concurrently_running=workflow.max_concurrently_running)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(
+        content={"max_concurrently_running": workflow.max_concurrently_running},
+        status_code=StatusCodes.OK
+    )
     return resp
 
 
 @api_v3_router.put(
-    "workflow/<workflow_id>/update_max_concurrently_running"
+    "workflow/{workflow_id}/update_max_concurrently_running"
 )
-def update_max_running(workflow_id: int) -> Any:
+async def update_max_running(workflow_id: int, request: Request) -> Any:
     """Update the number of tasks that can be running concurrently for a given workflow."""
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
     logger.debug("Update workflow max concurrently running")
 
@@ -321,7 +320,7 @@ def update_max_running(workflow_id: int) -> Any:
         new_limit = data["max_tasks"]
     except KeyError as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     session = SessionLocal()
@@ -343,20 +342,19 @@ def update_max_running(workflow_id: int) -> Any:
             f"Workflow ID {workflow_id} max concurrently running updated to {new_limit}"
         )
 
-    resp = jsonify(message=message)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.post("/workflow/<workflow_id>/task_status_updates")
-def task_status_updates(workflow_id: int) -> Any:
+@api_v3_router.post("/workflow/{workflow_id}/task_status_updates")
+async def task_status_updates(workflow_id: int, request: Request) -> Any:
     """Returns all tasks in the database that have the specified status.
 
     Args:
         workflow_id (int): the ID of the workflow.
     """
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
     logger.info("Get task by status")
 
     try:
@@ -381,13 +379,13 @@ def task_status_updates(workflow_id: int) -> Any:
     for row in session.execute(tasks_by_status_query):
         result_dict[row.status].append(row.id)
 
-    resp = jsonify(tasks_by_status=result_dict, time=str_time)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"tasks_by_status": result_dict, "time": str_time},
+                        status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.get(
-    "/workflow/<workflow_id>/fetch_workflow_metadata"
+    "/workflow/{workflow_id}/fetch_workflow_metadata"
 )
 def fetch_workflow_metadata(workflow_id: int) -> Any:
     """Get metadata associated with specified Workflow ID."""
@@ -404,17 +402,16 @@ def fetch_workflow_metadata(workflow_id: int) -> Any:
     else:
         return_tuple = wf.to_wire_as_distributor_workflow()
 
-    resp = jsonify(workflow=return_tuple)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"workflow": return_tuple},
+                        status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.get("/workflow/get_tasks/<workflow_id>")
-def get_tasks_from_workflow(workflow_id: int) -> Any:
+@api_v3_router.get("/workflow/get_tasks/{workflow_id}")
+def get_tasks_from_workflow(workflow_id: int,
+                            max_task_id: int,
+                            chunk_size: int) -> Any:
     """Return tasks associated with specified Workflow ID."""
-    max_task_id = request.args.get("max_task_id")
-    chunk_size = request.args.get("chunk_size")
-
     session = SessionLocal()
 
     if max_task_id == 0:
@@ -489,6 +486,5 @@ def get_tasks_from_workflow(workflow_id: int) -> Any:
             for task_id in array_map[array_id]:
                 resp_dict[task_id].append(max_concurrently_running)
 
-    resp = jsonify(tasks=resp_dict)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"tasks": resp_dict}, status_code=StatusCodes.OK)
     return resp

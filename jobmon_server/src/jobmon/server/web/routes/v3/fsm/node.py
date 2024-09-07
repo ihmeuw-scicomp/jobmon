@@ -3,8 +3,9 @@
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
 
-from flask import jsonify, request
+from fastapi import Request
 from sqlalchemy import insert, select
+from starlette.responses import JSONResponse
 import structlog
 
 
@@ -17,7 +18,7 @@ from jobmon.server.web.api import SessionLocal
 logger = structlog.get_logger(__name__)
 
 @api_v3_router.post("/nodes")
-def add_nodes() -> Any:
+async def add_nodes(request: Request) -> Any:
     """Add a chunk of nodes to the database.
 
     Args:
@@ -26,7 +27,7 @@ def add_nodes() -> Any:
         task_template_version_id: version id of the task_template a node belongs to.
         node_args: key-value pairs of arg_id and a value.
     """
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
     # Extract node and node_args
 
     # Bulk insert the nodes and node args with raw SQL, for performance. Ignore duplicate
@@ -96,8 +97,7 @@ def add_nodes() -> Any:
     return_nodes = {
         ":".join(str(i) for i in key): val for key, val in node_id_dict.items()
     }
-    resp = jsonify(nodes=return_nodes)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"nodes": return_nodes}, status_code=StatusCodes.OK)
     return resp
 
 

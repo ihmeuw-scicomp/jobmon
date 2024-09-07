@@ -4,13 +4,14 @@ from http import HTTPStatus as StatusCodes
 import json
 from typing import Any, cast, Dict, List, Set, Union
 
-from flask import jsonify, request
+from fastapi import Request
 from sqlalchemy import desc, insert, ScalarResult, select, tuple_, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core import constants
@@ -30,9 +31,9 @@ from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 logger = structlog.get_logger(__name__)
 
 @api_v3_router.put("/task/bind_tasks_no_args")
-def bind_tasks_no_args() -> Any:
+async def bind_tasks_no_args(request: Request) -> Any:
     """Bind the task objects to the database."""
-    all_data = cast(Dict, request.get_json())
+    all_data = cast(Dict, await request.json())
     tasks = all_data["tasks"]
     workflow_id = int(all_data["workflow_id"])
     mark_created = bool(all_data["mark_created"])
@@ -153,15 +154,14 @@ def bind_tasks_no_args() -> Any:
                 .values(created_date=func.now())
             )
 
-    resp = jsonify(tasks=return_tasks)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={"tasks": return_tasks}, status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.put("/task/bind_task_args")
-def bind_task_args() -> Any:
+async def bind_task_args(request: Request) -> Any:
     """Add task args and associated task ids to the database."""
-    all_data = cast(Dict, request.get_json())
+    all_data = cast(Dict, await request.json())
     task_args = all_data["task_args"]
     if any(task_args):
         # Insert task args using INSERT IGNORE to handle conflicts
@@ -205,15 +205,14 @@ def bind_task_args() -> Any:
                 f"that are too long. Message: {str(e)}",
                 status_code=400,
             ) from e
-    resp = jsonify()
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.put("/task/bind_task_attributes")
-def bind_task_attributes() -> Any:
+async def bind_task_attributes(request: Request) -> Any:
     """Add task attributes and associated attribute types to the database."""
-    all_data = cast(Dict, request.get_json())
+    all_data = cast(Dict, await request.json())
     attributes = all_data["task_attributes"]
 
     # Map attribute names to attribute_type_ids, insert if necessary
@@ -287,8 +286,7 @@ def bind_task_attributes() -> Any:
                         status_code=400,
                     ) from e
 
-    resp = jsonify()
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 
 
@@ -374,9 +372,9 @@ def _add_or_get_attribute_types(
 
 
 @api_v3_router.post("/task/bind_resources")
-def bind_task_resources() -> Any:
+async def bind_task_resources(request: Request) -> Any:
     """Add the task resources for a given task."""
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
 
     session = SessionLocal()
     with session.begin():
@@ -389,12 +387,11 @@ def bind_task_resources() -> Any:
         )
         session.add(new_resources)
 
-    resp = jsonify(new_resources.id)
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content=new_resources.id, status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.get("/task/<task_id>/most_recent_ti_error")
+@api_v3_router.get("/task/{task_id}/most_recent_ti_error")
 def get_most_recent_ti_error(task_id: int) -> Any:
     """Route to determine the cause of the most recent task_instance's error.
 
@@ -423,25 +420,25 @@ def get_most_recent_ti_error(task_id: int) -> Any:
         ti_error = session.execute(select_stmt).scalars().one_or_none()
 
     if ti_error is not None:
-        resp = jsonify(
-            {
+        content = {
                 "error_description": ti_error.description,
                 "task_instance_id": ti_error.task_instance_id,
             }
-        )
+        resp = JSONResponse(content=content, status_code=StatusCodes.OK)
     else:
-        resp = jsonify({"error_description": "", "task_instance_id": None})
+        resp = JSONResponse(content={"error_description": "", "task_instance_id": None},
+                            status_code=StatusCodes.OK)
     resp.status_code = StatusCodes.OK
     return resp
 
 
-@api_v3_router.post("/task/<workflow_id>/set_resume_state")
-def set_task_resume_state(workflow_id: int) -> Any:
+@api_v3_router.post("/task/{workflow_id}/set_resume_state")
+async def set_task_resume_state(workflow_id: int, request: Request) -> Any:
     """An endpoint to set all tasks to a resumable state for a workflow.
 
     Conditioned on the workflow already being in an appropriate resume state.
     """
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
     reset_if_running = bool(data["reset_if_running"])
 
     session = SessionLocal()
@@ -456,8 +453,8 @@ def set_task_resume_state(workflow_id: int) -> Any:
                 f"Workflow {workflow_id} is not resumable. Please "
                 f"set the appropriate resume state."
             )
-            resp = jsonify(err_msg=err_msg)
-            resp.status_code = StatusCodes.OK
+            resp = JSONResponse(content={"err_msg": err_msg},
+                                status_code=StatusCodes.OK)
             return resp
 
         # Set task reset. If calling this bulk route, don't update any metadata besides what's
@@ -478,6 +475,5 @@ def set_task_resume_state(workflow_id: int) -> Any:
             )
         )
 
-    resp = jsonify()
-    resp.status_code = StatusCodes.OK
+    resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
