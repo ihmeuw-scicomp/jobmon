@@ -9,7 +9,9 @@ from starlette.responses import JSONResponse
 from jobmon.server.web.models.cluster import Cluster
 from jobmon.server.web.models.cluster_type import ClusterType
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import SessionLocal
+from jobmon.server.web.db_admin import get_session_local
+
+SessionLocal = get_session_local()
 
 @api_v3_router.get("/cluster/{cluster_name}")
 def get_cluster_by_name(cluster_name: str) -> Any:

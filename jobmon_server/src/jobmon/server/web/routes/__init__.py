@@ -9,9 +9,11 @@ from sqlalchemy import func, select, text
 from sqlalchemy import orm
 from structlog import get_logger
 
-from jobmon.server.web.db_admin import SessionLocal
+from jobmon.server.web.db_admin import get_session_local
 
 logger = get_logger(__name__)
+
+SessionLocal = get_session_local()
 
 # ############################ SHARED LANDING ROUTES ##########################################
 def is_alive() -> Any:

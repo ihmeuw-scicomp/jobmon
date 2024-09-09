@@ -12,10 +12,10 @@ import structlog
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.node_arg import NodeArg
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import SessionLocal
-
+from jobmon.server.web.db_admin import get_session_local
 
 logger = structlog.get_logger(__name__)
+SessionLocal = get_session_local()
 
 @api_v3_router.post("/nodes")
 async def add_nodes(request: Request) -> Any:

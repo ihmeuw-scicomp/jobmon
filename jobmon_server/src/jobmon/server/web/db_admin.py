@@ -2,6 +2,7 @@ from importlib.resources import files  # type: ignore
 
 from alembic import command
 from alembic.config import Config
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy_utils import create_database, database_exists, drop_database
@@ -24,29 +25,22 @@ def apply_migrations(sqlalchemy_database_uri: str, revision: str = "head") -> No
     # Invoke the upgrade command programmatically
     command.upgrade(alembic_cfg, revision)
 
-# create a singleton
-_engine_instance = None
-
 
 def get_engine_from_config() -> Engine:
     """Create a SQLAlchemy engine from a URI."""
-    from sqlalchemy import create_engine
-    global _engine_instance
-    if _engine_instance is None:
 
-        connect_args = {}
-        config = get_jobmon_config()
-        sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")
+    connect_args = {}
+    config = get_jobmon_config()
+    sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")
+    if "sqlite" in sqlalchemy_database_uri:
+        connect_args["check_same_thread"] = False
 
-        if "sqlite" in sqlalchemy_database_uri:
-            connect_args["check_same_thread"] = False
-
-        _engine_instance = create_engine(
-            sqlalchemy_database_uri,
-            connect_args=connect_args,
-            pool_recycle=200,
-            future=True,
-        )
+    _engine_instance = create_engine(
+        sqlalchemy_database_uri,
+        connect_args=connect_args,
+        pool_recycle=200,
+        future=True,
+    )
 
     return _engine_instance
 
@@ -79,7 +73,14 @@ def terminate_db(sqlalchemy_database_uri: str) -> None:
         drop_database(sqlalchemy_database_uri)
 
 
-# create sessionlocal from app
-SessionLocal = sessionmaker(autocommit=False,
-                            autoflush=False,
-                            bind=get_engine_from_config())
+# create a singleton holder so that it gets created after config
+_session_local = None
+def get_session_local() -> sessionmaker:
+    """Get a session local object."""
+    global _session_local
+    if _session_local is None:
+        _session_local = sessionmaker(autocommit=False,
+                                      autoflush=False,
+                                      bind=get_engine_from_config())
+    return _session_local
+

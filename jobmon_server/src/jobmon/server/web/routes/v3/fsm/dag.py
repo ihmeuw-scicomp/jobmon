@@ -13,12 +13,13 @@ import structlog
 from jobmon.server.web.models.dag import Dag
 from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import SessionLocal
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
+SessionLocal = get_session_local()
 
 @api_v3_router.post("/dag")
 async  def add_dag(request: Request) -> Any:

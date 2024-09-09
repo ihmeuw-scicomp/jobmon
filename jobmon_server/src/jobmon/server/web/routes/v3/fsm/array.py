@@ -16,9 +16,10 @@ from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import SessionLocal
+from jobmon.server.web.db_admin import get_session_local
 
 logger = structlog.get_logger(__name__)
+SessionLocal = get_session_local()
 
 @api_v3_router.post("/array")
 async def add_array(request: Request) -> Any:

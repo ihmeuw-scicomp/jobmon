@@ -19,6 +19,7 @@ from jobmon.client.api import Tool
 from jobmon.core import requester
 from jobmon.core.requester import Requester
 from jobmon.server.web.api import get_app, JobmonConfig, configure_logging
+from jobmon.server.web.config import get_jobmon_config
 from jobmon.server.web.db_admin import init_db
 
 logger = logging.getLogger(__name__)
@@ -63,8 +64,6 @@ class WebServerProcess:
 
             signal.signal(signal.SIGTERM, sigterm_handler)
 
-            init_db(database_uri)
-
             config = JobmonConfig(
                 dict_config={
                     "db": {"sqlalchemy_database_uri": database_uri},
@@ -88,7 +87,10 @@ class WebServerProcess:
                     },
                 }
             )
-            app = get_app(config)
+
+            config = get_jobmon_config(config)
+
+            app = get_app()
             import uvicorn
             uvicorn.run(app, host="0.0.0.0", port=self.web_port)
 

@@ -8,7 +8,7 @@ from starlette.status import HTTP_404_NOT_FOUND
 import structlog
 from werkzeug.exceptions import BadRequest, UnsupportedMediaType
 
-from jobmon.server.web.db_admin import SessionLocal
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
@@ -18,7 +18,7 @@ async def teardown_session():
     try:
         yield
     finally:
-        SessionLocal.remove()
+        get_session_local().remove()
 
 def _handle_error(request: Request, error: Exception, status_code: Optional[int] = None) -> Any:
     """Handle all exceptions in a uniform manner."""
