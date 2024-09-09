@@ -16,7 +16,7 @@ from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.api import SessionLocal
+from jobmon.server.web.db_admin import SessionLocal
 
 logger = structlog.get_logger(__name__)
 

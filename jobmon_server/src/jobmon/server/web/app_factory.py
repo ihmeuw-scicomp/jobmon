@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Any, Type
+from typing import Any, Optional, Type
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import sqlalchemy
+from sqlalchemy.orm import sessionmaker
 import structlog
 
 from jobmon.core.configuration import JobmonConfig
-from jobmon.server.web import session_factory
+from jobmon.server.web.api import create_engine_from_config
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 from jobmon.server.web.server_side_exception import ServerError
 
@@ -23,7 +23,7 @@ class AppFactory:
     _structlog_configured = False
 
     def __init__(
-        self, sqlalchemy_database_uri: str = "", use_otlp: bool = False
+        self, config: Optional[JobmonConfig] = None, use_otlp: bool = False
     ) -> None:
         """Initialize the AppFactory object with the SQLAlchemy database URI.
 
@@ -38,10 +38,12 @@ class AppFactory:
             self._init_logging()
 
         # Create SQLAlchemy engine
-        self.engine = sqlalchemy.create_engine(
-            sqlalchemy_database_uri, pool_recycle=200, future=True
-        )
-        session_factory.configure(bind=self.engine)
+        self.engine = create_engine_from_config(config)
+
+    def get_session_local(self) -> sessionmaker:
+        """Create a session from the SQLAlchemy engine."""
+        return sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+
 
     @classmethod
     def from_defaults(cls: Type[AppFactory]) -> AppFactory:
@@ -103,23 +105,6 @@ class AppFactory:
             allow_methods=["*"],
             allow_headers=["Content-Type"],
         )
-
-        for version in ["v3"]:
-            mod = import_module(f"jobmon.server.web.routes.{version}")
-            # Get the router dynamically from the module (assuming it's an APIRouter)
-            api_router = getattr(mod, f"api_{version}_router")
-
-            # Include the router with a version-specific prefix
-            logger.info(f"Adding router for version {version}")
-            app.include_router(api_router, prefix=f"{url_prefix}/{version}")
-
-            # include fsm, cli, and reapper
-            for r in ["fsm_router"]:
-                logger.info(f"Adding router for {r}")
-                mod = import_module(f"jobmon.server.web.routes.{version}.fsm")
-                router = getattr(mod, r)
-                app.include_router(router, prefix=f"{url_prefix}/{version}")
-
 
         if self.otlp_api:
             self.otlp_api.instrument_app(app)

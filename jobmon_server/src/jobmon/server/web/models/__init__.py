@@ -6,6 +6,7 @@ from pkgutil import iter_modules
 from typing import Any
 
 from sqlalchemy import CheckConstraint, create_engine, event, func, String
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 import structlog
@@ -47,7 +48,7 @@ def load_model() -> None:
         import_module(f"{__name__}.{module_name}")
 
 
-def load_metadata(sqlalchemy_database_uri: str) -> None:
+def load_metadata(engine: Engine) -> None:
     """Load metadata into a database."""
     # load metadata
     from jobmon.server.web import session_factory
@@ -67,7 +68,6 @@ def load_metadata(sqlalchemy_database_uri: str) -> None:
         add_workflow_run_statuses,
     )
 
-    engine = create_engine(sqlalchemy_database_uri)
 
     with session_factory(bind=engine) as session:
         metadata_loaders = [

@@ -4,7 +4,7 @@ from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict, List
 
-from faskapi import Request
+from fastapi import Request
 from sqlalchemy import and_, case, func, insert, select, update
 from starlette.responses import JSONResponse
 import structlog
@@ -17,7 +17,7 @@ from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLo
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.api import SessionLocal
+from jobmon.server.web.db_admin import SessionLocal
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -345,7 +345,5 @@ async def set_status_for_triaging(workflow_run_id: int, request: Request) -> Any
             .execution_options(synchronize_session=False)
         )
         session.execute(update_stmt)
-    resp = jsonify()
-    resp.status_code = StatusCodes.OK
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp

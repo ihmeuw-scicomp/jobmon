@@ -2,13 +2,13 @@ from typing import Any
 
 from sqlalchemy.sql import func
 
-from jobmon.server.web import session_factory
+from jobmon.server.web.db_admin import SessionLocal
 from jobmon.server.web.server_side_exception import ServerError
 
 
 def add_time(next_report_increment: float) -> Any:
     """Adds the next report increment time, and then returns the new time."""
-    session = session_factory()
+    session = SessionLocal()
     if session is not None and session.bind is not None:
         if session.bind.dialect.name == "mysql":
             add_time_func = func.ADDTIME(

@@ -2,7 +2,7 @@ from http import HTTPStatus as StatusCodes
 from importlib import import_module
 from typing import Any, Optional
 
-from fastapi import APIRouter, FastAPI, Depends
+from fastapi import APIRouter
 from starlette.responses import JSONResponse
 from starlette.status import HTTP_200_OK
 
@@ -33,5 +33,4 @@ def test_route():
 def api_version():
     """Test connectivity to the database."""
     return JSONResponse(content={"status": "v3"})
-
 

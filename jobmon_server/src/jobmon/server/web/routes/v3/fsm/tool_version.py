@@ -12,7 +12,7 @@ import structlog
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.tool_version import ToolVersion
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.api import SessionLocal
+from jobmon.server.web.db_admin import SessionLocal
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -37,10 +37,12 @@ async def add_tool_version(request: Request) -> Any:
         with session.begin():
             tool_version = ToolVersion(tool_id=tool_id)
             session.add(tool_version)
+            session.close()
     except sqlalchemy.exc.IntegrityError:
         with session.begin():
             select_stmt = select(ToolVersion).where(ToolVersion.tool_id == tool_id)
             tool_version = session.execute(select_stmt).scalars().one()
+            session.close()
 
     wire_format = tool_version.to_wire_as_client_tool_version()
 

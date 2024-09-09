@@ -3,6 +3,8 @@
 from fastapi import APIRouter
 from importlib import import_module
 
+from jobmon.server.web.api import get_app
+
 fsm_router = APIRouter(tags=["fsm"])
 
 for module in [
@@ -21,4 +23,3 @@ for module in [
     "workflow_run",
 ]:
     import_module(f"jobmon.server.web.routes.v3.fsm.{module}")
-

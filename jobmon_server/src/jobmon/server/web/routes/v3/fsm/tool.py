@@ -18,7 +18,7 @@ from jobmon.server.web.models.tool import Tool
 from jobmon.server.web.models.tool_version import ToolVersion
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.api import SessionLocal
+from jobmon.server.web.db_admin import SessionLocal
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 logger = structlog.get_logger(__name__)
