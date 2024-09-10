@@ -3,8 +3,6 @@
 from fastapi import APIRouter
 from importlib import import_module
 
-from jobmon.server.web.api import get_app
-
 fsm_router = APIRouter(tags=["fsm"])
 
 for module in [
