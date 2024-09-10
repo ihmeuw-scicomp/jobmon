@@ -232,7 +232,7 @@ async def update_workflow_attribute(workflow_id: int, request: Request) -> Any:
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
     """ Add/update attributes for a workflow """
-    data = cast(Dict, request.get_json())
+    data = cast(Dict, await request.json())
 
     logger.debug("Update attributes")
     attributes = data["workflow_attributes"]
