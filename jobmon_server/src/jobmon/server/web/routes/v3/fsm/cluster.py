@@ -19,16 +19,23 @@ def get_cluster_by_name(cluster_name: str) -> Any:
     session = SessionLocal()
     with session.begin():
         select_stmt = (
-            select(Cluster)
+            select(Cluster, ClusterType.name)
             .join(ClusterType, Cluster.cluster_type_id == ClusterType.id)
             .filter(Cluster.name == cluster_name)
         )
-        cluster = session.execute(select_stmt).scalars().one_or_none()
+        result = session.execute(select_stmt).one_or_none()
 
     # send back json
-    if cluster is None:
+    if result is None:
         resp = JSONResponse(content={"cluster": None}, status_code=StatusCodes.OK)
     else:
-        resp = JSONResponse(content={"cluster": cluster}, status_code=StatusCodes.OK)
+        cluster, cluster_type_name = result
+        cluster_list = [
+            cluster.id,
+            cluster.name,
+            cluster_type_name,  # Access the cluster type name here
+            cluster.connection_parameters
+        ]
+        resp = JSONResponse(content={"cluster": cluster_list}, status_code=StatusCodes.OK)
     resp.status_code = StatusCodes.OK
     return resp

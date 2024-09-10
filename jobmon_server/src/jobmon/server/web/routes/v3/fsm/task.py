@@ -15,6 +15,8 @@ from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core import constants
+from jobmon.server.web.config import get_jobmon_config
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_arg import TaskArg
 from jobmon.server.web.models.task_attribute import TaskAttribute
@@ -25,11 +27,11 @@ from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
+_CONFIG = get_jobmon_config()
 
 @api_v3_router.put("/task/bind_tasks_no_args")
 async def bind_tasks_no_args(request: Request) -> Any:
@@ -174,16 +176,14 @@ async def bind_task_args(request: Request) -> Any:
         try:
             if (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
+                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
             ):
                 arg_insert_stmt = (
                     insert(TaskArg).values(task_arg_values).prefix_with("IGNORE")
                 )
             elif (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "sqlite"
+                and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
             ):
                 arg_insert_stmt = (
                     sqlite_insert(TaskArg)
@@ -193,8 +193,8 @@ async def bind_task_args(request: Request) -> Any:
             else:
                 raise ServerError(
                     "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                    + SessionLocal.bind.dialect.name
-                    if SessionLocal and SessionLocal.bind
+                    + _CONFIG.get("db", "sqlalchemy_database_uri")
+                    if SessionLocal
                     else "None"
                 )
             with session.begin():
@@ -243,8 +243,7 @@ async def bind_task_attributes(request: Request) -> Any:
                 try:
                     if (
                         SessionLocal
-                        and SessionLocal.bind
-                        and SessionLocal.bind.dialect.name == "mysql"
+                        and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
                     ):
                         attr_insert_stmt = mysql_insert(TaskAttribute).values(
                             insert_values
@@ -256,8 +255,7 @@ async def bind_task_attributes(request: Request) -> Any:
 
                     elif (
                         SessionLocal
-                        and SessionLocal.bind
-                        and SessionLocal.bind.dialect.name == "sqlite"
+                        and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
                     ):
                         for attr_to_add in insert_values:
                             attr_insert_stmt = (  # type: ignore
@@ -275,8 +273,8 @@ async def bind_task_attributes(request: Request) -> Any:
                     else:
                         raise ServerError(
                             "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                            + SessionLocal.bind.dialect.name
-                            if SessionLocal and SessionLocal.bind
+                            + _CONFIG.get("db", "sqlalchemy_database_uri")
+                            if SessionLocal
                             else "None"
                         )
                 except (DataError, IntegrityError) as e:
@@ -319,8 +317,7 @@ def _add_or_get_attribute_types(
         try:
             if (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
+                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
             ):
                 insert_stmt = (
                     insert(TaskAttributeType)
@@ -329,8 +326,7 @@ def _add_or_get_attribute_types(
                 )
             elif (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "sqlite"
+                and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
             ):
                 insert_stmt = (
                     sqlite_insert(TaskAttributeType)
@@ -340,8 +336,8 @@ def _add_or_get_attribute_types(
             else:
                 raise ServerError(
                     "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                    + SessionLocal.bind.dialect.name
-                    if SessionLocal and SessionLocal.bind
+                    + _CONFIG.get("db", "sqlalchemy_database_uri")
+                    if SessionLocal
                     else "None"
                 )
             session.execute(insert_stmt)

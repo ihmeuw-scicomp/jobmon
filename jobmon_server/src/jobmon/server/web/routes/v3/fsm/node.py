@@ -8,14 +8,15 @@ from sqlalchemy import insert, select
 from starlette.responses import JSONResponse
 import structlog
 
-
+from jobmon.server.web.config import get_jobmon_config
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.node_arg import NodeArg
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import get_session_local
 
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
+_CONFIG = get_jobmon_config()
 
 @api_v3_router.post("/nodes")
 async def add_nodes(request: Request) -> Any:
@@ -45,14 +46,12 @@ async def add_nodes(request: Request) -> Any:
         )
         if (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+            and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
         ):
             node_insert_stmt = node_insert_stmt.prefix_with("IGNORE")
         if (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "sqlite"
+            and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
         ):
             node_insert_stmt = node_insert_stmt.prefix_with("OR IGNORE")
 
@@ -108,14 +107,12 @@ def _insert_node_args(node_args_list: list) -> None:
             node_arg_insert_stmt = insert(NodeArg).values(node_args_list)
             if (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
+                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
             ):
                 node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("IGNORE")
             if (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "sqlite"
+                and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
             ):
                 node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("OR IGNORE")
 

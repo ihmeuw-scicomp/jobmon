@@ -17,9 +17,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import create_engine
 
 from jobmon.client.api import Tool
-from jobmon.core import requester
+from jobmon.core.configuration import JobmonConfig
 from jobmon.core.requester import Requester
-from jobmon.server.web.api import get_app, JobmonConfig, configure_logging
+from jobmon.server.web.api import get_app, configure_logging
 from jobmon.server.web.config import get_jobmon_config
 from jobmon.server.web.db_admin import init_db
 

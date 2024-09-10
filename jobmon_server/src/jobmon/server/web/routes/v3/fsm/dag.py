@@ -10,16 +10,18 @@ from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 import structlog
 
+from jobmon.server.web.config import get_jobmon_config
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.dag import Dag
 from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
+_CONFIG = get_jobmon_config()
 
 @api_v3_router.post("/dag")
 async  def add_dag(request: Request) -> Any:
@@ -48,7 +50,7 @@ async  def add_dag(request: Request) -> Any:
             dag = session.execute(select_stmt).scalar_one()
 
     # return result
-    resp = JSONResponse(content={"dag_id": dag.id, "created_date": dag.created_date},
+    resp = JSONResponse(content={"dag_id": dag.id, "created_date": str(dag.created_date)},
                         status_code=StatusCodes.OK)
     return resp
 
@@ -64,7 +66,7 @@ async def add_edges(dag_id: int, request: Request) -> Any:
         mark_created = bool(data.pop("mark_created"))
     except KeyError as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     # add dag and cast types
@@ -87,14 +89,12 @@ async def add_edges(dag_id: int, request: Request) -> Any:
         insert_stmt = insert(Edge).values(edges_to_add)
         if (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+            and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
         ):
             insert_stmt = insert_stmt.prefix_with("IGNORE")
         if (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "sqlite"
+            and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
         ):
             insert_stmt = insert_stmt.prefix_with("OR IGNORE")
         session.execute(insert_stmt)
