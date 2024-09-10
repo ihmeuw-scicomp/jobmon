@@ -103,7 +103,7 @@ def _add_or_get_arg(name: str, session: Session) -> Arg:
 
 
 @api_v3_router.post(
-    "/task_template/<task_template_id>/add_version"
+    "/task_template/{task_template_id}/add_version"
 )
 async def add_task_template_version(task_template_id: int, request: Request) -> Any:
     """Add a tool to the database."""

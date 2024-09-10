@@ -9,6 +9,7 @@ import sys
 from time import sleep
 from types import TracebackType
 from typing import Any, Optional
+import uvicorn
 
 import pytest
 import sqlalchemy
@@ -74,6 +75,8 @@ class WebServerProcess:
                     },
                 }
             )
+            get_jobmon_config(config)
+            init_db()
             configure_logging(
                 loggers_dict={
                     "jobmon.server.web": {
@@ -88,11 +91,10 @@ class WebServerProcess:
                 }
             )
 
-            config = get_jobmon_config(config)
-
             app = get_app()
-            import uvicorn
-            uvicorn.run(app, host="0.0.0.0", port=self.web_port)
+            print("********************1")
+            uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
+            print("********************2")
 
         ctx = mp.get_context("fork")
         self.p1 = ctx.Process(target=run_server_with_handler)

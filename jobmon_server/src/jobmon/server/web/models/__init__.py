@@ -51,7 +51,7 @@ def load_model() -> None:
 def load_metadata(engine: Engine) -> None:
     """Load metadata into a database."""
     # load metadata
-    from jobmon.server.web.db_admin import SessionLocal
+    from jobmon.server.web.db_admin import get_session_local
     from jobmon.server.web.models.arg_type import add_arg_types
     from jobmon.server.web.models.cluster_type import add_cluster_types
     from jobmon.server.web.models.cluster import add_clusters
@@ -67,7 +67,7 @@ def load_metadata(engine: Engine) -> None:
     from jobmon.server.web.models.workflow_run_status import (
         add_workflow_run_statuses,
     )
-
+    SessionLocal = get_session_local()
     session = SessionLocal()
     with session:
         metadata_loaders = [

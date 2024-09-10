@@ -38,13 +38,13 @@ async def add_tool_version(request: Request) -> Any:
         with session.begin():
             tool_version = ToolVersion(tool_id=tool_id)
             session.add(tool_version)
-            session.close()
+
     except sqlalchemy.exc.IntegrityError:
         with session.begin():
             select_stmt = select(ToolVersion).where(ToolVersion.tool_id == tool_id)
             tool_version = session.execute(select_stmt).scalars().one()
-            session.close()
 
+    session.refresh(tool_version)
     wire_format = tool_version.to_wire_as_client_tool_version()
 
     resp = JSONResponse(content={"tool_version": wire_format}, status_code=StatusCodes.OK)
