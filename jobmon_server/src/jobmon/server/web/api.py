@@ -6,28 +6,59 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import structlog
 
-
-from jobmon.core.configuration import JobmonConfig
+from jobmon.core.otlp import OtlpAPI
 from jobmon.server.web.config import get_jobmon_config
 from jobmon.server.web.log_config import configure_structlog  # noqa F401
 from jobmon.server.web.log_config import configure_logging  # noqa F401
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 from jobmon.server.web.server_side_exception import ServerError
 
-# a singleton to holp jobmon config
-_jobmon_config = None
-
-logger = structlog.get_logger()
-
 url_prefix = "/api"
 
-def get_app() -> FastAPI:
+
+def _init_logging(otlp_api: Optional[str] = None) -> bool:
+    """Initialize logging for the app."""
+    try:
+        extra_processors = []
+        if otlp_api:
+            def add_open_telemetry_spans(_: Any, __: Any, event_dict: dict) -> dict:
+                """Add OpenTelemetry spans to the log record."""
+                if otlp_api is not None:
+                    span, trace, parent_span = otlp_api.get_span_details()
+                else:
+                    raise ServerError("otlp_api is None.")
+
+                event_dict["span"] = {
+                    "span_id": span or None,
+                    "trace_id": trace or None,
+                    "parent_span_id": parent_span or None,
+                }
+                return event_dict
+
+            extra_processors.append(add_open_telemetry_spans)
+        configure_structlog(extra_processors)
+        return True
+    except Exception as e:
+        structlog.get_logger().error(f"Failed to initialize logging: {e}")
+        return False
+
+
+def get_app(use_otlp: bool = False,
+            structlog_configured: bool = False,
+            otlp_api: Optional[str] = None) -> FastAPI:
     """Get a flask app based on the config. If no config is provided, defaults are used.
 
     Args:
-        config: The jobmon config to use when creating the app.
+        use_otlp: Whether to use OpenTelemetry.
+        structlog_configured: Whether structlog is already configured.
+        otlp_api: The OpenTelemetry API to use.
     """
-    # create app from env or config if testing
+    if use_otlp and otlp_api is None:
+        otlp_api = OtlpAPI()
+        otlp_api.instrument_sqlalchemy()
+
+    if not structlog_configured:
+        structlog_configured = _init_logging(otlp_api)
 
     app = FastAPI(
         title="jobmon",
@@ -52,12 +83,10 @@ def get_app() -> FastAPI:
         api_router = getattr(mod, f"api_{version}_router")
 
         # Include the router with a version-specific prefix
-        logger.info(f"Adding router for version {version}")
         app.include_router(api_router, prefix=f"{url_prefix}/{version}")
 
         # include fsm, cli, and reapper
         for r in ["fsm_router"]:
-            logger.info(f"Adding router for {r}")
             mod = import_module(f"jobmon.server.web.routes.{version}.fsm")
             router = getattr(mod, r)
             app.include_router(router, prefix=f"{url_prefix}/{version}")
