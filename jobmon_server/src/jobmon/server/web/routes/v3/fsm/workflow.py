@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 import structlog
 
+from jobmon.server.web.config import get_jobmon_config
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.dag import Dag
 from jobmon.server.web.models.queue import Queue
@@ -23,12 +25,12 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_attribute import WorkflowAttribute
 from jobmon.server.web.models.workflow_attribute_type import WorkflowAttributeType
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
+_CONFIG = get_jobmon_config()
 
 
 def _add_workflow_attributes(
@@ -191,8 +193,7 @@ def _upsert_wf_attribute(
         wf_attrib_id = _add_or_get_wf_attribute_type(name, session)
         if (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+            and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
         ):
             insert_vals1 = mysql_insert(WorkflowAttribute).values(
                 workflow_id=workflow_id,
@@ -204,8 +205,7 @@ def _upsert_wf_attribute(
             )
         elif (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "sqlite"
+            and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
         ):
             insert_vals2: sqlalchemy.dialects.sqlite.dml.Insert = sqlite_insert(
                 WorkflowAttribute
@@ -256,7 +256,7 @@ async def set_resume(workflow_id: int, request: Request) -> Any:
         reset_running_jobs = bool(data["reset_running_jobs"])
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     session = SessionLocal()
