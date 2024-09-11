@@ -257,7 +257,7 @@ async def update_task_statuses(request: Request) -> Any:
     return resp
 
 
-@api_v3_router("/task_dependencies/{task_id}", methods=["GET"])
+@api_v3_router.get("/task_dependencies/{task_id}")
 def get_task_dependencies(task_id: int) -> Any:
     """Get task's downstream and upstream tasks and their status."""
     session = SessionLocal()
@@ -317,7 +317,7 @@ async def get_tasks_recursive(direction: str, request: Request) -> Any:
         raise e
 
 
-@api_v3_router.get("/task_resource_usage", methods=["GET"])
+@api_v3_router.get("/task_resource_usage")
 def get_task_resource_usage(task_id: int) -> Any:
     """Return the resource usage for a given Task ID."""
     session = SessionLocal()
@@ -577,7 +577,7 @@ def get_task_details(task_id: int) -> Any:
     return resp
 
 
-@aapi_v3_router.get("/task/get_task_details_viz/{task_id}")
+@api_v3_router.get("/task/get_task_details_viz/{task_id}")
 def get_task_details_viz(task_id: int) -> Any:
     """Get status of Task from Task ID."""
     session = SessionLocal()

@@ -86,9 +86,9 @@ def get_app(use_otlp: bool = False,
         app.include_router(api_router, prefix=f"{url_prefix}/{version}")
 
         # include fsm, cli, and reapper
-        for r in ["fsm_router"]:
-            mod = import_module(f"jobmon.server.web.routes.{version}.fsm")
-            router = getattr(mod, r)
+        for r in ["fsm", "cli"]:
+            mod = import_module(f"jobmon.server.web.routes.{version}.{r}")
+            router = getattr(mod, f"{r}_router")
             app.include_router(router, prefix=f"{url_prefix}/{version}")
 
     return app
