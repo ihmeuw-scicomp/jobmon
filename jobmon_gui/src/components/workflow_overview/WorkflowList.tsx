@@ -242,10 +242,6 @@ export default function WorkflowList() {
                             <Typography
                                 sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date)}</Typography>
                         </Grid>
-                        <Grid item xs={8}>
-                            <Typography
-                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date_end)}</Typography>
-                        </Grid>
                         <Grid item xs={4}>
                             <Typography sx={modalTitleStyles}>Status Date:</Typography>
                         </Grid>
