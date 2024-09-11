@@ -42,20 +42,25 @@ async def get_task_template(request: Request) -> Any:
     logger.info(f"Add task tamplate for tool_version_id {tool_version_id} ")
 
     # add to DB
-    session = SessionLocal()
     try:
-        with session.begin():
-            task_template = TaskTemplate(tool_version_id=tool_version_id, name=name)
-            session.add(task_template)
+        with SessionLocal() as session:
+            with session.begin():
+                task_template = TaskTemplate(tool_version_id=tool_version_id, name=name)
+                session.add(task_template)
+                session.flush()
+                session.refresh(task_template)
+                ttid = task_template.id
     except sqlalchemy.exc.IntegrityError:
-        with session.begin():
-            select_stmt = select(TaskTemplate).where(
-                TaskTemplate.tool_version_id == tool_version_id,
-                TaskTemplate.name == name,
-            )
-            task_template = session.execute(select_stmt).scalars().one()
-
-    resp = JSONResponse(content={"task_template_id": task_template.id},
+        with SessionLocal() as session:
+            with session.begin():
+                select_stmt = select(TaskTemplate).where(
+                    TaskTemplate.tool_version_id == tool_version_id,
+                    TaskTemplate.name == name,
+                )
+                task_template = session.execute(select_stmt).scalars().one()
+                ttid = task_template.id
+        ()
+    resp = JSONResponse(content={"task_template_id": ttid},
                         status_code=StatusCodes.OK)
     return resp
 
@@ -67,13 +72,13 @@ def get_task_template_versions(task_template_id: int) -> Any:
     structlog.contextvars.bind_contextvars(task_template_id=task_template_id)
     logger.info(f"Getting task template version for task template: {task_template_id}")
 
-    session = SessionLocal()
-    with session.begin():
-        select_stmt = select(TaskTemplateVersion).where(
-            TaskTemplateVersion.task_template_id == task_template_id
-        )
-        ttvs = session.execute(select_stmt).scalars().all()
-        wire_obj = [ttv.to_wire_as_client_task_template_version() for ttv in ttvs]
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = select(TaskTemplateVersion).where(
+                TaskTemplateVersion.task_template_id == task_template_id
+            )
+            ttvs = session.execute(select_stmt).scalars().all()
+            wire_obj = [ttv.to_wire_as_client_task_template_version() for ttv in ttvs]
 
     resp = JSONResponse(content={"task_template_versions": wire_obj},
                         status_code=StatusCodes.OK)
@@ -87,6 +92,7 @@ def _add_or_get_arg(name: str, session: Session) -> Arg:
             with session.begin():
                 arg = Arg(name=name)
                 session.add(arg)
+                session.flush()
                 break  # Successfully added, break the loop
         except IntegrityError:
             with session.begin():
@@ -122,63 +128,63 @@ async def add_task_template_version(task_template_id: int, request: Request) -> 
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    session = SessionLocal()
     # populate the argument table
     arg_mapping_dct: dict = {
         constants.ArgType.NODE_ARG: [],
         constants.ArgType.TASK_ARG: [],
         constants.ArgType.OP_ARG: [],
     }
-    for arg_name in node_args:
-        arg_mapping_dct[constants.ArgType.NODE_ARG].append(
-            _add_or_get_arg(arg_name, session)
-        )
-    for arg_name in task_args:
-        arg_mapping_dct[constants.ArgType.TASK_ARG].append(
-            _add_or_get_arg(arg_name, session)
-        )
-    for arg_name in op_args:
-        arg_mapping_dct[constants.ArgType.OP_ARG].append(
-            _add_or_get_arg(arg_name, session)
-        )
-
-    try:
-        with session.begin():
-            ttv = TaskTemplateVersion(
-                task_template_id=task_template_id,
-                command_template=command_template,
-                arg_mapping_hash=arg_mapping_hash,
+    with SessionLocal() as session:
+        for arg_name in node_args:
+            arg_mapping_dct[constants.ArgType.NODE_ARG].append(
+                _add_or_get_arg(arg_name, session)
             )
-            session.add(ttv)
-            session.flush()
-
-            # get a lock
-            session.refresh(ttv, with_for_update=True)
-            for arg_type_id in arg_mapping_dct.keys():
-                for arg in arg_mapping_dct[arg_type_id]:
-                    ctatm = TemplateArgMap(
-                        task_template_version_id=ttv.id,
-                        arg_id=arg.id,
-                        arg_type_id=arg_type_id,
-                    )
-                    session.add(ctatm)
-            session.flush()
-
-            task_template_version = ttv.to_wire_as_client_task_template_version()
-
-    except sqlalchemy.exc.IntegrityError:
-        with session.begin():
-            # if another process is adding this task_template_version then this query should
-            # block until the template_arg_map has been populated and committed
-            select_stmt = select(TaskTemplateVersion).where(
-                TaskTemplateVersion.task_template_id == task_template_id,
-                TaskTemplateVersion.command_template == command_template,
-                TaskTemplateVersion.arg_mapping_hash == arg_mapping_hash,
+        for arg_name in task_args:
+            arg_mapping_dct[constants.ArgType.TASK_ARG].append(
+                _add_or_get_arg(arg_name, session)
             )
-            ttv = session.execute(select_stmt).scalars().one()
+        for arg_name in op_args:
+            arg_mapping_dct[constants.ArgType.OP_ARG].append(
+                _add_or_get_arg(arg_name, session)
+            )
 
-            task_template_version = ttv.to_wire_as_client_task_template_version()
+        try:
+            with session.begin():
+                ttv = TaskTemplateVersion(
+                    task_template_id=task_template_id,
+                    command_template=command_template,
+                    arg_mapping_hash=arg_mapping_hash,
+                )
+                session.add(ttv)
+                session.flush()
 
+                # get a lock
+                session.refresh(ttv, with_for_update=True)
+                for arg_type_id in arg_mapping_dct.keys():
+                    for arg in arg_mapping_dct[arg_type_id]:
+                        ctatm = TemplateArgMap(
+                            task_template_version_id=ttv.id,
+                            arg_id=arg.id,
+                            arg_type_id=arg_type_id,
+                        )
+                        session.add(ctatm)
+                session.flush()
+
+                task_template_version = ttv.to_wire_as_client_task_template_version()
+
+        except sqlalchemy.exc.IntegrityError:
+            with session.begin():
+                # if another process is adding this task_template_version then this query should
+                # block until the template_arg_map has been populated and committed
+                select_stmt = select(TaskTemplateVersion).where(
+                    TaskTemplateVersion.task_template_id == task_template_id,
+                    TaskTemplateVersion.command_template == command_template,
+                    TaskTemplateVersion.arg_mapping_hash == arg_mapping_hash,
+                )
+                ttv = session.execute(select_stmt).scalars().one()
+
+                task_template_version = ttv.to_wire_as_client_task_template_version()
+        ()
     resp = JSONResponse(content={"task_template_version": task_template_version},
                         status_code=StatusCodes.OK)
     return resp

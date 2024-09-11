@@ -580,18 +580,18 @@ def get_task_details(task_id: int) -> Any:
 @api_v3_router.get("/task/get_task_details_viz/{task_id}")
 def get_task_details_viz(task_id: int) -> Any:
     """Get status of Task from Task ID."""
-    session = SessionLocal()
-    with session.begin():
-        query = select(
-            Task.status,
-            Task.workflow_id,
-            Task.name,
-            Task.command,
-            Task.status_date,
-        ).where(
-            Task.id == task_id,
-        )
-        rows = session.execute(query).all()
+    with SessionLocal() as session:
+        with session.begin():
+            query = select(
+                Task.status,
+                Task.workflow_id,
+                Task.name,
+                Task.command,
+                Task.status_date,
+            ).where(
+                Task.id == task_id,
+            )
+            rows = session.execute(query).all()
 
     column_names = (
         "task_status",

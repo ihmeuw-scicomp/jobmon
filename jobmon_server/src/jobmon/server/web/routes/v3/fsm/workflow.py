@@ -80,58 +80,58 @@ async def bind_workflow(request: Request) -> Any:
         task_hash=str(thash),
     )
     logger.info("Bind workflow")
-    session = SessionLocal()
-    with session.begin():
-        select_stmt = select(Workflow).where(
-            Workflow.tool_version_id == tv_id,
-            Workflow.dag_id == dag_id,
-            Workflow.workflow_args_hash == whash,
-            Workflow.task_hash == thash,
-        )
-        workflow = session.execute(select_stmt).scalars().one_or_none()
-        if workflow is None:
-            # create a new workflow
-            workflow = Workflow(
-                tool_version_id=tv_id,
-                dag_id=dag_id,
-                workflow_args_hash=whash,
-                task_hash=thash,
-                description=description,
-                name=name,
-                workflow_args=workflow_args,
-                max_concurrently_running=max_concurrently_running,
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = select(Workflow).where(
+                Workflow.tool_version_id == tv_id,
+                Workflow.dag_id == dag_id,
+                Workflow.workflow_args_hash == whash,
+                Workflow.task_hash == thash,
             )
-            session.add(workflow)
-            session.flush()
-            logger.info("Created new workflow")
-
-            # update attributes
-            if workflow_attributes and workflow and workflow.id:
-                _add_workflow_attributes(workflow.id, workflow_attributes, session)
+            workflow = session.execute(select_stmt).scalars().one_or_none()
+            if workflow is None:
+                # create a new workflow
+                workflow = Workflow(
+                    tool_version_id=tv_id,
+                    dag_id=dag_id,
+                    workflow_args_hash=whash,
+                    task_hash=thash,
+                    description=description,
+                    name=name,
+                    workflow_args=workflow_args,
+                    max_concurrently_running=max_concurrently_running,
+                )
+                session.add(workflow)
                 session.flush()
-            newly_created = True
-        else:
-            # set mutable attributes. Moved here from the set_resume method
-            workflow.description = description
-            workflow.name = name
-            workflow.max_concurrently_running = max_concurrently_running
-            session.flush()
+                logger.info("Created new workflow")
 
-            # upsert attributes
-            if workflow_attributes:
-                logger.info("Upsert attributes for workflow")
+                # update attributes
+                if workflow_attributes and workflow and workflow.id:
+                    _add_workflow_attributes(workflow.id, workflow_attributes, session)
+                    session.flush()
+                newly_created = True
+            else:
+                # set mutable attributes. Moved here from the set_resume method
+                workflow.description = description
+                workflow.name = name
+                workflow.max_concurrently_running = max_concurrently_running
+                session.flush()
+
+                # upsert attributes
                 if workflow_attributes:
-                    for name, val in workflow_attributes.items():
-                        if workflow and workflow.id:
-                            _upsert_wf_attribute(workflow.id, name, val, session)
-            newly_created = False
+                    logger.info("Upsert attributes for workflow")
+                    if workflow_attributes:
+                        for name, val in workflow_attributes.items():
+                            if workflow and workflow.id:
+                                _upsert_wf_attribute(workflow.id, name, val, session)
+                newly_created = False
 
-    content = {
-            "workflow_id": workflow.id,
-            "status": workflow.status,
-            "newly_created": newly_created,
-        }
-    resp = JSONResponse(content=content, status_code=StatusCodes.OK)
+        content = {
+                "workflow_id": workflow.id,
+                "status": workflow.status,
+                "newly_created": newly_created,
+            }
+        resp = JSONResponse(content=content, status_code=StatusCodes.OK)
     return resp
 
 
@@ -149,16 +149,16 @@ async def get_matching_workflows_by_workflow_args(workflow_args_hash: str,
     structlog.contextvars.bind_contextvars(workflow_args_hash=str(workflow_args_hash))
     logger.info(f"Looking for wf with hash {workflow_args_hash}")
 
-    session = SessionLocal()
-    with session.begin():
-        select_stmt = (
-            select(Workflow.task_hash, Workflow.tool_version_id, Dag.hash)
-            .join_from(Workflow, Dag, Workflow.dag_id == Dag.id)
-            .where(Workflow.workflow_args_hash == workflow_args_hash)
-        )
-        res = []
-        for row in session.execute(select_stmt).all():
-            res.append((row.task_hash, row.tool_version_id, row.hash))
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = (
+                select(Workflow.task_hash, Workflow.tool_version_id, Dag.hash)
+                .join_from(Workflow, Dag, Workflow.dag_id == Dag.id)
+                .where(Workflow.workflow_args_hash == workflow_args_hash)
+            )
+            res = []
+            for row in session.execute(select_stmt).all():
+                res.append((row.task_hash, row.tool_version_id, row.hash))
 
     if len(res) > 0:
         logger.debug(
@@ -219,6 +219,7 @@ def _upsert_wf_attribute(
                 set_=dict(value=value),
             )
         session.execute(upsert_stmt)
+        session.flush()
 
 
 @api_v3_router.put("/workflow/{workflow_id}/workflow_attributes")
@@ -241,7 +242,8 @@ async def update_workflow_attribute(workflow_id: int, request: Request) -> Any:
         with session.begin():
             for name, val in attributes.items():
                 _upsert_wf_attribute(workflow_id, name, val, session)
-
+        ()
+        session.close()
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 
@@ -259,15 +261,15 @@ async def set_resume(workflow_id: int, request: Request) -> Any:
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    session = SessionLocal()
-    with session.begin():
-        select_stmt = select(Workflow).where(Workflow.id == workflow_id)
-        workflow = session.execute(select_stmt).scalars().one_or_none()
-        if workflow:
-            # trigger resume on active workflow run
-            workflow.resume(reset_running_jobs)
-            session.flush()
-            logger.info(f"Resume set for wf {workflow_id}")
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = select(Workflow).where(Workflow.id == workflow_id)
+            workflow = session.execute(select_stmt).scalars().one_or_none()
+            if workflow:
+                # trigger resume on active workflow run
+                workflow.resume(reset_running_jobs)
+                session.flush()
+                logger.info(f"Resume set for wf {workflow_id}")
 
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
@@ -278,14 +280,15 @@ def workflow_is_resumable(workflow_id: int) -> Any:
     """Check if a workflow is in a resumable state."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
 
-    session = SessionLocal()
-    with session.begin():
-        select_stmt = select(Workflow).where(Workflow.id == workflow_id)
-        workflow = session.execute(select_stmt).scalars().one()
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = select(Workflow).where(Workflow.id == workflow_id)
+            workflow = session.execute(select_stmt).scalars().one()
 
-    logger.info(f"Workflow is resumable: {workflow.is_resumable}")
-    resp = JSONResponse(content={"workflow_is_resumable": workflow.is_resumable},
-                        status_code=StatusCodes.OK)
+        logger.info(f"Workflow is resumable: {workflow.is_resumable}")
+        resp = JSONResponse(content={"workflow_is_resumable":
+                                         workflow.is_resumable},
+                            status_code=StatusCodes.OK)
     return resp
 
 
@@ -296,15 +299,15 @@ async def get_max_concurrently_running(workflow_id: int, request: Request) -> An
     """Return the maximum concurrency of this workflow."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
 
-    session = SessionLocal()
-    with session.begin():
-        select_stmt = select(Workflow).where(Workflow.id == workflow_id)
-        workflow = session.execute(select_stmt).scalars().one()
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = select(Workflow).where(Workflow.id == workflow_id)
+            workflow = session.execute(select_stmt).scalars().one()
 
-    resp = JSONResponse(
-        content={"max_concurrently_running": workflow.max_concurrently_running},
-        status_code=StatusCodes.OK
-    )
+        resp = JSONResponse(
+            content={"max_concurrently_running": workflow.max_concurrently_running},
+            status_code=StatusCodes.OK
+        )
     return resp
 
 
@@ -324,26 +327,29 @@ async def update_max_running(workflow_id: int, request: Request) -> Any:
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    session = SessionLocal()
-    with session.begin():
-        update_stmt = (
-            update(Workflow)
-            .where(Workflow.id == workflow_id)
-            .values(max_concurrently_running=new_limit)
-        )
-        res = session.execute(update_stmt)
+    with SessionLocal() as session:
+        with session.begin():
+            update_stmt = (
+                update(Workflow)
+                .where(Workflow.id == workflow_id)
+                .values(max_concurrently_running=new_limit)
+            )
+            res = session.execute(update_stmt)
+            ()
+        if res.rowcount == 0:  # Return a warning message if no update was performed
+            message = (
+                f"No update performed for workflow ID {workflow_id}, "
+                f"max_concurrently_running is "
+                f"{new_limit}"
+            )
+        else:
+            message = (
+                f"Workflow ID {workflow_id} max concurrently "
+                f"running updated to {new_limit}"
+            )
 
-    if res.rowcount == 0:  # Return a warning message if no update was performed
-        message = (
-            f"No update performed for workflow ID {workflow_id}, max_concurrently_running is "
-            f"{new_limit}"
-        )
-    else:
-        message = (
-            f"Workflow ID {workflow_id} max concurrently running updated to {new_limit}"
-        )
-
-    resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
+        resp = JSONResponse(content={"message": message},
+                            status_code=StatusCodes.OK)
     return resp
 
 
@@ -367,10 +373,10 @@ async def task_status_updates(workflow_id: int, request: Request) -> Any:
         filter_criteria = (Task.workflow_id == workflow_id,)
 
     # get time from db
-    session = SessionLocal()
-    with session.begin():
-        db_time = session.execute(select(func.now())).scalar()
-        str_time = db_time.strftime("%Y-%m-%d %H:%M:%S") if db_time else None
+    with SessionLocal() as session:
+        with session.begin():
+            db_time = session.execute(select(func.now())).scalar()
+            str_time = db_time.strftime("%Y-%m-%d %H:%M:%S") if db_time else None
 
     # Prepare and execute your query without GROUP_CONCAT
     tasks_by_status_query = select(Task.status, Task.id).where(*filter_criteria)
@@ -391,20 +397,20 @@ async def task_status_updates(workflow_id: int, request: Request) -> Any:
 def fetch_workflow_metadata(workflow_id: int) -> Any:
     """Get metadata associated with specified Workflow ID."""
     # Query for a workflow object
-    session = SessionLocal()
-    with session.begin():
-        wf = session.execute(
-            select(Workflow).where(Workflow.id == workflow_id)
-        ).scalar()
+    with SessionLocal() as session:
+        with session.begin():
+            wf = session.execute(
+                select(Workflow).where(Workflow.id == workflow_id)
+            ).scalar()
 
-    if not wf:
-        logger.warning(f"No workflow found for ID {workflow_id}")
-        return_tuple = ()
-    else:
-        return_tuple = wf.to_wire_as_distributor_workflow()
+        if not wf:
+            logger.warning(f"No workflow found for ID {workflow_id}")
+            return_tuple = ()
+        else:
+            return_tuple = wf.to_wire_as_distributor_workflow()
 
-    resp = JSONResponse(content={"workflow": return_tuple},
-                        status_code=StatusCodes.OK)
+        resp = JSONResponse(content={"workflow": return_tuple},
+                            status_code=StatusCodes.OK)
     return resp
 
 
@@ -413,79 +419,76 @@ def get_tasks_from_workflow(workflow_id: int,
                             max_task_id: int,
                             chunk_size: int) -> Any:
     """Return tasks associated with specified Workflow ID."""
-    session = SessionLocal()
-
-    if max_task_id == 0:
-        # Performance suffers heavily if we do a search with WHERE task.id > 0
-        # Therefore, select the smallest task ID in the workflow and use that as the initial
-        # floor.
+    with SessionLocal() as session:
         with session.begin():
-            min_task_id = session.execute(
-                select(func.min(Task.id)).where(Task.workflow_id == workflow_id)
-            ).scalar()
-            max_task_id = min_task_id - 1 if min_task_id else 0
-
-    with session.begin():
-        # Query task table
-        query = (
-            select(
-                Task.id,
-                Task.array_id,
-                Task.status,
-                Task.max_attempts,
-                Task.resource_scales,
-                Task.fallback_queues,
-                TaskResources.requested_resources,
-                TaskResources.queue_id,
+            if max_task_id == 0:
+                # Performance suffers heavily if we do a search with WHERE task.id > 0
+                # Therefore, select the smallest task ID in the workflow and use that as the initial
+                # floor.
+                min_task_id = session.execute(
+                    select(func.min(Task.id)).where(Task.workflow_id == workflow_id)
+                ).scalar()
+                max_task_id = min_task_id - 1 if min_task_id else 0
+            # Query task table
+            query = (
+                select(
+                    Task.id,
+                    Task.array_id,
+                    Task.status,
+                    Task.max_attempts,
+                    Task.resource_scales,
+                    Task.fallback_queues,
+                    TaskResources.requested_resources,
+                    TaskResources.queue_id,
+                )
+                .join_from(Task, Array, Task.array_id == Array.id)
+                .join_from(Task, TaskResources, Task.task_resources_id == TaskResources.id)
+                .where(
+                    Task.workflow_id == workflow_id,
+                    # Note: because of this status != "DONE" filter, only the portion of the DAG
+                    # that is not complete is returned. Assumes that all tasks in a workflow
+                    # correspond to nodes that belong in the same DAG, and that no downstream
+                    # nodes can be in DONE for any unfinished task
+                    Task.status != TaskStatus.DONE,
+                    # Greater than set by the input max_task_id
+                    Task.id > max_task_id,
+                )
+                .order_by(Task.id)
+                .limit(chunk_size)
             )
-            .join_from(Task, Array, Task.array_id == Array.id)
-            .join_from(Task, TaskResources, Task.task_resources_id == TaskResources.id)
-            .where(
-                Task.workflow_id == workflow_id,
-                # Note: because of this status != "DONE" filter, only the portion of the DAG
-                # that is not complete is returned. Assumes that all tasks in a workflow
-                # correspond to nodes that belong in the same DAG, and that no downstream
-                # nodes can be in DONE for any unfinished task
-                Task.status != TaskStatus.DONE,
-                # Greater than set by the input max_task_id
-                Task.id > max_task_id,
-            )
-            .order_by(Task.id)
-            .limit(chunk_size)
-        )
-        res = session.execute(query).all()
+            res = session.execute(query).all()
 
-        queue_map: Dict[int, List[int]] = {}
-        array_map: Dict[int, List[int]] = {}
-        resp_dict = {}
-        for row in res:
-            task_id = row[0]
-            array_id = row[1]
-            queue_id = row[7]
-            row_metadata = row[1:7]
+            queue_map: Dict[int, List[int]] = {}
+            array_map: Dict[int, List[int]] = {}
+            resp_dict = {}
+            for row in res:
+                task_id = row[0]
+                array_id = row[1]
+                queue_id = row[7]
+                row_metadata = row[1:7]
 
-            resp_dict[task_id] = list(row_metadata)
-            if queue_id not in queue_map:
-                queue_map[queue_id] = []
-            queue_map[queue_id].append(task_id)
-            if array_id not in array_map:
-                array_map[array_id] = []
-            array_map[array_id].append(task_id)
+                resp_dict[task_id] = list(row_metadata)
+                if queue_id not in queue_map:
+                    queue_map[queue_id] = []
+                queue_map[queue_id].append(task_id)
+                if array_id not in array_map:
+                    array_map[array_id] = []
+                array_map[array_id].append(task_id)
 
-        # get the queue and cluster
-        for queue_id in queue_map.keys():
-            queue = session.get(Queue, queue_id)
-            queue_name = queue.name if queue else None
-            cluster_name = queue.cluster.name if queue else None  # type: ignore
-            for task_id in queue_map[queue_id]:
-                resp_dict[task_id].extend([cluster_name, queue_name])
+            # get the queue and cluster
+            for queue_id in queue_map.keys():
+                queue = session.get(Queue, queue_id)
+                queue_name = queue.name if queue else None
+                cluster_name = queue.cluster.name if queue else None  # type: ignore
+                for task_id in queue_map[queue_id]:
+                    resp_dict[task_id].extend([cluster_name, queue_name])
 
-        # get the max concurrency
-        for array_id in array_map.keys():
-            array: Any = session.get(Array, array_id)
-            max_concurrently_running = array.max_concurrently_running
-            for task_id in array_map[array_id]:
-                resp_dict[task_id].append(max_concurrently_running)
+            # get the max concurrency
+            for array_id in array_map.keys():
+                array: Any = session.get(Array, array_id)
+                max_concurrently_running = array.max_concurrently_running
+                for task_id in array_map[array_id]:
+                    resp_dict[task_id].append(max_concurrently_running)
 
     resp = JSONResponse(content={"tasks": resp_dict}, status_code=StatusCodes.OK)
     return resp

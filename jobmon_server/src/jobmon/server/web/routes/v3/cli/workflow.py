@@ -69,14 +69,14 @@ async def get_workflow_validation_status(request: Request) -> Any:
                             status_code=StatusCodes.OK)
         return resp
 
-    session = SessionLocal()
-    with session.begin():
-        # execute query
-        query_filter = [Task.workflow_id == Workflow.id, Task.id.in_(task_ids)]
-        sql = (
-            select(Task.workflow_id, Workflow.status).where(*query_filter)
-        ).distinct()
-        rows = session.execute(sql).all()
+    with SessionLocal() as session:
+        with session.begin():
+            # execute query
+            query_filter = [Task.workflow_id == Workflow.id, Task.id.in_(task_ids)]
+            sql = (
+                select(Task.workflow_id, Workflow.status).where(*query_filter)
+            ).distinct()
+            rows = session.execute(sql).all()
     res = [ti[1] for ti in rows]
     # Validate if all tasks are in the same workflow and the workflow status is dead
     if len(res) == 1 and res[0] in (
@@ -102,31 +102,31 @@ def get_workflow_tasks(workflow_id: int,
     status_request = status
     logger.debug(f"Get tasks for workflow in status {status_request}")
 
-    session = SessionLocal()
-    with session.begin():
-        if status_request:
-            query_filter = [
-                Workflow.id == Task.workflow_id,
-                Task.status.in_(
-                    [
-                        i
-                        for arg in status_request
-                        for i in _reversed_cli_label_mapping[arg]
-                    ]
-                ),
-                Workflow.id == int(workflow_id),
-            ]
-        else:
-            query_filter = [
-                Workflow.id == Task.workflow_id,
-                Workflow.id == int(workflow_id),
-            ]
-        sql = (
-            select(Task.id, Task.name, Task.status, Task.num_attempts).where(
-                *query_filter
-            )
-        ).order_by(Task.id.desc())
-        rows = session.execute(sql).all()
+    with SessionLocal() as session:
+        with session.begin():
+            if status_request:
+                query_filter = [
+                    Workflow.id == Task.workflow_id,
+                    Task.status.in_(
+                        [
+                            i
+                            for arg in status_request
+                            for i in _reversed_cli_label_mapping[arg]
+                        ]
+                    ),
+                    Workflow.id == int(workflow_id),
+                ]
+            else:
+                query_filter = [
+                    Workflow.id == Task.workflow_id,
+                    Workflow.id == int(workflow_id),
+                ]
+            sql = (
+                select(Task.id, Task.name, Task.status, Task.num_attempts).where(
+                    *query_filter
+                )
+            ).order_by(Task.id.desc())
+            rows = session.execute(sql).all()
     column_names = ("TASK_ID", "TASK_NAME", "STATUS", "RETRIES")
     res = [dict(zip(column_names, ti)) for ti in rows]
     for r in res:
@@ -161,11 +161,11 @@ def get_workflow_user_validation(workflow_id: int, username: str) -> Any:
     Used to validate permissions for a self-service request.
     """
     logger.debug(f"Validate user name {username} for workflow")
-    session = SessionLocal()
-    with session.begin():
-        query_filter = [WorkflowRun.workflow_id == workflow_id]
-        sql = (select(WorkflowRun.user).where(*query_filter)).distinct()
-        rows = session.execute(sql).all()
+    with SessionLocal() as session:
+        with session.begin():
+            query_filter = [WorkflowRun.workflow_id == workflow_id]
+            sql = (select(WorkflowRun.user).where(*query_filter)).distinct()
+            rows = session.execute(sql).all()
     usernames = [row[0] for row in rows]
     resp = JSONResponse(content={"validation": username in usernames},
                         status_code=StatusCodes.OK)
@@ -181,16 +181,16 @@ def get_workflow_run_for_workflow_reset(workflow_id: int, username: str) -> Any:
         2. This last workflow_run must have been started by the input username.
         3. This last workflow_run is in status 'E'
     """
-    session = SessionLocal()
-    with session.begin():
-        query_filter = [
-            WorkflowRun.workflow_id == workflow_id,
-            WorkflowRun.status == "E",
-        ]
-        sql = (select(WorkflowRun.id, WorkflowRun.user).where(*query_filter)).order_by(
-            WorkflowRun.created_date.desc()
-        )
-        rows = session.execute(sql).all()
+    with SessionLocal() as session:
+        with session.begin():
+            query_filter = [
+                WorkflowRun.workflow_id == workflow_id,
+                WorkflowRun.status == "E",
+            ]
+            sql = (select(WorkflowRun.id, WorkflowRun.user).where(*query_filter)).order_by(
+                WorkflowRun.created_date.desc()
+            )
+            rows = session.execute(sql).all()
     result = None if len(rows) <= 0 else rows[0]
     if result is not None and result[1] == username:
         resp = JSONResponse(content={"workflow_run_id": result[0]},
@@ -204,35 +204,35 @@ def get_workflow_run_for_workflow_reset(workflow_id: int, username: str) -> Any:
 @api_v3_router.put("workflow/<workflow_id>/reset")
 async def reset_workflow(workflow_id: int, request: Request) -> Any:
     """Update the workflow's status, all its tasks' statuses to 'G'."""
-    session = SessionLocal()
     data = await request.json()
     partial_reset = data.get("partial_reset", False)
-    with session.begin():
-        current_time = session.query(func.now()).scalar()
+    with SessionLocal() as session:
+        with session.begin():
+            current_time = session.query(func.now()).scalar()
 
-        workflow_query = select(Workflow).where(Workflow.id == workflow_id)
-        workflow = session.execute(workflow_query).scalars().one_or_none()
-        if workflow:
-            workflow.reset(current_time=current_time)
-            session.flush()
+            workflow_query = select(Workflow).where(Workflow.id == workflow_id)
+            workflow = session.execute(workflow_query).scalars().one_or_none()
+            if workflow:
+                workflow.reset(current_time=current_time)
+                session.flush()
 
-        # Update task statuses associated with the workflow
-        # Default behavior is a full workflow reset, all tasks to registered state
-        # User can optionally request only a partial reset if they want to resume this workflow
-        invalid_statuses = ["G"]
-        if partial_reset:
-            invalid_statuses.append("D")
-        update_filter = [
-            Task.workflow_id == workflow_id,
-            Task.status.notin_(invalid_statuses),
-        ]
-        update_stmt = (
-            update(Task)
-            .where(*update_filter)
-            .values(status="G", status_date=func.now(), num_attempts=0)
-        )
-        session.execute(update_stmt)
-        session.commit()
+            # Update task statuses associated with the workflow
+            # Default behavior is a full workflow reset, all tasks to registered state
+            # User can optionally request only a partial reset if they want to resume this workflow
+            invalid_statuses = ["G"]
+            if partial_reset:
+                invalid_statuses.append("D")
+            update_filter = [
+                Task.workflow_id == workflow_id,
+                Task.status.notin_(invalid_statuses),
+            ]
+            update_stmt = (
+                update(Task)
+                .where(*update_filter)
+                .values(status="G", status_date=func.now(), num_attempts=0)
+            )
+            session.execute(update_stmt)
+            session.commit()
 
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
@@ -276,22 +276,22 @@ def get_workflow_status(user: str,
     # performance improvement one: only query the limited number of workflows
     workflow_request = workflow_request[:limit]
     # performance improvement two: split query
-    session = SessionLocal()
-    with session.begin():
-        query_filter = [
-            Workflow.id.in_(workflow_request),  # type: ignore
-            WorkflowStatus.id == Workflow.status,  # type: ignore
-        ]
-        sql1: Select[
-            Tuple[Optional[int], Optional[str], Optional[str], Optional[datetime]]
-        ] = (
-            select(
-                Workflow.id, Workflow.name, WorkflowStatus.label, Workflow.created_date
+    with SessionLocal() as session:
+        with session.begin():
+            query_filter = [
+                Workflow.id.in_(workflow_request),  # type: ignore
+                WorkflowStatus.id == Workflow.status,  # type: ignore
+            ]
+            sql1: Select[
+                Tuple[Optional[int], Optional[str], Optional[str], Optional[datetime]]
+            ] = (
+                select(
+                    Workflow.id, Workflow.name, WorkflowStatus.label, Workflow.created_date
+                )
+            ).where(
+                *query_filter
             )
-        ).where(
-            *query_filter
-        )
-        rows1 = session.execute(sql1).all()
+            rows1 = session.execute(sql1).all()
     row_map = dict()
     for r in rows1:
         row_map[r[0]] = r
@@ -401,18 +401,18 @@ def get_workflow_status(user: str,
 @api_v3_router.get("/workflow_status_viz")
 def get_workflow_status_viz(workflow_ids: list[int] = Query(None)) -> Any:
     """Get the status of the workflows for GUI."""
-    session = SessionLocal()
     wf_ids = workflow_ids
     # return DS
     return_dic: Dict[int, Any] = dict()
     for wf_id in wf_ids:
-        with session.begin():
-            sql = select(
-                func.min(Task.num_attempts).label("min"),
-                func.max(Task.num_attempts).label("max"),
-                func.avg(Task.num_attempts).label("mean"),
-            ).where(Task.workflow_id == wf_id)
-            attempts = session.execute(sql).first()
+        with SessionLocal() as session:
+            with session.begin():
+                sql = select(
+                    func.min(Task.num_attempts).label("min"),
+                    func.max(Task.num_attempts).label("max"),
+                    func.avg(Task.num_attempts).label("mean"),
+                ).where(Task.workflow_id == wf_id)
+                attempts = session.execute(sql).first()
 
         return_dic[int(wf_id)] = {
             "id": int(wf_id),
@@ -427,13 +427,13 @@ def get_workflow_status_viz(workflow_ids: list[int] = Query(None)) -> Any:
             "num_attempts_min": int(attempts.min),  # type: ignore
             "num_attempts_max": int(attempts.max),  # type: ignore
         }
-
-    with session.begin():
-        query_filter = [Task.workflow_id.in_(wf_ids), Task.workflow_id == Workflow.id]
-        sql = select(
-            Task.workflow_id, Task.status, Workflow.max_concurrently_running
-        ).where(*query_filter)
-        rows = session.execute(sql).all()
+    with SessionLocal() as session:
+        with session.begin():
+            query_filter = [Task.workflow_id.in_(wf_ids), Task.workflow_id == Workflow.id]
+            sql = select(
+                Task.workflow_id, Task.status, Workflow.max_concurrently_running
+            ).where(*query_filter)
+            rows = session.execute(sql).all()
 
     for row in rows:
         return_dic[row[0]]["tasks"] += 1
@@ -455,99 +455,99 @@ def workflows_by_user_form(user: str,
                            date_submitted_end: str,
                            status: str) -> Any:
     """Fetch associated workflows and workflow runs by username."""
-    session = SessionLocal()
-    with session.begin():
-        where_clauses = []
-        substitution_dict = {}
-        if user:
-            where_clauses.append("workflow_run.user = :user")
-            substitution_dict["user"] = user
-        if tool:
-            where_clauses.append("tool.name = :tool")
-            substitution_dict["tool"] = tool
-        if wf_name:
-            where_clauses.append("workflow.name = :wf_name")
-            substitution_dict["wf_name"] = wf_name
-        if wf_args:
-            where_clauses.append("workflow.workflow_args = :wf_args")
-            substitution_dict["wf_args"] = wf_args
-        if wf_attribute_key:
-            where_clauses.append("workflow_attribute_type.name = :wf_attribute_key")
-            substitution_dict["wf_attribute_key"] = wf_attribute_key
-        if wf_attribute_value:
-            where_clauses.append("workflow_attribute.value = :wf_attribute_value")
-            substitution_dict["wf_attribute_value"] = wf_attribute_value
-        if wf_id:
-            where_clauses.append("workflow.id = :wf_id")
-            substitution_dict["wf_id"] = wf_id
-        if date_submitted:
-            where_clauses.append("workflow.created_date >= :date_submitted")
-            substitution_dict["date_submitted"] = date_submitted
-        if date_submitted_end:
-            where_clauses.append("workflow.created_date <= :date_submitted_end")
-            substitution_dict["date_submitted_end"] = date_submitted_end
-        if status:
-            where_clauses.append("workflow.status = :status")
-            substitution_dict["status"] = status
+    with SessionLocal() as session:
+        with session.begin():
+            where_clauses = []
+            substitution_dict = {}
+            if user:
+                where_clauses.append("workflow_run.user = :user")
+                substitution_dict["user"] = user
+            if tool:
+                where_clauses.append("tool.name = :tool")
+                substitution_dict["tool"] = tool
+            if wf_name:
+                where_clauses.append("workflow.name = :wf_name")
+                substitution_dict["wf_name"] = wf_name
+            if wf_args:
+                where_clauses.append("workflow.workflow_args = :wf_args")
+                substitution_dict["wf_args"] = wf_args
+            if wf_attribute_key:
+                where_clauses.append("workflow_attribute_type.name = :wf_attribute_key")
+                substitution_dict["wf_attribute_key"] = wf_attribute_key
+            if wf_attribute_value:
+                where_clauses.append("workflow_attribute.value = :wf_attribute_value")
+                substitution_dict["wf_attribute_value"] = wf_attribute_value
+            if wf_id:
+                where_clauses.append("workflow.id = :wf_id")
+                substitution_dict["wf_id"] = wf_id
+            if date_submitted:
+                where_clauses.append("workflow.created_date >= :date_submitted")
+                substitution_dict["date_submitted"] = date_submitted
+            if date_submitted_end:
+                where_clauses.append("workflow.created_date <= :date_submitted_end")
+                substitution_dict["date_submitted_end"] = date_submitted_end
+            if status:
+                where_clauses.append("workflow.status = :status")
+                substitution_dict["status"] = status
 
-        if where_clauses:
-            inner_where_clause = " WHERE " + (" AND ".join(where_clauses))
-        else:
-            inner_where_clause = ""
+            if where_clauses:
+                inner_where_clause = " WHERE " + (" AND ".join(where_clauses))
+            else:
+                inner_where_clause = ""
 
-        query = text(
-            f"""
-            SELECT
-                workflow.id,
-                workflow.name,
-                workflow.created_date,
-                workflow.status_date,
-                workflow.workflow_args,
-                count(distinct workflow_run.id) as num_attempts,
-                workflow_status.label,
-                tool.name
-            FROM
-                workflow
-                JOIN (
-                    SELECT
-                        distinct queue_id,
-                        workflow_id
-                    FROM
-                        task
-                        JOIN task_resources ON task_resources.id = task.task_resources_id
-                    WHERE
-                        task.workflow_id IN (
-                            SELECT
-                                workflow_run.workflow_id
-                            FROM
-                                workflow
-                                JOIN tool_version ON workflow.tool_version_id = tool_version.id
-                                JOIN tool ON tool.id = tool_version.tool_id
-                                JOIN workflow_run ON workflow.id = workflow_run.workflow_id
-                                LEFT JOIN workflow_attribute
-                                    ON workflow.id = workflow_attribute.workflow_id
-                                LEFT JOIN workflow_attribute_type
-                                    ON workflow_attribute.workflow_attribute_type_id =
-                                        workflow_attribute_type.id
-                            {inner_where_clause}
-                        )
-                    GROUP BY
-                        workflow_id, queue_id
-                ) workflow_queue ON workflow.id = workflow_queue.workflow_id
-                JOIN queue ON queue.id = workflow_queue.queue_id
-                JOIN workflow_run ON workflow.id = workflow_run.workflow_id
-                JOIN tool_version ON workflow.tool_version_id = tool_version.id
-                JOIN tool ON tool.id = tool_version.tool_id
-                JOIN workflow_status ON workflow.status = workflow_status.id
-            WHERE
-                cluster_id != 1
-            GROUP BY
-                workflow.id
-            ORDER BY
-                workflow.id DESC
-    """
-        )
-        rows = session.execute(query, substitution_dict).all()
+            query = text(
+                f"""
+                SELECT
+                    workflow.id,
+                    workflow.name,
+                    workflow.created_date,
+                    workflow.status_date,
+                    workflow.workflow_args,
+                    count(distinct workflow_run.id) as num_attempts,
+                    workflow_status.label,
+                    tool.name
+                FROM
+                    workflow
+                    JOIN (
+                        SELECT
+                            distinct queue_id,
+                            workflow_id
+                        FROM
+                            task
+                            JOIN task_resources ON task_resources.id = task.task_resources_id
+                        WHERE
+                            task.workflow_id IN (
+                                SELECT
+                                    workflow_run.workflow_id
+                                FROM
+                                    workflow
+                                    JOIN tool_version ON workflow.tool_version_id = tool_version.id
+                                    JOIN tool ON tool.id = tool_version.tool_id
+                                    JOIN workflow_run ON workflow.id = workflow_run.workflow_id
+                                    LEFT JOIN workflow_attribute
+                                        ON workflow.id = workflow_attribute.workflow_id
+                                    LEFT JOIN workflow_attribute_type
+                                        ON workflow_attribute.workflow_attribute_type_id =
+                                            workflow_attribute_type.id
+                                {inner_where_clause}
+                            )
+                        GROUP BY
+                            workflow_id, queue_id
+                    ) workflow_queue ON workflow.id = workflow_queue.workflow_id
+                    JOIN queue ON queue.id = workflow_queue.queue_id
+                    JOIN workflow_run ON workflow.id = workflow_run.workflow_id
+                    JOIN tool_version ON workflow.tool_version_id = tool_version.id
+                    JOIN tool ON tool.id = tool_version.tool_id
+                    JOIN workflow_status ON workflow.status = workflow_status.id
+                WHERE
+                    cluster_id != 1
+                GROUP BY
+                    workflow.id
+                ORDER BY
+                    workflow.id DESC
+        """
+            )
+            rows = session.execute(query, substitution_dict).all()
 
     column_names = (
         "wf_id",
@@ -575,28 +575,28 @@ def task_details_by_wf_id(workflow_id: int,
                           tt_name: str) -> Any:
     """Fetch Task details associated with Workflow ID and TaskTemplate name."""
     task_template_name = tt_name
-    session = SessionLocal()
-    with session.begin():
-        sql = (
-            select(
-                Task.id,
-                Task.name,
-                Task.status,
-                Task.command,
-                Task.num_attempts,
-                Task.status_date,
-                Task.max_attempts,
+    with SessionLocal() as session:
+        with session.begin():
+            sql = (
+                select(
+                    Task.id,
+                    Task.name,
+                    Task.status,
+                    Task.command,
+                    Task.num_attempts,
+                    Task.status_date,
+                    Task.max_attempts,
+                )
+                .where(
+                    Task.workflow_id == workflow_id,
+                    Task.node_id == Node.id,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                    TaskTemplate.name == task_template_name,
+                )
+                .order_by(Task.id.asc())
             )
-            .where(
-                Task.workflow_id == workflow_id,
-                Task.node_id == Node.id,
-                Node.task_template_version_id == TaskTemplateVersion.id,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
-                TaskTemplate.name == task_template_name,
-            )
-            .order_by(Task.id.asc())
-        )
-        rows = session.execute(sql).all()
+            rows = session.execute(sql).all()
 
     column_names = (
         "task_id",
@@ -618,25 +618,25 @@ def task_details_by_wf_id(workflow_id: int,
 @api_v3_router.get("/workflow_details_viz/{workflow_id}")
 def wf_details_by_wf_id(workflow_id: int) -> Any:
     """Fetch name, args, dates, tool for a Workflow provided WF ID."""
-    session = SessionLocal()
-    with session.begin():
-        sql = select(
-            Workflow.name,
-            Workflow.workflow_args,
-            Workflow.created_date,
-            Workflow.status_date,
-            Tool.name,
-            Workflow.status,
-            WorkflowStatus.description,
-            WorkflowRun.jobmon_version,
-        ).where(
-            Workflow.id == workflow_id,
-            Workflow.tool_version_id == ToolVersion.id,
-            ToolVersion.tool_id == Tool.id,
-            WorkflowStatus.id == Workflow.status,
-            WorkflowRun.workflow_id == Workflow.id,
-        )
-        rows = session.execute(sql).all()
+    with SessionLocal() as session:
+        with session.begin():
+            sql = select(
+                Workflow.name,
+                Workflow.workflow_args,
+                Workflow.created_date,
+                Workflow.status_date,
+                Tool.name,
+                Workflow.status,
+                WorkflowStatus.description,
+                WorkflowRun.jobmon_version,
+            ).where(
+                Workflow.id == workflow_id,
+                Workflow.tool_version_id == ToolVersion.id,
+                ToolVersion.tool_id == Tool.id,
+                WorkflowStatus.id == Workflow.status,
+                WorkflowRun.workflow_id == Workflow.id,
+            )
+            rows = session.execute(sql).all()
 
     column_names = (
         "wf_name",

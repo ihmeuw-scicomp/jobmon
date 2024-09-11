@@ -2,7 +2,7 @@
 
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import Request
 from starlette.responses import JSONResponse
@@ -39,42 +39,42 @@ SessionLocal = get_session_local()
 
 
 @api_v3_router.get("/get_task_template_version")
-def get_task_template_version_for_tasks(task_id: int,
-                                        workflow_id: int) -> Any:
+def get_task_template_version_for_tasks(task_id: Optional[int] = None,
+                                        workflow_id: Optional[int] = None) -> Any:
     """Get the task_template_version_ids."""
     # parse args
     t_id = task_id
     wf_id = workflow_id
     # This route only accept one task id or one wf id;
     # If provided both, ignor wf id
-    session = SessionLocal()
-    with session.begin():
-        if t_id:
-            query_filter = [
-                Task.id == t_id,
-                Task.node_id == Node.id,
-                Node.task_template_version_id == TaskTemplateVersion.id,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
-            ]
-            sql = select(
-                TaskTemplateVersion.id,
-                TaskTemplate.name,
-            ).where(*query_filter)
-
-        else:
-            query_filter = [
-                Task.workflow_id == wf_id,
-                Task.node_id == Node.id,
-                Node.task_template_version_id == TaskTemplateVersion.id,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
-            ]
-            sql = (
-                select(
+    with SessionLocal() as session:
+        with session.begin():
+            if t_id:
+                query_filter = [
+                    Task.id == t_id,
+                    Task.node_id == Node.id,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                ]
+                sql = select(
                     TaskTemplateVersion.id,
                     TaskTemplate.name,
                 ).where(*query_filter)
-            ).distinct()
-        rows = session.execute(sql).all()
+
+            else:
+                query_filter = [
+                    Task.workflow_id == wf_id,
+                    Task.node_id == Node.id,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                ]
+                sql = (
+                    select(
+                        TaskTemplateVersion.id,
+                        TaskTemplate.name,
+                    ).where(*query_filter)
+                ).distinct()
+            rows = session.execute(sql).all()
     column_names = ("id", "name")
     ttvis = [dict(zip(column_names, ti)) for ti in rows]
     resp = JSONResponse(content={"task_template_version_ids": ttvis},
@@ -83,7 +83,7 @@ def get_task_template_version_for_tasks(task_id: int,
 
 
 @api_v3_router.get("/get_requested_cores")
-def get_requested_cores(task_template_version_ids: int) -> Any:
+def get_requested_cores(task_template_version_ids: Optional[str] = None) -> Any:
     """Get the min, max, and arg of requested cores."""
     # parse args
     ttvis = task_template_version_ids
@@ -93,21 +93,21 @@ def get_requested_cores(task_template_version_ids: int) -> Any:
         )
     ttvis = [int(i) for i in ttvis[1:-1].split(",")]
     # null core should be treated as 1 instead of 0
-    session = SessionLocal()
-    with session.begin():
-        query_filter = [
-            TaskTemplateVersion.id.in_(ttvis),
-            TaskTemplateVersion.id == Node.task_template_version_id,
-            Task.node_id == Node.id,
-            Task.task_resources_id == TaskResources.id,
-        ]
+    with SessionLocal() as session:
+        with session.begin():
+            query_filter = [
+                TaskTemplateVersion.id.in_(ttvis),
+                TaskTemplateVersion.id == Node.task_template_version_id,
+                Task.node_id == Node.id,
+                Task.task_resources_id == TaskResources.id,
+            ]
 
-        sql = select(TaskTemplateVersion.id, TaskResources.requested_resources).where(
-            *query_filter
-        )
-    rows_raw = session.execute(sql).all()
-    column_names = ("id", "rr")
-    rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
+            sql = select(TaskTemplateVersion.id, TaskResources.requested_resources).where(
+                *query_filter
+            )
+        rows_raw = session.execute(sql).all()
+        column_names = ("id", "rr")
+        rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
 
     core_info = []
     if rows:
@@ -143,23 +143,23 @@ def get_most_popular_queue(task_template_version_ids: int) -> Any:
             "No task_template_version_ids returned in /get_most_popular_queue."
         )
     ttvis = [int(i) for i in ttvis[1:-1].split(",")]
-    session = SessionLocal()
-    with session.begin():
-        query_filter = [
-            TaskTemplateVersion.id.in_(ttvis),
-            TaskTemplateVersion.id == Node.task_template_version_id,
-            Task.node_id == Node.id,
-            TaskInstance.task_id == Task.id,
-            TaskInstance.task_resources_id == TaskResources.id,
-            TaskResources.queue_id.isnot(None),
-        ]
-        sql = select(TaskTemplateVersion.id, TaskResources.queue_id).where(
-            *query_filter
-        )
+    with SessionLocal() as session:
+        with session.begin():
+            query_filter = [
+                TaskTemplateVersion.id.in_(ttvis),
+                TaskTemplateVersion.id == Node.task_template_version_id,
+                Task.node_id == Node.id,
+                TaskInstance.task_id == Task.id,
+                TaskInstance.task_resources_id == TaskResources.id,
+                TaskResources.queue_id.isnot(None),
+            ]
+            sql = select(TaskTemplateVersion.id, TaskResources.queue_id).where(
+                *query_filter
+            )
 
-    rows_raw = session.execute(sql).all()
-    column_names = ("id", "queue_id")
-    rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
+        rows_raw = session.execute(sql).all()
+        column_names = ("id", "queue_id")
+        rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
     # return a "standard" json format for cli routes
     queue_info = []
     if rows:
@@ -216,29 +216,29 @@ async def get_task_template_resource_usage(request: Request) -> Any:
     ci = data.pop("ci", None)
     viz = bool(data.pop("viz", False))
 
-    session = SessionLocal()
-    with session.begin():
-        query_filter = [
-            TaskTemplateVersion.id == task_template_version_id,
-            Task.status == "D",
-            TaskInstance.status == "D",
-            TaskTemplateVersion.id == Node.task_template_version_id,
-            Node.id == Task.node_id,
-            Task.id == TaskInstance.task_id,
-        ]
-        if workflows:
-            query_filter += [
-                TaskInstance.workflow_run_id == WorkflowRun.id,
-                WorkflowRun.workflow_id == Workflow.id,
-                Workflow.id.in_(workflows),
+    with SessionLocal() as session:
+        with session.begin():
+            query_filter = [
+                TaskTemplateVersion.id == task_template_version_id,
+                Task.status == "D",
+                TaskInstance.status == "D",
+                TaskTemplateVersion.id == Node.task_template_version_id,
+                Node.id == Task.node_id,
+                Task.id == TaskInstance.task_id,
             ]
-        sql = select(
-            TaskInstance.wallclock, TaskInstance.maxrss, Node.id, Task.id
-        ).where(*query_filter)
-        rows_raw = session.execute(sql).all()
-        session.commit()
-    column_names = ("r", "m", "node_id", "task_id")
-    rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
+            if workflows:
+                query_filter += [
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                    WorkflowRun.workflow_id == Workflow.id,
+                    Workflow.id.in_(workflows),
+                ]
+            sql = select(
+                TaskInstance.wallclock, TaskInstance.maxrss, Node.id, Task.id
+            ).where(*query_filter)
+            rows_raw = session.execute(sql).all()
+            session.commit()
+        column_names = ("r", "m", "node_id", "task_id")
+        rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
     result = []
     if rows:
         for r in rows:
@@ -357,89 +357,89 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
     # return DS
     return_dic: Dict[int, Any] = dict()
 
-    session = SessionLocal()
-    with session.begin():
-        # user subquery as the Array table has to be joined on two columns
-        sub_query = (
-            select(
-                Array.id, Array.task_template_version_id, Array.max_concurrently_running
-            ).where(Array.workflow_id == workflow_id)
-        ).subquery()
-        join_table = (
-            Task.__table__.join(Node, Task.node_id == Node.id)
-            .join(
-                TaskTemplateVersion,
-                Node.task_template_version_id == TaskTemplateVersion.id,
+    with SessionLocal() as session:
+        with session.begin():
+            # user subquery as the Array table has to be joined on two columns
+            sub_query = (
+                select(
+                    Array.id, Array.task_template_version_id, Array.max_concurrently_running
+                ).where(Array.workflow_id == workflow_id)
+            ).subquery()
+            join_table = (
+                Task.__table__.join(Node, Task.node_id == Node.id)
+                .join(
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join(
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                # Arrays were introduced in 3.1.0, hence the outer-join for 3.0.* workflows
+                .join(
+                    sub_query,
+                    sub_query.c.task_template_version_id == TaskTemplateVersion.id,
+                    isouter=True,
+                )
             )
-            .join(
-                TaskTemplate,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
+            # Order by the task submitted date in each task template
+            sql = (
+                select(
+                    TaskTemplate.id,
+                    TaskTemplate.name,
+                    Task.id,
+                    Task.status,
+                    sub_query.c.max_concurrently_running,
+                    TaskTemplateVersion.id,
+                )
+                .select_from(join_table)
+                .where(Task.workflow_id == workflow_id)
+                .order_by(Task.id)
             )
-            # Arrays were introduced in 3.1.0, hence the outer-join for 3.0.* workflows
-            .join(
-                sub_query,
-                sub_query.c.task_template_version_id == TaskTemplateVersion.id,
-                isouter=True,
-            )
-        )
-        # Order by the task submitted date in each task template
-        sql = (
-            select(
-                TaskTemplate.id,
-                TaskTemplate.name,
-                Task.id,
-                Task.status,
-                sub_query.c.max_concurrently_running,
-                TaskTemplateVersion.id,
-            )
-            .select_from(join_table)
-            .where(Task.workflow_id == workflow_id)
-            .order_by(Task.id)
-        )
-        # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
-        # the optimizer may choose a suboptimal execution plan for large datasets.
-        # Has to be conditional since not all database engines support STRAIGHT_JOIN.
-        if (
-            SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
-        ):
-            sql = sql.prefix_with("STRAIGHT_JOIN")
-        rows = session.execute(sql).all()
-        session.commit()
+            # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
+            # the optimizer may choose a suboptimal execution plan for large datasets.
+            # Has to be conditional since not all database engines support STRAIGHT_JOIN.
+            if (
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
+            ):
+                sql = sql.prefix_with("STRAIGHT_JOIN")
+            rows = session.execute(sql).all()
+            session.commit()
 
     # Get min, max, avg for each task template in `workflow_id`
-    with session.begin():
-        join_table = (
-            Task.__table__.join(Node, Task.node_id == Node.id)
-            .join(
-                TaskTemplateVersion,
-                Node.task_template_version_id == TaskTemplateVersion.id,
+        with session.begin():
+            join_table = (
+                Task.__table__.join(Node, Task.node_id == Node.id)
+                .join(
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join(
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
             )
-            .join(
-                TaskTemplate,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
+            sql = (
+                select(
+                    TaskTemplate.id.label("task_template_id"),
+                    TaskTemplate.name.label("task_template_name"),
+                    func.min(Task.num_attempts).label("min"),
+                    func.max(Task.num_attempts).label("max"),
+                    func.avg(Task.num_attempts).label("mean"),
+                )
+                .select_from(join_table)
+                .where(Task.workflow_id == workflow_id)
+                .group_by(TaskTemplate.id)
             )
-        )
-        sql = (
-            select(
-                TaskTemplate.id.label("task_template_id"),
-                TaskTemplate.name.label("task_template_name"),
-                func.min(Task.num_attempts).label("min"),
-                func.max(Task.num_attempts).label("max"),
-                func.avg(Task.num_attempts).label("mean"),
-            )
-            .select_from(join_table)
-            .where(Task.workflow_id == workflow_id)
-            .group_by(TaskTemplate.id)
-        )
-        if (
-            SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
-        ):
-            sql = sql.prefix_with("STRAIGHT_JOIN")
-        attempts0 = session.execute(sql).all()
+            if (
+                SessionLocal
+                and SessionLocal.bind
+                and SessionLocal.bind.dialect.name == "mysql"
+            ):
+                sql = sql.prefix_with("STRAIGHT_JOIN")
+            attempts0 = session.execute(sql).all()
 
     attempts: Dict[Any, Row[Any]] = {attempt[0]: attempt for attempt in attempts0}
 
@@ -497,109 +497,109 @@ def get_tt_error_log_viz(wf_id: int,
     output_clustered_errors = cluster_errors.lower() == "true"
     offset = (page - 1) * page_size
 
-    session = SessionLocal()
-    with session.begin():
-        query_filter = [
-            TaskTemplateVersion.task_template_id == tt_id,
-            Task.workflow_id == wf_id,
-        ]
+    with SessionLocal() as session:
+        with session.begin():
+            query_filter = [
+                TaskTemplateVersion.task_template_id == tt_id,
+                Task.workflow_id == wf_id,
+            ]
 
-        where_conditions = query_filter[:]
-        if recent_errors:
-            where_conditions.extend(
-                [
-                    (
-                        TaskInstance.id
-                        == select(func.max(TaskInstance.id))
-                        .where(TaskInstance.task_id == Task.id)
-                        .correlate(Task)
-                        .scalar_subquery()
-                    ),
-                    (
-                        TaskInstance.workflow_run_id
-                        == select(func.max(WorkflowRun.id))
-                        .where(WorkflowRun.workflow_id == Task.workflow_id)
-                        .correlate(Task)
-                        .scalar_subquery()
-                    ),
-                ]
+            where_conditions = query_filter[:]
+            if recent_errors:
+                where_conditions.extend(
+                    [
+                        (
+                            TaskInstance.id
+                            == select(func.max(TaskInstance.id))
+                            .where(TaskInstance.task_id == Task.id)
+                            .correlate(Task)
+                            .scalar_subquery()
+                        ),
+                        (
+                            TaskInstance.workflow_run_id
+                            == select(func.max(WorkflowRun.id))
+                            .where(WorkflowRun.workflow_id == Task.workflow_id)
+                            .correlate(Task)
+                            .scalar_subquery()
+                        ),
+                    ]
+                )
+            if ti_id:
+                where_conditions.extend(
+                    [
+                        (TaskInstance.id == ti_id),
+                    ]
+                )
+
+            total_count_query = (
+                select(func.count(TaskInstanceErrorLog.id))
+                .join_from(
+                    TaskInstanceErrorLog,
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(
+                    TaskInstance,
+                    WorkflowRun,
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                )
+                .join_from(Task, Node, Task.node_id == Node.id)
+                .join_from(
+                    Node,
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join_from(
+                    TaskTemplateVersion,
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .where(*where_conditions)
             )
-        if ti_id:
-            where_conditions.extend(
-                [
-                    (TaskInstance.id == ti_id),
-                ]
+            total_count = session.execute(total_count_query).scalar()
+
+            sql = (
+                select(
+                    Task.id,
+                    TaskInstance.id,
+                    TaskInstanceErrorLog.id,
+                    TaskInstanceErrorLog.error_time,
+                    TaskInstanceErrorLog.description,
+                    TaskInstance.stderr_log,
+                    TaskInstance.workflow_run_id,
+                    Task.workflow_id,
+                )
+                .join_from(
+                    TaskInstanceErrorLog,
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(
+                    TaskInstance,
+                    WorkflowRun,
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                )
+                .join_from(Task, Node, Task.node_id == Node.id)
+                .join_from(
+                    Node,
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join_from(
+                    TaskTemplateVersion,
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .where(*where_conditions)
+                .order_by(TaskInstanceErrorLog.id.desc())
+                .offset(offset)
+                .limit(page_size)
             )
 
-        total_count_query = (
-            select(func.count(TaskInstanceErrorLog.id))
-            .join_from(
-                TaskInstanceErrorLog,
-                TaskInstance,
-                TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
-            )
-            .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
-            .join_from(
-                TaskInstance,
-                WorkflowRun,
-                TaskInstance.workflow_run_id == WorkflowRun.id,
-            )
-            .join_from(Task, Node, Task.node_id == Node.id)
-            .join_from(
-                Node,
-                TaskTemplateVersion,
-                Node.task_template_version_id == TaskTemplateVersion.id,
-            )
-            .join_from(
-                TaskTemplateVersion,
-                TaskTemplate,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
-            )
-            .where(*where_conditions)
-        )
-        total_count = session.execute(total_count_query).scalar()
-
-        sql = (
-            select(
-                Task.id,
-                TaskInstance.id,
-                TaskInstanceErrorLog.id,
-                TaskInstanceErrorLog.error_time,
-                TaskInstanceErrorLog.description,
-                TaskInstance.stderr_log,
-                TaskInstance.workflow_run_id,
-                Task.workflow_id,
-            )
-            .join_from(
-                TaskInstanceErrorLog,
-                TaskInstance,
-                TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
-            )
-            .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
-            .join_from(
-                TaskInstance,
-                WorkflowRun,
-                TaskInstance.workflow_run_id == WorkflowRun.id,
-            )
-            .join_from(Task, Node, Task.node_id == Node.id)
-            .join_from(
-                Node,
-                TaskTemplateVersion,
-                Node.task_template_version_id == TaskTemplateVersion.id,
-            )
-            .join_from(
-                TaskTemplateVersion,
-                TaskTemplate,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
-            )
-            .where(*where_conditions)
-            .order_by(TaskInstanceErrorLog.id.desc())
-            .offset(offset)
-            .limit(page_size)
-        )
-
-        rows = session.execute(sql).all()
-        session.commit()
+            rows = session.execute(sql).all()
+            session.commit()
 
     for r in rows:
         return_list.append(

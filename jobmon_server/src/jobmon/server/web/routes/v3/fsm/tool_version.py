@@ -33,19 +33,19 @@ async def add_tool_version(request: Request) -> Any:
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    session = SessionLocal()
-    try:
-        with session.begin():
-            tool_version = ToolVersion(tool_id=tool_id)
-            session.add(tool_version)
+    with SessionLocal() as session:
+        try:
+            with session.begin():
+                tool_version = ToolVersion(tool_id=tool_id)
+                session.add(tool_version)
 
-    except sqlalchemy.exc.IntegrityError:
-        with session.begin():
-            select_stmt = select(ToolVersion).where(ToolVersion.tool_id == tool_id)
-            tool_version = session.execute(select_stmt).scalars().one()
+        except sqlalchemy.exc.IntegrityError:
+            with session.begin():
+                select_stmt = select(ToolVersion).where(ToolVersion.tool_id == tool_id)
+                tool_version = session.execute(select_stmt).scalars().one()
 
-    session.refresh(tool_version)
-    wire_format = tool_version.to_wire_as_client_tool_version()
+        session.refresh(tool_version)
+        wire_format = tool_version.to_wire_as_client_tool_version()
 
     resp = JSONResponse(content={"tool_version": wire_format}, status_code=StatusCodes.OK)
     return resp
@@ -60,14 +60,14 @@ def get_task_templates(tool_version_id: int) -> Any:
     structlog.contextvars.bind_contextvars(tool_version_id=tool_version_id)
     logger.info("Getting available task_templates")
 
-    session = SessionLocal()
-    with session.begin():
-        select_stmt = select(TaskTemplate).where(
-            TaskTemplate.tool_version_id == tool_version_id
-        )
-        task_templates = session.execute(select_stmt).scalars().all()
-        wire_format = [t.to_wire_as_client_task_template() for t in task_templates]
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = select(TaskTemplate).where(
+                TaskTemplate.tool_version_id == tool_version_id
+            )
+            task_templates = session.execute(select_stmt).scalars().all()
+            wire_format = [t.to_wire_as_client_task_template() for t in task_templates]
 
-    resp = JSONResponse(content={"task_templates": wire_format},
-                        status_code=StatusCodes.OK)
+        resp = JSONResponse(content={"task_templates": wire_format},
+                            status_code=StatusCodes.OK)
     return resp

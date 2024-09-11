@@ -22,20 +22,20 @@ def get_task_resources(task_resources_id: int) -> Any:
     """Return an task_resources."""
     structlog.contextvars.bind_contextvars(task_resources_id=task_resources_id)
 
-    session = SessionLocal()
-    with session.begin():
-        select_stmt = (
-            select(TaskResources.requested_resources, Queue.name)
-            .join_from(TaskResources, Queue, TaskResources.queue_id == Queue.id)
-            .where(TaskResources.id == task_resources_id)
-        )
-        row = session.execute(select_stmt).fetchone()
-        requested_resources_raw, queue_name = row if row else (None, None)
-        requested_resources = (
-            ast.literal_eval(requested_resources_raw)
-            if requested_resources_raw
-            else None
-        )
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = (
+                select(TaskResources.requested_resources, Queue.name)
+                .join_from(TaskResources, Queue, TaskResources.queue_id == Queue.id)
+                .where(TaskResources.id == task_resources_id)
+            )
+            row = session.execute(select_stmt).fetchone()
+            requested_resources_raw, queue_name = row if row else (None, None)
+            requested_resources = (
+                ast.literal_eval(requested_resources_raw)
+                if requested_resources_raw
+                else None
+            )
 
     resp = JSONResponse(content={"requested_resources": requested_resources,
                                  "queue_name": queue_name},

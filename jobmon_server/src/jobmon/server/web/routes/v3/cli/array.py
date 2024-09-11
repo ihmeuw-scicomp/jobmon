@@ -36,21 +36,22 @@ def get_array_task_instances(workflow_id: int,
     if job_name:
         query_filters.append(Task.name == job_name)
 
-    session = SessionLocal()
-    with SessionLocal.begin():
-        select_stmt = (
-            select(
-                Task.id,
-                Task.name,
-                Array.name,
-                TaskInstance.id,
-                TaskInstance.stdout,
-                TaskInstance.stderr,
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = (
+                select(
+                    Task.id,
+                    Task.name,
+                    Array.name,
+                    TaskInstance.id,
+                    TaskInstance.stdout,
+                    TaskInstance.stderr,
+                )
+                .where(*query_filters)
+                .limit(limit)
             )
-            .where(*query_filters)
-            .limit(limit)
-        )
-        result = session.execute(select_stmt).all()
+            result = session.execute(select_stmt).all()
+
 
     column_names = (
         "TASK_ID",

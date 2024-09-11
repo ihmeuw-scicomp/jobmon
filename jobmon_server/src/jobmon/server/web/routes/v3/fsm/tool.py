@@ -36,18 +36,21 @@ async def add_tool(request: Request) -> Any:
         ) from e
 
     # add tool to db
-    session = SessionLocal()
-    print(session.bind)
     try:
-        with session.begin():
-            logger.info(f"Adding tool {tool_name}")
-            tool = Tool(name=tool_name)
-            session.add(tool)
+        with SessionLocal() as session:
+            with session.begin():
+                logger.info(f"Adding tool {tool_name}")
+                tool = Tool(name=tool_name)
+                session.add(tool)
+                session.flush()
+                session.refresh(tool)
+                wire_format = tool.to_wire_as_client_tool()
     except sqlalchemy.exc.IntegrityError:
-        with session.begin():
-            select_stmt = select(Tool).where(Tool.name == tool_name)
-            tool = session.execute(select_stmt).scalars().one()
-    wire_format = tool.to_wire_as_client_tool()
+        with SessionLocal() as session:
+            with session.begin():
+                select_stmt = select(Tool).where(Tool.name == tool_name)
+                tool = session.execute(select_stmt).scalars().one()
+                wire_format = tool.to_wire_as_client_tool()
 
     resp = JSONResponse(content={"tool": wire_format},
                         status_code=StatusCodes.OK)
@@ -68,16 +71,16 @@ def get_tool_versions(tool_id: int, request: Request) -> Any:
         ) from e
 
     # get data from db
-    session = SessionLocal()
-    with session.begin():
-        select_stmt = select(ToolVersion).where(ToolVersion.tool_id == tool_id)
-        tool_versions = session.execute(select_stmt).scalars().all()
-    wire_format = [t.to_wire_as_client_tool_version() for t in tool_versions]
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = select(ToolVersion).where(ToolVersion.tool_id == tool_id)
+            tool_versions = session.execute(select_stmt).scalars().all()
+        wire_format = [t.to_wire_as_client_tool_version() for t in tool_versions]
 
-    logger.info(f"Tool version for {tool_id} is {wire_format}")
+        logger.info(f"Tool version for {tool_id} is {wire_format}")
 
-    resp = JSONResponse(content={"tool_versions": wire_format},
-                        status_code=StatusCodes.OK)
+        resp = JSONResponse(content={"tool_versions": wire_format},
+                            status_code=StatusCodes.OK)
     return resp
 
 
@@ -146,43 +149,43 @@ def get_tool_resource_usage(tool_name: str,
                             status_code=StatusCodes.BAD_REQUEST)
         )
 
-    session = SessionLocal()
-    with session.begin():
-        sql = (
-            select(
-                TaskInstance.id,
-                TaskInstance.wallclock,
-                TaskInstance.maxrss,
-                NodeArg.val,
-                TaskResources.requested_resources,
+    with SessionLocal() as session:
+        with session.begin():
+            sql = (
+                select(
+                    TaskInstance.id,
+                    TaskInstance.wallclock,
+                    TaskInstance.maxrss,
+                    NodeArg.val,
+                    TaskResources.requested_resources,
+                )
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
+                .join_from(
+                    Workflow, ToolVersion, Workflow.tool_version_id == ToolVersion.id
+                )
+                .join_from(ToolVersion, Tool, ToolVersion.tool_id == Tool.id)
+                .join_from(Task, NodeArg, Task.node_id == NodeArg.node_id)
+                .join_from(Task, TaskResources, Task.task_resources_id == TaskResources.id)
+                .where(
+                    Tool.name == tool_name,
+                    Workflow.created_date.between(start_date, end_date),
+                    Task.status == "D",
+                    TaskInstance.status == "D",
+                )
             )
-            .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
-            .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
-            .join_from(
-                Workflow, ToolVersion, Workflow.tool_version_id == ToolVersion.id
-            )
-            .join_from(ToolVersion, Tool, ToolVersion.tool_id == Tool.id)
-            .join_from(Task, NodeArg, Task.node_id == NodeArg.node_id)
-            .join_from(Task, TaskResources, Task.task_resources_id == TaskResources.id)
-            .where(
-                Tool.name == tool_name,
-                Workflow.created_date.between(start_date, end_date),
-                Task.status == "D",
-                TaskInstance.status == "D",
-            )
-        )
-        results = session.execute(sql).all()
+            results = session.execute(sql).all()
 
-    column_names = (
-        "ti_id",
-        "ti_wallclock",
-        "ti_maxrss",
-        "node_arg_val",
-        "ti_requested_resources",
-    )
-    results_formatted: list[Dict[str, Any]] = [
-        dict(zip(column_names, result)) for result in results
-    ]
+        column_names = (
+            "ti_id",
+            "ti_wallclock",
+            "ti_maxrss",
+            "node_arg_val",
+            "ti_requested_resources",
+        )
+        results_formatted: list[Dict[str, Any]] = [
+            dict(zip(column_names, result)) for result in results
+        ]
 
     resp = JSONResponse(content=results_formatted, status_code=StatusCodes.OK)
     return resp

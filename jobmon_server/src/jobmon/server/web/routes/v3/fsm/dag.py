@@ -24,34 +24,33 @@ SessionLocal = get_session_local()
 _CONFIG = get_jobmon_config()
 
 @api_v3_router.post("/dag")
-async  def add_dag(request: Request) -> Any:
+async def add_dag(request: Request) -> Any:
     """Add a new dag to the database.
 
     Args:
         dag_hash: unique identifier of the dag, included in route
     """
-    data = await cast(Dict, request.json())
+    data = cast(Dict, await request.json())
 
     # add dag
     dag_hash = data.pop("dag_hash")
     structlog.contextvars.bind_contextvars(dag_hash=str(dag_hash))
     logger.info(f"Add dag:{dag_hash}")
 
-    session = SessionLocal()
+    with SessionLocal() as session:
+        try:
+            with session.begin():
+                dag = Dag(hash=dag_hash)
+                session.add(dag)
+                ()
+        except sqlalchemy.exc.IntegrityError:
+            with session.begin():
+                select_stmt = select(Dag).filter(Dag.hash == dag_hash)
+                dag = session.execute(select_stmt).scalar_one()
 
-    try:
-        with session.begin():
-            dag = Dag(hash=dag_hash)
-            session.add(dag)
-
-    except sqlalchemy.exc.IntegrityError:
-        with session.begin():
-            select_stmt = select(Dag).filter(Dag.hash == dag_hash)
-            dag = session.execute(select_stmt).scalar_one()
-
-    # return result
-    resp = JSONResponse(content={"dag_id": dag.id, "created_date": str(dag.created_date)},
-                        status_code=StatusCodes.OK)
+        # return result
+        resp = JSONResponse(content={"dag_id": dag.id, "created_date": str(dag.created_date)},
+                            status_code=StatusCodes.OK)
     return resp
 
 
@@ -84,21 +83,21 @@ async def add_edges(dag_id: int, request: Request) -> Any:
 
     # Bulk insert the nodes and node args with raw SQL, for performance. Ignore duplicate
     # keys
-    session = SessionLocal()
-    with session.begin():
-        insert_stmt = insert(Edge).values(edges_to_add)
-        if (
-            SessionLocal
-            and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
-        ):
-            insert_stmt = insert_stmt.prefix_with("IGNORE")
-        if (
-            SessionLocal
-            and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
-        ):
-            insert_stmt = insert_stmt.prefix_with("OR IGNORE")
-        session.execute(insert_stmt)
-        session.flush()
+    with SessionLocal() as session:
+        with session.begin():
+            insert_stmt = insert(Edge).values(edges_to_add)
+            if (
+                SessionLocal
+                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
+            ):
+                insert_stmt = insert_stmt.prefix_with("IGNORE")
+            if (
+                SessionLocal
+                and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
+            ):
+                insert_stmt = insert_stmt.prefix_with("OR IGNORE")
+            session.execute(insert_stmt)
+            ()
 
         if mark_created:
             update_stmt = (

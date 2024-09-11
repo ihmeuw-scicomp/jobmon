@@ -33,30 +33,30 @@ async def add_nodes(request: Request) -> Any:
 
     # Bulk insert the nodes and node args with raw SQL, for performance. Ignore duplicate
     # keys
-    session = SessionLocal()
-    with session.begin():
-        node_keys = [
-            (n["task_template_version_id"], n["node_args_hash"]) for n in data["nodes"]
-        ]
-        node_insert_stmt = insert(Node).values(
-            [
-                {"task_template_version_id": ttv, "node_args_hash": arghash}
-                for ttv, arghash in node_keys
+    with SessionLocal() as session:
+        with session.begin():
+            node_keys = [
+                (n["task_template_version_id"], n["node_args_hash"]) for n in data["nodes"]
             ]
-        )
-        if (
-            SessionLocal
-            and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
-        ):
-            node_insert_stmt = node_insert_stmt.prefix_with("IGNORE")
-        if (
-            SessionLocal
-            and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
-        ):
-            node_insert_stmt = node_insert_stmt.prefix_with("OR IGNORE")
+            node_insert_stmt = insert(Node).values(
+                [
+                    {"task_template_version_id": ttv, "node_args_hash": arghash}
+                    for ttv, arghash in node_keys
+                ]
+            )
+            if (
+                SessionLocal
+                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
+            ):
+                node_insert_stmt = node_insert_stmt.prefix_with("IGNORE")
+            if (
+                SessionLocal
+                and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
+            ):
+                node_insert_stmt = node_insert_stmt.prefix_with("OR IGNORE")
 
-        session.execute(node_insert_stmt)
-        session.flush()
+            session.execute(node_insert_stmt)
+            session.flush()
 
         # Retrieve the node IDs
         ttvids, node_arg_hashes = zip(*node_keys)
@@ -101,20 +101,21 @@ async def add_nodes(request: Request) -> Any:
 
 
 def _insert_node_args(node_args_list: list) -> None:
-    session = SessionLocal()
-    with session.begin():
-        if node_args_list:
-            node_arg_insert_stmt = insert(NodeArg).values(node_args_list)
-            if (
-                SessionLocal
-                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
-            ):
-                node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("IGNORE")
-            if (
-                SessionLocal
-                and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
-            ):
-                node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("OR IGNORE")
+    with SessionLocal() as session:
+        with session.begin():
+            if node_args_list:
+                node_arg_insert_stmt = insert(NodeArg).values(node_args_list)
+                if (
+                    SessionLocal
+                    and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
+                ):
+                    node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("IGNORE")
+                if (
+                    SessionLocal
+                    and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
+                ):
+                    node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("OR IGNORE")
 
-            session.execute(node_arg_insert_stmt)
-            session.flush()
+                session.execute(node_arg_insert_stmt)
+                ()
+
