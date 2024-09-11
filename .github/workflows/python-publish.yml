@@ -3,6 +3,7 @@ name: Build & Upload Python Package
 on:
   release:
     types: [published]
+  # Allows for manual trigger of build
   workflow_dispatch:
 
 permissions:
