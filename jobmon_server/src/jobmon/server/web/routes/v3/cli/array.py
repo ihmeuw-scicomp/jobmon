@@ -53,15 +53,15 @@ def get_array_task_instances(workflow_id: int,
             result = session.execute(select_stmt).all()
 
 
-    column_names = (
-        "TASK_ID",
-        "TASK_NAME",
-        "ARRAY_NAME",
-        "TASK_INSTANCE_ID",
-        "OUTPUT_PATH",
-        "ERROR_PATH",
-    )
-    array_tasks = [dict(zip(column_names, ti)) for ti in result]
-    resp = JSONResponse(content={"array_tasks": array_tasks},
-                        status_code=HTTPStatus.OK)
+        column_names = (
+            "TASK_ID",
+            "TASK_NAME",
+            "ARRAY_NAME",
+            "TASK_INSTANCE_ID",
+            "OUTPUT_PATH",
+            "ERROR_PATH",
+        )
+        array_tasks = [dict(zip(column_names, ti)) for ti in result]
+        resp = JSONResponse(content={"array_tasks": array_tasks},
+                            status_code=HTTPStatus.OK)
     return resp

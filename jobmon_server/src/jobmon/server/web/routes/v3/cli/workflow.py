@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from http import HTTPStatus as StatusCodes
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import Request, Query
 from starlette.responses import JSONResponse
@@ -77,27 +77,27 @@ async def get_workflow_validation_status(request: Request) -> Any:
                 select(Task.workflow_id, Workflow.status).where(*query_filter)
             ).distinct()
             rows = session.execute(sql).all()
-    res = [ti[1] for ti in rows]
-    # Validate if all tasks are in the same workflow and the workflow status is dead
-    if len(res) == 1 and res[0] in (
-        Statuses.FAILED,
-        Statuses.DONE,
-        Statuses.ABORTED,
-        Statuses.HALTED,
-    ):
-        validation = True
-    else:
-        validation = False
+        res = [ti[1] for ti in rows]
+        # Validate if all tasks are in the same workflow and the workflow status is dead
+        if len(res) == 1 and res[0] in (
+            Statuses.FAILED,
+            Statuses.DONE,
+            Statuses.ABORTED,
+            Statuses.HALTED,
+        ):
+            validation = True
+        else:
+            validation = False
 
-    resp = JSONResponse(content={"validation": validation, "workflow_status": res[0]},
-                        status_code=StatusCodes.OK)
+        resp = JSONResponse(content={"validation": validation, "workflow_status": res[0]},
+                            status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.get("/workflow/{workflow_id}/workflow_tasks")
 def get_workflow_tasks(workflow_id: int,
                        limit: int,
-                       status: Optional[str] = None) -> Any:
+                       status: Optional[list[str]] = Query(None)) -> Any:
     """Get the tasks for a given workflow."""
     status_request = status
     logger.debug(f"Get tasks for workflow in status {status_request}")
@@ -127,30 +127,30 @@ def get_workflow_tasks(workflow_id: int,
                 )
             ).order_by(Task.id.desc())
             rows = session.execute(sql).all()
-    column_names = ("TASK_ID", "TASK_NAME", "STATUS", "RETRIES")
-    res = [dict(zip(column_names, ti)) for ti in rows]
-    for r in res:
-        r["RETRIES"] = 0 if r["RETRIES"] <= 1 else r["RETRIES"] - 1
+        column_names = ("TASK_ID", "TASK_NAME", "STATUS", "RETRIES")
+        res = [dict(zip(column_names, ti)) for ti in rows]
+        for r in res:
+            r["RETRIES"] = 0 if r["RETRIES"] <= 1 else r["RETRIES"] - 1
 
-    if limit:
-        res = res[: int(limit)]
+        if limit:
+            res = res[: int(limit)]
 
-    logger.debug(
-        f"The following tasks of workflow are in status {status_request}:\n{res}"
-    )
-    if res:
-        # assign to dataframe for serialization
-        df = pd.DataFrame(res, columns=res[0].keys())
+        logger.debug(
+            f"The following tasks of workflow are in status {status_request}:\n{res}"
+        )
+        if res:
+            # assign to dataframe for serialization
+            df = pd.DataFrame(res, columns=res[0].keys())
 
-        # remap to jobmon_cli statuses
-        df.STATUS.replace(to_replace=_cli_label_mapping, inplace=True)
-        df = df.to_json()
-        resp = JSONResponse(content={"workflow_tasks": df},
-                            status_code=StatusCodes.OK)
-    else:
-        df = pd.DataFrame({}, columns=["TASK_ID", "TASK_NAME", "STATUS", "RETRIES"])
-        resp = JSONResponse(content={"workflow_tasks": df.to_json()},
-                            status_code=StatusCodes.OK)
+            # remap to jobmon_cli statuses
+            df.STATUS.replace(to_replace=_cli_label_mapping, inplace=True)
+            df = df.to_json()
+            resp = JSONResponse(content={"workflow_tasks": df},
+                                status_code=StatusCodes.OK)
+        else:
+            df = pd.DataFrame({}, columns=["TASK_ID", "TASK_NAME", "STATUS", "RETRIES"])
+            resp = JSONResponse(content={"workflow_tasks": df.to_json()},
+                                status_code=StatusCodes.OK)
     return resp
 
 
@@ -166,13 +166,13 @@ def get_workflow_user_validation(workflow_id: int, username: str) -> Any:
             query_filter = [WorkflowRun.workflow_id == workflow_id]
             sql = (select(WorkflowRun.user).where(*query_filter)).distinct()
             rows = session.execute(sql).all()
-    usernames = [row[0] for row in rows]
-    resp = JSONResponse(content={"validation": username in usernames},
-                        status_code=StatusCodes.OK)
+        usernames = [row[0] for row in rows]
+        resp = JSONResponse(content={"validation": username in usernames},
+                            status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.get("/workflow/<workflow_id>/validate_for_workflow_reset/<username>")
+@api_v3_router.get("/workflow/{workflow_id}/validate_for_workflow_reset/{username}")
 def get_workflow_run_for_workflow_reset(workflow_id: int, username: str) -> Any:
     """Last workflow_run_id associated with a given workflow_id started by the username.
 
@@ -191,17 +191,17 @@ def get_workflow_run_for_workflow_reset(workflow_id: int, username: str) -> Any:
                 WorkflowRun.created_date.desc()
             )
             rows = session.execute(sql).all()
-    result = None if len(rows) <= 0 else rows[0]
-    if result is not None and result[1] == username:
-        resp = JSONResponse(content={"workflow_run_id": result[0]},
-                            status_code=StatusCodes.OK)
-    else:
-        resp = JSONResponse(content={"workflow_run_id": None},
-                            status_code=StatusCodes.OK)
+        result = None if len(rows) <= 0 else rows[0]
+        if result is not None and result[1] == username:
+            resp = JSONResponse(content={"workflow_run_id": result[0]},
+                                status_code=StatusCodes.OK)
+        else:
+            resp = JSONResponse(content={"workflow_run_id": None},
+                                status_code=StatusCodes.OK)
     return resp
 
 
-@api_v3_router.put("workflow/<workflow_id>/reset")
+@api_v3_router.put("/workflow/{workflow_id}/reset")
 async def reset_workflow(workflow_id: int, request: Request) -> Any:
     """Update the workflow's status, all its tasks' statuses to 'G'."""
     data = await request.json()
@@ -234,24 +234,28 @@ async def reset_workflow(workflow_id: int, request: Request) -> Any:
             session.execute(update_stmt)
             session.commit()
 
-    resp = JSONResponse(content={}, status_code=StatusCodes.OK)
+        resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.get("/workflow_status")
-def get_workflow_status(user: str,
-                        workflow_id: int,
-                        limit: int) -> Any:
+def get_workflow_status(workflow_id: Optional[Union[int, str, List[Union[int, str]]]] = Query(None),
+                        limit: Optional[int] = Query(None),
+                        user: Optional[list[str]] = Query(None)
+                        ) -> Any:
     """Get the status of the workflow."""
     # initial params
     params = {}
     user_request = user
     if user_request == "all":  # specifying all is equivalent to None
         user_request = []
-    workflow_request = workflow_id
-    logger.debug(f"Query for wf {workflow_request} status.")
-    if workflow_request == "all":  # specifying all is equivalent to None
+    if isinstance(workflow_id, int):
+        workflow_request = [workflow_id]
+    elif isinstance(workflow_id, str) and workflow_id == "all":
         workflow_request = []
+    else:
+        workflow_request = workflow_id
+    logger.debug(f"Query for wf {workflow_request} status.")
     # set default to 5 to match status_commands
     limit = int(limit) if limit else 5
     # convert workflow request into sql filter

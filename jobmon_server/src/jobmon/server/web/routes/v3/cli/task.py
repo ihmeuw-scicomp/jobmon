@@ -58,73 +58,72 @@ def get_task_status(task_ids: list[int],
     if len(task_ids) == 0:
         raise InvalidUsage(f"Missing {task_ids} in request", status_code=400)
 
-    session = SessionLocal()
-    with session.begin():
-        query_filter = [
-            Task.id == TaskInstance.task_id,
-            TaskInstanceStatus.id == TaskInstance.status,
-        ]
-        if status_request:
-            if len(status_request) > 0:
-                status_codes = [
-                    i
-                    for arg in status_request
-                    for i in _reversed_task_instance_label_mapping[arg]
-                ]
-            query_filter.append(
-                TaskInstance.status.in_(
-                    [i for arg in status_request for i in status_codes]
+    with SessionLocal() as session:
+        with session.begin():
+            query_filter = [
+                Task.id == TaskInstance.task_id,
+                TaskInstanceStatus.id == TaskInstance.status,
+            ]
+            if status_request:
+                if len(status_request) > 0:
+                    status_codes = [
+                        i
+                        for arg in status_request
+                        for i in _reversed_task_instance_label_mapping[arg]
+                    ]
+                query_filter.append(
+                    TaskInstance.status.in_(
+                        [i for arg in status_request for i in status_codes]
+                    )
                 )
-            )
 
-        if task_ids:
-            query_filter.append(Task.id.in_(task_ids))
-        sql = (
-            select(
-                Task.id,
-                Task.status,
-                TaskInstance.id,
-                TaskInstance.distributor_id,
-                TaskInstanceStatus.label,
-                TaskInstance.usage_str,
-                TaskInstance.stdout,
-                TaskInstance.stderr,
-                TaskInstanceErrorLog.description,
+            if task_ids:
+                query_filter.append(Task.id.in_(task_ids))
+            sql = (
+                select(
+                    Task.id,
+                    Task.status,
+                    TaskInstance.id,
+                    TaskInstance.distributor_id,
+                    TaskInstanceStatus.label,
+                    TaskInstance.usage_str,
+                    TaskInstance.stdout,
+                    TaskInstance.stderr,
+                    TaskInstanceErrorLog.description,
+                )
+                .join_from(
+                    TaskInstance,
+                    TaskInstanceErrorLog,
+                    TaskInstance.id == TaskInstanceErrorLog.task_instance_id,
+                    isouter=True,
+                )
+                .where(*query_filter)
             )
-            .join_from(
-                TaskInstance,
-                TaskInstanceErrorLog,
-                TaskInstance.id == TaskInstanceErrorLog.task_instance_id,
-                isouter=True,
+            rows = session.execute(sql).all()
+
+            column_names = (
+                "TASK_ID",
+                "task_status",
+                "TASK_INSTANCE_ID",
+                "DISTRIBUTOR_ID",
+                "STATUS",
+                "RESOURCE_USAGE",
+                "STDOUT",
+                "STDERR",
+                "ERROR_TRACE",
             )
-            .where(*query_filter)
-        )
-        rows = session.execute(sql).all()
+            if rows and len(rows) > 0:
+                # assign to dataframe for serialization
+                df = pd.DataFrame(rows, columns=column_names)
+                # remap to jobmon_cli statuses
+                df.STATUS.replace(to_replace=_task_instance_label_mapping, inplace=True)
+                resp = JSONResponse(content={"task_instance_status": df.to_dict()},
+                                    status_code=StatusCodes.OK)
+            else:
+                df = pd.DataFrame({}, columns=column_names)
+                resp = JSONResponse(content={"task_instance_status": df.to_dict()},
+                                    status_code=StatusCodes.OK)
 
-    column_names = (
-        "TASK_ID",
-        "task_status",
-        "TASK_INSTANCE_ID",
-        "DISTRIBUTOR_ID",
-        "STATUS",
-        "RESOURCE_USAGE",
-        "STDOUT",
-        "STDERR",
-        "ERROR_TRACE",
-    )
-    if rows and len(rows) > 0:
-        # assign to dataframe for serialization
-        df = pd.DataFrame(rows, columns=column_names)
-        # remap to jobmon_cli statuses
-        df.STATUS.replace(to_replace=_task_instance_label_mapping, inplace=True)
-        resp = JSONResponse(content={"task_instance_status": df.to_dict()},
-                            status_code=StatusCodes.OK)
-    else:
-        df = pd.DataFrame({}, columns=column_names)
-        resp = JSONResponse(content={"task_instance_status": df.to_dict()},
-                            status_code=StatusCodes.OK)
-
-    resp.status_code = StatusCodes.OK
     return resp
 
 
@@ -143,55 +142,55 @@ async def get_task_subdag(request: Request) -> Any:
         raise InvalidUsage(f"Missing {task_ids} in request", status_code=400)
     if task_status is None:
         task_status = []
-    session = SessionLocal()
-    with session.begin():
-        select_stmt = (
-            select(
-                Task.workflow_id.label("workflow_id"),
-                Workflow.dag_id.label("dag_id"),
-                Task.node_id.label("node_id"),
-            )
-            .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
-            .where(Task.id.in_(task_ids))
-        )
-
-        # Initialize defaultdict to store information
-        grouped_data: Dict = dict()
-        grouped_data = defaultdict(
-            lambda: {"workflow_id": None, "dag_id": None, "node_ids": []}
-        )
-
-        for row in session.execute(select_stmt):
-            key = (
-                row.workflow_id,
-                row.dag_id,
-            )  # Assuming this combination is unique for each group
-            grouped_data[key]["workflow_id"] = row.workflow_id
-            grouped_data[key]["dag_id"] = row.dag_id
-            if grouped_data[key]:
-                grouped_data[key]["node_ids"].append(row.node_id)
-
-        # If we find no results, we handle it here
-        if not grouped_data:
-            resp = JSONResponse(content={"workflow_id": None, "sub_task": None},
-                                status_code=StatusCodes.OK)
-            return resp
-
-        # Since we have validated all the tasks belong to the same wf in status_command before
-        # this call, assume they all belong to the same wf.
-        if grouped_data:
-            some_key = next(iter(grouped_data))
-            workflow_id, dag_id = some_key
-            node_ids = [int(node_id) for node_id in grouped_data[some_key]["node_ids"]]
-
-            # Continue with your current processing logic
-            sub_dag_tree = _get_subdag(node_ids, dag_id, session)
-            sub_task_tree = _get_tasks_from_nodes(
-                workflow_id, sub_dag_tree, task_status, session
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = (
+                select(
+                    Task.workflow_id.label("workflow_id"),
+                    Workflow.dag_id.label("dag_id"),
+                    Task.node_id.label("node_id"),
+                )
+                .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
+                .where(Task.id.in_(task_ids))
             )
 
-    resp = JSONResponse(content={"workflow_id": workflow_id, "sub_task": sub_task_tree},
-                        status_code=StatusCodes.OK)
+            # Initialize defaultdict to store information
+            grouped_data: Dict = dict()
+            grouped_data = defaultdict(
+                lambda: {"workflow_id": None, "dag_id": None, "node_ids": []}
+            )
+
+            for row in session.execute(select_stmt):
+                key = (
+                    row.workflow_id,
+                    row.dag_id,
+                )  # Assuming this combination is unique for each group
+                grouped_data[key]["workflow_id"] = row.workflow_id
+                grouped_data[key]["dag_id"] = row.dag_id
+                if grouped_data[key]:
+                    grouped_data[key]["node_ids"].append(row.node_id)
+
+            # If we find no results, we handle it here
+            if not grouped_data:
+                resp = JSONResponse(content={"workflow_id": None, "sub_task": None},
+                                    status_code=StatusCodes.OK)
+                return resp
+
+            # Since we have validated all the tasks belong to the same wf in status_command before
+            # this call, assume they all belong to the same wf.
+            if grouped_data:
+                some_key = next(iter(grouped_data))
+                workflow_id, dag_id = some_key
+                node_ids = [int(node_id) for node_id in grouped_data[some_key]["node_ids"]]
+
+                # Continue with your current processing logic
+                sub_dag_tree = _get_subdag(node_ids, dag_id, session)
+                sub_task_tree = _get_tasks_from_nodes(
+                    workflow_id, sub_dag_tree, task_status, session
+                )
+
+        resp = JSONResponse(content={"workflow_id": workflow_id, "sub_task": sub_task_tree},
+                            status_code=StatusCodes.OK)
     return resp
 
 
@@ -209,88 +208,88 @@ async def update_task_statuses(request: Request) -> Any:
             f"problem with {str(e)} in request to {request.path}", status_code=400
         ) from e
 
-    session = SessionLocal()
-    with SessionLocal.begin():
-        try:
-            update_stmt = update(Task).where(
-                Task.id.in_(task_ids), Task.status != new_status
-            )
-            vals = {"status": new_status}
-            session.execute(update_stmt.values(**vals))
-
-            # If job is supposed to be rerun, set task instances to "K"
-            if new_status == constants.TaskStatus.REGISTERING:
-                task_instance_update_stmt = update(TaskInstance).where(
-                    TaskInstance.task_id.in_(task_ids),
-                    TaskInstance.status.notin_(
-                        [
-                            constants.TaskInstanceStatus.ERROR_FATAL,
-                            constants.TaskInstanceStatus.DONE,
-                            constants.TaskInstanceStatus.ERROR,
-                            constants.TaskInstanceStatus.UNKNOWN_ERROR,
-                            constants.TaskInstanceStatus.RESOURCE_ERROR,
-                            constants.TaskInstanceStatus.KILL_SELF,
-                            constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID,
-                        ]
-                    ),
+    with SessionLocal() as session:
+        with SessionLocal.begin():
+            try:
+                update_stmt = update(Task).where(
+                    Task.id.in_(task_ids), Task.status != new_status
                 )
-                vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
-                session.execute(task_instance_update_stmt.values(**vals))
+                vals = {"status": new_status}
+                session.execute(update_stmt.values(**vals))
 
-                # If workflow is done, need to set it to an error state before resume
-                if workflow_status == constants.WorkflowStatus.DONE:
-                    workflow_update_stmt = update(Workflow).where(
-                        Workflow.id == workflow_id
+                # If job is supposed to be rerun, set task instances to "K"
+                if new_status == constants.TaskStatus.REGISTERING:
+                    task_instance_update_stmt = update(TaskInstance).where(
+                        TaskInstance.task_id.in_(task_ids),
+                        TaskInstance.status.notin_(
+                            [
+                                constants.TaskInstanceStatus.ERROR_FATAL,
+                                constants.TaskInstanceStatus.DONE,
+                                constants.TaskInstanceStatus.ERROR,
+                                constants.TaskInstanceStatus.UNKNOWN_ERROR,
+                                constants.TaskInstanceStatus.RESOURCE_ERROR,
+                                constants.TaskInstanceStatus.KILL_SELF,
+                                constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID,
+                            ]
+                        ),
                     )
-                    vals = {"status": constants.WorkflowStatus.FAILED}
-                    session.execute(workflow_update_stmt.values(**vals))
+                    vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
+                    session.execute(task_instance_update_stmt.values(**vals))
 
-            session.commit()
-        except KeyError as e:
-            session.rollback()
-            raise InvalidUsage(
-                f"{str(e)} in request to {request.path}", status_code=400
-            ) from e
+                    # If workflow is done, need to set it to an error state before resume
+                    if workflow_status == constants.WorkflowStatus.DONE:
+                        workflow_update_stmt = update(Workflow).where(
+                            Workflow.id == workflow_id
+                        )
+                        vals = {"status": constants.WorkflowStatus.FAILED}
+                        session.execute(workflow_update_stmt.values(**vals))
 
-    message = f"updated to status {new_status}"
-    resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
+            except KeyError as e:
+                session.rollback()
+                raise InvalidUsage(
+                    f"{str(e)} in request to {request.path}", status_code=400
+                ) from e
+
+        message = f"updated to status {new_status}"
+        resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.get("/task_dependencies/{task_id}")
 def get_task_dependencies(task_id: int) -> Any:
     """Get task's downstream and upstream tasks and their status."""
-    session = SessionLocal()
-    with session.begin():
-        dag_id, workflow_id, node_id = _get_dag_and_wf_id(task_id, session)
-        logger.info(f"task_id: {task_id}, dag_id: {dag_id}, workflow_id: {workflow_id}")
-        up_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.UP)
-        down_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.DOWN)
-        up_task_dict = _get_tasks_from_nodes(workflow_id, list(up_nodes), [], session)
-        down_task_dict = _get_tasks_from_nodes(
-            workflow_id, list(down_nodes), [], session
+    with SessionLocal() as session:
+        with session.begin():
+            dag_id, workflow_id, node_id = _get_dag_and_wf_id(task_id, session)
+            logger.info(f"task_id: {task_id}, dag_id: {dag_id}, workflow_id: {workflow_id}")
+            up_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.UP)
+            down_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.DOWN)
+            up_task_dict = _get_tasks_from_nodes(workflow_id, list(up_nodes), [], session)
+            down_task_dict = _get_tasks_from_nodes(
+                workflow_id, list(down_nodes), [], session
+            )
+        print(up_nodes, down_nodes, up_task_dict, down_task_dict)
+
+        # return a "standard" json format so that it can be reused by future GUI
+        up = (
+            []
+            if up_task_dict is None or len(up_task_dict) == 0
+            else [
+                [{"id": k, "status": up_task_dict[k][0], "name": up_task_dict[k][1]}]
+                for k in up_task_dict
+            ]
         )
-    print(up_nodes, down_nodes, up_task_dict, down_task_dict)
+        down = (
+            []
+            if down_task_dict is None or len(down_task_dict) == 0
+            else [
+                [{"id": k, "status": down_task_dict[k][0], "name": down_task_dict[k][1]}]
+                for k in down_task_dict
+            ]
+        )
 
-    # return a "standard" json format so that it can be reused by future GUI
-    up = (
-        []
-        if up_task_dict is None or len(up_task_dict) == 0
-        else [
-            [{"id": k, "status": up_task_dict[k][0], "name": up_task_dict[k][1]}]
-            for k in up_task_dict
-        ]
-    )
-    down = (
-        []
-        if down_task_dict is None or len(down_task_dict) == 0
-        else [
-            [{"id": k, "status": down_task_dict[k][0], "name": down_task_dict[k][1]}]
-            for k in down_task_dict
-        ]
-    )
-
-    resp = JSONResponse(content={"up": up, "down": down}, status_code=StatusCodes.OK)
+        resp = JSONResponse(content={"up": up, "down": down},
+                            status_code=StatusCodes.OK)
     return resp
 
 
@@ -307,11 +306,11 @@ async def get_tasks_recursive(direction: str, request: Request) -> Any:
     task_ids = set(data.get("task_ids", []))
 
     try:
-        session = SessionLocal()
-        with session.begin():
-            tasks_recursive = _get_tasks_recursive(task_ids, direct, session)
-        resp = JSONResponse(content={"task_ids": list(tasks_recursive)},
-                            status_code=StatusCodes.OK)
+        with SessionLocal() as session:
+            with session.begin():
+                tasks_recursive = _get_tasks_recursive(task_ids, direct, session)
+            resp = JSONResponse(content={"task_ids": list(tasks_recursive)},
+                                status_code=StatusCodes.OK)
         return resp
     except InvalidUsage as e:
         raise e
@@ -320,32 +319,32 @@ async def get_tasks_recursive(direction: str, request: Request) -> Any:
 @api_v3_router.get("/task_resource_usage")
 def get_task_resource_usage(task_id: int) -> Any:
     """Return the resource usage for a given Task ID."""
-    session = SessionLocal()
-    with SessionLocal.begin():
-        select_stmt = (
-            select(
-                Task.num_attempts,
-                TaskInstance.nodename,
-                TaskInstance.wallclock,
-                TaskInstance.maxpss,
+    with SessionLocal() as session:
+        with SessionLocal.begin():
+            select_stmt = (
+                select(
+                    Task.num_attempts,
+                    TaskInstance.nodename,
+                    TaskInstance.wallclock,
+                    TaskInstance.maxpss,
+                )
+                .join_from(Task, TaskInstance, Task.id == TaskInstance.task_id)
+                .where(
+                    TaskInstance.task_id == task_id,
+                    TaskInstance.status == constants.TaskInstanceStatus.DONE,
+                )
             )
-            .join_from(Task, TaskInstance, Task.id == TaskInstance.task_id)
-            .where(
-                TaskInstance.task_id == task_id,
-                TaskInstance.status == constants.TaskInstanceStatus.DONE,
-            )
-        )
-        result = session.execute(select_stmt).one_or_none()
+            result = session.execute(select_stmt).one_or_none()
 
-        if result is None:
-            resource_usage = SerializeTaskResourceUsage.to_wire(None, None, None, None)
-        else:
-            resource_usage = SerializeTaskResourceUsage.to_wire(
-                result.num_attempts, result.nodename, result.wallclock, result.maxpss
-            )
+            if result is None:
+                resource_usage = SerializeTaskResourceUsage.to_wire(None, None, None, None)
+            else:
+                resource_usage = SerializeTaskResourceUsage.to_wire(
+                    result.num_attempts, result.nodename, result.wallclock, result.maxpss
+                )
 
-    resp = JSONResponse(content={"resource_usage": resource_usage},
-                        status_code=StatusCodes.OK)
+        resp = JSONResponse(content={"resource_usage": resource_usage},
+                            status_code=StatusCodes.OK)
     return resp
 
 
@@ -504,76 +503,77 @@ async def get_downstream_tasks(request: Request) -> Any:
 
     task_ids = data["task_ids"]
     dag_id = data["dag_id"]
-    session = SessionLocal()
-    with session.begin():
-        tasks_and_edges = session.execute(
-            select(Task.id, Task.node_id, Edge.downstream_node_ids).where(
-                Task.id.in_(task_ids),
-                Task.node_id == Edge.node_id,
-                Edge.dag_id == dag_id,
-            )
-        ).all()
-        result = {
-            row.id: [row.node_id, row.downstream_node_ids] for row in tasks_and_edges
-        }
+    with SessionLocal() as session:
+        with session.begin():
+            tasks_and_edges = session.execute(
+                select(Task.id, Task.node_id, Edge.downstream_node_ids).where(
+                    Task.id.in_(task_ids),
+                    Task.node_id == Edge.node_id,
+                    Edge.dag_id == dag_id,
+                )
+            ).all()
+            result = {
+                row.id: [row.node_id, row.downstream_node_ids] for row in tasks_and_edges
+            }
 
-    resp = JSONResponse(content={"downstream_tasks": result},
-                        status_code=StatusCodes.OK)
+        resp = JSONResponse(content={"downstream_tasks": result},
+                            status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.get("/task/get_ti_details_viz/{task_id}")
 def get_task_details(task_id: int) -> Any:
     """Get information about TaskInstances associated with specific Task ID."""
-    session = SessionLocal()
-    with session.begin():
-        query = (
-            select(
-                TaskInstance.id,
-                TaskInstanceStatus.label,
-                TaskInstance.stdout,
-                TaskInstance.stderr,
-                TaskInstance.stdout_log,
-                TaskInstance.stderr_log,
-                TaskInstance.distributor_id,
-                TaskInstance.nodename,
-                TaskInstanceErrorLog.description,
-                TaskInstance.wallclock,
-                TaskInstance.maxrss,
-                TaskResources.requested_resources,
+    with SessionLocal() as session:
+        with session.begin():
+            query = (
+                select(
+                    TaskInstance.id,
+                    TaskInstanceStatus.label,
+                    TaskInstance.stdout,
+                    TaskInstance.stderr,
+                    TaskInstance.stdout_log,
+                    TaskInstance.stderr_log,
+                    TaskInstance.distributor_id,
+                    TaskInstance.nodename,
+                    TaskInstanceErrorLog.description,
+                    TaskInstance.wallclock,
+                    TaskInstance.maxrss,
+                    TaskResources.requested_resources,
+                )
+                .outerjoin_from(
+                    TaskInstance,
+                    TaskInstanceErrorLog,
+                    TaskInstance.id == TaskInstanceErrorLog.task_instance_id,
+                )
+                .join(
+                    TaskResources,
+                    TaskInstance.task_resources_id == TaskResources.id,
+                )
+                .where(
+                    TaskInstance.task_id == task_id,
+                    TaskInstance.status == TaskInstanceStatus.id,
+                )
             )
-            .outerjoin_from(
-                TaskInstance,
-                TaskInstanceErrorLog,
-                TaskInstance.id == TaskInstanceErrorLog.task_instance_id,
-            )
-            .join(
-                TaskResources,
-                TaskInstance.task_resources_id == TaskResources.id,
-            )
-            .where(
-                TaskInstance.task_id == task_id,
-                TaskInstance.status == TaskInstanceStatus.id,
-            )
-        )
-        rows = session.execute(query).all()
+            rows = session.execute(query).all()
 
-    column_names = (
-        "ti_id",
-        "ti_status",
-        "ti_stdout",
-        "ti_stderr",
-        "ti_stdout_log",
-        "ti_stderr_log",
-        "ti_distributor_id",
-        "ti_nodename",
-        "ti_error_log_description",
-        "ti_wallclock",
-        "ti_maxrss",
-        "ti_resources",
-    )
-    result = [dict(zip(column_names, row)) for row in rows]
-    resp = JSONResponse(content={"taskinstances": result}, status_code=StatusCodes.OK)
+        column_names = (
+            "ti_id",
+            "ti_status",
+            "ti_stdout",
+            "ti_stderr",
+            "ti_stdout_log",
+            "ti_stderr_log",
+            "ti_distributor_id",
+            "ti_nodename",
+            "ti_error_log_description",
+            "ti_wallclock",
+            "ti_maxrss",
+            "ti_resources",
+        )
+        result = [dict(zip(column_names, row)) for row in rows]
+        resp = JSONResponse(content={"taskinstances": result},
+                            status_code=StatusCodes.OK)
     return resp
 
 
@@ -593,14 +593,14 @@ def get_task_details_viz(task_id: int) -> Any:
             )
             rows = session.execute(query).all()
 
-    column_names = (
-        "task_status",
-        "workflow_id",
-        "task_name",
-        "task_command",
-        "task_status_date",
-    )
-    result = [dict(zip(column_names, row)) for row in rows]
-    resp = JSONResponse(content={"task_details": result},
-                        status_code=StatusCodes.OK)
+        column_names = (
+            "task_status",
+            "workflow_id",
+            "task_name",
+            "task_command",
+            "task_status_date",
+        )
+        result = [dict(zip(column_names, row)) for row in rows]
+        resp = JSONResponse(content={"task_details": result},
+                            status_code=StatusCodes.OK)
     return resp

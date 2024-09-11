@@ -411,9 +411,12 @@ def test_get_workflow_status(db_engine, tool):
     factory.create_workflow_run()
 
     app_route = f"/workflow_status"
+    params = {
+        "workflow_id": [wf.workflow_id],  # This should be a list
+         }
     return_code, msg = wf.requester.send_request(
         app_route=app_route,
-        message={"workflow_id": [wf.workflow_id]},
+        message=params,
         request_type="get",
     )
     assert return_code == 200
