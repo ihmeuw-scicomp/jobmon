@@ -17,7 +17,7 @@ logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
 
 
-@api_v3_router.post("/task_resources/<task_resources_id>")
+@api_v3_router.post("/task_resources/{task_resources_id}")
 def get_task_resources(task_resources_id: int) -> Any:
     """Return an task_resources."""
     structlog.contextvars.bind_contextvars(task_resources_id=task_resources_id)

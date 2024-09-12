@@ -260,6 +260,13 @@ async def log_array_distributor_id(array_id: int, request: Request) -> Any:
     """Add distributor_id, stderr/stdout paths to the DB for all TIs in an array."""
     data = await request.json()
 
+    filtered_data = {
+        task_instance_id: distributor_id
+        for task_instance_id, distributor_id in data.items()
+        if isinstance(task_instance_id, str) and task_instance_id.isdigit()
+        # Check if key is a string that can be cast to an integer
+    }
+
     id_lst = list(data.keys())
 
     where_condition = and_(
@@ -279,7 +286,7 @@ async def log_array_distributor_id(array_id: int, request: Request) -> Any:
     case_stmt = case(
         *[
             (TaskInstance.id == int(task_instance_id), distributor_id)
-            for task_instance_id, distributor_id in data.items()
+            for task_instance_id, distributor_id in filtered_data.items()
         ],
         else_=TaskInstance.distributor_id,
     )
