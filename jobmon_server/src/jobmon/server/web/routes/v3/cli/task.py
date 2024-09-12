@@ -268,25 +268,25 @@ def get_task_dependencies(task_id: int) -> Any:
             down_task_dict = _get_tasks_from_nodes(
                 workflow_id, list(down_nodes), [], session
             )
-        print(up_nodes, down_nodes, up_task_dict, down_task_dict)
+            print(up_nodes, down_nodes, up_task_dict, down_task_dict)
 
-        # return a "standard" json format so that it can be reused by future GUI
-        up = (
-            []
-            if up_task_dict is None or len(up_task_dict) == 0
-            else [
-                [{"id": k, "status": up_task_dict[k][0], "name": up_task_dict[k][1]}]
-                for k in up_task_dict
-            ]
-        )
-        down = (
-            []
-            if down_task_dict is None or len(down_task_dict) == 0
-            else [
-                [{"id": k, "status": down_task_dict[k][0], "name": down_task_dict[k][1]}]
-                for k in down_task_dict
-            ]
-        )
+            # return a "standard" json format so that it can be reused by future GUI
+            up = (
+                []
+                if up_task_dict is None or len(up_task_dict) == 0
+                else [
+                    [{"id": k, "status": up_task_dict[k][0], "name": up_task_dict[k][1]}]
+                    for k in up_task_dict
+                ]
+            )
+            down = (
+                []
+                if down_task_dict is None or len(down_task_dict) == 0
+                else [
+                    [{"id": k, "status": down_task_dict[k][0], "name": down_task_dict[k][1]}]
+                    for k in down_task_dict
+                ]
+            )
 
         resp = JSONResponse(content={"up": up, "down": down},
                             status_code=StatusCodes.OK)

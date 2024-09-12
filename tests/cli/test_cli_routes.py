@@ -449,12 +449,12 @@ def test_get_task_status(db_engine, tool):
     )
     t1 = tt1.create_task(
         arg=1,
-        cluster_name="sequential",
+        cluster_name="dummy",
         compute_resources={"queue": "null.q", "num_cores": 2},
     )
     t2 = tt1.create_task(
         arg=2,
-        cluster_name="sequential",
+        cluster_name="dummy",
         compute_resources={"queue": "null.q", "num_cores": 4},
     )
     wf.add_tasks([t1, t2])
