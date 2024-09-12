@@ -68,20 +68,19 @@ def load_metadata(engine: Engine) -> None:
         add_workflow_run_statuses,
     )
     SessionLocal = get_session_local()
-    session = SessionLocal()
-    with session:
-        metadata_loaders = [
-            add_arg_types,
-            add_cluster_types,
-            add_clusters,
-            add_queues,
-            add_task_resources_types,
-            add_task_statuses,
-            add_task_instance_statuses,
-            add_workflow_statuses,
-            add_workflow_run_statuses,
-        ]
-        for loader in metadata_loaders:
-            loader(session)
-            session.flush()
-        session.commit()
+    with SessionLocal() as session:
+        with session.begin():
+            metadata_loaders = [
+                add_arg_types,
+                add_cluster_types,
+                add_clusters,
+                add_queues,
+                add_task_resources_types,
+                add_task_statuses,
+                add_task_instance_statuses,
+                add_workflow_statuses,
+                add_workflow_run_statuses,
+            ]
+            for loader in metadata_loaders:
+                loader(session)
+                session.flush()

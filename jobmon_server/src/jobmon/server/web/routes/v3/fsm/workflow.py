@@ -24,6 +24,7 @@ from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_attribute import WorkflowAttribute
 from jobmon.server.web.models.workflow_attribute_type import WorkflowAttributeType
+from jobmon.server.web.models.workflow_status import WorkflowStatus
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
@@ -491,4 +492,18 @@ def get_tasks_from_workflow(workflow_id: int,
                     resp_dict[task_id].append(max_concurrently_running)
 
     resp = JSONResponse(content={"tasks": resp_dict}, status_code=StatusCodes.OK)
+    return resp
+
+
+@api_v3_router.get("/workflow_status/available_status")
+def get_available_workflow_statuses() -> Any:
+    """Return all available workflow statuses."""
+    # an easy testing route to verify db is loaded
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = select(WorkflowStatus.label).distinct()
+            res = session.execute(select_stmt).scalars().all()
+            print(f"DB Testing Route*******************{res}")
+        resp = JSONResponse(content={"available_statuses": res},
+                            status_code=StatusCodes.OK)
     return resp

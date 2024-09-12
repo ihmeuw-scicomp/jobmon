@@ -8,7 +8,9 @@ def test_distributor_context(tool, task_template, client_env):
 
     workflow.add_tasks([t1])
     workflow.bind()
+    assert workflow.workflow_id is not None
     workflow._bind_tasks()
+    assert t1.task_id is not None
     wfr = WorkflowRunFactory(workflow.workflow_id).create_workflow_run()
 
     distributor_context = DistributorContext("sequential", wfr.workflow_run_id, 15)

@@ -22,6 +22,7 @@ from jobmon.core.requester import Requester
 from jobmon.server.web.api import get_app, configure_logging
 from jobmon.server.web.config import get_jobmon_config
 from jobmon.server.web.db_admin import init_db
+from jobmon.server.web.models import load_model
 
 logger = logging.getLogger(__name__)
 
@@ -57,14 +58,7 @@ class WebServerProcess:
         # jobmon_cli string
         database_uri = f"sqlite:///{self.filepath}"
 
-        def run_server_with_handler() -> None:
-            def sigterm_handler(_signo: int, _stack_frame: Any) -> None:
-                # catch SIGTERM and shut down with 0 so pycov finalizers are run
-                # Raises SystemExit(0):
-                sys.exit(0)
-
-            signal.signal(signal.SIGTERM, sigterm_handler)
-
+        def config_db() -> bool:
             config = JobmonConfig(
                 dict_config={
                     "db": {"sqlalchemy_database_uri": database_uri},
@@ -77,6 +71,7 @@ class WebServerProcess:
             )
             get_jobmon_config(config)
             init_db()
+            load_model()
             configure_logging(
                 loggers_dict={
                     "jobmon.server.web": {
@@ -90,44 +85,59 @@ class WebServerProcess:
                     },
                 }
             )
+            # verify db created
+            eng = sqlalchemy.create_engine(database_uri)
+            from sqlalchemy.orm import Session
+            with Session(eng) as session:
+                from sqlalchemy import text
+                res = session.execute(text("SELECT * from workflow_status")).fetchall()
+                return len(res) > 0
+
+        def run_server_with_handler() -> None:
+            def sigterm_handler(_signo: int, _stack_frame: Any) -> None:
+                # catch SIGTERM and shut down with 0 so pycov finalizers are run
+                # Raises SystemExit(0):
+                sys.exit(0)
+
+            signal.signal(signal.SIGTERM, sigterm_handler)
 
             app = get_app()
             print("********************1")
             uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
-            print("********************2")
 
-        ctx = mp.get_context("fork")
-        self.p1 = ctx.Process(target=run_server_with_handler)
-        self.p1.start()
+        if config_db():
+            # start server
+            ctx = mp.get_context("fork")
+            self.p1 = ctx.Process(target=run_server_with_handler)
+            self.p1.start()
 
-        # Wait for it to be up
-        status = 404
-        count = 0
-        # We try a total of 10 times with 3 seconds between tries. If the web service is not up
-        # in 30 seconds something is likely wrong.
-        max_tries = 10
-        while not status == 200 and count < max_tries:
-            try:
-                count += 1
-                url = f"http://{self.web_host}:{self.web_port}{self.api_prefix}/health"
-                print(url)
-                r = requests.get(
-                    url,
-                    headers={"Content-Type": "application/json"},
-                )
+            # Wait for it to be up
+            status = 404
+            count = 0
+            # We try a total of 10 times with 3 seconds between tries. If the web service is not up
+            # in 30 seconds something is likely wrong.
+            max_tries = 10
+            while not status == 200 and count < max_tries:
+                try:
+                    count += 1
+                    url = f"http://{self.web_host}:{self.web_port}{self.api_prefix}/health"
+                    print(url)
+                    r = requests.get(
+                        url,
+                        headers={"Content-Type": "application/json"},
+                    )
 
-                status = r.status_code
-            except Exception as e:
-                # Connection failures land here
-                # Safe to catch all because there is a max retry
-                if count >= max_tries:
-                    raise TimeoutError(
-                        f"Out-of-process jobmon services did not answer after "
-                        f"{count} attempts, probably failed to start."
-                    ) from e
-            # sleep outside of try block!
-            sleep(3)
-
+                    status = r.status_code
+                except Exception as e:
+                    # Connection failures land here
+                    # Safe to catch all because there is a max retry
+                    if count >= max_tries:
+                        raise TimeoutError(
+                            f"Out-of-process jobmon services did not answer after "
+                            f"{count} attempts, probably failed to start."
+                        ) from e
+                # sleep outside of try block!
+                sleep(3)
         return self
 
     def __exit__(

@@ -13,10 +13,15 @@ def get_jobmon_config(config: Optional[JobmonConfig] = None) -> JobmonConfig:
         config: The jobmon config to use when creating the app.
     """
     global _jobmon_config
-    if _jobmon_config is None:
-        if config is None:
+    if config is None:
+        # allow testing to override the config
+        if _jobmon_config is None:
+            # create from default
             _jobmon_config = JobmonConfig()
         else:
-            # leave an entry for testing
-            _jobmon_config = config
+            # do nothing; use the existing config instance
+            pass
+    else:
+        # leave an entry for testing
+        _jobmon_config = config
     return _jobmon_config

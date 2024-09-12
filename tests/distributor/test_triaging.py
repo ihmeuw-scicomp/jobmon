@@ -11,17 +11,13 @@ from jobmon.plugins.multiprocess.multiproc_distributor import (
     MultiprocessDistributor,
 )
 from jobmon.server.web._compat import subtract_time
-from jobmon.server.web import session_factory
+from jobmon.client.api import Tool
 from jobmon.server.web.models import load_model
-
 
 load_model()
 
-
 @pytest.fixture
 def tool(client_env):
-    from jobmon.client.tool import Tool
-
     tool = Tool()
     tool.set_default_compute_resources_from_dict(
         cluster_name="sequential", compute_resources={"queue": "null.q"}
@@ -44,8 +40,6 @@ def task_template(tool):
 def test_set_status_for_triaging(tool, db_engine, task_template):
     """tests that a task can be triaged and log as unknown error"""
     from jobmon.server.web.models.task_instance import TaskInstance
-
-    session_factory.configure(bind=db_engine)
 
     tool.set_default_compute_resources_from_dict(
         cluster_name="multiprocess", compute_resources={"queue": "null.q"}
@@ -80,7 +74,7 @@ def test_set_status_for_triaging(tool, db_engine, task_template):
 
     # turn the 3 task instances in different testing paths
     # 1. stage the report_by_date, along with respective status
-    with session_factory() as session:
+    with Session(bind=db_engine) as session:
         launched_stmt = (
             update(TaskInstance)
             .where(TaskInstance.task_id.in_([tis[0].task_id, tis[2].task_id]))
@@ -102,7 +96,7 @@ def test_set_status_for_triaging(tool, db_engine, task_template):
     swarm._set_status_for_triaging()
 
     # check the jobs to be Triaging
-    with session_factory() as session:
+    with Session(bind=db_engine) as session:
         select_stmt = (
             select(TaskInstance)
             .where(TaskInstance.task_id.in_([ti.task_id for ti in tis]))
@@ -138,8 +132,6 @@ def test_triaging_to_specific_error(
 ):
     """tests that a task can be triaged and log as unknown error"""
     from jobmon.server.web.models.task_instance import TaskInstance
-
-    session_factory.configure(bind=db_engine)
 
     tool.set_default_compute_resources_from_dict(
         cluster_name="multiprocess", compute_resources={"queue": "null.q"}

@@ -92,7 +92,10 @@ def test_task_attribute(db_engine, tool):
     )
     workflow1.add_tasks([task1, task2, task3])
     workflow1.bind()
+    assert workflow1.workflow_id is not None
     workflow1._bind_tasks()
+    for t in [task1, task2, task3]:
+        assert t.task_id is not None
     client_wfr = WorkflowRun(workflow1.workflow_id)
     client_wfr.bind()
 
@@ -170,9 +173,12 @@ def test_reset_attempts_on_resume(db_engine, tool):
 
     # add workflow to database
     workflow1.bind()
+    assert workflow1.workflow_id is not None
     workflow1._bind_tasks()
+    assert task_a.task_id is not None
     wfr_1 = WorkflowRun(workflow1.workflow_id)
     wfr_1.bind()
+    assert wfr_1.workflow_run_id is not None
     wfr_1._update_status(WorkflowRunStatus.BOUND)
     wfr_1._update_status(WorkflowRunStatus.ERROR)
 
@@ -222,8 +228,10 @@ def test_binding_length(db_engine, client_env, tool):
     wf = tool.create_workflow()
     wf.add_task(task1)
     wf.bind()
+    assert wf.workflow_id is not None
     with pytest.raises(InvalidRequest) as resp:
         wf._bind_tasks()
+        assert task1.task_id is not None
     exc_msg = resp.value.args[0]
     assert "Client error with status code 400" in exc_msg
 
@@ -234,8 +242,10 @@ def test_binding_length(db_engine, client_env, tool):
     wf2 = tool.create_workflow()
     wf2.add_task(task2)
     wf2.bind()
+    assert wf2.workflow_id is not None
     with pytest.raises(InvalidRequest) as resp2:
         wf2._bind_tasks()
+        assert task2.task_id is not None
     exc_msg = resp2.value.args[0]
     assert "Task attributes are constrained to 255 characters" in exc_msg
     assert "Client error with status code 400" in exc_msg
@@ -254,7 +264,9 @@ def test_binding_tasks(db_engine, client_env, tool):
     wf = tool.create_workflow()
     wf.add_task(task1)
     wf.bind()
+    assert wf.workflow_id is not None
     wf._bind_tasks()
+    assert task1.task_id is not None
     # verify the task is correctly bind, so are the args
     assert task1.task_id is not None
     with Session(bind=db_engine) as session:

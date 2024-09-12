@@ -50,6 +50,7 @@ def init_db() -> None:
     # get db url from config
     config = get_jobmon_config()
     sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")
+    print(f"**********************************Using database URI: {sqlalchemy_database_uri}")
     # create a fresh database
     add_metadata = False
     if not database_exists(sqlalchemy_database_uri):
@@ -75,12 +76,20 @@ def terminate_db(sqlalchemy_database_uri: str) -> None:
 
 # create a singleton holder so that it gets created after config
 _session_local = None
+_db_url = None
 def get_session_local() -> sessionmaker:
     """Get a session local object."""
     global _session_local
-    if _session_local is None:
+    global _db_url
+    config = get_jobmon_config()
+    url_from_config = config.get("db", "sqlalchemy_database_uri")
+    # if _session_local is not set, or db_url has changed, create a new
+    if _session_local is None or url_from_config != _db_url:
+        # backdoor for conftest without touching the existing JobmonConfig
         _session_local = sessionmaker(autocommit=False,
                                       autoflush=False,
                                       bind=get_engine_from_config())
+    # reset the db_url from config
+    _db_url = url_from_config
     return _session_local
 
