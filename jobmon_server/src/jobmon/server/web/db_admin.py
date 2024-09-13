@@ -50,7 +50,6 @@ def init_db() -> None:
     # get db url from config
     config = get_jobmon_config()
     sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")
-    print(f"**********************************Using database URI: {sqlalchemy_database_uri}")
     # create a fresh database
     add_metadata = False
     if not database_exists(sqlalchemy_database_uri):
@@ -84,6 +83,9 @@ def get_session_local() -> sessionmaker:
     config = get_jobmon_config()
     url_from_config = config.get("db", "sqlalchemy_database_uri")
     # if _session_local is not set, or db_url has changed, create a new
+    # this is to compromise to the behavior when running tests under a directory
+    # somehow, when running tests under a dir, it initializes the default config anyway
+    # this doesn't happen when running prod or a test file
     if _session_local is None or url_from_config != _db_url:
         # backdoor for conftest without touching the existing JobmonConfig
         _session_local = sessionmaker(autocommit=False,

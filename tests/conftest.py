@@ -102,7 +102,6 @@ class WebServerProcess:
             signal.signal(signal.SIGTERM, sigterm_handler)
 
             app = get_app()
-            print("********************1")
             uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
 
         if config_db():

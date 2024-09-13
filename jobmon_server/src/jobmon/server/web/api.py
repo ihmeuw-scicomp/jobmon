@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 import structlog
 
 from jobmon.core.otlp import OtlpAPI
-from jobmon.server.web.config import get_jobmon_config
 from jobmon.server.web.log_config import configure_structlog  # noqa F401
 from jobmon.server.web.log_config import configure_logging  # noqa F401
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
