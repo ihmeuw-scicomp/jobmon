@@ -76,7 +76,7 @@ def terminate_db(sqlalchemy_database_uri: str) -> None:
 # create a singleton holder so that it gets created after config
 _session_local = None
 _db_url = None
-def get_session_local() -> sessionmaker:
+def get_session_loca_bk() -> sessionmaker:
     """Get a session local object."""
     global _session_local
     global _db_url
@@ -95,3 +95,8 @@ def get_session_local() -> sessionmaker:
     _db_url = url_from_config
     return _session_local
 
+def get_session_local():
+    """Get a session local object."""
+    return sessionmaker(autocommit=False,
+                        autoflush=False,
+                        bind=get_engine_from_config())

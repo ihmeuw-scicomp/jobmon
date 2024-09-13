@@ -17,12 +17,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import create_engine
 
 from jobmon.client.api import Tool
-from jobmon.core.configuration import JobmonConfig
 from jobmon.core.requester import Requester
-from jobmon.server.web.api import get_app, configure_logging
-from jobmon.server.web.config import get_jobmon_config
-from jobmon.server.web.db_admin import init_db
-from jobmon.server.web.models import load_model
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +54,8 @@ class WebServerProcess:
         database_uri = f"sqlite:///{self.filepath}"
 
         def config_db() -> bool:
+            from jobmon.server.web.config import get_jobmon_config
+            from jobmon.core.configuration import JobmonConfig
             config = JobmonConfig(
                 dict_config={
                     "db": {"sqlalchemy_database_uri": database_uri},
@@ -70,6 +67,9 @@ class WebServerProcess:
                 }
             )
             get_jobmon_config(config)
+            from jobmon.server.web.api import configure_logging
+            from jobmon.server.web.db_admin import init_db
+            from jobmon.server.web.models import load_model
             init_db()
             load_model()
             configure_logging(
@@ -100,7 +100,7 @@ class WebServerProcess:
                 sys.exit(0)
 
             signal.signal(signal.SIGTERM, sigterm_handler)
-
+            from jobmon.server.web.api import get_app
             app = get_app()
             uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
 
