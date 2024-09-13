@@ -312,9 +312,7 @@ async def get_max_concurrently_running(workflow_id: int, request: Request) -> An
     return resp
 
 
-@api_v3_router.put(
-    "workflow/{workflow_id}/update_max_concurrently_running"
-)
+@api_v3_router.put("/workflow/{workflow_id}/update_max_concurrently_running")
 async def update_max_running(workflow_id: int, request: Request) -> Any:
     """Update the number of tasks that can be running concurrently for a given workflow."""
     data = cast(Dict, await request.json())

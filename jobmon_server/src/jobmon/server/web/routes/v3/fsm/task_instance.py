@@ -351,9 +351,7 @@ async def log_distributor_id(task_instance_id: int, request: Request) -> Any:
     return resp
 
 
-@api_v3_router.post(
-    "/task_instance/{task_instance_id}/log_known_error"
-)
+@api_v3_router.post("/task_instance/{task_instance_id}/log_known_error")
 async def log_known_error(task_instance_id: int, request: Request) -> Any:
     """Log a task_instance as errored.
 
@@ -617,14 +615,14 @@ def _log_error(
     try:
         error = TaskInstanceErrorLog(task_instance_id=ti.id, description=error_msg)
         session.add(error)
-        msg = _update_task_instance_state(ti, error_state)
+        msg = _update_task_instance_state(ti, error_state, request)
         session.flush()
         resp = JSONResponse(content={"message": msg}, status_code=StatusCodes.OK)
     except Exception as e:
         session.rollback()
         if request is not None:
             raise ServerError(
-                f"Unexpected Jobmon Server Error in {request.path}", status_code=500
+                f"Unexpected Jobmon Server Error in {request.url.path}", status_code=500
             ) from e
         else:
             raise ServerError(
