@@ -76,7 +76,7 @@ def terminate_db(sqlalchemy_database_uri: str) -> None:
 # create a singleton holder so that it gets created after config
 _session_local = None
 _db_url = None
-def get_session_loca_bk() -> sessionmaker:
+def get_session_local() -> sessionmaker:
     """Get a session local object."""
     global _session_local
     global _db_url
@@ -86,6 +86,9 @@ def get_session_loca_bk() -> sessionmaker:
     # this is to compromise to the behavior when running tests under a directory
     # somehow, when running tests under a dir, it initializes the default config anyway
     # this doesn't happen when running prod or a test file
+    '''TODO:
+       move to a .env file
+    '''
     if _session_local is None or url_from_config != _db_url:
         # backdoor for conftest without touching the existing JobmonConfig
         _session_local = sessionmaker(autocommit=False,
@@ -94,9 +97,3 @@ def get_session_loca_bk() -> sessionmaker:
     # reset the db_url from config
     _db_url = url_from_config
     return _session_local
-
-def get_session_local():
-    """Get a session local object."""
-    return sessionmaker(autocommit=False,
-                        autoflush=False,
-                        bind=get_engine_from_config())
