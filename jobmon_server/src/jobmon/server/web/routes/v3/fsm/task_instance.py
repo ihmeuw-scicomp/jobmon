@@ -265,9 +265,9 @@ async def get_task_instance_error_log(task_instance_id: int) -> Any:
                 .order_by(TaskInstanceErrorLog.task_instance_id)
             )
             res = session.execute(select_stmt).scalars().all()
-
-            resp = JSONResponse(content={"task_instance_error_log":
-                                             res.task_instance_error_log},
+            r = [tiel.to_wire() for tiel in res]
+            print(f"%%%%%%%%%%%%%%%%%%%%%%%%{r}")
+            resp = JSONResponse(content={"task_instance_error_log": r},
                                 status_code=StatusCodes.OK)
     return resp
 
