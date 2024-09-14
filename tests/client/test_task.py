@@ -362,3 +362,28 @@ def test_default_max_attemps(db_engine, client_env, tool):
     # test wf always have a default max attempts so existing code works
     wf5 = tool.create_workflow(default_max_attempts=None)
     assert wf5.default_max_attempts == tool.default_max_attempts is not None
+
+
+def test_downstream_task(client_env, tool, db_engine):
+    wf = tool.create_workflow()
+    tt = tool.get_task_template(
+        template_name="test_tt",
+        command_template="{arg1} {arg2}",
+        node_args=["arg1"],
+        task_args=["arg2"],
+    )
+    task1 = tt.create_task(name="task1", arg1="abc1", arg2="def")
+    task2 = tt.create_task(name="task2", arg1="abc2", arg2="def", upstream_tasks=[task1])
+    task3 = tt.create_task(name="task3", arg1="abc3", arg2="def", upstream_tasks=[task1])
+    wf.add_tasks([task1, task2, task3])
+    wf.bind()
+    assert wf.workflow_id is not None
+    wf._bind_tasks()
+    assert task1.task_id is not None
+    assert task2.task_id is not None
+    assert task3.task_id is not None
+    # use the /task/get_downstream_tasks endpoint to verify the downstream tasks
+    with Session(bind=db_engine) as session:
+        # verify attribute
+        res = session.execute(text(f"select * from task, edge where task.id={task1.task_id} and task.node_id=edge.node_id")).fetchall()
+        assert len(res) == 2
