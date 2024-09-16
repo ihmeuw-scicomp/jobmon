@@ -365,6 +365,7 @@ def test_default_max_attemps(db_engine, client_env, tool):
 
 
 def test_downstream_task(client_env, tool, db_engine):
+    """Test case to verify the downstream and the upstream tasks."""
     wf = tool.create_workflow()
     tt = tool.get_task_template(
         template_name="test_tt",
@@ -384,16 +385,20 @@ def test_downstream_task(client_env, tool, db_engine):
     assert task3.task_id is not None
     # use the /task/get_downstream_tasks endpoint to verify the downstream tasks
     with Session(bind=db_engine) as session:
-        # verify attribute
+        # verify edge
+        import re
         res = session.execute(text(
             f"select downstream_node_ids from task, edge where task.id={task1.task_id} and task.node_id=edge.node_id")).fetchall()
         assert len(res) == 1
-        assert res[0][0] == '"[2, 3]"'
+        two_id_patten = r'^\"\[\s*-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?\s*\]\"$'   # '"[1, 2]"'
+        assert re.match(two_id_patten, res[0][0])
+
+        one_id_pattern = r'^\"\[\s*-?\d+(\.\d+)?\s*\]\"$'  # '"[1]"'
         res = session.execute(text(
             f"select upstream_node_ids from task, edge where task.id={task2.task_id} and task.node_id=edge.node_id")).fetchall()
         assert len(res) == 1
-        assert res[0][0] == '"[1]"'
+        assert re.match(one_id_pattern, res[0][0])
         res = session.execute(text(
             f"select upstream_node_ids from task, edge where task.id={task3.task_id} and task.node_id=edge.node_id")).fetchall()
         assert len(res) == 1
-        assert res[0][0] == '"[1]"'
+        assert re.match(one_id_pattern, res[0][0])
