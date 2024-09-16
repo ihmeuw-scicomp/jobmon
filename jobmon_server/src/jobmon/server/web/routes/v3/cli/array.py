@@ -1,6 +1,7 @@
 from http import HTTPStatus
-from typing import Any
+from typing import Any, Optional
 
+from fastapi import Query
 from starlette.responses import JSONResponse
 from sqlalchemy import select
 
@@ -16,8 +17,8 @@ SessionLocal = get_session_local()
 @api_v3_router.get("/array/{workflow_id}/get_array_tasks")
 def get_array_task_instances(workflow_id: int,
                              array_name: str,
-                             job_name: str,
-                             limit: int = 5) -> Any:
+                             job_name: Optional[str] = Query(None),
+                             limit: Optional[int] = Query(None)) -> Any:
     """Return error/output filepaths for task instances filtered by array name.
 
     The user can also optionally filter by job name as well.
@@ -35,6 +36,10 @@ def get_array_task_instances(workflow_id: int,
 
     if job_name:
         query_filters.append(Task.name == job_name)
+
+    # set default limit to 5
+    if limit is None:
+        limit = 5
 
     with SessionLocal() as session:
         with session.begin():

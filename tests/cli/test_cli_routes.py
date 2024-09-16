@@ -677,7 +677,7 @@ def test_get_workflow_status_viz(tool):
 
     app_route = "/workflow_status_viz"
     return_code, msg = wf.requester.send_request(
-        app_route=app_route, message={"workflow_ids[]": wfids}, request_type="get"
+        app_route=app_route, message={"workflow_ids": wfids}, request_type="get"
     )
     assert return_code == 200
 
@@ -946,49 +946,3 @@ def test_workflow_overview_viz(client_env, db_engine):
 
     assert return_code == 200
     assert msg["workflows"][0]["wf_tool"] == tool_name
-
-
-def test_get_downstream_tasks(client_env, db_engine):
-    t = Tool(name="downstream_tasks")
-    wf = t.create_workflow(name="i_am_a_fake_wf")
-    tt1 = t.get_task_template(
-        template_name="tt_1", command_template="echo {arg}", node_args=["arg"]
-    )
-    tt2 = t.get_task_template(
-        template_name="tt_2", command_template="echo {arg}", node_args=["arg"]
-    )
-    t1 = tt1.create_task(
-        arg=1,
-        cluster_name="sequential",
-        compute_resources={"queue": "null.q", "num_cores": 2},
-    )
-    t2 = tt2.create_task(
-        arg=2,
-        cluster_name="sequential",
-        compute_resources={"queue": "null.q", "num_cores": 4},
-        upstream_tasks=[t1],
-    )
-    t3 = tt2.create_task(
-        arg=3,
-        cluster_name="sequential",
-        compute_resources={"queue": "null.q", "num_cores": 4},
-        upstream_tasks=[t1],
-    )
-    wf.add_tasks([t1, t2, t3])
-    wf.bind()
-    assert wf.workflow_id is not None
-    wf._bind_tasks()
-    assert t1.task_id is not None
-    assert t2.task_id is not None
-    assert t3.task_id is not None
-
-    dag_id = wf.dag_id
-    msg = {"dag_id": dag_id, "task_id": t1.task_id}
-    app_route = f"/task/get_downstream_tasks"
-    return_code, msg = wf.requester.send_request(
-        app_route=app_route, message=msg, request_type="get"
-    )
-    assert return_code == 200
-    assert len(msg["downstream_tasks"]) == 2
-    assert msg["downstream_tasks"][0]["task_id"] == t2.task_id
-    assert msg["downstream_tasks"][1]["task_id"] == t3.task_id

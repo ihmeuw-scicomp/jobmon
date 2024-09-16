@@ -4,7 +4,7 @@ from http import HTTPStatus as StatusCodes
 import json
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from fastapi import Request
+from fastapi import Request, Query
 from starlette.responses import JSONResponse
 import numpy as np
 import pandas as pd
@@ -32,11 +32,12 @@ from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.routes.v3.cli.workflow import _cli_label_mapping
 from jobmon.server.web.server_side_exception import InvalidUsage
+from jobmon.server.web.config import get_jobmon_config
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
-
+_CONFIG = get_jobmon_config()
 
 @api_v3_router.get("/get_task_template_version")
 def get_task_template_version_for_tasks(task_id: Optional[int] = None,
@@ -134,7 +135,9 @@ def get_requested_cores(task_template_version_ids: Optional[str] = None) -> Any:
 
 
 @api_v3_router.get("/get_most_popular_queue")
-def get_most_popular_queue(task_template_version_ids: int) -> Any:
+def get_most_popular_queue(
+        task_template_version_ids: Optional[str] = Query(...)
+) -> Any:
     """Get the most popular queue of the task template."""
     # parse args
     ttvis = task_template_version_ids
@@ -401,8 +404,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             # Has to be conditional since not all database engines support STRAIGHT_JOIN.
             if (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
+                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
             ):
                 sql = sql.prefix_with("STRAIGHT_JOIN")
             rows = session.execute(sql).all()
@@ -433,8 +435,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             )
             if (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
+                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
             ):
                 sql = sql.prefix_with("STRAIGHT_JOIN")
             attempts0 = session.execute(sql).all()
@@ -606,7 +607,7 @@ def get_tt_error_log_viz(wf_id: int,
                     "task_id": r[0],
                     "task_instance_id": r[1],
                     "task_instance_err_id": r[2],
-                    "error_time": r[3],
+                    "error_time": str(r[3]),
                     "error": r[4],
                     "task_instance_stderr_log": r[5],
                     "workflow_run_id": r[6],

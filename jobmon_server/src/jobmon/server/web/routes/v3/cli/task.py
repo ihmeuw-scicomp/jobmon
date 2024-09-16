@@ -3,9 +3,9 @@
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, cast, Dict, List, Set, Optional
+from typing import Any, cast, Dict, List, Set, Optional, Union
 
-from fastapi import Request
+from fastapi import Request, Query
 from starlette.responses import JSONResponse
 import pandas as pd
 from sqlalchemy import select, update
@@ -52,9 +52,16 @@ _reversed_task_instance_label_mapping = {
 
 
 @api_v3_router.get("/task_status")
-def get_task_status(task_ids: list[int],
-                    status_request: Optional[list[str]]) -> Any:
+def get_task_status(task_ids: Optional[Union[int, list[int]]] = Query(...),
+                    status_request: Optional[list[str]] = Query(None)) -> Any:
     """Get the status of a task."""
+    logger.info(f"*********************task_ids: {task_ids}, status_request: {status_request}")
+    if task_ids is None:
+        raise InvalidUsage("Missing task_ids in request", status_code=400)
+
+    if isinstance(task_ids, int):
+        task_ids = [task_ids]
+
     if len(task_ids) == 0:
         raise InvalidUsage(f"Missing {task_ids} in request", status_code=400)
 
@@ -117,11 +124,11 @@ def get_task_status(task_ids: list[int],
                 df = pd.DataFrame(rows, columns=column_names)
                 # remap to jobmon_cli statuses
                 df.STATUS.replace(to_replace=_task_instance_label_mapping, inplace=True)
-                resp = JSONResponse(content={"task_instance_status": df.to_dict()},
+                resp = JSONResponse(content={"task_instance_status": df.to_json()},
                                     status_code=StatusCodes.OK)
             else:
                 df = pd.DataFrame({}, columns=column_names)
-                resp = JSONResponse(content={"task_instance_status": df.to_dict()},
+                resp = JSONResponse(content={"task_instance_status": df.to_json()},
                                     status_code=StatusCodes.OK)
 
     return resp
@@ -205,7 +212,7 @@ async def update_task_statuses(request: Request) -> Any:
         workflow_id = data["workflow_id"]
     except KeyError as e:
         raise InvalidUsage(
-            f"problem with {str(e)} in request to {request.path}", status_code=400
+            f"problem with {str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     with SessionLocal() as session:
@@ -247,7 +254,7 @@ async def update_task_statuses(request: Request) -> Any:
             except KeyError as e:
                 session.rollback()
                 raise InvalidUsage(
-                    f"{str(e)} in request to {request.path}", status_code=400
+                    f"{str(e)} in request to {request.url.path}", status_code=400
                 ) from e
 
         message = f"updated to status {new_status}"

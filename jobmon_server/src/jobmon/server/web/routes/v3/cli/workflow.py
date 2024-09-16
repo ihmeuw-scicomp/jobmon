@@ -448,16 +448,16 @@ def get_workflow_status_viz(workflow_ids: list[int] = Query(None)) -> Any:
 
 
 @api_v3_router.get("/workflow_overview_viz")
-def workflows_by_user_form(user: str,
-                           tool: str,
-                           wf_name: str,
-                           wf_args: str,
-                           wf_attribute_value: str,
-                           wf_attribute_key: str,
-                           wf_id: int,
-                           date_submitted: str,
-                           date_submitted_end: str,
-                           status: str) -> Any:
+def workflows_by_user_form(user: Optional[str] = Query(None),
+                           tool: Optional[str] = Query(None),
+                           wf_name: Optional[str] = Query(None),
+                           wf_args: Optional[str] = Query(None),
+                           wf_attribute_value: Optional[str] = Query(None),
+                           wf_attribute_key: Optional[str] = Query(None),
+                           wf_id: Optional[int] = Query(None),
+                           date_submitted: Optional[str] = Query(None),
+                           date_submitted_end: Optional[str] = Query(None),
+                           status: Optional[str] = Query(None)) -> Any:
     """Fetch associated workflows and workflow runs by username."""
     with SessionLocal() as session:
         with session.begin():
@@ -553,24 +553,25 @@ def workflows_by_user_form(user: str,
             )
             rows = session.execute(query, substitution_dict).all()
 
-    column_names = (
-        "wf_id",
-        "wf_name",
-        "wf_submitted_date",
-        "wf_status_date",
-        "wf_args",
-        "wfr_count",
-        "wf_status",
-        "wf_tool",
-    )
-    # Initialize all possible states as 0. No need to return data since it will be refreshed
-    # on demand anyways.
-    initial_status_counts = {
-        label_mapping: 0 for label_mapping in set(_cli_label_mapping.values())
-    }
-    result = [dict(zip(column_names, row), **initial_status_counts) for row in rows]
+        column_names = (
+            "wf_id",
+            "wf_name",
+            "wf_submitted_date",
+            "wf_status_date",
+            "wf_args",
+            "wfr_count",
+            "wf_status",
+            "wf_tool",
+        )
+        # Initialize all possible states as 0. No need to return data since it will be refreshed
+        # on demand anyways.
+        initial_status_counts = {
+            label_mapping: 0 for label_mapping in set(_cli_label_mapping.values())
+        }
+        result = [dict(zip(column_names, row), **initial_status_counts) for row in rows]
 
-    res = JSONResponse(content=result, status_code=StatusCodes.OK)
+        res = JSONResponse(content={"workflows": result},
+                           status_code=StatusCodes.OK)
     return res
 
 
@@ -615,6 +616,7 @@ def task_details_by_wf_id(workflow_id: int,
     result = [dict(zip(column_names, row)) for row in rows]
     for r in result:
         r["task_status"] = _cli_label_mapping[r["task_status"]]
+        r["task_status_date"] = str(r["task_status_date"])
     res = JSONResponse(content={"tasks": result}, status_code=StatusCodes.OK)
     return res
 
@@ -642,17 +644,20 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
             )
             rows = session.execute(sql).all()
 
-    column_names = (
-        "wf_name",
-        "wf_args",
-        "wf_created_date",
-        "wf_status_date",
-        "tool_name",
-        "wf_status",
-        "wf_status_desc",
-        "wfr_jobmon_version",
-    )
+        column_names = (
+            "wf_name",
+            "wf_args",
+            "wf_created_date",
+            "wf_status_date",
+            "tool_name",
+            "wf_status",
+            "wf_status_desc",
+            "wfr_jobmon_version",
+        )
 
-    result = [dict(zip(column_names, row)) for row in rows]
-    resp = JSONResponse(content=result, status_code=StatusCodes.OK)
+        result = [dict(zip(column_names, row)) for row in rows]
+        for r in result:
+            r["wf_created_date"] = str(r["wf_created_date"])
+            r["wf_status_date"] = str(r["wf_status_date"])
+        resp = JSONResponse(content=result, status_code=StatusCodes.OK)
     return resp
