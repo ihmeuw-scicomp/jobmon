@@ -49,8 +49,12 @@ async def add_dag(request: Request) -> Any:
                 dag = session.execute(select_stmt).scalar_one()
 
         # return result
-        resp = JSONResponse(content={"dag_id": dag.id, "created_date": str(dag.created_date)},
-                            status_code=StatusCodes.OK)
+        if dag.created_date:
+            resp = JSONResponse(content={"dag_id": dag.id, "created_date": str(dag.created_date)},
+                                status_code=StatusCodes.OK)
+        else:
+            resp = JSONResponse(content={"dag_id": dag.id, "created_date": None},
+                                status_code=StatusCodes.OK)
     return resp
 
 

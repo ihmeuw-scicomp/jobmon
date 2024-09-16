@@ -385,5 +385,15 @@ def test_downstream_task(client_env, tool, db_engine):
     # use the /task/get_downstream_tasks endpoint to verify the downstream tasks
     with Session(bind=db_engine) as session:
         # verify attribute
-        res = session.execute(text(f"select * from task, edge where task.id={task1.task_id} and task.node_id=edge.node_id")).fetchall()
-        assert len(res) == 2
+        res = session.execute(text(
+            f"select downstream_node_ids from task, edge where task.id={task1.task_id} and task.node_id=edge.node_id")).fetchall()
+        assert len(res) == 1
+        assert res[0][0] == '"[2, 3]"'
+        res = session.execute(text(
+            f"select upstream_node_ids from task, edge where task.id={task2.task_id} and task.node_id=edge.node_id")).fetchall()
+        assert len(res) == 1
+        assert res[0][0] == '"[1]"'
+        res = session.execute(text(
+            f"select upstream_node_ids from task, edge where task.id={task3.task_id} and task.node_id=edge.node_id")).fetchall()
+        assert len(res) == 1
+        assert res[0][0] == '"[1]"'
