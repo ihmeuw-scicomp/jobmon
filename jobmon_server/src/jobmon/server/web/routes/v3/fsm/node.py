@@ -24,10 +24,7 @@ async def add_nodes(request: Request) -> Any:
     """Add a chunk of nodes to the database.
 
     Args:
-        nodes: a list of
-            node_args_hash: unique identifier of all NodeArgs associated with a node.
-        task_template_version_id: version id of the task_template a node belongs to.
-        node_args: key-value pairs of arg_id and a value.
+        request: The request object.
     """
     data = cast(Dict, await request.json())
     # Extract node and node_args

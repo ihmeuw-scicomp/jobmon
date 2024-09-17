@@ -3,13 +3,13 @@
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, cast, Dict, List, Set, Optional, Union
+from typing import Any, cast, Dict, List, Optional, Set, Union
 
-from fastapi import Request, Query
-from starlette.responses import JSONResponse
+from fastapi import Query, Request
 import pandas as pd
 from sqlalchemy import and_, select, update
 from sqlalchemy.orm import Session
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core import constants
@@ -192,8 +192,8 @@ async def get_task_subdag(request: Request) -> Any:
                 )
                 return resp
 
-            # Since we have validated all the tasks belong to the same wf in status_command before
-            # this call, assume they all belong to the same wf.
+            # Since we have validated all the tasks belong to the same wf in status_command
+            # before this call, assume they all belong to the same wf.
             if grouped_data:
                 some_key = next(iter(grouped_data))
                 workflow_id, dag_id = some_key

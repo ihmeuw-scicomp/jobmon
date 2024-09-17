@@ -29,7 +29,6 @@ def apply_migrations(sqlalchemy_database_uri: str, revision: str = "head") -> No
 
 def get_engine_from_config() -> Engine:
     """Create a SQLAlchemy engine from a URI."""
-
     connect_args = {}
     config = get_jobmon_config()
     sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")

@@ -9,7 +9,6 @@ from sqlalchemy import desc, insert, ScalarResult, select, tuple_, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import DataError, IntegrityError
-from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 import structlog
@@ -121,7 +120,8 @@ async def bind_tasks_no_args(request: Request) -> Any:
 
             # Bind new tasks with raw SQL
             if len(tasks_to_add):
-                # This command is guaranteed to succeed, since names are truncated in the client
+                # This command is guaranteed to succeed,
+                # since names are truncated in the client
                 task_insert_stmt = insert(Task).values(tasks_to_add)
                 session.execute(task_insert_stmt)
                 session.flush()
@@ -453,7 +453,8 @@ async def set_task_resume_state(workflow_id: int, request: Request) -> Any:
                 )
                 return resp
 
-            # Set task reset. If calling this bulk route, don't update any metadata besides what's
+            # Set task reset. If calling this bulk route,
+            # don't update any metadata besides what's
             # already bound in the database.
 
             # Logic: reset_if_running -> Reset all tasks not in "D" state

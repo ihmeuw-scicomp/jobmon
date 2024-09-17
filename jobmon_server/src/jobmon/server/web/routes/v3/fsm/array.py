@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict, Optional
+from typing import Any, cast, Dict
 
 from fastapi import Request
 from sqlalchemy import and_, case, func, insert, literal_column, select, update
@@ -11,12 +11,12 @@ import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.server.web._compat import add_time
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import get_session_local
 
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()

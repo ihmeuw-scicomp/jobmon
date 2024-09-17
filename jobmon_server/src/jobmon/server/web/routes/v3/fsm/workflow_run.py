@@ -11,13 +11,13 @@ import structlog
 
 from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -38,7 +38,7 @@ async def add_workflow_run(request: Request) -> Any:
         structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     logger.info(f"Add wfr for workflow_id:{workflow_id}.")
@@ -221,7 +221,7 @@ async def log_workflow_run_status_update(workflow_run_id: int, request: Request)
         status = data["status"]
     except Exception as e:
         raise InvalidUsage(
-            f"{str(e)} in request to {request.path}", status_code=400
+            f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
     logger.info(f"Log status update for workflow_run_id:{workflow_run_id}.")

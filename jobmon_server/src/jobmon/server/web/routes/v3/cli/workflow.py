@@ -4,8 +4,7 @@ from datetime import datetime
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from fastapi import Request, Query
-from starlette.responses import JSONResponse
+from fastapi import Query, Request
 import pandas as pd
 from sqlalchemy import (
     func,
@@ -14,6 +13,7 @@ from sqlalchemy import (
     text,
     update,
 )
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core.constants import WorkflowStatus as Statuses
@@ -224,7 +224,7 @@ async def reset_workflow(workflow_id: int, request: Request) -> Any:
 
             # Update task statuses associated with the workflow
             # Default behavior is a full workflow reset, all tasks to registered state
-            # User can optionally request only a partial reset if they want to resume this workflow
+            # User can optionally request only a partial reset if they want to resume
             invalid_statuses = ["G"]
             if partial_reset:
                 invalid_statuses.append("D")
@@ -261,7 +261,7 @@ def get_workflow_status(
     elif isinstance(workflow_id, str) and workflow_id == "all":
         workflow_request = []
     else:
-        workflow_request = workflow_id
+        workflow_request = workflow_id  # type: ignore
     logger.debug(f"Query for wf {workflow_request} status.")
     # set default to 5 to match status_commands
     limit = int(limit) if limit else 5
@@ -498,7 +498,7 @@ def workflows_by_user_form(
                 substitution_dict["wf_attribute_value"] = wf_attribute_value
             if wf_id:
                 where_clauses.append("workflow.id = :wf_id")
-                substitution_dict["wf_id"] = wf_id
+                substitution_dict["wf_id"] = wf_id  # type: ignore
             if date_submitted:
                 where_clauses.append("workflow.created_date >= :date_submitted")
                 substitution_dict["date_submitted"] = date_submitted
@@ -540,7 +540,8 @@ def workflows_by_user_form(
                                     workflow_run.workflow_id
                                 FROM
                                     workflow
-                                    JOIN tool_version ON workflow.tool_version_id = tool_version.id
+                                    JOIN tool_version ON
+                                        workflow.tool_version_id = tool_version.id
                                     JOIN tool ON tool.id = tool_version.tool_id
                                     JOIN workflow_run ON workflow.id = workflow_run.workflow_id
                                     LEFT JOIN workflow_attribute
@@ -578,7 +579,8 @@ def workflows_by_user_form(
             "wf_status",
             "wf_tool",
         )
-        # Initialize all possible states as 0. No need to return data since it will be refreshed
+        # Initialize all possible states as 0.
+        # No need to return data since it will be refreshed
         # on demand anyways.
         initial_status_counts = {
             label_mapping: 0 for label_mapping in set(_cli_label_mapping.values())

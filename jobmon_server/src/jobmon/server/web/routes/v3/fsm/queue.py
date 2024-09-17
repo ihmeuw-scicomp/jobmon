@@ -6,9 +6,10 @@ from typing import Any
 from sqlalchemy import select
 from starlette.responses import JSONResponse
 
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import get_session_local
+
 
 SessionLocal = get_session_local()
 

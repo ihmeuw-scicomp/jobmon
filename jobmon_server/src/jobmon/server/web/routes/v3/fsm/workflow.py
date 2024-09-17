@@ -351,6 +351,7 @@ async def task_status_updates(workflow_id: int, request: Request) -> Any:
 
     Args:
         workflow_id (int): the ID of the workflow.
+        request (Request): the request object.
     """
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
     data = cast(Dict, await request.json())
@@ -414,7 +415,7 @@ def get_tasks_from_workflow(workflow_id: int, max_task_id: int, chunk_size: int)
         with session.begin():
             if max_task_id == 0:
                 # Performance suffers heavily if we do a search with WHERE task.id > 0
-                # Therefore, select the smallest task ID in the workflow and use that as the initial
+                # Therefore, select the smallest task ID in the wf to use as the initial
                 # floor.
                 min_task_id = session.execute(
                     select(func.min(Task.id)).where(Task.workflow_id == workflow_id)
@@ -438,8 +439,8 @@ def get_tasks_from_workflow(workflow_id: int, max_task_id: int, chunk_size: int)
                 )
                 .where(
                     Task.workflow_id == workflow_id,
-                    # Note: because of this status != "DONE" filter, only the portion of the DAG
-                    # that is not complete is returned. Assumes that all tasks in a workflow
+                    # Note: because of this status != "DONE" filter, only the portion of the
+                    # DAG that is not complete is returned. Assumes that all tasks in a wf
                     # correspond to nodes that belong in the same DAG, and that no downstream
                     # nodes can be in DONE for any unfinished task
                     Task.status != TaskStatus.DONE,

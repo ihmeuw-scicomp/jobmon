@@ -2,18 +2,19 @@
 
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import Request, Query
-from starlette.responses import JSONResponse
+from fastapi import Query, Request
 import numpy as np
-import pandas as pd
+import pandas as pd  # type:ignore
 import scipy.stats as st  # type:ignore
 from sqlalchemy import Row, Select, select
 from sqlalchemy.sql import func
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
+from jobmon.server.web.config import get_jobmon_config
 from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.error_log_clustering import cluster_error_logs
 from jobmon.server.web.models.arg import Arg
@@ -32,7 +33,6 @@ from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.routes.v3.cli.workflow import _cli_label_mapping
 from jobmon.server.web.server_side_exception import InvalidUsage
-from jobmon.server.web.config import get_jobmon_config
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
@@ -95,7 +95,7 @@ def get_requested_cores(task_template_version_ids: Optional[str] = None) -> Any:
         raise ValueError(
             "No task_template_version_ids returned in /get_requested_cores"
         )
-    ttvis = [int(i) for i in ttvis[1:-1].split(",")]
+    ttvis = [int(i) for i in ttvis[1:-1].split(",")]  # type: ignore
     # null core should be treated as 1 instead of 0
     with SessionLocal() as session:
         with session.begin():
@@ -149,7 +149,7 @@ def get_most_popular_queue(
         raise ValueError(
             "No task_template_version_ids returned in /get_most_popular_queue."
         )
-    ttvis = [int(i) for i in ttvis[1:-1].split(",")]
+    ttvis = [int(i) for i in ttvis[1:-1].split(",")]  # type: ignore
     with SessionLocal() as session:
         with session.begin():
             query_filter = [

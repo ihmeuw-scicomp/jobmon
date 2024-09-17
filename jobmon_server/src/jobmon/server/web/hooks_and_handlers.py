@@ -1,8 +1,8 @@
-from typing import Any, cast, Dict, Optional
+import json
+from typing import Any, AsyncGenerator, Callable, cast, Dict, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-import json
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_404_NOT_FOUND
 import structlog
@@ -15,11 +15,12 @@ logger = structlog.get_logger(__name__)
 
 
 # Dependency for removing session after each request
-async def teardown_session():
+async def teardown_session() -> AsyncGenerator:
+    """Remove the session after each request."""
     try:
         yield
     finally:
-        get_session_local().remove()
+        get_session_local().remove()  # type: ignore
 
 
 def _handle_error(
@@ -43,7 +44,9 @@ def _handle_error(
     )
     rd = {"error": response_data}
     response = JSONResponse(
-        content=rd, media_type="application/custom+json", status_code=status_code
+        content=rd,  # type: ignore
+        media_type="application/custom+json",  # type: ignore
+        status_code=status_code,  # type: ignore
     )
     return response
 
@@ -66,7 +69,7 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
         return _handle_error(request, error)
 
     @app.middleware("http")
-    async def add_requester_context(request, call_next) -> None:
+    async def add_requester_context(request: Request, call_next: Callable) -> None:
         """Add structured logging context before each request."""
         structlog.contextvars.clear_contextvars()
         data = {}
@@ -85,13 +88,15 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
             else data
         )
         if context_data:
-            structlog.contextvars.bind_contextvars(path=request.path, **context_data)
+            structlog.contextvars.bind_contextvars(
+                path=request.url.path, **context_data
+            )
         response = await call_next(request)
         return response
 
     # Include the teardown function globally, using FastAPI dependencies (for session cleanup)
     @app.middleware("http")
-    async def session_middleware(request, call_next):
+    async def session_middleware(request: Request, call_next: Callable) -> Any:
         response = await call_next(request)
         teardown_session()  # Call the session teardown after Request
         return response

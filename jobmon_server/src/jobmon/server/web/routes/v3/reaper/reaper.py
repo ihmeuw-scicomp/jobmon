@@ -3,9 +3,9 @@
 from http import HTTPStatus as StatusCodes
 from typing import Any, Sequence, Tuple, Union
 
-from fastapi import Request, Query
-from starlette.responses import JSONResponse
+from fastapi import Query, Request
 from sqlalchemy import func, Row, Select, select, text, update
+from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core.exceptions import InvalidStateTransition

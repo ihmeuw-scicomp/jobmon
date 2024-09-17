@@ -49,7 +49,7 @@ class _ProcessResourceDetector(resources.ResourceDetector):
             resources.PROCESS_RUNTIME_NAME: sys.implementation.name,
             resources.PROCESS_OWNER: getpass.getuser(),
         }
-        return resources.Resource(attrs)
+        return resources.Resource(attrs)  # type: ignore
 
 
 class _ServiceResourceDetector(resources.ResourceDetector):
@@ -147,7 +147,7 @@ class OtlpAPI:
             span_kwargs = config.get_section(span_exporter)
             self._set_exporter(
                 span_kwargs,
-                trace.get_tracer_provider().add_span_processor,
+                trace.get_tracer_provider().add_span_processor,  # type: ignore
                 BatchSpanProcessor,
             )
 
@@ -156,7 +156,7 @@ class OtlpAPI:
             log_kwargs = config.get_section(log_exporter)
             self._set_exporter(
                 log_kwargs,
-                _logs.get_logger_provider().add_log_record_processor,
+                _logs.get_logger_provider().add_log_record_processor,  # type: ignore
                 BatchLogRecordProcessor,
             )
 
@@ -206,7 +206,7 @@ class OtlpAPI:
 
     def get_logger_provider(self) -> LoggerProvider:
         """Get the logger provider."""
-        return _logs.get_logger_provider()
+        return _logs.get_logger_provider()  # type: ignore
 
     def correlate_logger(self, logger_name: str, level: int = logging.INFO) -> None:
         """Correlate a logger with the current span."""

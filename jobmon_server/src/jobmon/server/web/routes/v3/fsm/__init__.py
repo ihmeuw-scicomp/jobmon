@@ -1,7 +1,8 @@
 """Routes used to move through the finite state."""
 
-from fastapi import APIRouter
 from importlib import import_module
+
+from fastapi import APIRouter
 
 fsm_router = APIRouter(tags=["fsm"])
 

@@ -1,15 +1,14 @@
 from importlib import import_module
-from importlib.resources import files  # type: ignore
-from typing import Any, Optional, Type
+from typing import Any, Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import structlog
 
 from jobmon.core.otlp import OtlpAPI
+from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 from jobmon.server.web.log_config import configure_structlog  # noqa F401
 from jobmon.server.web.log_config import configure_logging  # noqa F401
-from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 from jobmon.server.web.server_side_exception import ServerError
 
 url_prefix = "/api"
@@ -24,7 +23,7 @@ def _init_logging(otlp_api: Optional[str] = None) -> bool:
             def add_open_telemetry_spans(_: Any, __: Any, event_dict: dict) -> dict:
                 """Add OpenTelemetry spans to the log record."""
                 if otlp_api is not None:
-                    span, trace, parent_span = otlp_api.get_span_details()
+                    span, trace, parent_span = otlp_api.get_span_details()  # type: ignore
                 else:
                     raise ServerError("otlp_api is None.")
 
@@ -56,8 +55,8 @@ def get_app(
         otlp_api: The OpenTelemetry API to use.
     """
     if use_otlp and otlp_api is None:
-        otlp_api = OtlpAPI()
-        otlp_api.instrument_sqlalchemy()
+        otlp_api = OtlpAPI()  # type: ignore
+        otlp_api.instrument_sqlalchemy()  # type: ignore
 
     if not structlog_configured:
         structlog_configured = _init_logging(otlp_api)

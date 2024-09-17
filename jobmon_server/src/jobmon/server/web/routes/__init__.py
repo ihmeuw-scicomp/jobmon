@@ -6,7 +6,6 @@ from typing import Any
 
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
-from sqlalchemy import orm
 from structlog import get_logger
 
 from jobmon.server.web.db_admin import get_session_local

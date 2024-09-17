@@ -1,5 +1,6 @@
 # create a singleton on jobmon_config
 from typing import Optional
+
 from jobmon.core.configuration import JobmonConfig
 
 

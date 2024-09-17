@@ -1,5 +1,6 @@
-from fastapi import APIRouter
 from importlib import import_module
+
+from fastapi import APIRouter
 
 reaper_router = APIRouter(tags=["reaper"])
 

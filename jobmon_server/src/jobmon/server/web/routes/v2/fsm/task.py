@@ -177,16 +177,16 @@ def bind_task_args() -> Any:
         try:
             if (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
+                and SessionLocal.bind  # type: ignore
+                and SessionLocal.bind.dialect.name == "mysql"  # type: ignore
             ):
                 arg_insert_stmt = (
                     insert(TaskArg).values(task_arg_values).prefix_with("IGNORE")
                 )
             elif (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "sqlite"
+                and SessionLocal.bind  # type: ignore
+                and SessionLocal.bind.dialect.name == "sqlite"  # type: ignore
             ):
                 arg_insert_stmt = (
                     sqlite_insert(TaskArg)
@@ -196,8 +196,8 @@ def bind_task_args() -> Any:
             else:
                 raise ServerError(
                     "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                    + SessionLocal.bind.dialect.name
-                    if SessionLocal and SessionLocal.bind
+                    + SessionLocal.bind.dialect.name  # type: ignore
+                    if SessionLocal and SessionLocal.bind  # type: ignore
                     else "None"
                 )
             with session.begin():
@@ -248,8 +248,8 @@ def bind_task_attributes() -> Any:
                 try:
                     if (
                         SessionLocal
-                        and SessionLocal.bind
-                        and SessionLocal.bind.dialect.name == "mysql"
+                        and SessionLocal.bind  # type: ignore
+                        and SessionLocal.bind.dialect.name == "mysql"  # type: ignore
                     ):
                         attr_insert_stmt = mysql_insert(TaskAttribute).values(
                             insert_values
@@ -261,8 +261,8 @@ def bind_task_attributes() -> Any:
 
                     elif (
                         SessionLocal
-                        and SessionLocal.bind
-                        and SessionLocal.bind.dialect.name == "sqlite"
+                        and SessionLocal.bind  # type: ignore
+                        and SessionLocal.bind.dialect.name == "sqlite"  # type: ignore
                     ):
                         for attr_to_add in insert_values:
                             attr_insert_stmt = (  # type: ignore
@@ -280,8 +280,8 @@ def bind_task_attributes() -> Any:
                     else:
                         raise ServerError(
                             "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                            + SessionLocal.bind.dialect.name
-                            if SessionLocal and SessionLocal.bind
+                            + SessionLocal.bind.dialect.name  # type: ignore
+                            if SessionLocal and SessionLocal.bind  # type: ignore
                             else "None"
                         )
                 except (DataError, IntegrityError) as e:
@@ -325,8 +325,8 @@ def _add_or_get_attribute_types(
         try:
             if (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
+                and SessionLocal.bind  # type: ignore
+                and SessionLocal.bind.dialect.name == "mysql"  # type: ignore
             ):
                 insert_stmt = (
                     insert(TaskAttributeType)
@@ -335,8 +335,8 @@ def _add_or_get_attribute_types(
                 )
             elif (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "sqlite"
+                and SessionLocal.bind  # type: ignore
+                and SessionLocal.bind.dialect.name == "sqlite"  # type: ignore
             ):
                 insert_stmt = (
                     sqlite_insert(TaskAttributeType)
@@ -346,8 +346,8 @@ def _add_or_get_attribute_types(
             else:
                 raise ServerError(
                     "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                    + SessionLocal.bind.dialect.name
-                    if SessionLocal and SessionLocal.bind
+                    + SessionLocal.bind.dialect.name  # type: ignore
+                    if SessionLocal and SessionLocal.bind  # type: ignore
                     else "None"
                 )
             session.execute(insert_stmt)

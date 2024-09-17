@@ -5,7 +5,7 @@ from pathlib import Path
 from pkgutil import iter_modules
 from typing import Any
 
-from sqlalchemy import CheckConstraint, create_engine, event, func, String
+from sqlalchemy import CheckConstraint, event, func, String
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm.decl_api import DeclarativeMeta

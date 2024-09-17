@@ -16,12 +16,12 @@ from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.core.serializers import SerializeTaskInstanceBatch
 from jobmon.server.web._compat import add_time
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.server_side_exception import ServerError
 
 
@@ -85,6 +85,7 @@ async def log_ti_report_by(task_instance_id: int, request: Request) -> Any:
 
     Args:
         task_instance_id: id of the task_instance to log
+        request: fastapi request object
     """
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
@@ -127,6 +128,7 @@ async def log_ti_report_by_batch(request: Request) -> Any:
 
     Args:
         task_instance_id: id of the task_instance to log
+        request: fastapi request object
     """
     data = cast(Dict, await request.json())
     tis = data.get("task_instance_ids", None)
@@ -203,7 +205,7 @@ async def log_error_worker_node(task_instance_id: int, request: Request) -> Any:
 
     Args:
         task_instance_id (str): id of the task_instance to log done
-        error_message (str): message to log as error
+        request (Request): fastapi request object
     """
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
@@ -616,7 +618,7 @@ def _log_error(
     error_msg: str,
     distributor_id: Optional[int] = None,
     nodename: Optional[str] = None,
-    request: Request = None,
+    request: Optional[Request] = None,
 ) -> Any:
     if nodename is not None:
         ti.nodename = nodename  # type: ignore
@@ -626,7 +628,7 @@ def _log_error(
     try:
         error = TaskInstanceErrorLog(task_instance_id=ti.id, description=error_msg)
         session.add(error)
-        msg = _update_task_instance_state(ti, error_state, request)
+        msg = _update_task_instance_state(ti, error_state, request)  # type: ignore
         session.flush()
         resp = JSONResponse(content={"message": msg}, status_code=StatusCodes.OK)
     except Exception as e:

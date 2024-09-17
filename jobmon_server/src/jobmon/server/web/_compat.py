@@ -12,7 +12,6 @@ _CONFIG = get_jobmon_config()
 
 def add_time(next_report_increment: float) -> Any:
     """Adds the next report increment time, and then returns the new time."""
-
     with SessionLocal() as session:
         if session:
             if "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):

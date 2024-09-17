@@ -12,12 +12,12 @@ from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core import constants
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.arg import Arg
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.template_arg_map import TemplateArgMap
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 
@@ -172,8 +172,8 @@ async def add_task_template_version(task_template_id: int, request: Request) -> 
 
         except sqlalchemy.exc.IntegrityError:
             with session.begin():
-                # if another process is adding this task_template_version then this query should
-                # block until the template_arg_map has been populated and committed
+                # if another process is adding this task_template_version then this query
+                # should block until the template_arg_map has been populated and committed
                 select_stmt = select(TaskTemplateVersion).where(
                     TaskTemplateVersion.task_template_id == task_template_id,
                     TaskTemplateVersion.command_template == command_template,

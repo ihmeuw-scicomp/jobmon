@@ -29,7 +29,7 @@ async def add_dag(request: Request) -> Any:
     """Add a new dag to the database.
 
     Args:
-        dag_hash: unique identifier of the dag, included in route
+        request: The request object.
     """
     data = cast(Dict, await request.json())
 

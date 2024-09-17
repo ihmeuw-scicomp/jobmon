@@ -2,8 +2,8 @@ from http import HTTPStatus
 from typing import Any, Optional
 
 from fastapi import Query
-from starlette.responses import JSONResponse
 from sqlalchemy import select
+from starlette.responses import JSONResponse
 
 from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.array import Array
