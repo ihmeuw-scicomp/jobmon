@@ -60,8 +60,7 @@ async def get_task_template(request: Request) -> Any:
                 task_template = session.execute(select_stmt).scalars().one()
                 ttid = task_template.id
         ()
-    resp = JSONResponse(content={"task_template_id": ttid},
-                        status_code=StatusCodes.OK)
+    resp = JSONResponse(content={"task_template_id": ttid}, status_code=StatusCodes.OK)
     return resp
 
 
@@ -80,8 +79,9 @@ def get_task_template_versions(task_template_id: int) -> Any:
             ttvs = session.execute(select_stmt).scalars().all()
             wire_obj = [ttv.to_wire_as_client_task_template_version() for ttv in ttvs]
 
-    resp = JSONResponse(content={"task_template_versions": wire_obj},
-                        status_code=StatusCodes.OK)
+    resp = JSONResponse(
+        content={"task_template_versions": wire_obj}, status_code=StatusCodes.OK
+    )
     return resp
 
 
@@ -108,9 +108,7 @@ def _add_or_get_arg(name: str, session: Session) -> Arg:
     return arg
 
 
-@api_v3_router.post(
-    "/task_template/{task_template_id}/add_version"
-)
+@api_v3_router.post("/task_template/{task_template_id}/add_version")
 async def add_task_template_version(task_template_id: int, request: Request) -> Any:
     """Add a tool to the database."""
     # check input variables
@@ -185,6 +183,8 @@ async def add_task_template_version(task_template_id: int, request: Request) -> 
 
                 task_template_version = ttv.to_wire_as_client_task_template_version()
         ()
-    resp = JSONResponse(content={"task_template_version": task_template_version},
-                        status_code=StatusCodes.OK)
+    resp = JSONResponse(
+        content={"task_template_version": task_template_version},
+        status_code=StatusCodes.OK,
+    )
     return resp

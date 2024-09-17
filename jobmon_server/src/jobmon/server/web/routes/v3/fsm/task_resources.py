@@ -37,7 +37,8 @@ def get_task_resources(task_resources_id: int) -> Any:
                 else None
             )
 
-    resp = JSONResponse(content={"requested_resources": requested_resources,
-                                 "queue_name": queue_name},
-                        status_code=StatusCodes.OK)
+    resp = JSONResponse(
+        content={"requested_resources": requested_resources, "queue_name": queue_name},
+        status_code=StatusCodes.OK,
+    )
     return resp

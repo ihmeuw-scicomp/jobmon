@@ -9,6 +9,7 @@ from sqlalchemy_utils import create_database, database_exists, drop_database
 
 from jobmon.server.web.config import get_jobmon_config
 
+
 def apply_migrations(sqlalchemy_database_uri: str, revision: str = "head") -> None:
     """Apply migrations to the database."""
     # Adjust the package path to where alembic.ini is located within your package
@@ -64,6 +65,7 @@ def init_db() -> None:
     # load metadata if db is new
     if add_metadata:
         from jobmon.server.web.models import load_metadata
+
         load_metadata(engine)
 
 
@@ -76,6 +78,8 @@ def terminate_db(sqlalchemy_database_uri: str) -> None:
 # create a singleton holder so that it gets created after config
 _session_local = None
 _db_url = None
+
+
 def get_session_local() -> sessionmaker:
     """Get a session local object."""
     global _session_local
@@ -86,14 +90,14 @@ def get_session_local() -> sessionmaker:
     # this is to compromise to the behavior when running tests under a directory
     # somehow, when running tests under a dir, it initializes the default config anyway
     # this doesn't happen when running prod or a test file
-    '''TODO:
+    """TODO:
        move to a .env file
-    '''
+    """
     if _session_local is None or url_from_config != _db_url:
         # backdoor for conftest without touching the existing JobmonConfig
-        _session_local = sessionmaker(autocommit=False,
-                                      autoflush=False,
-                                      bind=get_engine_from_config())
+        _session_local = sessionmaker(
+            autocommit=False, autoflush=False, bind=get_engine_from_config()
+        )
     # reset the db_url from config
     _db_url = url_from_config
     return _session_local

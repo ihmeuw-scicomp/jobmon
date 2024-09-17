@@ -13,6 +13,7 @@ from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
 
+
 # Dependency for removing session after each request
 async def teardown_session():
     try:
@@ -20,7 +21,10 @@ async def teardown_session():
     finally:
         get_session_local().remove()
 
-def _handle_error(request: Request, error: Exception, status_code: Optional[int] = None) -> Any:
+
+def _handle_error(
+    request: Request, error: Exception, status_code: Optional[int] = None
+) -> Any:
     """Handle all exceptions in a uniform manner."""
     # Extract status code from the error
     status_code = status_code or getattr(error, "status_code", 500)
@@ -34,12 +38,13 @@ def _handle_error(request: Request, error: Exception, status_code: Optional[int]
         "exception_message": str(error),
         "status_code": str(status_code),
     }
-    logger.exception("server encountered:", status_code=status_code,
-                     route=request.url.path)
+    logger.exception(
+        "server encountered:", status_code=status_code, route=request.url.path
+    )
     rd = {"error": response_data}
-    response = JSONResponse(content=rd,
-                            media_type="application/custom+json",
-                            status_code=status_code)
+    response = JSONResponse(
+        content=rd, media_type="application/custom+json", status_code=status_code
+    )
     return response
 
 
@@ -51,8 +56,10 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
         if isinstance(error, StarletteHTTPException):
             if error.status_code == HTTP_404_NOT_FOUND:
                 logger.warning("Route not found:", route=request.url)
-                return JSONResponse(content={"error": f"Route {request.url} not found"},
-                                    status_code=HTTP_404_NOT_FOUND)
+                return JSONResponse(
+                    content={"error": f"Route {request.url} not found"},
+                    status_code=HTTP_404_NOT_FOUND,
+                )
             return _handle_error(request, error, error.status_code)
         if isinstance(error, InvalidUsage) or isinstance(error, ServerError):
             return _handle_error(request, error, error.status_code)

@@ -30,7 +30,9 @@ def get_queue_by_cluster_queue_names(cluster_id: int, queue_name: str) -> Any:
         if queue is None:
             resp = JSONResponse(content={"queue": None}, status_code=StatusCodes.OK)
         else:
-            resp = JSONResponse(content={"queue": queue.to_wire_as_requested_by_client()},
-                                status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"queue": queue.to_wire_as_requested_by_client()},
+                status_code=StatusCodes.OK,
+            )
         resp.status_code = StatusCodes.OK
     return resp

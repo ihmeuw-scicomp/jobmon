@@ -413,7 +413,7 @@ def test_get_workflow_status(db_engine, tool):
     app_route = f"/workflow_status"
     params = {
         "workflow_id": [wf.workflow_id],  # This should be a list
-         }
+    }
     return_code, msg = wf.requester.send_request(
         app_route=app_route,
         message=params,
@@ -961,9 +961,7 @@ def test_task_update_statuses(client_env, db_engine, tool):
             task_args=[],
             op_args=[],
         )
-        task = task_template.create_task(
-                arg=command_str, name=f"task", max_attempts=1
-            )
+        task = task_template.create_task(arg=command_str, name=f"task", max_attempts=1)
         tasks.append(task)
         wf.add_tasks(tasks)
         return wf, tasks
@@ -975,9 +973,14 @@ def test_task_update_statuses(client_env, db_engine, tool):
     assert wf.workflow_id is not None
     with Session(bind=db_engine) as session:
         from sqlalchemy import text
-        res = session.execute(text(f"select status from task where id= {t.task_id}")).fetchone()
+
+        res = session.execute(
+            text(f"select status from task where id= {t.task_id}")
+        ).fetchone()
         assert res[0] == "F"
-        res = session.execute(text(f"select status from workflow where id= {wf.workflow_id}")).fetchone()
+        res = session.execute(
+            text(f"select status from workflow where id= {wf.workflow_id}")
+        ).fetchone()
         assert res[0] == "F"
 
     _, resp = wf.requester.send_request(
@@ -993,7 +996,12 @@ def test_task_update_statuses(client_env, db_engine, tool):
 
     with Session(bind=db_engine) as session:
         from sqlalchemy import text
-        res = session.execute(text(f"select status from task where id= {t.task_id}")).fetchone()
+
+        res = session.execute(
+            text(f"select status from task where id= {t.task_id}")
+        ).fetchone()
         assert res[0] == "D"
-        res = session.execute(text(f"select status from workflow where id= {wf.workflow_id}")).fetchone()
+        res = session.execute(
+            text(f"select status from workflow where id= {wf.workflow_id}")
+        ).fetchone()
         assert res[0] == "F"

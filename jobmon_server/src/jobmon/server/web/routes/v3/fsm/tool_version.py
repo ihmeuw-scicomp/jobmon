@@ -47,13 +47,13 @@ async def add_tool_version(request: Request) -> Any:
         session.refresh(tool_version)
         wire_format = tool_version.to_wire_as_client_tool_version()
 
-    resp = JSONResponse(content={"tool_version": wire_format}, status_code=StatusCodes.OK)
+    resp = JSONResponse(
+        content={"tool_version": wire_format}, status_code=StatusCodes.OK
+    )
     return resp
 
 
-@api_v3_router.get(
-    "/tool_version/{tool_version_id}/task_templates"
-)
+@api_v3_router.get("/tool_version/{tool_version_id}/task_templates")
 def get_task_templates(tool_version_id: int) -> Any:
     """Get the Tool Version."""
     # check input variable
@@ -68,6 +68,7 @@ def get_task_templates(tool_version_id: int) -> Any:
             task_templates = session.execute(select_stmt).scalars().all()
             wire_format = [t.to_wire_as_client_task_template() for t in task_templates]
 
-        resp = JSONResponse(content={"task_templates": wire_format},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"task_templates": wire_format}, status_code=StatusCodes.OK
+        )
     return resp

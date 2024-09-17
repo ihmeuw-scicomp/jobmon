@@ -94,4 +94,3 @@ def special_char_decoding(input: str) -> str:
 def special_chars_function(foo: str) -> None:
     """Simple task_function with special chars."""
     print(f"foo: {foo}")
-

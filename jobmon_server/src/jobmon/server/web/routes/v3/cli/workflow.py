@@ -65,8 +65,7 @@ async def get_workflow_validation_status(request: Request) -> Any:
 
     # if the given list is empty, return True
     if len(task_ids) == 0:
-        resp = JSONResponse(content={"validation": True},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(content={"validation": True}, status_code=StatusCodes.OK)
         return resp
 
     with SessionLocal() as session:
@@ -89,15 +88,17 @@ async def get_workflow_validation_status(request: Request) -> Any:
         else:
             validation = False
 
-        resp = JSONResponse(content={"validation": validation, "workflow_status": res[0]},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"validation": validation, "workflow_status": res[0]},
+            status_code=StatusCodes.OK,
+        )
     return resp
 
 
 @api_v3_router.get("/workflow/{workflow_id}/workflow_tasks")
-def get_workflow_tasks(workflow_id: int,
-                       limit: int,
-                       status: Optional[list[str]] = Query(None)) -> Any:
+def get_workflow_tasks(
+    workflow_id: int, limit: int, status: Optional[list[str]] = Query(None)
+) -> Any:
     """Get the tasks for a given workflow."""
     status_request = status
     logger.debug(f"Get tasks for workflow in status {status_request}")
@@ -145,12 +146,14 @@ def get_workflow_tasks(workflow_id: int,
             # remap to jobmon_cli statuses
             df.STATUS.replace(to_replace=_cli_label_mapping, inplace=True)
             df = df.to_json()
-            resp = JSONResponse(content={"workflow_tasks": df},
-                                status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"workflow_tasks": df}, status_code=StatusCodes.OK
+            )
         else:
             df = pd.DataFrame({}, columns=["TASK_ID", "TASK_NAME", "STATUS", "RETRIES"])
-            resp = JSONResponse(content={"workflow_tasks": df.to_json()},
-                                status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"workflow_tasks": df.to_json()}, status_code=StatusCodes.OK
+            )
     return resp
 
 
@@ -167,8 +170,9 @@ def get_workflow_user_validation(workflow_id: int, username: str) -> Any:
             sql = (select(WorkflowRun.user).where(*query_filter)).distinct()
             rows = session.execute(sql).all()
         usernames = [row[0] for row in rows]
-        resp = JSONResponse(content={"validation": username in usernames},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"validation": username in usernames}, status_code=StatusCodes.OK
+        )
     return resp
 
 
@@ -187,17 +191,19 @@ def get_workflow_run_for_workflow_reset(workflow_id: int, username: str) -> Any:
                 WorkflowRun.workflow_id == workflow_id,
                 WorkflowRun.status == "E",
             ]
-            sql = (select(WorkflowRun.id, WorkflowRun.user).where(*query_filter)).order_by(
-                WorkflowRun.created_date.desc()
-            )
+            sql = (
+                select(WorkflowRun.id, WorkflowRun.user).where(*query_filter)
+            ).order_by(WorkflowRun.created_date.desc())
             rows = session.execute(sql).all()
         result = None if len(rows) <= 0 else rows[0]
         if result is not None and result[1] == username:
-            resp = JSONResponse(content={"workflow_run_id": result[0]},
-                                status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"workflow_run_id": result[0]}, status_code=StatusCodes.OK
+            )
         else:
-            resp = JSONResponse(content={"workflow_run_id": None},
-                                status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"workflow_run_id": None}, status_code=StatusCodes.OK
+            )
     return resp
 
 
@@ -239,10 +245,11 @@ async def reset_workflow(workflow_id: int, request: Request) -> Any:
 
 
 @api_v3_router.get("/workflow_status")
-def get_workflow_status(workflow_id: Optional[Union[int, str, List[Union[int, str]]]] = Query(None),
-                        limit: Optional[int] = Query(None),
-                        user: Optional[list[str]] = Query(None)
-                        ) -> Any:
+def get_workflow_status(
+    workflow_id: Optional[Union[int, str, List[Union[int, str]]]] = Query(None),
+    limit: Optional[int] = Query(None),
+    user: Optional[list[str]] = Query(None),
+) -> Any:
     """Get the status of the workflow."""
     # initial params
     params = {}
@@ -290,7 +297,10 @@ def get_workflow_status(workflow_id: Optional[Union[int, str, List[Union[int, st
                 Tuple[Optional[int], Optional[str], Optional[str], Optional[datetime]]
             ] = (
                 select(
-                    Workflow.id, Workflow.name, WorkflowStatus.label, Workflow.created_date
+                    Workflow.id,
+                    Workflow.name,
+                    WorkflowStatus.label,
+                    Workflow.created_date,
                 )
             ).where(
                 *query_filter
@@ -433,7 +443,10 @@ def get_workflow_status_viz(workflow_ids: list[int] = Query(None)) -> Any:
         }
     with SessionLocal() as session:
         with session.begin():
-            query_filter = [Task.workflow_id.in_(wf_ids), Task.workflow_id == Workflow.id]
+            query_filter = [
+                Task.workflow_id.in_(wf_ids),
+                Task.workflow_id == Workflow.id,
+            ]
             sql = select(
                 Task.workflow_id, Task.status, Workflow.max_concurrently_running
             ).where(*query_filter)
@@ -448,16 +461,18 @@ def get_workflow_status_viz(workflow_ids: list[int] = Query(None)) -> Any:
 
 
 @api_v3_router.get("/workflow_overview_viz")
-def workflows_by_user_form(user: Optional[str] = Query(None),
-                           tool: Optional[str] = Query(None),
-                           wf_name: Optional[str] = Query(None),
-                           wf_args: Optional[str] = Query(None),
-                           wf_attribute_value: Optional[str] = Query(None),
-                           wf_attribute_key: Optional[str] = Query(None),
-                           wf_id: Optional[int] = Query(None),
-                           date_submitted: Optional[str] = Query(None),
-                           date_submitted_end: Optional[str] = Query(None),
-                           status: Optional[str] = Query(None)) -> Any:
+def workflows_by_user_form(
+    user: Optional[str] = Query(None),
+    tool: Optional[str] = Query(None),
+    wf_name: Optional[str] = Query(None),
+    wf_args: Optional[str] = Query(None),
+    wf_attribute_value: Optional[str] = Query(None),
+    wf_attribute_key: Optional[str] = Query(None),
+    wf_id: Optional[int] = Query(None),
+    date_submitted: Optional[str] = Query(None),
+    date_submitted_end: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+) -> Any:
     """Fetch associated workflows and workflow runs by username."""
     with SessionLocal() as session:
         with session.begin():
@@ -570,14 +585,12 @@ def workflows_by_user_form(user: Optional[str] = Query(None),
         }
         result = [dict(zip(column_names, row), **initial_status_counts) for row in rows]
 
-        res = JSONResponse(content={"workflows": result},
-                           status_code=StatusCodes.OK)
+        res = JSONResponse(content={"workflows": result}, status_code=StatusCodes.OK)
     return res
 
 
 @api_v3_router.get("/task_table_viz/{workflow_id}")
-def task_details_by_wf_id(workflow_id: int,
-                          tt_name: str) -> Any:
+def task_details_by_wf_id(workflow_id: int, tt_name: str) -> Any:
     """Fetch Task details associated with Workflow ID and TaskTemplate name."""
     task_template_name = tt_name
     with SessionLocal() as session:

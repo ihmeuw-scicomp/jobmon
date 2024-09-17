@@ -18,6 +18,7 @@ logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
 _CONFIG = get_jobmon_config()
 
+
 @api_v3_router.post("/nodes")
 async def add_nodes(request: Request) -> Any:
     """Add a chunk of nodes to the database.
@@ -36,7 +37,8 @@ async def add_nodes(request: Request) -> Any:
     with SessionLocal() as session:
         with session.begin():
             node_keys = [
-                (n["task_template_version_id"], n["node_args_hash"]) for n in data["nodes"]
+                (n["task_template_version_id"], n["node_args_hash"])
+                for n in data["nodes"]
             ]
             node_insert_stmt = insert(Node).values(
                 [
@@ -44,14 +46,10 @@ async def add_nodes(request: Request) -> Any:
                     for ttv, arghash in node_keys
                 ]
             )
-            if (
-                SessionLocal
-                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
-            ):
+            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
                 node_insert_stmt = node_insert_stmt.prefix_with("IGNORE")
-            if (
-                SessionLocal
-                and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
+            if SessionLocal and "sqlite" in _CONFIG.get(
+                "db", "sqlalchemy_database_uri"
             ):
                 node_insert_stmt = node_insert_stmt.prefix_with("OR IGNORE")
 
@@ -105,17 +103,14 @@ def _insert_node_args(node_args_list: list) -> None:
         with session.begin():
             if node_args_list:
                 node_arg_insert_stmt = insert(NodeArg).values(node_args_list)
-                if (
-                    SessionLocal
-                    and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
+                if SessionLocal and "mysql" in _CONFIG.get(
+                    "db", "sqlalchemy_database_uri"
                 ):
                     node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("IGNORE")
-                if (
-                    SessionLocal
-                    and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
+                if SessionLocal and "sqlite" in _CONFIG.get(
+                    "db", "sqlalchemy_database_uri"
                 ):
                     node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("OR IGNORE")
 
                 session.execute(node_arg_insert_stmt)
                 ()
-

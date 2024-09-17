@@ -23,6 +23,7 @@ logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
 _CONFIG = get_jobmon_config()
 
+
 @api_v3_router.post("/dag")
 async def add_dag(request: Request) -> Any:
     """Add a new dag to the database.
@@ -50,11 +51,15 @@ async def add_dag(request: Request) -> Any:
 
         # return result
         if dag.created_date:
-            resp = JSONResponse(content={"dag_id": dag.id, "created_date": str(dag.created_date)},
-                                status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"dag_id": dag.id, "created_date": str(dag.created_date)},
+                status_code=StatusCodes.OK,
+            )
         else:
-            resp = JSONResponse(content={"dag_id": dag.id, "created_date": None},
-                                status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"dag_id": dag.id, "created_date": None},
+                status_code=StatusCodes.OK,
+            )
     return resp
 
 
@@ -90,14 +95,10 @@ async def add_edges(dag_id: int, request: Request) -> Any:
     with SessionLocal() as session:
         with session.begin():
             insert_stmt = insert(Edge).values(edges_to_add)
-            if (
-                SessionLocal
-                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
-            ):
+            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
                 insert_stmt = insert_stmt.prefix_with("IGNORE")
-            if (
-                SessionLocal
-                and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
+            if SessionLocal and "sqlite" in _CONFIG.get(
+                "db", "sqlalchemy_database_uri"
             ):
                 insert_stmt = insert_stmt.prefix_with("OR IGNORE")
             session.execute(insert_stmt)

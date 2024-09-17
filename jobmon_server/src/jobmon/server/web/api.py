@@ -20,6 +20,7 @@ def _init_logging(otlp_api: Optional[str] = None) -> bool:
     try:
         extra_processors = []
         if otlp_api:
+
             def add_open_telemetry_spans(_: Any, __: Any, event_dict: dict) -> dict:
                 """Add OpenTelemetry spans to the log record."""
                 if otlp_api is not None:
@@ -42,9 +43,11 @@ def _init_logging(otlp_api: Optional[str] = None) -> bool:
         return False
 
 
-def get_app(use_otlp: bool = False,
-            structlog_configured: bool = False,
-            otlp_api: Optional[str] = None) -> FastAPI:
+def get_app(
+    use_otlp: bool = False,
+    structlog_configured: bool = False,
+    otlp_api: Optional[str] = None,
+) -> FastAPI:
     """Get a flask app based on the config. If no config is provided, defaults are used.
 
     Args:
@@ -91,4 +94,3 @@ def get_app(use_otlp: bool = False,
             app.include_router(router, prefix=f"{url_prefix}/{version}")
 
     return app
-

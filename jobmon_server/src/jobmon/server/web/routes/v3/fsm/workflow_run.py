@@ -52,8 +52,10 @@ async def add_workflow_run(request: Request) -> Any:
             if not workflow:
                 # Binding to a non-existent workflow, exit early
                 err_msg = f"No workflow exists for ID {workflow_id}"
-                resp = JSONResponse(content={"workflow_run_id": None, "err_msg": err_msg},
-                                    status_code=StatusCodes.OK)
+                resp = JSONResponse(
+                    content={"workflow_run_id": None, "err_msg": err_msg},
+                    status_code=StatusCodes.OK,
+                )
                 return resp
 
             workflow_run = WorkflowRun(
@@ -69,7 +71,9 @@ async def add_workflow_run(request: Request) -> Any:
             # Transition to linking state, with_for_update claims a lock on the workflow
             # Any other actively linking workflows will return the incorrect workflow run id
 
-            active_workflow_run = workflow.link_workflow_run(workflow_run, next_heartbeat)
+            active_workflow_run = workflow.link_workflow_run(
+                workflow_run, next_heartbeat
+            )
             session.flush()
 
             try:
@@ -84,20 +88,23 @@ async def add_workflow_run(request: Request) -> Any:
                 err_msg = f"Workflow {workflow_id} is not in a resume-able state"
 
         if err_msg:
-            resp = JSONResponse(content={"workflow_run_id": None, "err_msg": err_msg},
-                                status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"workflow_run_id": None, "err_msg": err_msg},
+                status_code=StatusCodes.OK,
+            )
         else:
             logger.info(f"Add workflow_run:{workflow_run.id} for workflow.")
             resp = JSONResponse(
-                content={"workflow_run_id": workflow_run.id, "status": workflow_run.status},
-                status_code=StatusCodes.OK
+                content={
+                    "workflow_run_id": workflow_run.id,
+                    "status": workflow_run.status,
+                },
+                status_code=StatusCodes.OK,
             )
     return resp
 
 
-@api_v3_router.put(
-    "/workflow_run/{workflow_run_id}/terminate_task_instances"
-)
+@api_v3_router.put("/workflow_run/{workflow_run_id}/terminate_task_instances")
 async def terminate_workflow_run(workflow_run_id: int, request: Request) -> Any:
     """Terminate a workflow run and get its tasks in order."""
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
@@ -117,7 +124,10 @@ async def terminate_workflow_run(workflow_run_id: int, request: Request) -> Any:
             if workflow_run.status == constants.WorkflowRunStatus.HOT_RESUME:
                 task_states = [constants.TaskStatus.LAUNCHED]
             else:
-                task_states = [constants.TaskStatus.LAUNCHED, constants.TaskStatus.RUNNING]
+                task_states = [
+                    constants.TaskStatus.LAUNCHED,
+                    constants.TaskStatus.RUNNING,
+                ]
 
             insert_error_log_stmt = insert(TaskInstanceErrorLog).from_select(
                 ["task_instance_id", "description", "error_time"],
@@ -152,21 +162,21 @@ async def terminate_workflow_run(workflow_run_id: int, request: Request) -> Any:
                     )
                 )
                 .values(
-                    status=constants.TaskInstanceStatus.KILL_SELF, status_date=func.now()
+                    status=constants.TaskInstanceStatus.KILL_SELF,
+                    status_date=func.now(),
                 )
                 .execution_options(synchronize_session=False)
             )
 
             session.execute(update_task_instance_stmt)
 
-    resp = JSONResponse(content={"workflow_run_id": workflow_run_id},
-                        status_code=StatusCodes.OK)
+    resp = JSONResponse(
+        content={"workflow_run_id": workflow_run_id}, status_code=StatusCodes.OK
+    )
     return resp
 
 
-@api_v3_router.post(
-    "/workflow_run/{workflow_run_id}/log_heartbeat"
-)
+@api_v3_router.post("/workflow_run/{workflow_run_id}/log_heartbeat")
 async def log_workflow_run_heartbeat(workflow_run_id: int, request: Request) -> Any:
     """Log a heartbeat for the workflow run to show that the client side is still alive."""
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
@@ -191,18 +201,18 @@ async def log_workflow_run_heartbeat(workflow_run_id: int, request: Request) -> 
                 workflow_run.heartbeat(next_report_increment, status)
                 logger.debug(f"wfr {workflow_run_id} heartbeat confirmed")
             except InvalidStateTransition as e:
-                logger.debug(f"wfr {workflow_run_id} heartbeat rolled back, reason: {e}")
+                logger.debug(
+                    f"wfr {workflow_run_id} heartbeat rolled back, reason: {e}"
+                )
 
-        resp = JSONResponse(content={"status": str(workflow_run.status)},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"status": str(workflow_run.status)}, status_code=StatusCodes.OK
+        )
     return resp
 
 
-@api_v3_router.put(
-    "/workflow_run/{workflow_run_id}/update_status"
-)
-async def log_workflow_run_status_update(workflow_run_id: int,
-                                         request: Request) -> Any:
+@api_v3_router.put("/workflow_run/{workflow_run_id}/update_status")
+async def log_workflow_run_status_update(workflow_run_id: int, request: Request) -> Any:
     """Update the status of the workflow run."""
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
     try:
@@ -278,20 +288,22 @@ async def task_instances_status_check(workflow_run_id: int, request: Request) ->
             select_stmt = (
                 select(TaskInstance.status, TaskInstance.id)
                 .where(*where_clause)
-                .order_by(TaskInstance.status)  # Optional, but helps organize the result
+                .order_by(
+                    TaskInstance.status
+                )  # Optional, but helps organize the result
             )
 
             for row in session.execute(select_stmt):
                 return_dict[row[0]].append(int(row[1]))
 
-    resp = JSONResponse(content={"status_updates": dict(return_dict), "time": str_time},
-                        status_code=StatusCodes.OK)
+    resp = JSONResponse(
+        content={"status_updates": dict(return_dict), "time": str_time},
+        status_code=StatusCodes.OK,
+    )
     return resp
 
 
-@api_v3_router.post(
-    "/workflow_run/{workflow_run_id}/set_status_for_triaging"
-)
+@api_v3_router.post("/workflow_run/{workflow_run_id}/set_status_for_triaging")
 async def set_status_for_triaging(workflow_run_id: int, request: Request) -> Any:
     """Two triaging related status sets.
 

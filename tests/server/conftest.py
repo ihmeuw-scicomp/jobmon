@@ -12,6 +12,7 @@ def web_server_in_memory(tmp_path):
     url = "sqlite:///" + str(d)
     from jobmon.server.web.config import get_jobmon_config
     from jobmon.core.configuration import JobmonConfig
+
     config = JobmonConfig(
         dict_config={
             "db": {"sqlalchemy_database_uri": url},
@@ -27,11 +28,13 @@ def web_server_in_memory(tmp_path):
     from jobmon.server.web.api import configure_logging
     from jobmon.server.web.db_admin import init_db
     from jobmon.server.web.models import load_model
+
     init_db()
     load_model()
     eng = sqlalchemy.create_engine(url)
     from jobmon.server.web.api import get_app
     from fastapi.testclient import TestClient
+
     app = get_app()
     client = TestClient(app)
     yield client, eng

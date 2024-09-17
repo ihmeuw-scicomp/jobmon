@@ -13,6 +13,7 @@ from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 
 SessionLocal = get_session_local()
 
+
 @api_v3_router.get("/cluster/{cluster_name}")
 def get_cluster_by_name(cluster_name: str) -> Any:
     """Get the id, cluster_type_name and connection_parameters of a Cluster."""
@@ -34,7 +35,9 @@ def get_cluster_by_name(cluster_name: str) -> Any:
                 cluster.id,
                 cluster.name,
                 cluster_type_name,  # Access the cluster type name here
-                cluster.connection_parameters
+                cluster.connection_parameters,
             ]
-            resp = JSONResponse(content={"cluster": cluster_list}, status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"cluster": cluster_list}, status_code=StatusCodes.OK
+            )
         return resp

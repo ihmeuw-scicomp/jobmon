@@ -29,9 +29,7 @@ logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
 
 
-@api_v3_router.post(
-    "/task_instance/{task_instance_id}/log_running"
-)
+@api_v3_router.post("/task_instance/{task_instance_id}/log_running")
 async def log_running(task_instance_id: int, request: Request) -> Any:
     """Log a task_instance as running.
 
@@ -44,7 +42,9 @@ async def log_running(task_instance_id: int, request: Request) -> Any:
 
     with SessionLocal() as session:
         with session.begin():
-            select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
+            )
             task_instance = session.execute(select_stmt).scalars().one()
 
             if data.get("distributor_id", None) is not None:
@@ -68,13 +68,13 @@ async def log_running(task_instance_id: int, request: Request) -> Any:
 
             wire_format = task_instance.to_wire_as_worker_node_task_instance()
 
-    resp = JSONResponse(content={"task_instance": wire_format}, status_code=StatusCodes.OK)
+    resp = JSONResponse(
+        content={"task_instance": wire_format}, status_code=StatusCodes.OK
+    )
     return resp
 
 
-@api_v3_router.post(
-    "/task_instance/{task_instance_id}/log_report_by"
-)
+@api_v3_router.post("/task_instance/{task_instance_id}/log_report_by")
 async def log_ti_report_by(task_instance_id: int, request: Request) -> Any:
     """Log a task_instance as being responsive with a new report_by_date.
 
@@ -97,17 +97,22 @@ async def log_ti_report_by(task_instance_id: int, request: Request) -> Any:
                 if data is not None:
                     vals[optional_val] = val
 
-            update_stmt = update(TaskInstance).where(TaskInstance.id == task_instance_id)
+            update_stmt = update(TaskInstance).where(
+                TaskInstance.id == task_instance_id
+            )
             session.execute(update_stmt.values(**vals))
             session.flush()
 
-            select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
+            )
             task_instance = session.execute(select_stmt).scalars().one()
             if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
                 task_instance.transition(constants.TaskInstanceStatus.RUNNING)
 
-        resp = JSONResponse(content={"status": task_instance.status},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"status": task_instance.status}, status_code=StatusCodes.OK
+        )
     return resp
 
 
@@ -159,7 +164,9 @@ async def log_done(task_instance_id: int, request: Request) -> Any:
 
     with SessionLocal() as session:
         with session.begin():
-            select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
+            )
             task_instance = session.execute(select_stmt).scalars().one()
 
             optional_vals = [
@@ -184,14 +191,13 @@ async def log_done(task_instance_id: int, request: Request) -> Any:
                     # Tried to move to an illegal state
                     logger.error(e)
 
-        resp = JSONResponse(content={"status": task_instance.status},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"status": task_instance.status}, status_code=StatusCodes.OK
+        )
     return resp
 
 
-@api_v3_router.post(
-    "/task_instance/{task_instance_id}/log_error_worker_node"
-)
+@api_v3_router.post("/task_instance/{task_instance_id}/log_error_worker_node")
 async def log_error_worker_node(task_instance_id: int, request: Request) -> Any:
     """Log a task_instance as errored.
 
@@ -205,7 +211,9 @@ async def log_error_worker_node(task_instance_id: int, request: Request) -> Any:
 
     with SessionLocal() as session:
         with session.begin():
-            select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
+            )
             task_instance = session.execute(select_stmt).scalars().one()
 
             optional_vals = [
@@ -237,14 +245,13 @@ async def log_error_worker_node(task_instance_id: int, request: Request) -> Any:
                     # Tried to move to an illegal state
                     logger.error(e)
 
-        resp = JSONResponse(content={"status": task_instance.status},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"status": task_instance.status}, status_code=StatusCodes.OK
+        )
     return resp
 
 
-@api_v3_router.get(
-    "/task_instance/{task_instance_id}/task_instance_error_log"
-)
+@api_v3_router.get("/task_instance/{task_instance_id}/task_instance_error_log")
 async def get_task_instance_error_log(task_instance_id: int) -> Any:
     """Route to return all task_instance_error_log entries of the task_instance_id.
 
@@ -266,14 +273,13 @@ async def get_task_instance_error_log(task_instance_id: int) -> Any:
             )
             res = session.execute(select_stmt).scalars().all()
             r = [tiel.to_wire() for tiel in res]
-            resp = JSONResponse(content={"task_instance_error_log": r},
-                                status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"task_instance_error_log": r}, status_code=StatusCodes.OK
+            )
     return resp
 
 
-@api_v3_router.get(
-    "/get_array_task_instance_id/{array_id}/{batch_num}/{step_id}"
-)
+@api_v3_router.get("/get_array_task_instance_id/{array_id}/{batch_num}/{step_id}")
 def get_array_task_instance_id(array_id: int, batch_num: int, step_id: int) -> Any:
     """Given an array ID and an index, select a single task instance ID.
 
@@ -291,14 +297,13 @@ def get_array_task_instance_id(array_id: int, batch_num: int, step_id: int) -> A
             )
             task_instance_id = session.execute(select_stmt).scalars().one()
 
-        resp = JSONResponse(content={"task_instance_id": task_instance_id},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"task_instance_id": task_instance_id}, status_code=StatusCodes.OK
+        )
     return resp
 
 
-@api_v3_router.post(
-    "/task_instance/{task_instance_id}/log_no_distributor_id"
-)
+@api_v3_router.post("/task_instance/{task_instance_id}/log_no_distributor_id")
 async def log_no_distributor_id(task_instance_id: int, request: Request) -> Any:
     """Log a task_instance_id that did not get an distributor_id upon submission."""
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
@@ -311,7 +316,9 @@ async def log_no_distributor_id(task_instance_id: int, request: Request) -> Any:
 
     with SessionLocal() as session:
         with session.begin():
-            select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
+            )
             task_instance = session.execute(select_stmt).scalars().one()
             msg = _update_task_instance_state(
                 task_instance, constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID, request
@@ -325,9 +332,7 @@ async def log_no_distributor_id(task_instance_id: int, request: Request) -> Any:
     return resp
 
 
-@api_v3_router.post(
-    "/task_instance/{task_instance_id}/log_distributor_id"
-)
+@api_v3_router.post("/task_instance/{task_instance_id}/log_distributor_id")
 async def log_distributor_id(task_instance_id: int, request: Request) -> Any:
     """Log a task_instance's distributor id.
 
@@ -339,7 +344,9 @@ async def log_distributor_id(task_instance_id: int, request: Request) -> Any:
     data = cast(Dict, await request.json())
     with SessionLocal() as session:
         with session.begin():
-            select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
+            )
             task_instance = session.execute(select_stmt).scalars().one()
             msg = _update_task_instance_state(
                 task_instance, constants.TaskInstanceStatus.LAUNCHED, request
@@ -368,7 +375,9 @@ async def log_known_error(task_instance_id: int, request: Request) -> Any:
 
     with SessionLocal() as session:
         with session.begin():
-            select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
+            )
             task_instance = session.execute(select_stmt).scalars().one()
 
             try:
@@ -379,7 +388,7 @@ async def log_known_error(task_instance_id: int, request: Request) -> Any:
                     error_message,
                     distributor_id,
                     nodename,
-                    request
+                    request,
                 )
             except sqlalchemy.exc.OperationalError:
                 # modify the error message and retry
@@ -391,14 +400,12 @@ async def log_known_error(task_instance_id: int, request: Request) -> Any:
                     new_msg,
                     distributor_id,
                     nodename,
-                    request
+                    request,
                 )
     return resp
 
 
-@api_v3_router.post(
-    "/task_instance/{task_instance_id}/log_unknown_error"
-)
+@api_v3_router.post("/task_instance/{task_instance_id}/log_unknown_error")
 async def log_unknown_error(task_instance_id: int, request: Request) -> Any:
     """Log a task_instance as errored.
 
@@ -434,7 +441,7 @@ async def log_unknown_error(task_instance_id: int, request: Request) -> Any:
                         error_message,
                         distributor_id,
                         nodename,
-                        request
+                        request,
                     )
                 except sqlalchemy.exc.OperationalError:
                     # modify the error message and retry
@@ -446,7 +453,7 @@ async def log_unknown_error(task_instance_id: int, request: Request) -> Any:
                         new_msg,
                         distributor_id,
                         nodename,
-                        request
+                        request,
                     )
     return resp
 
@@ -473,7 +480,9 @@ async def instantiate_task_instances(request: Request) -> Any:
             task_update = (
                 update(Task)
                 .where(Task.id.in_(select(sub_query.c.id)))
-                .values(status=constants.TaskStatus.INSTANTIATING, status_date=func.now())
+                .values(
+                    status=constants.TaskStatus.INSTANTIATING, status_date=func.now()
+                )
                 .execution_options(synchronize_session=False)
             )
             session.execute(task_update)
@@ -495,7 +504,8 @@ async def instantiate_task_instances(request: Request) -> Any:
                 update(TaskInstance)
                 .where(TaskInstance.id.in_(select(sub_query.c.id)))
                 .values(
-                    status=constants.TaskInstanceStatus.INSTANTIATED, status_date=func.now()
+                    status=constants.TaskInstanceStatus.INSTANTIATED,
+                    status_date=func.now(),
                 )
                 .execution_options(synchronize_session=False)
             )
@@ -546,15 +556,17 @@ async def instantiate_task_instances(request: Request) -> Any:
                 )
             )
 
-        resp = JSONResponse(content={"task_instance_batches": serialized_batches},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"task_instance_batches": serialized_batches},
+            status_code=StatusCodes.OK,
+        )
     return resp
 
 
 # ############################ HELPER FUNCTIONS ###############################
-def _update_task_instance_state(task_instance: TaskInstance,
-                                status_id: str,
-                                request: Request) -> Any:
+def _update_task_instance_state(
+    task_instance: TaskInstance, status_id: str, request: Request
+) -> Any:
     """Advance the states of task_instance and it's associated Task.
 
     Return any messages that should be published based on the transition.
@@ -624,8 +636,6 @@ def _log_error(
                 f"Unexpected Jobmon Server Error in {request.url.path}", status_code=500
             ) from e
         else:
-            raise ServerError(
-                "Unexpected Jobmon Server Error", status_code=500
-            ) from e
+            raise ServerError("Unexpected Jobmon Server Error", status_code=500) from e
 
     return resp

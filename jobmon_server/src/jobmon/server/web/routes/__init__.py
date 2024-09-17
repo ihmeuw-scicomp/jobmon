@@ -15,6 +15,7 @@ logger = get_logger(__name__)
 
 SessionLocal = get_session_local()
 
+
 # ############################ SHARED LANDING ROUTES ##########################################
 def is_alive() -> Any:
     """Action that sends a response to the requester indicating that responder is listening."""
@@ -48,8 +49,7 @@ def health() -> Any:
     be checked individually.
     """
     _get_time()
-    resp = JSONResponse(content={"status": "OK"},
-                        status_code=StatusCodes.OK)
+    resp = JSONResponse(content={"status": "OK"}, status_code=StatusCodes.OK)
     return resp
 
 

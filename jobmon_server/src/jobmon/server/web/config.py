@@ -6,6 +6,7 @@ from jobmon.core.configuration import JobmonConfig
 # a singleton to holp jobmon config that enables testing
 _jobmon_config = None
 
+
 def get_jobmon_config(config: Optional[JobmonConfig] = None) -> JobmonConfig:
     """Get the jobmon config. If no config is provided, defaults are used.
 

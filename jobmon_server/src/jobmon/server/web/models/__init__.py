@@ -67,6 +67,7 @@ def load_metadata(engine: Engine) -> None:
     from jobmon.server.web.models.workflow_run_status import (
         add_workflow_run_statuses,
     )
+
     SessionLocal = get_session_local()
     with SessionLocal() as session:
         with session.begin():

@@ -16,6 +16,7 @@ from jobmon.server.web.models import load_model
 
 load_model()
 
+
 @pytest.fixture
 def tool(client_env):
     tool = Tool()

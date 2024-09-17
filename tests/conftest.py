@@ -56,6 +56,7 @@ class WebServerProcess:
         def config_db() -> bool:
             from jobmon.server.web.config import get_jobmon_config
             from jobmon.core.configuration import JobmonConfig
+
             config = JobmonConfig(
                 dict_config={
                     "db": {"sqlalchemy_database_uri": database_uri},
@@ -70,6 +71,7 @@ class WebServerProcess:
             from jobmon.server.web.api import configure_logging
             from jobmon.server.web.db_admin import init_db
             from jobmon.server.web.models import load_model
+
             init_db()
             load_model()
             configure_logging(
@@ -88,8 +90,10 @@ class WebServerProcess:
             # verify db created
             eng = sqlalchemy.create_engine(database_uri)
             from sqlalchemy.orm import Session
+
             with Session(eng) as session:
                 from sqlalchemy import text
+
                 res = session.execute(text("SELECT * from workflow_status")).fetchall()
                 return len(res) > 0
 
@@ -101,6 +105,7 @@ class WebServerProcess:
 
             signal.signal(signal.SIGTERM, sigterm_handler)
             from jobmon.server.web.api import get_app
+
             app = get_app()
             uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
 

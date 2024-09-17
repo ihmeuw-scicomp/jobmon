@@ -9,6 +9,7 @@ from jobmon.server.web.server_side_exception import ServerError
 SessionLocal = get_session_local()
 _CONFIG = get_jobmon_config()
 
+
 def add_time(next_report_increment: float) -> Any:
     """Adds the next report increment time, and then returns the new time."""
 

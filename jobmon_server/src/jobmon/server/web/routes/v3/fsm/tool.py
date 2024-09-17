@@ -24,6 +24,7 @@ from jobmon.server.web.server_side_exception import InvalidUsage
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
 
+
 @api_v3_router.post("/tool")
 async def add_tool(request: Request) -> Any:
     """Add a tool to the database."""
@@ -52,8 +53,7 @@ async def add_tool(request: Request) -> Any:
                 tool = session.execute(select_stmt).scalars().one()
                 wire_format = tool.to_wire_as_client_tool()
 
-    resp = JSONResponse(content={"tool": wire_format},
-                        status_code=StatusCodes.OK)
+    resp = JSONResponse(content={"tool": wire_format}, status_code=StatusCodes.OK)
     return resp
 
 
@@ -79,16 +79,18 @@ def get_tool_versions(tool_id: int, request: Request) -> Any:
 
         logger.info(f"Tool version for {tool_id} is {wire_format}")
 
-        resp = JSONResponse(content={"tool_versions": wire_format},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"tool_versions": wire_format}, status_code=StatusCodes.OK
+        )
     return resp
 
 
 @api_v3_router.get("/tool/{tool_name}/tool_resource_usage")
-def get_tool_resource_usage(tool_name: str,
-                            start_date: Optional[str] = None,
-                            end_date: Optional[str] = None,
-                            ) -> Any:
+def get_tool_resource_usage(
+    tool_name: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Any:
     """Gets resource usage and node args for all TaskInstances associated with a given tool.
 
     We limit this to one week time spans to not overwhelm the database.
@@ -126,27 +128,27 @@ def get_tool_resource_usage(tool_name: str,
     """
     # Validate that user passed in both dates
     if not start_date or not end_date:
-        return (
-            JSONResponse(content={"error": "Both start_date and end_date are required."},
-                         status_code=StatusCodes.BAD_REQUEST)
+        return JSONResponse(
+            content={"error": "Both start_date and end_date are required."},
+            status_code=StatusCodes.BAD_REQUEST,
         )
 
     try:
         start_date_object = datetime.strptime(start_date, "%Y-%m-%d").date()
         end_date_object = datetime.strptime(end_date, "%Y-%m-%d").date()
     except ValueError:
-        return (
-            JSONResponse(content={"error": "Dates must be in 'YYYY-MM-DD' format."},
-                         status_code=StatusCodes.BAD_REQUEST)
+        return JSONResponse(
+            content={"error": "Dates must be in 'YYYY-MM-DD' format."},
+            status_code=StatusCodes.BAD_REQUEST,
         )
 
     date_difference = end_date_object - start_date_object
 
     # Check if the difference exceeds one week
     if date_difference > timedelta(weeks=1):
-        return (
-            JSONResponse(content={"error": "Date range must be within one week."},
-                            status_code=StatusCodes.BAD_REQUEST)
+        return JSONResponse(
+            content={"error": "Date range must be within one week."},
+            status_code=StatusCodes.BAD_REQUEST,
         )
 
     with SessionLocal() as session:
@@ -166,7 +168,9 @@ def get_tool_resource_usage(tool_name: str,
                 )
                 .join_from(ToolVersion, Tool, ToolVersion.tool_id == Tool.id)
                 .join_from(Task, NodeArg, Task.node_id == NodeArg.node_id)
-                .join_from(Task, TaskResources, Task.task_resources_id == TaskResources.id)
+                .join_from(
+                    Task, TaskResources, Task.task_resources_id == TaskResources.id
+                )
                 .where(
                     Tool.name == tool_name,
                     Workflow.created_date.between(start_date, end_date),

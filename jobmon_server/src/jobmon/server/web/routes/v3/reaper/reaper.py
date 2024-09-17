@@ -21,9 +21,9 @@ from jobmon.server.web.routes.v3.reaper import reaper_router as api_v3_router
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
 
+
 @api_v3_router.put("/workflow/{workflow_id}/fix_status_inconsistency")
-async def fix_wf_inconsistency(workflow_id: int,
-                               request: Request) -> Any:
+async def fix_wf_inconsistency(workflow_id: int, request: Request) -> Any:
     """Find wf in F with all tasks in D and fix them.
 
     For flexibility, pass in the step size. It is easier to redeploy the reaper than the
@@ -89,8 +89,9 @@ async def fix_wf_inconsistency(workflow_id: int,
                 session.commit()
 
             logger.debug("Done fixing F-D inconsistent workflows.")
-        resp = JSONResponse(content={"wfid": current_max_wf_id},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"wfid": current_max_wf_id}, status_code=StatusCodes.OK
+        )
     return resp
 
 
@@ -105,17 +106,21 @@ def get_wf_name_and_args(workflow_id: int) -> Any:
 
         if result is None or len(result) == 0:
             # return empty values in case of DB inconsistency
-            resp =JSONResponse(content={"workflow_name": None, "workflow_args": None},
-                               status_code=StatusCodes.OK)
-        resp = JSONResponse(content={"workflow_name": result[0][0],
-                                     "workflow_args": result[0][1]},
-                            status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"workflow_name": None, "workflow_args": None},
+                status_code=StatusCodes.OK,
+            )
+        resp = JSONResponse(
+            content={"workflow_name": result[0][0], "workflow_args": result[0][1]},
+            status_code=StatusCodes.OK,
+        )
     return resp
 
 
 @api_v3_router.get("/lost_workflow_run")
-def get_lost_workflow_runs(status: Union[str, list[str]] = Query(...),
-                           version: str = Query(...)) -> Any:
+def get_lost_workflow_runs(
+    status: Union[str, list[str]] = Query(...), version: str = Query(...)
+) -> Any:
     """Return all workflow runs that are currently in the specified state."""
     if isinstance(status, str):
         status = [status]
@@ -129,8 +134,9 @@ def get_lost_workflow_runs(status: Union[str, list[str]] = Query(...),
             sql = select(WorkflowRun.id, WorkflowRun.workflow_id).where(*query_filter)
             rows = session.execute(sql).all()
         workflow_runs = [(r[0], r[1]) for r in rows]
-        resp = JSONResponse(content={"workflow_runs": workflow_runs},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"workflow_runs": workflow_runs}, status_code=StatusCodes.OK
+        )
     return resp
 
 
@@ -152,9 +158,9 @@ def reap_workflow_run(workflow_run_id: int) -> Any:
                 WorkflowRun.id == workflow_run_id,
                 WorkflowRun.heartbeat_date <= func.now(),
             ]
-            sql = select(WorkflowRun.id, WorkflowRun.workflow_id, WorkflowRun.status).where(
-                *query_filter
-            )
+            sql = select(
+                WorkflowRun.id, WorkflowRun.workflow_id, WorkflowRun.status
+            ).where(*query_filter)
             rows = session.execute(sql).all()
         if len(rows) == 0:
             resp = JSONResponse(content={"status": ""}, status_code=StatusCodes.OK)
@@ -202,6 +208,7 @@ def reap_workflow_run(workflow_run_id: int) -> Any:
                     """
             session.execute(text(query2))
             session.flush()
-        resp = JSONResponse(content={"status": target_wfr_status},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"status": target_wfr_status}, status_code=StatusCodes.OK
+        )
         return resp

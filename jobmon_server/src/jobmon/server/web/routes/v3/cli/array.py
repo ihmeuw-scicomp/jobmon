@@ -15,10 +15,12 @@ SessionLocal = get_session_local()
 
 
 @api_v3_router.get("/array/{workflow_id}/get_array_tasks")
-def get_array_task_instances(workflow_id: int,
-                             array_name: str,
-                             job_name: Optional[str] = Query(None),
-                             limit: Optional[int] = Query(None)) -> Any:
+def get_array_task_instances(
+    workflow_id: int,
+    array_name: str,
+    job_name: Optional[str] = Query(None),
+    limit: Optional[int] = Query(None),
+) -> Any:
     """Return error/output filepaths for task instances filtered by array name.
 
     The user can also optionally filter by job name as well.
@@ -57,7 +59,6 @@ def get_array_task_instances(workflow_id: int,
             )
             result = session.execute(select_stmt).all()
 
-
         column_names = (
             "TASK_ID",
             "TASK_NAME",
@@ -67,6 +68,7 @@ def get_array_task_instances(workflow_id: int,
             "ERROR_PATH",
         )
         array_tasks = [dict(zip(column_names, ti)) for ti in result]
-        resp = JSONResponse(content={"array_tasks": array_tasks},
-                            status_code=HTTPStatus.OK)
+        resp = JSONResponse(
+            content={"array_tasks": array_tasks}, status_code=HTTPStatus.OK
+        )
     return resp

@@ -39,9 +39,11 @@ logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
 _CONFIG = get_jobmon_config()
 
+
 @api_v3_router.get("/get_task_template_version")
-def get_task_template_version_for_tasks(task_id: Optional[int] = None,
-                                        workflow_id: Optional[int] = None) -> Any:
+def get_task_template_version_for_tasks(
+    task_id: Optional[int] = None, workflow_id: Optional[int] = None
+) -> Any:
     """Get the task_template_version_ids."""
     # parse args
     t_id = task_id
@@ -78,8 +80,9 @@ def get_task_template_version_for_tasks(task_id: Optional[int] = None,
             rows = session.execute(sql).all()
         column_names = ("id", "name")
         ttvis = [dict(zip(column_names, ti)) for ti in rows]
-        resp = JSONResponse(content={"task_template_version_ids": ttvis},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"task_template_version_ids": ttvis}, status_code=StatusCodes.OK
+        )
     return resp
 
 
@@ -103,9 +106,9 @@ def get_requested_cores(task_template_version_ids: Optional[str] = None) -> Any:
                 Task.task_resources_id == TaskResources.id,
             ]
 
-            sql = select(TaskTemplateVersion.id, TaskResources.requested_resources).where(
-                *query_filter
-            )
+            sql = select(
+                TaskTemplateVersion.id, TaskResources.requested_resources
+            ).where(*query_filter)
         rows_raw = session.execute(sql).all()
         column_names = ("id", "rr")
         rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
@@ -129,14 +132,15 @@ def get_requested_cores(task_template_version_ids: Optional[str] = None) -> Any:
                 core_info.append(
                     {"id": k, "min": item_min, "max": item_max, "avg": item_mean}
                 )
-        resp = JSONResponse(content={"core_info": core_info},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"core_info": core_info}, status_code=StatusCodes.OK
+        )
     return resp
 
 
 @api_v3_router.get("/get_most_popular_queue")
 def get_most_popular_queue(
-        task_template_version_ids: Optional[str] = Query(...)
+    task_template_version_ids: Optional[str] = Query(...),
 ) -> Any:
     """Get the most popular queue of the task template."""
     # parse args
@@ -193,8 +197,9 @@ def get_most_popular_queue(
                 queue_info.append(
                     {"id": ttvi, "queue": popular_q_name, "queue_id": popular_q}
                 )
-        resp = JSONResponse(content={"queue_info": queue_info},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"queue_info": queue_info}, status_code=StatusCodes.OK
+        )
     return resp
 
 
@@ -314,9 +319,15 @@ async def get_task_template_resource_usage(request: Request) -> Any:
 
                     def _calculate_ci(d: List, ci: float) -> List[Any]:
                         interval = st.t.interval(
-                            confidence=ci, df=len(d) - 1, loc=np.mean(d), scale=st.sem(d)
+                            confidence=ci,
+                            df=len(d) - 1,
+                            loc=np.mean(d),
+                            scale=st.sem(d),
                         )
-                        return [round(float(interval[0]), 2), round(float(interval[1]), 2)]
+                        return [
+                            round(float(interval[0]), 2),
+                            round(float(interval[1]), 2),
+                        ]
 
                     if len(mems) > 0:
                         ci_mem = _calculate_ci(mems, ci)
@@ -365,7 +376,9 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             # user subquery as the Array table has to be joined on two columns
             sub_query = (
                 select(
-                    Array.id, Array.task_template_version_id, Array.max_concurrently_running
+                    Array.id,
+                    Array.task_template_version_id,
+                    Array.max_concurrently_running,
                 ).where(Array.workflow_id == workflow_id)
             ).subquery()
             join_table = (
@@ -402,10 +415,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
             # the optimizer may choose a suboptimal execution plan for large datasets.
             # Has to be conditional since not all database engines support STRAIGHT_JOIN.
-            if (
-                SessionLocal
-                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
-            ):
+            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
                 sql = sql.prefix_with("STRAIGHT_JOIN")
             rows = session.execute(sql).all()
             session.flush()
@@ -433,10 +443,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
                 .where(Task.workflow_id == workflow_id)
                 .group_by(TaskTemplate.id)
             )
-            if (
-                SessionLocal
-                and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
-            ):
+            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
                 sql = sql.prefix_with("STRAIGHT_JOIN")
             attempts0 = session.execute(sql).all()
 
@@ -476,21 +483,21 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             return_dic[int(task_template_id)]["MAXC"] = (
                 max_concurrently if max_concurrently is not None else "NA"
             )
-        resp = JSONResponse(content=return_dic,
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(content=return_dic, status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.get("/tt_error_log_viz/{wf_id}/{tt_id}")
 @api_v3_router.get("/tt_error_log_viz/{wf_id}/{tt_id}/{ti_id}")
-def get_tt_error_log_viz(wf_id: int,
-                         tt_id: Optional[int] = None,
-                         ti_id: Optional[int] = None,
-                         page: int = 1,
-                         page_size: int = 10,
-                         just_recent_errors: str = "false",
-                         cluster_errors: str = "false"
-                         ) -> Any:
+def get_tt_error_log_viz(
+    wf_id: int,
+    tt_id: Optional[int] = None,
+    ti_id: Optional[int] = None,
+    page: int = 1,
+    page_size: int = 10,
+    just_recent_errors: str = "false",
+    cluster_errors: str = "false",
+) -> Any:
     """Get the error logs for a task template id for GUI."""
     return_list: List[Any] = []
     recent_errors = just_recent_errors.lower() == "true"
@@ -620,22 +627,18 @@ def get_tt_error_log_viz(wf_id: int,
             if errors_df.shape[0] > 0:
                 errors_df = cluster_error_logs(errors_df)
             total_count = errors_df.shape[0]
-            return_dict = (
-                {
-                    "error_logs": errors_df.to_dict(orient="records"),
-                    "total_count": total_count,
-                    "page": page,
-                    "page_size": page_size,
-                }
-            )
+            return_dict = {
+                "error_logs": errors_df.to_dict(orient="records"),
+                "total_count": total_count,
+                "page": page,
+                "page_size": page_size,
+            }
         else:
-            return_dict = (
-                {
-                    "error_logs": errors_df.to_dict(orient="records"),
-                    "total_count": total_count,
-                    "page": page,
-                    "page_size": page_size,
-                }
-            )
+            return_dict = {
+                "error_logs": errors_df.to_dict(orient="records"),
+                "total_count": total_count,
+                "page": page,
+                "page_size": page_size,
+            }
         resp = JSONResponse(content=return_dict, status_code=StatusCodes.OK)
     return resp

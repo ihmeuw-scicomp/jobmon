@@ -21,6 +21,7 @@ from jobmon.server.web.db_admin import get_session_local
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
 
+
 @api_v3_router.post("/array")
 async def add_array(request: Request) -> Any:
     """Return an array ID by workflow and task template version ID.
@@ -139,7 +140,9 @@ async def record_array_batch_num(array_id: int, request: Request) -> Any:
                     select(func.coalesce(func.max(TaskInstance.array_batch_num) + 1, 1))
                     .where((TaskInstance.array_id == array_id))
                     .label("array_batch_num"),
-                    (func.row_number().over(order_by=Task.id) - 1).label("array_step_id"),
+                    (func.row_number().over(order_by=Task.id) - 1).label(
+                        "array_step_id"
+                    ),
                     # status columns
                     literal_column(f"'{TaskInstanceStatus.QUEUED}'").label("status"),
                     func.now().label("status_date"),
@@ -164,7 +167,9 @@ async def record_array_batch_num(array_id: int, request: Request) -> Any:
             for row in session.execute(tasks_by_status_query):
                 result_dict[row[0]].append(row[1])
             ()
-    resp = JSONResponse(content={"tasks_by_status": result_dict}, status_code=StatusCodes.OK)
+    resp = JSONResponse(
+        content={"tasks_by_status": result_dict}, status_code=StatusCodes.OK
+    )
     return resp
 
 

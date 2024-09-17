@@ -128,17 +128,18 @@ async def bind_workflow(request: Request) -> Any:
                 newly_created = False
 
         content = {
-                "workflow_id": workflow.id,
-                "status": workflow.status,
-                "newly_created": newly_created,
-            }
+            "workflow_id": workflow.id,
+            "status": workflow.status,
+            "newly_created": newly_created,
+        }
         resp = JSONResponse(content=content, status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.get("/workflow/{workflow_args_hash}")
-async def get_matching_workflows_by_workflow_args(workflow_args_hash: str,
-                                                  request: Request) -> Any:
+async def get_matching_workflows_by_workflow_args(
+    workflow_args_hash: str, request: Request
+) -> Any:
     """Return any dag hashes that are assigned to workflows with identical workflow args."""
     try:
         workflow_args_hash = str(int(workflow_args_hash))
@@ -192,10 +193,7 @@ def _upsert_wf_attribute(
 ) -> None:
     with session.begin_nested():
         wf_attrib_id = _add_or_get_wf_attribute_type(name, session)
-        if (
-            SessionLocal
-            and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri")
-        ):
+        if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
             insert_vals1 = mysql_insert(WorkflowAttribute).values(
                 workflow_id=workflow_id,
                 workflow_attribute_type_id=wf_attrib_id,
@@ -204,10 +202,7 @@ def _upsert_wf_attribute(
             upsert_stmt = insert_vals1.on_duplicate_key_update(
                 value=insert_vals1.inserted.value
             )
-        elif (
-            SessionLocal
-            and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri")
-        ):
+        elif SessionLocal and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri"):
             insert_vals2: sqlalchemy.dialects.sqlite.dml.Insert = sqlite_insert(
                 WorkflowAttribute
             ).values(
@@ -287,15 +282,14 @@ def workflow_is_resumable(workflow_id: int) -> Any:
             workflow = session.execute(select_stmt).scalars().one()
 
         logger.info(f"Workflow is resumable: {workflow.is_resumable}")
-        resp = JSONResponse(content={"workflow_is_resumable":
-                                         workflow.is_resumable},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"workflow_is_resumable": workflow.is_resumable},
+            status_code=StatusCodes.OK,
+        )
     return resp
 
 
-@api_v3_router.get(
-    "/workflow/{workflow_id}/get_max_concurrently_running"
-)
+@api_v3_router.get("/workflow/{workflow_id}/get_max_concurrently_running")
 async def get_max_concurrently_running(workflow_id: int, request: Request) -> Any:
     """Return the maximum concurrency of this workflow."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
@@ -307,7 +301,7 @@ async def get_max_concurrently_running(workflow_id: int, request: Request) -> An
 
         resp = JSONResponse(
             content={"max_concurrently_running": workflow.max_concurrently_running},
-            status_code=StatusCodes.OK
+            status_code=StatusCodes.OK,
         )
     return resp
 
@@ -347,8 +341,7 @@ async def update_max_running(workflow_id: int, request: Request) -> Any:
                 f"running updated to {new_limit}"
             )
 
-        resp = JSONResponse(content={"message": message},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
     return resp
 
 
@@ -385,14 +378,14 @@ async def task_status_updates(workflow_id: int, request: Request) -> Any:
     for row in session.execute(tasks_by_status_query):
         result_dict[row.status].append(row.id)
 
-    resp = JSONResponse(content={"tasks_by_status": result_dict, "time": str_time},
-                        status_code=StatusCodes.OK)
+    resp = JSONResponse(
+        content={"tasks_by_status": result_dict, "time": str_time},
+        status_code=StatusCodes.OK,
+    )
     return resp
 
 
-@api_v3_router.get(
-    "/workflow/{workflow_id}/fetch_workflow_metadata"
-)
+@api_v3_router.get("/workflow/{workflow_id}/fetch_workflow_metadata")
 def fetch_workflow_metadata(workflow_id: int) -> Any:
     """Get metadata associated with specified Workflow ID."""
     # Query for a workflow object
@@ -408,15 +401,14 @@ def fetch_workflow_metadata(workflow_id: int) -> Any:
         else:
             return_tuple = wf.to_wire_as_distributor_workflow()
 
-        resp = JSONResponse(content={"workflow": return_tuple},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"workflow": return_tuple}, status_code=StatusCodes.OK
+        )
     return resp
 
 
 @api_v3_router.get("/workflow/get_tasks/{workflow_id}")
-def get_tasks_from_workflow(workflow_id: int,
-                            max_task_id: int,
-                            chunk_size: int) -> Any:
+def get_tasks_from_workflow(workflow_id: int, max_task_id: int, chunk_size: int) -> Any:
     """Return tasks associated with specified Workflow ID."""
     with SessionLocal() as session:
         with session.begin():
@@ -441,7 +433,9 @@ def get_tasks_from_workflow(workflow_id: int,
                     TaskResources.queue_id,
                 )
                 .join_from(Task, Array, Task.array_id == Array.id)
-                .join_from(Task, TaskResources, Task.task_resources_id == TaskResources.id)
+                .join_from(
+                    Task, TaskResources, Task.task_resources_id == TaskResources.id
+                )
                 .where(
                     Task.workflow_id == workflow_id,
                     # Note: because of this status != "DONE" filter, only the portion of the DAG
@@ -502,6 +496,7 @@ def get_available_workflow_statuses() -> Any:
             select_stmt = select(WorkflowStatus.label).distinct()
             res = session.execute(select_stmt).scalars().all()
             print(f"DB Testing Route*******************{res}")
-        resp = JSONResponse(content={"available_statuses": res},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"available_statuses": res}, status_code=StatusCodes.OK
+        )
     return resp

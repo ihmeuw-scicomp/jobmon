@@ -52,8 +52,10 @@ _reversed_task_instance_label_mapping = {
 
 
 @api_v3_router.get("/task_status")
-def get_task_status(task_ids: Optional[Union[int, list[int]]] = Query(...),
-                    status: Optional[Union[str, list[str]]] = Query(None)) -> Any:
+def get_task_status(
+    task_ids: Optional[Union[int, list[int]]] = Query(...),
+    status: Optional[Union[str, list[str]]] = Query(None),
+) -> Any:
     """Get the status of a task."""
     logger.info(f"*********************task_ids: {task_ids}, status_request: {status}")
     if task_ids is None:
@@ -82,9 +84,7 @@ def get_task_status(task_ids: Optional[Union[int, list[int]]] = Query(...),
                         for i in _reversed_task_instance_label_mapping[arg]
                     ]
                 query_filter.append(
-                    TaskInstance.status.in_(
-                        [i for arg in status for i in status_codes]
-                    )
+                    TaskInstance.status.in_([i for arg in status for i in status_codes])
                 )
 
             if task_ids:
@@ -127,12 +127,16 @@ def get_task_status(task_ids: Optional[Union[int, list[int]]] = Query(...),
                 df = pd.DataFrame(rows, columns=column_names)
                 # remap to jobmon_cli statuses
                 df.STATUS.replace(to_replace=_task_instance_label_mapping, inplace=True)
-                resp = JSONResponse(content={"task_instance_status": df.to_json()},
-                                    status_code=StatusCodes.OK)
+                resp = JSONResponse(
+                    content={"task_instance_status": df.to_json()},
+                    status_code=StatusCodes.OK,
+                )
             else:
                 df = pd.DataFrame({}, columns=column_names)
-                resp = JSONResponse(content={"task_instance_status": df.to_json()},
-                                    status_code=StatusCodes.OK)
+                resp = JSONResponse(
+                    content={"task_instance_status": df.to_json()},
+                    status_code=StatusCodes.OK,
+                )
 
     return resp
 
@@ -182,8 +186,10 @@ async def get_task_subdag(request: Request) -> Any:
 
             # If we find no results, we handle it here
             if not grouped_data:
-                resp = JSONResponse(content={"workflow_id": None, "sub_task": None},
-                                    status_code=StatusCodes.OK)
+                resp = JSONResponse(
+                    content={"workflow_id": None, "sub_task": None},
+                    status_code=StatusCodes.OK,
+                )
                 return resp
 
             # Since we have validated all the tasks belong to the same wf in status_command before
@@ -191,7 +197,9 @@ async def get_task_subdag(request: Request) -> Any:
             if grouped_data:
                 some_key = next(iter(grouped_data))
                 workflow_id, dag_id = some_key
-                node_ids = [int(node_id) for node_id in grouped_data[some_key]["node_ids"]]
+                node_ids = [
+                    int(node_id) for node_id in grouped_data[some_key]["node_ids"]
+                ]
 
                 # Continue with your current processing logic
                 sub_dag_tree = _get_subdag(node_ids, dag_id, session)
@@ -199,8 +207,10 @@ async def get_task_subdag(request: Request) -> Any:
                     workflow_id, sub_dag_tree, task_status, session
                 )
 
-        resp = JSONResponse(content={"workflow_id": workflow_id, "sub_task": sub_task_tree},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"workflow_id": workflow_id, "sub_task": sub_task_tree},
+            status_code=StatusCodes.OK,
+        )
     return resp
 
 
@@ -222,7 +232,9 @@ async def update_task_statuses(request: Request) -> Any:
 
     with SessionLocal() as session:
         with session.begin():
-            logger.info(f"reset status of task_ids: {task_ids}, new_status: {new_status}")
+            logger.info(
+                f"reset status of task_ids: {task_ids}, new_status: {new_status}"
+            )
             update_stmt = update(Task).where(
                 and_(Task.id.in_(task_ids), Task.status != new_status)
             )
@@ -268,10 +280,16 @@ def get_task_dependencies(task_id: int) -> Any:
     with SessionLocal() as session:
         with session.begin():
             dag_id, workflow_id, node_id = _get_dag_and_wf_id(task_id, session)
-            logger.info(f"task_id: {task_id}, dag_id: {dag_id}, workflow_id: {workflow_id}")
+            logger.info(
+                f"task_id: {task_id}, dag_id: {dag_id}, workflow_id: {workflow_id}"
+            )
             up_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.UP)
-            down_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.DOWN)
-            up_task_dict = _get_tasks_from_nodes(workflow_id, list(up_nodes), [], session)
+            down_nodes = _get_node_dependencies(
+                {node_id}, dag_id, session, Direction.DOWN
+            )
+            up_task_dict = _get_tasks_from_nodes(
+                workflow_id, list(up_nodes), [], session
+            )
             down_task_dict = _get_tasks_from_nodes(
                 workflow_id, list(down_nodes), [], session
             )
@@ -282,7 +300,13 @@ def get_task_dependencies(task_id: int) -> Any:
                 []
                 if up_task_dict is None or len(up_task_dict) == 0
                 else [
-                    [{"id": k, "status": up_task_dict[k][0], "name": up_task_dict[k][1]}]
+                    [
+                        {
+                            "id": k,
+                            "status": up_task_dict[k][0],
+                            "name": up_task_dict[k][1],
+                        }
+                    ]
                     for k in up_task_dict
                 ]
             )
@@ -290,13 +314,20 @@ def get_task_dependencies(task_id: int) -> Any:
                 []
                 if down_task_dict is None or len(down_task_dict) == 0
                 else [
-                    [{"id": k, "status": down_task_dict[k][0], "name": down_task_dict[k][1]}]
+                    [
+                        {
+                            "id": k,
+                            "status": down_task_dict[k][0],
+                            "name": down_task_dict[k][1],
+                        }
+                    ]
                     for k in down_task_dict
                 ]
             )
 
-        resp = JSONResponse(content={"up": up, "down": down},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"up": up, "down": down}, status_code=StatusCodes.OK
+        )
     return resp
 
 
@@ -316,8 +347,9 @@ async def get_tasks_recursive(direction: str, request: Request) -> Any:
         with SessionLocal() as session:
             with session.begin():
                 tasks_recursive = _get_tasks_recursive(task_ids, direct, session)
-            resp = JSONResponse(content={"task_ids": list(tasks_recursive)},
-                                status_code=StatusCodes.OK)
+            resp = JSONResponse(
+                content={"task_ids": list(tasks_recursive)}, status_code=StatusCodes.OK
+            )
         return resp
     except InvalidUsage as e:
         raise e
@@ -344,14 +376,20 @@ def get_task_resource_usage(task_id: int) -> Any:
             result = session.execute(select_stmt).one_or_none()
 
             if result is None:
-                resource_usage = SerializeTaskResourceUsage.to_wire(None, None, None, None)
+                resource_usage = SerializeTaskResourceUsage.to_wire(
+                    None, None, None, None
+                )
             else:
                 resource_usage = SerializeTaskResourceUsage.to_wire(
-                    result.num_attempts, result.nodename, result.wallclock, result.maxpss
+                    result.num_attempts,
+                    result.nodename,
+                    result.wallclock,
+                    result.maxpss,
                 )
 
-        resp = JSONResponse(content={"resource_usage": resource_usage},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"resource_usage": resource_usage}, status_code=StatusCodes.OK
+        )
     return resp
 
 
@@ -520,11 +558,13 @@ async def get_downstream_tasks(request: Request) -> Any:
                 )
             ).all()
             result = {
-                row.id: [row.node_id, row.downstream_node_ids] for row in tasks_and_edges
+                row.id: [row.node_id, row.downstream_node_ids]
+                for row in tasks_and_edges
             }
 
-        resp = JSONResponse(content={"downstream_tasks": result},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"downstream_tasks": result}, status_code=StatusCodes.OK
+        )
     return resp
 
 
@@ -579,8 +619,9 @@ def get_task_details(task_id: int) -> Any:
             "ti_resources",
         )
         result = [dict(zip(column_names, row)) for row in rows]
-        resp = JSONResponse(content={"taskinstances": result},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"taskinstances": result}, status_code=StatusCodes.OK
+        )
     return resp
 
 
@@ -608,6 +649,7 @@ def get_task_details_viz(task_id: int) -> Any:
             "task_status_date",
         )
         result = [dict(zip(column_names, row)) for row in rows]
-        resp = JSONResponse(content={"task_details": result},
-                            status_code=StatusCodes.OK)
+        resp = JSONResponse(
+            content={"task_details": result}, status_code=StatusCodes.OK
+        )
     return resp
