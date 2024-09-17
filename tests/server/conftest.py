@@ -61,19 +61,28 @@ def requester_in_memory(monkeypatch, web_server_in_memory, api_prefix):
     monkeypatch.setenv("JOBMON__HTTP__ROUTE_PREFIX", api_prefix)
     monkeypatch.setenv("JOBMON__HTTP__SERVICE_URL", "1")
 
-    app, engine = web_server_in_memory
+    client, engine = web_server_in_memory
 
-    def get_in_mem(url, params, data, headers, **kwargs):
+    def get_in_mem(url, params=None, data=None, headers=None, **kwargs):
+        # Reformat the URL
         url = "/" + url.split(":")[-1].split("/", 1)[1]
-        return app.get(path=url, query_string=params, data=data, headers=headers)
 
-    def post_in_mem(url, params, json, headers, **kwargs):
-        url = "/" + url.split(":")[-1].split("/", 1)[1]
-        return app.post(url, query_string=params, json=json, headers=headers)
+        # FastAPI uses `params` for query strings
+        return client.get(url, params=params, headers=headers)
 
-    def put_in_mem(url, params, json, headers, **kwargs):
+    def post_in_mem(url, params=None, json=None, headers=None, **kwargs):
+        # Reformat the URL
         url = "/" + url.split(":")[-1].split("/", 1)[1]
-        return app.put(url, query_string=params, json=json, headers=headers)
+
+        # FastAPI uses `params` for query strings and `json` for JSON body
+        return client.post(url, params=params, json=json, headers=headers)
+
+    def put_in_mem(url, params=None, json=None, headers=None, **kwargs):
+        # Reformat the URL
+        url = "/" + url.split(":")[-1].split("/", 1)[1]
+
+        # FastAPI uses `params` for query strings and `json` for JSON body
+        return client.put(url, params=params, json=json, headers=headers)
 
     monkeypatch.setattr(requests, "get", get_in_mem)
     monkeypatch.setattr(requests, "post", post_in_mem)
