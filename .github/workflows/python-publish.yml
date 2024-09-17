@@ -20,9 +20,12 @@ jobs:
       id-token: write
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+        fetch-tags: true
       # The default checkout does NOT get tags, hence this second fetch.
-    - name: Get tags
-      run: git fetch --tags origin
+#    - name: Get tags
+#      run: git fetch --tags origin
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
