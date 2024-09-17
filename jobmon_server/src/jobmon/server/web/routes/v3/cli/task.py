@@ -8,7 +8,7 @@ from typing import Any, cast, Dict, List, Set, Optional, Union
 from fastapi import Request, Query
 from starlette.responses import JSONResponse
 import pandas as pd
-from sqlalchemy import select, update
+from sqlalchemy import and_, select, update
 from sqlalchemy.orm import Session
 import structlog
 
@@ -53,9 +53,9 @@ _reversed_task_instance_label_mapping = {
 
 @api_v3_router.get("/task_status")
 def get_task_status(task_ids: Optional[Union[int, list[int]]] = Query(...),
-                    status_request: Optional[list[str]] = Query(None)) -> Any:
+                    status: Optional[Union[str, list[str]]] = Query(None)) -> Any:
     """Get the status of a task."""
-    logger.info(f"*********************task_ids: {task_ids}, status_request: {status_request}")
+    logger.info(f"*********************task_ids: {task_ids}, status_request: {status}")
     if task_ids is None:
         raise InvalidUsage("Missing task_ids in request", status_code=400)
 
@@ -65,22 +65,25 @@ def get_task_status(task_ids: Optional[Union[int, list[int]]] = Query(...),
     if len(task_ids) == 0:
         raise InvalidUsage(f"Missing {task_ids} in request", status_code=400)
 
+    if status and isinstance(status, str):
+        status = [status]
+
     with SessionLocal() as session:
         with session.begin():
             query_filter = [
                 Task.id == TaskInstance.task_id,
                 TaskInstanceStatus.id == TaskInstance.status,
             ]
-            if status_request:
-                if len(status_request) > 0:
+            if status:
+                if len(status) > 0:
                     status_codes = [
                         i
-                        for arg in status_request
+                        for arg in status
                         for i in _reversed_task_instance_label_mapping[arg]
                     ]
                 query_filter.append(
                     TaskInstance.status.in_(
-                        [i for arg in status_request for i in status_codes]
+                        [i for arg in status for i in status_codes]
                     )
                 )
 
@@ -207,6 +210,8 @@ async def update_task_statuses(request: Request) -> Any:
     data = cast(Dict, await request.json())
     try:
         task_ids = data["task_ids"]
+        if isinstance(task_ids, int):
+            task_ids = [task_ids]
         new_status = data["new_status"]
         workflow_status = data["workflow_status"]
         workflow_id = data["workflow_id"]
@@ -216,46 +221,41 @@ async def update_task_statuses(request: Request) -> Any:
         ) from e
 
     with SessionLocal() as session:
-        with SessionLocal.begin():
-            try:
-                update_stmt = update(Task).where(
-                    Task.id.in_(task_ids), Task.status != new_status
+        with session.begin():
+            logger.info(f"reset status of task_ids: {task_ids}, new_status: {new_status}")
+            update_stmt = update(Task).where(
+                and_(Task.id.in_(task_ids), Task.status != new_status)
+            )
+            vals = {"status": new_status}
+            session.execute(update_stmt.values(**vals))
+            session.flush()
+            # If job is supposed to be rerun, set task instances to "K"
+            if new_status == constants.TaskStatus.REGISTERING:
+                task_instance_update_stmt = update(TaskInstance).where(
+                    TaskInstance.task_id.in_(task_ids),
+                    TaskInstance.status.notin_(
+                        [
+                            constants.TaskInstanceStatus.ERROR_FATAL,
+                            constants.TaskInstanceStatus.DONE,
+                            constants.TaskInstanceStatus.ERROR,
+                            constants.TaskInstanceStatus.UNKNOWN_ERROR,
+                            constants.TaskInstanceStatus.RESOURCE_ERROR,
+                            constants.TaskInstanceStatus.KILL_SELF,
+                            constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID,
+                        ]
+                    ),
                 )
-                vals = {"status": new_status}
-                session.execute(update_stmt.values(**vals))
-
-                # If job is supposed to be rerun, set task instances to "K"
-                if new_status == constants.TaskStatus.REGISTERING:
-                    task_instance_update_stmt = update(TaskInstance).where(
-                        TaskInstance.task_id.in_(task_ids),
-                        TaskInstance.status.notin_(
-                            [
-                                constants.TaskInstanceStatus.ERROR_FATAL,
-                                constants.TaskInstanceStatus.DONE,
-                                constants.TaskInstanceStatus.ERROR,
-                                constants.TaskInstanceStatus.UNKNOWN_ERROR,
-                                constants.TaskInstanceStatus.RESOURCE_ERROR,
-                                constants.TaskInstanceStatus.KILL_SELF,
-                                constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID,
-                            ]
-                        ),
+                vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
+                session.execute(task_instance_update_stmt.values(**vals))
+                session.flush()
+                # If workflow is done, need to set it to an error state before resuming
+                if workflow_status == constants.WorkflowStatus.DONE:
+                    logger.info(f"reset workflow status for workflow_id: {workflow_id}")
+                    workflow_update_stmt = update(Workflow).where(
+                        Workflow.id == workflow_id
                     )
-                    vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
-                    session.execute(task_instance_update_stmt.values(**vals))
-
-                    # If workflow is done, need to set it to an error state before resume
-                    if workflow_status == constants.WorkflowStatus.DONE:
-                        workflow_update_stmt = update(Workflow).where(
-                            Workflow.id == workflow_id
-                        )
-                        vals = {"status": constants.WorkflowStatus.FAILED}
-                        session.execute(workflow_update_stmt.values(**vals))
-
-            except KeyError as e:
-                session.rollback()
-                raise InvalidUsage(
-                    f"{str(e)} in request to {request.url.path}", status_code=400
-                ) from e
+                    vals = {"status": constants.WorkflowStatus.FAILED}
+                    session.execute(workflow_update_stmt.values(**vals))
 
         message = f"updated to status {new_status}"
         resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)

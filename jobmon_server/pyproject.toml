@@ -29,7 +29,8 @@ dependencies = [
     'scikit-learn',
     'alembic',
     'importlib_resources; python_version<="3.12"',
-    'uvicorn'
+    'uvicorn',
+    'httpx'
 ]
 dynamic = ["version"]
 
