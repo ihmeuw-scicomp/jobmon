@@ -32,7 +32,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install build nox
     - name: Build package
-      run: nox -s buildfind .
+      run: nox -s build
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
