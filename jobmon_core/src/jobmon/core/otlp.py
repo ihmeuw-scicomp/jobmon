@@ -8,7 +8,7 @@ import socket
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Type
 
-from flask import Flask
+from fastapi import FastAPI
 from opentelemetry import _logs
 from opentelemetry import trace
 from opentelemetry.sdk import resources
@@ -184,8 +184,8 @@ class OtlpAPI:
             cls._sqlalchemy_instrumented = True
 
     @classmethod
-    def instrument_app(cls: Type[OtlpAPI], app: Flask) -> None:
-        """Instrument Flask app."""
+    def instrument_app(cls: Type[OtlpAPI], app: FastAPI) -> None:
+        """Instrument FastAPI app."""
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
         # Instrument FastAPI with OpenTelemetry

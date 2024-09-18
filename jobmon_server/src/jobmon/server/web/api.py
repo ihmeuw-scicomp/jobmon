@@ -14,7 +14,7 @@ from jobmon.server.web.server_side_exception import ServerError
 url_prefix = "/api"
 
 
-def _init_logging(otlp_api: Optional[str] = None) -> bool:
+def _init_logging(otlp_api: Optional[OtlpAPI] = None) -> bool:
     """Initialize logging for the app."""
     try:
         extra_processors = []
@@ -45,7 +45,7 @@ def _init_logging(otlp_api: Optional[str] = None) -> bool:
 def get_app(
     use_otlp: bool = False,
     structlog_configured: bool = False,
-    otlp_api: Optional[str] = None,
+    otlp_api: Optional[OtlpAPI] = None,
 ) -> FastAPI:
     """Get a flask app based on the config. If no config is provided, defaults are used.
 
@@ -55,8 +55,8 @@ def get_app(
         otlp_api: The OpenTelemetry API to use.
     """
     if use_otlp and otlp_api is None:
-        otlp_api = OtlpAPI()  # type: ignore
-        otlp_api.instrument_sqlalchemy()  # type: ignore
+        otlp_api = OtlpAPI()
+        otlp_api.instrument_sqlalchemy()
 
     if not structlog_configured:
         structlog_configured = _init_logging(otlp_api)
