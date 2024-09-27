@@ -37,7 +37,7 @@ export default function Usage({taskTemplateName, taskTemplateVersionId, workflow
 
     var runtime: any = []
     var memory: any = []
-    var run_mem = usageInfo[11]
+    var run_mem = usageInfo.data?.[11]
     for (var item in run_mem) {
         var run = run_mem[item].r
         var mem = run_mem[item].m
