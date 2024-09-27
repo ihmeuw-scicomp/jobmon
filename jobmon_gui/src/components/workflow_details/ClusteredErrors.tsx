@@ -288,7 +288,9 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
                         <Grid item xs={12}><Typography sx={labelStyles}>Task Instance stderr:</Typography></Grid>
                         <Grid item xs={12}>
                             <ScrollableCodeBlock>
-                                {error.task_instance_stderr_log || "No stderr output found"}
+                                <SyntaxHighlighter language={language}>
+                                    {error.task_instance_stderr_log || "No stderr output found"}
+                                </SyntaxHighlighter>
                             </ScrollableCodeBlock>
                         </Grid>
                     </Grid>
