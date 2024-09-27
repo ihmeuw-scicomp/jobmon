@@ -610,9 +610,10 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int, ti_id: Optional[int]) -> Any:
             )
             .where(*where_conditions)
             .order_by(TaskInstanceErrorLog.id.desc())
-            .offset(offset)
-            .limit(page_size)
         )
+
+        if not output_clustered_errors:
+            sql = sql.offset(offset).limit(page_size)
 
         rows = session.execute(sql).all()
         session.commit()

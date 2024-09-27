@@ -109,7 +109,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
             header: "Status Date",
             accessorKey: "task_status_date",
             Cell: ({renderedCellValue}) => (
-                convertDatePST(convertDate(renderedCellValue).toISOString())
+                convertDatePST(renderedCellValue)
             )
         },
     ];
