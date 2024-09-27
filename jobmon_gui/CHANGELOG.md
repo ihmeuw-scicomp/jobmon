@@ -19,6 +19,7 @@ All notable changes to the Jobmon GUI will be documented in this file.
 - Fixed a bug where "Invalid Date" showed in the workflow information modal on the landing page.
 - Fixed a bug where concurrency limit would show as "false" for any value that wasn't "No Limit".
 - Added syntax highlighting and new lines for error log messages.
+- Fixed a bug where the database connection information wasn't templating on the `jobmon_at_ihme` page.
 
 ## [3.3.0] - 2024-09-10
 
