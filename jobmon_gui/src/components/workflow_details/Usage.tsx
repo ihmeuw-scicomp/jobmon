@@ -1,6 +1,6 @@
 import React, {useEffect} from 'react';
 import MemoryHistogram from '@jobmon_gui/components/workflow_details/MemoryHistogram';
-import RuntimeHistogram from '@jobmon_gui/components/workflow_details/RuntimeHistogram';
+import RuntimeBoxPlot from '@jobmon_gui/components/workflow_details/RuntimeBoxPlot';
 import {formatBytes, bytes_to_gib} from '@jobmon_gui/utils/formatters'
 import {safe_rum_start_span, safe_rum_unit_end} from '@jobmon_gui/utils/rum'
 import humanizeDuration from 'humanize-duration';
@@ -38,14 +38,19 @@ export default function Usage({taskTemplateName, taskTemplateVersionId, workflow
     var runtime: any = []
     var memory: any = []
     var run_mem = usageInfo.data?.[11]
+    console.log("!!!!!run_mem!!!!!", run_mem)
     for (var item in run_mem) {
         var run = run_mem[item].r
         var mem = run_mem[item].m
+        var taskId = run_mem[item].task_id;
+        var requestedResources = run_mem[item].requested_resources ? JSON.parse(run_mem[item].requested_resources) : {};
+        var requestedRuntimeValue = requestedResources.runtime || 86400;
+
         if (run !== null && run !== 0 && run !== "0") {
-            runtime.push(run)
+            runtime.push({task_id: taskId, runtime: run, requestedRuntime: requestedRuntimeValue})
         }
         if (mem !== null && mem !== 0 && mem !== "0") {
-            memory.push(bytes_to_gib(mem))
+            memory.push({task_id: taskId, memory: bytes_to_gib(mem)})
         }
     }
 
@@ -101,7 +106,7 @@ export default function Usage({taskTemplateName, taskTemplateVersionId, workflow
                 <MemoryHistogram taskMemory={memory}/>
             </div>
             <div className="center-histogram">
-                <RuntimeHistogram taskRuntime={runtime}/>
+                <RuntimeBoxPlot taskRuntime={runtime}/>
             </div>
         </div>
     )
