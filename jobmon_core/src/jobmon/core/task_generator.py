@@ -335,6 +335,13 @@ class TaskGenerator:
                 self.task_function
             ).parameters.items()
         }
+        if naming_args is None:
+            logger.warning(
+                "You have specified no naming_args on a task_generator, which means that all "
+                "task args will be used in the task name. Usually, this results in a name "
+                "that's too long for Jobmon, so you might need to specify naming_args. "
+                "Include just the arguments that differ from task to task within a workflow."
+            )
         self._naming_args = (
             naming_args if naming_args is not None else self.params.keys()
         )
