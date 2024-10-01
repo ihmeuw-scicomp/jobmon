@@ -1,10 +1,11 @@
 import React from 'react';
 import Plot from 'react-plotly.js';
 
-export default function RuntimeBoxPlot({ taskRuntime }) {
-    const hoverText = taskRuntime.map(item => `Task ID: ${item.task_id}`);
+export default function RuntimeBoxPlot({taskRuntime}) {
+    const requestedRuntimes = taskRuntime.map(item => item.requestedRuntime)
+    const hoverText = taskRuntime.map(item => `Task ID: ${item.task_id}<br />Requested Runtime: ${item.requestedRuntime}`);
     const runtimes = taskRuntime.map(item => item.runtime);
-    const requestedRuntimes = taskRuntime.map(item => item.requestedRuntime); // Extract requestedRuntime
+    const percentageRuntimes = taskRuntime.map(item => item.percentageRuntime);
 
     return (
         <Plot
@@ -12,47 +13,31 @@ export default function RuntimeBoxPlot({ taskRuntime }) {
                 {
                     y: runtimes,
                     type: 'box',
-                    name: 'Utilized Runtime',
-                    marker: { color: '#3e853c' },
+                    name: 'Utilized Runtime (seconds)',
+                    marker: {color: '#3e853c'},
                     boxpoints: 'all',
                     text: hoverText,
                     hoverinfo: 'text+y',
+                    xaxis: 'x1',
+                    yaxis: 'y1',
                 },
                 {
-                    y: requestedRuntimes, // Use requestedRuntime here
+                    y: percentageRuntimes,
                     type: 'box',
-                    name: 'Requested Runtime',
-                    marker: { color: '#1f77b4' },
+                    name: 'Utilization vs. Requested Runtime (%)',
+                    marker: {color: '#1f77b4'},
                     boxpoints: 'all',
-                    text: hoverText, // You can change this if you want separate hover text for requested runtimes
+                    text: hoverText,
                     hoverinfo: 'text+y',
+                    xaxis: 'x2',
+                    yaxis: 'y2',
                 }
             ]}
             layout={{
                 width: 1000,
                 height: 600,
-                title: 'Runtime Box Plot - Linear Scale',
-                updatemenus: [{
-                    active: 1,
-                    buttons: [
-                        {
-                            label: "Log Scale",
-                            method: 'relayout',
-                            args: [{ 'yaxis.type': 'log' }, { 'title': 'Runtime Box Plot - Log Scale' }],
-                        },
-                        {
-                            label: "Linear Scale",
-                            method: 'relayout',
-                            args: [{ 'yaxis.type': 'linear' }, { 'title': 'Runtime Box Plot - Linear Scale' }],
-                        }
-                    ]
-                }],
-                yaxis: {
-                    title: 'Runtime',
-                },
-                xaxis: {
-                    title: 'Tasks',
-                },
+                grid: {rows: 1, columns: 2, pattern: 'independent'},
+                title: 'Runtime Box Plots',
             }}
         />
     );
