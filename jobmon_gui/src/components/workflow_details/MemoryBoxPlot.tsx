@@ -12,7 +12,7 @@ export default function MemoryBoxPlot({ taskMemory }) {
                 {
                     y: memory,
                     type: 'box',
-                    name: 'Utilized Memory (GiB)',
+                    name: 'Memory (GiB)',
                     marker: { color: '#3e853c' },
                     boxpoints: 'all',
                     text: hoverText,
@@ -23,7 +23,7 @@ export default function MemoryBoxPlot({ taskMemory }) {
                 {
                     y: percentageMemory,
                     type: 'box',
-                    name: 'Utilization vs. Requested Memory (%)',
+                    name: 'Utilization Percentage',
                     marker: { color: '#1f77b4' },
                     boxpoints: 'all',
                     text: hoverText,

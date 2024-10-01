@@ -48,7 +48,7 @@ export default function Usage({taskTemplateName, taskTemplateVersionId, workflow
         var requestedMemoryValue = requestedResources.memory || 1;
 
         if (run !== null && run !== 0 && run !== "0") {
-            var percentageRuntime = ((run - requestedRuntimeValue) / requestedRuntimeValue) * 100;
+            var percentageRuntime = (run / requestedRuntimeValue) * 100;
             runtime.push({
                 task_id: taskId,
                 runtime: run,
@@ -57,7 +57,7 @@ export default function Usage({taskTemplateName, taskTemplateVersionId, workflow
             })
         }
         if (mem !== null && mem !== 0 && mem !== "0") {
-            var percentageMemory = ((bytes_to_gib(mem) - requestedMemoryValue) / requestedMemoryValue) * 100;
+            var percentageMemory = (bytes_to_gib(mem) / requestedMemoryValue) * 100;
             memory.push({
                 task_id: taskId,
                 memory: bytes_to_gib(mem),

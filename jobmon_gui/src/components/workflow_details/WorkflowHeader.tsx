@@ -45,7 +45,7 @@ export default function WorkflowHeader({
                     {icon && <span className={className}>{icon}</span>}
                     {wf_id} - {wf_name}
                 </p>
-                <span style={{transform: 'translateY(-5px)'}}>
+                <span style={{transform: 'translateY(-5px)', paddingLeft: '10px'}}>
                     <HiInformationCircle onClick={() => setShowWFInfo(true)}/>
                 </span>
             </div>

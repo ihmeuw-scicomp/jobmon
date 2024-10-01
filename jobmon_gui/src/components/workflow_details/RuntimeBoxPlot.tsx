@@ -13,7 +13,7 @@ export default function RuntimeBoxPlot({taskRuntime}) {
                 {
                     y: runtimes,
                     type: 'box',
-                    name: 'Utilized Runtime (seconds)',
+                    name: 'Runtime (seconds)',
                     marker: {color: '#3e853c'},
                     boxpoints: 'all',
                     text: hoverText,
@@ -24,7 +24,7 @@ export default function RuntimeBoxPlot({taskRuntime}) {
                 {
                     y: percentageRuntimes,
                     type: 'box',
-                    name: 'Utilization vs. Requested Runtime (%)',
+                    name: 'Utilization Percentage',
                     marker: {color: '#1f77b4'},
                     boxpoints: 'all',
                     text: hoverText,
