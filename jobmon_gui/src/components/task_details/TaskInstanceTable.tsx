@@ -1,21 +1,11 @@
 import React, {useState} from 'react';
-import "react-bootstrap-table-next/dist/react-bootstrap-table2.min.css"
-import BootstrapTable, {ColumnDescription} from "react-bootstrap-table-next";
-import paginationFactory from "react-bootstrap-table2-paginator";
-import {FaCaretDown, FaCaretUp} from "react-icons/fa";
 import {HiInformationCircle} from "react-icons/hi";
 import CustomModal from '@jobmon_gui/components/Modal';
-import DOMPurify from 'dompurify';
 import {formatBytes} from "@jobmon_gui/utils/formatters";
 import humanizeDuration from 'humanize-duration';
+import {MaterialReactTable} from "material-react-table";
+import {Box} from "@mui/material";
 
-export const sanitize = (html: string): string => DOMPurify.sanitize(html);
-const customCaret = (order, column) => {
-    if (!order) return (<span><FaCaretUp style={{marginLeft: "5px"}}/></span>);
-    else if (order === 'asc') return (<span><FaCaretUp style={{marginLeft: "5px"}}/></span>);
-    else if (order === 'desc') return (<span><FaCaretDown style={{marginLeft: "5px"}}/></span>);
-    return null;
-}
 
 export default function TaskInstanceTable({taskInstanceData}) {
     const [showStdoutModal, setShowStdoutModal] = useState(false)
@@ -30,11 +20,6 @@ export default function TaskInstanceTable({taskInstanceData}) {
         'ti_distributor_id': '', 'ti_nodename': '', 'ti_error_log_description': '',
         'ti_wallclock': 0, 'ti_maxrss': '', 'ti_resources': ''
     });
-
-    const htmlFormatter = cell => {
-        // add sanitize to prevent xss attack
-        return <div dangerouslySetInnerHTML={{__html: sanitize(`${cell}`)}}/>;
-    };
 
     function get_data_brief(data) {
         let r: any = [];
@@ -77,82 +62,66 @@ export default function TaskInstanceTable({taskInstanceData}) {
         return r;
     }
 
+    const handleCellErrorClick = (rowIndex) => {
+        setShowStderrModal(true);
+        setRowDetail(taskInstanceData[rowIndex]);
+    };
+
+    const handleCellStdOutClick = (rowIndex) => {
+        setShowStdoutModal(true)
+        setRowDetail(taskInstanceData[rowIndex])
+    };
+
+    const handleCellResourcesClick = (rowIndex) => {
+        setShowResourcesModal(true)
+        setRowDetail(taskInstanceData[rowIndex])
+    };
+
     const data_brief = get_data_brief(taskInstanceData)
 
-    const columns: Array<ColumnDescription> = [
+    const columns = [
         {
-            dataField: "ti_id",
-            text: "ID",
-            sort: true,
-            sortCaret: customCaret,
-            headerStyle: {width: "10%"},
-            formatter: (cell) => (
-                <div id={`${cell}`}>{cell}</div>
+            accessorKey: "ti_id",
+            header: "ID",
+        },
+        {
+            accessorKey: "ti_status",
+            header: "Status",
+        },
+        {
+            accessorKey: "ti_stderr",
+            header: "Standard Error",
+            Cell: ({cell, row}) => (
+                <div onClick={() => handleCellErrorClick(row.index)}>
+                    {cell.getValue()}
+                </div>
+            ),
+        },
+        {
+            accessorKey: "ti_stdout",
+            header: "Standard Out",
+            Cell: ({cell, row}) => (
+                <div onClick={() => handleCellStdOutClick(row.index)}>
+                    {cell.getValue()}
+                </div>
             )
         },
         {
-            dataField: "ti_status",
-            text: "Status",
-            sort: true,
-            sortCaret: customCaret,
-            headerStyle: {width: "10%"},
-            style: {overflowWrap: 'break-word'},
+            accessorKey: "ti_distributor_id",
+            header: "Distributor ID",
         },
         {
-            dataField: "ti_stderr",
-            text: "Standard Error",
-            formatter: htmlFormatter,
-            // @ts-ignore
-            events: {
-                onClick: (e: any, column: any, columnIndex: any, row: any, rowIndex: any) => {
-                    setShowStderrModal(true)
-                    setRowDetail(taskInstanceData[rowIndex])
-                }
-            },
-            sort: true,
-            sortCaret: customCaret,
-            style: {overflowWrap: 'break-word'},
+            accessorKey: "ti_nodename",
+            header: "Node Name",
         },
         {
-            dataField: "ti_stdout",
-            text: "Standard Out",
-            formatter: htmlFormatter,
-            // @ts-ignore
-            events: {
-                onClick: (e: any, column: any, columnIndex: any, row: any, rowIndex: any) => {
-                    setShowStdoutModal(true)
-                    setRowDetail(taskInstanceData[rowIndex])
-                }
-            },
-            sort: true,
-            sortCaret: customCaret,
-            style: {overflowWrap: 'break-word'},
-        },
-        {
-            dataField: "ti_distributor_id",
-            text: "Distributor ID",
-            headerStyle: {width: "15%"},
-            sort: true,
-            sortCaret: customCaret,
-        },
-        {
-            dataField: "ti_nodename",
-            text: "Node Name",
-            sort: true,
-            sortCaret: customCaret,
-            style: {overflowWrap: 'break-word'},
-        },
-        {
-            dataField: "ti_resources",
-            text: "Resources",
-            // @ts-ignore
-            events: {
-                onClick: (e: any, column: any, columnIndex: any, row: any, rowIndex: any) => {
-                    setShowResourcesModal(true)
-                    setRowDetail(taskInstanceData[rowIndex])
-                }
-            },
-            style: {overflowWrap: 'break-word'},
+            accessorKey: "ti_resources",
+            header: "Resources",
+            Cell: ({cell, row}) => (
+                <div onClick={() => handleCellResourcesClick(row.index)}>
+                    {cell.getValue()}
+                </div>
+            )
         },
     ]
 
@@ -168,21 +137,10 @@ export default function TaskInstanceTable({taskInstanceData}) {
                     </p>
                 </header>
             </div>
-            <BootstrapTable
-                keyField="ti_id"
-                data={data_brief}
-                columns={columns}
-                bootstrap4
-                headerClasses="thead-dark"
-                striped
-                pagination={taskInstanceData.length === 0 ? undefined : paginationFactory({sizePerPage: 10})}
-                selectRow={{
-                    mode: "radio",
-                    hideSelectColumn: true,
-                    clickToSelect: true,
-                    bgColor: "#848884",
-                }}
-            />
+
+            <Box p={2} display="flex" justifyContent="center" width="100%">
+                <MaterialReactTable columns={columns} data={data_brief}/>
+            </Box>
 
             <CustomModal
                 className="ti_stdout_modal"

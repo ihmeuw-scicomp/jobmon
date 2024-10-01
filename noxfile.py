@@ -13,7 +13,7 @@ from nox.sessions import Session
 src_locations = ["jobmon_client/src", "jobmon_core/src", "jobmon_server/src"]
 test_locations = ["tests"]
 
-python = "3.8"
+python = "3.9"
 
 
 @nox.session(python=python, venv_backend="conda")
@@ -25,6 +25,9 @@ def tests(session: Session) -> None:
     args = session.posargs or test_locations
 
     session.run(
+        "coverage",
+        "run",
+        "-m",
         "pytest",
         *args,
         env={"SQLALCHEMY_WARN_20": "1"}
@@ -68,7 +71,7 @@ def typecheck(session: Session) -> None:
     args = session.posargs or src_locations
     session.install("mypy", "types-Flask", "types-requests", "types-PyMySQL", "types-filelock",
                     "types-PyYAML", "types-tabulate", "types-psutil", "types-Flask-Cors",
-                    "types-sqlalchemy-utils", "types-pkg-resources", "types-mysqlclient")
+                    "types-sqlalchemy-utils", "types-setuptools", "types-mysqlclient")
     session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
 
     session.run("mypy", "--explicit-package-bases", *args)

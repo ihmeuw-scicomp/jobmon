@@ -32,3 +32,4 @@ export default function CustomModal({headerContent, bodyContent, showModal, setS
         </Modal>
   )
 }
+

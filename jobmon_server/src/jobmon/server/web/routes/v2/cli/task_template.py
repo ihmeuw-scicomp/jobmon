@@ -2,7 +2,7 @@
 
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from flask import jsonify, request
 from flask_cors import cross_origin
@@ -14,6 +14,7 @@ from sqlalchemy.sql import func
 import structlog
 
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
+from jobmon.server.web.error_log_clustering import cluster_error_logs
 from jobmon.server.web.models.arg import Arg
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.node import Node
@@ -231,6 +232,7 @@ def get_task_template_resource_usage() -> Any:
             TaskTemplateVersion.id == Node.task_template_version_id,
             Node.id == Task.node_id,
             Task.id == TaskInstance.task_id,
+            Task.task_resources_id == TaskResources.id,
         ]
         if workflows:
             query_filter += [
@@ -239,11 +241,15 @@ def get_task_template_resource_usage() -> Any:
                 Workflow.id.in_(workflows),
             ]
         sql = select(
-            TaskInstance.wallclock, TaskInstance.maxrss, Node.id, Task.id
+            TaskInstance.wallclock,
+            TaskInstance.maxrss,
+            Node.id,
+            Task.id,
+            TaskResources.requested_resources,
         ).where(*query_filter)
         rows_raw = session.execute(sql).all()
         session.commit()
-    column_names = ("r", "m", "node_id", "task_id")
+    column_names = ("r", "m", "node_id", "task_id", "requested_resources")
     rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
     result = []
     if rows:
@@ -317,7 +323,7 @@ def get_task_template_resource_usage() -> Any:
 
                 def _calculate_ci(d: List, ci: float) -> List[Any]:
                     interval = st.t.interval(
-                        alpha=ci, df=len(d) - 1, loc=np.mean(d), scale=st.sem(d)
+                        confidence=ci, df=len(d) - 1, loc=np.mean(d), scale=st.sem(d)
                     )
                     return [round(float(interval[0]), 2), round(float(interval[1]), 2)]
 
@@ -492,18 +498,24 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
     return resp
 
 
-@api_v1_blueprint.route("/tt_error_log_viz/<wf_id>/<tt_id>", methods=["GET"])
-@api_v2_blueprint.route("/tt_error_log_viz/<wf_id>/<tt_id>", methods=["GET"])
+@api_v1_blueprint.route(
+    "/tt_error_log_viz/<wf_id>/<tt_id>", methods=["GET"], defaults={"ti_id": None}
+)
+@api_v2_blueprint.route(
+    "/tt_error_log_viz/<wf_id>/<tt_id>", methods=["GET"], defaults={"ti_id": None}
+)
+@api_v2_blueprint.route("/tt_error_log_viz/<wf_id>/<tt_id>/<ti_id>", methods=["GET"])
 @cross_origin()
-def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
+def get_tt_error_log_viz(tt_id: int, wf_id: int, ti_id: Optional[int]) -> Any:
     """Get the error logs for a task template id for GUI."""
     return_list: List[Any] = []
-
     arguments = request.args
     page = int(arguments.get("page", 1))
     page_size = int(arguments.get("page_size", 10))
     just_recent_errors = arguments.get("just_recent_errors", "false")
+    cluster_errors = arguments.get("cluster_errors", "false")
     recent_errors = just_recent_errors.lower() == "true"
+    output_clustered_errors = cluster_errors.lower() == "true"
     offset = (page - 1) * page_size
 
     session = SessionLocal()
@@ -531,6 +543,12 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
                         .correlate(Task)
                         .scalar_subquery()
                     ),
+                ]
+            )
+        if ti_id:
+            where_conditions.extend(
+                [
+                    (TaskInstance.id == ti_id),
                 ]
             )
 
@@ -597,9 +615,10 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
             )
             .where(*where_conditions)
             .order_by(TaskInstanceErrorLog.id.desc())
-            .offset(offset)
-            .limit(page_size)
         )
+
+        if not output_clustered_errors:
+            sql = sql.offset(offset).limit(page_size)
 
         rows = session.execute(sql).all()
         session.commit()
@@ -619,13 +638,26 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int) -> Any:
         )
     errors_df = pd.DataFrame(return_list)
 
-    resp = jsonify(
-        {
-            "error_logs": errors_df.to_dict(orient="records"),
-            "total_count": total_count,
-            "page": page,
-            "page_size": page_size,
-        }
-    )
+    if output_clustered_errors:
+        if errors_df.shape[0] > 0:
+            errors_df = cluster_error_logs(errors_df)
+        total_count = errors_df.shape[0]
+        resp = jsonify(
+            {
+                "error_logs": errors_df.to_dict(orient="records"),
+                "total_count": total_count,
+                "page": page,
+                "page_size": page_size,
+            }
+        )
+    else:
+        resp = jsonify(
+            {
+                "error_logs": errors_df.to_dict(orient="records"),
+                "total_count": total_count,
+                "page": page,
+                "page_size": page_size,
+            }
+        )
     resp.status_code = 200
     return resp

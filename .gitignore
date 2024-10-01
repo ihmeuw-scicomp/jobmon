@@ -40,3 +40,4 @@ docsource/api
 .idea/
 
 /jobmon_gui/node_modules/
+/corpora/

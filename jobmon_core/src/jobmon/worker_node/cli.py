@@ -1,11 +1,16 @@
 """Command line interface for Execution."""
 
 import argparse
+import importlib
+import importlib.machinery
+import importlib.util
 import logging
+import os
 import sys
 from typing import Optional
 
 from jobmon.core.cli import CLI
+from jobmon.core.task_generator import TaskGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +27,7 @@ class WorkerNodeCLI(CLI):
 
         self._add_worker_node_job_parser()
         self._add_worker_node_array_parser()
+        self._add_run_task_generator_parser()
 
     def run_task_instance_job(self, args: argparse.Namespace) -> int:
         """Configuration for the jobmon worker node."""
@@ -78,6 +84,82 @@ class WorkerNodeCLI(CLI):
             sys.exit(ReturnCodes.WORKER_NODE_CLI_FAILURE)
 
         return worker_node_task_instance.command_returncode
+
+    def run_task_generator(self, args: argparse.Namespace) -> int:
+        from jobmon.core.exceptions import ReturnCodes
+
+        # Import the module and get the task generator we've been pointed to, raise an error
+        # if it's not a TaskGenerator
+        # if the user used the --module_dir flag, add the module directory to the path
+        if args.module_source_path:
+            # Create a module spec from the source file
+            loader = importlib.machinery.SourceFileLoader(
+                args.module_name, os.path.expanduser(args.module_source_path)
+            )
+            spec = importlib.util.spec_from_loader(loader.name, loader)
+            # Create a new module based on the spec
+            mod = importlib.util.module_from_spec(spec)  # type: ignore
+            # Add the module to sys.modules
+            sys.modules[args.module_name] = mod
+            loader.exec_module(mod)
+        else:
+            mod = importlib.import_module(args.module_name)
+        task_generator = getattr(mod, args.func_name)
+        if not isinstance(task_generator, TaskGenerator):
+            raise ValueError(
+                f"{args.module_name}:{args.func_name} doesn't point to a runnable jobmon task."
+            )
+
+        # if the user used the --arghelp flag, print the help message for the task generator
+        if args.arghelp:
+            print(task_generator.help())
+            return ReturnCodes.OK
+        try:
+            task_generator.run(args.args)
+            return ReturnCodes.OK
+        except Exception as e:
+            print(e)
+            raise e
+
+    def _add_run_task_generator_parser(self) -> None:
+        generator_parser = self._subparsers.add_parser("task_generator")
+        generator_parser.set_defaults(func=self.run_task_generator)
+        generator_parser.add_argument(
+            "--module_name",
+            help="name of the module containing the TaskGenerator",
+            required=True,
+        )
+        generator_parser.add_argument(
+            "--func_name",
+            type=str,
+            help="the name of the function which has been turned into a TaskGenerator",
+            required=True,
+        )
+        generator_parser.add_argument(
+            "--args",
+            type=str,
+            help="Followed by the key=value; .\n"
+            "For example: \n"
+            "If you method has two argument: def func(foo: int, bar: str), pass\n"
+            "    --args foo=1 --args bar='test'\n"
+            "If you method has two argument: def func(foo: int, bar: List[str), pass\n"
+            "    --args foo=1 --args bar=[a,b]\n",
+            required=False,
+            action="append",
+        )
+        generator_parser.add_argument(
+            "--arghelp",
+            type=str,
+            help="Show the help message for the task generator. For example: --arghelp",
+            required=False,
+        )
+        generator_parser.add_argument(
+            "--module_source_path",
+            type=str,
+            help="The directory the module source code located; "
+            "you do not need this if the module is installed in your system.",
+            required=False,
+        )
 
     def _add_worker_node_job_parser(self) -> None:
         job_parser = self._subparsers.add_parser("worker_node_job")

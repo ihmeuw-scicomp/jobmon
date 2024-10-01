@@ -1,2 +1,15 @@
 [run]
 relative_files = true
+
+[report]
+omit =
+    */tests/*
+    */venv/*
+    */.tox/*
+    */.local/*
+    */.pyenv/*
+    */.venv/*
+    */.env/*
+    */.git/*
+    */.github/*
+    */.vscode/*

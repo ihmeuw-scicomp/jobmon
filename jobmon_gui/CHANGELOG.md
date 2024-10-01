@@ -9,6 +9,53 @@ All notable changes to the Jobmon GUI will be documented in this file.
 ### Deprecated
 ### Removed
 
+## [3.3.1] - 2024-10-01
+
+### User-Facing
+#### Changed
+- Switched from a histogram to a boxplot for resource usage on the `Workflow Details` page.
+- Now show both WF ID and WF name on `Workflow Details` page, instead of just ID.
+- Changed Squid link to point to new SlurmTool `Job Info` page.
+
+#### Added
+- Added a boxplot to the resource usage tab that shows the utilization vs. the requested resource (%).
+
+#### Fixed
+- Fixed a bug where the status date in the Task table on the Workflow Details page was showing in UTC instead of PDT/PST.
+- Fixed a bug where the runtime and memory histograms weren't showing any values.
+- Fixed a bug where clustered errors would only show a max of 10 errors.
+- Fixed a bug where "Invalid Date" showed in the workflow information modal on the landing page.
+- Fixed a bug where concurrency limit would show as "false" for any value that wasn't "No Limit".
+- Added syntax highlighting and new lines for error log messages.
+- Fixed a bug where the database connection information wasn't templating on the `jobmon_at_ihme` page.
+
+#### Removed
+- No longer show field names on landing page. Was `ID: <wf_ID> - Name: <wf_name>`, now `<wf_id> - <wf_name>`.
+
+## [3.3.0] - 2024-09-10
+
+### User-Facing
+#### Added
+- Added a `Clustered Errors` table to the `Workflow Details` page.
+- Added a modal that shows users the details of their clustered errors.
+- Workflow submitted date end time filter to `Workflow Overview` page.
+
+#### Changed
+- Removed table from `Workflow Overview` page; now show a list of progress bars with information buttons.
+- Changed look of filters on `Workflow Overview` page.
+- Changed the Task and TaskInstance tables to use the `react-material-table` component.
+- Persist users' filters on `Workflow Overview` page.
+
+#### Fixed
+- Fixed bug where workflow elapsed time was wrong. It's now workflow status date - workflow submitted date.
+
+#### Removed
+- Removed `Errors` tab on `Workflow Details` page; information is now on `Errors and Tasks` tab.
+
+### Developer
+#### Changed
+- Added zustand store to filters on `Workflow Overview` page.
+
 ## [1.14.0] - 2024-06-07
 ### User-Facing
 #### Added
@@ -16,11 +63,11 @@ All notable changes to the Jobmon GUI will be documented in this file.
 - Added a new resources column to the TaskInstance table on the `Task Details` page that shows the requested and 
 utilized resources.
 - Users are now able to filter their workflows by both workflow attribute key and workflow attribute value on the 
-`Workflow Overview` page
+`Workflow Overview` page.
 
 #### Fixed
 - Fixed bug in the breadcrumb navigation where the buttons would occasionally take users to the wrong page
-- Fixed bug where it shows "No Workflows Found" even if no filters were passed
+- Fixed bug where it shows "No Workflows Found" even if no filters were passed.
 
 #### Changed 
 - Default to showing only Workflows that were submitted in the last two weeks on the `Workflow Overview` page.
@@ -35,7 +82,7 @@ modal when clicked.
 - Change file structure to include assets, components, configs, screens, styles, and utils folders.
 - Switched to Vite for local development server.
 - Changed import paths to be relative instead of absolute.
-- Show Jobmon GUI version number on the bottom of left of GUI
+- Show Jobmon GUI version number on the bottom of left of GUI.
 
 ## [1.13.0] - 2023-10-11
 ### Changed
