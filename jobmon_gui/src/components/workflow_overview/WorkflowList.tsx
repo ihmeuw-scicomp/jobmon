@@ -185,7 +185,7 @@ export default function WorkflowList() {
                                         primary={
                                             <Typography variant="h6">
                                                 <Link to={`/workflow/${workflow.wf_id}/tasks${location.search}`}>
-                                                    ID: {workflow.wf_id} - Name: {workflow.wf_name}
+                                                    {workflow.wf_id} - {workflow.wf_name}
                                                 </Link>
                                             </Typography>
                                         }

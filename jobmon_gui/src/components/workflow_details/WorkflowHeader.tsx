@@ -24,32 +24,28 @@ export default function WorkflowHeader({
                                        }) {
     const [showWFInfo, setShowWFInfo] = useState(false)
 
+    const statusIcons = {
+        A: {icon: <IoMdCloseCircleOutline/>, className: 'icon-aa'},
+        D: {icon: <AiFillCheckCircle/>, className: 'icon-dd'},
+        F: {icon: <IoMdCloseCircle/>, className: 'icon-ff'},
+        G: {icon: <AiFillSchedule/>, className: 'icon-pp'},
+        H: {icon: <TbHandStop/>, className: 'icon-aa'},
+        I: {icon: <AiFillSchedule/>, className: 'icon-pp'},
+        O: {icon: <HiRocketLaunch/>, className: 'icon-ss'},
+        Q: {icon: <AiFillSchedule/>, className: 'icon-pp'},
+        R: {icon: <BiRun/>, className: 'icon-rr'},
+    };
+
+    const {icon, className} = statusIcons[wf_status] || {};
+
     return (
         <header className="App-header">
             <div style={{display: 'flex', alignItems: 'center'}}>
-                {wf_status === 'A' ? (
-                    <p><span className="icon-aa"><IoMdCloseCircleOutline/></span>Workflow ID: {wf_id}</p>
-                ) : wf_status === 'D' ? (
-                    <p><span className="icon-dd"><AiFillCheckCircle/></span>Workflow ID: {wf_id}</p>
-                ) : wf_status === 'F' ? (
-                    <p><span className="icon-ff"><IoMdCloseCircle/></span>Workflow ID: {wf_id}</p>
-                ) : wf_status === 'G' ? (
-                    <p><span className="icon-pp"><AiFillSchedule/></span>Workflow ID: {wf_id}</p>
-                ) : wf_status === 'H' ? (
-                    <p><span className="icon-aa"><TbHandStop/></span>Workflow ID: {wf_id}</p>
-                ) : wf_status === 'I' ? (
-                    <p><span className="icon-pp"><AiFillSchedule/></span>Workflow ID: {wf_id}</p>
-                ) : wf_status === 'O' ? (
-                    <p><span className="icon-ss"><HiRocketLaunch/></span>Workflow ID: {wf_id}</p>
-                ) : wf_status === 'Q' ? (
-                    <p><span className="icon-pp"><AiFillSchedule/></span>Workflow ID: {wf_id}</p>
-                ) : wf_status === 'R' ? (
-                    <p><span className="icon-rr"><BiRun/></span>Workflow ID: {wf_id}</p>
-                ) : (
-                    <p>Workflow ID: {wf_id}</p>
-                )}
-
-                <span style={{ transform: 'translateY(-5px)' }}>
+                <p>
+                    {icon && <span className={className}>{icon}</span>}
+                    {wf_id} - {wf_name}
+                </p>
+                <span style={{transform: 'translateY(-5px)', paddingLeft: '10px'}}>
                     <HiInformationCircle onClick={() => setShowWFInfo(true)}/>
                 </span>
             </div>

@@ -1,10 +1,9 @@
-import React, {useEffect} from 'react';
-import MemoryHistogram from '@jobmon_gui/components/workflow_details/MemoryHistogram';
-import RuntimeHistogram from '@jobmon_gui/components/workflow_details/RuntimeHistogram';
+import React from 'react';
+import MemoryBoxPlot from '@jobmon_gui/components/workflow_details/MemoryBoxPlot';
+import RuntimeBoxPlot from '@jobmon_gui/components/workflow_details/RuntimeBoxPlot';
 import {formatBytes, bytes_to_gib} from '@jobmon_gui/utils/formatters'
-import {safe_rum_start_span, safe_rum_unit_end} from '@jobmon_gui/utils/rum'
 import humanizeDuration from 'humanize-duration';
-import {task_table_url, usage_url} from "@jobmon_gui/configs/ApiUrls";
+import {usage_url} from "@jobmon_gui/configs/ApiUrls";
 import {useQuery} from "@tanstack/react-query";
 import axios from "axios";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
@@ -41,11 +40,30 @@ export default function Usage({taskTemplateName, taskTemplateVersionId, workflow
     for (var item in run_mem) {
         var run = run_mem[item].r
         var mem = run_mem[item].m
+        var taskId = run_mem[item].task_id;
+        var requestedResources = run_mem[item].requested_resources ? JSON.parse(run_mem[item].requested_resources) : {};
+        // Default time in Jobmon is 24 hours
+        var requestedRuntimeValue = requestedResources.runtime || 86400;
+        // Default time in Jobmon is 1GiB
+        var requestedMemoryValue = requestedResources.memory || 1;
+
         if (run !== null && run !== 0 && run !== "0") {
-            runtime.push(run)
+            var percentageRuntime = (run / requestedRuntimeValue) * 100;
+            runtime.push({
+                task_id: taskId,
+                runtime: run,
+                percentageRuntime: percentageRuntime,
+                requestedRuntime: requestedRuntimeValue
+            })
         }
         if (mem !== null && mem !== 0 && mem !== "0") {
-            memory.push(bytes_to_gib(mem))
+            var percentageMemory = (bytes_to_gib(mem) / requestedMemoryValue) * 100;
+            memory.push({
+                task_id: taskId,
+                memory: bytes_to_gib(mem),
+                percentageMemory: percentageMemory,
+                requestedMemory: requestedMemoryValue
+            })
         }
     }
 
@@ -98,10 +116,10 @@ export default function Usage({taskTemplateName, taskTemplateVersionId, workflow
                 </div>
             </div>
             <div className="center-histogram">
-                <MemoryHistogram taskMemory={memory}/>
+                <MemoryBoxPlot taskMemory={memory}/>
             </div>
             <div className="center-histogram">
-                <RuntimeHistogram taskRuntime={runtime}/>
+                <RuntimeBoxPlot taskRuntime={runtime}/>
             </div>
         </div>
     )

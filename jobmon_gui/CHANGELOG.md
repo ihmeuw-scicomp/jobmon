@@ -9,9 +9,17 @@ All notable changes to the Jobmon GUI will be documented in this file.
 ### Deprecated
 ### Removed
 
-## [3.3.1] -TBD
+## [3.3.1] - 2024-10-01
 
 ### User-Facing
+#### Changed
+- Switched from a histogram to a boxplot for resource usage on the `Workflow Details` page.
+- Now show both WF ID and WF name on `Workflow Details` page, instead of just ID.
+- Changed Squid link to point to new SlurmTool `Job Info` page.
+
+#### Added
+- Added a boxplot to the resource usage tab that shows the utilization vs. the requested resource (%).
+
 #### Fixed
 - Fixed a bug where the status date in the Task table on the Workflow Details page was showing in UTC instead of PDT/PST.
 - Fixed a bug where the runtime and memory histograms weren't showing any values.
@@ -20,6 +28,9 @@ All notable changes to the Jobmon GUI will be documented in this file.
 - Fixed a bug where concurrency limit would show as "false" for any value that wasn't "No Limit".
 - Added syntax highlighting and new lines for error log messages.
 - Fixed a bug where the database connection information wasn't templating on the `jobmon_at_ihme` page.
+
+#### Removed
+- No longer show field names on landing page. Was `ID: <wf_ID> - Name: <wf_name>`, now `<wf_id> - <wf_name>`.
 
 ## [3.3.0] - 2024-09-10
 
