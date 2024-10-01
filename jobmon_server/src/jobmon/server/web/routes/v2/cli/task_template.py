@@ -232,7 +232,7 @@ def get_task_template_resource_usage() -> Any:
             TaskTemplateVersion.id == Node.task_template_version_id,
             Node.id == Task.node_id,
             Task.id == TaskInstance.task_id,
-            Task.task_resources_id == TaskResources.id
+            Task.task_resources_id == TaskResources.id,
         ]
         if workflows:
             query_filter += [
@@ -241,7 +241,11 @@ def get_task_template_resource_usage() -> Any:
                 Workflow.id.in_(workflows),
             ]
         sql = select(
-            TaskInstance.wallclock, TaskInstance.maxrss, Node.id, Task.id, TaskResources.requested_resources
+            TaskInstance.wallclock,
+            TaskInstance.maxrss,
+            Node.id,
+            Task.id,
+            TaskResources.requested_resources,
         ).where(*query_filter)
         rows_raw = session.execute(sql).all()
         session.commit()
