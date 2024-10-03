@@ -170,7 +170,7 @@ class SerializeTaskInstanceErrorLog:
         task_instance_error_log_id: int, error_time: datetime, description: str
     ) -> tuple:
         """Submit the args for an SerializeTaskInstanceErrorLog object to the database."""
-        return task_instance_error_log_id, error_time, description
+        return task_instance_error_log_id, str(error_time), description
 
     @staticmethod
     def kwargs_from_wire(wire_tuple: tuple) -> dict:

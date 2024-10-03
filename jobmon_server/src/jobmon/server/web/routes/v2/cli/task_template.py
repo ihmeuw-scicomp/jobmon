@@ -412,8 +412,8 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
         # Has to be conditional since not all database engines support STRAIGHT_JOIN.
         if (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+            and SessionLocal.bind  # type: ignore
+            and SessionLocal.bind.dialect.name == "mysql"  # type: ignore
         ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         rows = session.execute(sql).all()
@@ -446,8 +446,8 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
         )
         if (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+            and SessionLocal.bind  # type: ignore
+            and SessionLocal.bind.dialect.name == "mysql"  # type: ignore
         ):
             sql = sql.prefix_with("STRAIGHT_JOIN")
         attempts0 = session.execute(sql).all()

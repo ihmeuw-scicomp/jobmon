@@ -24,6 +24,8 @@ dependencies = [
     'grpcio<=1.64.1',
     'docutils',
     'sphinx',
+    'opentelemetry-api',
+    'opentelemetry-sdk',
 ]
 dynamic = ["version"]
 
@@ -37,6 +39,7 @@ otlp = [
     'opentelemetry-api',
     'opentelemetry-sdk',
     'opentelemetry-instrumentation',
+    'opentelemetry-instrumentation-fastapi',
     'opentelemetry-instrumentation-requests',
     'opentelemetry-exporter-otlp'
 ]

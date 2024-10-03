@@ -6,7 +6,11 @@ import importlib.machinery
 
 from typing import Optional
 
-from jobmon.core.task_generator import task_generator, TaskGeneratorModuleDocumenter, TaskGeneratorDocumenter
+from jobmon.core.task_generator import (
+    task_generator,
+    TaskGeneratorModuleDocumenter,
+    TaskGeneratorDocumenter,
+)
 from jobmon.client.api import Tool
 
 # Get the full path of the current script
@@ -45,7 +49,8 @@ def simple_tasks_seq() -> None:
             cluster_name="sequential",
             compute_resources=compute_resources,
             foo=i,
-            bar=["a a", "b\"c\"b"])
+            bar=["a a", 'b"c"b'],
+        )
         wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
@@ -72,7 +77,8 @@ def simple_tasks_slurm() -> None:
             cluster_name="slurm",
             compute_resources=compute_resources,
             foo=i,
-            bar=["a", "b"])
+            bar=["a", "b"],
+        )
         wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
@@ -144,9 +150,7 @@ def simple_tasks_serializer_slurm_src() -> None:
     simple_function = task_generator_funcs.simple_function_with_serializer_rsc
     test_year = task_generator_funcs.TestYear
     for i in range(2020, 2024):
-        task = simple_function.create_task(
-           year=test_year(i)
-        )
+        task = simple_function.create_task(year=test_year(i))
         wf.add_tasks([task])
     r = wf.run(configure_logging=True)
     assert r == "D"
@@ -168,7 +172,9 @@ def simple_tasks_array() -> None:
     task_generator_funcs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.simple_function
-    tasks = simple_function.create_tasks(compute_resources=compute_resources, foo=[1, 2], bar=[["a", "b"]])
+    tasks = simple_function.create_tasks(
+        compute_resources=compute_resources, foo=[1, 2], bar=[["a", "b"]]
+    )
     wf.add_tasks(tasks)
     r = wf.run(configure_logging=True)
     assert r == "D"
@@ -192,8 +198,8 @@ def simple_tasks_serializer_array() -> None:
     simple_function = task_generator_funcs.simple_function_with_serializer
     test_year = task_generator_funcs.TestYear
     tasks = simple_function.create_tasks(
-            compute_resources=compute_resources, year=[test_year(2023), test_year(2024)]
-        )
+        compute_resources=compute_resources, year=[test_year(2023), test_year(2024)]
+    )
     wf.add_tasks(tasks)
     r = wf.run(configure_logging=True)
     assert r == "D"
@@ -215,7 +221,9 @@ def special_char_tasks_serializer_seq() -> None:
     task_generator_funcs = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(task_generator_funcs)
     simple_function = task_generator_funcs.special_chars_function
-    task = simple_function.create_task(compute_resources=compute_resources, foo=f"\'aaa\'")
+    task = simple_function.create_task(
+        compute_resources=compute_resources, foo=f"'aaa'"
+    )
     wf.add_task(task)
     r = wf.run(configure_logging=True)
     assert r == "D"
@@ -223,8 +231,8 @@ def special_char_tasks_serializer_seq() -> None:
 
 ## ------------FHS tests-----------------
 spec = importlib.util.spec_from_file_location(
-        "task_generator_fhs", fhs_generator_funcs_path
-    )
+    "task_generator_fhs", fhs_generator_funcs_path
+)
 task_generator_fhs = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(task_generator_fhs)
 YearRange = task_generator_fhs.YearRange
@@ -239,16 +247,29 @@ quantiles_to_list = task_generator_fhs.quantiles_to_list
 quantiles_from_list = task_generator_fhs.quantiles_from_list
 
 fhs_serializer = {
-        YearRange: (str, YearRange.parse_year_range),
-        Versions: (versions_to_list, versions_from_list),
-        FHSFileSpec: (str, FHSFileSpec.parse),
-        FHSDirSpec: (str, FHSDirSpec.parse),
-        VersionMetadata: (str, VersionMetadata.parse_version),
-        Quantiles: (quantiles_to_list, quantiles_from_list),
-    }
+    YearRange: (str, YearRange.parse_year_range),
+    Versions: (versions_to_list, versions_from_list),
+    FHSFileSpec: (str, FHSFileSpec.parse),
+    FHSDirSpec: (str, FHSDirSpec.parse),
+    VersionMetadata: (str, VersionMetadata.parse_version),
+    Quantiles: (quantiles_to_list, quantiles_from_list),
+}
 
-@task_generator(tool_name="test_tool", naming_args=["version"], serializers=fhs_serializer, module_source_path=fhs_generator_funcs_path)
-def fhs_simple_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDirSpec, vm: VersionMetadata, q: Optional[Quantiles]) -> None:
+
+@task_generator(
+    tool_name="test_tool",
+    naming_args=["version"],
+    serializers=fhs_serializer,
+    module_source_path=fhs_generator_funcs_path,
+)
+def fhs_simple_function(
+    yr: YearRange,
+    v: Versions,
+    fSpec: FHSFileSpec,
+    dSpec: FHSDirSpec,
+    vm: VersionMetadata,
+    q: Optional[Quantiles],
+) -> None:
     """Simple task_function."""
     print(f"YearRange: {yr}")
     print(f"Version: {v}")
@@ -269,14 +290,14 @@ def fhs_seq():
     # Import the task_generator_funcs.py module
 
     task = fhs_simple_function.create_task(
-            compute_resources=compute_resources,
-            yr=YearRange(2020, 2021),
-            v=Versions("1.0", "2.0"),
-            fSpec=FHSFileSpec("/path/to/file"),
-            dSpec=FHSDirSpec("/path/to/dir"),
-            vm=VersionMetadata("1.0"),
-            q=Quantiles(0.1, 0.9)
-        )
+        compute_resources=compute_resources,
+        yr=YearRange(2020, 2021),
+        v=Versions("1.0", "2.0"),
+        fSpec=FHSFileSpec("/path/to/file"),
+        dSpec=FHSDirSpec("/path/to/dir"),
+        vm=VersionMetadata("1.0"),
+        q=Quantiles(0.1, 0.9),
+    )
     wf.add_tasks([task])
     s = wf.run(configure_logging=True)
     assert s == "D"
@@ -292,13 +313,13 @@ def fhs_slurm():
     # Import the task_generator_funcs.py module
 
     task = fhs_simple_function.create_task(
-            compute_resources=compute_resources,
-            yr=YearRange(2020, 2021),
-            v=Versions("1.0", "2.0"),
-            fSpec=FHSFileSpec("/path/to/file"),
-            dSpec=FHSDirSpec("/path/to/dir"),
-            vm=VersionMetadata("1.0"),
-        )
+        compute_resources=compute_resources,
+        yr=YearRange(2020, 2021),
+        v=Versions("1.0", "2.0"),
+        fSpec=FHSFileSpec("/path/to/file"),
+        dSpec=FHSDirSpec("/path/to/dir"),
+        vm=VersionMetadata("1.0"),
+    )
     wf.add_tasks([task])
     s = wf.run(configure_logging=True)
     assert s == "D"
@@ -311,14 +332,14 @@ def fhs_slurmz_rsc():
     # Import the task_generator_funcs.py module
 
     task = fhs_simple_function.create_task(
-            cluster_name="slurm",
-            compute_resources=compute_resources,
-            yr=YearRange(2020, 2021),
-            v=Versions("1.0", "2.0"),
-            fSpec=FHSFileSpec("/path/to/file"),
-            dSpec=FHSDirSpec("/path/to/dir"),
-            vm=VersionMetadata("1.0"),
-        )
+        cluster_name="slurm",
+        compute_resources=compute_resources,
+        yr=YearRange(2020, 2021),
+        v=Versions("1.0", "2.0"),
+        fSpec=FHSFileSpec("/path/to/file"),
+        dSpec=FHSDirSpec("/path/to/dir"),
+        vm=VersionMetadata("1.0"),
+    )
     wf.add_tasks([task])
     s = wf.run(configure_logging=True)
     assert s == "D"
@@ -355,6 +376,7 @@ def main():
         simple_tasks_serializer_slurm_src()
     else:
         simple_tasks_seq()
+
 
 if __name__ == "__main__":
     main()

@@ -194,8 +194,8 @@ def _upsert_wf_attribute(
         wf_attrib_id = _add_or_get_wf_attribute_type(name, session)
         if (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+            and SessionLocal.bind  # type: ignore
+            and SessionLocal.bind.dialect.name == "mysql"  # type: ignore
         ):
             insert_vals1 = mysql_insert(WorkflowAttribute).values(
                 workflow_id=workflow_id,
@@ -207,8 +207,8 @@ def _upsert_wf_attribute(
             )
         elif (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "sqlite"
+            and SessionLocal.bind  # type: ignore
+            and SessionLocal.bind.dialect.name == "sqlite"  # type: ignore
         ):
             insert_vals2: sqlalchemy.dialects.sqlite.dml.Insert = sqlite_insert(
                 WorkflowAttribute

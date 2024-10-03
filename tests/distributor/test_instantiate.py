@@ -29,7 +29,10 @@ def test_instantiate_job(tool, db_engine, task_template):
     workflow = tool.create_workflow(name="test_instantiate_queued_jobs_on_sequential")
     workflow.add_tasks([t1, t2])
     workflow.bind()
+    assert workflow.workflow_id is not None
     workflow._bind_tasks()
+    assert t1.task_id is not None
+    assert t2.task_id is not None
     factory = WorkflowRunFactory(workflow.workflow_id)
     wfr = factory.create_workflow_run()
 

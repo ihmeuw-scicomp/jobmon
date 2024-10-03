@@ -14,7 +14,9 @@ def test_repr_strings(tool, task_template):
 
     wf.add_task(task)
     wf.bind()
+    assert wf.workflow_id is not None
     wf._bind_tasks()
+    assert task.task_id is not None
     wfr = WorkflowRun(wf.workflow_id)
     wfr.bind()
 

@@ -168,7 +168,7 @@ class Requester(object):
     ) -> Tuple[int, Any]:
         # construct url
         route = self.url + app_route
-        logger.debug(f"Route: {route}, message: {message}")
+        logger.info(f"Route: {route}, message: {message}")
 
         if request_type in ["post", "put"]:
             message["server_structlog_context"] = self.server_structlog_context

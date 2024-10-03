@@ -33,6 +33,7 @@ def test_workflow_run_bind(tool, task_template, requester_no_retry):
     t1 = task_template.create_task(arg="sleep 1")
     wf.add_tasks([t1])
     wf.bind()
+    assert wf.workflow_id is not None
 
     # Tasks not bound yet, therefore workflow has not logged created_date.
     # Ensure workflowrun bind fails with not resumable
@@ -45,6 +46,7 @@ def test_workflow_run_bind(tool, task_template, requester_no_retry):
 
     # bind tasks, try again
     wf._bind_tasks()
+    assert t1.task_id is not None
     wfr = factory.create_workflow_run()
     assert wfr.status == WorkflowRunStatus.LINKING
 
@@ -83,7 +85,9 @@ def test_task_resources_conversion(tool, task_template):
 
     # Check the workflow can still bind
     wf1.bind()
+    assert wf1.workflow_id is not None
     wf1._bind_tasks()
+    assert t1.task_id is not None
     task_resources = list(wf1._task_resources.values())[0]
     assert task_resources.requested_resources["memory"] == 20
     assert task_resources.queue.queue_name == "null.q"

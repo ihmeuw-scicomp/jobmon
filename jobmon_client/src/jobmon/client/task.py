@@ -530,4 +530,4 @@ class Task:
                 f"request through route {app_route}. Expected code "
                 f"200. Response content: {response}"
             )
-        return SerializeTaskResourceUsage.kwargs_from_wire(response)
+        return SerializeTaskResourceUsage.kwargs_from_wire(response["resource_usage"])
