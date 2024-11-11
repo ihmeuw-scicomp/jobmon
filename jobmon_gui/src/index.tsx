@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom/client';
 import WorkflowOverview from '@jobmon_gui/screens/WorkflowOverview';
 import {
     HashRouter,
-    Routes,
     Route,
 } from "react-router-dom";
 import WorkflowDetails from '@jobmon_gui/screens/WorkflowDetails'
