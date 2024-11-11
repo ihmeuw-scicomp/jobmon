@@ -8,6 +8,7 @@ from flask import jsonify, request
 from flask_cors import cross_origin
 import pandas as pd
 from sqlalchemy import (
+    and_,
     func,
     Select,
     select,
@@ -82,10 +83,10 @@ def get_workflow_validation_status() -> Any:
     res = [ti[1] for ti in rows]
     # Validate if all tasks are in the same workflow and the workflow status is dead
     if len(res) == 1 and res[0] in (
-        Statuses.FAILED,
-        Statuses.DONE,
-        Statuses.ABORTED,
-        Statuses.HALTED,
+            Statuses.FAILED,
+            Statuses.DONE,
+            Statuses.ABORTED,
+            Statuses.HALTED,
     ):
         validation = True
     else:
@@ -382,10 +383,10 @@ def get_workflow_status() -> Any:
             df[col + "_pct"] = (df[col].astype(float) / df["TASKS"].astype(float)) * 100
             df[col + "_pct"] = df[[col + "_pct"]].round(1)
             df[col] = (
-                df[col].astype(int).astype(str)
-                + " ("
-                + df[col + "_pct"].astype(str)
-                + "%)"
+                    df[col].astype(int).astype(str)
+                    + " ("
+                    + df[col + "_pct"].astype(str)
+                    + "%)"
             )
 
         # df.replace(to_replace={"0 (0.0%)": "NA"}, inplace=True)
@@ -664,6 +665,15 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
     """Fetch name, args, dates, tool for a Workflow provided WF ID."""
     session = SessionLocal()
     with session.begin():
+        latest_workflow_run_subquery = (
+            session.query(
+                WorkflowRun.workflow_id,
+                func.max(WorkflowRun.heartbeat_date)
+            )
+            .group_by(WorkflowRun.workflow_id)
+            .subquery()
+        )
+
         sql = select(
             Workflow.name,
             Workflow.workflow_args,
@@ -673,12 +683,21 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
             Workflow.status,
             WorkflowStatus.description,
             WorkflowRun.jobmon_version,
+            WorkflowRun.heartbeat_date,
+        ).select_from(
+            Workflow
+        ).join(
+            ToolVersion, Workflow.tool_version_id == ToolVersion.id
+        ).join(
+            Tool, ToolVersion.tool_id == Tool.id
+        ).join(
+            WorkflowStatus, WorkflowStatus.id == Workflow.status
+        ).join(
+            WorkflowRun, WorkflowRun.workflow_id == Workflow.id
+        ).join(
+            latest_workflow_run_subquery,
         ).where(
             Workflow.id == workflow_id,
-            Workflow.tool_version_id == ToolVersion.id,
-            ToolVersion.tool_id == Tool.id,
-            WorkflowStatus.id == Workflow.status,
-            WorkflowRun.workflow_id == Workflow.id,
         )
         rows = session.execute(sql).all()
 
@@ -691,6 +710,7 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
         "wf_status",
         "wf_status_desc",
         "wfr_jobmon_version",
+        "wfr_heartbeat_date",
     )
 
     result = [dict(zip(column_names, row)) for row in rows]
