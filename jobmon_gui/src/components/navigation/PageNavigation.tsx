@@ -203,7 +203,7 @@ export default function PageNavigation({children}: PropsWithChildren) {
                         </ListItemButton>
                     </Tooltip>
                 </ListItem>
-                <ListItem key={"drawerHelp"} disablePadding>
+                <ListItem key={"drawerDocumentation"} disablePadding>
                     <Tooltip title={open ? "" : "Documentation"} placement="right">
                         <ListItemButton href={readTheDocsUrl} target={"_blank"}>
                             <ListItemIcon>
