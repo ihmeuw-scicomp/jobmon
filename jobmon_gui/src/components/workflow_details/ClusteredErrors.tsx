@@ -16,6 +16,7 @@ import IconButton from "@mui/material/IconButton";
 import {useTaskTableColumnsStore} from "@jobmon_gui/stores/task_table";
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import HtmlTooltip from "@jobmon_gui/components/HtmlToolTip";
+import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
 
 type ClusteredErrorsProps = {
     taskTemplateId: string | number
@@ -47,6 +48,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
     const queryClient = useQueryClient()
     const taskTableColumnFilters = useTaskTableColumnsStore()
     const [errorDetailIndex, setErrorDetailIndex] = useState<boolean | ErrorSampleModalDetails>(false)
+    const [language, setLanguage] = useState('python');
     const errors = useQuery({
         queryKey: ["workflow_details", "clustered_errors", workflowId, taskTemplateId],
         queryFn: async () => {
@@ -205,6 +207,11 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
             sample_index: errorDetailIndex.sample_index - 1
         })
     }
+
+    const toggleLanguage = () => {
+        setLanguage(prevLang => (prevLang === 'python' ? 'r' : 'python'));
+    };
+
     const modalChildren = () => {
         if (errorDetails.isLoading) {
             return (<CircularProgress/>)
@@ -267,15 +274,23 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
 
                         <Grid item xs={12}><Typography sx={labelStyles}>Error Message:</Typography></Grid>
                         <Grid item xs={12}>
+                            <Button onClick={toggleLanguage}>
+                                {language === 'python' ?
+                                    'Switch to R Syntax Highlighting' : 'Switch to Python Syntax Highlighting'}
+                            </Button>
                             <ScrollableCodeBlock>
-                                {error.error}
+                                <SyntaxHighlighter language={language}>
+                                    {error.error}
+                                </SyntaxHighlighter>
                             </ScrollableCodeBlock>
                         </Grid>
 
                         <Grid item xs={12}><Typography sx={labelStyles}>Task Instance stderr:</Typography></Grid>
                         <Grid item xs={12}>
                             <ScrollableCodeBlock>
-                                {error.task_instance_stderr_log || "No stderr output found"}
+                                <SyntaxHighlighter language={language}>
+                                    {error.task_instance_stderr_log || "No stderr output found"}
+                                </SyntaxHighlighter>
                             </ScrollableCodeBlock>
                         </Grid>
                     </Grid>

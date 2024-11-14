@@ -232,6 +232,7 @@ def get_task_template_resource_usage() -> Any:
             TaskTemplateVersion.id == Node.task_template_version_id,
             Node.id == Task.node_id,
             Task.id == TaskInstance.task_id,
+            Task.task_resources_id == TaskResources.id,
         ]
         if workflows:
             query_filter += [
@@ -240,11 +241,15 @@ def get_task_template_resource_usage() -> Any:
                 Workflow.id.in_(workflows),
             ]
         sql = select(
-            TaskInstance.wallclock, TaskInstance.maxrss, Node.id, Task.id
+            TaskInstance.wallclock,
+            TaskInstance.maxrss,
+            Node.id,
+            Task.id,
+            TaskResources.requested_resources,
         ).where(*query_filter)
         rows_raw = session.execute(sql).all()
         session.commit()
-    column_names = ("r", "m", "node_id", "task_id")
+    column_names = ("r", "m", "node_id", "task_id", "requested_resources")
     rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
     result = []
     if rows:
@@ -610,9 +615,10 @@ def get_tt_error_log_viz(tt_id: int, wf_id: int, ti_id: Optional[int]) -> Any:
             )
             .where(*where_conditions)
             .order_by(TaskInstanceErrorLog.id.desc())
-            .offset(offset)
-            .limit(page_size)
         )
+
+        if not output_clustered_errors:
+            sql = sql.offset(offset).limit(page_size)
 
         rows = session.execute(sql).all()
         session.commit()

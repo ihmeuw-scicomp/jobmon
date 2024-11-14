@@ -21,17 +21,14 @@ or
     :widths: auto
     :align: left
 
-    ===================  =================== ================================================
+    ===================  =================== ==========================================================================================
     Parameter             Type                Description
-    ===================  =================== ================================================
-    serializers          Dict                 A dict of {type: callable} to
-                                              serialize the input parameters.
-    naming_args          Optional[List[str]]  The args used to name the task.
-                                              Does not apply to array tasks.
+    ===================  =================== ==========================================================================================
+    serializers          Dict                 A dict of {type: callable} to serialize the input parameters.
+    naming_args          Optional[List[str]]  The args used to name the task. Does not apply to array tasks.
     max_attempts         Optional[int]        The maximum number of attempts to run the task.
-    module_source_path   Optional[str]        The path to the module source code if the module
-                                              is not in the current conda environment.
-    ===================  =================== =================================================
+    module_source_path   Optional[str]        The path to the module source code if the module is not in the current conda environment.
+    ===================  =================== ==========================================================================================
 
 *Examples*
 

@@ -185,7 +185,7 @@ export default function WorkflowList() {
                                         primary={
                                             <Typography variant="h6">
                                                 <Link to={`/workflow/${workflow.wf_id}/tasks${location.search}`}>
-                                                    ID: {workflow.wf_id} - Name: {workflow.wf_name}
+                                                    {workflow.wf_id} - {workflow.wf_name}
                                                 </Link>
                                             </Typography>
                                         }
@@ -241,10 +241,6 @@ export default function WorkflowList() {
                         <Grid item xs={8}>
                             <Typography
                                 sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date)}</Typography>
-                        </Grid>
-                        <Grid item xs={8}>
-                            <Typography
-                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date_end)}</Typography>
                         </Grid>
                         <Grid item xs={4}>
                             <Typography sx={modalTitleStyles}>Status Date:</Typography>

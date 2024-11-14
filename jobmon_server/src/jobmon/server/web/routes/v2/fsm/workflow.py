@@ -16,6 +16,7 @@ from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.dag import Dag
 from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.models.task import Task
+from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.workflow import Workflow
@@ -507,5 +508,86 @@ def get_tasks_from_workflow(workflow_id: int) -> Any:
                 resp_dict[task_id].append(max_concurrently_running)
 
     resp = jsonify(tasks=resp_dict)
+    resp.status_code = StatusCodes.OK
+    return resp
+
+
+@api_v1_blueprint.route("/workflow/<workflow_id>/wf_resource_usage", methods=["GET"])
+@api_v2_blueprint.route("/workflow/<workflow_id>/wf_resource_usage", methods=["GET"])
+def get_wf_resource_usage(workflow_id: int) -> Any:
+    """Gets task instance resource usage for a given Workflow ID.
+
+    Args:
+        workflow_id (int): ID of the Workflow
+
+    Returns:
+        List[Dict[str, Any]]: A list of dictionaries containing the Task ID, name, status and
+        num of attempts and the TaskInstance ID, status and resource usage.
+
+    Example Call:
+        /workflow/123412/wf_resource_usage
+
+    Example Response:
+        [
+            {
+                "task_id": 6213741,
+                "task_name": "random_task_name",
+                "task_status": "D",
+                "task_num_attempts": 2,
+                "task_instance_id": 91823412,
+                "ti_usage_str": "wallclock=8 cpu=1, mem=7 GBs, io=5 GB"
+                "ti_wallclock": 8
+                "ti_maxrss": 7
+                "ti_maxpss": 5
+                "ti_cpu": 1
+                "ti_io": 5
+                "ti_status": "D"
+            }
+        ]
+
+    """
+    session = SessionLocal()
+    with session.begin():
+        sql = (
+            select(
+                Task.id,
+                Task.name,
+                Task.status,
+                Task.num_attempts,
+                TaskInstance.id,
+                TaskInstance.usage_str,
+                TaskInstance.wallclock,
+                TaskInstance.maxrss,
+                TaskInstance.maxpss,
+                TaskInstance.cpu,
+                TaskInstance.io,
+                TaskInstance.status,
+            )
+            .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+            .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
+            .where(Task.workflow_id == workflow_id)
+        )
+        results = session.execute(sql).all()
+
+    column_names = (
+        "task_id",
+        "task_name",
+        "task_status",
+        "task_num_attempts",
+        "task_instance_id",
+        "ti_usage_str",
+        "ti_wallclock",
+        "ti_maxrss",
+        "ti_maxpss",
+        "ti_cpu",
+        "ti_io",
+        "ti_status",
+    )
+
+    results_formatted: list[Dict[str, Any]] = [
+        dict(zip(column_names, result)) for result in results
+    ]
+
+    resp = jsonify(results_formatted)
     resp.status_code = StatusCodes.OK
     return resp

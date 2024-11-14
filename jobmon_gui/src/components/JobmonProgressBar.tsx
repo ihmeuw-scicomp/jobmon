@@ -96,7 +96,7 @@ export default function JobmonProgressBar({
 
     const num_attempts_avg = parseFloat(data.num_attempts_avg.toString()).toFixed(1);
     const INT_32_MAX = 2147483647
-    const maxc = data.MAXC === INT_32_MAX ? "No Limit" : data.MAXC === INT_32_MAX
+    const maxc = data.MAXC === INT_32_MAX ? "No Limit" : data.MAXC;
 
     // Animated
     if (style === "animated") {
