@@ -4,8 +4,6 @@ A GUI to visualize Jobmon Workflows.
 ## Overview
 This application uses React, Flask, and Bootstrap.
 
-The Jobmon GUI was originally created by create-react-app.
-
 ## Roadmap
 You can see the roadmap of the upcoming deployments here: https://hub.ihme.washington.edu/display/DataScience/Jobmon+GUI+Design+and+Initial+Roadmap
 
@@ -25,12 +23,10 @@ To deploy the Flask app locally:
 To deploy the React app locally:
 
 1. Open a new terminal
-2. Install npm
+2. Install bun
 3. Navigate to the jobmon_gui subdirectory
-4. Run `npm install`
-5. Run `npm start`
-
-Note: When running locally the React app uses the Webpack Dev Server to serve its assets.
+4. Run `bun install`
+5. Run `bun start`
 
 You can then access the site at: http://localhost:3000
 
