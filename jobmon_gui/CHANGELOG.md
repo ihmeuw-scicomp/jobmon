@@ -17,6 +17,8 @@ All notable changes to the Jobmon GUI will be documented in this file.
 
 #### Changed
 - Show WorkflowRun heartbeat_date instead of Workflow status_date on the workflow details page.
+- Truncate file paths in TaskInstance table of `Task Details` page.
+- Changed nav bar to match other apps.
 
 ### Developer
 #### Changed

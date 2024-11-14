@@ -8,10 +8,15 @@ import {Box} from "@mui/material";
 
 
 export default function TaskInstanceTable({taskInstanceData}) {
-    const [showStdoutModal, setShowStdoutModal] = useState(false)
-    const [showStderrModal, setShowStderrModal] = useState(false)
-    const [showResourcesModal, setShowResourcesModal] = useState(false)
-    const [showTIStatusModal, setShowTIStatusModal] = useState(false)
+    const [modalVisibility, setModalVisibility] = useState({
+        stdout: false,
+        stderr: false,
+        resources: false,
+        status: false,
+    });
+
+    const showModal = (modalName) => setModalVisibility({...modalVisibility, [modalName]: true});
+    const hideModal = (modalName) => setModalVisibility({...modalVisibility, [modalName]: false});
 
     // ti_stderr_log is pulled from task_instance.stderr_log, ti_error_log_description is pulled from task_instance_error_log.description
     const [rowDetail, setRowDetail] = useState({
@@ -22,59 +27,25 @@ export default function TaskInstanceTable({taskInstanceData}) {
     });
 
     function get_data_brief(data) {
-        let r: any = [];
-
-        for (let i in data) {
-            let e = data[i];
-            let stderr_display = e.ti_stderr_log
-            let stdout_display = e.ti_stdout_log
-
-            // Currently not using. Leave in, in case we want to switch to showing logs in table when more users switch to 3.2.1
-            if (stderr_display != null) {
-                stderr_display = `
-                <div class="ti-logs">${e.ti_stderr_log.trim().split("\n").slice(-1)}</div>
-                `;
-            }
-            if (stdout_display != null) {
-                stdout_display = `
-                <div class="ti-logs">${e.ti_stdout_log.trim().split("\n").slice(-1)}</div>
-                `;
-            }
-
-            r.push({
-                "ti_id": e.ti_id,
-                "ti_status": e.ti_status,
-                "stderr_brief": stderr_display,
-                "stdout_brief": stdout_display,
-                "ti_stdout": e.ti_stdout,
-                "ti_stderr": e.ti_stderr,
-                "ti_distributor_id": e.ti_distributor_id,
-                "ti_nodename": e.ti_nodename,
-                "ti_stdout_log": e.ti_stdout_log,
-                "ti_stderr_log": e.ti_stderr_log,
-                "ti_error_log_description": e.ti_error_log_description,
-                "ti_wallclock": e.ti_wallclock,
-                "ti_maxrss": e.ti_maxrss,
-                "ti_resources": e.ti_resources,
-            })
-
-        }
-        return r;
+        return data.map(data => ({
+            "ti_id": data.ti_id,
+            "ti_status": data.ti_status,
+            "ti_stdout": data.ti_stdout,
+            "ti_stderr": data.ti_stderr,
+            "ti_distributor_id": data.ti_distributor_id,
+            "ti_nodename": data.ti_nodename,
+            "ti_stdout_log": data.ti_stdout_log,
+            "ti_stderr_log": data.ti_stderr_log,
+            "ti_error_log_description": data.ti_error_log_description,
+            "ti_wallclock": data.ti_wallclock,
+            "ti_maxrss": data.ti_maxrss,
+            "ti_resources": data.ti_resources,
+        }));
     }
 
-    const handleCellErrorClick = (rowIndex) => {
-        setShowStderrModal(true);
+    const handleCellClick = (rowIndex, modalName) => {
         setRowDetail(taskInstanceData[rowIndex]);
-    };
-
-    const handleCellStdOutClick = (rowIndex) => {
-        setShowStdoutModal(true)
-        setRowDetail(taskInstanceData[rowIndex])
-    };
-
-    const handleCellResourcesClick = (rowIndex) => {
-        setShowResourcesModal(true)
-        setRowDetail(taskInstanceData[rowIndex])
+        showModal(modalName);
     };
 
     const data_brief = get_data_brief(taskInstanceData)
@@ -92,8 +63,8 @@ export default function TaskInstanceTable({taskInstanceData}) {
             accessorKey: "ti_stderr",
             header: "Standard Error",
             Cell: ({cell, row}) => (
-                <div onClick={() => handleCellErrorClick(row.index)}>
-                    {cell.getValue()}
+                <div onClick={() => handleCellClick(row.index, "stderr")}>
+                    {cell.getValue()?.length > 30 ? "..." + cell.getValue().slice(-30) : cell.getValue()}
                 </div>
             ),
         },
@@ -101,8 +72,8 @@ export default function TaskInstanceTable({taskInstanceData}) {
             accessorKey: "ti_stdout",
             header: "Standard Out",
             Cell: ({cell, row}) => (
-                <div onClick={() => handleCellStdOutClick(row.index)}>
-                    {cell.getValue()}
+                <div onClick={() => handleCellClick(row.index, "stdout")}>
+                    {cell.getValue()?.length > 30 ? "..." + cell.getValue().slice(-30) : cell.getValue()}
                 </div>
             )
         },
@@ -118,7 +89,7 @@ export default function TaskInstanceTable({taskInstanceData}) {
             accessorKey: "ti_resources",
             header: "Resources",
             Cell: ({cell, row}) => (
-                <div onClick={() => handleCellResourcesClick(row.index)}>
+                <div onClick={() => handleCellClick(row.index, "resources")}>
                     {cell.getValue()}
                 </div>
             )
@@ -132,7 +103,7 @@ export default function TaskInstanceTable({taskInstanceData}) {
                     <p className='color-dark'>
                         Task Instances&nbsp;
                         <span>
-                            <HiInformationCircle onClick={() => setShowTIStatusModal(true)}/>
+                            <HiInformationCircle onClick={() => showModal("status")}/>
                         </span>
                     </p>
                 </header>
@@ -156,8 +127,8 @@ export default function TaskInstanceTable({taskInstanceData}) {
                         {rowDetail.ti_stdout_log}
                     </p>
                 }
-                showModal={showStdoutModal}
-                setShowModal={setShowStdoutModal}
+                showModal={modalVisibility.stdout}
+                setShowModal={() => hideModal('stdout')}
             />
 
             <CustomModal
@@ -176,8 +147,8 @@ export default function TaskInstanceTable({taskInstanceData}) {
                         {rowDetail.ti_error_log_description}
                     </p>
                 }
-                showModal={showStderrModal}
-                setShowModal={setShowStderrModal}
+                showModal={modalVisibility.stderr}
+                setShowModal={() => hideModal('stderr')}
 
             />
             <CustomModal
@@ -215,9 +186,8 @@ export default function TaskInstanceTable({taskInstanceData}) {
                         <i>runtime</i>: {humanizeDuration(rowDetail.ti_wallclock * 1000)}
                     </p>
                 }
-                showModal={showResourcesModal}
-                setShowModal={setShowResourcesModal}
-
+                showModal={modalVisibility.resources}
+                setShowModal={() => hideModal("resources")}
             />
 
             <CustomModal
@@ -248,9 +218,8 @@ export default function TaskInstanceTable({taskInstanceData}) {
                         insufficient memory or runtime.<br/>
                     </p>
                 }
-                showModal={showTIStatusModal}
-                setShowModal={setShowTIStatusModal}
-
+                showModal={modalVisibility.status}
+                setShowModal={() => hideModal("status")}
             />
         </div>
     );
