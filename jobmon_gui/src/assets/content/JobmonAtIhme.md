@@ -84,6 +84,13 @@ Port: {{JOBMON_DB_PORT}}
 
 Please note to access the Jobmon database you need to switch your VPN to "All Internet Traffic" in your Big-IP Edge Client.
 
+## Jobmon Database API
+The base URL for the Jobmon Database API is:
+
+```shell
+{{JOBMON_BASE_URL}}
+```
+
 ### Jobmon ERD
 
 ![Jobmon ERD](jobmon_erd.svg)
