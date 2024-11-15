@@ -1,5 +1,6 @@
 import multiprocessing as mp
 import os
+from random import randint
 import socket
 import sys
 from time import sleep
@@ -207,6 +208,6 @@ if __name__ == "__main__":
     ctx = mp.get_context("fork")
     p_server = ctx.Process(target=start_web_service, args=())
     p_server.start()
-    # p_large_wf = ctx.Process(target=create_large_workflow, args=()) # TODO: issue: cluster "dummy" dous not exist, so response from jobmon_core/src/jobmon/core/cluster.py: _, response = self.requester.send_request(app_route=app_route, message={}, request_type="get") returns {'cluster': null}
-    # p_large_wf.start()
-    # create_multiple_status_wf()  # TODO: issue: cluster "multiprocess" dous not exist, so response from jobmon_core/src/jobmon/core/cluster.py: _, response = self.requester.send_request(app_route=app_route, message={}, request_type="get") returns {'cluster': null}
+    p_large_wf = ctx.Process(target=create_large_workflow, args=())
+    p_large_wf.start()
+    create_multiple_status_wf()

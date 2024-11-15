@@ -1,5 +1,5 @@
 db:
-  sqlalchemy_database_uri: sqlite://
+  sqlalchemy_database_uri: sqlite:////tmp/tests.sqlite
 distributor:
   poll_interval: 10
 heartbeat:
