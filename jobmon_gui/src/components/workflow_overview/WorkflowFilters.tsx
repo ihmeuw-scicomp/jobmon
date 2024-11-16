@@ -44,14 +44,14 @@ export default function WorkflowFilters() {
                                onChange={(e) => workflowSettings.setWfArgs(e.target.value)}/>
                 </Grid>
                 <Grid item xs={1.5}>
-                    <TextField label="Workflow Attribute Key"
+                    <TextField label="WF Attribute Key"
                                fullWidth={true}
                                value={workflowSettings.get().wf_attribute_key}
                                onChange={(e) => workflowSettings.setWfAttributeKey(e.target.value)}/>
 
                 </Grid>
                 <Grid item xs={1.5}>
-                    <TextField label="Workflow Attribute Value" fullWidth={true}
+                    <TextField label="WF Attribute Value" fullWidth={true}
                                value={workflowSettings.get().wf_attribute_value}
                                onChange={(e) => workflowSettings.setWfAttributeValue(e.target.value)}/>
 

@@ -10,6 +10,7 @@ import CssBaseline from "@mui/material/CssBaseline";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import MenuIcon from "@mui/icons-material/Menu";
+import SubjectIcon from '@mui/icons-material/Subject';
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ListItem from "@mui/material/ListItem";
@@ -17,7 +18,7 @@ import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import {PropsWithChildren, useState} from "react";
-import {Link, useNavigate} from "react-router-dom";
+import {useNavigate} from "react-router-dom";
 import {IhmeIcon} from "@jobmon_gui/assets/logo/logo";
 
 import FeedIcon from "@mui/icons-material/Feed";
@@ -29,6 +30,7 @@ import BatchPredictionIcon from '@mui/icons-material/BatchPrediction';
 import {Tooltip} from "@mui/material";
 import bifrostEnabled from "@jobmon_gui/components/navigation/Bifrost";
 import "@fontsource/archivo"
+import {readTheDocsUrl} from "@jobmon_gui/configs/ExternalUrls";
 
 const drawerWidth = 260;
 
@@ -198,6 +200,16 @@ export default function PageNavigation({children}: PropsWithChildren) {
                             </ListItemIcon>
 
                             <ListItemText primary={"Help"}/>
+                        </ListItemButton>
+                    </Tooltip>
+                </ListItem>
+                <ListItem key={"drawerDocumentation"} disablePadding>
+                    <Tooltip title={open ? "" : "Documentation"} placement="right">
+                        <ListItemButton href={readTheDocsUrl} target={"_blank"}>
+                            <ListItemIcon>
+                                <SubjectIcon/>
+                            </ListItemIcon>
+                            <ListItemText primary={"Documentation"}/>
                         </ListItemButton>
                     </Tooltip>
                 </ListItem>
