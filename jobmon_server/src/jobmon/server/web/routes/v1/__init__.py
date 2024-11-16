@@ -33,7 +33,7 @@ def api_version() -> Any:
 @api_v1_blueprint.teardown_request
 def teardown(e: Optional[BaseException]) -> None:
     """Remove threadlocal session from registry."""
-    SessionLocal.remove()
+    SessionLocal.remove()  # type: ignore
 
 
 import_module("jobmon.server.web.routes.v1.fsm")

@@ -47,14 +47,14 @@ def add_nodes() -> Any:
         )
         if (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "mysql"
+            and SessionLocal.bind  # type: ignore
+            and SessionLocal.bind.dialect.name == "mysql"  # type: ignore
         ):
             node_insert_stmt = node_insert_stmt.prefix_with("IGNORE")
         if (
             SessionLocal
-            and SessionLocal.bind
-            and SessionLocal.bind.dialect.name == "sqlite"
+            and SessionLocal.bind  # type: ignore
+            and SessionLocal.bind.dialect.name == "sqlite"  # type: ignore
         ):
             node_insert_stmt = node_insert_stmt.prefix_with("OR IGNORE")
 
@@ -111,14 +111,14 @@ def _insert_node_args(node_args_list: list) -> None:
             node_arg_insert_stmt = insert(NodeArg).values(node_args_list)
             if (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "mysql"
+                and SessionLocal.bind  # type: ignore
+                and SessionLocal.bind.dialect.name == "mysql"  # type: ignore
             ):
                 node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("IGNORE")
             if (
                 SessionLocal
-                and SessionLocal.bind
-                and SessionLocal.bind.dialect.name == "sqlite"
+                and SessionLocal.bind  # type: ignore
+                and SessionLocal.bind.dialect.name == "sqlite"  # type: ignore
             ):
                 node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("OR IGNORE")
 

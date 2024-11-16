@@ -1,15 +1,31 @@
-from typing import Any, cast, Dict, Optional
+import json
+from typing import Any, AsyncGenerator, Callable, cast, Dict, Optional
 
-from flask import Flask, jsonify, request
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.status import HTTP_404_NOT_FOUND
 import structlog
 from werkzeug.exceptions import BadRequest, UnsupportedMediaType
 
+from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
 
 
-def _handle_error(error: Exception, status_code: Optional[int] = None) -> Any:
+# Dependency for removing session after each request
+async def teardown_session() -> AsyncGenerator:
+    """Remove the session after each request."""
+    try:
+        yield
+    finally:
+        get_session_local().remove()  # type: ignore
+
+
+def _handle_error(
+    request: Request, error: Exception, status_code: Optional[int] = None
+) -> Any:
     """Handle all exceptions in a uniform manner."""
     # Extract status code from the error
     status_code = status_code or getattr(error, "status_code", 500)
@@ -23,39 +39,47 @@ def _handle_error(error: Exception, status_code: Optional[int] = None) -> Any:
         "exception_message": str(error),
         "status_code": str(status_code),
     }
-    logger.exception("server encountered:", status_code=status_code, route=request.path)
-
-    response = jsonify(error=response_data)
-    response.content_type = "application/json"
-    response.status_code = status_code
+    logger.exception(
+        "server encountered:", status_code=status_code, route=request.url.path
+    )
+    rd = {"error": response_data}
+    response = JSONResponse(
+        content=rd,  # type: ignore
+        media_type="application/custom+json",  # type: ignore
+        status_code=status_code,  # type: ignore
+    )
     return response
 
 
-def add_hooks_and_handlers(app: Flask) -> Flask:
+def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
     """Add logging hooks and exception handlers."""
 
-    @app.errorhandler(Exception)
-    def handle_generic_exception(error: Any) -> Any:
-        return _handle_error(error)
+    @app.exception_handler(Exception)
+    def handle_generic_exception(request: Request, error: Any) -> Any:
+        if isinstance(error, StarletteHTTPException):
+            if error.status_code == HTTP_404_NOT_FOUND:
+                logger.warning("Route not found:", route=request.url)
+                return JSONResponse(
+                    content={"error": f"Route {request.url} not found"},
+                    status_code=HTTP_404_NOT_FOUND,
+                )
+            return _handle_error(request, error, error.status_code)
+        if isinstance(error, InvalidUsage) or isinstance(error, ServerError):
+            return _handle_error(request, error, error.status_code)
+        return _handle_error(request, error)
 
-    @app.errorhandler(InvalidUsage)
-    @app.errorhandler(ServerError)
-    def handle_custom_errors(error: Any) -> Any:
-        return _handle_error(error, error.status_code)
-
-    @app.errorhandler(404)
-    def page_not_found(e: Any) -> Any:
-        logger.warning("Route not found:", route=request.url)
-        return f"This route does not exist: {request.url}", 404
-
-    @app.before_request
-    def add_requester_context() -> None:
+    @app.middleware("http")
+    async def add_requester_context(request: Request, call_next: Callable) -> None:
         """Add structured logging context before each request."""
         structlog.contextvars.clear_contextvars()
-
+        data = {}
         try:
-            data = cast(Dict, request.get_json())
-        except (BadRequest, UnsupportedMediaType):
+            # Only parse JSON if the content type is application/json
+            if request.headers.get("content-type") == "application/json":
+                body = await request.body()  # Get the raw body
+                if body:  # Check if the body is not empty
+                    data = cast(Dict[str, Any], await request.json())
+        except (BadRequest, UnsupportedMediaType, json.JSONDecodeError):
             data = {}
 
         context_data = (
@@ -64,6 +88,17 @@ def add_hooks_and_handlers(app: Flask) -> Flask:
             else data
         )
         if context_data:
-            structlog.contextvars.bind_contextvars(path=request.path, **context_data)
+            structlog.contextvars.bind_contextvars(
+                path=request.url.path, **context_data
+            )
+        response = await call_next(request)
+        return response
+
+    # Include the teardown function globally, using FastAPI dependencies (for session cleanup)
+    @app.middleware("http")
+    async def session_middleware(request: Request, call_next: Callable) -> Any:
+        response = await call_next(request)
+        teardown_session()  # Call the session teardown after Request
+        return response
 
     return app

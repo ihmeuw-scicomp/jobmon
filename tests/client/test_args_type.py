@@ -53,7 +53,11 @@ def test_node_args(tool, test_script, input, expect):
     )
     workflow1.add_tasks([t1])
     workflow1.bind()
+    # make sure wf bind is actually working; otherwise, it won't fail if there is no db
+    assert isinstance(workflow1.workflow_id, int)
     workflow1._bind_tasks()
+    # same as above
+    assert isinstance(t1.task_id, int)
 
 
 @pytest.mark.parametrize(
@@ -85,7 +89,9 @@ def test_task_args(tool, test_script, input, expect):
     )
     workflow1.add_tasks([t1])
     workflow1.bind()
+    assert isinstance(workflow1.workflow_id, int)
     workflow1._bind_tasks()
+    assert isinstance(t1.task_id, int)
 
 
 @pytest.mark.parametrize(
@@ -111,4 +117,6 @@ def test_op_args(tool, test_script, input, expect):
     )
     workflow1.add_tasks([t1])
     workflow1.bind()
+    assert isinstance(workflow1.workflow_id, int)
     workflow1._bind_tasks()
+    assert isinstance(t1.task_id, int)
