@@ -33,7 +33,7 @@ def api_version() -> Any:
 @api_v2_blueprint.teardown_request
 def teardown(e: Optional[BaseException]) -> None:
     """Remove threadlocal session from registry."""
-    SessionLocal.remove()
+    SessionLocal.remove()  # type: ignore
 
 
 for module in ["cli", "fsm", "reaper"]:

@@ -8,7 +8,7 @@ import socket
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Type
 
-from flask import Flask
+from fastapi import FastAPI
 from opentelemetry import _logs
 from opentelemetry import trace
 from opentelemetry.sdk import resources
@@ -49,7 +49,7 @@ class _ProcessResourceDetector(resources.ResourceDetector):
             resources.PROCESS_RUNTIME_NAME: sys.implementation.name,
             resources.PROCESS_OWNER: getpass.getuser(),
         }
-        return resources.Resource(attrs)
+        return resources.Resource(attrs)  # type: ignore
 
 
 class _ServiceResourceDetector(resources.ResourceDetector):
@@ -147,7 +147,7 @@ class OtlpAPI:
             span_kwargs = config.get_section(span_exporter)
             self._set_exporter(
                 span_kwargs,
-                trace.get_tracer_provider().add_span_processor,
+                trace.get_tracer_provider().add_span_processor,  # type: ignore
                 BatchSpanProcessor,
             )
 
@@ -156,7 +156,7 @@ class OtlpAPI:
             log_kwargs = config.get_section(log_exporter)
             self._set_exporter(
                 log_kwargs,
-                _logs.get_logger_provider().add_log_record_processor,
+                _logs.get_logger_provider().add_log_record_processor,  # type: ignore
                 BatchLogRecordProcessor,
             )
 
@@ -184,11 +184,12 @@ class OtlpAPI:
             cls._sqlalchemy_instrumented = True
 
     @classmethod
-    def instrument_app(cls: Type[OtlpAPI], app: Flask) -> None:
-        """Instrument Flask app."""
-        from opentelemetry.instrumentation.flask import FlaskInstrumentor
+    def instrument_app(cls: Type[OtlpAPI], app: FastAPI) -> None:
+        """Instrument FastAPI app."""
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
-        FlaskInstrumentor().instrument_app(app)
+        # Instrument FastAPI with OpenTelemetry
+        FastAPIInstrumentor.instrument_app(app)
 
     @classmethod
     def instrument_requests(cls: Type[OtlpAPI]) -> None:
@@ -205,7 +206,7 @@ class OtlpAPI:
 
     def get_logger_provider(self) -> LoggerProvider:
         """Get the logger provider."""
-        return _logs.get_logger_provider()
+        return _logs.get_logger_provider()  # type: ignore
 
     def correlate_logger(self, logger_name: str, level: int = logging.INFO) -> None:
         """Correlate a logger with the current span."""
