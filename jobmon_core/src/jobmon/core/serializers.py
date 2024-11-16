@@ -12,7 +12,7 @@ class SerializeDistributorTask:
     @staticmethod
     def to_wire(
         task_id: int,
-        array_id: int,
+        array_id: Optional[int],
         name: str,
         command: str,
         requested_resources: dict,
@@ -170,7 +170,7 @@ class SerializeTaskInstanceErrorLog:
         task_instance_error_log_id: int, error_time: datetime, description: str
     ) -> tuple:
         """Submit the args for an SerializeTaskInstanceErrorLog object to the database."""
-        return task_instance_error_log_id, error_time, description
+        return task_instance_error_log_id, str(error_time), description
 
     @staticmethod
     def kwargs_from_wire(wire_tuple: tuple) -> dict:
