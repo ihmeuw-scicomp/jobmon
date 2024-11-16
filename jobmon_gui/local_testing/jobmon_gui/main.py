@@ -3,8 +3,8 @@
 This file spins up a web server on http://localhost:8070 with database jobmon.db.
 The base URL for the web server is http://localhost:8070/api/v3.
 
-It also provides the option to create N workflows for testing.
-Pass in the argument N to create N workflows.
+It also provides the option to create a workflow for testing.
+Pass in any argument to create a workflow.
 The workflow runs on the sequential cluster with the null.q queue.
 It does not require slurm cluster access, and can run on your Mac.
 """
@@ -80,6 +80,12 @@ def run_server_with_handler() -> None:
 
 if __name__ == "__main__":
     os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070/api/v3"
+    create_wf = False
+    if len(sys.argv) > 1:
+        create_wf = True
+        print("Starting server and creating a workflow")
+    else:
+        print("Starting server")
     if config_db():
         # start server
         ctx = mp.get_context("fork")
@@ -87,8 +93,6 @@ if __name__ == "__main__":
         p_server.start()
         # create N workflows for testing
         # if there is an arg, convert to int, and create the corresponding number of workflows
-        if len(sys.argv) > 1:
-            N = int(sys.argv[1])
-            for i in range(N):
-                os.system(f"python tests/worker_node/task_generator_wf.py 1")
+        if create_wf:
+            os.system(f"python tests/worker_node/task_generator_wf.py 1")
         p_server.join()
