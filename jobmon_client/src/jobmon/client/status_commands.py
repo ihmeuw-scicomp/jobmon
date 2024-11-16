@@ -211,6 +211,7 @@ def task_status(
     rc, res = requester.send_request(
         app_route="/task_status", message=msg, request_type="get"
     )
+
     if json:
         return res["task_instance_status"]
     else:
@@ -301,7 +302,6 @@ def update_task_status(
     assert (
         new_status in allowed_statuses
     ), f"Only {allowed_statuses} allowed to be set via CLI"
-
     # Conditional logic: If the new status is "D", only need to set task to "D"
     # Else: All downstreams must also be set to "G", and task instances set to "K"
     if force and recursive:
