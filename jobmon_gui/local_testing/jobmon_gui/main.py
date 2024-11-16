@@ -1,8 +1,18 @@
-"""Initialize Web services."""
+"""Initialize Web services.
+
+This file spins up a web server on http://localhost:8070 with database jobmon.db.
+The base URL for the web server is http://localhost:8070/api/v3.
+
+It also creates a simple workflow for testing.
+The workflow runs on the sequential cluster with the null.q queue.
+It does not require slurm cluster access, and can run on your Mac.
+"""
 import signal
 import sys
 from typing import Any, Optional
 import uvicorn
+import multiprocessing as mp
+import os
 
 import sqlalchemy
 
@@ -65,10 +75,15 @@ def run_server_with_handler() -> None:
     app = get_app()
     uvicorn.run(app, host="0.0.0.0", port=8070)
 
-def main():
-    if config_db():
-        # start server
-        run_server_with_handler()
+
 
 if __name__ == "__main__":
-    main()
+    os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070/api/v3"
+    if config_db():
+        # start server
+        ctx = mp.get_context("fork")
+        p_server = ctx.Process(target=run_server_with_handler, args=())
+        p_server.start()
+        # create a workflow for testing
+        os.system("python tests/worker_node/task_generator_wf.py 1")
+        p_server.join()

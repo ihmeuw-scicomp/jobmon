@@ -77,27 +77,42 @@ export default function WorkflowList() {
             dayjs(workflowSettings.get().date_submitted_end).format("YYYY-MM-DD"),
             workflowSettings.get().status
         ],
-        queryFn: async () => {
-            workflowSettings.clearDataRefresh()
-            const params = new URLSearchParams({
-                user: workflowSettings.get().user,
-                tool: workflowSettings.get().tool,
-                wf_name: workflowSettings.get().wf_name,
-                wf_args: workflowSettings.get().wf_args,
-                wf_attribute_key: workflowSettings.get().wf_attribute_key,
-                wf_attribute_value: workflowSettings.get().wf_attribute_value,
-                wf_id: workflowSettings.get().wf_id,
-                date_submitted: dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
-                date_submitted_end: dayjs(workflowSettings.get().date_submitted_end).add(1, 'day').format("YYYY-MM-DD"),
-                status: workflowSettings.get().status
-            });
-            return axios.get<WorkflowsQueryResponse>(workflow_overview_url, {
-                ...jobmonAxiosConfig,
-                params: params
-            }).then((response) => {
-                return response.data?.workflows
-            })
-        },
+     queryFn: async () => {
+        workflowSettings.clearDataRefresh();
+
+        // Construct params, excluding empty values
+        const rawParams = {
+            user: workflowSettings.get().user,
+            tool: workflowSettings.get().tool,
+            wf_name: workflowSettings.get().wf_name,
+            wf_args: workflowSettings.get().wf_args,
+            wf_attribute_key: workflowSettings.get().wf_attribute_key,
+            wf_attribute_value: workflowSettings.get().wf_attribute_value,
+            wf_id: workflowSettings.get().wf_id,
+            date_submitted: workflowSettings.get().date_submitted
+                ? dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD")
+                : undefined,
+            date_submitted_end: workflowSettings.get().date_submitted_end
+                ? dayjs(workflowSettings.get().date_submitted_end).add(1, 'day').format("YYYY-MM-DD")
+                : undefined,
+            status: workflowSettings.get().status,
+        };
+
+        // Filter out keys with undefined or empty string values
+        const filteredParams = Object.fromEntries(
+            Object.entries(rawParams).filter(([_, value]) => value != null && value !== "")
+        );
+
+        // Create URLSearchParams from filteredParams
+        const params = new URLSearchParams(filteredParams);
+
+        return axios.get<WorkflowsQueryResponse>(workflow_overview_url, {
+            ...jobmonAxiosConfig,
+            params: params,
+        }).then((response) => {
+            return response.data?.workflows;
+        });
+    },
         enabled: workflowSettings.getRefreshData()
     })
 
@@ -184,7 +199,7 @@ export default function WorkflowList() {
                                     <ListItemText
                                         primary={
                                             <Typography variant="h6">
-                                                <Link to={`/workflow/${workflow.wf_id}/tasks${location.search}`}>
+                                                <Link to={`/workflow/${workflow.wf_id}/tasks`}>
                                                     {workflow.wf_id} - {workflow.wf_name}
                                                 </Link>
                                             </Typography>
