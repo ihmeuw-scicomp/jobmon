@@ -7,14 +7,12 @@ from time import sleep
 
 from sqlalchemy import text, create_engine
 from sqlalchemy.orm import Session
-from sqlalchemy_utils import create_database, database_exists
 import uvicorn
 
 from jobmon.client.api import Tool
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.api import get_app
-from jobmon.server.web.db_admin import apply_migrations
-from jobmon.server.web.models import load_metadata
+from jobmon.server.web.db_admin import apply_migrations, init_db
 
 
 TESTS_DB_FILEPATH = "/tmp/tests.sqlite"
@@ -41,10 +39,7 @@ class WebServerProcess:
 
         if not os.path.exists(self.filepath):
             open(self.filepath, 'a').close()
-            # init db
-            if not database_exists(database_uri):
-                create_database(database_uri)
-                load_metadata(database_uri)
+            init_db()
             apply_migrations(database_uri)
 
         config = JobmonConfig(dict_config={"db": {"sqlalchemy_database_uri": database_uri}})
