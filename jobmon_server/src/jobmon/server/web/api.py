@@ -47,7 +47,7 @@ def get_app(
     structlog_configured: bool = False,
     otlp_api: Optional[OtlpAPI] = None,
 ) -> FastAPI:
-    """Get a flask app based on the config. If no config is provided, defaults are used.
+    """Get a FastAPI app based on the config. If no config is provided, defaults are used.
 
     Args:
         use_otlp: Whether to use OpenTelemetry.
