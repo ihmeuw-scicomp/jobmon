@@ -639,9 +639,16 @@ def task_details_by_wf_id(workflow_id: int, tt_name: str) -> Any:
 @api_v3_router.get("/workflow_details_viz/{workflow_id}")
 def wf_details_by_wf_id(workflow_id: int) -> Any:
     """Fetch name, args, dates, tool for a Workflow provided WF ID."""
-    with SessionLocal() as session:
-        with session.begin():
-            sql = select(
+    session = SessionLocal()
+    with session.begin():
+        latest_workflow_run_subquery = (
+            session.query(WorkflowRun.workflow_id, func.max(WorkflowRun.heartbeat_date))
+            .group_by(WorkflowRun.workflow_id)
+            .subquery()
+        )
+
+        sql = (
+            select(
                 Workflow.name,
                 Workflow.workflow_args,
                 Workflow.created_date,
@@ -650,29 +657,41 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
                 Workflow.status,
                 WorkflowStatus.description,
                 WorkflowRun.jobmon_version,
-            ).where(
-                Workflow.id == workflow_id,
-                Workflow.tool_version_id == ToolVersion.id,
-                ToolVersion.tool_id == Tool.id,
-                WorkflowStatus.id == Workflow.status,
-                WorkflowRun.workflow_id == Workflow.id,
+                WorkflowRun.heartbeat_date,
             )
-            rows = session.execute(sql).all()
-
-        column_names = (
-            "wf_name",
-            "wf_args",
-            "wf_created_date",
-            "wf_status_date",
-            "tool_name",
-            "wf_status",
-            "wf_status_desc",
-            "wfr_jobmon_version",
+            .select_from(Workflow)
+            .join(ToolVersion, Workflow.tool_version_id == ToolVersion.id)
+            .join(Tool, ToolVersion.tool_id == Tool.id)
+            .join(WorkflowStatus, WorkflowStatus.id == Workflow.status)
+            .join(WorkflowRun, WorkflowRun.workflow_id == Workflow.id)
+            .join(
+                latest_workflow_run_subquery,
+            )
+            .where(
+                Workflow.id == workflow_id,
+            )
         )
+        rows = session.execute(sql).all()
 
-        result = [dict(zip(column_names, row)) for row in rows]
-        for r in result:
-            r["wf_created_date"] = str(r["wf_created_date"])
-            r["wf_status_date"] = str(r["wf_status_date"])
-        resp = JSONResponse(content=result, status_code=StatusCodes.OK)
+    column_names = (
+        "wf_name",
+        "wf_args",
+        "wf_created_date",
+        "wf_status_date",
+        "tool_name",
+        "wf_status",
+        "wf_status_desc",
+        "wfr_jobmon_version",
+        "wfr_heartbeat_date",
+    )
+
+    result = [dict(zip(column_names, row)) for row in rows]
+    date_fields = ["wf_status_date", "wf_created_date", "wfr_heartbeat_date"]
+
+    if result:
+        for field in date_fields:
+            if field in result[0]:
+                result[0][field] = result[0][field].isoformat()
+
+    resp = JSONResponse(content=result, status_code=200)
     return resp

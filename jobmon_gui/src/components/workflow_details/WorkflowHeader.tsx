@@ -18,7 +18,7 @@ export default function WorkflowHeader({
                                            wf_name,
                                            wf_args,
                                            wf_submitted_date,
-                                           wf_status_date,
+                                           wfr_heartbeat_date,
                                            wf_elapsed_time,
                                            jobmon_version
                                        }) {
@@ -62,7 +62,7 @@ export default function WorkflowHeader({
                             <b>Workflow Name:</b> {wf_name}<br/>
                             <b>Workflow Args:</b> {wf_args}<br/>
                             <b>Workflow Submitted Date:</b> {wf_submitted_date}<br/>
-                            <b>Workflow Status Date:</b> {wf_status_date}<br/>
+                            <b>WorkflowRun Heartbeat Date:</b> {wfr_heartbeat_date}<br/>
                             <b>Workflow Elapsed Time:</b> {wf_elapsed_time}<br/>
                             <b>Jobmon Version:</b> {jobmon_version}<br/>
                         </p>
