@@ -1,15 +1,21 @@
+import multiprocessing as mp
 import os
+from random import randint
 import socket
 import sys
-import multiprocessing as mp
-from jobmon.server.web.api import get_app, JobmonConfig
-from jobmon.server.web.db_admin import apply_migrations, init_db
-from sqlalchemy import text, create_engine
 from time import sleep
-from random import randint
-from jobmon.server.web.app_factory import AppFactory  # noqa F401
+
+from sqlalchemy import text, create_engine
 from sqlalchemy.orm import Session
+import uvicorn
+
 from jobmon.client.api import Tool
+from jobmon.core.configuration import JobmonConfig
+from jobmon.server.web.api import get_app
+from jobmon.server.web.db_admin import apply_migrations, init_db
+
+
+TESTS_DB_FILEPATH = "/tmp/tests.sqlite"
 
 
 class WebServerProcess:
@@ -29,20 +35,19 @@ class WebServerProcess:
         os.environ["JOBMON__OTLP__WEB_ENABLED"] = "true"
         os.environ["JOBMON__OTLP__SPAN_EXPORTER"] = ""
         os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
-        os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070/api/v2"
+        os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070/api/v3"
 
         if not os.path.exists(self.filepath):
             open(self.filepath, 'a').close()
-            init_db(database_uri)
+            init_db()
             apply_migrations(database_uri)
 
         config = JobmonConfig(dict_config={"db": {"sqlalchemy_database_uri": database_uri}})
         app = get_app(config)
-        config.set("http", "service_url", f"http://{self.web_host}:{self.web_port}/api/v2")
+        config.set("http", "service_url", f"http://{self.web_host}:{self.web_port}/api/v3")
         config.write()
 
-        with app.app_context():
-            app.run(host="0.0.0.0", port=self.web_port)
+        uvicorn.run(app, host=self.web_host, port=self.web_port, log_level="info")
 
 
 def create_multiple_status_wf():
@@ -138,7 +143,7 @@ def create_multiple_status_wf():
         wf.add_tasks(tasks)
         wf.run()
         # insert some random resource data
-        db_engine = create_engine("sqlite:///tmp/jobmon.db")
+        db_engine = create_engine(f"sqlite:///{TESTS_DB_FILEPATH}")
         with Session(bind=db_engine) as session:
             for task in tasks:
                 query = text(f"""
@@ -189,7 +194,7 @@ def create_large_workflow():
     # fill in fake resource usage data
 
 
-def start_web_service(filepath='/tmp/jobmon.db'):
+def start_web_service(filepath=TESTS_DB_FILEPATH):
     server = WebServerProcess(filepath=filepath)
     server.start_web_service()
 

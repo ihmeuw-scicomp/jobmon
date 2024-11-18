@@ -468,7 +468,7 @@ def workflows_by_user_form(
     wf_args: Optional[str] = Query(None),
     wf_attribute_value: Optional[str] = Query(None),
     wf_attribute_key: Optional[str] = Query(None),
-    wf_id: Optional[int] = Query(None),
+    wf_id: Optional[str] = Query(None),
     date_submitted: Optional[str] = Query(None),
     date_submitted_end: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
