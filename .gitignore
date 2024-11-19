@@ -41,3 +41,6 @@ docsource/api
 
 /jobmon_gui/node_modules/
 /corpora/
+.venv
+*.code-workspace
+/.env

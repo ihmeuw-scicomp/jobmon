@@ -87,9 +87,9 @@ def get_tool_versions(tool_id: int, request: Request) -> Any:
 
 @api_v3_router.get("/tool/{tool_name}/tool_resource_usage")
 def get_tool_resource_usage(
-    tool_name: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+        tool_name: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
 ) -> Any:
     """Gets resource usage and node args for all TaskInstances associated with a given tool.
 

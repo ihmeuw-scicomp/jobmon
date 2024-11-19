@@ -6,11 +6,13 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import yaml
+from dotenv import load_dotenv
 
 from jobmon.core import CONFIG_FILE_FROM_INSTALLER_PLUGIN
 from jobmon.core.cli import CLI
 from jobmon.core.exceptions import ConfigError
 
+load_dotenv()
 
 DEFAULTS_FILE_NAME = "defaults.yaml"
 DEFAULTS_FILE = Path(__file__).parent / DEFAULTS_FILE_NAME

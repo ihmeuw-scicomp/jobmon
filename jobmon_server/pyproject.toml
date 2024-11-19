@@ -30,7 +30,8 @@ dependencies = [
     'alembic',
     'importlib_resources; python_version<="3.12"',
     'uvicorn',
-    'httpx'
+    'httpx',
+    'authlib',
 ]
 dynamic = ["version"]
 

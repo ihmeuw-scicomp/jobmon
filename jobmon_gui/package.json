@@ -24,6 +24,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "axios": "^0.23.0",
     "bootstrap": "^4.6.1",
+    "caniuse-lite": "^1.0.30001680",
     "dayjs": "^1.11.11",
     "dompurify": "^2.4.1",
     "export-to-csv": "^1.3.0",

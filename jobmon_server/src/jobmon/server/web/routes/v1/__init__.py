@@ -1,39 +1,48 @@
-from http import HTTPStatus as StatusCodes
 from importlib import import_module
-from typing import Any, Optional
 
-from flask import Blueprint, jsonify
+from fastapi import APIRouter
+from starlette.responses import JSONResponse
+from starlette.status import HTTP_200_OK
 
 from jobmon.server.web import routes
-from jobmon.server.web.routes import SessionLocal
 
-api_v1_blueprint = Blueprint("v1", __name__, url_prefix="/v1")
+version = "v1"
+# Create a router for version 1 of the API
+api_v1_router = APIRouter(tags=[version], prefix=f"/{version}")
+
+for r in ["fsm", "cli", "reaper"]:
+    mod = import_module(f"jobmon.server.web.routes.{version}.{r}")
+    router = getattr(mod, f"{r}_router")
+    api_v1_router.include_router(router)
+
 
 # Shared routes
-api_v1_blueprint.add_url_rule("/", view_func=routes.is_alive, methods=["GET"])
-api_v1_blueprint.add_url_rule("/time", view_func=routes.get_pst_now, methods=["GET"])
-api_v1_blueprint.add_url_rule("/health", view_func=routes.health, methods=["GET"])
-api_v1_blueprint.add_url_rule(
-    "/test_bad", view_func=routes.test_route, methods=["GET"]  # type: ignore
-)
+@api_v1_router.get("/")
+def is_alive() -> JSONResponse:
+    """Test connectivity to the database."""
+    return routes.is_alive()
 
 
-@api_v1_blueprint.route("/api_version", methods=["GET"])
-def api_version() -> Any:
-    """Test connectivity to the database.
-
-    Return 200 if everything is OK. Defined in each module with a different route, so it can
-    be checked individually.
-    """
-    resp = jsonify(status="v1")
-    resp.status_code = StatusCodes.OK
-    return resp
+@api_v1_router.get("/time")
+def get_pst_now() -> JSONResponse:
+    """Get the current time in the Pacific."""
+    return routes.get_pst_now()
 
 
-@api_v1_blueprint.teardown_request
-def teardown(e: Optional[BaseException]) -> None:
-    """Remove threadlocal session from registry."""
-    SessionLocal.remove()  # type: ignore
+@api_v1_router.get("/health")
+def health() -> JSONResponse:
+    """Test connectivity to the app."""
+    return routes.health()
 
 
-import_module("jobmon.server.web.routes.v1.fsm")
+@api_v1_router.get("/test_bad")
+def test_route() -> None:
+    """Test route."""
+    return routes.test_route()
+
+
+# Define an API version route
+@api_v1_router.get("/api_version", status_code=HTTP_200_OK)
+def api_version() -> JSONResponse:
+    """Test connectivity to the database."""
+    return JSONResponse(content={"status": version})

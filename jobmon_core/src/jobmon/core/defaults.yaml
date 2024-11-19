@@ -12,6 +12,8 @@ http:
   retries_timeout: 300
   route_prefix: ''
   service_url: http://127.0.0.1:8070/api/v3
+oidc:
+  name: OIDC
 otlp:
   http_enabled: false
   web_enabled: false

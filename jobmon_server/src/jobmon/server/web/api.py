@@ -43,9 +43,9 @@ def _init_logging(otlp_api: Optional[OtlpAPI] = None) -> bool:
 
 
 def get_app(
-    use_otlp: bool = False,
-    structlog_configured: bool = False,
-    otlp_api: Optional[OtlpAPI] = None,
+        use_otlp: bool = False,
+        structlog_configured: bool = False,
+        otlp_api: Optional[OtlpAPI] = None,
 ) -> FastAPI:
     """Get a FastAPI app based on the config. If no config is provided, defaults are used.
 
@@ -77,19 +77,11 @@ def get_app(
     )
 
     add_hooks_and_handlers(app)
-
-    for version in ["v3"]:
+    for version in ["v3", "v2", "v1"]:
         mod = import_module(f"jobmon.server.web.routes.{version}")
         # Get the router dynamically from the module (assuming it's an APIRouter)
         api_router = getattr(mod, f"api_{version}_router")
-
         # Include the router with a version-specific prefix
-        app.include_router(api_router, prefix=f"{url_prefix}/{version}")
-
-        # include fsm, cli, and reapper
-        for r in ["fsm", "cli", "reaper"]:
-            mod = import_module(f"jobmon.server.web.routes.{version}.{r}")
-            router = getattr(mod, f"{r}_router")
-            app.include_router(router, prefix=f"{url_prefix}/{version}")
+        app.include_router(api_router, prefix=f"{url_prefix}")
 
     return app
