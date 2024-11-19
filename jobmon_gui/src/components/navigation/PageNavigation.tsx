@@ -9,7 +9,7 @@ import List from "@mui/material/List";
 import CssBaseline from "@mui/material/CssBaseline";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
-import MenuIcon from "@mui/icons-material/Menu";
+import SubjectIcon from '@mui/icons-material/Subject';
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import ListItem from "@mui/material/ListItem";
@@ -29,6 +29,7 @@ import BatchPredictionIcon from '@mui/icons-material/BatchPrediction';
 import {Tooltip} from "@mui/material";
 import bifrostEnabled from "@jobmon_gui/components/navigation/Bifrost";
 import "@fontsource/archivo"
+import {readTheDocsUrl} from "@jobmon_gui/configs/ExternalUrls";
 
 const drawerWidth = 260;
 
@@ -56,10 +57,7 @@ const closedMixin = (theme: Theme): CSSObject => ({
 const DrawerHeader = styled("div")(({theme}) => ({
     display: "flex",
     alignItems: "center",
-    justifyContent: "flex-end",
-    padding: theme.spacing(0, 1),
-    // necessary for content to be below app bar
-    ...theme.mixins.toolbar,
+    padding: theme.spacing(1, 1),
 }));
 
 interface AppBarProps extends MuiAppBarProps {
@@ -105,58 +103,79 @@ export default function PageNavigation({children}: PropsWithChildren) {
     const theme = useTheme();
     const [open, setOpen] = useState(false);
     const navigate = useNavigate();
+    const [drawerOpen, setDrawerOpen] = useState(false);
 
     const handleDrawerOpen = () => {
-        setOpen(true);
+        setDrawerOpen(true);
     };
 
     const handleDrawerClose = () => {
-        setOpen(false);
+        setDrawerOpen(false);
     };
 
     return (
-        <Box sx={{display: "flex"}}>
+        <Box sx={{display: "flex"}} id="AppBarBox">
             <CssBaseline/>
-            <AppBar position="fixed" open={open} sx={{backgroundColor: "#17B9CF"}}>
+            <AppBar position="fixed" sx={{backgroundColor: "#17B9CF"}} id="AppBar">
                 <Toolbar>
-                    <IconButton
-                        color="inherit"
-                        aria-label="open drawer"
-                        onClick={handleDrawerOpen}
-                        edge="start"
-                        sx={{
-                            marginRight: 5,
-                            ...(open && {display: "none"}),
-                        }}>
-                        <MenuIcon/>
-                    </IconButton>
                     <Box sx={{display: "flex", alignItems: "center"}}>
                         <img src={IhmeIcon} style={{padding: 5}} height={50} alt=""/>
                         <Typography
+                            variant="banner"
                             sx={{
-                                fontFamily: "'Archivo', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'sans-serif'",
-                                fontWeight: 300,
-                                fontSize: "3rem",
-                                lineHeight: 1.167,
-                                letterSpacing: "0em",
-                                color: "white",
-                                textDecoration: "none",
                                 boxShadow: "none",
                                 userSelect: "none",
                                 display: "flex",
                                 alignItems: "center",
+                                '&:hover': {
+                                    textDecoration: "none",
+                                },
+                                '&:visited': {
+                                    color: "inherit",
+                                },
                             }}
-                        >
+                            component={Link}
+                            id="homeNavbarLink"
+                            to="/">
                             Jobmon GUI
                         </Typography>
                     </Box>
+
+
                 </Toolbar>
             </AppBar>
-            <Drawer variant="permanent" open={open}>
-                <DrawerHeader>
-                    <IconButton onClick={handleDrawerClose}>
-                        {theme.direction === "ltr" ? <ChevronLeftIcon/> : <ChevronRightIcon/>}
-                    </IconButton>
+            <Drawer
+                id="Drawer"
+                variant="permanent"
+                open={drawerOpen}
+                sx={{
+                    maxHeight: 'calc(100vh - 200px)',
+                    mr: 2,
+                }}
+            >
+                <Toolbar/>
+                <DrawerHeader id="DrawerHeader">
+                    {
+                        drawerOpen ? (
+                            <IconButton
+                                color="inherit"
+                                aria-label="close drawer"
+                                onClick={handleDrawerClose}
+                            >
+                                {theme.direction === "ltr" ? <ChevronLeftIcon/> :
+                                    <ChevronRightIcon/>}
+                            </IconButton>
+                        ) : (
+                            <IconButton
+                                color="inherit"
+                                aria-label="open drawer"
+                                onClick={handleDrawerOpen}
+                            >
+                                {theme.direction === "ltr" ? <ChevronRightIcon/> :
+                                    <ChevronLeftIcon/>}
+                            </IconButton>
+                        )
+                    }
                 </DrawerHeader>
                 <Divider/>
                 <List>
@@ -196,8 +215,17 @@ export default function PageNavigation({children}: PropsWithChildren) {
                             <ListItemIcon>
                                 <BatchPredictionIcon/>
                             </ListItemIcon>
-
                             <ListItemText primary={"Help"}/>
+                        </ListItemButton>
+                    </Tooltip>
+                </ListItem>
+                <ListItem key={"drawerDocumentation"} disablePadding>
+                    <Tooltip title={open ? "" : "Documentation"} placement="right">
+                        <ListItemButton href={readTheDocsUrl} target={"_blank"}>
+                            <ListItemIcon>
+                                <SubjectIcon/>
+                            </ListItemIcon>
+                            <ListItemText primary={"Documentation"}/>
                         </ListItemButton>
                     </Tooltip>
                 </ListItem>
@@ -212,7 +240,7 @@ export default function PageNavigation({children}: PropsWithChildren) {
 
             </Drawer>
             <Box component="main" sx={{flexGrow: 1, p: 3}}>
-                <DrawerHeader/>
+                <Toolbar/>
                 {children}
             </Box>
         </Box>

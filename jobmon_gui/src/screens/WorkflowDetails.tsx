@@ -162,8 +162,8 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
                     wf_name={wfDetails?.data?.wf_name}
                     wf_args={wfDetails?.data?.wf_args}
                     wf_submitted_date={convertDatePST(wfDetails?.data?.wf_created_date)}
-                    wf_status_date={convertDatePST(wfDetails?.data?.wf_status_date)}
-                    wf_elapsed_time={humanizeDuration(new Date(wfDetails?.data?.wf_status_date).getTime() - new Date(wfDetails?.data?.wf_created_date).getTime())}
+                    wfr_heartbeat_date={convertDatePST(wfDetails?.data?.wfr_heartbeat_date)}
+                    wf_elapsed_time={humanizeDuration(new Date(wfDetails?.data?.wfr_heartbeat_date).getTime() - new Date(wfDetails?.data?.wf_created_date).getTime())}
                     jobmon_version={wfDetails?.data?.wfr_jobmon_version}
                 />
             </Box>

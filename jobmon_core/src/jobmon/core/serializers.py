@@ -12,7 +12,7 @@ class SerializeDistributorTask:
     @staticmethod
     def to_wire(
         task_id: int,
-        array_id: int,
+        array_id: Optional[int],
         name: str,
         command: str,
         requested_resources: dict,
