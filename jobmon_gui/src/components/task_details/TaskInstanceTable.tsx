@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {HiInformationCircle} from "react-icons/hi";
+import ClickableCell from "@jobmon_gui/components/common/ClickableCell";
 import CustomModal from '@jobmon_gui/components/Modal';
 import {formatBytes} from "@jobmon_gui/utils/formatters";
 import humanizeDuration from 'humanize-duration';
@@ -63,18 +64,18 @@ export default function TaskInstanceTable({taskInstanceData}) {
             accessorKey: "ti_stderr",
             header: "Standard Error",
             Cell: ({cell, row}) => (
-                <div onClick={() => handleCellClick(row.index, "stderr")}>
+                <ClickableCell onClick={() => handleCellClick(row.index, "stderr")}>
                     {cell.getValue()?.length > 30 ? "..." + cell.getValue().slice(-30) : cell.getValue()}
-                </div>
+                </ClickableCell>
             ),
         },
         {
             accessorKey: "ti_stdout",
             header: "Standard Out",
             Cell: ({cell, row}) => (
-                <div onClick={() => handleCellClick(row.index, "stdout")}>
+                <ClickableCell onClick={() => handleCellClick(row.index, "stdout")}>
                     {cell.getValue()?.length > 30 ? "..." + cell.getValue().slice(-30) : cell.getValue()}
-                </div>
+                </ClickableCell>
             )
         },
         {
@@ -89,9 +90,9 @@ export default function TaskInstanceTable({taskInstanceData}) {
             accessorKey: "ti_resources",
             header: "Resources",
             Cell: ({cell, row}) => (
-                <div onClick={() => handleCellClick(row.index, "resources")}>
+                <ClickableCell onClick={() => handleCellClick(row.index, "resources")}>
                     {cell.getValue()}
-                </div>
+                </ClickableCell>
             )
         },
     ]
