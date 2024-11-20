@@ -7,7 +7,9 @@ import NodeLists from '@jobmon_gui/components/task_details/NodeLists';
 import TaskFSM from '@jobmon_gui/components/task_details/TaskFSM';
 import {convertDatePST} from '@jobmon_gui/utils/formatters'
 import {HiInformationCircle} from "react-icons/hi";
+import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
 import CustomModal from '@jobmon_gui/components/Modal';
+import IconButton from "@mui/material/IconButton";
 
 function getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId) {
     // Returns task status and workflow ID
@@ -134,13 +136,47 @@ export default function TaskDetails() {
                     <p className='color-dark'>
                         Task Name: {task_name}&nbsp;
                         <span>
-                            <HiInformationCircle onClick={() => setShowTaskInfo(true)}/>
+                            <HtmlTooltip
+                                title="Task Information"
+                                arrow={true}
+                                placement={"right"} 
+                            >
+                                <IconButton
+                                    color="inherit"
+                                    sx={{
+                                        padding: 0,
+                                        fontSize: 'inherit',
+                                    }}
+                                >
+                                    <HiInformationCircle
+                                        style={{cursor: 'pointer'}}
+                                        onClick={() => setShowTaskInfo(true)}
+                                    />
+                                </IconButton>
+                            </HtmlTooltip>
                         </span>
                     </p>
                     <p className="color-dark">
                         Task Finite State Machine&nbsp;
                         <span>
-                            <HiInformationCircle onClick={() => setShowTaskFSM(true)}/>
+                        <HtmlTooltip
+                                title="Task Finite State Machine"
+                                arrow={true}
+                                placement={"right"} 
+                            >
+                                <IconButton
+                                    color="inherit"
+                                    sx={{
+                                        padding: 0,
+                                        fontSize: 'inherit',
+                                    }}
+                                >
+                                    <HiInformationCircle
+                                        style={{cursor: 'pointer'}}
+                                        onClick={() => setShowTaskFSM(true)}
+                                    />
+                                </IconButton>
+                            </HtmlTooltip>
                         </span>
                     </p>
                 </header>

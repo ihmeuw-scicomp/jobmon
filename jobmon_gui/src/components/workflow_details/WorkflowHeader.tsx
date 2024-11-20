@@ -8,6 +8,8 @@ import {TbHandStop} from "react-icons/tb";
 import {HiRocketLaunch} from "react-icons/hi2";
 import {HiInformationCircle} from "react-icons/hi";
 import React, {useState} from "react";
+import IconButton from "@mui/material/IconButton";
+import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
 import CustomModal from '@jobmon_gui/components/Modal';
 
 export default function WorkflowHeader({
@@ -46,7 +48,24 @@ export default function WorkflowHeader({
                     {wf_id} - {wf_name}
                 </p>
                 <span style={{transform: 'translateY(-5px)', paddingLeft: '10px'}}>
-                    <HiInformationCircle onClick={() => setShowWFInfo(true)}/>
+                    <HtmlTooltip
+                        title="Workflow Information"
+                        arrow={true}
+                        placement={"right"} 
+                    >
+                        <IconButton
+                            color="inherit"
+                            sx={{
+                                padding: 0,
+                                fontSize: 'inherit',
+                            }}
+                        >
+                            <HiInformationCircle
+                                style={{cursor: 'pointer'}}
+                                onClick={() => setShowWFInfo(true)}
+                            />
+                        </IconButton>
+                    </HtmlTooltip>
                 </span>
             </div>
             <div>
