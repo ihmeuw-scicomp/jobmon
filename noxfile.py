@@ -13,14 +13,14 @@ from nox.sessions import Session
 src_locations = ["jobmon_client/src", "jobmon_core/src", "jobmon_server/src"]
 test_locations = ["tests"]
 
-python = "3.9"
+python = "3.10"
 
 
 @nox.session(python=python, venv_backend="conda")
 def tests(session: Session) -> None:
     """Run the test suite."""
-    session.install("pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock")
-    session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
+    session.install("pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock", "uvicorn", "nltk")
+    # session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
 
     args = session.posargs or test_locations
 
@@ -29,6 +29,7 @@ def tests(session: Session) -> None:
         "run",
         "-m",
         "pytest",
+        "-s",
         *args,
         env={"SQLALCHEMY_WARN_20": "1"}
     )
