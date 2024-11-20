@@ -4,7 +4,7 @@ A GUI to visualize Jobmon Workflows.
 
 ## Overview
 
-This application uses React, Flask, and Bootstrap.
+This application uses React, FastApi, and Bootstrap.
 
 ## Roadmap
 
@@ -12,9 +12,9 @@ You can see the roadmap of the upcoming deployments here: https://hub.ihme.washi
 
 ## Testing Locally
 
-### Deploying the Flask Server App Locally
+### Deploying the FastApi Server App Locally
 
-To deploy the Flask app locally:
+To deploy the FastApi app locally:
 
 1. Open a terminal
 2. Make a conda environment and activate it
@@ -22,7 +22,7 @@ To deploy the Flask app locally:
 4. Navigate to the top of the Jobmon repository
 5. Run `nox -s launch_gui_test_server`
 6. Run `.nox/launch_gui_test_server/bin/python jobmon_gui/local_testing/jobmon_gui/testing_servers/functionaltest_server.py`
-    - This command will spin up a local version of the Flask backend, running on 127.0.0.1:8070 by default. You can then configure the React app to point to this URL for testing purposes.
+    - This command will spin up a local version of the Fastapi backend, running on 127.0.0.1:8070 by default. You can then configure the React app to point to this URL for testing purposes.
 
 ### Deploying the React App Locally
 

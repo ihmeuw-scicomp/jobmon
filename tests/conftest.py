@@ -21,7 +21,7 @@ from jobmon.core.requester import Requester
 
 logger = logging.getLogger(__name__)
 
-_api_prefix = "/api/v3"
+_api_prefix = "/api/v2"
 
 
 @pytest.fixture(scope="session")

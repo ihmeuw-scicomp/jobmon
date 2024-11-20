@@ -41,7 +41,7 @@ class Cluster:
 
         Args:
             cluster_name: the name of the cluster
-            requester (Requester): requester object to connect to Flask service.
+            requester (Requester): requester object to connect to FastApi service.
         """
         cluster = cls(cluster_name, requester)
         cluster.bind()

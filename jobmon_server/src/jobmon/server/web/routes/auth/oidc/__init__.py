@@ -4,6 +4,6 @@ from importlib import import_module
 
 from fastapi import APIRouter
 
-oidc_router = APIRouter(tags=["oidc"])
+oidc_router = APIRouter(tags=["oidc"], prefix="/oidc")
 
-import_module("jobmon.server.web.routes.v3.oidc.oidc")
+import_module("jobmon.server.web.routes.auth.oidc.oidc")

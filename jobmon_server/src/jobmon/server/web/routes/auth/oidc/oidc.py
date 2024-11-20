@@ -1,12 +1,13 @@
 import structlog
 from authlib.integrations.base_client import OAuthError
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import Depends
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse
 from jobmon.server.web.auth import oauth
 from jobmon.server.web.routes.utils import get_user
 
-from jobmon.server.web.routes.v3.oidc import oidc_router as api_v3_router
+from jobmon.server.web.routes.auth.oidc import oidc_router as api_auth_router
+
 from jobmon.core.configuration import JobmonConfig
 
 logger = structlog.get_logger(__name__)
@@ -14,8 +15,7 @@ logger = structlog.get_logger(__name__)
 _CONFIG = JobmonConfig()
 
 
-
-@api_v3_router.get("/login")
+@api_auth_router.get("/login")
 async def login(request: Request):
     redirect_uri = _CONFIG.get("oidc", "redirect_uri")
 
@@ -29,7 +29,7 @@ async def login(request: Request):
     return await oauth.onelogin.authorize_redirect(request, redirect_uri)
 
 
-@api_v3_router.get("/auth")
+@api_auth_router.get("/auth")
 async def auth(request: Request):
     # logger.debug(f"AUTH_DEBUG:oauth.onelogin:{oauth.onelogin}")
     # logger.debug(f"AUTH_DEBUG:request:{request}")
@@ -47,7 +47,6 @@ async def auth(request: Request):
         logger.error(error)
         return HTMLResponse(f"<h1>{error.error}</h1>")
     user = token.get("userinfo")
-    UserRepository().add_user(email=user.email)  # noqa F821
     if user:
         # We must sort groups to prevent "mismatching_state: CSRF Warning! State not equal in request and response."
         if "groups" in user:
@@ -70,7 +69,7 @@ async def auth(request: Request):
     return RedirectResponse(redirect_url)
 
 
-@api_v3_router.get("/userinfo")
+@api_auth_router.get("/userinfo")
 async def userinfo(request: Request) -> dict:
     user = get_user(request)
     # logger.info(f"User info: {user}")
@@ -79,7 +78,7 @@ async def userinfo(request: Request) -> dict:
     return user
 
 
-@api_v3_router.get("/logout")
+@api_auth_router.get("/logout")
 async def logout(request: Request):
     request.session.pop("user", None)
     return RedirectResponse(url="/")

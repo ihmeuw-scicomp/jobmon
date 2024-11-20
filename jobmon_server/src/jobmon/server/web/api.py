@@ -1,17 +1,31 @@
 from importlib import import_module
 from typing import Any, Optional
-
-from fastapi import FastAPI
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 import structlog
 
+from jobmon.core.configuration import JobmonConfig
 from jobmon.core.otlp import OtlpAPI
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 from jobmon.server.web.log_config import configure_structlog  # noqa F401
 from jobmon.server.web.log_config import configure_logging  # noqa F401
+from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
+from jobmon.server.web.routes.utils import get_user
 from jobmon.server.web.server_side_exception import ServerError
+from fastapi.openapi.docs import (
+    get_redoc_html,
+    get_swagger_ui_oauth2_redirect_html,
+    get_swagger_ui_html,
+)
 
 url_prefix = "/api"
+
+docs_static_uri = f"{url_prefix}/docs_static"
+docs_uri = f"{url_prefix}/docs"
+_CONFIG = JobmonConfig()
 
 
 def _init_logging(otlp_api: Optional[OtlpAPI] = None) -> bool:
@@ -64,9 +78,10 @@ def get_app(
     app = FastAPI(
         title="jobmon",
         openapi_url="/api/openapi.json",
-        docs_url="/api/docs",
+        docs_url=None,
     )
-
+    docs_static_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
+    app.mount(docs_static_uri, StaticFiles(directory=docs_static_path), name="docs_static")
     # Add CORS middleware to the FastAPI app
     app.add_middleware(
         CORSMiddleware,
@@ -75,13 +90,35 @@ def get_app(
         allow_methods=["*"],
         allow_headers=["Content-Type"],
     )
-
+    app.add_middleware(SessionMiddleware, secret_key=_CONFIG.get("session", "secret_key"))
+    app.add_middleware(SecurityHeadersMiddleware, csp=True)
     add_hooks_and_handlers(app)
-    for version in ["v3", "v2", "v1"]:
+    for version in ["auth", "v3", "v2", "v1"]:
         mod = import_module(f"jobmon.server.web.routes.{version}")
         # Get the router dynamically from the module (assuming it's an APIRouter)
         api_router = getattr(mod, f"api_{version}_router")
         # Include the router with a version-specific prefix
-        app.include_router(api_router, prefix=f"{url_prefix}")
+        dependencies = None
+        if version == "v3":
+            dependencies = [Depends(get_user)]
+        app.include_router(api_router, prefix=f"{url_prefix}", dependencies=dependencies)
+
+    @app.get("/api/docs", include_in_schema=False)
+    async def custom_swagger_ui_html():
+        return get_swagger_ui_html(
+            openapi_url=app.openapi_url,
+            title=app.title + " API",
+            oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
+            swagger_js_url=f"{docs_static_uri}/swagger-ui-bundle.js",
+            swagger_css_url=f"{docs_static_uri}/swagger-ui.css",
+        )
+
+    @app.get("/api/redoc", include_in_schema=False)
+    async def redoc_html():
+        return get_redoc_html(
+            openapi_url=app.openapi_url,
+            title=app.title + " - ReDoc",
+            redoc_js_url=f"{docs_static_uri}/redoc.standalone.js",
+        )
 
     return app

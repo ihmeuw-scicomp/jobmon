@@ -184,7 +184,7 @@ class Workflow(object):
             workflow_attributes: Attributes that make this workflow different from other
                 workflows that the user wants to record.
             max_concurrently_running: How many running jobs to allow in parallel
-            requester: object to communicate with the flask services.
+            requester: object to communicate with the FastApi services.
             chunk_size: how many tasks to bind in a single request
             default_max_attempts: the default max attempts of the workflow for each array
         """

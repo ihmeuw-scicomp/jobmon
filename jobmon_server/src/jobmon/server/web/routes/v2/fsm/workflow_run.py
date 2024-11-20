@@ -27,6 +27,7 @@ SessionLocal = get_session_local()
 
 
 @api_v1_router.post("/workflow_run")
+@api_v2_router.post("/workflow_run")
 async def add_workflow_run(request: Request) -> Any:
     """Add a workflow run to the db."""
     try:

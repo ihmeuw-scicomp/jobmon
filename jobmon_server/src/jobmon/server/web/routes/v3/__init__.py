@@ -1,5 +1,4 @@
 from importlib import import_module
-
 from fastapi import APIRouter
 from starlette.responses import JSONResponse
 from starlette.status import HTTP_200_OK
@@ -10,13 +9,10 @@ version = "v3"
 # Create a router for version 3 of the API
 api_v3_router = APIRouter(tags=[version], prefix=f"/{version}")
 
-for r in ["fsm", "cli", "reaper", "oidc"]:
+for r in ["fsm", "cli", "reaper"]:
     mod = import_module(f"jobmon.server.web.routes.{version}.{r}")
     router = getattr(mod, f"{r}_router")
-    prefix = ""
-    if r == "oidc":
-        prefix = "/auth/oidc"
-    api_v3_router.include_router(router, prefix=prefix)
+    api_v3_router.include_router(router)
 
 
 # Shared routes

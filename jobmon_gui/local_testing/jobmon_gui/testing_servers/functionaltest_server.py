@@ -35,7 +35,7 @@ class WebServerProcess:
         os.environ["JOBMON__OTLP__WEB_ENABLED"] = "true"
         os.environ["JOBMON__OTLP__SPAN_EXPORTER"] = ""
         os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
-        os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070/api/v3"
+        os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070/api/v2"
 
         if not os.path.exists(self.filepath):
             open(self.filepath, 'a').close()
@@ -44,7 +44,7 @@ class WebServerProcess:
 
         config = JobmonConfig(dict_config={"db": {"sqlalchemy_database_uri": database_uri}})
         app = get_app(config)
-        config.set("http", "service_url", f"http://{self.web_host}:{self.web_port}/api/v3")
+        config.set("http", "service_url", f"http://{self.web_host}:{self.web_port}/api/v2")
         config.write()
 
         uvicorn.run(app, host=self.web_host, port=self.web_port, log_level="info")

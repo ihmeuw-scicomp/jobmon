@@ -25,7 +25,7 @@ def http_request_ok(status_code: int) -> bool:
 
 
 class Requester(object):
-    """Requester object to make HTTP requests to the Jobmon Flask services."""
+    """Requester object to make HTTP requests to the Jobmon FastApi services."""
 
     # Class-level attribute to store the OtlpAPI instance
     _otlp_api = None
