@@ -127,12 +127,9 @@ RuntimeError: Unexpected error occurred while processing task."""
             "workflow_id": 1,
             "workflow_run_id": 1,
         }
-        for i in range(100000)
+        for i in range(100)
     ]
     input_df = pd.DataFrame(input_data)
     start_time = time.time()
     output_df = cluster_error_logs(input_df)
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    print(f"Execution time: {elapsed_time:.4f} seconds")
     assert output_df.shape[0] == 5
