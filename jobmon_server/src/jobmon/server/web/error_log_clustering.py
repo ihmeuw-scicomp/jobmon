@@ -1,13 +1,8 @@
 import nltk
-from nltk import corpus
 from pandas import DataFrame
 import sklearn.feature_extraction.text as ext
 
 nltk.download("punkt", quiet=True)
-nltk.download("stopwords", quiet=True)
-
-stopwords = corpus.stopwords.words("english")
-stopwords.extend(["could", "might", "must", "need", "sha", "wo", "would"])
 
 
 def cluster_error_logs(df: DataFrame) -> DataFrame:
