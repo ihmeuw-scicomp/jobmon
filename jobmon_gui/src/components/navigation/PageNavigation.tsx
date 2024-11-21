@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useContext} from 'react';
 
 import {styled, useTheme, Theme, CSSObject} from "@mui/material/styles";
 import Box from "@mui/material/Box";
@@ -26,10 +26,14 @@ import Typography from "@mui/material/Typography";
 import MediationIcon from '@mui/icons-material/Mediation';
 import BifrostLinks from "@jobmon_gui/components/navigation/BifrostLinks";
 import BatchPredictionIcon from '@mui/icons-material/BatchPrediction';
-import {Tooltip} from "@mui/material";
+import {Button, Tooltip} from "@mui/material";
 import bifrostEnabled from "@jobmon_gui/components/navigation/Bifrost";
 import "@fontsource/archivo"
 import {readTheDocsUrl} from "@jobmon_gui/configs/ExternalUrls";
+import {logoutURL} from "@jobmon_gui/configs/ApiUrls.ts";
+import AuthContext from "@jobmon_gui/contexts/AuthContext.tsx";
+import UserAvatarButton from '@jobmon_gui/components/navigation/UserAvatarButton';
+import UserMenu from "@jobmon_gui/components/navigation/UserMenu.tsx";
 
 const drawerWidth = 260;
 
@@ -104,6 +108,8 @@ export default function PageNavigation({children}: PropsWithChildren) {
     const [open, setOpen] = useState(false);
     const navigate = useNavigate();
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const {user} = useContext(AuthContext)
+    const [userMenuAnchorEl, setUserMenuAnchorEl] = useState<null | HTMLElement>(null);
 
     const handleDrawerOpen = () => {
         setDrawerOpen(true);
@@ -118,7 +124,7 @@ export default function PageNavigation({children}: PropsWithChildren) {
             <CssBaseline/>
             <AppBar position="fixed" sx={{backgroundColor: "#17B9CF"}} id="AppBar">
                 <Toolbar>
-                    <Box sx={{display: "flex", alignItems: "center"}}>
+                    <Box sx={{display: "flex", flexGrow: 1, alignItems: "center"}}>
                         <img src={IhmeIcon} style={{padding: 5}} height={50} alt=""/>
                         <Typography
                             variant="banner"
@@ -137,10 +143,16 @@ export default function PageNavigation({children}: PropsWithChildren) {
                             component={Link}
                             id="homeNavbarLink"
                             to="/">
-                            Jobmon GUI
+                            Jobmon
                         </Typography>
                     </Box>
-
+                    <Box>
+                        <UserAvatarButton
+                            userFullName={user.given_name || user.family_name ? `${user.given_name} ${user.family_name}` : ''}
+                            onClickHandler={setUserMenuAnchorEl}/>
+                        <UserMenu username={user.email || ""} anchorEl={userMenuAnchorEl}
+                                  setAnchorEl={setUserMenuAnchorEl}/>
+                    </Box>
 
                 </Toolbar>
             </AppBar>

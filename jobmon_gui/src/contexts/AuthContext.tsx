@@ -2,6 +2,8 @@ import {createContext, useState, useEffect, PropsWithChildren} from 'react'
 import {Link} from "react-router-dom";
 import {loginURL, logoutURL, userInfoURL} from "@jobmon_gui/configs/ApiUrls.ts";
 import ExternalRedirect from "@jobmon_gui/utils/ExternalRedirect.ts"
+import {Button} from "@mui/material";
+import LoginScreen from "@jobmon_gui/screens/Login.tsx";
 
 export type UserType = {
     sub: string,
@@ -63,10 +65,10 @@ export const AuthProvider = (props: PropsWithChildren) => {
                 setUser(null)
                 console.log("Check user response not ok")
                 localStorage.removeItem('userInfo')
-                ExternalRedirect(loginURL)
+                // ExternalRedirect(loginURL)
             }
         } catch (e) {
-            ExternalRedirect(loginURL)
+            // ExternalRedirect(loginURL)
         }
     }
 
@@ -86,16 +88,17 @@ export const AuthProvider = (props: PropsWithChildren) => {
     }
 
     // Only render children if user is logged in
-    if(user) {
+    if (!user) {
         return (
-            <AuthContext.Provider value={{user, checkUser, loginHandler, logoutHandler}}>
-                {props.children}
-            </AuthContext.Provider>
+            <LoginScreen/>
         )
+
     }
     // Render something in case the redirect fails
     return (
-        <Link to={loginURL}></Link>
+        <AuthContext.Provider value={{user, checkUser, loginHandler, logoutHandler}}>
+            {props.children}
+        </AuthContext.Provider>
     )
 }
 

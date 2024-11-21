@@ -32,10 +32,10 @@ const root = ReactDOM.createRoot(
 );
 root.render(
     <QueryClientProvider client={queryClient}>
-
         <HashRouter>
-            <AuthProvider>
-                <CustomThemeProvider>
+
+            <CustomThemeProvider>
+                <AuthProvider>
                     <PageNavigation>
                         <ApmRoutes>
                             <Route path="workflow">
@@ -56,8 +56,8 @@ root.render(
                             />
                         </ApmRoutes>
                     </PageNavigation>
-                </CustomThemeProvider>
-            </AuthProvider>
+                </AuthProvider>
+            </CustomThemeProvider>
         </HashRouter>
     </QueryClientProvider>
 );

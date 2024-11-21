@@ -81,4 +81,4 @@ async def userinfo(request: Request) -> dict:
 @api_auth_router.get("/logout")
 async def logout(request: Request):
     request.session.pop("user", None)
-    return RedirectResponse(url="/")
+    return RedirectResponse(url=_CONFIG.get("oidc", "login_landing_page_uri"))
