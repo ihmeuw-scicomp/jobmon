@@ -649,7 +649,14 @@ def get_task_details_viz(task_id: int) -> Any:
             "task_status_date",
         )
         result = [dict(zip(column_names, row)) for row in rows]
+
+        if result and "task_status_date" in result[0]:
+            result[0]["task_status_date"] = result[0]["task_status_date"].isoformat()
+
         resp = JSONResponse(
             content={"task_details": result}, status_code=StatusCodes.OK
         )
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "*"
     return resp

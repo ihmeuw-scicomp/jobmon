@@ -9,6 +9,21 @@ All notable changes to the Jobmon GUI will be documented in this file.
 ### Deprecated
 ### Removed
 
+## [3.4.0] - TBD
+
+### User-Facing
+#### Added
+- Added the Jobmon ReadTheDocs link to the navigation bar.
+
+#### Changed
+- Show WorkflowRun heartbeat_date instead of Workflow status_date on the workflow details page.
+- Truncate file paths in TaskInstance table of `Task Details` page.
+- Changed nav bar to match other apps.
+
+### Developer
+#### Changed
+ - Switched from NPM to bun.
+
 ## [3.3.1] - 2024-10-01
 
 ### User-Facing
