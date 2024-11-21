@@ -19,8 +19,8 @@ python = "3.10"
 @nox.session(python=python, venv_backend="conda")
 def tests(session: Session) -> None:
     """Run the test suite."""
-    session.install("pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock", "uvicorn", "nltk")
-    # session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
+    session.install("pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock")
+    session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
 
     args = session.posargs or test_locations
 
