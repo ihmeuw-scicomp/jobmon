@@ -29,7 +29,6 @@ def tests(session: Session) -> None:
         "run",
         "-m",
         "pytest",
-        "-s",
         *args,
         env={"SQLALCHEMY_WARN_20": "1"}
     )
