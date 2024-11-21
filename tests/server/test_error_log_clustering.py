@@ -64,7 +64,6 @@ def test_cluster_error_logs_two_clusters():
   File "/app/database.py", line 132, in execute
     raise TimeoutError("Connection timed out while trying to reach the database server.")
 TimeoutError: Connection timed out while trying to reach the database server.""",
-
         """Traceback (most recent call last):
   File "/app/job_runner.py", line 75, in execute_job
     self.process_task(data)
@@ -75,7 +74,6 @@ TimeoutError: Connection timed out while trying to reach the database server."""
   File "/app/task_processor.py", line 30, in preprocess_data
     raise MemoryError("Memory limit exceeded during data processing. The task required more memory than allocated.")
 MemoryError: Memory limit exceeded during data processing. The task required more memory than allocated.""",
-
         """Traceback (most recent call last):
   File "/app/data_validator.py", line 18, in validate_data
     check_required_fields(data)
@@ -88,7 +86,6 @@ MemoryError: Memory limit exceeded during data processing. The task required mor
   File "/app/error_logger.py", line 67, in log_to_external_service
     raise ConnectionError("Failed to connect to external error logging service.")
 ConnectionError: Failed to connect to external error logging service.""",
-
         """Traceback (most recent call last):
   File "/app/network_manager.py", line 21, in send_request
     self.connect_to_server()
@@ -101,7 +98,6 @@ ConnectionError: Failed to connect to external error logging service.""",
   File "/app/vendor/requests/adapters.py", line 517, in send
     raise requests.exceptions.ConnectionError("Failed to establish a new connection.")
 requests.exceptions.ConnectionError: Failed to establish a new connection.""",
-
         """Traceback (most recent call last):
   File "/app/task_handler.py", line 32, in start_task
     result = execute_task(task)
@@ -113,7 +109,7 @@ requests.exceptions.ConnectionError: Failed to establish a new connection.""",
     if check_for_errors(intermediate_result):
   File "/app/task_handler.py", line 5, in check_for_errors
     raise RuntimeError("Unexpected error occurred while processing task.")
-RuntimeError: Unexpected error occurred while processing task."""
+RuntimeError: Unexpected error occurred while processing task.""",
     ]
 
     input_data = [
@@ -130,6 +126,5 @@ RuntimeError: Unexpected error occurred while processing task."""
         for i in range(100)
     ]
     input_df = pd.DataFrame(input_data)
-    start_time = time.time()
     output_df = cluster_error_logs(input_df)
     assert output_df.shape[0] == 5
