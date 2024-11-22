@@ -31,7 +31,7 @@ class Task(Base):
 
     def to_wire_as_distributor_task(self) -> tuple:
         """Serialize executor task object."""
-        array_id = int(self.array.id if self.array is not None else -1)
+        array_id = self.array.id if self.array is not None else None
         serialized = SerializeDistributorTask.to_wire(
             task_id=self.id,
             array_id=array_id,
