@@ -57,7 +57,8 @@ export default function WorkflowHeader({
                     }
                     bodyContent={
                         <p>
-                            <b>Workflow Status:</b> {wf_status_desc}<br/>
+                            <b>Workflow Status:</b> {wf_status}<br/>
+                            <b>Workflow Status Description: </b> {wf_status_desc}<br/>
                             <b>Workflow Tool:</b> {wf_tool}<br/>
                             <b>Workflow Name:</b> {wf_name}<br/>
                             <b>Workflow Args:</b> {wf_args}<br/>
