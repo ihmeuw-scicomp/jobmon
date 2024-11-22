@@ -58,7 +58,7 @@ def create_multiple_status_wf():
     """
     # give the large wf sometime to run
     sleep(60)
-    C = "multiprocess"
+    C = "sequential"
     Q = "null.q"
     tool = Tool("complex_wf_tool")
     # shared tt for all wf
