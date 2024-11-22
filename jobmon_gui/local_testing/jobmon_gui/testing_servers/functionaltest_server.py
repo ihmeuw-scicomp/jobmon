@@ -157,7 +157,7 @@ def create_multiple_status_wf():
 
 
 def create_large_workflow():
-    C = "dummy"
+    C = "sequential"
     Q = "null.q"
 
     TOTAL_TASK = 50000  # refer to production wf 53630
