@@ -1,11 +1,10 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {Link, useLocation} from 'react-router-dom';
-
-import {convertDate, convertDatePST} from '@jobmon_gui/utils/formatters'
+import {AdapterDayjs} from "@mui/x-date-pickers/AdapterDayjs";
 import '@jobmon_gui/styles/jobmon_gui.css';
 import {FaCircle} from "react-icons/fa";
-import {MaterialReactTable, MRT_RowData, useMaterialReactTable} from 'material-react-table';
-import {Box, Button, CircularProgress} from '@mui/material';
+import {createMRTColumnHelper, MaterialReactTable, MRT_RowData, useMaterialReactTable} from 'material-react-table';
+import {Box, Button} from '@mui/material';
 import {mkConfig, generateCsv, download} from "export-to-csv";
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import {useQuery} from "@tanstack/react-query";
@@ -14,7 +13,11 @@ import {task_table_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import Typography from "@mui/material/Typography";
 import {type Row} from '@tanstack/react-table';
-import {useTaskTableColumnsStore} from "@jobmon_gui/stores/task_table";
+import {useTaskTableStore} from "@jobmon_gui/stores/TaskTable.ts";
+import {LocalizationProvider} from "@mui/x-date-pickers";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import {formatDayjsDate} from "@jobmon_gui/utils/DayTime.ts";
 
 type TaskTableProps = {
     taskTemplateName: string
@@ -28,7 +31,7 @@ type Task = {
     task_name: string
     task_num_attempts: number
     task_status: string
-    task_status_date: string
+    task_status_date: dayjs.Dayjs
 }
 type Tasks = {
     tasks: Task[]
@@ -36,8 +39,10 @@ type Tasks = {
 
 
 export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps) {
+    dayjs.extend(utc)
+    const columnHelper = createMRTColumnHelper<Task>()
     const location = useLocation();
-    const columnFilters = useTaskTableColumnsStore()
+    const taskTableStore = useTaskTableStore()
     const tasks = useQuery({
         queryKey: ["workflow_details", "tasks", workflowId, taskTemplateName],
         queryFn: async () => {
@@ -49,7 +54,10 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
                     params: {tt_name: taskTemplateName}
                 }
             ).then((r) => {
-                return r.data.tasks
+                return r.data.tasks.map((task: Task) => {
+                    task.task_status_date = dayjs.utc(task.task_status_date, 'YYYY-MM-DD HH:mm:SS')
+                    return task
+                })
             })
         },
         staleTime: 5000,
@@ -58,9 +66,8 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
 
 
     const columns = [
-        {
+        columnHelper.accessor("task_id", {
             header: "Task ID",
-            accessorKey: "task_id",
             Cell: ({renderedCellValue, row}) => (
                 <nav>
                     <Link
@@ -72,14 +79,12 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
                 </nav>
             ),
             filterFn: 'listFilter',
-        },
-        {
+        }),
+        columnHelper.accessor("task_name", {
             header: "Task Name",
-            accessorKey: "task_name",
-        },
-        {
+        }),
+        columnHelper.accessor("task_status",{
             header: "Status",
-            accessorKey: "task_status",
             Cell: ({row}) => {
                 const status = row.original.task_status;
                 const statusData = workflow_status.find(item => item.status === status);
@@ -90,41 +95,27 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
                     </div>
                 );
             },
-        },
-        {
+        }),
+        columnHelper.accessor("task_command",{
             header: "Command",
-            accessorKey: "task_command",
             enableClickToCopy: true,
             size: 200,
-        },
-        {
+        }),
+        columnHelper.accessor("task_num_attempts",{
             header: "Num Attempts",
-            accessorKey: "task_num_attempts",
-        },
-        {
+        }),
+        columnHelper.accessor("task_max_attempts",{
             header: "Max Attempts",
-            accessorKey: "task_max_attempts",
-        },
-        {
+        }),
+        columnHelper.accessor("task_status_date",{
             header: "Status Date",
-            accessorKey: "task_status_date",
+            filterVariant: 'datetime-range',
+            size: 350,
             Cell: ({renderedCellValue}) => (
-                convertDatePST(renderedCellValue)
+                dayjs.isDayjs(renderedCellValue) ? formatDayjsDate(renderedCellValue) : renderedCellValue
             )
-        },
+        }),
     ];
-
-
-    const [sorting, setSorting] = useState([{
-        id: 'task_id',
-        desc: false, //sort by age in descending order by default
-    }])
-    const [pagination, setPagination] = useState({pageIndex: 0, pageSize: 15})
-
-    const setColumnFilters = (updater) => {
-        const newColumnFilters = typeof updater === "function" ? updater(columnFilters.get()) : updater;
-        columnFilters.set(newColumnFilters)
-    }
 
 
     const table = useMaterialReactTable({
@@ -134,23 +125,39 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         enableColumnFilterModes: true,
 
         state: {
-
-            get columnFilters() {
-                return columnFilters.get() //pass controlled state back to the table (overrides internal state)
-            },
-            get sorting() {
-                return sorting
-            },
-            get pagination() {
-                return pagination
-            },
-
+            isLoading: tasks.isLoading,
+            pagination: taskTableStore.getPagination(),
+            columnFilters: taskTableStore.getFilters(),
+            sorting: taskTableStore.getSorting(),
+            columnOrder: taskTableStore.getColumnOrder(),
+            density: taskTableStore.getDensity(),
+            columnVisibility: taskTableStore.getColumnVisibility(),
+            showColumnFilters: taskTableStore.getFilterVisibility(),
         },
         enableColumnResizing: true,
         layoutMode: "grid",
-        onColumnFiltersChange: setColumnFilters,
-        onSortingChange: setSorting,
-        onPaginationChange: setPagination,
+        onPaginationChange: (s) => {
+            taskTableStore.setPagination(s)
+        },
+        onColumnFiltersChange: (s) => {
+            taskTableStore.setFilters(s)
+        },
+        onSortingChange: (s) => {
+            taskTableStore.setSorting(s)
+        },
+        onColumnOrderChange: (s) => {
+            taskTableStore.setColumnOrder(s)
+        },
+        onDensityChange: (s) => {
+            taskTableStore.setDensity(s)
+        },
+        onColumnVisibilityChange: (s) => {
+            taskTableStore.setColumnVisibility(s)
+        },
+        onShowColumnFiltersChange: (s) => {
+            taskTableStore.setFilterVisibility(s)
+        },
+
         filterFns: {
             listFilter: <TData extends MRT_RowData>(
                 row: Row<TData>,
@@ -191,7 +198,10 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
     });
 
     const exportToCSV = () => {
-        const csv = generateCsv(csvConfig)(tasks?.data);
+        const csv = generateCsv(csvConfig)(tasks?.data.map((r) => {
+            r.task_status_date = formatDayjsDate(r.task_status_date)
+            return r
+        }));
         download(csvConfig)(csv);
     };
 
@@ -199,18 +209,15 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         return (<Typography sx={{pt: 5}}>Select a task template from above to view tasks</Typography>)
     }
 
-    if (tasks.isLoading) {
-        return (<CircularProgress/>)
-    }
-
-
     if (tasks.isError) {
         return (<Typography sx={{pt: 5}}>Error loading tasks. Please refresh and try again.</Typography>)
     }
 
     return (
         <Box p={2} display="flex" justifyContent="center" width="100%">
-            <MaterialReactTable table={table}/>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <MaterialReactTable table={table}/>
+            </LocalizationProvider>
         </Box>
     );
 }

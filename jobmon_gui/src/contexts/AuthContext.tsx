@@ -1,9 +1,10 @@
-import {createContext, useState, useEffect, PropsWithChildren} from 'react'
-import {Link} from "react-router-dom";
+import {createContext, PropsWithChildren} from 'react'
 import {loginURL, logoutURL, userInfoURL} from "@jobmon_gui/configs/ApiUrls.ts";
 import ExternalRedirect from "@jobmon_gui/utils/ExternalRedirect.ts"
-import {Button} from "@mui/material";
 import LoginScreen from "@jobmon_gui/screens/Login.tsx";
+import {useQuery} from "@tanstack/react-query";
+import axios from "axios";
+import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
 
 export type UserType = {
     sub: string,
@@ -25,14 +26,11 @@ export type UserType = {
 
 export type AuthContextType = {
     user: UserType | null
-    checkUser: () => void
     loginHandler: () => void
     logoutHandler: () => void
 }
 const AuthContextDefaultValue: AuthContextType = {
     user: null,
-    checkUser: () => {
-    },
     loginHandler: () => {
     },
     logoutHandler: () => {
@@ -41,62 +39,39 @@ const AuthContextDefaultValue: AuthContextType = {
 const AuthContext = createContext<AuthContextType>(AuthContextDefaultValue)
 
 export const AuthProvider = (props: PropsWithChildren) => {
-    const [user, setUser] = useState<UserType | null>(null)
+    // const [user, setUser] = useState<UserType | null>(null)
 
-
-    // Check if user is logged in
-    const checkUser = async () => {
-        console.log("Running Check User")
-        try {
-            const res = await fetch(userInfoURL, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    // 'X-CSRFToken': cookieData,
-                },
-                credentials: "include",
-            })
-            const data = await res.json()
-            if (res.ok && data.email) {
-                setUser(data)
-                console.log("Setting userInfo Localstorage")
-                localStorage.setItem('userInfo', JSON.stringify(data))
-            } else {
-                setUser(null)
-                console.log("Check user response not ok")
-                localStorage.removeItem('userInfo')
-                // ExternalRedirect(loginURL)
-            }
-        } catch (e) {
-            // ExternalRedirect(loginURL)
+    const user = useQuery(
+        {
+            queryKey: ['userinfo'],
+            queryFn: async () => {
+                return axios.get<UserType>(userInfoURL, jobmonAxiosConfig).then((r) => {
+                    localStorage.setItem('userInfo', JSON.stringify(r.data))
+                    return r.data
+                })
+            },
+            retry: false
         }
+    )
+    const checkUser = () => {
     }
-
-
-    useEffect(() => {
-        checkUser()
-    }, [])
 
     const loginHandler = () => {
         ExternalRedirect(loginURL)
     }
 
     const logoutHandler = () => {
-        setUser(null)
         localStorage.removeItem('userInfo')
         ExternalRedirect(logoutURL)
     }
-
-    // Only render children if user is logged in
-    if (!user) {
-        return (
-            <LoginScreen/>
-        )
-
+    if (user.isError || !user.data) {
+        localStorage.removeItem('userInfo')
+        return <LoginScreen/>
     }
+    const userData = user.data
     // Render something in case the redirect fails
     return (
-        <AuthContext.Provider value={{user, checkUser, loginHandler, logoutHandler}}>
+        <AuthContext.Provider value={{user: userData, loginHandler: loginHandler, logoutHandler: logoutHandler}}>
             {props.children}
         </AuthContext.Provider>
     )

@@ -1,7 +1,6 @@
 import React, {useState} from 'react';
 import axios from 'axios';
 import {Link, useLocation} from "react-router-dom";
-import {convertDatePST} from '@jobmon_gui/utils/formatters';
 import {FaCircle} from "react-icons/fa";
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
 import {useQuery} from "@tanstack/react-query";
@@ -22,6 +21,10 @@ import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import IconButton from '@mui/material/IconButton';
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal";
 import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea";
+import {useDisplayTimeFormatStore, useDisplayTimezoneStore} from "@jobmon_gui/stores/DateTime.ts";
+import utc from "dayjs/plugin/utc";
+import advancedFormat from "dayjs/plugin/advancedFormat";
+import timezone from "dayjs/plugin/timezone";
 
 type WorkflowType = {
     DONE: number,
@@ -45,6 +48,9 @@ type WorkflowsQueryResponse = {
 }
 
 export default function WorkflowList() {
+    dayjs.extend(utc)
+    dayjs.extend(advancedFormat);
+    dayjs.extend(timezone);
     const [showWorkflowInfo, setShowWorkflowInfo] = useState(false)
     const [workflowDetails, setWorkflowDetails] = useState<WorkflowType>({
         DONE: 0,
@@ -64,6 +70,8 @@ export default function WorkflowList() {
     });
     const location = useLocation();
     const workflowSettings = useWorkflowSearchSettings()
+    const timezoneStore = useDisplayTimezoneStore()
+    const timeFormatStore = useDisplayTimeFormatStore()
 
     const workflows = useQuery({
         queryKey: [
@@ -240,14 +248,14 @@ export default function WorkflowList() {
                         </Grid>
                         <Grid item xs={8}>
                             <Typography
-                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date)}</Typography>
+                                sx={modalValuesStyles}>{dayjs(workflowDetails.wf_submitted_date).tz(timezoneStore.get() || Intl.DateTimeFormat().resolvedOptions().timeZone).format(timeFormatStore.get())}</Typography>
                         </Grid>
                         <Grid item xs={4}>
                             <Typography sx={modalTitleStyles}>Status Date:</Typography>
                         </Grid>
                         <Grid item xs={8}>
                             <Typography
-                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_status_date)}</Typography>
+                                sx={modalValuesStyles}>{dayjs(workflowDetails.wf_status_date).tz(timezoneStore.get() || Intl.DateTimeFormat().resolvedOptions().timeZone).format(timeFormatStore.get())}</Typography>
                         </Grid>
                         <Grid item xs={4}>
                             <Typography sx={modalTitleStyles}>Number of Workflow Runs:</Typography>

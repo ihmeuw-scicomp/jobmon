@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import HTTPException
 from starlette.requests import Request
 import structlog
@@ -17,6 +19,8 @@ def get_user(request: Request):
     user = request.session.get("user")
     if not user:
         raise HTTPException(status_code=403, detail="Unauthorized")
+    # if 'exp' not in user or user['exp'] < int(datetime.now().timestamp()):
+    #     raise HTTPException(status_code=403, detail="Session expired")
     return user
 
 

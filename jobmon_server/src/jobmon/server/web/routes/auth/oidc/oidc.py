@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import structlog
 from authlib.integrations.base_client import OAuthError
 from fastapi import Depends
@@ -61,6 +63,7 @@ async def auth(request: Request):
         else:
             user["groups"] = []
         logger.debug(f"AUTH_DEBUG:groups_after_sort:{user['groups']}")
+        print(dict(user))
         request.session["user"] = dict(user)
         logger.debug(f"AUTH_DEBUG:request_session_user:{request.session['user']}")
 
