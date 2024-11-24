@@ -1,11 +1,6 @@
 import {create} from 'zustand'
-import {createJSONStorage, devtools, persist} from 'zustand/middleware'
+import {devtools, persist} from 'zustand/middleware'
 import dayjs, {Dayjs} from "dayjs"; // required for devtools typing
-
-const getUrlSearch = () => {
-    return window.location.search.substring(1)
-}
-
 
 export type WorkflowSearchSettings = {
     user: string
@@ -20,11 +15,6 @@ export type WorkflowSearchSettings = {
     "status": string
 }
 
-type WorkflowSearchSettingsSearchParams = Omit<WorkflowSearchSettings, 'date_submitted'> & { date_submitted: string };
-
-
-const twoWeeksMs = 12096e5; // 2 weeks in milliseconds
-const twoWeeksAgo = new Date(Date.now() - twoWeeksMs);
 const defaultSettings = {
     user: "",
     tool: "",

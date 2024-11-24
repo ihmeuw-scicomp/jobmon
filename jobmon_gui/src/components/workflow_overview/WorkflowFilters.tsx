@@ -4,17 +4,15 @@ import {AdapterDayjs} from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs from "dayjs";
 import React, {useEffect} from "react";
 import {useWorkflowSearchSettings} from "@jobmon_gui/stores/workflow_settings";
-import {useSearchParams} from "react-router-dom";
 import {useQueryClient} from "@tanstack/react-query";
 import Box from "@mui/material/Box";
 
 export default function WorkflowFilters() {
     const queryClient = useQueryClient()
     const workflowSettings = useWorkflowSearchSettings()
-    const [searchParams] = useSearchParams();
 
     useEffect(() => {
-        workflowSettings.loadValuesFromSearchParams(searchParams);
+        workflowSettings.loadValuesFromSearchParams(new URLSearchParams(window.location.search));
     }, []);
 
     const handleClear = () => {
@@ -40,25 +38,25 @@ export default function WorkflowFilters() {
                 <Grid item xs={3}>
                     <TextField
                         label="Username"
+                        fullWidth={true}
                         value={workflowSettings.getPending().user}
                         onChange={(e) => handleInputChange("user", e.target.value)}
-                        fullWidth={true}
                     />
                 </Grid>
                 <Grid item xs={3}>
                     <TextField
                         label="Workflow Args"
+                        fullWidth={true}
                         value={workflowSettings.getPending().wf_args}
                         onChange={(e) => handleInputChange("wf_args", e.target.value)}
-                        fullWidth={true}
                     />
                 </Grid>
                 <Grid item xs={1.5}>
                     <TextField
                         label="WF Attribute Key"
+                        fullWidth={true}
                         value={workflowSettings.getPending().wf_attribute_key}
                         onChange={(e) => handleInputChange("wf_attribute_key", e.target.value)}
-                        fullWidth={true}
                     />
 
                 </Grid>
@@ -73,9 +71,9 @@ export default function WorkflowFilters() {
                 <Grid item xs={3}>
                     <TextField
                         label="Tool"
+                        fullWidth={true}
                         value={workflowSettings.getPending().tool}
                         onChange={(e) => handleInputChange("tool", e.target.value)}
-                        fullWidth={true}
                     />
 
                 </Grid>
@@ -83,8 +81,8 @@ export default function WorkflowFilters() {
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DatePicker
                             label={"Submitted Date Start"}
-                            value={workflowSettings.getPending().date_submitted}
-                            onChange={(value) => handleInputChange("date_submitted", value)}
+                            value={workflowSettings.getPending().date_submitted ? dayjs(workflowSettings.getPending().date_submitted) : dayjs().subtract(2, "weeks")}
+                            onChange={(value) => handleInputChange("date_submitted", dayjs(value))}
                             sx={{width: "100%"}}
                         />
                     </LocalizationProvider>
@@ -94,33 +92,30 @@ export default function WorkflowFilters() {
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DatePicker
                             label={"Submitted Date End"}
-                            value={workflowSettings.getPending().date_submitted_end}
-                            onChange={(value) => handleInputChange("date_submitted_end", value)}
+                            value={workflowSettings.getPending().date_submitted_end ? dayjs(workflowSettings.getPending().date_submitted_end) : dayjs()}
+                            onChange={(value) => handleInputChange("date_submitted_end", dayjs(value))}
                             sx={{width: "100%"}}
                         />
                     </LocalizationProvider>
 
                 </Grid>
                 <Grid item xs={3}>
-                    <TextField
-                        label="Workflow Name"
-                        value={workflowSettings.getPending().wf_name}
-                        onChange={(e) => handleInputChange("wf_name", e.target.value)}
-                        fullWidth={true}
-                    />
+                    <TextField label="Workflow Name"
+                               fullWidth={true}
+                               value={workflowSettings.getPending().wf_name}
+                               onChange={(e) => handleInputChange("wf_name", e.target.value)}/>
 
                 </Grid>
                 <Grid item xs={3}>
                     <FormControl fullWidth={true}>
                         <InputLabel id="LABEL-workflow-status">Workflow Status</InputLabel>
-                        <Select
-                            labelId="LABEL-workflow-status"
-                            label="Workflow Status"
-                            id={"SELECT-workflow-status"}
-                            value={workflowSettings.getPending().status}
-                            onChange={(e) => handleInputChange("status", e.target.value)}
-                            fullWidth={true}
-                        >
+                        <Select labelId="LABEL-workflow-status"
+
+                                label="Workflow Status"
+                                id={"SELECT-workflow-status"}
+                                onChange={(e) => handleInputChange("status", e.target.value)}
+                                value={workflowSettings.getPending().status}
+                                fullWidth={true}>
                             <MenuItem>{undefined}</MenuItem>
                             <MenuItem value="A">Aborted</MenuItem>
                             <MenuItem value="D">Done</MenuItem>
@@ -135,11 +130,10 @@ export default function WorkflowFilters() {
                     </FormControl>
                 </Grid>
                 <Grid item xs={3}>
-                    <TextField
-                        label="Workflow ID" fullWidth={true}
-                        value={workflowSettings.getPending().wf_id}
-                        onChange={(e) => handleInputChange("wf_id", e.target.value)}
-                    />
+                    <TextField label="Workflow ID" fullWidth={true}
+                               value={workflowSettings.getPending().wf_id}
+                               onChange={(e) => handleInputChange("wf_id", e.target.value)}/>
+
                 </Grid>
                 <Grid item xs={12}>
                     <Grid container spacing={2}>
