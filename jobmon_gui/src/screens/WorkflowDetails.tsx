@@ -36,7 +36,7 @@ type WorkflowDetails = {
     wf_status_date: string
     wf_status_desc: string
     wfr_jobmon_version: string
-
+    wfr_heartbeat_date: string
 }
 
 type WorkflowDetailsResponse = WorkflowDetails[]
