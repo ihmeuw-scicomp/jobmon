@@ -199,7 +199,7 @@ export default function WorkflowList() {
                                     <ListItemText
                                         primary={
                                             <Typography variant="h6">
-                                                <Link to={`/workflow/${workflow.wf_id}/tasks`}>
+                                                <Link to={`/workflow/${workflow.wf_id}`}>
                                                     {workflow.wf_id} - {workflow.wf_name}
                                                 </Link>
                                             </Typography>
