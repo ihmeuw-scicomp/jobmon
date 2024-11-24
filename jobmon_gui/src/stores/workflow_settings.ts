@@ -40,7 +40,11 @@ const defaultSettings = {
 
 export type WorkflowSearchSettingsStore = {
     settings: WorkflowSearchSettings
+    pendingSettings: WorkflowSearchSettings
     refreshData: boolean
+    applyPendingSettings: () => void
+    resetPendingSettings: () => void
+    setPendingSetting: (key: string, value: string) => void
     getRefreshData: () => boolean
     triggerDataRefresh: () => void
     clearDataRefresh: () => void
@@ -57,6 +61,7 @@ export type WorkflowSearchSettingsStore = {
     setDateSubmittedEnd: (newValue: Dayjs) => void
     setStatus: (newValue: string) => void
     get: () => WorkflowSearchSettings
+    getPending: () => WorkflowSearchSettings
     loadValuesFromSearchParams: (searchParams: URLSearchParams) => void
     clear: () => void
 }
@@ -66,7 +71,22 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
         persist(
             (set, get) => ({
                 settings: defaultSettings,
+                pendingSettings: defaultSettings,
                 refreshData: false,
+                applyPendingSettings: () => {
+                    set({
+                        settings: get().pendingSettings,
+                        refreshData: true,
+                    });
+                },
+                resetPendingSettings: () => set({ pendingSettings: defaultSettings }),
+                setPendingSetting: (key, value) =>
+                    set((state) => ({
+                        pendingSettings: {
+                            ...state.pendingSettings,
+                            [key]: value,
+                        },
+                    })),
                 triggerDataRefresh: () => set({...get(), refreshData: true}),
                 clearDataRefresh: () => set({...get(), refreshData: false}),
                 getRefreshData: () => get().refreshData,
@@ -107,7 +127,6 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                             tool: newValue
                         }
                     }))
-
                     get().updateUrlSearchParams()
                 },
                 setWfName: (newValue: string) => {
@@ -117,7 +136,6 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                             wf_name: newValue
                         }
                     }))
-
                     get().updateUrlSearchParams()
                 },
                 setWfArgs: (newValue: string) => {
@@ -183,40 +201,29 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                         }
                     }))
                     get().updateUrlSearchParams()
-
                 },
                 get: () => get().settings,
+                getPending: () => get().pendingSettings,
                 loadValuesFromSearchParams: (searchParams: URLSearchParams) => {
-                    const urlUser = searchParams.get("user") || ""
-                    const urlTool = searchParams.get("tool") || ""
-                    const urlWfName = searchParams.get("wf_name") || ""
-                    const urlWfArgs = searchParams.get("wf_args") || ""
-                    const urlWfAttributeKey = searchParams.get("wf_attribute_key") || ""
-                    const urlWfAttributeValue = searchParams.get("wf_attribute_value") || ""
-                    const urlWfId = searchParams.get("wf_id") || ""
-                    const urlDateSubmitted = searchParams.get("date_submitted") ? dayjs(searchParams.get("date_submitted")) : dayjs().subtract(2, 'weeks')
-                    const urlDateSubmittedEnd = searchParams.get("date_submitted_end") ? dayjs(searchParams.get("date_submitted_end")) : dayjs()
-                    const urlStatus = searchParams.get("status") || ""
-
-
+                    const loadedSettings = {
+                        user: searchParams.get("user") || "",
+                        tool: searchParams.get("tool") || "",
+                        wf_name: searchParams.get("wf_name") || "",
+                        wf_args: searchParams.get("wf_args") || "",
+                        wf_attribute_key: searchParams.get("wf_attribute_key") || "",
+                        wf_attribute_value: searchParams.get("wf_attribute_value") || "",
+                        wf_id: searchParams.get("wf_id") || "",
+                        date_submitted: searchParams.get("date_submitted") ? dayjs(searchParams.get("date_submitted")) : dayjs().subtract(2, 'weeks'),
+                        date_submitted_end: searchParams.get("date_submitted_end") ? dayjs(searchParams.get("date_submitted_end")) : dayjs(),
+                        status: searchParams.get("status") || "",
+                    };
                     set({
-                        settings: {
-                            user: urlUser,
-                            tool: urlTool,
-                            wf_name: urlWfName,
-                            wf_args: urlWfArgs,
-                            wf_attribute_key: urlWfAttributeKey,
-                            wf_attribute_value: urlWfAttributeValue,
-                            wf_id: urlWfId,
-                            date_submitted: urlDateSubmitted || dayjs().subtract(2, 'weeks'),
-                            date_submitted_end: urlDateSubmittedEnd || dayjs(),
-                            status: urlStatus,
-                        }
-                    })
-
+                        settings: loadedSettings,
+                        pendingSettings: loadedSettings,
+                    });
                 },
                 clear: () => {
-                    set(() => ({settings: defaultSettings}))
+                    set(() => ({settings: defaultSettings, pendingSettings: defaultSettings}))
                     get().updateUrlSearchParams()
                 }
             }),
