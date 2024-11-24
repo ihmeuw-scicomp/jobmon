@@ -125,7 +125,7 @@ export default function TaskDetails() {
                 <Breadcrumb.Item>
                     <button className="breadcrumb-button" onClick={handleHomeClick}>Home</button>
                 </Breadcrumb.Item>
-                <Breadcrumb.Item><Link to={{pathname: `/workflow/${workflow_id}/tasks`}}>Workflow
+                <Breadcrumb.Item><Link to={{pathname: `/workflow/${workflow_id}`}}>Workflow
                     ID {workflow_id}</Link></Breadcrumb.Item>
                 <Breadcrumb.Item active>Task ID {taskId}</Breadcrumb.Item>
             </Breadcrumb>
