@@ -54,8 +54,8 @@ def create_simple_wf():
 def create_tired_wf():
     """Use dummy cluster to create a fake tired workflow."""
     from jobmon.client.api import Tool
-    tool = Tool("dummy")
-    C = "dummy"
+    tool = Tool("multiprocess")
+    C = "multiprocess"
     Q = "null.q"
     tt = tool.get_task_template(
         template_name="tired_task1",
