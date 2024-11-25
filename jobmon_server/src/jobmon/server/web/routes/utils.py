@@ -1,4 +1,5 @@
-from typing import Any, List, Mapping, TypedDict
+from typing import Any, List, Mapping
+from typing_extensions import TypedDict
 
 from fastapi import HTTPException
 from starlette.requests import Request

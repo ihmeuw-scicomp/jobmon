@@ -1,8 +1,7 @@
-from typing import Union
-
 from authlib.integrations.base_client import OAuthError
+from fastapi import HTTPException
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, RedirectResponse
+from starlette.responses import RedirectResponse
 import structlog
 
 from jobmon.core.configuration import JobmonConfig
@@ -34,7 +33,7 @@ async def login(request: Request) -> RedirectResponse:
 
 
 @api_auth_router.get("/auth")
-async def auth(request: Request) -> Union[RedirectResponse, HTMLResponse]:
+async def auth(request: Request) -> RedirectResponse:
     """auth.
 
     Validates authorization data from OIDC identify provider.
@@ -53,7 +52,7 @@ async def auth(request: Request) -> Union[RedirectResponse, HTMLResponse]:
         logger.error(f"token: {token}")
     except OAuthError as error:
         logger.error(error)
-        return HTMLResponse(f"<h1>{error.error}</h1>")
+        raise HTTPException(status_code=404, detail=error.error)
     user = token.get("userinfo")
     if user:
         # We must sort groups to prevent "mismatching_state: CSRF Warning!

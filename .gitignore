@@ -42,12 +42,8 @@ docsource/api
 
 /jobmon_gui/node_modules/
 /corpora/
-<<<<<<< HEAD
 .venv
 *.code-workspace
 /.env
-=======
-
 # ignore .env
 .env
->>>>>>> d404a81bd5887f4f036ab4bc83c84f3305d4c958
