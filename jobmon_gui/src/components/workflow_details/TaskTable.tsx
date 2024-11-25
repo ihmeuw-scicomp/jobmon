@@ -37,7 +37,6 @@ type Tasks = {
     tasks: Task[]
 }
 
-
 export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps) {
     dayjs.extend(utc)
     const columnHelper = createMRTColumnHelper<Task>()
@@ -83,7 +82,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         columnHelper.accessor("task_name", {
             header: "Task Name",
         }),
-        columnHelper.accessor("task_status",{
+        columnHelper.accessor("task_status", {
             header: "Status",
             Cell: ({row}) => {
                 const status = row.original.task_status;
@@ -96,18 +95,18 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
                 );
             },
         }),
-        columnHelper.accessor("task_command",{
+        columnHelper.accessor("task_command", {
             header: "Command",
             enableClickToCopy: true,
             size: 200,
         }),
-        columnHelper.accessor("task_num_attempts",{
+        columnHelper.accessor("task_num_attempts", {
             header: "Num Attempts",
         }),
-        columnHelper.accessor("task_max_attempts",{
+        columnHelper.accessor("task_max_attempts", {
             header: "Max Attempts",
         }),
-        columnHelper.accessor("task_status_date",{
+        columnHelper.accessor("task_status_date", {
             header: "Status Date",
             filterVariant: 'datetime-range',
             size: 350,
@@ -198,10 +197,11 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
     });
 
     const exportToCSV = () => {
-        const csv = generateCsv(csvConfig)(tasks?.data.map((r) => {
-            r.task_status_date = formatDayjsDate(r.task_status_date)
-            return r
-        }));
+        // Replace the dayjs objects with strings
+        const tasksWithRenderedDates = tasks?.data.map((r) => {
+            return {...r, task_status_date: formatDayjsDate(r.task_status_date)}
+        })
+        const csv = generateCsv(csvConfig)(tasksWithRenderedDates);
         download(csvConfig)(csv);
     };
 
