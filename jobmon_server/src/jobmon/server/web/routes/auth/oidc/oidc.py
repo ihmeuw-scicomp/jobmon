@@ -1,3 +1,5 @@
+from typing import Union
+
 from authlib.integrations.base_client import OAuthError
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse
@@ -6,7 +8,7 @@ import structlog
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.auth import oauth
 from jobmon.server.web.routes.auth.oidc import oidc_router as api_auth_router
-from jobmon.server.web.routes.utils import get_user
+from jobmon.server.web.routes.utils import get_user, User
 
 logger = structlog.get_logger(__name__)
 
@@ -32,7 +34,7 @@ async def login(request: Request) -> RedirectResponse:
 
 
 @api_auth_router.get("/auth")
-async def auth(request: Request) -> RedirectResponse:
+async def auth(request: Request) -> Union[RedirectResponse, HTMLResponse]:
     """auth.
 
     Validates authorization data from OIDC identify provider.
@@ -79,7 +81,7 @@ async def auth(request: Request) -> RedirectResponse:
 
 
 @api_auth_router.get("/userinfo")
-async def userinfo(request: Request) -> dict:
+async def userinfo(request: Request) -> User:
     """userinfo.
 
     Returns the user's information from the user's session cookie.

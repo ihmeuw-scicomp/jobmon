@@ -75,10 +75,12 @@ def get_app(
 
     if not structlog_configured:
         structlog_configured = _init_logging(otlp_api)
+    app_title = "jobmon"
+    openapi_url = "/api/openapi.json"
 
     app = FastAPI(
-        title="jobmon",
-        openapi_url="/api/openapi.json",
+        title=app_title,
+        openapi_url=openapi_url,
         docs_url=None,
     )
     docs_static_path = os.path.join(
@@ -115,8 +117,8 @@ def get_app(
     @app.get("/api/docs", include_in_schema=False)
     async def custom_swagger_ui_html() -> HTMLResponse:
         return get_swagger_ui_html(
-            openapi_url=app.openapi_url,
-            title=app.title + " API",
+            openapi_url=openapi_url,
+            title=app_title + " API",
             oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
             swagger_js_url=f"{docs_static_uri}/swagger-ui-bundle.js",
             swagger_css_url=f"{docs_static_uri}/swagger-ui.css",
@@ -125,8 +127,8 @@ def get_app(
     @app.get("/api/redoc", include_in_schema=False)
     async def redoc_html() -> HTMLResponse:
         return get_redoc_html(
-            openapi_url=app.openapi_url,
-            title=app.title + " - ReDoc",
+            openapi_url=openapi_url,
+            title=app_title + " ReDoc",
             redoc_js_url=f"{docs_static_uri}/redoc.standalone.js",
         )
 

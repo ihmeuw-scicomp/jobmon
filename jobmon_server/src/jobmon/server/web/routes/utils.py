@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Any, List, Mapping, TypedDict
 
 from fastapi import HTTPException
 from starlette.requests import Request
@@ -11,7 +11,49 @@ _CONFIG = JobmonConfig()
 logger = structlog.get_logger(__name__)
 
 
-def get_user(request: Request) -> dict[str, Union[str, int, list[str]]]:
+class User(TypedDict):
+    sub: str
+    email: str
+    preferred_username: str
+    name: str
+    updated_at: int
+    given_name: str
+    family_name: str
+    groups: List[str]
+    nonce: str
+    at_hash: str
+    sid: str
+    aud: str
+    exp: int
+    iat: int
+    iss: str
+
+
+def to_user_dict(data: Mapping[str, Any]) -> User:
+    """to_user_dict.
+
+    Converts dict to User TypedDict.
+    """
+    return User(
+        sub=data["sub"],
+        email=data["email"],
+        preferred_username=data["preferred_username"],
+        name=data["name"],
+        updated_at=data["updated_at"],
+        given_name=data["given_name"],
+        family_name=data["family_name"],
+        groups=data["groups"],
+        nonce=data["nonce"],
+        at_hash=data["at_hash"],
+        sid=data["sid"],
+        aud=data["aud"],
+        exp=data["exp"],
+        iat=data["iat"],
+        iss=data["iss"],
+    )
+
+
+def get_user(request: Request) -> User:
     """get_user.
 
     A shared function to get the user from the session.
@@ -23,7 +65,7 @@ def get_user(request: Request) -> dict[str, Union[str, int, list[str]]]:
         raise HTTPException(status_code=403, detail="Unauthorized")
     # if 'exp' not in user or user['exp'] < int(datetime.now().timestamp()):
     #     raise HTTPException(status_code=403, detail="Session expired")
-    return user
+    return to_user_dict(user)
 
 
 def user_in_group(request: Request, group: str) -> bool:
@@ -32,14 +74,14 @@ def user_in_group(request: Request, group: str) -> bool:
     Check is a user is a member of the specified group.
     """
     user = get_user(request)
-    groups = user["groups"]
+    groups: List[str] = user["groups"]
     logger.info(f"{groups}")
     if group in groups:
         return True
     return False
 
 
-def is_super_user(user: dict[str, Union[str, int, list[str]]]) -> bool:
+def is_super_user(user: User) -> bool:
     """is_super_user.
 
     Checks if a user is a member of the superuser group defined in the

@@ -622,8 +622,8 @@ def get_tt_error_log_viz(
                     "task_instance_id": r[1],
                     "task_instance_err_id": r[2],
                     "error_time": str(r[3]),
-                    "error": r[4],
-                    "task_instance_stderr_log": r[5],
+                    "error": str(r[4]),
+                    "task_instance_stderr_log": str(r[5]),
                     "workflow_run_id": r[6],
                     "workflow_id": r[7],
                 }
