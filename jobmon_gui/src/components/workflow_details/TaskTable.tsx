@@ -121,10 +121,19 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
     }])
     const [pagination, setPagination] = useState({pageIndex: 0, pageSize: 15})
 
+    let debounceTimer; // Timer variable for debouncing
+
     const setColumnFilters = (updater) => {
-        const newColumnFilters = typeof updater === "function" ? updater(columnFilters.get()) : updater;
-        columnFilters.set(newColumnFilters)
-    }
+        // Clear the previous timer
+        clearTimeout(debounceTimer);
+
+        // Set a new timer to execute the filter after 1 second
+        debounceTimer = setTimeout(() => {
+            const newColumnFilters =
+                typeof updater === "function" ? updater(columnFilters.get()) : updater;
+            columnFilters.set(newColumnFilters);
+        }, 1000); // 1000ms delay
+    };
 
 
     const table = useMaterialReactTable({
@@ -170,6 +179,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
                     startIcon={<FileDownloadIcon/>}>
                     Export All Data
                 </Button>
+
             </Box>)
         }
     });
