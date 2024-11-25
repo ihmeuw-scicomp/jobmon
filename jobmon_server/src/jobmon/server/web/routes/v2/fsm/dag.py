@@ -16,7 +16,6 @@ from jobmon.server.web.models.dag import Dag
 from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
-
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
@@ -101,7 +100,7 @@ async def add_edges(dag_id: int, request: Request) -> Any:
             if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
                 insert_stmt = insert_stmt.prefix_with("IGNORE")
             if SessionLocal and "sqlite" in _CONFIG.get(
-                    "db", "sqlalchemy_database_uri"
+                "db", "sqlalchemy_database_uri"
             ):
                 insert_stmt = insert_stmt.prefix_with("OR IGNORE")
             session.execute(insert_stmt)

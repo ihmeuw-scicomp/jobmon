@@ -1,8 +1,5 @@
-from datetime import datetime, timedelta
-
 import structlog
 from authlib.integrations.base_client import OAuthError
-from fastapi import Depends
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse
 from jobmon.server.web.auth import oauth
@@ -82,6 +79,6 @@ async def userinfo(request: Request) -> dict:
 
 
 @api_auth_router.get("/logout")
-async def logout(request: Request):
+async def logout(request: Request) -> RedirectResponse:
     request.session.pop("user", None)
     return RedirectResponse(url=_CONFIG.get("oidc", "login_landing_page_uri"))

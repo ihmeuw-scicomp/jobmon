@@ -19,7 +19,6 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
-
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 logger = structlog.get_logger(__name__)
@@ -137,8 +136,8 @@ async def terminate_workflow_run(workflow_run_id: int, request: Request) -> Any:
                 select(
                     TaskInstance.id,
                     (
-                            "Workflow resume requested. Setting to K from status of: "
-                            + TaskInstance.status
+                        "Workflow resume requested. Setting to K from status of: "
+                        + TaskInstance.status
                     ),
                     func.now(),
                 ).where(
@@ -279,12 +278,12 @@ async def task_instances_status_check(workflow_run_id: int, request: Request) ->
                 # 2) instances that have changed into the declared status
                 where_clause.append(
                     (
-                            TaskInstance.id.in_(task_instance_ids)
-                            & (TaskInstance.status != status)
+                        TaskInstance.id.in_(task_instance_ids)
+                        & (TaskInstance.status != status)
                     )
                     | (
-                            TaskInstance.id.notin_(task_instance_ids)
-                            & (TaskInstance.status == status)
+                        TaskInstance.id.notin_(task_instance_ids)
+                        & (TaskInstance.status == status)
                     )
                 )
             else:
@@ -315,8 +314,7 @@ async def set_status_for_triaging(workflow_run_id: int, request: Request) -> Any
 
     Query all task instances that are submitted to distributor or running which haven't
     reported as alive in the allocated time, and set them for Triaging(from Running)
-    and Kill_self(from Launched).
-    """
+    and Kill_self(from Launched)."""
 
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
     try:

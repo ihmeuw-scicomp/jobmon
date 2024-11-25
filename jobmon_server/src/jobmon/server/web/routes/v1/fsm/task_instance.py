@@ -2,10 +2,11 @@
 
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
+
 from fastapi import Request
 from sqlalchemy import select
-import structlog
 from starlette.responses import JSONResponse
+import structlog
 
 from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition
@@ -30,7 +31,9 @@ async def log_running(request: Request, task_instance_id: int) -> Any:
 
     with SessionLocal() as session:
         with session.begin():
-            select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
+            )
             task_instance = session.execute(select_stmt).scalars().one()
 
             if data.get("distributor_id", None) is not None:
@@ -51,5 +54,7 @@ async def log_running(request: Request, task_instance_id: int) -> Any:
                     logger.error(e)
 
             wire_format = task_instance.to_wire_as_worker_node_task_instance()
-    resp = JSONResponse(content={"task_instance": wire_format}, status_code=StatusCodes.OK)
+    resp = JSONResponse(
+        content={"task_instance": wire_format}, status_code=StatusCodes.OK
+    )
     return resp

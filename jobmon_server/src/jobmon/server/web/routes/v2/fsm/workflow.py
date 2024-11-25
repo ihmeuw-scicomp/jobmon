@@ -27,7 +27,6 @@ from jobmon.server.web.models.workflow_attribute_type import WorkflowAttributeTy
 from jobmon.server.web.models.workflow_status import WorkflowStatus
 from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
-
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 logger = structlog.get_logger(__name__)
@@ -36,7 +35,7 @@ _CONFIG = get_jobmon_config()
 
 
 def _add_workflow_attributes(
-        workflow_id: int, workflow_attributes: Dict[str, str], session: Session
+    workflow_id: int, workflow_attributes: Dict[str, str], session: Session
 ) -> None:
     # add attribute
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
@@ -141,7 +140,7 @@ async def bind_workflow(request: Request) -> Any:
 @api_v1_router.get("/workflow/{workflow_args_hash}")
 @api_v2_router.get("/workflow/{workflow_args_hash}")
 async def get_matching_workflows_by_workflow_args(
-        workflow_args_hash: str, request: Request
+    workflow_args_hash: str, request: Request
 ) -> Any:
     """Return any dag hashes that are assigned to workflows with identical workflow args."""
     try:
@@ -192,7 +191,7 @@ def _add_or_get_wf_attribute_type(name: str, session: Session) -> Optional[int]:
 
 
 def _upsert_wf_attribute(
-        workflow_id: int, name: str, value: str, session: Session
+    workflow_id: int, name: str, value: str, session: Session
 ) -> None:
     with session.begin_nested():
         wf_attrib_id = _add_or_get_wf_attribute_type(name, session)

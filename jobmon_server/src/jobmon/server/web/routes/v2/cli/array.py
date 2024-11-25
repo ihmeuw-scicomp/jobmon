@@ -18,10 +18,10 @@ SessionLocal = get_session_local()
 @api_v1_router.get("/array/{workflow_id}/get_array_tasks")
 @api_v2_router.get("/array/{workflow_id}/get_array_tasks")
 def get_array_task_instances(
-        workflow_id: int,
-        array_name: str,
-        job_name: Optional[str] = Query(None),
-        limit: Optional[int] = Query(None),
+    workflow_id: int,
+    array_name: str,
+    job_name: Optional[str] = Query(None),
+    limit: Optional[int] = Query(None),
 ) -> Any:
     """Return error/output filepaths for task instances filtered by array name.
 

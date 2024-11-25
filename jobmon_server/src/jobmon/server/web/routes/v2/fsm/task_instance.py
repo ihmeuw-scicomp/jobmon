@@ -23,7 +23,6 @@ from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
-
 from jobmon.server.web.server_side_exception import ServerError
 
 logger = structlog.get_logger(__name__)
@@ -547,11 +546,11 @@ async def instantiate_task_instances(request: Request) -> Any:
 
             # Collect the rows into the defaultdict
             for (
-                    array_id,
-                    array_name,
-                    array_batch_num,
-                    task_resources_id,
-                    task_instance_id,
+                array_id,
+                array_name,
+                array_batch_num,
+                task_resources_id,
+                task_instance_id,
             ) in session.execute(instantiated_batches_query):
                 key = (array_id, array_batch_num, array_name, task_resources_id)
                 grouped_data[key].append(int(task_instance_id))
@@ -579,7 +578,7 @@ async def instantiate_task_instances(request: Request) -> Any:
 
 # ############################ HELPER FUNCTIONS ###############################
 def _update_task_instance_state(
-        task_instance: TaskInstance, status_id: str, request: Request
+    task_instance: TaskInstance, status_id: str, request: Request
 ) -> Any:
     """Advance the states of task_instance and it's associated Task.
 
@@ -624,13 +623,13 @@ def _update_task_instance_state(
 
 
 def _log_error(
-        session: Session,
-        ti: TaskInstance,
-        error_state: str,
-        error_msg: str,
-        distributor_id: Optional[int] = None,
-        nodename: Optional[str] = None,
-        request: Optional[Request] = None,
+    session: Session,
+    ti: TaskInstance,
+    error_state: str,
+    error_msg: str,
+    distributor_id: Optional[int] = None,
+    nodename: Optional[str] = None,
+    request: Optional[Request] = None,
 ) -> Any:
     if nodename is not None:
         ti.nodename = nodename  # type: ignore

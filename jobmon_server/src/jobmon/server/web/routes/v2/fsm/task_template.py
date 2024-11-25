@@ -19,7 +19,6 @@ from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.template_arg_map import TemplateArgMap
 from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
-
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 logger = structlog.get_logger(__name__)

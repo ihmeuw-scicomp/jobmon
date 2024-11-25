@@ -81,10 +81,10 @@ async def get_workflow_validation_status(request: Request) -> Any:
         res = [ti[1] for ti in rows]
         # Validate if all tasks are in the same workflow and the workflow status is dead
         if len(res) == 1 and res[0] in (
-                Statuses.FAILED,
-                Statuses.DONE,
-                Statuses.ABORTED,
-                Statuses.HALTED,
+            Statuses.FAILED,
+            Statuses.DONE,
+            Statuses.ABORTED,
+            Statuses.HALTED,
         ):
             validation = True
         else:
@@ -100,7 +100,7 @@ async def get_workflow_validation_status(request: Request) -> Any:
 @api_v1_router.get("/workflow/{workflow_id}/workflow_tasks")
 @api_v2_router.get("/workflow/{workflow_id}/workflow_tasks")
 def get_workflow_tasks(
-        workflow_id: int, limit: int, status: Optional[list[str]] = Query(None)
+    workflow_id: int, limit: int, status: Optional[list[str]] = Query(None)
 ) -> Any:
     """Get the tasks for a given workflow."""
     status_request = status
@@ -253,9 +253,9 @@ async def reset_workflow(workflow_id: int, request: Request) -> Any:
 @api_v1_router.get("/workflow_status")
 @api_v2_router.get("/workflow_status")
 def get_workflow_status(
-        workflow_id: Optional[Union[int, str, List[Union[int, str]]]] = Query(None),
-        limit: Optional[int] = Query(None),
-        user: Optional[list[str]] = Query(None),
+    workflow_id: Optional[Union[int, str, List[Union[int, str]]]] = Query(None),
+    limit: Optional[int] = Query(None),
+    user: Optional[list[str]] = Query(None),
 ) -> Any:
     """Get the status of the workflow."""
     # initial params
@@ -386,10 +386,10 @@ def get_workflow_status(
             df[col + "_pct"] = (df[col].astype(float) / df["TASKS"].astype(float)) * 100
             df[col + "_pct"] = df[[col + "_pct"]].round(1)
             df[col] = (
-                    df[col].astype(int).astype(str)
-                    + " ("
-                    + df[col + "_pct"].astype(str)
-                    + "%)"
+                df[col].astype(int).astype(str)
+                + " ("
+                + df[col + "_pct"].astype(str)
+                + "%)"
             )
 
         # df.replace(to_replace={"0 (0.0%)": "NA"}, inplace=True)
@@ -471,16 +471,16 @@ def get_workflow_status_viz(workflow_ids: list[int] = Query(None)) -> Any:
 @api_v1_router.get("/workflow_overview_viz")
 @api_v2_router.get("/workflow_overview_viz")
 def workflows_by_user_form(
-        user: Optional[str] = Query(None),
-        tool: Optional[str] = Query(None),
-        wf_name: Optional[str] = Query(None),
-        wf_args: Optional[str] = Query(None),
-        wf_attribute_value: Optional[str] = Query(None),
-        wf_attribute_key: Optional[str] = Query(None),
-        wf_id: Optional[str] = Query(None),
-        date_submitted: Optional[str] = Query(None),
-        date_submitted_end: Optional[str] = Query(None),
-        status: Optional[str] = Query(None),
+    user: Optional[str] = Query(None),
+    tool: Optional[str] = Query(None),
+    wf_name: Optional[str] = Query(None),
+    wf_args: Optional[str] = Query(None),
+    wf_attribute_value: Optional[str] = Query(None),
+    wf_attribute_key: Optional[str] = Query(None),
+    wf_id: Optional[str] = Query(None),
+    date_submitted: Optional[str] = Query(None),
+    date_submitted_end: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
 ) -> Any:
     """Fetch associated workflows and workflow runs by username."""
     with SessionLocal() as session:

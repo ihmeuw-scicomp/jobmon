@@ -1,6 +1,7 @@
+import os
 from importlib import import_module
 from typing import Any, Optional
-import os
+
 from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,7 @@ from fastapi.openapi.docs import (
     get_swagger_ui_oauth2_redirect_html,
     get_swagger_ui_html,
 )
+from starlette.responses import HTMLResponse
 
 url_prefix = "/api"
 
@@ -57,9 +59,9 @@ def _init_logging(otlp_api: Optional[OtlpAPI] = None) -> bool:
 
 
 def get_app(
-        use_otlp: bool = False,
-        structlog_configured: bool = False,
-        otlp_api: Optional[OtlpAPI] = None,
+    use_otlp: bool = False,
+    structlog_configured: bool = False,
+    otlp_api: Optional[OtlpAPI] = None,
 ) -> FastAPI:
     """Get a FastAPI app based on the config. If no config is provided, defaults are used.
 
@@ -80,8 +82,12 @@ def get_app(
         openapi_url="/api/openapi.json",
         docs_url=None,
     )
-    docs_static_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "static")
-    app.mount(docs_static_uri, StaticFiles(directory=docs_static_path), name="docs_static")
+    docs_static_path = os.path.join(
+        os.path.dirname(os.path.realpath(__file__)), "static"
+    )
+    app.mount(
+        docs_static_uri, StaticFiles(directory=docs_static_path), name="docs_static"
+    )
     # Add CORS middleware to the FastAPI app
     app.add_middleware(
         CORSMiddleware,
@@ -90,7 +96,9 @@ def get_app(
         allow_methods=["*"],
         allow_headers=["Content-Type"],
     )
-    app.add_middleware(SessionMiddleware, secret_key=_CONFIG.get("session", "secret_key"))
+    app.add_middleware(
+        SessionMiddleware, secret_key=_CONFIG.get("session", "secret_key")
+    )
     app.add_middleware(SecurityHeadersMiddleware, csp=True)
     add_hooks_and_handlers(app)
     for version in ["auth", "v3", "v2", "v1"]:
@@ -101,10 +109,12 @@ def get_app(
         dependencies = None
         if version == "v3":
             dependencies = [Depends(get_user)]
-        app.include_router(api_router, prefix=f"{url_prefix}", dependencies=dependencies)
+        app.include_router(
+            api_router, prefix=f"{url_prefix}", dependencies=dependencies
+        )
 
     @app.get("/api/docs", include_in_schema=False)
-    async def custom_swagger_ui_html():
+    async def custom_swagger_ui_html() -> HTMLResponse:
         return get_swagger_ui_html(
             openapi_url=app.openapi_url,
             title=app.title + " API",
@@ -114,7 +124,7 @@ def get_app(
         )
 
     @app.get("/api/redoc", include_in_schema=False)
-    async def redoc_html():
+    async def redoc_html() -> HTMLResponse:
         return get_redoc_html(
             openapi_url=app.openapi_url,
             title=app.title + " - ReDoc",

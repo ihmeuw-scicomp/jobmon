@@ -3,10 +3,9 @@
 from http import HTTPStatus as StatusCodes
 from typing import Any
 
-from fastapi import Request
 from sqlalchemy import case, func, update
-import structlog
 from starlette.responses import JSONResponse
+import structlog
 
 from jobmon.core import constants
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -22,8 +21,7 @@ def set_status_for_triaging(workflow_run_id: int) -> Any:
 
     Query all task instances that are submitted to distributor or running which haven't
     reported as alive in the allocated time, and set them for Triaging(from Running)
-    and Kill_self(from Launched).
-    """
+    and Kill_self(from Launched)."""
 
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
     logger.error("v1")

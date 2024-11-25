@@ -32,7 +32,6 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.routes.v1.cli import cli_router as api_v1_router
 from jobmon.server.web.routes.v2.cli import cli_router as api_v2_router
-
 from jobmon.server.web.routes.v3.cli.workflow import _cli_label_mapping
 from jobmon.server.web.server_side_exception import InvalidUsage
 
@@ -45,7 +44,7 @@ _CONFIG = get_jobmon_config()
 @api_v1_router.get("/get_task_template_version")
 @api_v2_router.get("/get_task_template_version")
 def get_task_template_version_for_tasks(
-        task_id: Optional[int] = None, workflow_id: Optional[int] = None
+    task_id: Optional[int] = None, workflow_id: Optional[int] = None
 ) -> Any:
     """Get the task_template_version_ids."""
     # parse args
@@ -145,7 +144,7 @@ def get_requested_cores(task_template_version_ids: Optional[str] = None) -> Any:
 @api_v1_router.get("/get_most_popular_queue")
 @api_v2_router.get("/get_most_popular_queue")
 def get_most_popular_queue(
-        task_template_version_ids: Optional[str] = Query(...),
+    task_template_version_ids: Optional[str] = Query(...),
 ) -> Any:
     """Get the most popular queue of the task template."""
     # parse args
@@ -498,13 +497,13 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
 @api_v2_router.get("/tt_error_log_viz/{wf_id}/{tt_id}")
 @api_v2_router.get("/tt_error_log_viz/{wf_id}/{tt_id}/{ti_id}")
 def get_tt_error_log_viz(
-        wf_id: int,
-        tt_id: Optional[int] = None,
-        ti_id: Optional[int] = None,
-        page: int = 1,
-        page_size: int = 10,
-        just_recent_errors: str = "false",
-        cluster_errors: str = "false",
+    wf_id: int,
+    tt_id: Optional[int] = None,
+    ti_id: Optional[int] = None,
+    page: int = 1,
+    page_size: int = 10,
+    just_recent_errors: str = "false",
+    cluster_errors: str = "false",
 ) -> Any:
     """Get the error logs for a task template id for GUI."""
     return_list: List[Any] = []
@@ -524,18 +523,18 @@ def get_tt_error_log_viz(
                 where_conditions.extend(
                     [
                         (
-                                TaskInstance.id
-                                == select(func.max(TaskInstance.id))
-                                .where(TaskInstance.task_id == Task.id)
-                                .correlate(Task)
-                                .scalar_subquery()
+                            TaskInstance.id
+                            == select(func.max(TaskInstance.id))
+                            .where(TaskInstance.task_id == Task.id)
+                            .correlate(Task)
+                            .scalar_subquery()
                         ),
                         (
-                                TaskInstance.workflow_run_id
-                                == select(func.max(WorkflowRun.id))
-                                .where(WorkflowRun.workflow_id == Task.workflow_id)
-                                .correlate(Task)
-                                .scalar_subquery()
+                            TaskInstance.workflow_run_id
+                            == select(func.max(WorkflowRun.id))
+                            .where(WorkflowRun.workflow_id == Task.workflow_id)
+                            .correlate(Task)
+                            .scalar_subquery()
                         ),
                     ]
                 )

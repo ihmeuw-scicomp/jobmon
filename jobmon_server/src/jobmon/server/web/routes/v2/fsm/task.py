@@ -27,7 +27,6 @@ from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
-
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
@@ -185,7 +184,7 @@ async def bind_task_args(request: Request) -> Any:
                     insert(TaskArg).values(task_arg_values).prefix_with("IGNORE")
                 )
             elif SessionLocal and "sqlite" in _CONFIG.get(
-                    "db", "sqlalchemy_database_uri"
+                "db", "sqlalchemy_database_uri"
             ):
                 arg_insert_stmt = (
                     sqlite_insert(TaskArg)
@@ -247,7 +246,7 @@ async def bind_task_attributes(request: Request) -> Any:
                 if insert_values:
                     try:
                         if SessionLocal and "mysql" in _CONFIG.get(
-                                "db", "sqlalchemy_database_uri"
+                            "db", "sqlalchemy_database_uri"
                         ):
                             attr_insert_stmt = mysql_insert(TaskAttribute).values(
                                 insert_values
@@ -258,7 +257,7 @@ async def bind_task_attributes(request: Request) -> Any:
                             session.execute(attr_insert_stmt)
 
                         elif SessionLocal and "sqlite" in _CONFIG.get(
-                                "db", "sqlalchemy_database_uri"
+                            "db", "sqlalchemy_database_uri"
                         ):
                             for attr_to_add in insert_values:
                                 attr_insert_stmt = (  # type: ignore
@@ -318,7 +317,7 @@ def _add_or_get_attribute_types(names: Union[List[str], Set[str]]) -> Dict[str, 
                 new_attribute_types = [{"name": name} for name in new_names]
                 try:
                     if SessionLocal and "mysql" in _CONFIG.get(
-                            "db", "sqlalchemy_database_uri"
+                        "db", "sqlalchemy_database_uri"
                     ):
                         insert_stmt = (
                             insert(TaskAttributeType)
@@ -326,7 +325,7 @@ def _add_or_get_attribute_types(names: Union[List[str], Set[str]]) -> Dict[str, 
                             .prefix_with("IGNORE")
                         )
                     elif SessionLocal and "sqlite" in _CONFIG.get(
-                            "db", "sqlalchemy_database_uri"
+                        "db", "sqlalchemy_database_uri"
                     ):
                         insert_stmt = (
                             sqlite_insert(TaskAttributeType)

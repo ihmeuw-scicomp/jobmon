@@ -123,7 +123,7 @@ def get_wf_name_and_args(workflow_id: int) -> Any:
 @api_v1_router.get("/lost_workflow_run")
 @api_v2_router.get("/lost_workflow_run")
 def get_lost_workflow_runs(
-        status: Union[str, list[str]] = Query(...), version: str = Query(...)
+    status: Union[str, list[str]] = Query(...), version: str = Query(...)
 ) -> Any:
     """Return all workflow runs that are currently in the specified state."""
     if isinstance(status, str):

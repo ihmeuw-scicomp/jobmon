@@ -25,7 +25,6 @@ from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.routes.v1.cli import cli_router as api_v1_router
 from jobmon.server.web.routes.v2.cli import cli_router as api_v2_router
-
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
@@ -56,8 +55,8 @@ _reversed_task_instance_label_mapping = {
 @api_v1_router.get("/task_status")
 @api_v2_router.get("/task_status")
 def get_task_status(
-        task_ids: Optional[Union[int, list[int]]] = Query(...),
-        status: Optional[Union[str, list[str]]] = Query(None),
+    task_ids: Optional[Union[int, list[int]]] = Query(...),
+    status: Optional[Union[str, list[str]]] = Query(None),
 ) -> Any:
     """Get the status of a task."""
     logger.info(f"*********************task_ids: {task_ids}, status_request: {status}")
@@ -402,7 +401,7 @@ def get_task_resource_usage(task_id: int) -> Any:
 
 
 def _get_tasks_recursive(
-        task_ids: Set[int], direction: Direction, session: Session
+    task_ids: Set[int], direction: Direction, session: Session
 ) -> set:
     """Get all input task_ids'.
 
@@ -462,7 +461,7 @@ def _get_dag_and_wf_id(task_id: int, session: Session) -> tuple:
 
 
 def _get_node_dependencies(
-        nodes: set, dag_id: int, session: Session, direction: Direction
+    nodes: set, dag_id: int, session: Session, direction: Direction
 ) -> Set[int]:
     """Get all upstream nodes of a node.
 
@@ -520,7 +519,7 @@ def _get_subdag(node_ids: list, dag_id: int, session: Session) -> list:
 
 
 def _get_tasks_from_nodes(
-        workflow_id: int, nodes: List, task_status: List, session: Session
+    workflow_id: int, nodes: List, task_status: List, session: Session
 ) -> dict:
     """Get task ids of the given node ids.
 

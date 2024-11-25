@@ -2,6 +2,7 @@
 Middleware for security.
 From: https://github.com/tiangolo/fastapi/issues/4420#issuecomment-1234146365
 """
+
 from collections import OrderedDict
 from typing import List, Union
 
@@ -16,9 +17,15 @@ CSP: dict[str, Union[str, List[str]]] = {
         "data:",
     ],
     "connect-src": "'self'",
-    "script-src": ["'self'",
-                   "/api/docs_static/swagger-ui-bundle.js 'sha256-eV3QMumkWxytVHa/LDvu+mnW+PcSAEI4SfFu0iIlbDc='"],
-    "style-src": ["'self'", "'unsafe-inline'", "/api/docs_static/swagger-ui.css", ],
+    "script-src": [
+        "'self'",
+        "/api/docs_static/swagger-ui-bundle.js 'sha256-eV3QMumkWxytVHa/LDvu+mnW+PcSAEI4SfFu0iIlbDc='",
+    ],
+    "style-src": [
+        "'self'",
+        "'unsafe-inline'",
+        "/api/docs_static/swagger-ui.css",
+    ],
 }
 
 
@@ -60,7 +67,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         self.csp = csp
 
     async def dispatch(
-            self, request: Request, call_next: RequestResponseEndpoint
+        self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
         """Dispatch of the middleware.
 

@@ -48,7 +48,7 @@ async def add_nodes(request: Request) -> Any:
             if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
                 node_insert_stmt = node_insert_stmt.prefix_with("IGNORE")
             if SessionLocal and "sqlite" in _CONFIG.get(
-                    "db", "sqlalchemy_database_uri"
+                "db", "sqlalchemy_database_uri"
             ):
                 node_insert_stmt = node_insert_stmt.prefix_with("OR IGNORE")
 
@@ -103,11 +103,11 @@ def _insert_node_args(node_args_list: list) -> None:
             if node_args_list:
                 node_arg_insert_stmt = insert(NodeArg).values(node_args_list)
                 if SessionLocal and "mysql" in _CONFIG.get(
-                        "db", "sqlalchemy_database_uri"
+                    "db", "sqlalchemy_database_uri"
                 ):
                     node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("IGNORE")
                 if SessionLocal and "sqlite" in _CONFIG.get(
-                        "db", "sqlalchemy_database_uri"
+                    "db", "sqlalchemy_database_uri"
                 ):
                     node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("OR IGNORE")
 
