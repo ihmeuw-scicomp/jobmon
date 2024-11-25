@@ -1,10 +1,12 @@
 import React, {useState} from 'react';
 import {HiInformationCircle} from "react-icons/hi";
+import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
 import CustomModal from '@jobmon_gui/components/Modal';
 import {formatBytes} from "@jobmon_gui/utils/formatters";
 import humanizeDuration from 'humanize-duration';
 import {MaterialReactTable} from "material-react-table";
 import {Box} from "@mui/material";
+import IconButton from "@mui/material/IconButton";
 
 
 export default function TaskInstanceTable({taskInstanceData}) {
@@ -103,7 +105,24 @@ export default function TaskInstanceTable({taskInstanceData}) {
                     <p className='color-dark'>
                         Task Instances&nbsp;
                         <span>
-                            <HiInformationCircle onClick={() => showModal("status")}/>
+                            <HtmlTooltip
+                                title="Task Instance Statuses"
+                                arrow={true}
+                                placement={"right"} 
+                            >
+                                <IconButton
+                                    color="inherit"
+                                    sx={{
+                                        padding: 0,
+                                        fontSize: 'inherit',
+                                    }}
+                                >
+                                    <HiInformationCircle
+                                        style={{cursor: 'pointer'}}
+                                        onClick={() => showModal("status")}
+                                    />
+                                </IconButton>
+                            </HtmlTooltip>
                         </span>
                     </p>
                 </header>
