@@ -21,8 +21,8 @@ def set_status_for_triaging(workflow_run_id: int) -> Any:
 
     Query all task instances that are submitted to distributor or running which haven't
     reported as alive in the allocated time, and set them for Triaging(from Running)
-    and Kill_self(from Launched)."""
-
+    and Kill_self(from Launched).
+    """
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
     logger.error("v1")
     workflow_run_id = workflow_run_id

@@ -142,7 +142,7 @@ class JobmonConfig:
         for env_key in os.environ.keys():
             if env_key.startswith(prefix):
                 # Extract the original key name by removing the prefix
-                key = env_key[len(prefix):].lower()
+                key = env_key[len(prefix) :].lower()
                 section_dict[key] = os.environ[env_key]
 
         return section_dict

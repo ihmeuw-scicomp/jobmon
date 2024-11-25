@@ -1,8 +1,8 @@
-from authlib.integrations.starlette_client import OAuth
-from starlette.config import Config
-
 import logging
 import sys
+
+from authlib.integrations.starlette_client import OAuth
+from starlette.config import Config
 
 from jobmon.core.configuration import JobmonConfig
 

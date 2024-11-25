@@ -1,5 +1,5 @@
-"""
-Middleware for security.
+"""Middleware for security.
+
 From: https://github.com/tiangolo/fastapi/issues/4420#issuecomment-1234146365
 """
 
@@ -8,6 +8,8 @@ from typing import List, Union
 
 from fastapi import FastAPI, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+
+swagger_bundle_shasum = "sha256-eV3QMumkWxytVHa/LDvu+mnW+PcSAEI4SfFu0iIlbDc="
 
 CSP: dict[str, Union[str, List[str]]] = {
     "default-src": "'self'",
@@ -19,7 +21,7 @@ CSP: dict[str, Union[str, List[str]]] = {
     "connect-src": "'self'",
     "script-src": [
         "'self'",
-        "/api/docs_static/swagger-ui-bundle.js 'sha256-eV3QMumkWxytVHa/LDvu+mnW+PcSAEI4SfFu0iIlbDc='",
+        f"/api/docs_static/swagger-ui-bundle.js '{swagger_bundle_shasum}'",
     ],
     "style-src": [
         "'self'",

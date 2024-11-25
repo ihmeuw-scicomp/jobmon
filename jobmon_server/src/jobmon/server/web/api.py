@@ -1,11 +1,16 @@
-import os
 from importlib import import_module
+import os
 from typing import Any, Optional
 
-from fastapi.staticfiles import StaticFiles
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import (
+    get_redoc_html,
+    get_swagger_ui_html,
+)
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import HTMLResponse
 import structlog
 
 from jobmon.core.configuration import JobmonConfig
@@ -16,12 +21,6 @@ from jobmon.server.web.log_config import configure_logging  # noqa F401
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
 from jobmon.server.web.routes.utils import get_user
 from jobmon.server.web.server_side_exception import ServerError
-from fastapi.openapi.docs import (
-    get_redoc_html,
-    get_swagger_ui_oauth2_redirect_html,
-    get_swagger_ui_html,
-)
-from starlette.responses import HTMLResponse
 
 url_prefix = "/api"
 

@@ -1,13 +1,12 @@
-import structlog
 from authlib.integrations.base_client import OAuthError
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, RedirectResponse
-from jobmon.server.web.auth import oauth
-from jobmon.server.web.routes.utils import get_user
-
-from jobmon.server.web.routes.auth.oidc import oidc_router as api_auth_router
+import structlog
 
 from jobmon.core.configuration import JobmonConfig
+from jobmon.server.web.auth import oauth
+from jobmon.server.web.routes.auth.oidc import oidc_router as api_auth_router
+from jobmon.server.web.routes.utils import get_user
 
 logger = structlog.get_logger(__name__)
 
@@ -15,7 +14,11 @@ _CONFIG = JobmonConfig()
 
 
 @api_auth_router.get("/login")
-async def login(request: Request):
+async def login(request: Request) -> RedirectResponse:
+    """login.
+
+    Handles user login via OIDC.
+    """
     redirect_uri = _CONFIG.get("oidc", "redirect_uri")
 
     logger.debug(f"Redirect URL {redirect_uri}")
@@ -29,7 +32,11 @@ async def login(request: Request):
 
 
 @api_auth_router.get("/auth")
-async def auth(request: Request):
+async def auth(request: Request) -> RedirectResponse:
+    """auth.
+
+    Validates authorization data from OIDC identify provider.
+    """
     # logger.debug(f"AUTH_DEBUG:oauth.onelogin:{oauth.onelogin}")
     # logger.debug(f"AUTH_DEBUG:request:{request}")
     # logger.debug(f"AUTH_DEBUG:request.query_params:{dict(request.query_params)}")
@@ -47,9 +54,11 @@ async def auth(request: Request):
         return HTMLResponse(f"<h1>{error.error}</h1>")
     user = token.get("userinfo")
     if user:
-        # We must sort groups to prevent "mismatching_state: CSRF Warning! State not equal in request and response."
+        # We must sort groups to prevent "mismatching_state: CSRF Warning!
+        # State not equal in request and response."
         if "groups" in user:
-            # Remove groups starting with "app-" to prevent long lists of groups that break auth
+            # Remove groups starting with "app-" to prevent long
+            # lists of groups that break auth
             logger.debug(f"AUTH_DEBUG:groups:{user['groups']}")
             user["groups"] = [
                 group for group in user["groups"] if not str(group).startswith("app-")
@@ -71,14 +80,20 @@ async def auth(request: Request):
 
 @api_auth_router.get("/userinfo")
 async def userinfo(request: Request) -> dict:
+    """userinfo.
+
+    Returns the user's information from the user's session cookie.
+    Used to check if the user is logged in.
+    """
     user = get_user(request)
-    # logger.info(f"User info: {user}")
-    # logger.info(f"User is admin: {is_super_user(user)}")
-    # user["is_admin"] = is_super_user(user)
     return user
 
 
 @api_auth_router.get("/logout")
 async def logout(request: Request) -> RedirectResponse:
+    """logout.
+
+    Delete the user's session cookie.
+    """
     request.session.pop("user", None)
     return RedirectResponse(url=_CONFIG.get("oidc", "login_landing_page_uri"))
