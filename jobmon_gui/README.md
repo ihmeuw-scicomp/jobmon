@@ -14,16 +14,13 @@ You can see the roadmap of the upcoming deployments here: https://hub.ihme.washi
 
 ### Deploying the Flask Server App Locally
 
-To deploy the Flask app locally:
+To deploy the FastAPI server locally:
 
 1. Open a terminal
 2. Make a conda environment and activate it
-3. Install `nox` by running `conda install conda-forge::nox`
-4. Navigate to the top of the Jobmon repository
-5. Run `nox -s launch_gui_test_server`
-6. Run `.nox/launch_gui_test_server/bin/python jobmon_gui/local_testing/jobmon_gui/testing_servers/functionaltest_server.py`
-    - This command will spin up a local version of the Flask backend, running on 127.0.0.1:8070 by default. You can then configure the React app to point to this URL for testing purposes.
-
+3. Install jobmon by `pip install -e ./jobmon_core ./jobmon_workflow ./jobmon_server`
+4. Start the testing server by running `python ./jobmon_gui/local_testing/jobmon_gui/main.py `
+5. If you want 10 workflows, run `python ./jobmon_gui/local_testing/jobmon_gui/create_wfs.py --wf 10`; (if you want unlimited workflows, run `python ./jobmon_gui/local_testing/jobmon_gui/create_wfs.py`)
 ### Deploying the React App Locally
 
 To deploy the React app locally:

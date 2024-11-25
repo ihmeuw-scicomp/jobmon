@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import tempfile
+from time import sleep
 
 
 import nox
@@ -136,12 +137,3 @@ def clean(session: Session) -> None:
             os.remove(file)
 
 
-@nox.session(python=python, venv_backend="conda")
-def launch_gui_test_server(session: Session) -> None:
-    session.conda_install("mysqlclient")
-    if os.path.exists("/tmp/tests.sqlite"):
-        os.remove("/tmp/tests.sqlite")
-    session.install("-e", "./jobmon_core")
-    session.install("-e", "./jobmon_client")
-    session.install("-e", "./jobmon_server[otlp]")
-    session.run("python", "jobmon_gui/local_testing/jobmon_gui/testing_servers/_create_sqlite_db.py")
