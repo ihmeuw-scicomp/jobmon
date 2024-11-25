@@ -8,7 +8,7 @@ nltk.download("punkt", quiet=True)
 def cluster_error_logs(df: DataFrame) -> DataFrame:
     """Cluster error logs using unsupervised learning."""
     count_vectorizer = ext.CountVectorizer()
-    doc_matrix = count_vectorizer.fit_transform(df["error"])
+    doc_matrix = count_vectorizer.fit_transform(df["task_instance_stderr_log"])
 
     # TF-IDF transformation
     tf_idf_transformer = ext.TfidfTransformer()

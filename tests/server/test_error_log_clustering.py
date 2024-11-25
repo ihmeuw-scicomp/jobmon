@@ -50,7 +50,7 @@ def test_cluster_error_logs():
     assert output_df.shape[0] == 1
 
 
-def test_cluster_error_logs_two_clusters():
+def test_cluster_error_logs_five_clusters():
     error_types = [
         """Traceback (most recent call last):
   File "/app/task_scheduler.py", line 42, in run_task
@@ -114,12 +114,12 @@ RuntimeError: Unexpected error occurred while processing task.""",
 
     input_data = [
         {
-            "error": random.choice(error_types),
+            "error": None,
             "error_time": "Mon, 15 Jul 2024 18:05:45 GMT",
             "task_id": i + 1,
             "task_instance_err_id": i + 100,
             "task_instance_id": i + 1000,
-            "task_instance_stderr_log": None,
+            "task_instance_stderr_log": random.choice(error_types),
             "workflow_id": 1,
             "workflow_run_id": 1,
         }
