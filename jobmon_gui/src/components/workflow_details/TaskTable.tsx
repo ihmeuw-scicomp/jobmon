@@ -194,6 +194,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         fieldSeparator: ',',
         decimalSeparator: '.',
         useKeysAsHeaders: true,
+        filename: `Jobmon_Workflow_${workflowId}_Tasks`
     });
 
     const exportToCSV = () => {
