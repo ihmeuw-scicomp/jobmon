@@ -116,7 +116,6 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         }),
     ];
 
-
     const table = useMaterialReactTable({
         data: tasks?.data || [],
         columns: columns,
@@ -176,6 +175,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
                     startIcon={<FileDownloadIcon/>}>
                     Export All Data
                 </Button>
+
             </Box>)
         }
     });

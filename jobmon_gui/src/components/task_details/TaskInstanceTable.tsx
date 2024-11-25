@@ -16,6 +16,8 @@ import {TaskInstance} from "@jobmon_gui/types/TaskInstance.ts";
 type TaskInstanceTableProps = {
     taskId: number | string
 }
+import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
+import IconButton from "@mui/material/IconButton";
 
 
 export default function TaskInstanceTable({taskId}: TaskInstanceTableProps) {
@@ -147,7 +149,24 @@ export default function TaskInstanceTable({taskId}: TaskInstanceTableProps) {
                     <p className='color-dark'>
                         Task Instances&nbsp;
                         <span>
-                            <HiInformationCircle onClick={() => showModal("status")}/>
+                            <HtmlTooltip
+                                title="Task Instance Statuses"
+                                arrow={true}
+                                placement={"right"} 
+                            >
+                                <IconButton
+                                    color="inherit"
+                                    sx={{
+                                        padding: 0,
+                                        fontSize: 'inherit',
+                                    }}
+                                >
+                                    <HiInformationCircle
+                                        style={{cursor: 'pointer'}}
+                                        onClick={() => showModal("status")}
+                                    />
+                                </IconButton>
+                            </HtmlTooltip>
                         </span>
                     </p>
                 </header>

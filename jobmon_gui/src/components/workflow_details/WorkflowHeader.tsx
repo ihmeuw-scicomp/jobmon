@@ -21,6 +21,8 @@ import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
 type WorkflowHeaderProps = {
     wf_id: number | string
 }
+import IconButton from "@mui/material/IconButton";
+import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
 
 export default function WorkflowHeader({
                                            wf_id,
@@ -84,7 +86,24 @@ export default function WorkflowHeader({
                     {wf_id} - {wf_name}
                 </span>
                 <span style={{transform: 'translateY(-5px)', paddingLeft: '10px'}}>
-                    <HiInformationCircle onClick={() => setShowWFInfo(true)}/>
+                    <HtmlTooltip
+                        title="Workflow Information"
+                        arrow={true}
+                        placement={"right"} 
+                    >
+                        <IconButton
+                            color="inherit"
+                            sx={{
+                                padding: 0,
+                                fontSize: 'inherit',
+                            }}
+                        >
+                            <HiInformationCircle
+                                style={{cursor: 'pointer'}}
+                                onClick={() => setShowWFInfo(true)}
+                            />
+                        </IconButton>
+                    </HtmlTooltip>
                 </span>
             </Box>
             <Box>
@@ -93,6 +112,8 @@ export default function WorkflowHeader({
                     children={
                         <Grid container spacing={2}>
                             <Grid item xs={3} sx={gridHeaderStyles}>Workflow Status:</Grid>
+                            <Grid item xs={9}>{wf_status}</Grid>
+                            <Grid item xs={3} sx={gridHeaderStyles}>Workflow Status Description:</Grid>
                             <Grid item xs={9}>{wf_status_desc}</Grid>
                             <Grid item xs={3} sx={gridHeaderStyles}>Workflow Tool:</Grid>
                             <Grid item xs={9}>{wf_tool}</Grid>
@@ -115,6 +136,7 @@ export default function WorkflowHeader({
                     width="80%"/>
             </Box>
         </Box>
+
     )
 
 }

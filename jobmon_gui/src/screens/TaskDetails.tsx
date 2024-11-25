@@ -12,6 +12,8 @@ import {getTaskDetailsQueryFn} from "@jobmon_gui/queries/GetTaskDetails.ts";
 import Typography from "@mui/material/Typography";
 import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea.tsx";
 import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
+import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
+import IconButton from "@mui/material/IconButton";
 
 
 export default function TaskDetails() {
@@ -62,13 +64,47 @@ export default function TaskDetails() {
                     <p className='color-dark'>
                         Task Name: {task_details?.data?.task_name}&nbsp;
                         <span>
-                            <HiInformationCircle onClick={() => setShowTaskInfo(true)}/>
+                            <HtmlTooltip
+                                title="Task Information"
+                                arrow={true}
+                                placement={"right"} 
+                            >
+                                <IconButton
+                                    color="inherit"
+                                    sx={{
+                                        padding: 0,
+                                        fontSize: 'inherit',
+                                    }}
+                                >
+                                    <HiInformationCircle
+                                        style={{cursor: 'pointer'}}
+                                        onClick={() => setShowTaskInfo(true)}
+                                    />
+                                </IconButton>
+                            </HtmlTooltip>
                         </span>
                     </p>
                     <p className="color-dark">
                         Task Finite State Machine&nbsp;
                         <span>
-                            <HiInformationCircle onClick={() => setShowTaskFSM(true)}/>
+                        <HtmlTooltip
+                                title="Task Finite State Machine"
+                                arrow={true}
+                                placement={"right"} 
+                            >
+                                <IconButton
+                                    color="inherit"
+                                    sx={{
+                                        padding: 0,
+                                        fontSize: 'inherit',
+                                    }}
+                                >
+                                    <HiInformationCircle
+                                        style={{cursor: 'pointer'}}
+                                        onClick={() => setShowTaskFSM(true)}
+                                    />
+                                </IconButton>
+                            </HtmlTooltip>
                         </span>
                     </p>
                 </header>
