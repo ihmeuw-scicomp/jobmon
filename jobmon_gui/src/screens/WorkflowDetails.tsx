@@ -25,12 +25,6 @@ import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import Divider from "@mui/material/Divider";
 
-
-type WorkflowDetailsProps = {
-    subpage: number
-}
-
-
 const task_template_tooltip_text = (<Box>
     <Typography sx={{fontWeight: "bold"}}>Task Templates</Typography>
     <Typography variant={"body2"}>
@@ -40,11 +34,12 @@ const task_template_tooltip_text = (<Box>
 </Box>)
 
 
-function WorkflowDetails({subpage}: WorkflowDetailsProps) {
+function WorkflowDetails() {
     let params = useParams();
     let workflowId = params.workflowId;
 
 
+    const [activeTab, setActiveTab] = useState(0);
     const [task_template_name, setTaskTemplateName] = useState('');
     const [tt_id, setTTID] = useState('');
     const [task_template_version_id, setTaskTemplateVersionId] = useState('');
@@ -109,8 +104,6 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
             </div>
         );
     }
-
-    console.log(`subpage: ${subpage}`)
 
     if (wfTTStatus.isLoading) {
         return (<CircularProgress/>)
@@ -187,19 +180,16 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
 
             </Box>
             <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
-                <Tabs onChange={(event, value) => {
-                    if (value == 0) {
-                        navigate(`/workflow/${workflowId}/tasks`)
-                    }
-                    if (value == 1) {
-                        navigate(`/workflow/${workflowId}/usage`)
-                    }
-                }} aria-label="Tab selection" value={subpage}>
+                <Tabs
+                    value={activeTab}
+                    onChange={(event, newValue) => setActiveTab(newValue)}
+                    aria-label="Tab selection"
+                >
                     <Tab label="Errors and Tasks" value={0}/>
                     <Tab label="Resource Usage" value={1}/>
                 </Tabs>
             </Box>
-            <TabPanel value={subpage} index={0}>
+            <TabPanel value={activeTab} index={0}>
                 <Box>
                     <Typography variant={"h5"} sx={{pt: 3}}>Clustered Errors</Typography>
                     <ClusteredErrors taskTemplateId={tt_id} workflowId={workflowId}/>
@@ -209,17 +199,14 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
                     <TaskTable taskTemplateName={task_template_name} workflowId={workflowId}/>
                 </Box>
             </TabPanel>
-            <TabPanel value={subpage} index={1}>
+            <TabPanel value={activeTab} index={1}>
                 <Usage taskTemplateName={task_template_name}
                        taskTemplateVersionId={task_template_version_id}
                        workflowId={workflowId}
                 />
             </TabPanel>
         </Box>
-
-
     );
-
 }
 
 export default WorkflowDetails;

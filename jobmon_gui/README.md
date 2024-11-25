@@ -19,10 +19,11 @@ To deploy the FastApi app locally:
 1. Open a terminal
 2. Make a conda environment and activate it
 3. Install `nox` by running `conda install conda-forge::nox`
-4. Navigate to the top of the Jobmon repository
-5. Run `nox -s launch_gui_test_server`
-6. Run `.nox/launch_gui_test_server/bin/python jobmon_gui/local_testing/jobmon_gui/testing_servers/functionaltest_server.py`
-    - This command will spin up a local version of the Fastapi backend, running on 127.0.0.1:8070 by default. You can then configure the React app to point to this URL for testing purposes.
+4. Install jobmon sub-packages by running `pip install -e ./jobmon_core ./jobmon_client ./jobmon_server`
+5. Navigate to the top of the Jobmon repository
+6. Run `nox -s launch_gui_test_server`
+7. Run `.nox/launch_gui_test_server/bin/python jobmon_gui/local_testing/jobmon_gui/testing_servers/functionaltest_server.py`
+    - This command will spin up a local version of the FastAPI backend, running on 127.0.0.1:8070 by default. You can then configure the React app to point to this URL for testing purposes.
 
 ### Deploying the React App Locally
 

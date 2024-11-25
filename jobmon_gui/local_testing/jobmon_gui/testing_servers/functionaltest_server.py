@@ -58,7 +58,7 @@ def create_multiple_status_wf():
     """
     # give the large wf sometime to run
     sleep(60)
-    C = "multiprocess"
+    C = "sequential"
     Q = "null.q"
     tool = Tool("complex_wf_tool")
     # shared tt for all wf
@@ -157,7 +157,7 @@ def create_multiple_status_wf():
 
 
 def create_large_workflow():
-    C = "dummy"
+    C = "sequential"
     Q = "null.q"
 
     TOTAL_TASK = 50000  # refer to production wf 53630

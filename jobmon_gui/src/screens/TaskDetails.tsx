@@ -8,7 +8,6 @@ import {HiInformationCircle} from "react-icons/hi";
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
 import {CircularProgress, Grid} from "@mui/material";
 import {useQuery} from "@tanstack/react-query";
-import {getTaskInstanceDetailsQueryFn} from "@jobmon_gui/queries/GetTaskInstanceDetails.ts";
 import {getTaskDetailsQueryFn} from "@jobmon_gui/queries/GetTaskDetails.ts";
 import Typography from "@mui/material/Typography";
 import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea.tsx";
@@ -51,8 +50,11 @@ export default function TaskDetails() {
                 <Breadcrumb.Item>
                     <button className="breadcrumb-button" onClick={handleHomeClick}>Home</button>
                 </Breadcrumb.Item>
-                <Breadcrumb.Item><Link to={{pathname: `/workflow/${task_details?.data?.workflow_id}/tasks`}}>Workflow
-                    ID {task_details?.data?.workflow_id}</Link></Breadcrumb.Item>
+                <Breadcrumb.Item>
+                    <Link to={{pathname: `/workflow/${task_details?.data?.workflow_id}`}}>
+                        Workflow ID {task_details?.data?.workflow_id}
+                    </Link>
+                </Breadcrumb.Item>
                 <Breadcrumb.Item active>Task ID {taskId}</Breadcrumb.Item>
             </Breadcrumb>
             <div>

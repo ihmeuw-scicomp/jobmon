@@ -33,15 +33,11 @@ const root = ReactDOM.createRoot(
 root.render(
     <QueryClientProvider client={queryClient}>
         <HashRouter>
-
             <CustomThemeProvider>
                 <AuthProvider>
                     <PageNavigation>
                         <ApmRoutes>
-                            <Route path="workflow">
-                                <Route path=":workflowId/tasks" element={<WorkflowDetails subpage={0}/>}/>
-                                <Route path=":workflowId/usage" element={<WorkflowDetails subpage={1}/>}/>
-                            </Route>
+                            <Route path="workflow/:workflowId" element={<WorkflowDetails/>}></Route>
                             <Route path="task_details/:taskId" element={<TaskDetails/>}></Route>
                             <Route path="help" element={<Help/>}></Route>
                             <Route path="jobmon_at_ihme" element={<JobmonAtIHME/>}></Route>

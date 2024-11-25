@@ -515,7 +515,7 @@ class Workflow(object):
 
         logger.info(
             f"Workflow ID {self.workflow_id} assigned. Progress can be monitored at "
-            f"{gui_url}/#/workflow/{self.workflow_id}/tasks"
+            f"{gui_url}/#/workflow/{self.workflow_id}"
         )
 
         # Check if this workflow is already complete and is runnable

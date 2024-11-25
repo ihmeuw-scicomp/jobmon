@@ -2,7 +2,7 @@ import React, {useEffect, useState} from 'react';
 import Box from "@mui/material/Box";
 import axios from "axios";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
-import {error_log_viz_url, task_table_url} from "@jobmon_gui/configs/ApiUrls";
+import {error_log_viz_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import Typography from "@mui/material/Typography";
 import {CircularProgress, Fade, Grid} from "@mui/material";
@@ -19,8 +19,6 @@ import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
 import {useClusteredErrorsTableStore} from "@jobmon_gui/stores/ClusteredErrorsTable.ts";
 import {useTaskTableStore} from "@jobmon_gui/stores/TaskTable.ts";
 import dayjs from "dayjs";
-
-import {useDisplayTimeFormatStore, useDisplayTimezoneStore} from "@jobmon_gui/stores/DateTime.ts";
 import {AdapterDayjs} from "@mui/x-date-pickers/AdapterDayjs";
 import {LocalizationProvider} from "@mui/x-date-pickers";
 import {formatDayjsDate, formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
@@ -70,8 +68,6 @@ interface ErrorDetails {
 
 export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredErrorsProps) {
 
-    const timezoneStore = useDisplayTimezoneStore()
-    const timeFormatStore = useDisplayTimeFormatStore()
     const queryClient = useQueryClient()
     const tableStore = useClusteredErrorsTableStore()
     const taskTableStore = useTaskTableStore()
