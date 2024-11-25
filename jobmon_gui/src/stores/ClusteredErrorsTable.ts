@@ -149,7 +149,12 @@ export const useClusteredErrorsTableStore = create<clusteredErrorsTableStore>()(
             getFilters: () => {
                 return get().filters
             },
-            sorting: [],
+            sorting: [
+                {
+                    "id": "group_instance_count",
+                    "desc": true
+                }
+            ],
             setSorting: (updaterOrValue: Updater<SortingState>) => {
                 // updateOrValue will be of one of these types: ((prevState: S) => S) | S
 

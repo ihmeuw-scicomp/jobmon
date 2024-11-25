@@ -238,7 +238,7 @@ export default function TaskInstanceTable({taskId}: TaskInstanceTableProps) {
                         <br></br>
                         <b>Utilized Resources:</b> <br></br>
                         <i>memory</i>: {formatBytes(rowDetail.ti_maxrss)}<br></br>
-                        <i>runtime</i>: {rowDetail.ti_wallclock ? humanizeDuration(parseInt(rowDetail.ti_wallclock) * 1000) : ""}
+                        <i>runtime</i>: {rowDetail.ti_wallclock ? humanizeDuration(parseInt(rowDetail.ti_wallclock.toString()) * 1000) : ""}
                     </p>
                 }
                 open={modalVisibility.resources}
