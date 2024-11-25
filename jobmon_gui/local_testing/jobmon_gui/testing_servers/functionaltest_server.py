@@ -37,10 +37,12 @@ class WebServerProcess:
         os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
         os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070/api/v3"
 
-        if not os.path.exists(self.filepath):
-            open(self.filepath, 'a').close()
-            init_db()
-            apply_migrations(database_uri)
+        if os.path.exists(self.filepath):
+            os.remove(self.filepath)
+
+        open(self.filepath, 'a').close()
+        init_db()
+        apply_migrations(database_uri)
 
         config = JobmonConfig(dict_config={"db": {"sqlalchemy_database_uri": database_uri}})
         app = get_app(config)
@@ -58,7 +60,7 @@ def create_multiple_status_wf():
     """
     # give the large wf sometime to run
     sleep(60)
-    C = "sequential"
+    C = "multiprocess"
     Q = "null.q"
     tool = Tool("complex_wf_tool")
     # shared tt for all wf
@@ -157,7 +159,7 @@ def create_multiple_status_wf():
 
 
 def create_large_workflow():
-    C = "sequential"
+    C = "dummy"
     Q = "null.q"
 
     TOTAL_TASK = 50000  # refer to production wf 53630
