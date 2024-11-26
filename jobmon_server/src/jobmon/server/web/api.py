@@ -66,6 +66,7 @@ def get_app(
     """Get a FastAPI app based on the config. If no config is provided, defaults are used.
 
     Args:
+        versions: The versions of the API to include.
         use_otlp: Whether to use OpenTelemetry.
         structlog_configured: Whether structlog is already configured.
         otlp_api: The OpenTelemetry API to use.
