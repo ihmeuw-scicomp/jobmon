@@ -3,41 +3,18 @@ import sqlalchemy
 
 
 @pytest.fixture(scope="function")
-def web_server_in_memory(tmp_path):
+def web_server_in_memory(global_web_config, db_engine):
     """This sets up the JSM/JQS using the test_client which is a
     fake server
     """
     # The create_app call sets up database connections
-    d = tmp_path / "jobmon.db"
-    url = "sqlite:///" + str(d)
-    from jobmon.server.web.config import get_jobmon_config
-    from jobmon.core.configuration import JobmonConfig
 
-    config = JobmonConfig(
-        dict_config={
-            "db": {"sqlalchemy_database_uri": url},
-            "otlp": {
-                "web_enabled": "false",
-                "span_exporter": "",
-                "log_exporter": "",
-            },
-        }
-    )
-    get_jobmon_config(config)
-
-    from jobmon.server.web.api import configure_logging
-    from jobmon.server.web.db_admin import init_db
-    from jobmon.server.web.models import load_model
-
-    init_db()
-    load_model()
-    eng = sqlalchemy.create_engine(url)
     from jobmon.server.web.api import get_app
     from fastapi.testclient import TestClient
 
-    app = get_app()
+    app = get_app(versions=["v2"])
     client = TestClient(app)
-    yield client, eng
+    yield client, db_engine
 
 
 def get_test_content(response):
