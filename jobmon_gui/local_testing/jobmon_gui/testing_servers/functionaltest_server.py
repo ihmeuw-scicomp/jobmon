@@ -1,7 +1,8 @@
 import multiprocessing as mp
 import os
-from random import randint
+from random import randint, choices
 import socket
+import string
 import sys
 from time import sleep
 
@@ -27,9 +28,8 @@ class WebServerProcess:
         from jobmon.server.web.api import get_app
         from jobmon.server.web.db_admin import init_db
 
-        config = JobmonConfig()
         init_db()
-        app = get_app(config)
+        app = get_app()
 
         uvicorn.run(app, host=self.web_host, port=self.web_port, log_level="info")
 
@@ -199,8 +199,8 @@ def set_environment(filepath=TESTS_DB_FILEPATH):
     os.environ["JOBMON__OTLP__SPAN_EXPORTER"] = ""
     os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
     os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070"
-    os.environ["JOBMON__HTTP__ROUTE_PREFIX"] = "/api/v3"
-
+    os.environ["JOBMON__HTTP__ROUTE_PREFIX"] = "/api/v2"
+    os.environ["JOBMON__SESSION__SECRET_KEY"] = ''.join(choices(string.ascii_letters + string.digits, k=16))
 
 if __name__ == "__main__":
     set_environment()
