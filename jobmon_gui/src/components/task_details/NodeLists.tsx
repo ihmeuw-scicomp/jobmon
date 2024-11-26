@@ -1,11 +1,34 @@
 import React from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Link } from "react-router-dom";
+import {Link} from "react-router-dom";
 import Card from 'react-bootstrap/Card';
 import ListGroup from 'react-bootstrap/ListGroup';
+import {useQuery} from "@tanstack/react-query";
+import {CircularProgress} from "@mui/material";
+import Typography from "@mui/material/Typography";
+import {getTaskDependenciesQuernFn} from "@jobmon_gui/queries/GetTaskDependancies.ts";
+
+type NodeListsProps = {
+    taskId: string | number
+}
+export default function NodeLists({taskId}: NodeListsProps) {
+
+    const taskDependencies = useQuery(
+        {
+            queryKey: ["task_dependencies", taskId],
+            queryFn: getTaskDependenciesQuernFn,
+            refetchInterval: 60_000,
+        }
+    )
 
 
-export default function NodeLists({ upstreamTasks, downstreamTasks }) {
+    if (taskDependencies.isError) {
+        return <Typography>Error loading upstream and downstream tasks. Please reload and try agian.</Typography>;
+    }
+    if (taskDependencies.isLoading || !taskDependencies.data) {
+        return <CircularProgress/>;
+    }
+
     return (
         <div className='div-level-2 pl-5 pt-2'>
             <p className='font-weight-bold'>Dependencies</p>
@@ -14,10 +37,10 @@ export default function NodeLists({ upstreamTasks, downstreamTasks }) {
                     <Card.Header className="dependency-header">Upstream Task IDs</Card.Header>
                     <ListGroup variant="flush">
                         {
-                            upstreamTasks.flat(1).map(d => (
+                            taskDependencies.data.up.flat(1).map(d => (
                                 <ListGroup.Item className="dependency-list-group-item">
                                     <Link
-                                        to={{ pathname: `/task_details/${d["id"]}` }}
+                                        to={{pathname: `/task_details/${d["id"]}`}}
                                         key={d["id"]}>{d["name"]}
                                     </Link>
                                 </ListGroup.Item>
@@ -29,10 +52,10 @@ export default function NodeLists({ upstreamTasks, downstreamTasks }) {
                     <Card.Header className="dependency-header">Downstream Task IDs</Card.Header>
                     <ListGroup variant="flush">
                         {
-                            downstreamTasks.flat(1).map(d => (
+                            taskDependencies.data.down.flat(1).map(d => (
                                 <ListGroup.Item className="dependency-list-group-item">
                                     <Link
-                                        to={{ pathname: `/task_details/${d["id"]}` }}
+                                        to={{pathname: `/task_details/${d["id"]}`}}
                                         key={d["id"]}>{d["name"]}
                                     </Link>
                                 </ListGroup.Item>
@@ -41,6 +64,6 @@ export default function NodeLists({ upstreamTasks, downstreamTasks }) {
                     </ListGroup>
                 </Card>
             </div>
-        </div >
+        </div>
     );
 }

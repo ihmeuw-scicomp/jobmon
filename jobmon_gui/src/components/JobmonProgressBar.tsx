@@ -50,7 +50,7 @@ export default function JobmonProgressBar({
             const baseUrl = import.meta.env.VITE_APP_BASE_URL + "/workflow_status_viz";
             const url = new URL(baseUrl);
             const wf_ids = [workflowId];
-            wf_ids.forEach(id => url.searchParams.append('workflow_ids', id));
+            wf_ids.forEach(id => url.searchParams.append('workflow_ids', id.toString()));
             return axios.get<WfDetailsResponse>(
                 url.toString(),
                 {

@@ -1,11 +1,19 @@
+from importlib import import_module
+
 from fastapi import APIRouter
 from starlette.responses import JSONResponse
 from starlette.status import HTTP_200_OK
 
 from jobmon.server.web import routes
 
+version = "v3"
 # Create a router for version 3 of the API
-api_v3_router = APIRouter(tags=["v3"])
+api_v3_router = APIRouter(tags=[version], prefix=f"/{version}")
+
+for r in ["fsm", "cli", "reaper"]:
+    mod = import_module(f"jobmon.server.web.routes.{version}.{r}")
+    router = getattr(mod, f"{r}_router")
+    api_v3_router.include_router(router)
 
 
 # Shared routes
@@ -37,4 +45,4 @@ def test_route() -> None:
 @api_v3_router.get("/api_version", status_code=HTTP_200_OK)
 def api_version() -> JSONResponse:
     """Test connectivity to the database."""
-    return JSONResponse(content={"status": "v3"})
+    return JSONResponse(content={"status": version})

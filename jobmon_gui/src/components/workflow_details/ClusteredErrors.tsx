@@ -2,21 +2,26 @@ import React, {useEffect, useState} from 'react';
 import Box from "@mui/material/Box";
 import axios from "axios";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
-import {error_log_viz_url, task_table_url} from "@jobmon_gui/configs/ApiUrls";
+import {error_log_viz_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import Typography from "@mui/material/Typography";
 import {CircularProgress, Fade, Grid} from "@mui/material";
-import {MaterialReactTable, useMaterialReactTable} from "material-react-table";
+import {createMRTColumnHelper, MaterialReactTable, useMaterialReactTable} from "material-react-table";
 import {Button} from '@mui/material';
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal";
 import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea";
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import IconButton from "@mui/material/IconButton";
-import {useTaskTableColumnsStore} from "@jobmon_gui/stores/task_table";
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import HtmlTooltip from "@jobmon_gui/components/HtmlToolTip";
 import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
+import {useClusteredErrorsTableStore} from "@jobmon_gui/stores/ClusteredErrorsTable.ts";
+import {useTaskTableStore} from "@jobmon_gui/stores/TaskTable.ts";
+import dayjs from "dayjs";
+import {AdapterDayjs} from "@mui/x-date-pickers/AdapterDayjs";
+import {LocalizationProvider} from "@mui/x-date-pickers";
+import {formatDayjsDate, formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
 
 type ClusteredErrorsProps = {
     taskTemplateId: string | number
@@ -38,21 +43,45 @@ interface ErrorLog {
     error: string
 }
 
+type ClusteredError = {
+    group_instance_count: number
+    task_instance_ids: number[]
+    task_ids: number[]
+    sample_error: string
+    workflow_run_id: number
+    workflow_id: number
+    first_error_time: string | dayjs.Dayjs
+}
+
+type ClusteredErrorList = {
+    error_logs: ClusteredError[]
+    total_count: number
+    page: number
+    page_size: number
+}
+
 interface ErrorDetails {
     data?: {
         error_logs?: ErrorLog[];
     };
 }
 
+interface ColumnType extends ClusteredError {
+    // Extend ClusteredError type to add optional actions column
+    actions?: string
+}
+
 export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredErrorsProps) {
+    const columnHelper = createMRTColumnHelper<ColumnType>()
     const queryClient = useQueryClient()
-    const taskTableColumnFilters = useTaskTableColumnsStore()
+    const tableStore = useClusteredErrorsTableStore()
+    const taskTableStore = useTaskTableStore()
     const [errorDetailIndex, setErrorDetailIndex] = useState<boolean | ErrorSampleModalDetails>(false)
     const [language, setLanguage] = useState('python');
     const errors = useQuery({
         queryKey: ["workflow_details", "clustered_errors", workflowId, taskTemplateId],
         queryFn: async () => {
-            return axios.get(
+            return axios.get<ClusteredErrorList>(
                 `${error_log_viz_url}${workflowId}/${taskTemplateId}#`,
                 {
                     ...jobmonAxiosConfig,
@@ -60,7 +89,13 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
                     params: {cluster_errors: "true"}
                 }
             ).then((r) => {
-                return r.data
+                return {
+                    ...r.data, error_logs: r.data.error_logs.map((el) => {
+                        el.first_error_time = dayjs(el.first_error_time)
+                        return el
+                    })
+                }
+
             })
         },
         enabled: !!taskTemplateId
@@ -123,9 +158,8 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
     }, [errorDetailIndex]);
 
     const columns = [
-        {
+        columnHelper.accessor("sample_error", {
             header: "Sample Error",
-            accessorKey: "sample_error",
             size: 750,
             Cell: ({renderedCellValue, row}) => (
                 <Typography>
@@ -138,26 +172,27 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
                     </Button>
                 </Typography>
             ),
-        },
-        {
+        }),
+        columnHelper.accessor("first_error_time", {
             header: "First Seen",
-            accessorKey: "first_error_time",
-        },
-        {
+            filterVariant: 'datetime-range',
+            size: 350,
+            Cell: ({renderedCellValue}) => (
+                dayjs.isDayjs(renderedCellValue) ? formatDayjsDate(renderedCellValue) : renderedCellValue
+            )
+        }),
+        columnHelper.accessor("group_instance_count", {
             header: "Occurrences",
-            accessorKey: "group_instance_count",
-            desc: true,
-        },
-        {
+        }),
+        columnHelper.accessor("actions", {
             header: "Actions",
-            accessorKey: "actions",
             Cell: ({row}) => (
                 <HtmlTooltip title={"Filter tasks table for tasks with this error"}
                              arrow={true}
                              placement={"right"}>
                     <IconButton sx={{textTransform: 'none', textAlign: "left"}}
                                 onClick={() => {
-                                    taskTableColumnFilters.set([{
+                                    taskTableStore.setFilters([{
                                         id: "task_id",
                                         value: row.original.task_ids.join(",")
                                     }])
@@ -166,13 +201,43 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
                     </IconButton>
                 </HtmlTooltip>
             ),
-        },
+        }),
     ];
 
     const table = useMaterialReactTable({
-        data: (errors as ErrorDetails)?.data?.error_logs || [],
+        data: errors?.data?.error_logs || [],
         columns: columns,
-        initialState: {density: 'comfortable'},
+        state: {
+            isLoading: errors.isLoading,
+            pagination: tableStore.getPagination(),
+            columnFilters: tableStore.getFilters(),
+            sorting: tableStore.getSorting(),
+            columnOrder: tableStore.getColumnOrder(),
+            density: tableStore.getDensity(),
+            columnVisibility: tableStore.getColumnVisibility(),
+            showColumnFilters: tableStore.getFilterVisibility(),
+        },
+        onPaginationChange: (s) => {
+            tableStore.setPagination(s)
+        },
+        onColumnFiltersChange: (s) => {
+            tableStore.setFilters(s)
+        },
+        onSortingChange: (s) => {
+            tableStore.setSorting(s)
+        },
+        onColumnOrderChange: (s) => {
+            tableStore.setColumnOrder(s)
+        },
+        onDensityChange: (s) => {
+            tableStore.setDensity(s)
+        },
+        onColumnVisibilityChange: (s) => {
+            tableStore.setColumnVisibility(s)
+        },
+        onShowColumnFiltersChange: (s) => {
+            tableStore.setFilterVisibility(s)
+        },
         enableColumnResizing: true,
         layoutMode: "grid-no-grow",
     });
@@ -180,9 +245,6 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
 
     if (!taskTemplateId) {
         return (<Typography sx={{pt: 5}}>Select a task template from above to clustered errors</Typography>)
-    }
-    if (errors.isLoading) {
-        return (<CircularProgress/>)
     }
     if (errors.isError) {
         return (<Typography>Unable to retrieve clustered errors. Please refresh and try again</Typography>)
@@ -258,7 +320,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
                     </Box>
                     <Grid container spacing={2}>
                         <Grid item xs={3}><Typography sx={labelStyles}>Error Time:</Typography></Grid>
-                        <Grid item xs={9}>{error.error_time}</Grid>
+                        <Grid item xs={9}>{formatJobmonDate(error.error_time)}</Grid>
 
                         <Grid item xs={3}><Typography sx={labelStyles}>task_id:</Typography></Grid>
                         <Grid item xs={9}>{error.task_id}</Grid>
@@ -309,7 +371,9 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
 
     return (
         <Box p={2} display="flex" justifyContent="center" width="100%">
-            <MaterialReactTable table={table}/>
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <MaterialReactTable table={table}/>
+            </LocalizationProvider>
             <JobmonModal
                 title={`Error Sample for Task Instance ID: ${currentTiID()}`}
                 open={errorDetailIndex !== false}

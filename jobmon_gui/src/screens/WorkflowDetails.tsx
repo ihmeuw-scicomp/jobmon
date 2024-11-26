@@ -6,7 +6,6 @@ import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import {FaLightbulb} from "react-icons/fa";
 import humanizeDuration from 'humanize-duration';
 import Tab from '@mui/material/Tab';
-
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
 import Usage from '@jobmon_gui/components/workflow_details/Usage';
 import WorkflowHeader from "@jobmon_gui/components/workflow_details/WorkflowHeader"
@@ -15,31 +14,16 @@ import {CircularProgress, Tabs, Tooltip} from "@mui/material";
 import TaskTable from "@jobmon_gui/components/workflow_details/TaskTable";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
 import {useQuery} from "@tanstack/react-query";
-import {workflow_details_url, workflow_tt_status_url} from "@jobmon_gui/configs/ApiUrls";
+import {workflow_tt_status_url} from "@jobmon_gui/configs/ApiUrls";
 import Typography from "@mui/material/Typography";
 import {TTStatusResponse} from "@jobmon_gui/types/TaskTemplateStatus";
 import HtmlTooltip from "@jobmon_gui/components/HtmlToolTip";
 import ClusteredErrors from "@jobmon_gui/components/workflow_details/ClusteredErrors";
-import {useTaskTableColumnsStore} from "@jobmon_gui/stores/task_table";
-import {convertDatePST} from "@jobmon_gui/utils/formatters";
-
-type WorkflowDetailsProps = {
-    subpage: number
-}
-
-type WorkflowDetails = {
-    tool_name: string
-    wf_args: string
-    wf_created_date: string
-    wf_name: string
-    wf_status: string
-    wf_status_date: string
-    wf_status_desc: string
-    wfr_jobmon_version: string
-
-}
-
-type WorkflowDetailsResponse = WorkflowDetails[]
+import {useTaskTableStore} from "@jobmon_gui/stores/TaskTable.ts";
+import {useClusteredErrorsTableStore} from "@jobmon_gui/stores/ClusteredErrorsTable.ts";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Divider from "@mui/material/Divider";
 
 const task_template_tooltip_text = (<Box>
     <Typography sx={{fontWeight: "bold"}}>Task Templates</Typography>
@@ -50,30 +34,15 @@ const task_template_tooltip_text = (<Box>
 </Box>)
 
 
-function WorkflowDetails({subpage}: WorkflowDetailsProps) {
+function WorkflowDetails() {
     let params = useParams();
     let workflowId = params.workflowId;
-    const taskTableColumnFilters = useTaskTableColumnsStore()
 
+
+    const [activeTab, setActiveTab] = useState(0);
     const [task_template_name, setTaskTemplateName] = useState('');
     const [tt_id, setTTID] = useState('');
     const [task_template_version_id, setTaskTemplateVersionId] = useState('');
-
-
-    const wfDetails = useQuery({
-        queryKey: ["workflow_details", "details", params.workflowId],
-        queryFn: async () => {
-
-            return axios.get<WorkflowDetailsResponse>(workflow_details_url + params.workflowId, {
-                    ...jobmonAxiosConfig,
-                    data: null,
-                }
-            ).then((r) => {
-                return r.data[0]
-            })
-        },
-        staleTime: 60000, // 60 seconds
-    })
 
     const wfTTStatus = useQuery({
         queryKey: ["workflow_details", "tt_status", workflowId],
@@ -94,6 +63,9 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
 
     //TaskTemplate link click function
     function clickTaskTemplate(name, tt_id, tt_version_id) {
+
+        useTaskTableStore.setState({...useTaskTableStore.getState(), filters: []})
+        useClusteredErrorsTableStore.setState({...useClusteredErrorsTableStore.getState(), filters: []})
         setTaskTemplateName(name);
         setTTID(tt_id);
         setTaskTemplateVersionId(tt_version_id);
@@ -133,8 +105,6 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
         );
     }
 
-    console.log(`subpage: ${subpage}`)
-
     if (wfTTStatus.isLoading) {
         return (<CircularProgress/>)
     }
@@ -156,15 +126,6 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
             <Box sx={{justifyContent: 'start', pt: 3}}>
                 <WorkflowHeader
                     wf_id={workflowId}
-                    wf_status={wfDetails?.data?.wf_status}
-                    wf_status_desc={wfDetails?.data?.wf_status_desc}
-                    wf_tool={wfDetails?.data?.tool_name}
-                    wf_name={wfDetails?.data?.wf_name}
-                    wf_args={wfDetails?.data?.wf_args}
-                    wf_submitted_date={convertDatePST(wfDetails?.data?.wf_created_date)}
-                    wfr_heartbeat_date={convertDatePST(wfDetails?.data?.wfr_heartbeat_date)}
-                    wf_elapsed_time={humanizeDuration(new Date(wfDetails?.data?.wfr_heartbeat_date).getTime() - new Date(wfDetails?.data?.wf_created_date).getTime())}
-                    jobmon_version={wfDetails?.data?.wfr_jobmon_version}
                 />
             </Box>
 
@@ -188,50 +149,47 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
 
             </Box>
 
-            <Box id="tt_progress" className="div-scroll">
-                <ul>
+            <Box id="tt_progress">
+                <List>
                     {
                         Object.keys(wfTTStatus?.data).map(key => (
-                            <li
+                            <ListItem
+                                key={key}
                                 className={`tt-container ${tt_id == wfTTStatus?.data[key]["id"].toString() ? "selected" : ""}`}
                                 id={wfTTStatus?.data[key]["id"].toString()}
                                 onClick={() => {
-                                    taskTableColumnFilters.clear()
                                     clickTaskTemplate(wfTTStatus?.data[key]["name"], wfTTStatus?.data[key]["id"], wfTTStatus?.data[key]["task_template_version_id"])
                                 }}
                             >
-                                <div className="div_floatleft">
-                                    <span className="tt-name">{wfTTStatus?.data[key]["name"]}</span>
-                                </div>
-                                <div className="div_floatright">
+                                <Box className="div_floatleft">
+                                    <Typography className="tt-name">{wfTTStatus?.data[key]["name"]}</Typography>
+                                </Box>
+                                <Box className="div_floatright">
                                     <JobmonProgressBar
                                         workflowId={workflowId}
                                         ttId={key}
                                         placement="left"
                                     />
-                                </div>
+                                </Box>
                                 <br/>
-                                <hr className="hr-dot"/>
-                            </li>
+                                <Divider className="hr-dot"/>
+                            </ListItem>
                         ))
                     }
-                </ul>
+                </List>
 
             </Box>
             <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
-                <Tabs onChange={(event, value) => {
-                    if (value == 0) {
-                        navigate(`/workflow/${workflowId}/tasks`)
-                    }
-                    if (value == 1) {
-                        navigate(`/workflow/${workflowId}/usage`)
-                    }
-                }} aria-label="Tab selection" value={subpage}>
+                <Tabs
+                    value={activeTab}
+                    onChange={(event, newValue) => setActiveTab(newValue)}
+                    aria-label="Tab selection"
+                >
                     <Tab label="Errors and Tasks" value={0}/>
                     <Tab label="Resource Usage" value={1}/>
                 </Tabs>
             </Box>
-            <TabPanel value={subpage} index={0}>
+            <TabPanel value={activeTab} index={0}>
                 <Box>
                     <Typography variant={"h5"} sx={{pt: 3}}>Clustered Errors</Typography>
                     <ClusteredErrors taskTemplateId={tt_id} workflowId={workflowId}/>
@@ -241,17 +199,14 @@ function WorkflowDetails({subpage}: WorkflowDetailsProps) {
                     <TaskTable taskTemplateName={task_template_name} workflowId={workflowId}/>
                 </Box>
             </TabPanel>
-            <TabPanel value={subpage} index={1}>
+            <TabPanel value={activeTab} index={1}>
                 <Usage taskTemplateName={task_template_name}
                        taskTemplateVersionId={task_template_version_id}
                        workflowId={workflowId}
                 />
             </TabPanel>
         </Box>
-
-
     );
-
 }
 
 export default WorkflowDetails;

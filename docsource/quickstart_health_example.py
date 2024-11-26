@@ -156,7 +156,7 @@ workflow.bind()
 print("Workflow creation complete.")
 print(f"Running workflow with ID {workflow.workflow_id}.")
 print("If you have a Jobmon GUI deployed, see the Jobmon GUI for full information:")
-print(f"https://jobmon-gui.mydomain.com/#/workflow/{workflow.workflow_id}/tasks")
+print(f"https://jobmon-gui.mydomain.com/#/workflow/{workflow.workflow_id}")
 
 
 # run workflow

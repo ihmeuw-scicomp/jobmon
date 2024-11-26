@@ -1,114 +1,33 @@
-import React, {useState, useEffect} from 'react';
-import axios from 'axios';
+import React, {useState} from 'react';
 import {Link, useParams, useNavigate, useLocation} from 'react-router-dom';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import TaskInstanceTable from '@jobmon_gui/components/task_details/TaskInstanceTable';
 import NodeLists from '@jobmon_gui/components/task_details/NodeLists';
 import TaskFSM from '@jobmon_gui/components/task_details/TaskFSM';
-import {convertDatePST} from '@jobmon_gui/utils/formatters'
 import {HiInformationCircle} from "react-icons/hi";
+import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
+import {CircularProgress, Grid} from "@mui/material";
+import {useQuery} from "@tanstack/react-query";
+import {getTaskDetailsQueryFn} from "@jobmon_gui/queries/GetTaskDetails.ts";
+import Typography from "@mui/material/Typography";
+import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea.tsx";
+import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
 import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
-import CustomModal from '@jobmon_gui/components/Modal';
 import IconButton from "@mui/material/IconButton";
 
-function getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId) {
-    // Returns task status and workflow ID
-    const url = import.meta.env.VITE_APP_BASE_URL + "/task/get_task_details_viz/" + taskId;
-    const fetchData = async () => {
-        const result: any = await axios({
-                method: 'get',
-                url: url,
-                data: null,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            }
-        )
-        const data = result.data.task_details[0]
-        setTaskStatus(data.task_status)
-        setWorkflowId(data.workflow_id)
-        setTaskName(data.task_name)
-        setTaskCommand(data.task_command)
-        setTaskStatusDate(convertDatePST(data.task_status_date))
-
-    };
-    return fetchData
-}
-
-function getTIDetails(setTIDetails, taskId) {
-    // Data for the TaskInstance table
-    const url = import.meta.env.VITE_APP_BASE_URL + "/task/get_ti_details_viz/" + taskId;
-    const fetchData = async () => {
-        const result: any = await axios({
-                method: 'get',
-                url: url,
-                data: null,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            }
-        )
-        setTIDetails(result.data.taskinstances)
-    };
-    return fetchData
-}
-
-function getTaskDependencies(setUpstreamTasks, setDownstreamTasks, taskId) {
-    // Data for upstream and downstream task lists
-    const url = import.meta.env.VITE_APP_BASE_URL + "/task_dependencies/" + taskId;
-    const fetchData = async () => {
-        const result: any = await axios({
-                method: 'get',
-                url: url,
-                data: null,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-            }
-        )
-        let data = result.data;
-        setUpstreamTasks(data["up"])
-        setDownstreamTasks(data["down"])
-    };
-    return fetchData
-}
 
 export default function TaskDetails() {
+    const navigate = useNavigate()
     let params = useParams();
-    let taskId = params.taskId
-    const [ti_details, setTIDetails] = useState([])
-    const [upstream_tasks, setUpstreamTasks] = useState([])
-    const [downtream_tasks, setDownstreamTasks] = useState([])
-    const [task_status, setTaskStatus] = useState("")
-    const [workflow_id, setWorkflowId] = useState("")
-    const [task_name, setTaskName] = useState("")
-    const [task_command, setTaskCommand] = useState("")
-    const [task_status_date, setTaskStatusDate] = useState("")
+    const taskId = params.taskId
+
+    const task_details = useQuery({
+        queryKey: ["task_details", taskId],
+        queryFn: getTaskDetailsQueryFn
+    })
+
     const [showTaskInfo, setShowTaskInfo] = useState(false)
     const [showTaskFSM, setShowTaskFSM] = useState(false)
-
-
-    //***********************hooks******************************
-    useEffect(() => {
-        getTIDetails(setTIDetails, taskId)();
-        getTaskDependencies(setUpstreamTasks, setDownstreamTasks, taskId)();
-        getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId)();
-    }, [taskId]);
-
-    // Update task status and table every 60 seconds if task is not in terminal state
-    useEffect(() => {
-        const interval = setInterval(() => {
-            if (task_status !== "D" && task_status !== "F") {
-                getTaskDetails(setTaskStatus, setWorkflowId, setTaskName, setTaskCommand, setTaskStatusDate, taskId)();
-                getTIDetails(setTIDetails, taskId)();
-            }
-        }, 60000);
-        return () => clearInterval(interval);
-    }, [taskId, task_status]);
-
     const location = useLocation();
 
     const handleHomeClick = () => {
@@ -120,21 +39,30 @@ export default function TaskDetails() {
         });
     };
 
-    const navigate = useNavigate()
+
+    if (task_details.isError) {
+        return <Typography>Unable to load task details. Please refresh and try again.</Typography>
+    }
+    if (task_details.isLoading || !task_details.data) {
+        return <CircularProgress/>
+    }
     return (
         <div>
             <Breadcrumb>
                 <Breadcrumb.Item>
                     <button className="breadcrumb-button" onClick={handleHomeClick}>Home</button>
                 </Breadcrumb.Item>
-                <Breadcrumb.Item><Link to={{pathname: `/workflow/${workflow_id}/tasks`}}>Workflow
-                    ID {workflow_id}</Link></Breadcrumb.Item>
+                <Breadcrumb.Item>
+                    <Link to={{pathname: `/workflow/${task_details?.data?.workflow_id}`}}>
+                        Workflow ID {task_details?.data?.workflow_id}
+                    </Link>
+                </Breadcrumb.Item>
                 <Breadcrumb.Item active>Task ID {taskId}</Breadcrumb.Item>
             </Breadcrumb>
             <div>
                 <header className="div-level-2 header-1 ">
                     <p className='color-dark'>
-                        Task Name: {task_name}&nbsp;
+                        Task Name: {task_details?.data?.task_name}&nbsp;
                         <span>
                             <HtmlTooltip
                                 title="Task Information"
@@ -183,55 +111,68 @@ export default function TaskDetails() {
             </div>
             <div className='row pt-2 mx-0 px-0'>
                 <div className="col-3">
-                    <NodeLists upstreamTasks={upstream_tasks} downstreamTasks={downtream_tasks}/>
+                    <NodeLists taskId={taskId}/>
                 </div>
                 <div className="col-9">
-                    <TaskFSM taskStatus={task_status}/>
+                    <TaskFSM taskStatusCode={task_details?.data?.task_status}/>
                 </div>
             </div>
             <div id="wftable" className="div-level-2">
-                <TaskInstanceTable taskInstanceData={ti_details}/>
+                <TaskInstanceTable taskId={taskId}/>
             </div>
-            <CustomModal
-                className="task_info_modal"
-                headerContent={
-                    <h5> Task Information</h5>
+            <JobmonModal
+                title={
+                    "Task Information"
                 }
-                bodyContent={
-                    <p>
-                        <b>Task ID:</b> {taskId}<br/>
-                        <b>Task Command:</b> {task_command}<br/>
-                        <b>Task Status Date:</b> {task_status_date}<br/>
-                    </p>
+                children={
+                    <Grid container spacing={2}>
+                        <Grid item xs={3}><b>Task ID:</b></Grid>
+                        <Grid item xs={9}>{taskId}</Grid>
+                        <Grid item xs={3}><b>Task Command:</b></Grid>
+                        <Grid item
+                              xs={9}><ScrollableCodeBlock>{task_details?.data?.task_command}</ScrollableCodeBlock></Grid>
+                        <Grid item xs={3}><b>Task Status Date:</b></Grid>
+                        <Grid item
+                              xs={9}>{formatJobmonDate(task_details?.data?.task_status_date)}</Grid>
+                    </Grid>
                 }
-                showModal={showTaskInfo}
-                setShowModal={setShowTaskInfo}
+                open={showTaskInfo}
+                onClose={() => setShowTaskInfo(false)}
+                width="80%"
             />
-            <CustomModal
-                className="task_fsm_modal"
-                headerContent={
-                    <h5> Task Finite State Machine</h5>
+            <JobmonModal
+                title={
+                    "Task Finite State Machine"
                 }
-                bodyContent={
-                    <p>
-                        <b>Registering:</b> Task is bound to the database.<br/>
-                        <b>Queued:</b> Task's dependencies have successfully completed, task can be run when the
-                        scheduler is ready.<br/>
-                        <b>Instantiating:</b> A task instance is preparing to be launched/submitted.<br/>
-                        <b>Launched:</b> Task instance submitted to the cluster normally.<br/>
-                        <b>Running:</b> Task is running on the specified distributor.<br/>
-                        <b>Error Recoverable:</b> Task has errored out but has more attempts so it will be retried.<br/>
-                        <b>Adjusting Resources:</b> Task errored with a resource error, the resources will be adjusted
-                        before retrying.<br/>
-                        <b>Error Fatal:</b> Task errored out and has used all of the attempts, therefore has failed for
-                        this WorkflowRun. <br/>
-                        It can be resumed in a new WFR.<br/>
-                        <b>Done:</b> Task ran successfully to completion; it has a TaskInstance that successfully
-                        completed.<br/>
-                    </p>
+                children={
+                    <Grid container spacing={2}>
+                        <Grid item xs={3}><b>Registering:</b></Grid>
+                        <Grid item xs={9}> Task is bound to the database.</Grid>
+                        <Grid item xs={3}><b>Queued:</b></Grid>
+                        <Grid item xs={9}> Task's dependencies have successfully completed, task can be run when the
+                            scheduler is ready.</Grid>
+                        <Grid item xs={3}><b>Instantiating:</b></Grid>
+                        <Grid item xs={9}> A task instance is preparing to be launched/submitted.</Grid>
+                        <Grid item xs={3}><b>Launched:</b></Grid>
+                        <Grid item xs={9}> Task instance submitted to the cluster normally.</Grid>
+                        <Grid item xs={3}><b>Running:</b></Grid>
+                        <Grid item xs={9}> Task is running on the specified distributor.</Grid>
+                        <Grid item xs={3}><b>Error Recoverable:</b></Grid>
+                        <Grid item xs={9}> Task has errored out but has more attempts so it will be retried.</Grid>
+                        <Grid item xs={3}><b>Adjusting Resources:</b></Grid>
+                        <Grid item xs={9}> Task errored with a resource error, the resources will be adjusted before
+                            retrying.</Grid>
+                        <Grid item xs={3}><b>Error Fatal:</b></Grid>
+                        <Grid item xs={9}> Task errored out and has used all of the attempts, therefore has failed for
+                            this WorkflowRun. <br/>It can be resumed in a new WFR.</Grid>
+                        <Grid item xs={3}><b>Done:</b></Grid>
+                        <Grid item xs={9}> Task ran successfully to completion; it has a TaskInstance that successfully
+                            completed.</Grid>
+                    </Grid>
                 }
-                showModal={showTaskFSM}
-                setShowModal={setShowTaskFSM}
+                open={showTaskFSM}
+                onClose={() => setShowTaskFSM(false)}
+                width="80%"
             />
         </div>
     );

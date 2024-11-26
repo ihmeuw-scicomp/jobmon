@@ -14,7 +14,8 @@ import CustomThemeProvider from "@jobmon_gui/contexts/CustomThemeProvider";
 import {QueryClient, QueryClientProvider} from "@tanstack/react-query";
 import '@fontsource-variable/roboto-mono';
 import "@fontsource/archivo";
-import { ApmRoutes } from '@elastic/apm-rum-react'
+import {ApmRoutes} from '@elastic/apm-rum-react'
+import {AuthProvider} from "@jobmon_gui/contexts/AuthContext.tsx";
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -33,26 +34,25 @@ root.render(
     <QueryClientProvider client={queryClient}>
         <HashRouter>
             <CustomThemeProvider>
-                <PageNavigation>
-                    <ApmRoutes>
-                        <Route path="workflow">
-                            <Route path=":workflowId/tasks" element={<WorkflowDetails subpage={0}/>}/>
-                            <Route path=":workflowId/usage" element={<WorkflowDetails subpage={1}/>}/>
-                        </Route>
-                        <Route path="task_details/:taskId" element={<TaskDetails/>}></Route>
-                        <Route path="help" element={<Help/>}></Route>
-                        <Route path="jobmon_at_ihme" element={<JobmonAtIHME/>}></Route>
-                        <Route path="/" element={<WorkflowOverview/>}/>
-                        <Route
-                            path="*"
-                            element={
-                                <main style={{padding: "1rem"}}>
-                                    <p>Whoops! There's nothing here!</p>
-                                </main>
-                            }
-                        />
-                    </ApmRoutes>
-                </PageNavigation>
+                <AuthProvider>
+                    <PageNavigation>
+                        <ApmRoutes>
+                            <Route path="workflow/:workflowId" element={<WorkflowDetails/>}></Route>
+                            <Route path="task_details/:taskId" element={<TaskDetails/>}></Route>
+                            <Route path="help" element={<Help/>}></Route>
+                            <Route path="jobmon_at_ihme" element={<JobmonAtIHME/>}></Route>
+                            <Route path="/" element={<WorkflowOverview/>}/>
+                            <Route
+                                path="*"
+                                element={
+                                    <main style={{padding: "1rem"}}>
+                                        <p>Whoops! There's nothing here!</p>
+                                    </main>
+                                }
+                            />
+                        </ApmRoutes>
+                    </PageNavigation>
+                </AuthProvider>
             </CustomThemeProvider>
         </HashRouter>
     </QueryClientProvider>

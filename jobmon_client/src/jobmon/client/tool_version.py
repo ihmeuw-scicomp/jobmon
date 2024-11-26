@@ -28,7 +28,7 @@ class ToolVersion:
 
         Args:
             tool_version_id: an integer id associated with a Tool
-            requester: communicate with the flask services.
+            requester: communicate with the FastApi services.
         """
         self.id = tool_version_id
         self._tool: Tool

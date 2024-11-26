@@ -56,7 +56,7 @@ class Tool:
             name: the name of the tool
             active_tool_version_id: which version of the tool to attach task templates and
                 workflows to.
-            requester: communicate with the flask services.
+            requester: communicate with the FastApi services.
         """
         if requester is None:
             requester = Requester.from_defaults()
