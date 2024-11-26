@@ -1,5 +1,5 @@
 db:
-  sqlalchemy_database_uri: sqlite:////tmp/tests.sqlite
+  sqlalchemy_database_uri: ''
 distributor:
   poll_interval: 10
 heartbeat:
@@ -11,7 +11,7 @@ http:
   retries_attempts: 10
   retries_timeout: 300
   route_prefix: ''
-  service_url: http://127.0.0.1:8070/api/v2
+  service_url: ''
 oidc:
   name: OIDC
 otlp:

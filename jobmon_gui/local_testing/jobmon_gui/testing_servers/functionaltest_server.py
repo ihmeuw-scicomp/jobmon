@@ -5,50 +5,40 @@ import socket
 import sys
 from time import sleep
 
+import requests
 from sqlalchemy import text, create_engine
 from sqlalchemy.orm import Session
 import uvicorn
-
-from jobmon.client.api import Tool
-from jobmon.core.configuration import JobmonConfig
-from jobmon.server.web.api import get_app
-from jobmon.server.web.db_admin import apply_migrations, init_db
 
 
 TESTS_DB_FILEPATH = "/tmp/tests.sqlite"
 
 
 class WebServerProcess:
-    def __init__(self, filepath: str) -> None:
+    def __init__(self) -> None:
         if sys.platform == "darwin":
             self.web_host = "127.0.0.1"
         else:
             self.web_host = socket.getfqdn()
         self.web_port = 8070
-        self.filepath = filepath
 
     def start_web_service(self):
-        database_uri = f"sqlite:///{self.filepath}"
-        print(f"Database URI: {database_uri}")
-        os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = database_uri
-        os.environ["JOBMON__WEB__SQLALCHEMY_DATABASE_URI"] = database_uri
-        os.environ["JOBMON__OTLP__WEB_ENABLED"] = "true"
-        os.environ["JOBMON__OTLP__SPAN_EXPORTER"] = ""
-        os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
-        os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070/api/v2"
+        from jobmon.core.configuration import JobmonConfig
+        from jobmon.server.web.api import get_app
+        from jobmon.server.web.db_admin import init_db
 
-        if not os.path.exists(self.filepath):
-            open(self.filepath, 'a').close()
-            init_db()
-            apply_migrations(database_uri)
-
-        config = JobmonConfig(dict_config={"db": {"sqlalchemy_database_uri": database_uri}})
+        config = JobmonConfig()
+        init_db()
         app = get_app(config)
-        config.set("http", "service_url", f"http://{self.web_host}:{self.web_port}/api/v2")
-        config.write()
 
         uvicorn.run(app, host=self.web_host, port=self.web_port, log_level="info")
 
+    def is_alive(self):
+        try:
+            res = requests.get(f"http://{self.web_host}:{self.web_port}/api/v3/health")
+            return res.status_code == 200
+        except requests.exceptions.RequestException:
+            return False
 
 def create_multiple_status_wf():
     """Create wf with:
@@ -56,6 +46,8 @@ def create_multiple_status_wf():
            2. Various status in tt
            3. tt cross wfs
     """
+    from jobmon.client.api import Tool
+
     # give the large wf sometime to run
     sleep(60)
     C = "sequential"
@@ -157,6 +149,8 @@ def create_multiple_status_wf():
 
 
 def create_large_workflow():
+    from jobmon.client.api import Tool
+
     C = "sequential"
     Q = "null.q"
 
@@ -194,15 +188,29 @@ def create_large_workflow():
     # fill in fake resource usage data
 
 
-def start_web_service(filepath=TESTS_DB_FILEPATH):
-    server = WebServerProcess(filepath=filepath)
+def start_web_service():
+    server = WebServerProcess()
     server.start_web_service()
 
 
+def set_environment(filepath=TESTS_DB_FILEPATH):
+    os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{filepath}"
+    os.environ["JOBMON__OTLP__WEB_ENABLED"] = "false"
+    os.environ["JOBMON__OTLP__SPAN_EXPORTER"] = ""
+    os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
+    os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070"
+    os.environ["JOBMON__HTTP__ROUTE_PREFIX"] = "/api/v3"
+
+
 if __name__ == "__main__":
+    set_environment()
     ctx = mp.get_context("fork")
     p_server = ctx.Process(target=start_web_service, args=())
     p_server.start()
+    max_retries = 10
+    while not p_server.is_alive() and max_retries > 0:
+        sleep(1)
+        max_retries -= 1
     p_large_wf = ctx.Process(target=create_large_workflow, args=())
     p_large_wf.start()
     create_multiple_status_wf()
