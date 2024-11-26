@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from jobmon.core.cluster_protocol import ClusterDistributor, ClusterWorkerNode
 from jobmon.core.constants import TaskInstanceStatus
-from jobmon.core.exceptions import RemoteExitInfoNotAvailable, ReturnCodes
 from jobmon.worker_node.cli import WorkerNodeCLI
 from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
 
@@ -121,10 +120,10 @@ class DummyDistributor(ClusterDistributor):
     ) -> str:
         """Run a fake execution of the task.
 
-                In a real executor, this is where submission to the cluster would happen (e.g. sbatch
-                or qsub). Here, since it's a dummy executor, we just get a random number and empty
-                file paths.
-                """
+        In a real executor, this is where submission to the cluster would happen.
+        Here, since it's a dummy executor, we just get a random number and empty
+        file paths.
+        """
         logger.debug("This is the Dummy Distributor")
         # even number for non array tasks
         distributor_id = random.randint(1, int(1e6)) * 2

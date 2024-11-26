@@ -4,20 +4,13 @@ from __future__ import annotations
 
 from importlib.metadata import version
 import logging
-import os
-import random
-from typing import Any, Dict, List, Optional, Set, Tuple, Type, Union
+from typing import Type
 
 from jobmon.core.cluster_protocol import (
     ClusterDistributor,
     ClusterQueue,
     ClusterWorkerNode,
 )
-from jobmon.core.constants import TaskInstanceStatus
-from jobmon.core.exceptions import RemoteExitInfoNotAvailable
-from jobmon.worker_node.cli import WorkerNodeCLI
-from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
-
 
 logger = logging.getLogger(__name__)
 
@@ -27,16 +20,19 @@ __version__ = version("jobmon_core")
 def get_cluster_queue_class() -> Type[ClusterQueue]:
     """Return the queue class for the dummy executor."""
     from jobmon.plugins.dummy.dummy_queue import DummyQueue
+
     return DummyQueue
 
 
 def get_cluster_distributor_class() -> Type[ClusterDistributor]:
     """Return the cluster distributor for the dummy executor."""
     from jobmon.plugins.dummy.dummy_distributor import DummyDistributor
+
     return DummyDistributor
 
 
 def get_cluster_worker_node_class() -> Type[ClusterWorkerNode]:
     """Return the cluster worker node class for the dummy executor."""
     from jobmon.plugins.dummy.dummy_distributor import DummyWorkerNode
+
     return DummyWorkerNode
