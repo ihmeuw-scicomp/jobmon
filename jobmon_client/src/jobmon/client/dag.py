@@ -94,16 +94,18 @@ class Dag(object):
             for n in node.upstream_nodes:
                 if n not in nodes_in_dag:
                     raise NodeDependencyNotExistError(
-                        f"Upstream node, {hash(n)}, for node, {hash(node)}, "
-                        "does not exist in the dag.Check that every task has been added to "
-                        "the workflow and is in the correct order."
+                        f"Upstream node not in the dag."
+                        f"Node id: {node}."
+                        f"Node's Upstream Nodes: {node.upstream_nodes}."
+                        f"Invalid upstream node: {n}."
                     )
             for n in node.downstream_nodes:
                 if n not in nodes_in_dag:
                     raise NodeDependencyNotExistError(
-                        f"Downstream node, {hash(n)}, for node, {hash(node)}, "
-                        "does not exist in the dag.Check that every task has been added to "
-                        "the workflow and is in the correct order."
+                        f"Downstream node not in the dag."
+                        f"Node id: {node}."
+                        f"Node's Downstream Nodes: {node.downstream_nodes}."
+                        f"Invalid downstream node: {n}."
                     )
 
         dag_map = {node: node.downstream_nodes for node in nodes_in_dag}
