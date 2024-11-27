@@ -3,7 +3,7 @@ import sqlalchemy
 
 
 @pytest.fixture(scope="function")
-def web_server_in_memory(global_web_config, db_engine):
+def web_server_in_memory(db_engine):
     """This sets up the JSM/JQS using the test_client which is a
     fake server
     """
