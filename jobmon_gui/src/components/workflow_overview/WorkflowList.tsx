@@ -3,7 +3,7 @@ import axios from 'axios';
 import {Link, useLocation} from "react-router-dom";
 import {FaCircle} from "react-icons/fa";
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
-import {useQuery} from "@tanstack/react-query";
+import {useQuery, useQueryClient} from "@tanstack/react-query";
 import dayjs from "dayjs";
 import {workflow_overview_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
@@ -25,6 +25,8 @@ import {useDisplayTimeFormatStore, useDisplayTimezoneStore} from "@jobmon_gui/st
 import utc from "dayjs/plugin/utc";
 import advancedFormat from "dayjs/plugin/advancedFormat";
 import timezone from "dayjs/plugin/timezone";
+import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
+import {getWorkflowTTStatusQueryFn} from "@jobmon_gui/queries/GetWorkflowTTStatus.ts";
 
 type WorkflowType = {
     DONE: number,
@@ -51,6 +53,7 @@ export default function WorkflowList() {
     dayjs.extend(utc)
     dayjs.extend(advancedFormat);
     dayjs.extend(timezone);
+    const queryClient = useQueryClient();
     const [showWorkflowInfo, setShowWorkflowInfo] = useState(false)
     const [workflowDetails, setWorkflowDetails] = useState<WorkflowType>({
         DONE: 0,
@@ -85,42 +88,42 @@ export default function WorkflowList() {
             dayjs(workflowSettings.get().date_submitted_end).format("YYYY-MM-DD"),
             workflowSettings.get().status
         ],
-     queryFn: async () => {
-        workflowSettings.clearDataRefresh();
+        queryFn: async () => {
+            workflowSettings.clearDataRefresh();
 
-        // Construct params, excluding empty values
-        const rawParams = {
-            user: workflowSettings.get().user,
-            tool: workflowSettings.get().tool,
-            wf_name: workflowSettings.get().wf_name,
-            wf_args: workflowSettings.get().wf_args,
-            wf_attribute_key: workflowSettings.get().wf_attribute_key,
-            wf_attribute_value: workflowSettings.get().wf_attribute_value,
-            wf_id: workflowSettings.get().wf_id,
-            date_submitted: workflowSettings.get().date_submitted
-                ? dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD")
-                : undefined,
-            date_submitted_end: workflowSettings.get().date_submitted_end
-                ? dayjs(workflowSettings.get().date_submitted_end).add(1, 'day').format("YYYY-MM-DD")
-                : undefined,
-            status: workflowSettings.get().status,
-        };
+            // Construct params, excluding empty values
+            const rawParams = {
+                user: workflowSettings.get().user,
+                tool: workflowSettings.get().tool,
+                wf_name: workflowSettings.get().wf_name,
+                wf_args: workflowSettings.get().wf_args,
+                wf_attribute_key: workflowSettings.get().wf_attribute_key,
+                wf_attribute_value: workflowSettings.get().wf_attribute_value,
+                wf_id: workflowSettings.get().wf_id,
+                date_submitted: workflowSettings.get().date_submitted
+                    ? dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD")
+                    : undefined,
+                date_submitted_end: workflowSettings.get().date_submitted_end
+                    ? dayjs(workflowSettings.get().date_submitted_end).add(1, 'day').format("YYYY-MM-DD")
+                    : undefined,
+                status: workflowSettings.get().status,
+            };
 
-        // Filter out keys with undefined or empty string values
-        const filteredParams = Object.fromEntries(
-            Object.entries(rawParams).filter(([_, value]) => value != null && value !== "")
-        );
+            // Filter out keys with undefined or empty string values
+            const filteredParams = Object.fromEntries(
+                Object.entries(rawParams).filter(([_, value]) => value != null && value !== "")
+            );
 
-        // Create URLSearchParams from filteredParams
-        const params = new URLSearchParams(filteredParams);
+            // Create URLSearchParams from filteredParams
+            const params = new URLSearchParams(filteredParams);
 
-        return axios.get<WorkflowsQueryResponse>(workflow_overview_url, {
-            ...jobmonAxiosConfig,
-            params: params,
-        }).then((response) => {
-            return response.data?.workflows;
-        });
-    },
+            return axios.get<WorkflowsQueryResponse>(workflow_overview_url, {
+                ...jobmonAxiosConfig,
+                params: params,
+            }).then((response) => {
+                return response.data?.workflows;
+            });
+        },
         enabled: workflowSettings.getRefreshData()
     })
 
@@ -207,7 +210,19 @@ export default function WorkflowList() {
                                     <ListItemText
                                         primary={
                                             <Typography variant="h6">
-                                                <Link to={`/workflow/${workflow.wf_id}`}>
+                                                <Link to={`/workflow/${workflow.wf_id}`}
+                                                      onMouseEnter={async () => {
+                                                          queryClient.prefetchQuery({
+                                                              queryKey: ["workflow_details", "details", workflow.wf_id],
+                                                              queryFn: getWorkflowDetailsQueryFn,
+                                                          },)
+                                                          queryClient.prefetchQuery({
+                                                              queryKey: ["workflow_details", "tt_status", workflow.wf_id],
+                                                              queryFn: getWorkflowTTStatusQueryFn
+                                                          },)
+
+                                                      }}
+                                                >
                                                     {workflow.wf_id} - {workflow.wf_name}
                                                 </Link>
                                             </Typography>

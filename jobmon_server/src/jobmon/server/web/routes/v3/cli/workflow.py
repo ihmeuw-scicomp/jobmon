@@ -658,6 +658,7 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
                 WorkflowStatus.description,
                 WorkflowRun.jobmon_version,
                 WorkflowRun.heartbeat_date,
+                WorkflowRun.user,
             )
             .select_from(Workflow)
             .join(ToolVersion, Workflow.tool_version_id == ToolVersion.id)
@@ -683,6 +684,7 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
         "wf_status_desc",
         "wfr_jobmon_version",
         "wfr_heartbeat_date",
+        "wfr_user",
     )
 
     result = [dict(zip(column_names, row)) for row in rows]

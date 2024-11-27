@@ -8,5 +8,6 @@ export type WorkflowDetails = {
     wf_status_desc: string
     wfr_jobmon_version: string
     wfr_heartbeat_date: string
+    wfr_user: string
 }
 export type WorkflowDetailsResponse = WorkflowDetails[]

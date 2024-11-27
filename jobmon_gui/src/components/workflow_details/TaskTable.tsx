@@ -7,10 +7,7 @@ import {createMRTColumnHelper, MaterialReactTable, MRT_RowData, useMaterialReact
 import {Box, Button} from '@mui/material';
 import {mkConfig, generateCsv, download} from "export-to-csv";
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
-import {useQuery} from "@tanstack/react-query";
-import axios from "axios";
-import {task_table_url} from "@jobmon_gui/configs/ApiUrls";
-import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
+import {useQuery, useQueryClient} from "@tanstack/react-query";
 import Typography from "@mui/material/Typography";
 import {type Row} from '@tanstack/react-table';
 import {useTaskTableStore} from "@jobmon_gui/stores/TaskTable.ts";
@@ -18,49 +15,23 @@ import {LocalizationProvider} from "@mui/x-date-pickers";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import {formatDayjsDate} from "@jobmon_gui/utils/DayTime.ts";
+import {getTaskDetailsQueryFn} from "@jobmon_gui/queries/GetTaskDetails.ts";
+import {getWorkflowTasksQueryFn} from "@jobmon_gui/queries/GetWorkflowTasks.ts";
+import {Task, TaskTableProps} from "@jobmon_gui/types/TaskTable.ts";
 
-type TaskTableProps = {
-    taskTemplateName: string
-    workflowId: number | string
-}
-
-type Task = {
-    task_command: string
-    task_id: number
-    task_max_attempts: number
-    task_name: string
-    task_num_attempts: number
-    task_status: string
-    task_status_date: dayjs.Dayjs
-}
-type Tasks = {
-    tasks: Task[]
-}
 
 export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps) {
     dayjs.extend(utc)
+    const queryClient = useQueryClient()
     const columnHelper = createMRTColumnHelper<Task>()
     const location = useLocation();
     const taskTableStore = useTaskTableStore()
     const tasks = useQuery({
         queryKey: ["workflow_details", "tasks", workflowId, taskTemplateName],
-        queryFn: async () => {
-            return axios.get<Tasks>(
-                task_table_url + workflowId,
-                {
-                    ...jobmonAxiosConfig,
-                    data: null,
-                    params: {tt_name: taskTemplateName}
-                }
-            ).then((r) => {
-                return r.data.tasks.map((task: Task) => {
-                    task.task_status_date = dayjs.utc(task.task_status_date, 'YYYY-MM-DD HH:mm:SS')
-                    return task
-                })
-            })
-        },
+        queryFn: getWorkflowTasksQueryFn,
         staleTime: 5000,
-        enabled: !!taskTemplateName
+        enabled: !!taskTemplateName,
+        refetchOnMount: false
     })
 
 
@@ -72,6 +43,13 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
                     <Link
                         to={{pathname: `/task_details/${row.original.task_id}`, search: location.search}}
                         key={row.original.task_id}
+                        onMouseEnter={async () => {
+                            queryClient.prefetchQuery({
+                                queryKey: ["task_details", row.original.task_id],
+                                queryFn: getTaskDetailsQueryFn
+                            })
+
+                        }}
                     >
                         {renderedCellValue}
                     </Link>

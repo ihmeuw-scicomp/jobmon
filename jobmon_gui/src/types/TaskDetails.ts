@@ -10,3 +10,4 @@ export type TaskDetails = {
 export type TaskDetailsResponse = {
     task_details: TaskDetails[]
 }
+

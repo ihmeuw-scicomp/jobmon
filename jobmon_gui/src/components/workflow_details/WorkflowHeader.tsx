@@ -4,16 +4,11 @@ import {IoMdCloseCircle, IoMdCloseCircleOutline} from "react-icons/io";
 import {AiFillSchedule, AiFillCheckCircle} from "react-icons/ai";
 import {TbHandStop} from "react-icons/tb";
 import {HiRocketLaunch} from "react-icons/hi2";
-import {HiInformationCircle} from "react-icons/hi";
-import React, {useState} from "react";
+import React, {useContext, useState} from "react";
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
 import {CircularProgress, Grid} from "@mui/material";
 import {Box} from "@mui/system";
-import {useQuery} from "@tanstack/react-query";
-import axios from "axios";
-import {workflow_details_url} from "@jobmon_gui/configs/ApiUrls.ts";
-import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
-import {WorkflowDetailsResponse} from "@jobmon_gui/types/WorkflowDetails.ts";
+import {useMutation, useQuery} from "@tanstack/react-query";
 import Typography from "@mui/material/Typography";
 import humanizeDuration from 'humanize-duration';
 import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
@@ -23,25 +18,23 @@ type WorkflowHeaderProps = {
 }
 import IconButton from "@mui/material/IconButton";
 import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
+import InfoIcon from '@mui/icons-material/Info';
+import AuthContext from "@jobmon_gui/contexts/AuthContext.tsx";
+import StopWorkflowButton from "@jobmon_gui/components/StopWorkflow.tsx";
+import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
 
 export default function WorkflowHeader({
                                            wf_id,
                                        }: WorkflowHeaderProps) {
-
+    const {user} = useContext(AuthContext)
+    const user_name = user?.preferred_username ? user?.preferred_username.split("@")[0] : "unknown"
     const wfDetails = useQuery({
         queryKey: ["workflow_details", "details", wf_id],
-        queryFn: async () => {
-
-            return axios.get<WorkflowDetailsResponse>(workflow_details_url + wf_id, {
-                    ...jobmonAxiosConfig,
-                    data: null,
-                }
-            ).then((r) => {
-                return r.data[0]
-            })
-        },
+        queryFn: getWorkflowDetailsQueryFn,
         staleTime: 60000, // 60 seconds
     })
+
+    const stopWorkflow = useMutation({})
 
     const [showWFInfo, setShowWFInfo] = useState(false)
 
@@ -75,6 +68,7 @@ export default function WorkflowHeader({
     const wfr_heartbeat_date = formatJobmonDate(wfDetails?.data?.wfr_heartbeat_date)
     const wf_elapsed_time = humanizeDuration(new Date(wfDetails?.data?.wfr_heartbeat_date).getTime() - new Date(wfDetails?.data?.wf_created_date).getTime())
     const jobmon_version = wfDetails?.data?.wfr_jobmon_version
+    const wfr_user = wfDetails?.data?.wfr_user
 
     const {icon, className} = statusIcons[wf_status] || {};
 
@@ -89,21 +83,17 @@ export default function WorkflowHeader({
                     <HtmlTooltip
                         title="Workflow Information"
                         arrow={true}
-                        placement={"right"} 
+                        placement={"bottom"}
+                        sx={{pl: 1}}
                     >
                         <IconButton
                             color="inherit"
-                            sx={{
-                                padding: 0,
-                                fontSize: 'inherit',
-                            }}
+                            onClick={() => setShowWFInfo(true)}
                         >
-                            <HiInformationCircle
-                                style={{cursor: 'pointer'}}
-                                onClick={() => setShowWFInfo(true)}
-                            />
+                            <InfoIcon fontSize={"large"}/>
                         </IconButton>
                     </HtmlTooltip>
+                    <StopWorkflowButton wf_id={wf_id}/>
                 </span>
             </Box>
             <Box>
@@ -125,6 +115,8 @@ export default function WorkflowHeader({
                             <Grid item xs={9}>{wf_submitted_date}</Grid>
                             <Grid item xs={3} sx={gridHeaderStyles}>WorkflowRun Heartbeat Date:</Grid>
                             <Grid item xs={9}>{wfr_heartbeat_date}</Grid>
+                            <Grid item xs={3} sx={gridHeaderStyles}>Workflow User:</Grid>
+                            <Grid item xs={9}>{wfr_user}</Grid>
                             <Grid item xs={3} sx={gridHeaderStyles}>Workflow Elapsed Time:</Grid>
                             <Grid item xs={9}>{wf_elapsed_time}</Grid>
                             <Grid item xs={3} sx={gridHeaderStyles}>Jobmon Version:</Grid>
