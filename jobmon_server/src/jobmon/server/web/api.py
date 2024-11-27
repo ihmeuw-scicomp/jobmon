@@ -14,11 +14,10 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse
 import structlog
 
-from jobmon.core.configuration import JobmonConfig
 from jobmon.core.otlp import OtlpAPI
+from jobmon.server.web.config import get_jobmon_config
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 from jobmon.server.web.log_config import configure_structlog  # noqa F401
-from jobmon.server.web.log_config import configure_logging  # noqa F401
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
 from jobmon.server.web.routes.utils import get_user
 from jobmon.server.web.server_side_exception import ServerError
@@ -27,7 +26,8 @@ url_prefix = "/api"
 
 docs_static_uri = f"{url_prefix}/docs_static"
 docs_uri = f"{url_prefix}/docs"
-_CONFIG = JobmonConfig()
+
+_CONFIG = get_jobmon_config()
 
 
 def _init_logging(otlp_api: Optional[OtlpAPI] = None) -> bool:
@@ -59,6 +59,7 @@ def _init_logging(otlp_api: Optional[OtlpAPI] = None) -> bool:
 
 
 def get_app(
+    versions: Optional[list[str]] = None,
     use_otlp: bool = False,
     structlog_configured: bool = False,
     otlp_api: Optional[OtlpAPI] = None,
@@ -66,6 +67,7 @@ def get_app(
     """Get a FastAPI app based on the config. If no config is provided, defaults are used.
 
     Args:
+        versions: The versions of the API to include.
         use_otlp: Whether to use OpenTelemetry.
         structlog_configured: Whether structlog is already configured.
         otlp_api: The OpenTelemetry API to use.
@@ -104,7 +106,8 @@ def get_app(
     )
     app.add_middleware(SecurityHeadersMiddleware, csp=True)
     add_hooks_and_handlers(app)
-    for version in ["auth", "v3", "v2", "v1"]:
+    versions = versions or ["auth", "v3", "v2", "v1"]
+    for version in versions:
         mod = import_module(f"jobmon.server.web.routes.{version}")
         # Get the router dynamically from the module (assuming it's an APIRouter)
         api_router = getattr(mod, f"api_{version}_router")
