@@ -75,7 +75,6 @@ def get_request_username(request: Request) -> str:
     Returns the username part of the email address from the request.
     """
     email = get_user(request)["email"]
-    print(email)
     return email.split("@")[0]
 
 

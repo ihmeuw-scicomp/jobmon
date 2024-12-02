@@ -266,7 +266,7 @@ async def set_resume(workflow_id: int, request: Request) -> Any:
             workflow = session.execute(select_stmt).scalars().one_or_none()
             wf_run_select_stmt = (
                 select(WorkflowRun)
-                .where(Workflow.id == workflow_id)
+                .where(WorkflowRun.workflow_id == workflow_id)
                 .order_by(WorkflowRun.id.desc())
                 .limit(1)
             )
