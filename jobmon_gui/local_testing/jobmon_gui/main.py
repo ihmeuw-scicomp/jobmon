@@ -79,20 +79,6 @@ def run_server_with_handler() -> None:
 
 
 if __name__ == "__main__":
-    os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070/api/v3"
-    create_wf = False
-    if len(sys.argv) > 1:
-        create_wf = True
-        print("Starting server and creating a workflow")
-    else:
-        print("Starting server")
+    print("Starting server")
     if config_db():
-        # start server
-        ctx = mp.get_context("fork")
-        p_server = ctx.Process(target=run_server_with_handler, args=())
-        p_server.start()
-        # create N workflows for testing
-        # if there is an arg, convert to int, and create the corresponding number of workflows
-        if create_wf:
-            os.system(f"python tests/worker_node/task_generator_wf.py 1")
-        p_server.join()
+        run_server_with_handler()

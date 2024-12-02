@@ -14,7 +14,7 @@ from jobmon.core.cluster import Cluster
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
 from jobmon.distributor.distributor_service import DistributorService
-from jobmon.plugins.dummy import DummyDistributor
+from jobmon.plugins.dummy.dummy_distributor import DummyDistributor
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 from jobmon.server.web.models import load_model

@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import text, update
 from sqlalchemy.orm import Session
 
-from jobmon.plugins.dummy import DummyDistributor
+from jobmon.plugins.dummy.dummy_distributor import DummyDistributor
 from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow import DistributorContext
