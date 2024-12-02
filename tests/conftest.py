@@ -1,11 +1,11 @@
 import logging
 import multiprocessing as mp
 import os
-import platform
 import requests
 import signal
 import socket
 import sys
+import tempfile
 from time import sleep
 from types import TracebackType
 from typing import Any, Optional
@@ -18,28 +18,24 @@ from sqlalchemy import create_engine
 
 from jobmon.client.api import Tool
 from jobmon.core.requester import Requester
+from jobmon.core.configuration import JobmonConfig
+from jobmon.server.web.config import get_jobmon_config
 
 logger = logging.getLogger(__name__)
 
 _api_prefix = "/api/v2"
 
 
-@pytest.fixture(scope="session")
-def api_prefix():
-    return _api_prefix
+def pytest_sessionstart(session):
+    # Create a unique SQLite file in a temporary directory
+    tmp_dir = tempfile.mkdtemp()
+    sqlite_file = os.path.join(tmp_dir, "tests.sqlite")
 
+    # Print information for debugging purposes
+    print("Running code before test file import")
+    print(f"SQLite file created at: {sqlite_file}")
 
-@pytest.fixture(scope="session")
-def sqlite_file(tmpdir_factory) -> str:
-    file = str(tmpdir_factory.mktemp("db").join("tests.sqlite"))
-    return file
-
-
-@pytest.fixture(scope="session", autouse=True)
-def global_web_config(sqlite_file: str):
-    from jobmon.core.configuration import JobmonConfig
-    from jobmon.server.web.config import get_jobmon_config
-
+    # Configure Jobmon with the SQLite file
     config = JobmonConfig(
         dict_config={
             "db": {"sqlalchemy_database_uri": f"sqlite:///{sqlite_file}"},
@@ -52,11 +48,15 @@ def global_web_config(sqlite_file: str):
         }
     )
     get_jobmon_config(config)
-    return config
 
 
 @pytest.fixture(scope="session")
-def db_engine(sqlite_file) -> Engine:
+def api_prefix():
+    return _api_prefix
+
+
+@pytest.fixture(scope="session")
+def db_engine() -> Engine:
     from jobmon.server.web.config import get_jobmon_config
 
     config = get_jobmon_config()
@@ -75,7 +75,7 @@ def db_engine(sqlite_file) -> Engine:
 
         res = session.execute(text("SELECT * from workflow_status")).fetchall()
         assert len(res) > 0
-    return sqlalchemy.create_engine(f"sqlite:///{sqlite_file}")
+    return eng
 
 
 class WebServerProcess:
@@ -174,7 +174,7 @@ class WebServerProcess:
 
 
 @pytest.fixture(scope="session")
-def web_server_process(global_web_config, db_engine):
+def web_server_process(db_engine):
     """This starts the flask dev server in separate processes"""
     with WebServerProcess() as web:
         yield {"JOBMON_HOST": web.web_host, "JOBMON_PORT": web.web_port}

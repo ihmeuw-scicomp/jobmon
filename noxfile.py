@@ -138,7 +138,7 @@ def clean(session: Session) -> None:
 
 @nox.session(python=python, venv_backend="conda")
 def launch_gui_test_server(session: Session) -> None:
-    session.conda_install("mysqlclient")
+    session.conda_install("mysqlclient", "--channel", "conda-forge")
     if os.path.exists("/tmp/tests.sqlite"):
         os.remove("/tmp/tests.sqlite")
     session.install("-e", "./jobmon_core")
