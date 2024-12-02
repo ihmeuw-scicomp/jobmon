@@ -1,13 +1,9 @@
-import pytest
 import ast
 
-from typing import Optional, Callable, Type, Dict, List, Any, Union
-import sys
+from typing import Optional, Callable, List, Any, Union
 import os
-import importlib
 
 from jobmon.core.task_generator import task_generator
-from jobmon.client.api import Tool
 
 # Get the full path of the current script
 script_path = os.path.abspath(__file__)

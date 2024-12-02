@@ -16,10 +16,11 @@ To deploy the Jobmon Server Backend locally:
 2. Make a conda environment and activate it
 3. Install `nox` by running `conda install conda-forge::nox`
 4. Navigate to the top of the Jobmon repository
-5. Run `nox -s launch_gui_test_server`
-6. Run `conda activate ./.nox/launch_gui_test_server`
-7. Run `python jobmon_gui/local_testing/jobmon_gui/testing_servers/functionaltest_server.py`
+5. Run `nox -s build_gui_test_env`
+6. Run `conda activate ./.nox/build_gui_test_env`
+7. Run `python jobmon_gui/local_testing/jobmon_gui/main.py`
     - This command will spin up a local version of the Jobmon Server, running on 127.0.0.1:8070 by default. You can then configure the React app to point to this URL for testing purposes.
+8. Run `python jobmon_gui/local_testing/jobmon_gui/create_wfs.py`
 
 ### Deploying the Jobmon GUI Frontend Locally
 

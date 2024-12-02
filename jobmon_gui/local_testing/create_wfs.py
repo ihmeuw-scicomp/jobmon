@@ -44,9 +44,9 @@ def parse_arguments():
 
 def create_simple_wf():
     """Use the task_generator_wf.py script to create a simple workflow."""
-    wf_script_path = Path(__file__).parent.parent.parent.parent / "tests/worker_node/task_generator_wf.py"
+    wf_script_path = Path(__file__).parent.parent.parent / "tests/worker_node/task_generator_wf.py"
     # Run the command and wait for it to finish
-    result = subprocess.run(["python", wf_script_path, "1"], check=True)
+    result = subprocess.check_output(["python", str(wf_script_path), "1"])
     # This line will only run after the command above finishes
     print("Simple workflow completed!")
 
@@ -98,7 +98,6 @@ def create_tired_wf():
 
 
 def create_wf(total, wf_type):
-    wf_script_path = Path(__file__).parent.parent.parent.parent / "tests/worker_node/task_generator_wf.py"
     created = 0
     # create #total of workflows; if total is 0, create workflows continuously
     while total == 0 or created < total:
@@ -120,7 +119,8 @@ if __name__ == "__main__":
 
     # Access the arguments
     url = args.server_url
-    os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070/api/v3"
+    os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070"
+    os.environ["JOBMON__HTTP__ROUTE_PREFIX"] = "/api/v2"
     wfs = args.wf
     wf_type = args.wf_type
     create_wf(wfs, wf_type)
