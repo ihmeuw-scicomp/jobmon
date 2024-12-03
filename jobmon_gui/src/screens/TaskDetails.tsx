@@ -7,16 +7,19 @@ import TaskFSM from '@jobmon_gui/components/task_details/TaskFSM';
 import {HiInformationCircle} from "react-icons/hi";
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
 import {CircularProgress, Grid} from "@mui/material";
-import {useQuery} from "@tanstack/react-query";
+import {useQuery, useQueryClient} from "@tanstack/react-query";
 import {getTaskDetailsQueryFn} from "@jobmon_gui/queries/GetTaskDetails.ts";
 import Typography from "@mui/material/Typography";
 import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea.tsx";
 import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
 import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
 import IconButton from "@mui/material/IconButton";
+import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
+import {getWorkflowTTStatusQueryFn} from "@jobmon_gui/queries/GetWorkflowTTStatus.ts";
 
 
 export default function TaskDetails() {
+    const queryClient = useQueryClient();
     const navigate = useNavigate()
     let params = useParams();
     const taskId = params.taskId
@@ -31,6 +34,7 @@ export default function TaskDetails() {
     const location = useLocation();
 
     const handleHomeClick = () => {
+
         const searchParams = new URLSearchParams(location.search);
         const search = searchParams.toString();
         navigate({
@@ -53,7 +57,19 @@ export default function TaskDetails() {
                     <button className="breadcrumb-button" onClick={handleHomeClick}>Home</button>
                 </Breadcrumb.Item>
                 <Breadcrumb.Item>
-                    <Link to={{pathname: `/workflow/${task_details?.data?.workflow_id}`}}>
+                    <Link to={{pathname: `/workflow/${task_details?.data?.workflow_id}`}}
+                          onMouseEnter={async () => {
+                              queryClient.prefetchQuery({
+                                  queryKey: ["workflow_details", "details", task_details?.data?.workflow_id],
+                                  queryFn: getWorkflowDetailsQueryFn,
+                              },)
+                              queryClient.prefetchQuery({
+                                  queryKey: ["workflow_details", "tt_status", task_details?.data?.workflow_id],
+                                  queryFn: getWorkflowTTStatusQueryFn
+                              },)
+
+                          }}
+                    >
                         Workflow ID {task_details?.data?.workflow_id}
                     </Link>
                 </Breadcrumb.Item>
@@ -67,7 +83,7 @@ export default function TaskDetails() {
                             <HtmlTooltip
                                 title="Task Information"
                                 arrow={true}
-                                placement={"right"} 
+                                placement={"right"}
                             >
                                 <IconButton
                                     color="inherit"
@@ -88,10 +104,10 @@ export default function TaskDetails() {
                         Task Finite State Machine&nbsp;
                         <span>
                         <HtmlTooltip
-                                title="Task Finite State Machine"
-                                arrow={true}
-                                placement={"right"} 
-                            >
+                            title="Task Finite State Machine"
+                            arrow={true}
+                            placement={"right"}
+                        >
                                 <IconButton
                                     color="inherit"
                                     sx={{

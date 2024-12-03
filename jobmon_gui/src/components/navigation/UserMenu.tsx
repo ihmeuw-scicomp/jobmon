@@ -19,6 +19,7 @@ import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
 import {useDisplayTimeFormatStore, useDisplayTimezoneStore} from "@jobmon_gui/stores/DateTime.ts";
 import InfoIcon from '@mui/icons-material/Info';
 import IconButton from "@mui/material/IconButton";
+import HtmlTooltip from "@jobmon_gui/components/HtmlToolTip.tsx";
 
 type UserMenuProps = {
     username: string
@@ -58,16 +59,15 @@ const UserMenu = ({username, anchorEl, setAnchorEl}: UserMenuProps) => {
             <JobmonModal title={"Settings"} open={settingsOpen} onClose={() => setSettingsOpen(false)} width={'80%'}>
                 <Grid container spacing={4} sx={{pl: 4}}>
                     <Grid item xs={3}>
-                        <Box sx={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+                        <Box sx={{display: 'flex', justifyContent: "flex-end"}}>
                             <Typography fontWeight={"bold"} fontSize={"1.2em"} sx={{pt: 1}}>
                                 Timezone:
-                                <Tooltip
+                                <HtmlTooltip
                                     title={"Jobmon stores all dates in UTC. This setting allows you to set the timezone that will be displayed in the web ui."}>
                                     <IconButton>
                                         <InfoIcon/>
                                     </IconButton>
-                                </Tooltip
-                                >
+                                </HtmlTooltip>
                             </Typography>
                         </Box>
 
@@ -82,15 +82,15 @@ const UserMenu = ({username, anchorEl, setAnchorEl}: UserMenuProps) => {
                         </Select>
                     </Grid>
                     <Grid item xs={3}>
-                        <Box sx={{display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
+                        <Box sx={{display: 'flex',  justifyContent: "flex-end"}}>
                             <Typography fontWeight={"bold"} fontSize={"1.2em"} sx={{pt: 1}}>
                                 Time Format:
-                                <Tooltip
+                                <HtmlTooltip
                                     title={"This setting allows you to customize the displayed time format."}>
                                     <IconButton>
                                         <InfoIcon/>
                                     </IconButton>
-                                </Tooltip
+                                </HtmlTooltip
                                 >
                             </Typography>
                         </Box>

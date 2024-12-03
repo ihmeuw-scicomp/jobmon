@@ -18,58 +18,17 @@ import HtmlTooltip from "@jobmon_gui/components/HtmlToolTip";
 import {Prism as SyntaxHighlighter} from 'react-syntax-highlighter';
 import {useClusteredErrorsTableStore} from "@jobmon_gui/stores/ClusteredErrorsTable.ts";
 import {useTaskTableStore} from "@jobmon_gui/stores/TaskTable.ts";
-import dayjs from "dayjs";
 import {AdapterDayjs} from "@mui/x-date-pickers/AdapterDayjs";
 import {LocalizationProvider} from "@mui/x-date-pickers";
 import {formatDayjsDate, formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
-
-type ClusteredErrorsProps = {
-    taskTemplateId: string | number
-    workflowId: number | string
-}
-
-type ErrorSampleModalDetails = {
-    sample_index: number
-    sample_ids: number[]
-}
-
-interface ErrorLog {
-    task_id: number
-    workflow_id: number
-    workflow_run_id: number
-    task_instance_err_id: number
-    task_instance_stderr_log: string
-    error_time: string
-    error: string
-}
-
-type ClusteredError = {
-    group_instance_count: number
-    task_instance_ids: number[]
-    task_ids: number[]
-    sample_error: string
-    workflow_run_id: number
-    workflow_id: number
-    first_error_time: string | dayjs.Dayjs
-}
-
-type ClusteredErrorList = {
-    error_logs: ClusteredError[]
-    total_count: number
-    page: number
-    page_size: number
-}
-
-interface ErrorDetails {
-    data?: {
-        error_logs?: ErrorLog[];
-    };
-}
-
-interface ColumnType extends ClusteredError {
-    // Extend ClusteredError type to add optional actions column
-    actions?: string
-}
+import {getClusteredErrorsFn} from "@jobmon_gui/queries/GetClusteredErrors.ts";
+import dayjs from "dayjs";
+import {
+    ClusteredErrorsProps,
+    ColumnType,
+    ErrorDetails,
+    ErrorSampleModalDetails
+} from "@jobmon_gui/types/ClusteredErrors.ts";
 
 export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredErrorsProps) {
     const columnHelper = createMRTColumnHelper<ColumnType>()
@@ -80,24 +39,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
     const [language, setLanguage] = useState('python');
     const errors = useQuery({
         queryKey: ["workflow_details", "clustered_errors", workflowId, taskTemplateId],
-        queryFn: async () => {
-            return axios.get<ClusteredErrorList>(
-                `${error_log_viz_url}${workflowId}/${taskTemplateId}#`,
-                {
-                    ...jobmonAxiosConfig,
-                    data: null,
-                    params: {cluster_errors: "true"}
-                }
-            ).then((r) => {
-                return {
-                    ...r.data, error_logs: r.data.error_logs.map((el) => {
-                        el.first_error_time = dayjs(el.first_error_time)
-                        return el
-                    })
-                }
-
-            })
-        },
+        queryFn: getClusteredErrorsFn,
         enabled: !!taskTemplateId
     })
     const prefetchErrorDetails = async (nextErrorDetailIndex: boolean | ErrorSampleModalDetails) => {

@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import (
     get_redoc_html,
     get_swagger_ui_html,
@@ -99,6 +100,7 @@ def get_app(
         allow_methods=["*"],
         allow_headers=["Content-Type"],
     )
+    app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
     app.add_middleware(
         SessionMiddleware, secret_key=_CONFIG.get("session", "secret_key")
     )

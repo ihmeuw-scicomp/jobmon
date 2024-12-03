@@ -4,7 +4,7 @@ from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict, List, Optional, Tuple
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 import sqlalchemy
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
@@ -24,10 +24,11 @@ from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_attribute import WorkflowAttribute
 from jobmon.server.web.models.workflow_attribute_type import WorkflowAttributeType
+from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_status import WorkflowStatus
+from jobmon.server.web.routes.utils import get_request_username
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
-
 
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
@@ -250,6 +251,8 @@ async def set_resume(workflow_id: int, request: Request) -> Any:
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
     try:
         data = cast(Dict, await request.json())
+        user_name = get_request_username(request)
+
         logger.info("Set resume for workflow")
         reset_running_jobs = bool(data["reset_running_jobs"])
     except Exception as e:
@@ -261,7 +264,16 @@ async def set_resume(workflow_id: int, request: Request) -> Any:
         with session.begin():
             select_stmt = select(Workflow).where(Workflow.id == workflow_id)
             workflow = session.execute(select_stmt).scalars().one_or_none()
+            wf_run_select_stmt = (
+                select(WorkflowRun)
+                .where(WorkflowRun.workflow_id == workflow_id)
+                .order_by(WorkflowRun.id.desc())
+                .limit(1)
+            )
+            workflow_run = session.execute(wf_run_select_stmt).scalars().one_or_none()
             if workflow:
+                if workflow_run.user != user_name:
+                    raise HTTPException(status_code=401, detail="Unauthorized.")
                 # trigger resume on active workflow run
                 workflow.resume(reset_running_jobs)
                 session.flush()

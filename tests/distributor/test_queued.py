@@ -2,7 +2,7 @@ from jobmon.core.constants import TaskInstanceStatus
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.distributor.distributor_service import DistributorService
-from jobmon.plugins.dummy import DummyDistributor
+from jobmon.plugins.dummy.dummy_distributor import DummyDistributor
 
 
 def test_queued(tool, task_template):

@@ -69,6 +69,15 @@ def get_user(request: Request) -> User:
     return to_user_dict(user)
 
 
+def get_request_username(request: Request) -> str:
+    """get_request_username.
+
+    Returns the username part of the email address from the request.
+    """
+    email = get_user(request)["email"]
+    return email.split("@")[0]
+
+
 def user_in_group(request: Request, group: str) -> bool:
     """user_in_group.
 
