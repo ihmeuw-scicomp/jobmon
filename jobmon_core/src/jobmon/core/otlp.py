@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import getpass
 import logging
-import logging.config
 import os
 import socket
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Type
 
-from fastapi import FastAPI
-from opentelemetry import _logs
-from opentelemetry import trace
+from opentelemetry import _logs, trace
 from opentelemetry.sdk import resources
 from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
@@ -18,68 +15,8 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import Tracer
 
-
 from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
-
-
-def get_resource(raise_on_error: bool) -> resources.Resource:
-    """Gather data on the currently running process to define an opentelemetry resource.
-
-    Args:
-        raise_on_error: if True, will raise if an exception is encountered
-
-    Returns:
-        opentelemetry.sdk.resources.Resource
-    """
-    detectors = [
-        _ServiceResourceDetector(raise_on_error=raise_on_error),
-        _ProcessResourceDetector(raise_on_error=raise_on_error),
-        _HostResourceDetector(raise_on_error=raise_on_error),
-    ]
-    detected_resources = resources.get_aggregated_resources(detectors)
-    return detected_resources
-
-
-class _ProcessResourceDetector(resources.ResourceDetector):
-    def detect(self) -> resources.Resource:
-        """Returns a Resource related to the process."""
-        attrs = {
-            resources.PROCESS_PID: os.getpid(),
-            resources.PROCESS_RUNTIME_NAME: sys.implementation.name,
-            resources.PROCESS_OWNER: getpass.getuser(),
-        }
-        return resources.Resource(attrs)  # type: ignore
-
-
-class _ServiceResourceDetector(resources.ResourceDetector):
-    def detect(self) -> resources.Resource:
-        """Returns a Resource related to the instrumentation library itself."""
-        attrs = {
-            resources.SERVICE_NAME: "jobmon",
-            resources.SERVICE_VERSION: __version__,
-        }
-        return resources.Resource(attrs)
-
-
-class _HostResourceDetector(resources.ResourceDetector):
-    def detect(self) -> resources.Resource:
-        """Returns a Resource related to the host machine."""
-        attrs = {resources.HOST_NAME: socket.gethostname()}
-        return resources.Resource(attrs)
-
-
-class _ClusterResourceDetector(resources.ResourceDetector):
-    def detect(self) -> resources.Resource:
-        """Returns a Resource related to the cluster job (if applicable)."""
-        attrs = {}
-        env_variables = ["SLURM_JOBID", "SLURM_JOB_ACCOUNT", "SLURM_JOB_NAME", "JOB_ID"]
-        for variable_str in env_variables:
-            variable_val = os.getenv(variable_str)
-            if variable_val:
-                attrs[variable_str.lower()] = variable_val
-        return resources.Resource(attrs)
-
 
 class OtlpAPI:
     """OpenTelemetry API."""
@@ -88,35 +25,19 @@ class OtlpAPI:
     _initialized = False
     _sqlalchemy_instrumented = False
     _requests_instrumented = False
-    _log_config = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "root": {"level": "INFO", "handlers": []},
-        "formatters": {
-            "otel_jobmon": {
-                "class": "jobmon.core.otlp.OpenTelemetryLogFormatter",
-                "format": "%(asctime)s [%(levelname)s] [trace_id=%(trace_id)s,"
-                " span_id=%(span_id)s, parent_span_id=%(parent_span_id)s]"
-                " - %(message)s",
-            }
-        },
-        "handlers": {
-            "otel_jobmon": {
-                "class": "opentelemetry.sdk._logs.LoggingHandler",
-                "formatter": "otel_jobmon",
-            },
-        },
-    }
 
     def __new__(cls: Type[OtlpAPI], *args: Any, **kwargs: Any) -> OtlpAPI:
         if not cls._instance:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, extra_detectors: List[resources.ResourceDetector] = []) -> None:
+    def __init__(self, extra_detectors: Optional[List[resources.ResourceDetector]] = None) -> None:
         """Initialize the OtlpAPI object."""
         if OtlpAPI._initialized:
             return
+
+        if extra_detectors is None:
+            extra_detectors = []
 
         self._configure_resources(extra_detectors)
         self._configure_providers()
@@ -147,7 +68,7 @@ class OtlpAPI:
             span_kwargs = config.get_section(span_exporter)
             self._set_exporter(
                 span_kwargs,
-                trace.get_tracer_provider().add_span_processor,  # type: ignore
+                trace.get_tracer_provider().add_span_processor,
                 BatchSpanProcessor,
             )
 
@@ -156,7 +77,7 @@ class OtlpAPI:
             log_kwargs = config.get_section(log_exporter)
             self._set_exporter(
                 log_kwargs,
-                _logs.get_logger_provider().add_log_record_processor,  # type: ignore
+                _logs.get_logger_provider().add_log_record_processor,
                 BatchLogRecordProcessor,
             )
 
@@ -184,12 +105,12 @@ class OtlpAPI:
             cls._sqlalchemy_instrumented = True
 
     @classmethod
-    def instrument_app(cls: Type[OtlpAPI], app: FastAPI) -> None:
+    def instrument_app(cls: Type[OtlpAPI], app: Any) -> None:
         """Instrument FastAPI app."""
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
         # Instrument FastAPI with OpenTelemetry
-        FastAPIInstrumentor.instrument_app(app)
+        FastAPIInstrumentor().instrument_app(app)
 
     @classmethod
     def instrument_requests(cls: Type[OtlpAPI]) -> None:
@@ -206,22 +127,7 @@ class OtlpAPI:
 
     def get_logger_provider(self) -> LoggerProvider:
         """Get the logger provider."""
-        return _logs.get_logger_provider()  # type: ignore
-
-    def correlate_logger(self, logger_name: str, level: int = logging.INFO) -> None:
-        """Correlate a logger with the current span."""
-        log_config = self._log_config.copy()
-        log_config.update(
-            {
-                "loggers": {
-                    logger_name: {
-                        "handlers": ["otel_jobmon"],
-                        "level": level,
-                    },
-                },
-            }
-        )
-        logging.config.dictConfig(log_config)
+        return _logs.get_logger_provider()
 
     @staticmethod
     def get_span_details() -> Tuple[Optional[str], Optional[str], Optional[str]]:
@@ -235,23 +141,43 @@ class OtlpAPI:
         ctx = span.get_span_context()
 
         # Get parent span, but handle if it doesn't exist
-        parent = None
-        if hasattr(span, "parent"):
-            parent = span.parent
+        parent = getattr(span, 'parent', None)
 
-        span_id = hex(ctx.span_id) if ctx and ctx.span_id else None
-        trace_id = hex(ctx.trace_id) if ctx and ctx.trace_id else None
-        parent_span_id = None if not parent else hex(parent.span_id)
+        span_id = format(ctx.span_id, '016x') if ctx and ctx.span_id else None
+        trace_id = format(ctx.trace_id, '032x') if ctx and ctx.trace_id else None
+        parent_span_id = format(parent.span_id, '016x') if parent else None
 
         return span_id, trace_id, parent_span_id
 
-
-class OpenTelemetryLogFormatter(logging.Formatter):
+class OpenTelemetryLogFormatter(logging.Formatter): 
     """Formatter that adds OpenTelemetry spans to log records."""
 
-    def format(self, record: Any) -> Any:
+    def format(self, record: logging.LogRecord) -> str:
         span_id, trace_id, parent_span_id = OtlpAPI.get_span_details()
         record.span_id = span_id
         record.trace_id = trace_id
         record.parent_span_id = parent_span_id
         return super().format(record)
+
+# Resource detectors
+class _ProcessResourceDetector(resources.ResourceDetector):
+    def detect(self) -> resources.Resource:
+        attrs = {
+            resources.PROCESS_PID: os.getpid(),
+            resources.PROCESS_RUNTIME_NAME: sys.implementation.name,
+            resources.PROCESS_OWNER: getpass.getuser(),
+        }
+        return resources.Resource(attrs)
+
+class _ServiceResourceDetector(resources.ResourceDetector):
+    def detect(self) -> resources.Resource:
+        attrs = {
+            resources.SERVICE_NAME: "jobmon",
+            resources.SERVICE_VERSION: __version__,
+        }
+        return resources.Resource(attrs)
+
+class _HostResourceDetector(resources.ResourceDetector):
+    def detect(self) -> resources.Resource:
+        attrs = {resources.HOST_NAME: socket.gethostname()}
+        return resources.Resource(attrs)

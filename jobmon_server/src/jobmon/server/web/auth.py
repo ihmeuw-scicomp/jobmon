@@ -12,7 +12,7 @@ log.setLevel(logging.DEBUG)
 
 _CONFIG = JobmonConfig()
 
-config = Config("../.env")
+config = Config()
 oauth = OAuth(config)
 
 # https://docs.authlib.org/en/latest/client/frameworks.html
