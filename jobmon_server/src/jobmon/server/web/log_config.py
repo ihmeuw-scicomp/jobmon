@@ -58,7 +58,9 @@ def merge_logging_configs(base_config: Dict, new_config: Dict) -> None:
             base_config[key] = value
 
 
-def configure_logging(dict_config: Optional[Dict] = None, file_config: str = "") -> None:
+def configure_logging(
+    dict_config: Optional[Dict] = None, file_config: str = ""
+) -> None:
     """Setup logging with default handlers and OpenTelemetry if enabled."""
     logging_config = dict_config
     if logging_config is None and file_config:
