@@ -60,11 +60,11 @@ class OtlpAPI:
             self._detectors.extend(extra_detectors)
 
         resource_group = resources.get_aggregated_resources(self._detectors)
-        
+
         # Store the SDK TracerProvider instance
         self.tracer_provider = TracerProvider(resource=resource_group)
         trace.set_tracer_provider(self.tracer_provider)
-        
+
         # Store the SDK LoggerProvider instance
         self.logger_provider = LoggerProvider(resource=resource_group)
         _logs.set_logger_provider(self.logger_provider)
@@ -177,10 +177,15 @@ class _ProcessResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:
         attrs: Mapping[str, Union[str, bool, int, float]] = {
             str(resources.PROCESS_PID): int(os.getpid()),  # Explicit cast to int
-            str(resources.PROCESS_RUNTIME_NAME): str(sys.implementation.name),  # Explicit cast to str
-            str(resources.PROCESS_OWNER): str(getpass.getuser()),  # Explicit cast to str
+            str(resources.PROCESS_RUNTIME_NAME): str(
+                sys.implementation.name
+            ),  # Explicit cast to str
+            str(resources.PROCESS_OWNER): str(
+                getpass.getuser()
+            ),  # Explicit cast to str
         }
         return resources.Resource(attrs)
+
 
 class _ServiceResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:

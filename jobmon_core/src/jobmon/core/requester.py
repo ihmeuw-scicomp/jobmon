@@ -46,6 +46,7 @@ _OTEL_LOGGING_CONFIG = {
     },
 }
 
+
 def http_request_ok(status_code: int) -> bool:
     """Return True if HTTP return codes that are deemed ok."""
     return status_code in (200, 302, 307)
