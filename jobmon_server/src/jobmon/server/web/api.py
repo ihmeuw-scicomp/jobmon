@@ -17,9 +17,7 @@ from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddlew
 from jobmon.server.web.routes.utils import get_user
 
 
-def get_app(
-    versions: Optional[List[str]] = None,
-) -> FastAPI:
+def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     """Get a FastAPI app based on the config. If no config is provided, defaults are used.
 
     Args:

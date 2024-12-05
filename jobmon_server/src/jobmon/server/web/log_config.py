@@ -60,7 +60,7 @@ def merge_logging_configs(base_config: Dict, new_config: Dict) -> None:
 
 def configure_logging() -> None:
     """Setup logging with default handlers and OpenTelemetry if enabled."""
-    default_logging_config = {
+    logging_config = {
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": default_formatters.copy(),
@@ -70,8 +70,8 @@ def configure_logging() -> None:
     config = JobmonConfig()
     try:
         log_config_file = config.get("logging", "log_config_file")
-        logging_config = load_logging_config_from_file(log_config_file)
-        logging_config = merge_logging_configs(default_logging_config, logging_config)
+        file_config = load_logging_config_from_file(log_config_file)
+        merge_logging_configs(logging_config, file_config)
     except ConfigError:
         # Use default configurations
         logging_config = {

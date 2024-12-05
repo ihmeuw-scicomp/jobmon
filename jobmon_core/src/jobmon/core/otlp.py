@@ -5,7 +5,7 @@ import logging
 import os
 import socket
 import sys
-from typing import Any, Callable, List, Optional, Tuple, Type
+from typing import Any, Callable, List, Mapping, Optional, Tuple, Type, Union
 
 from opentelemetry import _logs, trace
 from opentelemetry.sdk import resources
@@ -60,8 +60,14 @@ class OtlpAPI:
             self._detectors.extend(extra_detectors)
 
         resource_group = resources.get_aggregated_resources(self._detectors)
-        trace.set_tracer_provider(TracerProvider(resource=resource_group))
-        _logs.set_logger_provider(LoggerProvider(resource=resource_group))
+        
+        # Store the SDK TracerProvider instance
+        self.tracer_provider = TracerProvider(resource=resource_group)
+        trace.set_tracer_provider(self.tracer_provider)
+        
+        # Store the SDK LoggerProvider instance
+        self.logger_provider = LoggerProvider(resource=resource_group)
+        _logs.set_logger_provider(self.logger_provider)
 
     def _configure_providers(self) -> None:
         config = JobmonConfig()
@@ -71,7 +77,7 @@ class OtlpAPI:
             span_kwargs = config.get_section(span_exporter)
             self._set_exporter(
                 span_kwargs,
-                trace.get_tracer_provider().add_span_processor,
+                self.tracer_provider.add_span_processor,  # Use the SDK instance
                 BatchSpanProcessor,
             )
 
@@ -80,18 +86,21 @@ class OtlpAPI:
             log_kwargs = config.get_section(log_exporter)
             self._set_exporter(
                 log_kwargs,
-                _logs.get_logger_provider().add_log_record_processor,
+                self.logger_provider.add_log_record_processor,  # Use the SDK instance
                 BatchLogRecordProcessor,
             )
 
     def _set_exporter(
-        self, kwargs: Any, add_processor_func: Callable, batch_processor: Any
+        self,
+        kwargs: Any,
+        add_processor_func: Callable[[Any], None],
+        batch_processor_class: Type[Any],
     ) -> None:
         module_name = kwargs["module"]
         class_name = kwargs["class"]
         module = __import__(module_name, fromlist=[class_name])
         ExporterClass = getattr(module, class_name)
-        processor = batch_processor(
+        processor = batch_processor_class(
             ExporterClass(
                 **{k: v for k, v in kwargs.items() if k not in ["module", "class"]}
             )
@@ -125,12 +134,12 @@ class OtlpAPI:
             cls._requests_instrumented = True
 
     def get_tracer(self, name: str) -> Tracer:
-        """Get a tracer."""
-        return trace.get_tracer(name)
+        """Get a tracer from the SDK TracerProvider."""
+        return self.tracer_provider.get_tracer(name)
 
     def get_logger_provider(self) -> LoggerProvider:
         """Get the logger provider."""
-        return _logs.get_logger_provider()
+        return self.logger_provider
 
     @staticmethod
     def get_span_details() -> Tuple[Optional[str], Optional[str], Optional[str]]:
@@ -164,16 +173,14 @@ class OpenTelemetryLogFormatter(logging.Formatter):
         return super().format(record)
 
 
-# Resource detectors
 class _ProcessResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:
-        attrs = {
-            resources.PROCESS_PID: os.getpid(),
-            resources.PROCESS_RUNTIME_NAME: sys.implementation.name,
-            resources.PROCESS_OWNER: getpass.getuser(),
+        attrs: Mapping[str, Union[str, bool, int, float]] = {
+            str(resources.PROCESS_PID): int(os.getpid()),  # Explicit cast to int
+            str(resources.PROCESS_RUNTIME_NAME): str(sys.implementation.name),  # Explicit cast to str
+            str(resources.PROCESS_OWNER): str(getpass.getuser()),  # Explicit cast to str
         }
         return resources.Resource(attrs)
-
 
 class _ServiceResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:

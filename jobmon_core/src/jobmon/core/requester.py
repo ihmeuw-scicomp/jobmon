@@ -6,6 +6,7 @@ import contextlib
 import functools
 import json
 import logging
+import logging.config
 from typing import Any, Callable, Dict, Tuple, Type
 
 import requests
@@ -18,6 +19,32 @@ from jobmon.core.exceptions import InvalidRequest, InvalidResponse
 
 logger = logging.getLogger(__name__)
 
+_OTEL_LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "otel": {
+            "()": "jobmon.core.otlp.OpenTelemetryLogFormatter",
+            "format": "%(asctime)s [%(levelname)s] [trace_id=%(trace_id)s,"
+            " span_id=%(span_id)s, parent_span_id=%(parent_span_id)s]"
+            " - %(message)s",
+        },
+    },
+    "handlers": {
+        "otel_text": {
+            "level": "INFO",
+            "class": "opentelemetry.sdk._logs.LoggingHandler",
+            "formatter": "otel",
+        },
+    },
+    "loggers": {
+        "jobmon.core.requester": {
+            "handlers": ["otel_text"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
 
 def http_request_ok(status_code: int) -> bool:
     """Return True if HTTP return codes that are deemed ok."""
@@ -56,8 +83,8 @@ class Requester(object):
         # setup connections to backend
         otlp_instance = OtlpAPI()
         otlp_instance.instrument_requests()
-        otlp_instance.correlate_logger("jobmon.core.requester")
 
+        logging.config.dictConfig(_OTEL_LOGGING_CONFIG)
         # setup tracer for Requester to use
         cls._otlp_api = otlp_instance
 
