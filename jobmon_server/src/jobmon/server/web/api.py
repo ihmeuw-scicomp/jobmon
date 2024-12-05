@@ -1,25 +1,24 @@
-from typing import Optional, List
-from fastapi import FastAPI, Depends
 from importlib import import_module
 import os
+from typing import List, Optional
 
 # Additional imports for middlewares and dependencies
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
 from jobmon.core.configuration import JobmonConfig
+from jobmon.server.web.log_config import configure_logging
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
 from jobmon.server.web.routes.utils import get_user
-from jobmon.server.web.log_config import configure_logging
 
 
 def get_app(
     versions: Optional[List[str]] = None,
-    log_config_file: Optional[str] = None,
 ) -> FastAPI:
     """Get a FastAPI app based on the config. If no config is provided, defaults are used.
 
@@ -87,9 +86,7 @@ def get_app(
         dependencies = None
         if version == "v3":
             dependencies = [Depends(get_user)]
-        app.include_router(
-            api_router, prefix=url_prefix, dependencies=dependencies
-        )
+        app.include_router(api_router, prefix=url_prefix, dependencies=dependencies)
 
     # Custom documentation endpoints
     @app.get("/api/docs", include_in_schema=False)

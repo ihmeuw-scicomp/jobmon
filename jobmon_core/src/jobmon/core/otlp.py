@@ -18,6 +18,7 @@ from opentelemetry.trace import Tracer
 from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
 
+
 class OtlpAPI:
     """OpenTelemetry API."""
 
@@ -31,7 +32,9 @@ class OtlpAPI:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self, extra_detectors: Optional[List[resources.ResourceDetector]] = None) -> None:
+    def __init__(
+        self, extra_detectors: Optional[List[resources.ResourceDetector]] = None
+    ) -> None:
         """Initialize the OtlpAPI object."""
         if OtlpAPI._initialized:
             return
@@ -141,15 +144,16 @@ class OtlpAPI:
         ctx = span.get_span_context()
 
         # Get parent span, but handle if it doesn't exist
-        parent = getattr(span, 'parent', None)
+        parent = getattr(span, "parent", None)
 
-        span_id = format(ctx.span_id, '016x') if ctx and ctx.span_id else None
-        trace_id = format(ctx.trace_id, '032x') if ctx and ctx.trace_id else None
-        parent_span_id = format(parent.span_id, '016x') if parent else None
+        span_id = format(ctx.span_id, "016x") if ctx and ctx.span_id else None
+        trace_id = format(ctx.trace_id, "032x") if ctx and ctx.trace_id else None
+        parent_span_id = format(parent.span_id, "016x") if parent else None
 
         return span_id, trace_id, parent_span_id
 
-class OpenTelemetryLogFormatter(logging.Formatter): 
+
+class OpenTelemetryLogFormatter(logging.Formatter):
     """Formatter that adds OpenTelemetry spans to log records."""
 
     def format(self, record: logging.LogRecord) -> str:
@@ -158,6 +162,7 @@ class OpenTelemetryLogFormatter(logging.Formatter):
         record.trace_id = trace_id
         record.parent_span_id = parent_span_id
         return super().format(record)
+
 
 # Resource detectors
 class _ProcessResourceDetector(resources.ResourceDetector):
@@ -169,6 +174,7 @@ class _ProcessResourceDetector(resources.ResourceDetector):
         }
         return resources.Resource(attrs)
 
+
 class _ServiceResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:
         attrs = {
@@ -176,6 +182,7 @@ class _ServiceResourceDetector(resources.ResourceDetector):
             resources.SERVICE_VERSION: __version__,
         }
         return resources.Resource(attrs)
+
 
 class _HostResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:

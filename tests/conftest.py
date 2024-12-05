@@ -44,7 +44,7 @@ def pytest_sessionstart(session):
                 "span_exporter": "",
                 "log_exporter": "",
             },
-            "session": {"secret_key": "test"}
+            "session": {"secret_key": "test"},
         }
     )
     get_jobmon_config(config)
@@ -109,6 +109,7 @@ class WebServerProcess:
             signal.signal(signal.SIGTERM, sigterm_handler)
             from jobmon.server.web.api import get_app
             from jobmon.server.web.log_config import configure_logging
+
             configure_logging(
                 loggers_dict={
                     "jobmon.server.web": {
@@ -170,7 +171,6 @@ class WebServerProcess:
         # interrupt and join for coverage
         self.p1.terminate()
         self.p1.join()
-
 
 
 @pytest.fixture(scope="session")

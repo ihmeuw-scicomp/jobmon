@@ -11,6 +11,7 @@ import yaml
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.exceptions import ConfigError
 
+
 def configure_structlog(extra_processors: Optional[List] = None) -> None:
     """Configure structlog processors."""
     if extra_processors is None:
@@ -34,29 +35,36 @@ def configure_structlog(extra_processors: Optional[List] = None) -> None:
         cache_logger_on_first_use=True,
     )
 
+
 def load_logging_config_from_file(filepath: str) -> Dict:
     """Load logging configuration from a YAML file."""
     if os.path.exists(filepath):
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             return yaml.safe_load(f)
     else:
         return {}
 
+
 def merge_logging_configs(base_config: Dict, new_config: Dict) -> None:
     """Recursively merge new_config into base_config."""
     for key, value in new_config.items():
-        if key in base_config and isinstance(base_config[key], dict) and isinstance(value, dict):
+        if (
+            key in base_config
+            and isinstance(base_config[key], dict)
+            and isinstance(value, dict)
+        ):
             merge_logging_configs(base_config[key], value)
         else:
             base_config[key] = value
 
+
 def configure_logging() -> None:
     """Setup logging with default handlers and OpenTelemetry if enabled."""
     default_logging_config = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': default_formatters.copy(),
-        'handlers': default_handlers.copy(),
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": default_formatters.copy(),
+        "handlers": default_handlers.copy(),
     }
     # Load logging configuration from file if provided
     config = JobmonConfig()
@@ -67,11 +75,11 @@ def configure_logging() -> None:
     except ConfigError:
         # Use default configurations
         logging_config = {
-            'version': 1,
-            'disable_existing_loggers': False,
-            'formatters': default_formatters.copy(),
-            'handlers': default_handlers.copy(),
-            'loggers': default_loggers.copy(),
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": default_formatters.copy(),
+            "handlers": default_handlers.copy(),
+            "loggers": default_loggers.copy(),
         }
 
     # Apply the logging configuration
@@ -81,6 +89,7 @@ def configure_logging() -> None:
     configure_structlog()
 
     logging.getLogger(__name__).info("Logging has been configured.")
+
 
 # Default formatters
 default_formatters: Dict = {
@@ -97,9 +106,9 @@ default_formatters: Dict = {
     "otel": {
         "()": "jobmon.core.otlp.OpenTelemetryLogFormatter",
         "format": "%(asctime)s [%(levelname)s] [trace_id=%(trace_id)s,"
-                    " span_id=%(span_id)s, parent_span_id=%(parent_span_id)s]"
-                    " - %(message)s",
-    }
+        " span_id=%(span_id)s, parent_span_id=%(parent_span_id)s]"
+        " - %(message)s",
+    },
 }
 
 # Default handlers
