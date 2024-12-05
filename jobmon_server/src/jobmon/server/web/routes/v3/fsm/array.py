@@ -17,6 +17,7 @@ from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
+from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
 
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
@@ -313,4 +314,23 @@ async def log_array_distributor_id(array_id: int, request: Request) -> Any:
             session.execute(update_stmt)
             ()
     resp = JSONResponse(content={"success": True}, status_code=StatusCodes.OK)
+    return resp
+
+
+@api_v3_router.get("/array/{array_id}/get_array_max_concurrently_running")
+async def get_array_max_concurrently_running(array_id: int, request: Request) -> Any:
+    """Return the maximum concurrency of this array."""
+    structlog.contextvars.bind_contextvars(array_id=array_id)
+
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = (
+                select(Array)
+                .where(Array.id == array_id))
+            array = session.execute(select_stmt).scalars().one()
+
+        resp = JSONResponse(
+            content={"max_concurrently_running": array.max_concurrently_running},
+            status_code=StatusCodes.OK,
+        )
     return resp

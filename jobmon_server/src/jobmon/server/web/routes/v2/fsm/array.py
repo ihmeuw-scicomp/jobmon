@@ -318,3 +318,22 @@ async def log_array_distributor_id(array_id: int, request: Request) -> Any:
             ()
     resp = JSONResponse(content={"success": True}, status_code=StatusCodes.OK)
     return resp
+
+
+@api_v2_router.get("/array/{array_id}/get_array_max_concurrently_running")
+async def get_array_max_concurrently_running(array_id: int, request: Request) -> Any:
+    """Return the maximum concurrency of this array."""
+    structlog.contextvars.bind_contextvars(array_id=array_id)
+
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = (
+                select(Array)
+                .where(Array.id == array_id))
+            array = session.execute(select_stmt).scalars().one()
+
+        resp = JSONResponse(
+            content={"max_concurrently_running": array.max_concurrently_running},
+            status_code=StatusCodes.OK,
+        )
+    return resp

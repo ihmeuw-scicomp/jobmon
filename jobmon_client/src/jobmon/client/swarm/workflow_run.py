@@ -705,6 +705,7 @@ class WorkflowRun:
         self._log_heartbeat()
         self._task_status_updates(full_sync=full_sync)
         self._synchronize_max_concurrently_running()
+        self._synchronize_array_max_concurrently_running()
 
     def _refresh_task_status_map(self, updated_tasks: Set[SwarmTask]) -> None:
         # remove these tasks from old mapping
@@ -857,6 +858,14 @@ class WorkflowRun:
             app_route=app_route, message={}, request_type="get"
         )
         self.max_concurrently_running = response["max_concurrently_running"]
+
+    def _synchronize_array_max_concurrently_running(self) -> None:
+        for aid, array in self.arrays.items():
+            app_route = f"/array/{aid}/get_array_max_concurrently_running"
+            _, response = self.requester.send_request(
+                app_route=app_route, message={}, request_type="get"
+            )
+            self.arrays[aid].max_concurrently_running = response["max_concurrently_running"]
 
     def queue_task_batch(self, tasks: List[SwarmTask]) -> None:
         first_task = tasks[0]

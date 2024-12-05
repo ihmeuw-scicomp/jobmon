@@ -6,7 +6,7 @@ import {TbHandStop} from "react-icons/tb";
 import {HiRocketLaunch} from "react-icons/hi2";
 import React, {useContext, useState} from "react";
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
-import {CircularProgress, Grid} from "@mui/material";
+import {CircularProgress, Grid, TextField} from "@mui/material";
 import {Box} from "@mui/system";
 import {useMutation, useQuery} from "@tanstack/react-query";
 import Typography from "@mui/material/Typography";
@@ -21,10 +21,15 @@ import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
 import InfoIcon from '@mui/icons-material/Info';
 import AuthContext from "@jobmon_gui/contexts/AuthContext.tsx";
 import StopWorkflowButton from "@jobmon_gui/components/StopWorkflow.tsx";
+import BuildIcon from '@mui/icons-material/Build';
 import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
+import axios from "axios";
+import {set_task_template_concurrency_url} from "@jobmon_gui/configs/ApiUrls.ts";
+import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
 
 export default function WorkflowHeader({
                                            wf_id,
+                                           task_template_info,
                                        }: WorkflowHeaderProps) {
     const {user} = useContext(AuthContext)
     const user_name = user?.preferred_username ? user?.preferred_username.split("@")[0] : "unknown"
@@ -34,9 +39,44 @@ export default function WorkflowHeader({
         staleTime: 60000, // 60 seconds
     })
 
-    const stopWorkflow = useMutation({})
-
     const [showWFInfo, setShowWFInfo] = useState(false)
+    const [showTechnicalPanel, setShowTechnicalPanel] = useState(false)
+
+    const [fieldValues, setFieldValues] = useState(
+        task_template_info.reduce((acc, template) => {
+            acc[template.tt_version_id] = 50;
+            return acc;
+        }, {})
+    );
+
+    const updateTaskTemplateConcurrency = useMutation({
+        mutationFn: async ({task_template_version_id, max_tasks}: {
+            task_template_version_id: string;
+            max_tasks: string
+        }) => {
+            console.log("!!!! TT VERSION ID", task_template_version_id)
+            console.log("!!!! WF_IF", wf_id)
+            return axios.put(set_task_template_concurrency_url(wf_id), {
+                task_template_version_id: task_template_version_id,
+                max_tasks: max_tasks
+            }, jobmonAxiosConfig)
+        },
+    })
+
+    const handleInputChange = (id) => (event) => {
+        const value = event.target.value === "" ? "" : Number(event.target.value);
+        if (value === "" || (value >= 0 && value <= 2147483647)) {
+            setFieldValues((prevValues) => ({
+                ...prevValues,
+                [id]: value,
+            }));
+        }
+        updateTaskTemplateConcurrency.mutate({
+            task_template_version_id: id,
+            max_tasks: value.toString(),
+        });
+
+    };
 
     const statusIcons = {
         A: {icon: <IoMdCloseCircleOutline/>, className: 'icon-aa'},
@@ -77,7 +117,7 @@ export default function WorkflowHeader({
             <Box sx={{display: 'flex', alignItems: 'center'}}>
                 <span>
                     {icon && <span className={className}>{icon}</span>}
-                    {wf_id} - {wf_name}
+                    {wf_id} {wf_name ? `- ${wf_name}` : ''}
                 </span>
                 <span style={{transform: 'translateY(-5px)', paddingLeft: '10px'}}>
                     <HtmlTooltip
@@ -93,7 +133,12 @@ export default function WorkflowHeader({
                             <InfoIcon fontSize={"large"}/>
                         </IconButton>
                     </HtmlTooltip>
-                    <StopWorkflowButton wf_id={wf_id}/>
+                    <IconButton
+                        color="inherit"
+                        onClick={() => setShowTechnicalPanel(true)}
+                    >
+                        <BuildIcon/>
+                    </IconButton>
                 </span>
             </Box>
             <Box>
@@ -125,6 +170,47 @@ export default function WorkflowHeader({
                     }
                     open={showWFInfo}
                     onClose={() => setShowWFInfo(false)}
+                    width="80%"/>
+            </Box>
+            <Box>
+                <JobmonModal
+                    title={`Workflow ${wf_id} Technical Panel`}
+                    children={
+                        <Grid container spacing={2}>
+                            <Grid item xs={10}>
+                                <StopWorkflowButton wf_id={wf_id}/>
+                            </Grid>
+                            <Grid item xs={10} sx={gridHeaderStyles}></Grid>
+                            <Grid item xs={10}>
+                                <Typography variant="h5">Task Template Concurrency Limit</Typography>
+                            </Grid>
+                            {task_template_info?.map((template) => (
+                                <React.Fragment key={template.tt_version_id}>
+                                    <Grid item xs={3}>
+                                        <Typography sx={gridHeaderStyles}>{template.name}</Typography>
+                                    </Grid>
+                                    <Grid item xs={9}>
+                                        <TextField
+                                            value={fieldValues[template.tt_version_id]}
+                                            onChange={handleInputChange(template.tt_version_id)}
+                                            inputProps={{
+                                                step: 1,
+                                                min: 0,
+                                                max: 2147483647,
+                                                type: "number",
+                                                "aria-labelledby": `input-number-${template.tt_version_id}`,
+                                            }}
+                                            variant="outlined"
+                                            size="small"
+                                            fullWidth
+                                        />
+                                    </Grid>
+                                </React.Fragment>
+                            ))}
+                        </Grid>
+                    }
+                    open={showTechnicalPanel}
+                    onClose={() => setShowTechnicalPanel(false)}
                     width="80%"/>
             </Box>
         </Box>
