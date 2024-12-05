@@ -58,37 +58,31 @@ def merge_logging_configs(base_config: Dict, new_config: Dict) -> None:
             base_config[key] = value
 
 
-def configure_logging() -> None:
+def configure_logging(dict_config: Optional[Dict] = None, file_config: str = "") -> None:
     """Setup logging with default handlers and OpenTelemetry if enabled."""
-    logging_config = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": default_formatters.copy(),
-        "handlers": default_handlers.copy(),
-    }
-    # Load logging configuration from file if provided
-    config = JobmonConfig()
-    try:
-        log_config_file = config.get("logging", "log_config_file")
-        file_config = load_logging_config_from_file(log_config_file)
-        merge_logging_configs(logging_config, file_config)
-    except ConfigError:
-        # Use default configurations
-        logging_config = {
-            "version": 1,
-            "disable_existing_loggers": False,
-            "formatters": default_formatters.copy(),
-            "handlers": default_handlers.copy(),
-            "loggers": default_loggers.copy(),
-        }
+    logging_config = dict_config
+    if logging_config is None and file_config:
+        logging_config = load_logging_config_from_file(file_config)
+
+    if logging_config is None:
+        config = JobmonConfig()
+        try:
+            log_config_file = config.get("logging", "log_config_file")
+            logging_config = load_logging_config_from_file(log_config_file)
+        except ConfigError:
+            logging_config = {
+                "version": 1,
+                "disable_existing_loggers": True,
+                "formatters": default_formatters.copy(),
+                "handlers": default_handlers.copy(),
+                "loggers": default_loggers.copy(),
+            }
 
     # Apply the logging configuration
     logging.config.dictConfig(logging_config)
 
     # Configure structlog after logging is configured
     configure_structlog()
-
-    logging.getLogger(__name__).info("Logging has been configured.")
 
 
 # Default formatters

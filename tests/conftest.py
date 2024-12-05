@@ -108,10 +108,14 @@ class WebServerProcess:
 
             signal.signal(signal.SIGTERM, sigterm_handler)
             from jobmon.server.web.api import get_app
-            from jobmon.server.web.log_config import configure_logging
+            from jobmon.server.web import log_config
 
-            configure_logging(
-                loggers_dict={
+            dict_config = {
+                "version": 1,
+                "disable_existing_loggers": True,
+                "formatters": log_config.default_formatters.copy(),
+                "handlers": log_config.default_handlers.copy(),
+                "loggers": {
                     "jobmon.server.web": {
                         "handlers": ["console_text"],
                         "level": "INFO",
@@ -121,8 +125,9 @@ class WebServerProcess:
                         "handlers": ["console_text"],
                         "level": "WARNING",
                     },
-                }
-            )
+                },
+            }
+            log_config.configure_logging(dict_config=dict_config)
 
             app = get_app(versions=["v2"])
             uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))

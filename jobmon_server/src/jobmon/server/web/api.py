@@ -12,6 +12,7 @@ from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
 from jobmon.core.configuration import JobmonConfig
+from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 from jobmon.server.web.log_config import configure_logging
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
 from jobmon.server.web.routes.utils import get_user
@@ -39,6 +40,7 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         openapi_url=openapi_url,
         docs_url=None,
     )
+    app = add_hooks_and_handlers(app)
 
     # OpenTelemetry instrumentation
     if USE_OTEL:

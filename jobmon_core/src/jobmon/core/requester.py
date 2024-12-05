@@ -194,42 +194,43 @@ class Requester(object):
         message: dict,
         request_type: str,
     ) -> Tuple[int, Any]:
-        # construct url
+        # Construct URL
         route = self.url + app_route
         logger.info(f"Route: {route}, message: {message}")
 
-        if request_type in ["post", "put"]:
-            message["server_structlog_context"] = self.server_structlog_context
-        else:
-            {}
+        # Add version to query parameters
+        params = {"client_jobmon_version": __version__}
+        if request_type == "get":
+            params.update(message)
 
-        # send request to server
+        # Set headers, including the custom header for structlog context
+        headers = {
+            "Content-Type": "application/json",
+            "X-Server-Structlog-Context": json.dumps(self.server_structlog_context),
+        }
+
+        # Send the appropriate request
         if request_type == "post":
-            params = {"client_jobmon_version": __version__}
             response = requests.post(
                 route,
                 params=params,
                 json=message,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 timeout=self.request_timeout,
             )
         elif request_type == "get":
-            params = message.copy()
-            params["client_jobmon_version"] = __version__
             response = requests.get(
                 route,
                 params=params,
-                data=json.dumps(self.server_structlog_context),
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 timeout=self.request_timeout,
             )
         elif request_type == "put":
-            params = {"client_jobmon_version": __version__}
             response = requests.put(
                 route,
                 params=params,
                 json=message,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 timeout=self.request_timeout,
             )
         else:
@@ -237,6 +238,7 @@ class Requester(object):
                 f"request_type must be one of 'get', 'post', or 'put'. Got {request_type}"
             )
 
+        # Extract status code and content
         status_code, content = get_content(response)
 
         # Raise the InvalidResponse exception based on the logic from should_retry_result
