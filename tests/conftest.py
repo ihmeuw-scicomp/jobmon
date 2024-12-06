@@ -107,6 +107,10 @@ class WebServerProcess:
                 sys.exit(0)
 
             signal.signal(signal.SIGTERM, sigterm_handler)
+            from random import choices
+            import string
+            os.environ["JOBMON__SESSION__SECRET_KEY"] = ''.join(choices(string.ascii_letters + string.digits, k=16))
+
             from jobmon.server.web.api import get_app
             from jobmon.server.web import log_config
 
