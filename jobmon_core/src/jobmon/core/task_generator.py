@@ -18,7 +18,7 @@ from typing import (
     Union,
 )
 
-from docstring_parser import Docstring, parser
+import docstring_parser
 from docutils import nodes, statemachine  # type: ignore
 from docutils.parsers.rst import Directive  # type: ignore
 from sphinx import application  # type: ignore
@@ -227,7 +227,7 @@ def _clean_arg_name(arg_name: str) -> str:
     return arg_name.replace("--", "").replace("-", "_")
 
 
-def _get_short_description(task_function_docstring: Docstring) -> str:
+def _get_short_description(task_function_docstring: docstring_parser.Docstring) -> str:
     short_description = ""
     if task_function_docstring.short_description:
         short_description += "\n" + task_function_docstring.short_description
@@ -799,7 +799,7 @@ class TaskGenerator:
     def help(self) -> str:
         """Return help text for the task_function."""
         # Parse the task function's docstring - Note that there may be nothing!
-        task_function_docstring = parse(  # type: ignore
+        task_function_docstring = docstring_parser.parse(  # type: ignore
             self.task_function.__doc__  # type: ignore
         )  # type: ignore
 
@@ -1118,7 +1118,7 @@ def _generate_nodes(task_generator: TaskGenerator, state: Any) -> nodes.Node:
     )
 
     # Get rST lines for the description and options
-    parsed_docstring = parse(str(task_generator.task_function.__doc__))
+    parsed_docstring = docstring_parser.parse(str(task_generator.task_function.__doc__))
     lines = []
     lines.extend(
         _format_description(
@@ -1141,7 +1141,7 @@ def _generate_nodes(task_generator: TaskGenerator, state: Any) -> nodes.Node:
 
 
 def _format_description(
-    task_generator: TaskGenerator, parsed_docstring: Docstring
+    task_generator: TaskGenerator, parsed_docstring: docstring_parser.Docstring
 ) -> list[str]:
     """Format the description of the task generator into proper rST."""
     lines = []
@@ -1168,7 +1168,7 @@ def _format_description(
 
 
 def _format_options(
-    task_generator: TaskGenerator, parsed_docstring: Docstring
+    task_generator: TaskGenerator, parsed_docstring: docstring_parser.Docstring
 ) -> list[str]:
     """Format the options of the task generator into proper rST."""
     param_docs = {param.arg_name: param for param in parsed_docstring.params}

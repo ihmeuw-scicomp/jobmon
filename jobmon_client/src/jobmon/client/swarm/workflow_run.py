@@ -865,7 +865,9 @@ class WorkflowRun:
             _, response = self.requester.send_request(
                 app_route=app_route, message={}, request_type="get"
             )
-            self.arrays[aid].max_concurrently_running = response["max_concurrently_running"]
+            self.arrays[aid].max_concurrently_running = response[
+                "max_concurrently_running"
+            ]
 
     def queue_task_batch(self, tasks: List[SwarmTask]) -> None:
         first_task = tasks[0]

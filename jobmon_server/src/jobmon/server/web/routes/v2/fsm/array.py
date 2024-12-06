@@ -321,24 +321,23 @@ async def log_array_distributor_id(array_id: int, request: Request) -> Any:
 
 
 @api_v2_router.get("/array/{array_id}/get_array_max_concurrently_running")
-@api_v2_router.get("/workflow/{workflow_id}/get_array_max_concurrently_running/{task_template_version_id}")
-async def get_array_max_concurrently_running(array_id: int | None = None, workflow_id: int | None = None,
-                                             task_template_version_id: int | None = None) -> Any:
+@api_v2_router.get(
+    "/workflow/{workflow_id}/get_array_max_concurrently_running/{task_template_version_id}"
+)
+async def get_array_max_concurrently_running(
+    array_id: int | None = None,
+    workflow_id: int | None = None,
+    task_template_version_id: int | None = None,
+) -> Any:
     """Return the maximum concurrency of this array."""
     structlog.contextvars.bind_contextvars(array_id=array_id)
 
     if array_id is not None:
-        select_stmt = (
-            select(Array)
-            .where(Array.id == array_id)
-        )
+        select_stmt = select(Array).where(Array.id == array_id)
     else:
-        select_stmt = (
-            select(Array)
-            .where(
-                Array.workflow_id == workflow_id,
-                Array.task_template_version_id == task_template_version_id
-            )
+        select_stmt = select(Array).where(
+            Array.workflow_id == workflow_id,
+            Array.task_template_version_id == task_template_version_id,
         )
 
     with SessionLocal() as session:

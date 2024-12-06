@@ -36,7 +36,7 @@ _CONFIG = get_jobmon_config()
 
 
 def _add_workflow_attributes(
-        workflow_id: int, workflow_attributes: Dict[str, str], session: Session
+    workflow_id: int, workflow_attributes: Dict[str, str], session: Session
 ) -> None:
     # add attribute
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
@@ -139,7 +139,7 @@ async def bind_workflow(request: Request) -> Any:
 
 @api_v3_router.get("/workflow/{workflow_args_hash}")
 async def get_matching_workflows_by_workflow_args(
-        workflow_args_hash: str, request: Request
+    workflow_args_hash: str, request: Request
 ) -> Any:
     """Return any dag hashes that are assigned to workflows with identical workflow args."""
     try:
@@ -190,7 +190,7 @@ def _add_or_get_wf_attribute_type(name: str, session: Session) -> Optional[int]:
 
 
 def _upsert_wf_attribute(
-        workflow_id: int, name: str, value: str, session: Session
+    workflow_id: int, name: str, value: str, session: Session
 ) -> None:
     with session.begin_nested():
         wf_attrib_id = _add_or_get_wf_attribute_type(name, session)
@@ -565,7 +565,7 @@ async def update_array_max_running(workflow_id: int, request: Request) -> Any:
                 update(Array)
                 .where(
                     Array.workflow_id == workflow_id,
-                    Array.task_template_version_id == task_template_version_id
+                    Array.task_template_version_id == task_template_version_id,
                 )
                 .values(max_concurrently_running=new_limit)
             )
@@ -576,10 +576,5 @@ async def update_array_max_running(workflow_id: int, request: Request) -> Any:
             message = (
                 f"Error updating max_concurrently_running for array ID {workflow_id}."
             )
-        else:
-            message = (
-                f"Array ID {workflow_id} max concurrently running updated to {new_limit}."
-            )
-
         resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
     return resp
