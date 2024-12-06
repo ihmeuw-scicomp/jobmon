@@ -1,6 +1,6 @@
 import axios from "axios";
 import {WorkflowDetailsResponse} from "@jobmon_gui/types/WorkflowDetails.ts";
-import {workflow_details_url} from "@jobmon_gui/configs/ApiUrls.ts";
+import {get_workflow_concurrency_url, workflow_details_url} from "@jobmon_gui/configs/ApiUrls.ts";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
 
 type getWorkflowDetailsQueryFnArgs = {

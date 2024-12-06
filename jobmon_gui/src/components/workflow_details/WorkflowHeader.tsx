@@ -22,10 +22,15 @@ import InfoIcon from '@mui/icons-material/Info';
 import AuthContext from "@jobmon_gui/contexts/AuthContext.tsx";
 import StopWorkflowButton from "@jobmon_gui/components/StopWorkflow.tsx";
 import BuildIcon from '@mui/icons-material/Build';
-import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
+import {getWorkflowDetailsQueryFn, getWorkflowConcurrncyLimitQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
 import axios from "axios";
-import {set_task_template_concurrency_url, set_wf_concurrency_url} from "@jobmon_gui/configs/ApiUrls.ts";
+import {
+    get_workflow_concurrency_url,
+    set_task_template_concurrency_url,
+    set_wf_concurrency_url
+} from "@jobmon_gui/configs/ApiUrls.ts";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
+import {WorkflowDetailsResponse} from "@jobmon_gui/types/WorkflowDetails.ts";
 
 export default function WorkflowHeader({
                                            wf_id,
@@ -33,11 +38,19 @@ export default function WorkflowHeader({
                                        }: WorkflowHeaderProps) {
     const {user} = useContext(AuthContext)
     const user_name = user?.preferred_username ? user?.preferred_username.split("@")[0] : "unknown"
+    const [wfFieldValues, setWfFieldValues] = useState(null)
     const wfDetails = useQuery({
         queryKey: ["workflow_details", "details", wf_id],
         queryFn: getWorkflowDetailsQueryFn,
         staleTime: 60000, // 60 seconds
     })
+
+    axios.get(get_workflow_concurrency_url(wf_id), {
+        ...jobmonAxiosConfig,
+        data: null,
+    }).then((r) => {
+        setWfFieldValues(r.data.max_concurrently_running)
+    });
 
     const [showWFInfo, setShowWFInfo] = useState(false)
     const [showTechnicalPanel, setShowTechnicalPanel] = useState(false)
@@ -48,8 +61,6 @@ export default function WorkflowHeader({
             return acc;
         }, {})
     );
-
-    const [wfFieldValues, setWfFieldValues] = useState(50)
 
     const updateTaskTemplateConcurrency = useMutation({
         mutationFn: async ({task_template_version_id, max_tasks}: {
@@ -130,7 +141,7 @@ export default function WorkflowHeader({
     const wf_elapsed_time = humanizeDuration(new Date(wfDetails?.data?.wfr_heartbeat_date).getTime() - new Date(wfDetails?.data?.wf_created_date).getTime())
     const jobmon_version = wfDetails?.data?.wfr_jobmon_version
     const wfr_user = wfDetails?.data?.wfr_user
-    const disabled = jobmon_version !== "3.4.0"
+    const disabled = jobmon_version !== "3.4.0.dev147"
 
     const {icon, className} = statusIcons[wf_status] || {};
 
