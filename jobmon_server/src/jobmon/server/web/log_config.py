@@ -99,12 +99,6 @@ default_formatters: Dict = {
         "()": structlog.stdlib.ProcessorFormatter,
         "processor": structlog.processors.JSONRenderer(),
     },
-    "otel": {
-        "()": "jobmon.core.otlp.OpenTelemetryLogFormatter",
-        "format": "%(asctime)s [%(levelname)s] [trace_id=%(trace_id)s,"
-        " span_id=%(span_id)s, parent_span_id=%(parent_span_id)s]"
-        " - %(message)s",
-    },
 }
 
 # Default handlers
@@ -118,11 +112,6 @@ default_handlers: Dict = {
         "level": "INFO",
         "class": "logging.StreamHandler",
         "formatter": "json",
-    },
-    "otel_text": {
-        "level": "INFO",
-        "class": "opentelemetry.sdk._logs.LoggingHandler",
-        "formatter": "otel",
     },
 }
 
