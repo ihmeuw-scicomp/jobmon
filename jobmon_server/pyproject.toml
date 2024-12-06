@@ -46,6 +46,9 @@ otlp = [
     'opentelemetry-instrumentation-fastapi',
     'opentelemetry-instrumentation-sqlalchemy',
 ]
+mysql = [
+    'mysqlclient',
+]
 
 [tool.setuptools]
 license-files = ["../LICENSE"]

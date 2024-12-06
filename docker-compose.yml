@@ -4,9 +4,13 @@ services:
     build: 
       context: ./
       dockerfile: ./jobmon_server/Dockerfile
+      args:
+        EDITABLE: "${EDITABLE:-false}"  # Pass the EDITABLE argument with a default of false
+        EXTRAS: "${EXTRAS:-}"          # Pass the EXTRAS argument with a default of empty
     ports:
       - "8070:80"
     volumes:
+      - ./jobmon_core:/app/jobmon/jobmon_core:ro
       - ./jobmon_server:/app/jobmon/jobmon_server:ro
     env_file:
       - .env
