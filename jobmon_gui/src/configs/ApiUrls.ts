@@ -21,3 +21,4 @@ export const task_dependencies_url = api_base_url + "/task_dependencies/"
 
 export const workflow_set_resume_url = (wf_id: number | string) => api_base_url + `/workflow/${wf_id}/set_resume`
 export const set_task_template_concurrency_url = (wf_id: number | string) => api_base_url + `/workflow/${wf_id}/update_array_max_concurrently_running`
+export const set_wf_concurrency_url = (wf_id: number | string) => api_base_url + `/workflow/${wf_id}/update_max_concurrently_running`

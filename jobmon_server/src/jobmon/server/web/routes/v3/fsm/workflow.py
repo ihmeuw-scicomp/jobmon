@@ -36,7 +36,7 @@ _CONFIG = get_jobmon_config()
 
 
 def _add_workflow_attributes(
-    workflow_id: int, workflow_attributes: Dict[str, str], session: Session
+        workflow_id: int, workflow_attributes: Dict[str, str], session: Session
 ) -> None:
     # add attribute
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
@@ -139,7 +139,7 @@ async def bind_workflow(request: Request) -> Any:
 
 @api_v3_router.get("/workflow/{workflow_args_hash}")
 async def get_matching_workflows_by_workflow_args(
-    workflow_args_hash: str, request: Request
+        workflow_args_hash: str, request: Request
 ) -> Any:
     """Return any dag hashes that are assigned to workflows with identical workflow args."""
     try:
@@ -190,7 +190,7 @@ def _add_or_get_wf_attribute_type(name: str, session: Session) -> Optional[int]:
 
 
 def _upsert_wf_attribute(
-    workflow_id: int, name: str, value: str, session: Session
+        workflow_id: int, name: str, value: str, session: Session
 ) -> None:
     with session.begin_nested():
         wf_attrib_id = _add_or_get_wf_attribute_type(name, session)
@@ -327,6 +327,7 @@ async def update_max_running(workflow_id: int, request: Request) -> Any:
 
     try:
         new_limit = data["max_tasks"]
+        user_name = get_request_username(request)
     except KeyError as e:
         raise InvalidUsage(
             f"{str(e)} in request to {request.url.path}", status_code=400
@@ -334,13 +335,26 @@ async def update_max_running(workflow_id: int, request: Request) -> Any:
 
     with SessionLocal() as session:
         with session.begin():
+            select_stmt = select(Workflow).where(Workflow.id == workflow_id)
+            workflow = session.execute(select_stmt).scalars().one_or_none()
+            wf_run_select_stmt = (
+                select(WorkflowRun)
+                .where(WorkflowRun.workflow_id == workflow_id)
+                .order_by(WorkflowRun.id.desc())
+                .limit(1)
+            )
+            workflow_run = session.execute(wf_run_select_stmt).scalars().one_or_none()
+
+            if workflow:
+                if workflow_run.user != user_name:
+                    raise HTTPException(status_code=401, detail="Unauthorized.")
+
             update_stmt = (
                 update(Workflow)
                 .where(Workflow.id == workflow_id)
                 .values(max_concurrently_running=new_limit)
             )
             res = session.execute(update_stmt)
-            ()
         if res.rowcount == 0:  # Return a warning message if no update was performed
             message = (
                 f"No update performed for workflow ID {workflow_id}, "

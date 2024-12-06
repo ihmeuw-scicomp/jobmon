@@ -24,7 +24,7 @@ import StopWorkflowButton from "@jobmon_gui/components/StopWorkflow.tsx";
 import BuildIcon from '@mui/icons-material/Build';
 import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
 import axios from "axios";
-import {set_task_template_concurrency_url} from "@jobmon_gui/configs/ApiUrls.ts";
+import {set_task_template_concurrency_url, set_wf_concurrency_url} from "@jobmon_gui/configs/ApiUrls.ts";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
 
 export default function WorkflowHeader({
@@ -49,15 +49,25 @@ export default function WorkflowHeader({
         }, {})
     );
 
+    const [wfFieldValues, setWfFieldValues] = useState(50)
+
     const updateTaskTemplateConcurrency = useMutation({
         mutationFn: async ({task_template_version_id, max_tasks}: {
             task_template_version_id: string;
             max_tasks: string
         }) => {
-            console.log("!!!! TT VERSION ID", task_template_version_id)
-            console.log("!!!! WF_IF", wf_id)
             return axios.put(set_task_template_concurrency_url(wf_id), {
                 task_template_version_id: task_template_version_id,
+                max_tasks: max_tasks
+            }, jobmonAxiosConfig)
+        },
+    })
+
+    const updateWfConcurrency = useMutation({
+        mutationFn: async ({max_tasks}: {
+            max_tasks: string
+        }) => {
+            return axios.put(set_wf_concurrency_url(wf_id), {
                 max_tasks: max_tasks
             }, jobmonAxiosConfig)
         },
@@ -73,6 +83,17 @@ export default function WorkflowHeader({
         }
         updateTaskTemplateConcurrency.mutate({
             task_template_version_id: id,
+            max_tasks: value.toString(),
+        });
+
+    };
+
+    const handleWfInputChange = () => (event) => {
+        const value = event.target.value === "" ? "" : Number(event.target.value);
+        if (value === "" || (value >= 0 && value <= 2147483647)) {
+            setWfFieldValues(value === "" ? 0 : value);
+        }
+        updateWfConcurrency.mutate({
             max_tasks: value.toString(),
         });
 
@@ -180,7 +201,25 @@ export default function WorkflowHeader({
                             <Grid item xs={10}>
                                 <StopWorkflowButton wf_id={wf_id}/>
                             </Grid>
-                            <Grid item xs={10} sx={gridHeaderStyles}></Grid>
+                            <Grid item xs={10}>
+                                <Typography variant="h5">Workflow Concurrency Limit</Typography>
+                            </Grid>
+                            <Grid item xs={9}>
+                                <TextField
+                                    value={wfFieldValues}
+                                    onChange={handleWfInputChange()}
+                                    inputProps={{
+                                        step: 1,
+                                        min: 0,
+                                        max: 2147483647,
+                                        type: "number",
+                                        "aria-labelledby": `workflow-input-number`,
+                                    }}
+                                    variant="outlined"
+                                    size="small"
+                                    fullWidth
+                                />
+                            </Grid>
                             <Grid item xs={10}>
                                 <Typography variant="h5">Task Template Concurrency Limit</Typography>
                             </Grid>
