@@ -4,7 +4,7 @@ import {IoMdCloseCircle, IoMdCloseCircleOutline} from "react-icons/io";
 import {AiFillSchedule, AiFillCheckCircle} from "react-icons/ai";
 import {TbHandStop} from "react-icons/tb";
 import {HiRocketLaunch} from "react-icons/hi2";
-import React, {useContext, useState} from "react";
+import React, {useContext, useState, useEffect} from "react";
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
 import {CircularProgress, Grid, TextField} from "@mui/material";
 import {Box} from "@mui/system";
@@ -22,15 +22,15 @@ import InfoIcon from '@mui/icons-material/Info';
 import AuthContext from "@jobmon_gui/contexts/AuthContext.tsx";
 import StopWorkflowButton from "@jobmon_gui/components/StopWorkflow.tsx";
 import BuildIcon from '@mui/icons-material/Build';
-import {getWorkflowDetailsQueryFn, getWorkflowConcurrncyLimitQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
+import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
 import axios from "axios";
 import {
+    get_task_template_concurrency_url,
     get_workflow_concurrency_url,
     set_task_template_concurrency_url,
     set_wf_concurrency_url
 } from "@jobmon_gui/configs/ApiUrls.ts";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
-import {WorkflowDetailsResponse} from "@jobmon_gui/types/WorkflowDetails.ts";
 
 export default function WorkflowHeader({
                                            wf_id,
@@ -73,6 +73,19 @@ export default function WorkflowHeader({
             }, jobmonAxiosConfig)
         },
     })
+
+    useEffect(() => {
+        task_template_info.map(template => {
+            const url = get_task_template_concurrency_url(wf_id, template.tt_version_id);
+            return axios.get(url, jobmonAxiosConfig)
+                .then((r) => {
+                    setFieldValues(prevValues => ({
+                        ...prevValues,
+                        [template.tt_version_id]: r.data.max_concurrently_running
+                    }));
+                })
+        });
+    }, [task_template_info]);
 
     const updateWfConcurrency = useMutation({
         mutationFn: async ({max_tasks}: {

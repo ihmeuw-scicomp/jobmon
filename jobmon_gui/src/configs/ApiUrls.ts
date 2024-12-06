@@ -23,3 +23,4 @@ export const workflow_set_resume_url = (wf_id: number | string) => api_base_url 
 export const set_task_template_concurrency_url = (wf_id: number | string) => api_base_url + `/workflow/${wf_id}/update_array_max_concurrently_running`
 export const set_wf_concurrency_url = (wf_id: number | string) => api_base_url + `/workflow/${wf_id}/update_max_concurrently_running`
 export const get_workflow_concurrency_url = (wf_id: number | string) => api_base_url + `/workflow/${wf_id}/get_max_concurrently_running`
+export const get_task_template_concurrency_url = (wf_id: number | string, tt_version_id: number | string) => api_base_url + `/workflow/${wf_id}/get_array_max_concurrently_running/${tt_version_id}`
