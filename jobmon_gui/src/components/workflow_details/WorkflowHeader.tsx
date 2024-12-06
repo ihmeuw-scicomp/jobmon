@@ -154,7 +154,7 @@ export default function WorkflowHeader({
     const wf_elapsed_time = humanizeDuration(new Date(wfDetails?.data?.wfr_heartbeat_date).getTime() - new Date(wfDetails?.data?.wf_created_date).getTime())
     const jobmon_version = wfDetails?.data?.wfr_jobmon_version
     const wfr_user = wfDetails?.data?.wfr_user
-    const disabled = jobmon_version !== "3.4.0.dev147"
+    const disabled = jobmon_version !== "3.4.0"
 
     const {icon, className} = statusIcons[wf_status] || {};
 
