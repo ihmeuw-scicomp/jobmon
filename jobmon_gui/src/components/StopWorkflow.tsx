@@ -18,6 +18,7 @@ type StopWorkflowButtonProps = {
 
 export default function StopWorkflowButton({
                                                wf_id,
+                                               disabled,
                                            }: StopWorkflowButtonProps) {
     const {user} = useContext(AuthContext)
     const queryClient = useQueryClient();
@@ -132,11 +133,11 @@ export default function StopWorkflowButton({
 
     return (<>
             <IconButton color="inherit"
-                        disabled={user_name != wfDetails.data.wfr_user || stoppedStates.includes(wfDetails.data.wf_status)}
+                        disabled={user_name != wfDetails.data.wfr_user || stoppedStates.includes(wfDetails.data.wf_status) || disabled}
                         onClick={() => {
                             setConfirmModalOpen(true)
                         }}>
-                <Button variant="contained"
+                <Button variant="contained" disabled={disabled}
                         sx={{bgcolor: 'red', borderRadius: '0', '&:hover': {bgcolor: 'darkred'}}}>
                     Stop Workflow
                 </Button>

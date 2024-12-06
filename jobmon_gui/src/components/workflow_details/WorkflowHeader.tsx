@@ -130,6 +130,7 @@ export default function WorkflowHeader({
     const wf_elapsed_time = humanizeDuration(new Date(wfDetails?.data?.wfr_heartbeat_date).getTime() - new Date(wfDetails?.data?.wf_created_date).getTime())
     const jobmon_version = wfDetails?.data?.wfr_jobmon_version
     const wfr_user = wfDetails?.data?.wfr_user
+    const disabled = jobmon_version !== "3.4.0"
 
     const {icon, className} = statusIcons[wf_status] || {};
 
@@ -199,7 +200,7 @@ export default function WorkflowHeader({
                     children={
                         <Grid container spacing={2}>
                             <Grid item xs={10}>
-                                <StopWorkflowButton wf_id={wf_id}/>
+                                <StopWorkflowButton wf_id={wf_id} disabled={disabled}/>
                             </Grid>
                             <Grid item xs={10}>
                                 <Typography variant="h5">Workflow Concurrency Limit</Typography>
@@ -218,6 +219,7 @@ export default function WorkflowHeader({
                                     variant="outlined"
                                     size="small"
                                     fullWidth
+                                    disabled={disabled}
                                 />
                             </Grid>
                             <Grid item xs={10}>
@@ -242,6 +244,7 @@ export default function WorkflowHeader({
                                             variant="outlined"
                                             size="small"
                                             fullWidth
+                                            disabled={disabled}
                                         />
                                     </Grid>
                                 </React.Fragment>
