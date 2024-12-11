@@ -327,6 +327,7 @@ async def update_max_running(workflow_id: int, request: Request) -> Any:
 
     try:
         new_limit = data["max_tasks"]
+        user_name = get_request_username(request)
     except KeyError as e:
         raise InvalidUsage(
             f"{str(e)} in request to {request.url.path}", status_code=400
@@ -334,13 +335,26 @@ async def update_max_running(workflow_id: int, request: Request) -> Any:
 
     with SessionLocal() as session:
         with session.begin():
+            select_stmt = select(Workflow).where(Workflow.id == workflow_id)
+            workflow = session.execute(select_stmt).scalars().one_or_none()
+            wf_run_select_stmt = (
+                select(WorkflowRun)
+                .where(WorkflowRun.workflow_id == workflow_id)
+                .order_by(WorkflowRun.id.desc())
+                .limit(1)
+            )
+            workflow_run = session.execute(wf_run_select_stmt).scalars().one_or_none()
+
+            if workflow:
+                if workflow_run.user != user_name:
+                    raise HTTPException(status_code=401, detail="Unauthorized.")
+
             update_stmt = (
                 update(Workflow)
                 .where(Workflow.id == workflow_id)
                 .values(max_concurrently_running=new_limit)
             )
             res = session.execute(update_stmt)
-            ()
         if res.rowcount == 0:  # Return a warning message if no update was performed
             message = (
                 f"No update performed for workflow ID {workflow_id}, "
@@ -512,4 +526,55 @@ def get_available_workflow_statuses() -> Any:
         resp = JSONResponse(
             content={"available_statuses": res}, status_code=StatusCodes.OK
         )
+    return resp
+
+
+@api_v3_router.put("/workflow/{workflow_id}/update_array_max_concurrently_running")
+async def update_array_max_running(workflow_id: int, request: Request) -> Any:
+    """Update the number of tasks that can be running concurrently for a given Array."""
+    data = cast(Dict, await request.json())
+    structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
+    logger.debug("Update array max concurrently running")
+
+    try:
+        new_limit = int(data["max_tasks"])
+        task_template_version_id = data["task_template_version_id"]
+        user_name = get_request_username(request)
+    except KeyError as e:
+        raise InvalidUsage(
+            f"{str(e)} in request to {request.url.path}", status_code=400
+        ) from e
+
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = select(Workflow).where(Workflow.id == workflow_id)
+            workflow = session.execute(select_stmt).scalars().one_or_none()
+            wf_run_select_stmt = (
+                select(WorkflowRun)
+                .where(WorkflowRun.workflow_id == workflow_id)
+                .order_by(WorkflowRun.id.desc())
+                .limit(1)
+            )
+            workflow_run = session.execute(wf_run_select_stmt).scalars().one_or_none()
+
+            if workflow:
+                if workflow_run.user != user_name:
+                    raise HTTPException(status_code=401, detail="Unauthorized.")
+
+            update_stmt = (
+                update(Array)
+                .where(
+                    Array.workflow_id == workflow_id,
+                    Array.task_template_version_id == task_template_version_id,
+                )
+                .values(max_concurrently_running=new_limit)
+            )
+
+        res = session.execute(update_stmt)
+        session.commit()
+        if res.rowcount == 0:  # Return a warning message if no update was performed
+            message = (
+                f"Error updating max_concurrently_running for array ID {workflow_id}."
+            )
+        resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
     return resp
