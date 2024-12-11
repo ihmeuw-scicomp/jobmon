@@ -5,7 +5,8 @@ import logging
 import os
 import socket
 import sys
-from typing import Any, Callable, List, Mapping, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, Union
+
 
 from opentelemetry import _logs, trace
 from opentelemetry.sdk import resources
@@ -171,6 +172,27 @@ class OpenTelemetryLogFormatter(logging.Formatter):
         record.trace_id = trace_id
         record.parent_span_id = parent_span_id
         return super().format(record)
+
+
+def add_span_details_processor(logger: Any, method_name: str, event_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Structlog processor to add OpenTelemetry span details to log entries.
+
+    Args:
+        logger: The logger instance (not used, but required by Structlog processor signature).
+        method_name: The logging method name (e.g., "info", "debug").
+        event_dict: The event dictionary representing the log entry.
+
+    Returns:
+        The modified event dictionary with OpenTelemetry span details added.
+    """
+    span_id, trace_id, parent_span_id = OtlpAPI.get_span_details()
+    if trace_id or span_id or parent_span_id:
+        event_dict.update({
+            "trace_id": trace_id,
+            "span_id": span_id,
+            "parent_span_id": parent_span_id,
+        })
+    return event_dict
 
 
 class _ProcessResourceDetector(resources.ResourceDetector):
