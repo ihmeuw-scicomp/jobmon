@@ -1,0 +1,23 @@
+version: "3.9"
+services:
+  jobmon_backend:
+    build: 
+      context: ./
+      dockerfile: ./jobmon_server/Dockerfile
+    ports:
+      - "8070:80"
+    volumes:
+      - ./jobmon_server:/app/jobmon/jobmon_server:ro
+    env_file:
+      - .env
+    command: >
+      /bin/sh -c "jobmon_server init_db && fastapi run /app/main.py --port 80 --reload"
+  jobmon_frontend:
+    build: ./jobmon_gui
+    platform: linux/amd64
+    ports:
+      - "3000:3000"  # Map port 3000 for the frontend (adjust if needed)
+    volumes:
+      - ./frontend:/app/jobmon_gui:ro
+    env_file:
+      - .env  # Load environment variables from the .env file

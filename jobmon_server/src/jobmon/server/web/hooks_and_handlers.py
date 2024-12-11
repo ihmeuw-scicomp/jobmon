@@ -1,12 +1,11 @@
 import json
-from typing import Any, AsyncGenerator, Callable, cast, Dict, Optional
+from typing import Any, AsyncGenerator, Callable, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_404_NOT_FOUND
 import structlog
-from werkzeug.exceptions import BadRequest, UnsupportedMediaType
 
 from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
@@ -72,25 +71,23 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
     async def add_requester_context(request: Request, call_next: Callable) -> None:
         """Add structured logging context before each request."""
         structlog.contextvars.clear_contextvars()
-        data = {}
-        try:
-            # Only parse JSON if the content type is application/json
-            if request.headers.get("content-type") == "application/json":
-                body = await request.body()  # Get the raw body
-                if body:  # Check if the body is not empty
-                    data = cast(Dict[str, Any], await request.json())
-        except (BadRequest, UnsupportedMediaType, json.JSONDecodeError):
-            data = {}
 
-        context_data = (
-            data.pop("server_structlog_context", {})
-            if request.method in ["POST", "PUT"]
-            else data
-        )
-        if context_data:
-            structlog.contextvars.bind_contextvars(
-                path=request.url.path, **context_data
-            )
+        # Extract the context from the custom header
+        context_str = request.headers.get("X-Server-Structlog-Context")
+        if context_str:
+            try:
+                context_data = json.loads(context_str)
+                structlog.contextvars.bind_contextvars(
+                    path=request.url.path, **context_data
+                )
+            except json.JSONDecodeError:
+                # Handle invalid JSON in the header gracefully
+                structlog.contextvars.bind_contextvars(
+                    path=request.url.path,
+                    error="Invalid JSON in X-Server-Structlog-Context header",
+                )
+
+        # Process the request and return the response
         response = await call_next(request)
         return response
 
