@@ -14,12 +14,9 @@ import uvicorn
 import pytest
 import sqlalchemy
 from sqlalchemy.engine import Engine
-from sqlalchemy import create_engine
 
 from jobmon.client.api import Tool
 from jobmon.core.requester import Requester
-from jobmon.core.configuration import JobmonConfig
-from jobmon.server.web.config import get_jobmon_config
 
 logger = logging.getLogger(__name__)
 
@@ -35,19 +32,11 @@ def pytest_sessionstart(session):
     print("Running code before test file import")
     print(f"SQLite file created at: {sqlite_file}")
 
-    # Configure Jobmon with the SQLite file
-    config = JobmonConfig(
-        dict_config={
-            "db": {"sqlalchemy_database_uri": f"sqlite:///{sqlite_file}"},
-            "otlp": {
-                "web_enabled": "false",
-                "span_exporter": "",
-                "log_exporter": "",
-            },
-            "session": {"secret_key": "test"},
-        }
-    )
-    get_jobmon_config(config)
+    os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{sqlite_file}"
+    os.environ["JOBMON__OTLP__WEB_ENABLED"] = "false"
+    os.environ["JOBMON__OTLP__SPAN_EXPORTER"] = ""
+    os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
+    os.environ["JOBMON__SESSION__SECRET_KEY"] = "test"
 
 
 @pytest.fixture(scope="session")
@@ -107,11 +96,16 @@ class WebServerProcess:
                 sys.exit(0)
 
             signal.signal(signal.SIGTERM, sigterm_handler)
-            from jobmon.server.web.api import get_app
-            from jobmon.server.web.log_config import configure_logging
 
-            configure_logging(
-                loggers_dict={
+            from jobmon.server.web.api import get_app
+            from jobmon.server.web import log_config
+
+            dict_config = {
+                "version": 1,
+                "disable_existing_loggers": True,
+                "formatters": log_config.default_formatters.copy(),
+                "handlers": log_config.default_handlers.copy(),
+                "loggers": {
                     "jobmon.server.web": {
                         "handlers": ["console_text"],
                         "level": "INFO",
@@ -121,8 +115,9 @@ class WebServerProcess:
                         "handlers": ["console_text"],
                         "level": "WARNING",
                     },
-                }
-            )
+                },
+            }
+            log_config.configure_logging(dict_config=dict_config)
 
             app = get_app(versions=["v2"])
             uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))

@@ -6,6 +6,7 @@ import contextlib
 import functools
 import json
 import logging
+import logging.config
 from typing import Any, Callable, Dict, Tuple, Type
 
 import requests
@@ -17,6 +18,33 @@ from jobmon.core.configuration import JobmonConfig
 from jobmon.core.exceptions import InvalidRequest, InvalidResponse
 
 logger = logging.getLogger(__name__)
+
+_OTEL_LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "otel": {
+            "()": "jobmon.core.otlp.OpenTelemetryLogFormatter",
+            "format": "%(asctime)s [%(levelname)s] [trace_id=%(trace_id)s,"
+            " span_id=%(span_id)s, parent_span_id=%(parent_span_id)s]"
+            " - %(message)s",
+        },
+    },
+    "handlers": {
+        "otel_text": {
+            "level": "INFO",
+            "class": "opentelemetry.sdk._logs.LoggingHandler",
+            "formatter": "otel",
+        },
+    },
+    "loggers": {
+        "jobmon.core.requester": {
+            "handlers": ["otel_text"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
 
 
 def http_request_ok(status_code: int) -> bool:
@@ -56,8 +84,8 @@ class Requester(object):
         # setup connections to backend
         otlp_instance = OtlpAPI()
         otlp_instance.instrument_requests()
-        otlp_instance.correlate_logger("jobmon.core.requester")
 
+        logging.config.dictConfig(_OTEL_LOGGING_CONFIG)
         # setup tracer for Requester to use
         cls._otlp_api = otlp_instance
 
@@ -166,42 +194,43 @@ class Requester(object):
         message: dict,
         request_type: str,
     ) -> Tuple[int, Any]:
-        # construct url
+        # Construct URL
         route = self.url + app_route
         logger.info(f"Route: {route}, message: {message}")
 
-        if request_type in ["post", "put"]:
-            message["server_structlog_context"] = self.server_structlog_context
-        else:
-            {}
+        # Add version to query parameters
+        params = {"client_jobmon_version": __version__}
+        if request_type == "get":
+            params.update(message)
 
-        # send request to server
+        # Set headers, including the custom header for structlog context
+        headers = {
+            "Content-Type": "application/json",
+            "X-Server-Structlog-Context": json.dumps(self.server_structlog_context),
+        }
+
+        # Send the appropriate request
         if request_type == "post":
-            params = {"client_jobmon_version": __version__}
             response = requests.post(
                 route,
                 params=params,
                 json=message,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 timeout=self.request_timeout,
             )
         elif request_type == "get":
-            params = message.copy()
-            params["client_jobmon_version"] = __version__
             response = requests.get(
                 route,
                 params=params,
-                data=json.dumps(self.server_structlog_context),
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 timeout=self.request_timeout,
             )
         elif request_type == "put":
-            params = {"client_jobmon_version": __version__}
             response = requests.put(
                 route,
                 params=params,
                 json=message,
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 timeout=self.request_timeout,
             )
         else:
@@ -209,6 +238,7 @@ class Requester(object):
                 f"request_type must be one of 'get', 'post', or 'put'. Got {request_type}"
             )
 
+        # Extract status code and content
         status_code, content = get_content(response)
 
         # Raise the InvalidResponse exception based on the logic from should_retry_result

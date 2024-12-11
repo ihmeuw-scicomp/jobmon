@@ -1,83 +1,37 @@
 from importlib import import_module
 import os
-from typing import Any, Optional
+from typing import List, Optional
 
+# Additional imports for middlewares and dependencies
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.openapi.docs import (
-    get_redoc_html,
-    get_swagger_ui_html,
-)
-from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse
-import structlog
+from starlette.staticfiles import StaticFiles
 
-from jobmon.core.otlp import OtlpAPI
-from jobmon.server.web.config import get_jobmon_config
+from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
-from jobmon.server.web.log_config import configure_structlog  # noqa F401
+from jobmon.server.web.log_config import configure_logging
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
 from jobmon.server.web.routes.utils import get_user
-from jobmon.server.web.server_side_exception import ServerError
-
-url_prefix = "/api"
-
-docs_static_uri = f"{url_prefix}/docs_static"
-docs_uri = f"{url_prefix}/docs"
-
-_CONFIG = get_jobmon_config()
 
 
-def _init_logging(otlp_api: Optional[OtlpAPI] = None) -> bool:
-    """Initialize logging for the app."""
-    try:
-        extra_processors = []
-        if otlp_api:
-
-            def add_open_telemetry_spans(_: Any, __: Any, event_dict: dict) -> dict:
-                """Add OpenTelemetry spans to the log record."""
-                if otlp_api is not None:
-                    span, trace, parent_span = otlp_api.get_span_details()  # type: ignore
-                else:
-                    raise ServerError("otlp_api is None.")
-
-                event_dict["span"] = {
-                    "span_id": span or None,
-                    "trace_id": trace or None,
-                    "parent_span_id": parent_span or None,
-                }
-                return event_dict
-
-            extra_processors.append(add_open_telemetry_spans)
-        configure_structlog(extra_processors)
-        return True
-    except Exception as e:
-        structlog.get_logger().error(f"Failed to initialize logging: {e}")
-        return False
-
-
-def get_app(
-    versions: Optional[list[str]] = None,
-    use_otlp: bool = False,
-    structlog_configured: bool = False,
-    otlp_api: Optional[OtlpAPI] = None,
-) -> FastAPI:
+def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     """Get a FastAPI app based on the config. If no config is provided, defaults are used.
 
     Args:
         versions: The versions of the API to include.
-        use_otlp: Whether to use OpenTelemetry.
-        structlog_configured: Whether structlog is already configured.
-        otlp_api: The OpenTelemetry API to use.
+        log_config_file: Path to the logging configuration file.
     """
-    if use_otlp and otlp_api is None:
-        otlp_api = OtlpAPI()
-        otlp_api.instrument_sqlalchemy()
+    config = JobmonConfig()
+    USE_OTEL = config.get_boolean("otlp", "web_enabled")
 
-    if not structlog_configured:
-        structlog_configured = _init_logging(otlp_api)
+    # Configure logging
+    configure_logging()
+
+    # Initialize the FastAPI app
     app_title = "jobmon"
     openapi_url = "/api/openapi.json"
 
@@ -86,13 +40,28 @@ def get_app(
         openapi_url=openapi_url,
         docs_url=None,
     )
+    app = add_hooks_and_handlers(app)
+
+    # OpenTelemetry instrumentation
+    if USE_OTEL:
+        # Import OTel modules here to avoid unnecessary imports when OTel is disabled
+        from jobmon.core.otlp import OtlpAPI
+
+        otlp_api = OtlpAPI()
+        otlp_api.instrument_sqlalchemy()
+        otlp_api.instrument_requests()
+        otlp_api.instrument_app(app)
+
+    # Mount static files
+    docs_static_uri = "/static"  # Adjust as necessary
     docs_static_path = os.path.join(
         os.path.dirname(os.path.realpath(__file__)), "static"
     )
     app.mount(
         docs_static_uri, StaticFiles(directory=docs_static_path), name="docs_static"
     )
-    # Add CORS middleware to the FastAPI app
+
+    # Add middlewares
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],  # Adjust the origins as needed
@@ -102,11 +71,13 @@ def get_app(
     )
     app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
     app.add_middleware(
-        SessionMiddleware, secret_key=_CONFIG.get("session", "secret_key")
+        SessionMiddleware, secret_key=config.get("session", "secret_key")
     )
     app.add_middleware(SecurityHeadersMiddleware, csp=True)
-    add_hooks_and_handlers(app)
+
+    # Include routers
     versions = versions or ["auth", "v3", "v2", "v1"]
+    url_prefix = "/api"  # Adjust as necessary
     for version in versions:
         mod = import_module(f"jobmon.server.web.routes.{version}")
         # Get the router dynamically from the module (assuming it's an APIRouter)
@@ -115,10 +86,9 @@ def get_app(
         dependencies = None
         if version == "v3":
             dependencies = [Depends(get_user)]
-        app.include_router(
-            api_router, prefix=f"{url_prefix}", dependencies=dependencies
-        )
+        app.include_router(api_router, prefix=url_prefix, dependencies=dependencies)
 
+    # Custom documentation endpoints
     @app.get("/api/docs", include_in_schema=False)
     async def custom_swagger_ui_html() -> HTMLResponse:
         return get_swagger_ui_html(

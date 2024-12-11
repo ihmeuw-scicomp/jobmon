@@ -1,5 +1,4 @@
 import pytest
-import sqlalchemy
 
 
 @pytest.fixture(scope="function")
