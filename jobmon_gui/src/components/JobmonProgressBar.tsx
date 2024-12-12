@@ -100,10 +100,17 @@ export default function JobmonProgressBar({
     const maxc = data.MAXC === INT_32_MAX ? "No Limit" : data.MAXC;
 
     function getLabel(value) {
-        // Only show 100% if all tasks are done i.e. do not round up to 100%
         const total = data.tasks
+
+        // Handle edge case where total is 0. This shouldn't happen
+        if (total === 0) return "0%";
+
+        // Only show 100% if all tasks are done i.e. do not round up to 100%
         if (value / total === 1) return "100%";
-        return `${(Math.floor((value / total) * 1000) / 10).toFixed(1)}%`;
+
+        // Calculate percentage and round down to 1 decimal place
+        const percentage = (value / total) * 100;
+        return `${Math.floor(percentage * 10) / 10}%`;
     }
 
 
