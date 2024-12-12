@@ -52,7 +52,7 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         otlp_api.instrument_requests()
         otlp_api.instrument_app(app)
 
-        configure_structlog(add_span_details_processor)
+        configure_structlog([add_span_details_processor])
     else:
         configure_structlog()
 
