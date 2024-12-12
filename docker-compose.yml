@@ -22,6 +22,6 @@ services:
     ports:
       - "3000:3000"  # Map port 3000 for the frontend (adjust if needed)
     volumes:
-      - ./frontend:/app/jobmon_gui:ro
+      - ./jobmon_gui:/app/jobmon_gui:ro
     env_file:
       - .env  # Load environment variables from the .env file
