@@ -14,12 +14,26 @@ All notable changes to the Jobmon GUI will be documented in this file.
 ### User-Facing
 #### Added
 - Added the Jobmon ReadTheDocs link to the navigation bar.
+- Added authentication.
+- Added a user menu where users can specify timezone and date display.
+- Added a workflow technical panel - workflow stopage, workflow and tasktemplate concurrency limit.
 
 #### Changed
 - Show WorkflowRun heartbeat_date instead of Workflow status_date on the workflow details page.
 - Truncate file paths in TaskInstance table of `Task Details` page.
 - Changed nav bar to match other apps.
 - Optimized the clustered error logs on the `Workflow Details` page to be faster.
+- Truncated the workflow details URL.
+- Persist users table settings to a zustand store.
+- Changed behavior of back button on Workflow Details page. Previously it would flip between task and resource usage tabs. It will now take users home.
+
+#### Fixed
+- Bug where users weren't able to type more than one character in the Task table.
+- Fixed bug where progress bars would round up to 100% even though all tasks weren't completed.
+
+#### Removed
+- Removed the auto-filtering of WorkflowList search functionality.
+
 
 ### Developer
 #### Changed
