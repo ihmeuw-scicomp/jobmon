@@ -2,8 +2,7 @@ import "@jobmon_gui/styles/jobmon_gui.css";
 import React, {useContext, useState} from "react";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
 import IconButton from "@mui/material/IconButton";
-import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
-import {StopCircle, Check, Error} from "@mui/icons-material";
+import {Check, Error} from "@mui/icons-material";
 import AuthContext from "@jobmon_gui/contexts/AuthContext.tsx";
 import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
 import Typography from "@mui/material/Typography";
@@ -19,6 +18,7 @@ type StopWorkflowButtonProps = {
 
 export default function StopWorkflowButton({
                                                wf_id,
+                                               disabled,
                                            }: StopWorkflowButtonProps) {
     const {user} = useContext(AuthContext)
     const queryClient = useQueryClient();
@@ -52,10 +52,11 @@ export default function StopWorkflowButton({
     const ModalChildren = () => {
 
         if (stopWorkflow.isError) {
-                        return (<Grid container spacing={2}>
+            return (<Grid container spacing={2}>
                     <Grid item xs={12}>
-                        <Alert icon={<Error fontSize="inherit" />} severity="error" variant="outlined">
-                        <Typography variant={"h6"}>Error stopping workflow. Please refresh the page and try again.</Typography>
+                        <Alert icon={<Error fontSize="inherit"/>} severity="error" variant="outlined">
+                            <Typography variant={"h6"}>Error stopping workflow. Please refresh the page and try
+                                again.</Typography>
                         </Alert>
                     </Grid>
                     <Grid item xs={12}></Grid>
@@ -78,8 +79,8 @@ export default function StopWorkflowButton({
         if (stopWorkflow.isSuccess) {
             return (<Grid container spacing={2}>
                     <Grid item xs={12}>
-                        <Alert icon={<Check fontSize="inherit" />} severity="success" variant="outlined">
-                        <Typography variant={"h6"}>Workflow stop request sent successfully.</Typography>
+                        <Alert icon={<Check fontSize="inherit"/>} severity="success" variant="outlined">
+                            <Typography variant={"h6"}>Workflow stop request sent successfully.</Typography>
                         </Alert>
                     </Grid>
                     <Grid item xs={12}></Grid>
@@ -131,13 +132,16 @@ export default function StopWorkflowButton({
     }
 
     return (<>
-            <HtmlTooltip title={"Stop Workflow"} placement={"bottom"} arrow={true} sx={{pl: 1}}>
-                <IconButton color="inherit" disabled={user_name != wfDetails.data.wfr_user || stoppedStates.includes(wfDetails.data.wf_status)} onClick={() => {
-                    setConfirmModalOpen(true)
-                }}>
-                    <StopCircle fontSize={"large"}/>
-                </IconButton>
-            </HtmlTooltip>
+            <IconButton color="inherit"
+                        disabled={user_name != wfDetails.data.wfr_user || stoppedStates.includes(wfDetails.data.wf_status) || disabled}
+                        onClick={() => {
+                            setConfirmModalOpen(true)
+                        }}>
+                <Button variant="contained" disabled={disabled}
+                        sx={{bgcolor: 'red', borderRadius: '0', '&:hover': {bgcolor: 'darkred'}}}>
+                    Stop Workflow
+                </Button>
+            </IconButton>
             <ConfirmationModal/>
         </>
 

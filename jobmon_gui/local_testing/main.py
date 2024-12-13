@@ -21,6 +21,7 @@ def set_environment():
     os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
     os.environ["JOBMON__SESSION__SECRET_KEY"] = ''.join(choices(string.ascii_letters + string.digits, k=16))
 
+
 def main():
     from jobmon.core.configuration import JobmonConfig
     from jobmon.server.web.api import get_app
@@ -29,6 +30,7 @@ def main():
     init_db()
     app = get_app()
     uvicorn.run(app, host="0.0.0.0", port=8070)
+
 
 if __name__ == "__main__":
     set_environment()

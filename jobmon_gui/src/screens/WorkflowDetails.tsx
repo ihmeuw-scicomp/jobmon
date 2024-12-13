@@ -3,7 +3,6 @@ import '@jobmon_gui/styles/jobmon_gui.css';
 import {useParams, useNavigate, useLocation} from 'react-router-dom';
 import axios from 'axios';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
-import {FaLightbulb} from "react-icons/fa";
 import Tab from '@mui/material/Tab';
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
 import Usage from '@jobmon_gui/components/workflow_details/Usage';
@@ -24,6 +23,7 @@ import {getWorkflowTTStatusQueryFn} from "@jobmon_gui/queries/GetWorkflowTTStatu
 import {getWorkflowUsageQueryFn} from "@jobmon_gui/queries/GetWorkflowUsage.ts";
 import {getClusteredErrorsFn} from "@jobmon_gui/queries/GetClusteredErrors.ts";
 import {getWorkflowTasksQueryFn} from "@jobmon_gui/queries/GetWorkflowTasks.ts";
+
 
 const task_template_tooltip_text = (<Box>
     <Typography sx={{fontWeight: "bold"}}>Task Templates</Typography>
@@ -49,9 +49,6 @@ function WorkflowDetails() {
         queryKey: ["workflow_details", "tt_status", workflowId],
         queryFn: getWorkflowTTStatusQueryFn
     })
-
-
-    //*******************event handling****************************
 
     //TaskTemplate link click function
     const clickTaskTemplate = async (name, tt_id, tt_version_id) => {
@@ -104,6 +101,12 @@ function WorkflowDetails() {
         return (<Typography>Error loading workflow task template details. Please refresh and try again.</Typography>)
     }
 
+    const taskTemplateInfo = wfTTStatus?.data
+        ? Object.values(wfTTStatus.data).map((taskTemplate: any) => ({
+            tt_version_id: taskTemplate.task_template_version_id,
+            name: taskTemplate.name
+        }))
+        : [];
 
     return (
         <Box>
@@ -117,7 +120,7 @@ function WorkflowDetails() {
             </Breadcrumb>
             <Box sx={{justifyContent: 'start', pt: 3}}>
                 <WorkflowHeader
-                    wf_id={workflowId}
+                    wf_id={workflowId} task_template_info={taskTemplateInfo}
                 />
             </Box>
 
@@ -135,7 +138,7 @@ function WorkflowDetails() {
                 }}><HtmlTooltip title={task_template_tooltip_text}
                                 arrow={true}
                                 placement={"right"}>
-                    <span>Task Templates&nbsp;<FaLightbulb/></span>
+                    <span>Task Templates&nbsp;</span>
                 </HtmlTooltip>
                 </Typography>
 

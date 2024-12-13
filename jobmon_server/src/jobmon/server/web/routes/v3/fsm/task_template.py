@@ -1,4 +1,4 @@
-"""Routes for Tasks."""
+"""Routes for TaskTemplates."""
 
 from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict
@@ -19,7 +19,6 @@ from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.template_arg_map import TemplateArgMap
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
-
 
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()

@@ -223,7 +223,7 @@ export default function WorkflowList() {
 
                                                       }}
                                                 >
-                                                    {workflow.wf_id} - {workflow.wf_name}
+                                                    {workflow.wf_id} {workflow.wf_name ? `- ${workflow.wf_name}` : ''}
                                                 </Link>
                                             </Typography>
                                         }
