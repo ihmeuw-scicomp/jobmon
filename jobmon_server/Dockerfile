@@ -38,4 +38,4 @@ RUN bash -c ' \
 RUN python -m nltk.downloader popular punkt_tab
 
 # Set the command to run the server
-CMD ["fastapi", "run", "/app/main.py", "--port", "80", "--reload"]
+CMD ["fastapi", "run", "/app/main.py", "--port", "80"]
