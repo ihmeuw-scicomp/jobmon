@@ -17,7 +17,9 @@ services:
     command: >
       /bin/sh -c "jobmon_server init_db && fastapi run /app/main.py --port 80 --reload"
   jobmon_frontend:
-    build: ./jobmon_gui
+    build: 
+      context: ./jobmon_gui
+      dockerfile: ./jobmon_gui/Dockerfile.local
     platform: linux/amd64
     ports:
       - "3000:3000"  # Map port 3000 for the frontend (adjust if needed)
