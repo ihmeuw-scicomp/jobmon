@@ -15,7 +15,17 @@ import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
 
 type WorkflowHeaderProps = {
     wf_id: number | string
+    task_template_info: { tt_version_id: any; name: any; }[];
 }
+
+interface WorkflowData {
+  max_concurrently_running: number;
+}
+
+interface TaskTemplateData {
+  max_concurrently_running: number;
+}
+
 import IconButton from "@mui/material/IconButton";
 import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
 import InfoIcon from '@mui/icons-material/Info';
@@ -45,7 +55,7 @@ export default function WorkflowHeader({
         staleTime: 60000, // 60 seconds
     })
 
-    axios.get(get_workflow_concurrency_url(wf_id), {
+    axios.get<WorkflowData>(get_workflow_concurrency_url(wf_id), {
         ...jobmonAxiosConfig,
         data: null,
     }).then((r) => {
@@ -77,7 +87,7 @@ export default function WorkflowHeader({
     useEffect(() => {
         task_template_info.map(template => {
             const url = get_task_template_concurrency_url(wf_id, template.tt_version_id);
-            return axios.get(url, jobmonAxiosConfig)
+            return axios.get<TaskTemplateData>(url, jobmonAxiosConfig)
                 .then((r) => {
                     setFieldValues(prevValues => ({
                         ...prevValues,
