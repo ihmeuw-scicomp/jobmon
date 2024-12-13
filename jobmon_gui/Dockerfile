@@ -5,7 +5,7 @@ FROM oven/bun:1.1.13
 COPY . /app
 
 # Set the working directory
-WORKDIR /app/jobmon_gui
+WORKDIR /app
 
 # Install dependencies
 RUN bun install
