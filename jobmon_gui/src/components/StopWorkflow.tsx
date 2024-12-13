@@ -14,6 +14,7 @@ import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
 
 type StopWorkflowButtonProps = {
     wf_id: number | string
+    disabled: boolean
 }
 
 export default function StopWorkflowButton({
