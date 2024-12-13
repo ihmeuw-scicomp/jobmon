@@ -1,11 +1,11 @@
 # Start from a specific Bun version for stability
 FROM oven/bun:1.1.13
 
-# Create app directory
-WORKDIR /app
-
-# Copy all files
+# Copy application files
 COPY . /app
+
+# Set the working directory
+WORKDIR /app/jobmon_gui
 
 # Install dependencies
 RUN bun install
