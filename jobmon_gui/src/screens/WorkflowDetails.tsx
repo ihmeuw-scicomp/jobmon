@@ -1,7 +1,6 @@
 import React, {useState} from 'react';
 import '@jobmon_gui/styles/jobmon_gui.css';
 import {useParams, useNavigate, useLocation} from 'react-router-dom';
-import axios from 'axios';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import Tab from '@mui/material/Tab';
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
@@ -23,7 +22,7 @@ import {getWorkflowTTStatusQueryFn} from "@jobmon_gui/queries/GetWorkflowTTStatu
 import {getWorkflowUsageQueryFn} from "@jobmon_gui/queries/GetWorkflowUsage.ts";
 import {getClusteredErrorsFn} from "@jobmon_gui/queries/GetClusteredErrors.ts";
 import {getWorkflowTasksQueryFn} from "@jobmon_gui/queries/GetWorkflowTasks.ts";
-
+import DagViz from "@jobmon_gui/components/workflow_details/DagViz.tsx";
 
 const task_template_tooltip_text = (<Box>
     <Typography sx={{fontWeight: "bold"}}>Task Templates</Typography>
@@ -41,6 +40,7 @@ function WorkflowDetails() {
 
 
     const [activeTab, setActiveTab] = useState(0);
+    const [tt_active_tab, setTTActiveTab] = useState(0);
     const [task_template_name, setTaskTemplateName] = useState('');
     const [tt_id, setTTID] = useState('');
     const [task_template_version_id, setTaskTemplateVersionId] = useState('');
@@ -143,51 +143,66 @@ function WorkflowDetails() {
                 </Typography>
 
             </Box>
-
-            <Box id="tt_progress">
-                <List>
-                    {
-                        Object.keys(wfTTStatus?.data).map(key => (
-                            <ListItem
-                                key={key}
-                                className={`tt-container ${tt_id == wfTTStatus?.data[key]["id"].toString() ? "selected" : ""}`}
-                                id={wfTTStatus?.data[key]["id"].toString()}
-                                onClick={() => {
-                                    clickTaskTemplate(wfTTStatus?.data[key]["name"], wfTTStatus?.data[key]["id"], wfTTStatus?.data[key]["task_template_version_id"])
-                                }}
-                                onMouseEnter={async () => {
-                                    void queryClient.prefetchQuery({
-                                        queryKey: ["workflow_details", "usage", wfTTStatus?.data[key]["task_template_version_id"], workflowId],
-                                        queryFn: getWorkflowUsageQueryFn,
-                                    })
-                                    void queryClient.prefetchQuery({
-                                        queryKey: ["workflow_details", "clustered_errors", workflowId, wfTTStatus?.data[key]["task_template_version_id"]],
-                                        queryFn: getClusteredErrorsFn,
-                                    })
-                                    void queryClient.prefetchQuery({
-                                        queryKey: ["workflow_details", "tasks", workflowId, wfTTStatus?.data[key]["name"]],
-                                        queryFn: getWorkflowTasksQueryFn,
-                                    })
-                                }}
-                            >
-                                <Box className="div_floatleft">
-                                    <Typography className="tt-name">{wfTTStatus?.data[key]["name"]}</Typography>
-                                </Box>
-                                <Box className="div_floatright">
-                                    <JobmonProgressBar
-                                        workflowId={workflowId}
-                                        ttId={key}
-                                        placement="left"
-                                    />
-                                </Box>
-                                <br/>
-                                <Divider className="hr-dot"/>
-                            </ListItem>
-                        ))
-                    }
-                </List>
-
+            <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
+                <Tabs
+                    value={tt_active_tab}
+                    onChange={(event, newValue) => setTTActiveTab(newValue)}
+                    aria-label="Tab selection"
+                >
+                    <Tab label="Task Templates" value={0}/>
+                    <Tab label="Dag Viz" value={1}/>
+                </Tabs>
             </Box>
+
+            <TabPanel value={tt_active_tab} index={0}>
+                <Box id="tt_progress">
+                    <List>
+                        {
+                            Object.keys(wfTTStatus?.data).map(key => (
+                                <ListItem
+                                    key={key}
+                                    className={`tt-container ${tt_id == wfTTStatus?.data[key]["id"].toString() ? "selected" : ""}`}
+                                    id={wfTTStatus?.data[key]["id"].toString()}
+                                    onClick={() => {
+                                        clickTaskTemplate(wfTTStatus?.data[key]["name"], wfTTStatus?.data[key]["id"], wfTTStatus?.data[key]["task_template_version_id"])
+                                    }}
+                                    onMouseEnter={async () => {
+                                        void queryClient.prefetchQuery({
+                                            queryKey: ["workflow_details", "usage", wfTTStatus?.data[key]["task_template_version_id"], workflowId],
+                                            queryFn: getWorkflowUsageQueryFn,
+                                        })
+                                        void queryClient.prefetchQuery({
+                                            queryKey: ["workflow_details", "clustered_errors", workflowId, wfTTStatus?.data[key]["task_template_version_id"]],
+                                            queryFn: getClusteredErrorsFn,
+                                        })
+                                        void queryClient.prefetchQuery({
+                                            queryKey: ["workflow_details", "tasks", workflowId, wfTTStatus?.data[key]["name"]],
+                                            queryFn: getWorkflowTasksQueryFn,
+                                        })
+                                    }}
+                                >
+                                    <Box className="div_floatleft">
+                                        <Typography className="tt-name">{wfTTStatus?.data[key]["name"]}</Typography>
+                                    </Box>
+                                    <Box className="div_floatright">
+                                        <JobmonProgressBar
+                                            workflowId={workflowId}
+                                            ttId={key}
+                                            placement="left"
+                                        />
+                                    </Box>
+                                    <br/>
+                                    <Divider className="hr-dot"/>
+                                </ListItem>
+                            ))
+                        }
+                    </List>
+                </Box>
+            </TabPanel>
+
+            <TabPanel value={tt_active_tab} index={1}>
+                <DagViz/>
+            </TabPanel>
             <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
                 <Tabs
                     value={activeTab}
