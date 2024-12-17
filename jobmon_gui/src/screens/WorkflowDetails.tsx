@@ -24,14 +24,6 @@ import {getClusteredErrorsFn} from "@jobmon_gui/queries/GetClusteredErrors.ts";
 import {getWorkflowTasksQueryFn} from "@jobmon_gui/queries/GetWorkflowTasks.ts";
 import DagViz from "@jobmon_gui/components/workflow_details/DagViz.tsx";
 
-const task_template_tooltip_text = (<Box>
-    <Typography sx={{fontWeight: "bold"}}>Task Templates</Typography>
-    <Typography variant={"body2"}>
-        The list of task templates with status bar, ordered by the
-        submitted time of the first task associated with the task template.
-    </Typography>
-</Box>)
-
 
 function WorkflowDetails() {
     let params = useParams();
@@ -129,20 +121,6 @@ function WorkflowDetails() {
                                    placement="bottom"/>
             </Box>
 
-            <Box id="tt_title" className="div-level-2">
-                <Typography sx={{
-                    textAlign: "left",
-                    fontSize: "calc(16px + 1vmin)",
-                    color: "var(--color-title)",
-                    width: "90%"
-                }}><HtmlTooltip title={task_template_tooltip_text}
-                                arrow={true}
-                                placement={"right"}>
-                    <span>Task Templates&nbsp;</span>
-                </HtmlTooltip>
-                </Typography>
-
-            </Box>
             <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
                 <Tabs
                     value={tt_active_tab}
@@ -198,36 +176,36 @@ function WorkflowDetails() {
                         }
                     </List>
                 </Box>
+                <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
+                    <Tabs
+                        value={activeTab}
+                        onChange={(event, newValue) => setActiveTab(newValue)}
+                        aria-label="Tab selection"
+                    >
+                        <Tab label="Errors and Tasks" value={0}/>
+                        <Tab label="Resource Usage" value={1}/>
+                    </Tabs>
+                </Box>
+                <TabPanel value={activeTab} index={0}>
+                    <Box>
+                        <Typography variant={"h5"} sx={{pt: 3}}>Clustered Errors</Typography>
+                        <ClusteredErrors taskTemplateId={tt_id} workflowId={workflowId}/>
+                    </Box>
+                    <Box>
+                        <Typography variant={"h5"} sx={{pt: 3}}>Tasks</Typography>
+                        <TaskTable taskTemplateName={task_template_name} workflowId={workflowId}/>
+                    </Box>
+                </TabPanel>
+                <TabPanel value={activeTab} index={1}>
+                    <Usage taskTemplateName={task_template_name}
+                           taskTemplateVersionId={task_template_version_id}
+                           workflowId={workflowId}
+                    />
+                </TabPanel>
             </TabPanel>
 
             <TabPanel value={tt_active_tab} index={1}>
                 <DagViz/>
-            </TabPanel>
-            <Box sx={{borderBottom: 1, borderColor: 'divider'}}>
-                <Tabs
-                    value={activeTab}
-                    onChange={(event, newValue) => setActiveTab(newValue)}
-                    aria-label="Tab selection"
-                >
-                    <Tab label="Errors and Tasks" value={0}/>
-                    <Tab label="Resource Usage" value={1}/>
-                </Tabs>
-            </Box>
-            <TabPanel value={activeTab} index={0}>
-                <Box>
-                    <Typography variant={"h5"} sx={{pt: 3}}>Clustered Errors</Typography>
-                    <ClusteredErrors taskTemplateId={tt_id} workflowId={workflowId}/>
-                </Box>
-                <Box>
-                    <Typography variant={"h5"} sx={{pt: 3}}>Tasks</Typography>
-                    <TaskTable taskTemplateName={task_template_name} workflowId={workflowId}/>
-                </Box>
-            </TabPanel>
-            <TabPanel value={activeTab} index={1}>
-                <Usage taskTemplateName={task_template_name}
-                       taskTemplateVersionId={task_template_version_id}
-                       workflowId={workflowId}
-                />
             </TabPanel>
         </Box>
     );

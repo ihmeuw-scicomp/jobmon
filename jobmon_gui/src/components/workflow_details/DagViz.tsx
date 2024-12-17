@@ -1,11 +1,20 @@
 import React from "react";
 import ReactFlow, {MiniMap, Controls, Background} from 'reactflow';
 import dagre from 'dagre';
+import axios from "axios";
+import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
+import {get_task_template_dag} from "@jobmon_gui/configs/ApiUrls.ts";
 
 export default function DagViz() {
+    axios.get(get_task_template_dag(2), {
+        ...jobmonAxiosConfig,
+        data: null,
+    }).then((r) => {
+        console.log("WE'VE RETURNED", r.data)
+        // setWfFieldValues(r.data.max_concurrently_running)
+    });
 
-
-    const getLayoutedNodes = (nodes, edges) => {
+    const getLayedOutNodes = (nodes, edges) => {
         const g = new dagre.graphlib.Graph();
         g.setGraph({rankdir: 'TB'});
         g.setDefaultEdgeLabel(() => ({}));
@@ -69,7 +78,7 @@ export default function DagViz() {
     ];
 
 
-    const layoutedNodes = getLayoutedNodes(nodes, edges);
+    const layoutedNodes = getLayedOutNodes(nodes, edges);
 
     return (
         <div style={{height: 500}}>
