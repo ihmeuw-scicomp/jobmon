@@ -174,7 +174,9 @@ class OpenTelemetryLogFormatter(logging.Formatter):
         return super().format(record)
 
 
-def add_span_details_processor(logger: Any, method_name: str, event_dict: Dict[str, Any]) -> Dict[str, Any]:
+def add_span_details_processor(
+    logger: Any, method_name: str, event_dict: Dict[str, Any]
+) -> Dict[str, Any]:
     """Structlog processor to add OpenTelemetry span details to log entries.
 
     Args:
@@ -187,11 +189,13 @@ def add_span_details_processor(logger: Any, method_name: str, event_dict: Dict[s
     """
     span_id, trace_id, parent_span_id = OtlpAPI.get_span_details()
     if trace_id or span_id or parent_span_id:
-        event_dict.update({
-            "trace_id": trace_id,
-            "span_id": span_id,
-            "parent_span_id": parent_span_id,
-        })
+        event_dict.update(
+            {
+                "trace_id": trace_id,
+                "span_id": span_id,
+                "parent_span_id": parent_span_id,
+            }
+        )
     return event_dict
 
 

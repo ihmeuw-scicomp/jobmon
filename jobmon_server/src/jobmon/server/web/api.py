@@ -56,7 +56,6 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     else:
         configure_structlog()
 
-
     # Mount static files
     docs_static_uri = "/static"  # Adjust as necessary
     docs_static_path = os.path.join(
