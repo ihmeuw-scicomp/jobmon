@@ -12,6 +12,7 @@ from sqlalchemy import Row, Select, select
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 import structlog
+from decimal import Decimal
 
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
 from jobmon.server.web.config import get_jobmon_config
@@ -371,6 +372,12 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
     # return DS
     return_dic: Dict[int, Any] = dict()
 
+    def serialize_decimal(value):
+        """Convert Decimal to float for JSON serialization."""
+        if isinstance(value, Decimal):
+            return float(value)
+        return value
+
     with SessionLocal() as session:
         with session.begin():
             # user subquery as the Array table has to be joined on two columns
@@ -483,7 +490,13 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             return_dic[int(task_template_id)]["MAXC"] = (
                 max_concurrently if max_concurrently is not None else "NA"
             )
-        resp = JSONResponse(content=return_dic, status_code=StatusCodes.OK)
+
+        return_dic_serializable = {
+            key: {k: serialize_decimal(v) if isinstance(v, (Decimal, float)) else v for k, v in val.items()}
+            for key, val in return_dic.items()
+        }
+
+        resp = JSONResponse(content=return_dic_serializable, status_code=StatusCodes.OK)
     return resp
 
 
