@@ -11,7 +11,6 @@ import {CircularProgress, Tabs} from "@mui/material";
 import TaskTable from "@jobmon_gui/components/workflow_details/TaskTable";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
 import Typography from "@mui/material/Typography";
-import HtmlTooltip from "@jobmon_gui/components/HtmlToolTip";
 import ClusteredErrors from "@jobmon_gui/components/workflow_details/ClusteredErrors";
 import {useTaskTableStore} from "@jobmon_gui/stores/TaskTable.ts";
 import {useClusteredErrorsTableStore} from "@jobmon_gui/stores/ClusteredErrorsTable.ts";
@@ -205,7 +204,7 @@ function WorkflowDetails() {
             </TabPanel>
 
             <TabPanel value={tt_active_tab} index={1}>
-                <DagViz/>
+                <DagViz workflowId={workflowId}/>
             </TabPanel>
         </Box>
     );

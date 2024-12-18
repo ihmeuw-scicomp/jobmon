@@ -5,6 +5,7 @@ from http import HTTPStatus as StatusCodes
 from typing import Any, cast, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException, Request
+import pandas as pd
 import sqlalchemy
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
@@ -17,10 +18,14 @@ from jobmon.server.web.config import get_jobmon_config
 from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.dag import Dag
+from jobmon.server.web.models.edge import Edge
+from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_status import TaskStatus
+from jobmon.server.web.models.task_template import TaskTemplate
+from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_attribute import WorkflowAttribute
 from jobmon.server.web.models.workflow_attribute_type import WorkflowAttributeType
@@ -577,4 +582,75 @@ async def update_array_max_running(workflow_id: int, request: Request) -> Any:
                 f"Error updating max_concurrently_running for array ID {workflow_id}."
             )
         resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
+    return resp
+
+
+@api_v3_router.get("/workflow/{workflow_id}/task_template_dag")
+async def task_template_dag(workflow_id: str) -> Any:
+    with SessionLocal() as session:
+        with session.begin():
+            dag_query = session.query(
+                Workflow.dag_id
+            ).filter(Workflow.id == workflow_id)
+
+            dag_id = dag_query.scalar()
+
+            query = session.query(
+                Edge.node_id,
+                Edge.upstream_node_ids,
+                Edge.downstream_node_ids,
+                TaskTemplate.name
+            ).join(
+                Node, Edge.node_id == Node.id
+            ).join(
+                TaskTemplateVersion, Node.task_template_version_id == TaskTemplateVersion.id
+            ).join(
+                TaskTemplate, TaskTemplateVersion.task_template_id == TaskTemplate.id
+            ).filter(
+                Edge.dag_id == dag_id
+            )
+
+            res = session.execute(query).fetchall()
+
+            results_list = [
+                {
+                    "node_id": row.node_id,
+                    "upstream_node_ids": row.upstream_node_ids,
+                    "downstream_node_ids": row.downstream_node_ids,
+                    "name": row.name
+                }
+                for row in res
+            ]
+
+    df = pd.DataFrame(results_list)
+    task_template_lookup = df[["node_id", "name"]]
+    df["downstream_node_ids"] = (
+        df["downstream_node_ids"]
+        .fillna("[]")
+        .str.rstrip('"]')
+        .str.lstrip('["')
+        .str.split(",")
+    )
+
+    df = df.explode("downstream_node_ids")[["node_id", "downstream_node_ids"]]
+    df = df.loc[df["downstream_node_ids"] != ""].astype(int)
+    df = df.merge(task_template_lookup, on="node_id", how="left")
+    df = df.merge(
+        task_template_lookup.rename(
+            columns={
+                "name": "downstream_task_template_id",
+                "node_id": "downstream_node_ids",
+            }
+        ),
+        how="left",
+        on="downstream_node_ids",
+    )
+
+    df = df[["name", "downstream_task_template_id"]].drop_duplicates()
+
+    resp = JSONResponse(
+        content={"tt_dag": df.to_dict(orient="records")},
+        status_code=StatusCodes.OK,
+    )
+
     return resp
