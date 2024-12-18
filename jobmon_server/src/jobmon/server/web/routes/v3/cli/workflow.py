@@ -569,7 +569,7 @@ def workflows_by_user_form(
             )
             rows = session.execute(query, substitution_dict).all()
 
-        def serialize_datetime(obj):
+        def serialize_datetime(obj: datetime) -> str:
             """Serialize datetime objects into string format."""
             if isinstance(obj, datetime):
                 return obj.isoformat()
@@ -592,8 +592,12 @@ def workflows_by_user_form(
             label_mapping: 0 for label_mapping in set(_cli_label_mapping.values())
         }
         result = [
-            {**dict(zip(column_names, row)), **initial_status_counts, "wf_submitted_date": serialize_datetime(row[2]),
-             "wf_status_date": serialize_datetime(row[3])}
+            {
+                **dict(zip(column_names, row)),
+                **initial_status_counts,
+                "wf_submitted_date": serialize_datetime(row[2]),
+                "wf_status_date": serialize_datetime(row[3]),
+            }
             for row in rows
         ]
 

@@ -1,8 +1,9 @@
 """Routes for TaskTemplate."""
 
+from decimal import Decimal
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fastapi import Query, Request
 import numpy as np
@@ -12,7 +13,6 @@ from sqlalchemy import Row, Select, select
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 import structlog
-from decimal import Decimal
 
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
 from jobmon.server.web.config import get_jobmon_config
@@ -372,7 +372,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
     # return DS
     return_dic: Dict[int, Any] = dict()
 
-    def serialize_decimal(value):
+    def serialize_decimal(value: Union[Decimal, float]) -> float:
         """Convert Decimal to float for JSON serialization."""
         if isinstance(value, Decimal):
             return float(value)
@@ -492,7 +492,10 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             )
 
         return_dic_serializable = {
-            key: {k: serialize_decimal(v) if isinstance(v, (Decimal, float)) else v for k, v in val.items()}
+            key: {
+                k: serialize_decimal(v) if isinstance(v, (Decimal, float)) else v
+                for k, v in val.items()
+            }
             for key, val in return_dic.items()
         }
 
