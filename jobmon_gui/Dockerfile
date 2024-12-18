@@ -1,17 +1,23 @@
-# Use the official Bun image
-FROM oven/bun:latest
+# Start from a specific Bun version for stability
+FROM oven/bun:1.1.13
+
+# Copy application files
+COPY . /app
 
 # Set the working directory
 WORKDIR /app
 
-# Copy application files
-COPY . .
-
 # Install dependencies
 RUN bun install
 
-# Expose the port your app will run on
+# Build the production bundle
+RUN bun run build
+
+# Install a static server (e.g. serve)
+RUN bun add serve
+
+# Expose the production port
 EXPOSE 3000
 
-# Start the Bun app
-CMD ["bun", "run", "start"]
+# Serve the built files
+CMD ["bun", "run", "serve"]

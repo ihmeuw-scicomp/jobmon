@@ -83,9 +83,6 @@ def configure_logging(
     # Apply the logging configuration
     logging.config.dictConfig(logging_config)
 
-    # Configure structlog after logging is configured
-    configure_structlog()
-
 
 # Default formatters
 default_formatters: Dict = {
