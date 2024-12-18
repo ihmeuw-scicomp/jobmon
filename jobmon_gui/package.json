@@ -64,7 +64,7 @@
   "scripts": {
     "start": "vite --host",
     "build": "tsc && vite build",
-    "serve": "vite preview"
+    "serve": "serve dist"
   },
   "overrides": {
     "got": "^12.1.0",

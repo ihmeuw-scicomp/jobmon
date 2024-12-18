@@ -13,7 +13,7 @@ from starlette.staticfiles import StaticFiles
 
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
-from jobmon.server.web.log_config import configure_logging
+from jobmon.server.web.log_config import configure_logging, configure_structlog
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
 from jobmon.server.web.routes.utils import get_user
 
@@ -26,7 +26,6 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         log_config_file: Path to the logging configuration file.
     """
     config = JobmonConfig()
-    USE_OTEL = config.get_boolean("otlp", "web_enabled")
 
     # Configure logging
     configure_logging()
@@ -42,15 +41,20 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     )
     app = add_hooks_and_handlers(app)
 
+    USE_OTEL = config.get_boolean("otlp", "web_enabled")
     # OpenTelemetry instrumentation
     if USE_OTEL:
         # Import OTel modules here to avoid unnecessary imports when OTel is disabled
-        from jobmon.core.otlp import OtlpAPI
+        from jobmon.core.otlp import OtlpAPI, add_span_details_processor
 
         otlp_api = OtlpAPI()
         otlp_api.instrument_sqlalchemy()
         otlp_api.instrument_requests()
         otlp_api.instrument_app(app)
+
+        configure_structlog([add_span_details_processor])
+    else:
+        configure_structlog()
 
     # Mount static files
     docs_static_uri = "/static"  # Adjust as necessary
