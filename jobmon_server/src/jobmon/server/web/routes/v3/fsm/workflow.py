@@ -632,6 +632,7 @@ async def task_template_dag(workflow_id: str) -> Any:
         .str.split(",")
     )
 
+    # Handle edge case where the is only one node
     df = df.explode("downstream_node_ids")[["node_id", "downstream_node_ids"]]
     df = df.loc[df["downstream_node_ids"] != ""].astype(int)
     df = df.merge(task_template_lookup, on="node_id", how="left")
@@ -646,10 +647,15 @@ async def task_template_dag(workflow_id: str) -> Any:
         on="downstream_node_ids",
     )
 
-    df = df[["name", "downstream_task_template_id"]].drop_duplicates()
+    task_template_names_without_edges = task_template_lookup[["name"]]
+    task_template_names_without_edges["downstream_task_template_id"] = None
+
+    df = df[["name", "downstream_task_template_id"]]
+    df = pd.concat([df, task_template_names_without_edges]).drop_duplicates()
+    resp_content = {"tt_dag": df.to_dict(orient="records")}
 
     resp = JSONResponse(
-        content={"tt_dag": df.to_dict(orient="records")},
+        content=resp_content,
         status_code=StatusCodes.OK,
     )
 
