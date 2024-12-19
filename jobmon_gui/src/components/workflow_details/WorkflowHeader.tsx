@@ -171,7 +171,7 @@ export default function WorkflowHeader({
     }
 
     const normalizedVersion = normalizeVersion(jobmon_version);
-    const disabled = compare(normalizedVersion, "3.3", '>')
+    const disabled = !compare(normalizedVersion, "3.3", '>')
 
     const {icon, className} = statusIcons[wf_status] || {};
 
