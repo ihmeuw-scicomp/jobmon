@@ -12,6 +12,7 @@ import {useMutation, useQuery} from "@tanstack/react-query";
 import Typography from "@mui/material/Typography";
 import humanizeDuration from 'humanize-duration';
 import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
+import {compare} from 'compare-versions';
 
 type WorkflowHeaderProps = {
     wf_id: number | string
@@ -19,11 +20,11 @@ type WorkflowHeaderProps = {
 }
 
 interface WorkflowData {
-  max_concurrently_running: number;
+    max_concurrently_running: number;
 }
 
 interface TaskTemplateData {
-  max_concurrently_running: number;
+    max_concurrently_running: number;
 }
 
 import IconButton from "@mui/material/IconButton";
@@ -164,7 +165,13 @@ export default function WorkflowHeader({
     const wf_elapsed_time = humanizeDuration(new Date(wfDetails?.data?.wfr_heartbeat_date).getTime() - new Date(wfDetails?.data?.wf_created_date).getTime())
     const jobmon_version = wfDetails?.data?.wfr_jobmon_version
     const wfr_user = wfDetails?.data?.wfr_user
-    const disabled = jobmon_version !== "3.4.0"
+
+    function normalizeVersion(version) {
+        return version.replace(/\.dev/, '-dev');
+    }
+
+    const normalizedVersion = normalizeVersion(jobmon_version);
+    const disabled = compare(normalizedVersion, "3.3", '>')
 
     const {icon, className} = statusIcons[wf_status] || {};
 
