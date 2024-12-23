@@ -349,3 +349,111 @@ async def get_array_max_concurrently_running(
             status_code=StatusCodes.OK,
         )
     return resp
+
+
+@api_v1_router.post("/array/{array_id}/transition_to_killed")
+@api_v2_router.post("/array/{array_id}/transition_to_killed")
+async def transition_to_killed(array_id: int, request: Request) -> Any:
+    """
+    Transition TIs associated with an (array_id, batch_num) from KILL_SELF 
+    (or other killable states) to ERROR_FATAL. Also mark parent Tasks 
+    with status=ERROR_FATAL if they're in a killable state.
+    
+    Mirrors the pattern of transition_to_launched.
+    """
+    structlog.contextvars.bind_contextvars(array_id=array_id)
+
+    data = cast(Dict, await request.json())
+    batch_num = data["batch_number"]
+
+    # 1) Acquire locks on the parent Tasks, and set them to ERROR_FATAL 
+    #    if they're in a killable state.
+    #    This is analogous to how transition_to_launched locks tasks 
+    #    that are INSTANTIATING and sets them to LAUNCHED.
+
+    with SessionLocal() as session:
+        with session.begin():
+            # Find Task IDs belonging to TIs in this array & batch
+            task_ids_query = (
+                select(TaskInstance.task_id)
+                .where(
+                    TaskInstance.array_id == array_id,
+                    TaskInstance.array_batch_num == batch_num,
+                    TaskInstance.status == TaskInstanceStatus.KILL_SELF,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            task_ids = session.execute(task_ids_query).scalars().all()
+
+            # We'll define "killable" Task states. Adjust as appropriate.
+            killable_task_states = (
+                TaskStatus.LAUNCHED,
+                TaskStatus.RUNNING,
+            )
+            task_condition = and_(
+                Task.array_id == array_id,
+                Task.id.in_(task_ids),
+                Task.status.in_(killable_task_states),
+            )
+
+            # Lock them with_for_update
+            task_locks = (
+                select(Task.id)
+                .where(task_condition)
+                .with_for_update()
+                .execution_options(synchronize_session=False)
+            )
+            session.execute(task_locks)
+
+            # Transition them to ERROR_FATAL
+            update_task_stmt = (
+                update(Task)
+                .where(task_condition)
+                .values(status=TaskStatus.ERROR_FATAL, status_date=func.now())
+            ).execution_options(synchronize_session=False)
+            session.execute(update_task_stmt)
+            # The trailing () is not required but you can keep it for consistency 
+            # if that’s how your code style is set.
+
+    # 2) Now transition the TIs themselves to ERROR_FATAL.
+    #    This is in a separate session, just like _update_task_instance
+    #    is invoked in transition_to_launched.
+    _update_task_instance_killed(array_id, batch_num)
+
+    # 3) Return success
+    return JSONResponse(content={}, status_code=StatusCodes.OK)
+
+def _update_task_instance_killed(array_id: int, batch_num: int) -> None:
+    """
+    Bulk update TaskInstances in (array_id, batch_num) from KILL_SELF (or other eligible states)
+    to ERROR_FATAL, mirroring the pattern in _update_task_instance.
+    """
+    # In this example, we assume you specifically want to move TIs in KILL_SELF -> ERROR_FATAL.
+    # Adapt as needed if you also want to kill TIs in LAUNCHED, RUNNING, etc.
+    ti_condition = and_(
+        TaskInstance.array_id == array_id,
+        TaskInstance.array_batch_num == batch_num,
+        TaskInstance.status == TaskInstanceStatus.KILL_SELF,
+    )
+
+    with SessionLocal() as session:
+        with session.begin():
+            # Acquire a lock on these TIs
+            task_instance_ids_query = (
+                select(TaskInstance.id)
+                .where(ti_condition)
+                .with_for_update()
+                .execution_options(synchronize_session=False)
+            )
+            session.execute(task_instance_ids_query)
+
+            # Transition them all to ERROR_FATAL
+            update_stmt = (
+                update(TaskInstance)
+                .where(ti_condition)
+                .values(
+                    status=TaskInstanceStatus.ERROR_FATAL,
+                    status_date=func.now(),
+                )
+            ).execution_options(synchronize_session=False)
+            session.execute(update_stmt)
