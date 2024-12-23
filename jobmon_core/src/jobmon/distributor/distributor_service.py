@@ -396,11 +396,11 @@ class DistributorService:
         task_instance.transition_to_error(r_msg, r_value)
 
     def kill_self_batch(self, task_instance_batch: TaskInstanceBatch) -> None:
-        """
-        Terminate all TIs in this batch at the cluster level, then mark them 
-        as killed in the DB through the batch object.
-        """
+        """Terminate all TIs in this batch.
 
+        Args:
+            task_instance_batch: The batch of task instances to terminate.
+        """
         # 1) Collect the distributor IDs to terminate
         distributor_ids = [
             ti.distributor_id
@@ -619,7 +619,6 @@ class DistributorService:
 
     def _check_kill_self_for_work(self) -> Generator[DistributorCommand, None, None]:
         """Handle TIs in KILL_SELF state, grouped by their TaskInstanceBatch."""
-
         kill_self_task_instances = list(
             self._task_instance_status_map[TaskInstanceStatus.KILL_SELF]
         )

@@ -73,7 +73,7 @@ class DistributorTaskInstance:
     def distributor_id(self) -> str:
         """Returns the distributor id of the TI."""
         return self._distributor_id
-    
+
     @distributor_id.setter
     def distributor_id(self, val: str) -> None:
         self._distributor_id = val

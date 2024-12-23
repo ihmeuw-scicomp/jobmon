@@ -12,6 +12,7 @@ from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLo
 
 load_model()
 
+
 def test_transition_to_killed(tool, db_engine, task_template):
     # 1) Create a small workflow and bind to DB
     t1 = tool.active_task_templates["simple_template"].create_task(arg="sleep 200")
@@ -27,7 +28,9 @@ def test_transition_to_killed(tool, db_engine, task_template):
 
     # 2) Create a WorkflowRun and produce TaskInstances
     wfr = WorkflowRunFactory(workflow.workflow_id).create_workflow_run()
-    swarm = SwarmWorkflowRun(workflow_run_id=wfr.workflow_run_id, requester=workflow.requester)
+    swarm = SwarmWorkflowRun(
+        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    )
     swarm.from_workflow(workflow)
     swarm.set_initial_fringe()
     swarm.process_commands()
@@ -73,9 +76,9 @@ def test_transition_to_killed(tool, db_engine, task_template):
 
         for ti in task_instances:
             # Confirm they transitioned to ERROR_FATAL
-            assert ti.status == TaskInstanceStatus.ERROR_FATAL, (
-                f"Expected ERROR_FATAL but got {ti.status} for TI {ti.id}"
-            )
+            assert (
+                ti.status == TaskInstanceStatus.ERROR_FATAL
+            ), f"Expected ERROR_FATAL but got {ti.status} for TI {ti.id}"
 
     # 7) Shut down the distributor
     distributor_service.cluster_interface.stop()

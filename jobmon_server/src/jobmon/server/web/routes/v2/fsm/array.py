@@ -354,21 +354,18 @@ async def get_array_max_concurrently_running(
 @api_v1_router.post("/array/{array_id}/transition_to_killed")
 @api_v2_router.post("/array/{array_id}/transition_to_killed")
 async def transition_to_killed(array_id: int, request: Request) -> Any:
-    """
-    Transition TIs associated with an (array_id, batch_num) from KILL_SELF 
-    (or other killable states) to ERROR_FATAL. Also mark parent Tasks 
-    with status=ERROR_FATAL if they're in a killable state.
-    
-    Mirrors the pattern of transition_to_launched.
+    """Transition TIs from KILL_SELF  to ERROR_FATAL.
+
+    Also mark parent Taskswith status=ERROR_FATAL if they're in a killable state.
     """
     structlog.contextvars.bind_contextvars(array_id=array_id)
 
     data = cast(Dict, await request.json())
     batch_num = data["batch_number"]
 
-    # 1) Acquire locks on the parent Tasks, and set them to ERROR_FATAL 
+    # 1) Acquire locks on the parent Tasks, and set them to ERROR_FATAL
     #    if they're in a killable state.
-    #    This is analogous to how transition_to_launched locks tasks 
+    #    This is analogous to how transition_to_launched locks tasks
     #    that are INSTANTIATING and sets them to LAUNCHED.
 
     with SessionLocal() as session:
@@ -412,7 +409,7 @@ async def transition_to_killed(array_id: int, request: Request) -> Any:
                 .values(status=TaskStatus.ERROR_FATAL, status_date=func.now())
             ).execution_options(synchronize_session=False)
             session.execute(update_task_stmt)
-            # The trailing () is not required but you can keep it for consistency 
+            # The trailing () is not required but you can keep it for consistency
             # if that’s how your code style is set.
 
     # 2) Now transition the TIs themselves to ERROR_FATAL.
@@ -423,11 +420,9 @@ async def transition_to_killed(array_id: int, request: Request) -> Any:
     # 3) Return success
     return JSONResponse(content={}, status_code=StatusCodes.OK)
 
+
 def _update_task_instance_killed(array_id: int, batch_num: int) -> None:
-    """
-    Bulk update TaskInstances in (array_id, batch_num) from KILL_SELF (or other eligible states)
-    to ERROR_FATAL, mirroring the pattern in _update_task_instance.
-    """
+    """Bulk update TaskInstances in (array_id, batch_num) from KILL_SELF."""
     # In this example, we assume you specifically want to move TIs in KILL_SELF -> ERROR_FATAL.
     # Adapt as needed if you also want to kill TIs in LAUNCHED, RUNNING, etc.
     ti_condition = and_(
