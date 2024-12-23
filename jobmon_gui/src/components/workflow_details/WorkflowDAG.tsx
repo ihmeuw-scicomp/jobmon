@@ -1,11 +1,13 @@
-import React, {useState, useEffect} from "react";
+import React, {useState, useMemo, useEffect} from "react";
 import ReactFlow, {MiniMap, Controls, Background} from 'reactflow';
 import dagre from 'dagre';
 import axios from "axios";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
 import {get_task_template_dag} from "@jobmon_gui/configs/ApiUrls.ts";
+import {useQuery} from "@tanstack/react-query";
+import TaskTemplateTotalPopover from "@jobmon_gui/components/TaskTemplateTotalPopover.tsx";
 
-export default function DagViz(workflowId) {
+export default function WorkflowDAG(workflowId) {
     const [nodes, setNodes] = useState([]);
     const [edges, setEdges] = useState([]);
 
@@ -35,10 +37,21 @@ export default function DagViz(workflowId) {
         return {nodes, edges};
     };
 
+    // useQuery({
+    //     queryKey: ['taskTemplateDAG', workflowId.workflowId],
+    //     queryFn: async () => {
+    //         const response = await axios.get(get_task_template_dag(workflowId.workflowId), {
+    //             ...jobmonAxiosConfig,
+    //             data: null,
+    //         });
+    //         const {nodes, edges} = createNodesAndEdgesFromTTDAG(response.data.tt_dag);
+    //         setNodes(nodes);
+    //         setEdges(edges);
+    //     },
+    // });
+
     useEffect(() => {
         if (!workflowId.workflowId) return;
-
-        console.log("!!!!!! WORKFLOW ID !!!!!", workflowId.workflowId)
 
         axios.get(get_task_template_dag(workflowId.workflowId), {
             ...jobmonAxiosConfig,
@@ -54,7 +67,13 @@ export default function DagViz(workflowId) {
 
     const getLayoutNodes = (nodes, edges) => {
         const g = new dagre.graphlib.Graph();
-        g.setGraph({rankdir: 'TB'});
+        g.setGraph({
+            rankdir: 'TB',
+            ranksep: 60,
+            nodesep: 50,
+            marginx: 20,
+            marginy: 20,
+        });
         g.setDefaultEdgeLabel(() => ({}));
 
         nodes.forEach((node) => {
@@ -62,20 +81,29 @@ export default function DagViz(workflowId) {
         });
 
         edges.forEach((edge) => {
-            g.setEdge(edge.source, edge.target);
+            g.setEdge(edge.source, edge.target, {
+                minlen: 1,
+                weight: 1,
+            });
         });
 
         dagre.layout(g);
 
         nodes.forEach((node) => {
             const nodeWithPosition = g.node(node.id);
-            node.position = {x: nodeWithPosition.x, y: nodeWithPosition.y};
+            node.position = {
+                x: nodeWithPosition.x - 172 / 2,
+                y: nodeWithPosition.y - 36 / 2,
+            };
         });
 
         return nodes;
     };
 
-    const laidOutNodes = getLayoutNodes(nodes, edges);
+    const laidOutNodes = useMemo(() => {
+        return getLayoutNodes(nodes, edges);
+    }, [nodes, edges]);
+    
 
     return (
         <div style={{height: 500}}>

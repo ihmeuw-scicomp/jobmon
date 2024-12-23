@@ -2,8 +2,7 @@ import React, {useState} from 'react';
 import {Link, useParams, useNavigate, useLocation} from 'react-router-dom';
 import Breadcrumb from 'react-bootstrap/Breadcrumb';
 import TaskInstanceTable from '@jobmon_gui/components/task_details/TaskInstanceTable';
-import NodeLists from '@jobmon_gui/components/task_details/NodeLists';
-import TaskFSM from '@jobmon_gui/components/task_details/TaskFSM';
+import TaskDAG from '@jobmon_gui/components/task_details/TaskDAG.tsx';
 import {HiInformationCircle} from "react-icons/hi";
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
 import {CircularProgress, Grid} from "@mui/material";
@@ -101,7 +100,7 @@ export default function TaskDetails() {
                         </span>
                     </p>
                     <p className="color-dark">
-                        Task Finite State Machine&nbsp;
+                        Task Dependencies&nbsp;
                         <span>
                         <HtmlTooltip
                             title="Task Finite State Machine"
@@ -126,12 +125,7 @@ export default function TaskDetails() {
                 </header>
             </div>
             <div className='row pt-2 mx-0 px-0'>
-                <div className="col-3">
-                    <NodeLists taskId={taskId}/>
-                </div>
-                <div className="col-9">
-                    <TaskFSM taskStatusCode={task_details?.data?.task_status}/>
-                </div>
+                    <TaskDAG taskId={taskId} taskName={task_details?.data?.task_name} taskStatus={task_details?.data?.task_status}/>
             </div>
             <div id="wftable" className="div-level-2">
                 <TaskInstanceTable taskId={taskId}/>

@@ -21,7 +21,7 @@ import {getWorkflowTTStatusQueryFn} from "@jobmon_gui/queries/GetWorkflowTTStatu
 import {getWorkflowUsageQueryFn} from "@jobmon_gui/queries/GetWorkflowUsage.ts";
 import {getClusteredErrorsFn} from "@jobmon_gui/queries/GetClusteredErrors.ts";
 import {getWorkflowTasksQueryFn} from "@jobmon_gui/queries/GetWorkflowTasks.ts";
-import DagViz from "@jobmon_gui/components/workflow_details/DagViz.tsx";
+import WorkflowDAG from "@jobmon_gui/components/workflow_details/WorkflowDAG.tsx";
 
 
 function WorkflowDetails() {
@@ -204,7 +204,7 @@ function WorkflowDetails() {
             </TabPanel>
 
             <TabPanel value={tt_active_tab} index={1}>
-                <DagViz workflowId={workflowId}/>
+                <WorkflowDAG workflowId={workflowId}/>
             </TabPanel>
         </Box>
     );
