@@ -166,6 +166,8 @@ class TaskInstance(Base):
         (TaskInstanceStatus.TRIAGING, TaskInstanceStatus.ERROR_FATAL),
         # task instance error after transitioning from kill_self
         (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.ERROR_FATAL),
+        # task is reset by workflow resume and worker finishes gracefully
+        (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.DONE),
         # transition to a recoverable error after failing to log a heartbeat in launched
         (TaskInstanceStatus.NO_HEARTBEAT, TaskInstanceStatus.ERROR),
     ]
@@ -206,9 +208,8 @@ class TaskInstance(Base):
         # The worker finishes gracefully before reconciler can log an unknown
         # error
         (TaskInstanceStatus.DONE, TaskInstanceStatus.UNKNOWN_ERROR),
-        # task is reset by workflow resume and worker finishes gracefully but
-        # resume won the race
-        (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.DONE),
+        # task is reset by workflow resume and worker hits an application error
+        (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.ERROR),
         # task is reset by workflow resume and reconciler or worker node
         # discovers resource error, but resume won the race
         (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.RESOURCE_ERROR),
