@@ -138,6 +138,8 @@ export default function TaskDetails() {
                     <Grid container spacing={2}>
                         <Grid item xs={3}><b>Task ID:</b></Grid>
                         <Grid item xs={9}>{taskId}</Grid>
+                        <Grid item xs={3}><b>Task Status:</b></Grid>
+                        <Grid item xs={9}>{task_details?.data?.task_status}</Grid>
                         <Grid item xs={3}><b>Task Command:</b></Grid>
                         <Grid item
                               xs={9}><ScrollableCodeBlock>{task_details?.data?.task_command}</ScrollableCodeBlock></Grid>
@@ -156,26 +158,26 @@ export default function TaskDetails() {
                 }
                 children={
                     <Grid container spacing={2}>
-                        <Grid item xs={3}><b>Registering:</b></Grid>
+                        <Grid item xs={3}><b>Registered (G):</b></Grid>
                         <Grid item xs={9}> Task is bound to the database.</Grid>
-                        <Grid item xs={3}><b>Queued:</b></Grid>
+                        <Grid item xs={3}><b>Queued for Instantiation (Q):</b></Grid>
                         <Grid item xs={9}> Task's dependencies have successfully completed, task can be run when the
                             scheduler is ready.</Grid>
-                        <Grid item xs={3}><b>Instantiating:</b></Grid>
+                        <Grid item xs={3}><b>Instantiated (I):</b></Grid>
                         <Grid item xs={9}> A task instance is preparing to be launched/submitted.</Grid>
-                        <Grid item xs={3}><b>Launched:</b></Grid>
+                        <Grid item xs={3}><b>Launched (L):</b></Grid>
                         <Grid item xs={9}> Task instance submitted to the cluster normally.</Grid>
-                        <Grid item xs={3}><b>Running:</b></Grid>
+                        <Grid item xs={3}><b>Running (R):</b></Grid>
                         <Grid item xs={9}> Task is running on the specified distributor.</Grid>
-                        <Grid item xs={3}><b>Error Recoverable:</b></Grid>
+                        <Grid item xs={3}><b>Error Recoverable (E):</b></Grid>
                         <Grid item xs={9}> Task has errored out but has more attempts so it will be retried.</Grid>
-                        <Grid item xs={3}><b>Adjusting Resources:</b></Grid>
+                        <Grid item xs={3}><b>Adjusting Resources (A):</b></Grid>
                         <Grid item xs={9}> Task errored with a resource error, the resources will be adjusted before
                             retrying.</Grid>
-                        <Grid item xs={3}><b>Error Fatal:</b></Grid>
+                        <Grid item xs={3}><b>Error Fatal (F):</b></Grid>
                         <Grid item xs={9}> Task errored out and has used all of the attempts, therefore has failed for
                             this WorkflowRun. <br/>It can be resumed in a new WFR.</Grid>
-                        <Grid item xs={3}><b>Done:</b></Grid>
+                        <Grid item xs={3}><b>Done (D):</b></Grid>
                         <Grid item xs={9}> Task ran successfully to completion; it has a TaskInstance that successfully
                             completed.</Grid>
                     </Grid>
