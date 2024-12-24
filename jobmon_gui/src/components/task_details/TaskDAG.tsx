@@ -128,18 +128,22 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
     if (taskDependencies.isLoading || !taskDependencies.data) {
         return <CircularProgress/>;
     }
-
+    
     return (
         <div style={{width: '100%', height: '500px'}}>
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodeClick={handleNodeClick}
-                fitView
-            >
-                <Background/>
-                <Controls/>
-            </ReactFlow>
+            {nodes.length === 0 || edges.length === 0 ? (
+                <div>Loading...</div> // You can replace this with a spinner or any custom loading component
+            ) : (
+                <ReactFlow
+                    nodes={nodes}
+                    edges={edges}
+                    onNodeClick={handleNodeClick}
+                    fitView
+                >
+                    <Background/>
+                    <Controls/>
+                </ReactFlow>
+            )}
         </div>
     );
 }

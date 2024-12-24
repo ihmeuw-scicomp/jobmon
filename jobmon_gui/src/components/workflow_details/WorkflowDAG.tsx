@@ -1,19 +1,19 @@
-import React, {useState, useMemo, useEffect, useRef} from "react";
-import ReactFlow, {MiniMap, Controls, Background, useReactFlow} from 'reactflow';
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import ReactFlow, { MiniMap, Controls, Background, useReactFlow } from 'reactflow';
 import dagre from 'dagre';
 import axios from "axios";
-import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
-import {get_task_template_dag, workflow_tt_status_url} from "@jobmon_gui/configs/ApiUrls.ts";
+import { jobmonAxiosConfig } from "@jobmon_gui/configs/Axios.ts";
+import { get_task_template_dag, workflow_tt_status_url } from "@jobmon_gui/configs/ApiUrls.ts";
 import TaskTemplatePopover from "@jobmon_gui/components/TaskTemplatePopover.tsx";
-import {useQuery} from "@tanstack/react-query";
-import {TTStatusResponse} from "@jobmon_gui/types/TaskTemplateStatus.ts";
+import { useQuery } from "@tanstack/react-query";
+import { TTStatusResponse } from "@jobmon_gui/types/TaskTemplateStatus.ts";
+import {CircularProgress} from "@mui/material";
 
 export default function WorkflowDAG(workflowId) {
     const [nodes, setNodes] = useState([]);
     const [edges, setEdges] = useState([]);
     const [selectedNode, setSelectedNode] = useState(null);
-    const [popoverPosition, setPopoverPosition] = useState({x: 0, y: 0});
-    const [nodeData, setNodeData] = useState(null);
+    const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
     const popoverRef = useRef(null);
     const [tt_data, setTTData] = useState<typeof wfTTStatus.data[any] | undefined>(undefined);
 
@@ -41,20 +41,20 @@ export default function WorkflowDAG(workflowId) {
             const targetId = task.downstream_task_template_id;
 
             if (!nodeSet.has(sourceId)) {
-                nodes.push({id: sourceId, data: {label: sourceId}});
+                nodes.push({ id: sourceId, data: { label: sourceId } });
                 nodeSet.add(sourceId);
             }
             if (targetId && !nodeSet.has(targetId)) {
-                nodes.push({id: targetId, data: {label: targetId}});
+                nodes.push({ id: targetId, data: { label: targetId } });
                 nodeSet.add(targetId);
             }
 
             if (targetId) {
-                edges.push({id: `e${index}`, source: sourceId, target: targetId});
+                edges.push({ id: `e${index}`, source: sourceId, target: targetId });
             }
         });
 
-        return {nodes, edges};
+        return { nodes, edges };
     };
 
     useEffect(() => {
@@ -64,7 +64,7 @@ export default function WorkflowDAG(workflowId) {
             ...jobmonAxiosConfig,
             data: null,
         }).then((r) => {
-            const {nodes, edges} = createNodesAndEdgesFromTTDAG(r.data.tt_dag);
+            const { nodes, edges } = createNodesAndEdgesFromTTDAG(r.data.tt_dag);
             setNodes(nodes);
             setEdges(edges);
         }).catch((error) => {
@@ -84,7 +84,7 @@ export default function WorkflowDAG(workflowId) {
         g.setDefaultEdgeLabel(() => ({}));
 
         nodes.forEach((node) => {
-            g.setNode(node.id, {width: 172, height: 36});
+            g.setNode(node.id, { width: 172, height: 36 });
         });
 
         edges.forEach((edge) => {
@@ -114,7 +114,7 @@ export default function WorkflowDAG(workflowId) {
     const handleNodeHover = (event, node) => {
         setSelectedNode(node);
         setPopoverPosition(node.position);
-        setTTData(Object.values(wfTTStatus.data).find(item => item.name === node.id))
+        setTTData(Object.values(wfTTStatus.data).find(item => item.name === node.id));
     };
 
     const handleNodeLeave = () => {
@@ -136,17 +136,21 @@ export default function WorkflowDAG(workflowId) {
     }, []);
 
     return (
-        <div style={{height: 500}}>
-            <ReactFlow
-                nodes={laidOutNodes}
-                edges={edges}
-                onNodeMouseEnter={handleNodeHover}
-                onNodeMouseLeave={handleNodeLeave}
-            >
-                <MiniMap/>
-                <Controls/>
-                <Background/>
-            </ReactFlow>
+        <div style={{ height: 500 }}>
+            {nodes.length === 0 || edges.length === 0 ? (
+                <CircularProgress/>
+            ) : (
+                <ReactFlow
+                    nodes={laidOutNodes}
+                    edges={edges}
+                    onNodeMouseEnter={handleNodeHover}
+                    onNodeMouseLeave={handleNodeLeave}
+                >
+                    <MiniMap />
+                    <Controls />
+                    <Background />
+                </ReactFlow>
+            )}
 
             {selectedNode && tt_data && (
                 <TaskTemplatePopover
