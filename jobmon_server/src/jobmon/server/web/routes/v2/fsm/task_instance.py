@@ -216,9 +216,7 @@ async def log_error_worker_node(task_instance_id: int, request: Request) -> Any:
     logger.info(f"Log ERROR for TI:{task_instance_id}.")
 
     with SessionLocal() as session:
-        select_stmt = select(TaskInstance).where(
-            TaskInstance.id == task_instance_id
-        )
+        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
         task_instance = session.execute(select_stmt).scalars().one()
 
         optional_vals = [
@@ -240,9 +238,7 @@ async def log_error_worker_node(task_instance_id: int, request: Request) -> Any:
         error_description = data["error_description"]
         try:
             session.execute(
-                select(Task)
-                .where(Task.id == task_instance.task_id)
-                .with_for_update()
+                select(Task).where(Task.id == task_instance.task_id).with_for_update()
             ).scalar_one()
             task_instance.transition(error_state)
             session.commit()
