@@ -566,22 +566,21 @@ class DistributorService:
                 else:
                     # remove from old status set
                     previous_status = task_instance.status
-                    print(task_instance)
                     self._task_instance_status_map[previous_status].remove(
                         task_instance
                     )
 
-                    # change to new status and move to new set
-                    task_instance.status = new_status
-
                     try:
-                        self._task_instance_status_map[task_instance.status].add(
+                        self._task_instance_status_map[new_status].add(
                             task_instance
                         )
+                        # change to new status and move to new set
+                        task_instance.status = new_status
+
                     except KeyError:
                         # If the task instance is in a terminal state, e.g. D, E, etc.,
                         # expire it from the distributor
-                        continue
+                        del self._task_instances[task_instance_id]
 
     def _check_queued_for_work(self) -> Generator[DistributorCommand, None, None]:
         queued_task_instances = list(
