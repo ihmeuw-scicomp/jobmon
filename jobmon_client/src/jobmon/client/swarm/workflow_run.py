@@ -515,10 +515,12 @@ class WorkflowRun:
                 # If the workflow run status was updated asynchronously, terminate
                 # all active task instances and error out.
                 if self.status in terminating_states:
-                    logger.warning(
-                        f"Workflow Run set to {self.status}. Attempting graceful shutdown."
-                    )
-                    if any([any(self._task_status_map[s]) for s in self._active_states]):
+                    wait_states = [TaskStatus.INSTANTIATING, TaskStatus.LAUNCHED, TaskStatus.RUNNING]
+                    keep_waiting = any([any(self._task_status_map[s]) for s in wait_states])
+                    if keep_waiting:
+                        logger.warning(
+                           f"Workflow Run set to {self.status}. Waiting for tasks to stop"
+                        )
                         # Active task instances will be set to "K", the processing loop then
                         # keeps running until all of the states are appropriately set.
                         self._terminate_task_instances()
