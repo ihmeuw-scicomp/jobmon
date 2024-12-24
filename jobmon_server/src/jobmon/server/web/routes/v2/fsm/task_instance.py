@@ -255,9 +255,9 @@ async def log_error_worker_node(task_instance_id: int, request: Request) -> Any:
             session.add(error)
             session.commit()
 
-    resp = JSONResponse(
-        content={"status": task_instance.status}, status_code=StatusCodes.OK
-    )
+        resp = JSONResponse(
+            content={"status": task_instance.status}, status_code=StatusCodes.OK
+        )
     return resp
 
 
