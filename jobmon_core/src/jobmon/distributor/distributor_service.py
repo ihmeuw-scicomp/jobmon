@@ -566,6 +566,7 @@ class DistributorService:
                 else:
                     # remove from old status set
                     previous_status = task_instance.status
+                    print(task_instance)
                     self._task_instance_status_map[previous_status].remove(
                         task_instance
                     )

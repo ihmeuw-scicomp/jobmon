@@ -518,9 +518,12 @@ class WorkflowRun:
                     logger.warning(
                         f"Workflow Run set to {self.status}. Attempting graceful shutdown."
                     )
-                    # Active task instances will be set to "K", the processing loop then
-                    # keeps running until all of the states are appropriately set.
-                    self._terminate_task_instances()
+                    if any([any(self._task_status_map[s]) for s in self._active_states]):
+                        # Active task instances will be set to "K", the processing loop then
+                        # keeps running until all of the states are appropriately set.
+                        self._terminate_task_instances()
+                    else:
+                        break
 
                 # if fail fast and any error
                 if self.fail_fast and self._task_status_map[TaskStatus.ERROR_FATAL]:

@@ -211,8 +211,10 @@ class TaskInstance(Base):
         # task is reset by workflow resume and worker hits an application error
         (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.ERROR),
         # task is reset by workflow resume and reconciler or worker node
-        # discovers resource error, but resume won the race
+        # discovers resource error
         (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.RESOURCE_ERROR),
+        # task is reset by workflow resume and reconciler discovers unknown error
+        (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.UNKNOWN_ERROR),
     ]
 
     error_states = [
