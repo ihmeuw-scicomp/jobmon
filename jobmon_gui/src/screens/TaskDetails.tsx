@@ -125,7 +125,8 @@ export default function TaskDetails() {
                 </header>
             </div>
             <div className='row pt-2 mx-0 px-0'>
-                    <TaskDAG taskId={taskId} taskName={task_details?.data?.task_name} taskStatus={task_details?.data?.task_status}/>
+                <TaskDAG taskId={taskId} taskName={task_details?.data?.task_name}
+                         taskStatus={task_details?.data?.task_status}/>
             </div>
             <div id="wftable" className="div-level-2">
                 <TaskInstanceTable taskId={taskId}/>
@@ -137,7 +138,15 @@ export default function TaskDetails() {
                 children={
                     <Grid container spacing={2}>
                         <Grid item xs={3}><b>Task ID:</b></Grid>
-                        <Grid item xs={9}>{taskId}</Grid>
+                        <Grid item xs={9}>
+                            <Link
+                                to={{pathname: `/task_details/${taskId}`}}
+                                key={taskId}
+                                onClick={() => setShowTaskInfo(false)}
+                            >
+                                {taskId}
+                            </Link>
+                        </Grid>
                         <Grid item xs={3}><b>Task Status:</b></Grid>
                         <Grid item xs={9}>{task_details?.data?.task_status}</Grid>
                         <Grid item xs={3}><b>Task Command:</b></Grid>
