@@ -581,7 +581,7 @@ class DistributorService:
                     except KeyError:
                         # If the task instance is in a terminal state, e.g. D, E, etc.,
                         # expire it from the distributor
-                        continue
+                        del self._task_instances[task_instance_id]
 
     def _check_queued_for_work(self) -> Generator[DistributorCommand, None, None]:
         queued_task_instances = list(
