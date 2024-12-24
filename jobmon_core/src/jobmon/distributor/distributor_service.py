@@ -571,9 +571,7 @@ class DistributorService:
                     )
 
                     try:
-                        self._task_instance_status_map[new_status].add(
-                            task_instance
-                        )
+                        self._task_instance_status_map[new_status].add(task_instance)
                         # change to new status and move to new set
                         task_instance.status = new_status
 
