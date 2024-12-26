@@ -5,7 +5,8 @@ from pathlib import Path
 from pkgutil import iter_modules
 from typing import Any
 
-from sqlalchemy import CheckConstraint, create_engine, event, func, String
+from sqlalchemy import CheckConstraint, event, func, String
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 import structlog
@@ -47,10 +48,10 @@ def load_model() -> None:
         import_module(f"{__name__}.{module_name}")
 
 
-def load_metadata(sqlalchemy_database_uri: str) -> None:
+def load_metadata(engine: Engine) -> None:
     """Load metadata into a database."""
     # load metadata
-    from jobmon.server.web import session_factory
+    from jobmon.server.web.db_admin import get_session_local
     from jobmon.server.web.models.arg_type import add_arg_types
     from jobmon.server.web.models.cluster_type import add_cluster_types
     from jobmon.server.web.models.cluster import add_clusters
@@ -67,21 +68,20 @@ def load_metadata(sqlalchemy_database_uri: str) -> None:
         add_workflow_run_statuses,
     )
 
-    engine = create_engine(sqlalchemy_database_uri)
-
-    with session_factory(bind=engine) as session:
-        metadata_loaders = [
-            add_arg_types,
-            add_cluster_types,
-            add_clusters,
-            add_queues,
-            add_task_resources_types,
-            add_task_statuses,
-            add_task_instance_statuses,
-            add_workflow_statuses,
-            add_workflow_run_statuses,
-        ]
-        for loader in metadata_loaders:
-            loader(session)
-            session.flush()
-        session.commit()
+    SessionLocal = get_session_local()
+    with SessionLocal() as session:
+        with session.begin():
+            metadata_loaders = [
+                add_arg_types,
+                add_cluster_types,
+                add_clusters,
+                add_queues,
+                add_task_resources_types,
+                add_task_statuses,
+                add_task_instance_statuses,
+                add_workflow_statuses,
+                add_workflow_run_statuses,
+            ]
+            for loader in metadata_loaders:
+                loader(session)
+                session.flush()

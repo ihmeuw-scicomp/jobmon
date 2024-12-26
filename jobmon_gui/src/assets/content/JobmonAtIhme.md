@@ -75,14 +75,21 @@ of their tasks using the [Jobmon GUI](https://jobmon-gui.ihme.washington.edu)
 The Jobmon database is hosted in Azure, the database information (read-only) is as follows:
 
 ```shell
-Host: JOBMON_DB_HOST
-Username: JOBMON_DB_USER
-Password: JOBMON_DB_PASSWORD
-Database: JOBMON_DB_DATABASE
-Port: JOBMON_DB_PORT
+Host: {{JOBMON_DB_HOST}}
+Username: {{JOBMON_DB_USER}}
+Password: {{JOBMON_DB_PASSWORD}}
+Database: {{JOBMON_DB_DATABASE}}
+Port: {{JOBMON_DB_PORT}}
 ```
 
 Please note to access the Jobmon database you need to switch your VPN to "All Internet Traffic" in your Big-IP Edge Client.
+
+## Jobmon Database API
+The base URL for the Jobmon Database API is:
+
+```shell
+{{JOBMON_BASE_URL}}
+```
 
 ### Jobmon ERD
 

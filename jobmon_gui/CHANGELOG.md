@@ -9,7 +9,60 @@ All notable changes to the Jobmon GUI will be documented in this file.
 ### Deprecated
 ### Removed
 
-## [1.15.0] - TBD
+## [3.4.0] - TBD
+
+### User-Facing
+#### Added
+- Added the Jobmon ReadTheDocs link to the navigation bar.
+- Added authentication.
+- Added a user menu where users can specify timezone and date display.
+- Added a workflow technical panel - workflow stopage, workflow and tasktemplate concurrency limit.
+
+#### Changed
+- Show WorkflowRun heartbeat_date instead of Workflow status_date on the workflow details page.
+- Truncate file paths in TaskInstance table of `Task Details` page.
+- Changed nav bar to match other apps.
+- Optimized the clustered error logs on the `Workflow Details` page to be faster.
+- Truncated the workflow details URL.
+- Persist users table settings to a zustand store.
+- Changed behavior of back button on Workflow Details page. Previously it would flip between task and resource usage tabs. It will now take users home.
+
+#### Fixed
+- Bug where users weren't able to type more than one character in the Task table.
+- Fixed bug where progress bars would round up to 100% even though all tasks weren't completed.
+
+#### Removed
+- Removed the auto-filtering of WorkflowList search functionality.
+
+
+### Developer
+#### Changed
+ - Switched from NPM to bun.
+
+## [3.3.1] - 2024-10-01
+
+### User-Facing
+#### Changed
+- Switched from a histogram to a boxplot for resource usage on the `Workflow Details` page.
+- Now show both WF ID and WF name on `Workflow Details` page, instead of just ID.
+- Changed Squid link to point to new SlurmTool `Job Info` page.
+
+#### Added
+- Added a boxplot to the resource usage tab that shows the utilization vs. the requested resource (%).
+
+#### Fixed
+- Fixed a bug where the status date in the Task table on the Workflow Details page was showing in UTC instead of PDT/PST.
+- Fixed a bug where the runtime and memory histograms weren't showing any values.
+- Fixed a bug where clustered errors would only show a max of 10 errors.
+- Fixed a bug where "Invalid Date" showed in the workflow information modal on the landing page.
+- Fixed a bug where concurrency limit would show as "false" for any value that wasn't "No Limit".
+- Added syntax highlighting and new lines for error log messages.
+- Fixed a bug where the database connection information wasn't templating on the `jobmon_at_ihme` page.
+
+#### Removed
+- No longer show field names on landing page. Was `ID: <wf_ID> - Name: <wf_name>`, now `<wf_id> - <wf_name>`.
+
+## [3.3.0] - 2024-09-10
 
 ### User-Facing
 #### Added

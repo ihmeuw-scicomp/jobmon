@@ -1,10 +1,9 @@
 import React, {useState} from 'react';
 import axios from 'axios';
 import {Link, useLocation} from "react-router-dom";
-import {convertDatePST} from '@jobmon_gui/utils/formatters';
 import {FaCircle} from "react-icons/fa";
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
-import {useQuery} from "@tanstack/react-query";
+import {useQuery, useQueryClient} from "@tanstack/react-query";
 import dayjs from "dayjs";
 import {workflow_overview_url} from "@jobmon_gui/configs/ApiUrls";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios";
@@ -22,6 +21,12 @@ import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import IconButton from '@mui/material/IconButton';
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal";
 import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea";
+import {useDisplayTimeFormatStore, useDisplayTimezoneStore} from "@jobmon_gui/stores/DateTime.ts";
+import utc from "dayjs/plugin/utc";
+import advancedFormat from "dayjs/plugin/advancedFormat";
+import timezone from "dayjs/plugin/timezone";
+import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
+import {getWorkflowTTStatusQueryFn} from "@jobmon_gui/queries/GetWorkflowTTStatus.ts";
 
 type WorkflowType = {
     DONE: number,
@@ -45,6 +50,10 @@ type WorkflowsQueryResponse = {
 }
 
 export default function WorkflowList() {
+    dayjs.extend(utc)
+    dayjs.extend(advancedFormat);
+    dayjs.extend(timezone);
+    const queryClient = useQueryClient();
     const [showWorkflowInfo, setShowWorkflowInfo] = useState(false)
     const [workflowDetails, setWorkflowDetails] = useState<WorkflowType>({
         DONE: 0,
@@ -64,6 +73,8 @@ export default function WorkflowList() {
     });
     const location = useLocation();
     const workflowSettings = useWorkflowSearchSettings()
+    const timezoneStore = useDisplayTimezoneStore()
+    const timeFormatStore = useDisplayTimeFormatStore()
 
     const workflows = useQuery({
         queryKey: [
@@ -78,8 +89,10 @@ export default function WorkflowList() {
             workflowSettings.get().status
         ],
         queryFn: async () => {
-            workflowSettings.clearDataRefresh()
-            const params = new URLSearchParams({
+            workflowSettings.clearDataRefresh();
+
+            // Construct params, excluding empty values
+            const rawParams = {
                 user: workflowSettings.get().user,
                 tool: workflowSettings.get().tool,
                 wf_name: workflowSettings.get().wf_name,
@@ -87,16 +100,29 @@ export default function WorkflowList() {
                 wf_attribute_key: workflowSettings.get().wf_attribute_key,
                 wf_attribute_value: workflowSettings.get().wf_attribute_value,
                 wf_id: workflowSettings.get().wf_id,
-                date_submitted: dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD"),
-                date_submitted_end: dayjs(workflowSettings.get().date_submitted_end).add(1, 'day').format("YYYY-MM-DD"),
-                status: workflowSettings.get().status
-            });
+                date_submitted: workflowSettings.get().date_submitted
+                    ? dayjs(workflowSettings.get().date_submitted).format("YYYY-MM-DD")
+                    : undefined,
+                date_submitted_end: workflowSettings.get().date_submitted_end
+                    ? dayjs(workflowSettings.get().date_submitted_end).add(1, 'day').format("YYYY-MM-DD")
+                    : undefined,
+                status: workflowSettings.get().status,
+            };
+
+            // Filter out keys with undefined or empty string values
+            const filteredParams = Object.fromEntries(
+                Object.entries(rawParams).filter(([_, value]) => value != null && value !== "")
+            );
+
+            // Create URLSearchParams from filteredParams
+            const params = new URLSearchParams(filteredParams);
+
             return axios.get<WorkflowsQueryResponse>(workflow_overview_url, {
                 ...jobmonAxiosConfig,
-                params: params
+                params: params,
             }).then((response) => {
-                return response.data?.workflows
-            })
+                return response.data?.workflows;
+            });
         },
         enabled: workflowSettings.getRefreshData()
     })
@@ -184,8 +210,20 @@ export default function WorkflowList() {
                                     <ListItemText
                                         primary={
                                             <Typography variant="h6">
-                                                <Link to={`/workflow/${workflow.wf_id}/tasks${location.search}`}>
-                                                    ID: {workflow.wf_id} - Name: {workflow.wf_name}
+                                                <Link to={`/workflow/${workflow.wf_id}`}
+                                                      onMouseEnter={async () => {
+                                                          queryClient.prefetchQuery({
+                                                              queryKey: ["workflow_details", "details", workflow.wf_id],
+                                                              queryFn: getWorkflowDetailsQueryFn,
+                                                          },)
+                                                          queryClient.prefetchQuery({
+                                                              queryKey: ["workflow_details", "tt_status", workflow.wf_id],
+                                                              queryFn: getWorkflowTTStatusQueryFn
+                                                          },)
+
+                                                      }}
+                                                >
+                                                    {workflow.wf_id} {workflow.wf_name ? `- ${workflow.wf_name}` : ''}
                                                 </Link>
                                             </Typography>
                                         }
@@ -240,18 +278,14 @@ export default function WorkflowList() {
                         </Grid>
                         <Grid item xs={8}>
                             <Typography
-                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date)}</Typography>
-                        </Grid>
-                        <Grid item xs={8}>
-                            <Typography
-                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_submitted_date_end)}</Typography>
+                                sx={modalValuesStyles}>{dayjs(workflowDetails.wf_submitted_date).tz(timezoneStore.get() || Intl.DateTimeFormat().resolvedOptions().timeZone).format(timeFormatStore.get())}</Typography>
                         </Grid>
                         <Grid item xs={4}>
                             <Typography sx={modalTitleStyles}>Status Date:</Typography>
                         </Grid>
                         <Grid item xs={8}>
                             <Typography
-                                sx={modalValuesStyles}>{convertDatePST(workflowDetails.wf_status_date)}</Typography>
+                                sx={modalValuesStyles}>{dayjs(workflowDetails.wf_status_date).tz(timezoneStore.get() || Intl.DateTimeFormat().resolvedOptions().timeZone).format(timeFormatStore.get())}</Typography>
                         </Grid>
                         <Grid item xs={4}>
                             <Typography sx={modalTitleStyles}>Number of Workflow Runs:</Typography>

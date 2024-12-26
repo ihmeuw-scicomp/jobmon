@@ -1,13 +1,9 @@
-import pytest
 import ast
 
-from typing import Optional, Callable, Type, Dict, List, Any, Union
-import sys
+from typing import Optional, Callable, List, Any, Union
 import os
-import importlib
 
 from jobmon.core.task_generator import task_generator
-from jobmon.client.api import Tool
 
 # Get the full path of the current script
 script_path = os.path.abspath(__file__)
@@ -18,6 +14,7 @@ full_script_path = os.path.realpath(script_path)
 fhs_generator_funcs_path = os.path.join(
     os.path.dirname(script_path), "task_generator_fhs.py"
 )
+
 
 class YearRange:
     """A Fake class representing a range of years."""
@@ -47,8 +44,10 @@ class Versions:
             self._version = [ast.literal_eval(str(v)) for v in version]
         else:
             self._version = [str(version)]
+
     def __eq__(self, other: Any) -> bool:
         return self._version == other._version
+
 
 def versions_to_list(versions: Versions) -> str:
     """Serializer for VersionMetadata that produces a list of strings."""
@@ -84,6 +83,7 @@ class Quantiles:
 
     def __eq__(self, other: Any) -> bool:
         return self.lower == other.lower and self.upper == other.upper
+
 
 def quantiles_to_list(quantiles: Quantiles) -> str:
     """Serializer for Quantiles that produces a list of strings."""
@@ -199,8 +199,16 @@ def fhs_task_generator(
         module_source_path=module_source_path,
     )
 
+
 @fhs_task_generator(tool_name="test_tool", naming_args=["version"])
-def fhs_simple_function(yr: YearRange, v: Versions, fSpec: FHSFileSpec, dSpec: FHSDirSpec, vm: VersionMetadata, q: Optional[Quantiles]=None) -> None:
+def fhs_simple_function(
+    yr: YearRange,
+    v: Versions,
+    fSpec: FHSFileSpec,
+    dSpec: FHSDirSpec,
+    vm: VersionMetadata,
+    q: Optional[Quantiles] = None,
+) -> None:
     """Simple task_function."""
     print(f"YearRange: {yr}")
     print(f"Version: {v}")

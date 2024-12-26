@@ -15,8 +15,8 @@ classifiers = [
 ]
 dependencies = [
     'jobmon_core',
-    'flask',
-    'flask_cors',
+    'fastapi[standard]>=0.103.2',
+    'fastapi-plugins>=0.12.0',
     'pymysql', # install MySQLdb/mysqlclient for more performance
     'sqlalchemy>=2.0.0',
     'sqlalchemy_utils',
@@ -26,7 +26,11 @@ dependencies = [
     'nltk',
     'scikit-learn',
     'alembic',
-    'importlib_resources; python_version<="3.12"'
+    'importlib_resources; python_version<="3.12"',
+    'uvicorn',
+    'httpx',
+    'authlib',
+    'itsdangerous',
 ]
 dynamic = ["version"]
 
@@ -36,8 +40,14 @@ jobmon_server = "jobmon.server.cli:main"
 [project.optional-dependencies]
 otlp = [
     'jobmon_core[otlp]',
-    'opentelemetry-instrumentation-flask',
+    'opentelemetry-api',
+    'opentelemetry-sdk',
+    'opentelemetry-exporter-otlp',
+    'opentelemetry-instrumentation-fastapi',
     'opentelemetry-instrumentation-sqlalchemy',
+]
+mysql = [
+    'mysqlclient',
 ]
 
 [tool.setuptools]

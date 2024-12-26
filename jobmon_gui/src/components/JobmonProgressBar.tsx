@@ -34,26 +34,27 @@ type JobmonProgressBarProps = {
     workflowId: number | string
     ttId?: string | number
     placement?: "top" | "bottom" | "left" | "right"
-    style?: "striped" | "animated"
 }
+
+const INT_32_MAX = 2147483647
+
 export default function JobmonProgressBar({
                                               workflowId,
                                               ttId,
                                               placement = "bottom",
-                                              style = "striped"
                                           }: JobmonProgressBarProps) {
 
-    // style can be striped or animated
     const workflow_status = useQuery({
         queryKey: ["workflow_details", "progress_bar", workflowId],
         queryFn: async () => {
-            const url = import.meta.env.VITE_APP_BASE_URL + "/workflow_status_viz";
+            const baseUrl = import.meta.env.VITE_APP_BASE_URL + "/workflow_status_viz";
+            const url = new URL(baseUrl);
             const wf_ids = [workflowId];
-            return axios.get<WfDetailsResponse>(url,
+            wf_ids.forEach(id => url.searchParams.append('workflow_ids', id.toString()));
+            return axios.get<WfDetailsResponse>(
+                url.toString(),
                 {
                     ...jobmonAxiosConfig,
-                    data: null,
-                    params: {workflow_ids: wf_ids},
                 }
             ).then((r) => {
                 return r.data[workflowId]
@@ -96,87 +97,23 @@ export default function JobmonProgressBar({
     }
 
     const num_attempts_avg = parseFloat(data.num_attempts_avg.toString()).toFixed(1);
-    const INT_32_MAX = 2147483647
-    const maxc = data.MAXC === INT_32_MAX ? "No Limit" : data.MAXC === INT_32_MAX
+    const maxc = data.MAXC === INT_32_MAX ? "No Limit" : data.MAXC;
 
-    // Animated
-    if (style === "animated") {
-        return (
-            <OverlayTrigger
-                placement={placement}
-                trigger={["hover", "focus"]}
-                overlay={(
-                    <Popover id="task_count">
-                        <table id="tt-tasks">
-                            <tbody>
-                            <tr>
-                                <th className="scheduled">Scheduled:</th>
-                                <td>{data.SCHEDULED}</td>
-                            </tr>
-                            <tr>
-                                <th className="pending"> Pending:</th>
-                                <td>{data.PENDING}</td>
-                            </tr>
-                            <tr>
-                                <th className="running">Running:</th>
-                                <td>{data.RUNNING}</td>
-                            </tr>
-                            <tr>
-                                <th className="done">Done:</th>
-                                <td>{data.DONE}</td>
-                            </tr>
-                            <tr>
-                                <th className="fatal">Fatal:</th>
-                                <td>{data.FATAL}</td>
-                            </tr>
-                            <tr>
-                                <th> Total:</th>
-                                <td>{data.tasks}</td>
-                            </tr>
-                            </tbody>
-                        </table>
-                        <hr/>
-                        <table id="tt-stats">
-                            <tbody>
-                            <tr>
-                                <th># Attempts:</th>
-                                <td>{num_attempts_avg} ({data.num_attempts_min} - {data.num_attempts_max})</td>
-                            </tr>
-                            <tr>
-                                <th>Concurrency Limit:</th>
-                                <td>{maxc.toLocaleString()}</td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </Popover>
-                )}
-            >
+    function getLabel(value) {
+        const total = data.tasks
 
-                <ProgressBar>
-                    <ProgressBar className="pending-progress-bar" animated max={data.tasks}
-                                 now={data.PENDING} key={1}
-                                 isChild={true}
-                                 label={((data.PENDING / data.tasks) * 100).toFixed(1) + "%"}/>
-                    <ProgressBar className="scheduled-progress-bar" animated max={data.tasks}
-                                 now={data.SCHEDULED} key={2}
-                                 isChild={true}
-                                 label={((data.SCHEDULED / data.tasks) * 100).toFixed(1) + "%"}/>
-                    <ProgressBar className="running-progress-bar" animated max={data.tasks}
-                                 now={data.RUNNING} key={3}
-                                 isChild={true}
-                                 label={((data.RUNNING / data.tasks) * 100).toFixed(1) + "%"}/>
-                    <ProgressBar className="done-progress-bar" animated max={data.tasks}
-                                 now={data.DONE} key={4} isChild={true}
-                                 label={((data.DONE / data.tasks) * 100).toFixed(1) + "%"}/>
-                    <ProgressBar className="fatal-progress-bar" animated max={data.tasks}
-                                 now={data.FATAL} key={5} isChild={true}
-                                 label={((data.FATAL / data.tasks) * 100).toFixed(1) + "%"}/>
-                </ProgressBar>
-            </OverlayTrigger>
+        // Handle edge case where total is 0. This shouldn't happen
+        if (total === 0) return "0%";
 
-        );
+        // Only show 100% if all tasks are done i.e. do not round up to 100%
+        if (value / total === 1) return "100%";
+
+        // Calculate percentage and round down to 1 decimal place
+        const percentage = (value / total) * 100;
+        return `${Math.floor(percentage * 10) / 10}%`;
     }
-    // Striped
+
+
     return (
         <OverlayTrigger
             placement={placement}
@@ -227,23 +164,22 @@ export default function JobmonProgressBar({
                 </Popover>
             )}
         >
-
             <ProgressBar>
                 <ProgressBar className="pending-progress-bar" max={data.tasks}
                              now={data.PENDING} key={1} isChild={true}
-                             label={((data.PENDING / data.tasks) * 100).toFixed(1) + "%"}/>
+                             label={getLabel(data.PENDING)}/>
                 <ProgressBar className="scheduled-progress-bar" max={data.tasks}
                              now={data.SCHEDULED} key={2} isChild={true}
-                             label={((data.SCHEDULED / data.tasks) * 100).toFixed(1) + "%"}/>
+                             label={getLabel(data.SCHEDULED)}/>
                 <ProgressBar className="running-progress-bar" max={data.tasks}
                              now={data.RUNNING} key={3} isChild={true}
-                             label={((data.RUNNING / data.tasks) * 100).toFixed(1) + "%"}/>
+                             label={getLabel(data.RUNNING)}/>
                 <ProgressBar className="done-progress-bar" max={data.tasks}
                              now={data.DONE} key={4} isChild={true}
-                             label={((data.DONE / data.tasks) * 100).toFixed(1) + "%"}/>
+                             label={getLabel(data.DONE)}/>
                 <ProgressBar className="fatal-progress-bar" max={data.tasks}
                              now={data.FATAL} key={5} isChild={true}
-                             label={((data.FATAL / data.tasks) * 100).toFixed(1) + "%"}/>
+                             label={getLabel(data.FATAL)}/>
             </ProgressBar>
         </OverlayTrigger>
 

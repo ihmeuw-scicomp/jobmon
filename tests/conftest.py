@@ -1,29 +1,42 @@
 import logging
 import multiprocessing as mp
 import os
-import platform
 import requests
 import signal
 import socket
 import sys
+import tempfile
 from time import sleep
 from types import TracebackType
 from typing import Any, Optional
+import uvicorn
 
 import pytest
 import sqlalchemy
 from sqlalchemy.engine import Engine
-from sqlalchemy import create_engine
 
 from jobmon.client.api import Tool
-from jobmon.core import requester
 from jobmon.core.requester import Requester
-from jobmon.server.web.api import get_app, JobmonConfig, configure_logging
-from jobmon.server.web.db_admin import init_db
 
 logger = logging.getLogger(__name__)
 
 _api_prefix = "/api/v2"
+
+
+def pytest_sessionstart(session):
+    # Create a unique SQLite file in a temporary directory
+    tmp_dir = tempfile.mkdtemp()
+    sqlite_file = os.path.join(tmp_dir, "tests.sqlite")
+
+    # Print information for debugging purposes
+    print("Running code before test file import")
+    print(f"SQLite file created at: {sqlite_file}")
+
+    os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{sqlite_file}"
+    os.environ["JOBMON__OTLP__WEB_ENABLED"] = "false"
+    os.environ["JOBMON__OTLP__SPAN_EXPORTER"] = ""
+    os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
+    os.environ["JOBMON__SESSION__SECRET_KEY"] = "test"
 
 
 @pytest.fixture(scope="session")
@@ -31,10 +44,33 @@ def api_prefix():
     return _api_prefix
 
 
+@pytest.fixture(scope="session")
+def db_engine() -> Engine:
+    from jobmon.server.web.config import get_jobmon_config
+
+    config = get_jobmon_config()
+    from jobmon.server.web.db_admin import init_db
+    from jobmon.server.web.models import load_model
+
+    init_db()
+    load_model()
+
+    # verify db created
+    eng = sqlalchemy.create_engine(config.get("db", "sqlalchemy_database_uri"))
+    from sqlalchemy.orm import Session
+
+    with Session(eng) as session:
+        from sqlalchemy import text
+
+        res = session.execute(text("SELECT * from workflow_status")).fetchall()
+        assert len(res) > 0
+    return eng
+
+
 class WebServerProcess:
     """Context manager creates the Jobmon web server in a process and tears it down on exit."""
 
-    def __init__(self, filepath: str) -> None:
+    def __init__(self) -> None:
         """Initializes the web server process.
 
         Args:
@@ -48,12 +84,10 @@ class WebServerProcess:
             self.web_host = socket.getfqdn()
         self.web_port = str(10_000 + os.getpid() % 30_000)
         self.api_prefix = _api_prefix
-        self.filepath = filepath
 
     def __enter__(self) -> Any:
         """Starts the web service process."""
         # jobmon_cli string
-        database_uri = f"sqlite:///{self.filepath}"
 
         def run_server_with_handler() -> None:
             def sigterm_handler(_signo: int, _stack_frame: Any) -> None:
@@ -63,20 +97,15 @@ class WebServerProcess:
 
             signal.signal(signal.SIGTERM, sigterm_handler)
 
-            init_db(database_uri)
+            from jobmon.server.web.api import get_app
+            from jobmon.server.web import log_config
 
-            config = JobmonConfig(
-                dict_config={
-                    "db": {"sqlalchemy_database_uri": database_uri},
-                    "otlp": {
-                        "web_enabled": "false",
-                        "span_exporter": "",
-                        "log_exporter": "",
-                    },
-                }
-            )
-            configure_logging(
-                loggers_dict={
+            dict_config = {
+                "version": 1,
+                "disable_existing_loggers": True,
+                "formatters": log_config.default_formatters.copy(),
+                "handlers": log_config.default_handlers.copy(),
+                "loggers": {
                     "jobmon.server.web": {
                         "handlers": ["console_text"],
                         "level": "INFO",
@@ -86,12 +115,14 @@ class WebServerProcess:
                         "handlers": ["console_text"],
                         "level": "WARNING",
                     },
-                }
-            )
-            app = get_app(config)
-            with app.app_context():
-                app.run(host="0.0.0.0", port=self.web_port)
+                },
+            }
+            log_config.configure_logging(dict_config=dict_config)
 
+            app = get_app(versions=["v2"])
+            uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
+
+        # start server
         ctx = mp.get_context("fork")
         self.p1 = ctx.Process(target=run_server_with_handler)
         self.p1.start()
@@ -123,7 +154,6 @@ class WebServerProcess:
                     ) from e
             # sleep outside of try block!
             sleep(3)
-
         return self
 
     def __exit__(
@@ -138,32 +168,11 @@ class WebServerProcess:
         self.p1.join()
 
 
-@pytest.fixture(scope="session", autouse=True)
-def set_mac_to_fork():
-    """necessary for running tests on a mac with python 3.8 see:
-    https://github.com/pytest-dev/pytest-flask/issues/104"""
-    if platform.system() == "Darwin":
-        import multiprocessing
-
-        multiprocessing.set_start_method("fork")
-
-
 @pytest.fixture(scope="session")
-def sqlite_file(tmpdir_factory) -> str:
-    file = str(tmpdir_factory.mktemp("db").join("tests.sqlite"))
-    return file
-
-
-@pytest.fixture(scope="session")
-def web_server_process(sqlite_file):
+def web_server_process(db_engine):
     """This starts the flask dev server in separate processes"""
-    with WebServerProcess(sqlite_file) as web:
+    with WebServerProcess() as web:
         yield {"JOBMON_HOST": web.web_host, "JOBMON_PORT": web.web_port}
-
-
-@pytest.fixture(scope="session")
-def db_engine(sqlite_file) -> Engine:
-    return sqlalchemy.create_engine(f"sqlite:///{sqlite_file}")
 
 
 @pytest.fixture(scope="function")

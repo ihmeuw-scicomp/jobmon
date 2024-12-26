@@ -4,11 +4,11 @@ import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
-import HubIcon from "@mui/icons-material/Hub";
+import StorageIcon from '@mui/icons-material/Storage';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import {Tooltip} from "@mui/material";
-import {imageLauncherUrl, metricMindUrl, squidUrl} from "@jobmon_gui/configs/ExternalUrls";
+import {imageLauncherUrl, metricMindUrl, jobInfoUrl} from "@jobmon_gui/configs/ExternalUrls";
 
 
 type BifrostLinksProps = {
@@ -46,13 +46,13 @@ export const BifrostLinks = ({enabled, open}: BifrostLinksProps) => {
                         </ListItemButton>
                     </Tooltip>
                 </ListItem>
-                <ListItem key={"drawerExternalSquid"} disablePadding>
-                    <Tooltip title={open ? "" : "Squid"} placement="right">
-                        <ListItemButton href={squidUrl} target={"_blank"}>
+                <ListItem key={"drawerExternalJobInfo"} disablePadding>
+                    <Tooltip title={open ? "" : "Job Info"} placement="right">
+                        <ListItemButton href={jobInfoUrl} target={"_blank"}>
                             <ListItemIcon>
-                                <HubIcon/>
+                                <StorageIcon/>
                             </ListItemIcon>
-                            <ListItemText primary={"Squid"}/>
+                            <ListItemText primary={"Job Info"}/>
                         </ListItemButton>
                     </Tooltip>
                 </ListItem>

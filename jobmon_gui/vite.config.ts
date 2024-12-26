@@ -1,12 +1,13 @@
 import {defineConfig} from "vite"
 import react from "@vitejs/plugin-react"
 import path from "path";
-import mdPlugin from "vite-plugin-markdown"
+import mdPlugin, {Mode} from "vite-plugin-markdown"
 // https://vitejs.dev/config/
 export default defineConfig({
     base: '/',
-    plugins: [react(), mdPlugin({mode:"markdown"})],
+    plugins: [react(), mdPlugin({mode: [Mode.MARKDOWN]})],
     server: {
+        host: true, // Allows access from external IPs
         port: 3000,
     },
     define: {

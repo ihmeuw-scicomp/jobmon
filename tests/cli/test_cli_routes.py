@@ -411,9 +411,12 @@ def test_get_workflow_status(db_engine, tool):
     factory.create_workflow_run()
 
     app_route = f"/workflow_status"
+    params = {
+        "workflow_id": [wf.workflow_id],  # This should be a list
+    }
     return_code, msg = wf.requester.send_request(
         app_route=app_route,
-        message={"workflow_id": [wf.workflow_id]},
+        message=params,
         request_type="get",
     )
     assert return_code == 200
@@ -446,12 +449,12 @@ def test_get_task_status(db_engine, tool):
     )
     t1 = tt1.create_task(
         arg=1,
-        cluster_name="sequential",
+        cluster_name="dummy",
         compute_resources={"queue": "null.q", "num_cores": 2},
     )
     t2 = tt1.create_task(
         arg=2,
-        cluster_name="sequential",
+        cluster_name="dummy",
         compute_resources={"queue": "null.q", "num_cores": 4},
     )
     wf.add_tasks([t1, t2])
@@ -674,7 +677,7 @@ def test_get_workflow_status_viz(tool):
 
     app_route = "/workflow_status_viz"
     return_code, msg = wf.requester.send_request(
-        app_route=app_route, message={"workflow_ids[]": wfids}, request_type="get"
+        app_route=app_route, message={"workflow_ids": wfids}, request_type="get"
     )
     assert return_code == 200
 
@@ -943,3 +946,62 @@ def test_workflow_overview_viz(client_env, db_engine):
 
     assert return_code == 200
     assert msg["workflows"][0]["wf_tool"] == tool_name
+
+
+def test_task_update_statuses(client_env, db_engine, tool):
+    def generate_workflow_and_tasks(tool):
+        # Create a wf with 1 failed task
+        wf = tool.create_workflow(workflow_args="test_cli_update_workflow")
+        tasks = []
+        command_str = "exit -9"
+        task_template = tool.get_task_template(
+            template_name="failed_tt",
+            command_template="{arg}",
+            node_args=["arg"],
+            task_args=[],
+            op_args=[],
+        )
+        task = task_template.create_task(arg=command_str, name=f"task", max_attempts=1)
+        tasks.append(task)
+        wf.add_tasks(tasks)
+        return wf, tasks
+
+    wf, ts = generate_workflow_and_tasks(tool)
+    t = ts[0]
+    wf.run()
+    assert t.task_id is not None
+    assert wf.workflow_id is not None
+    with Session(bind=db_engine) as session:
+        from sqlalchemy import text
+
+        res = session.execute(
+            text(f"select status from task where id= {t.task_id}")
+        ).fetchone()
+        assert res[0] == "F"
+        res = session.execute(
+            text(f"select status from workflow where id= {wf.workflow_id}")
+        ).fetchone()
+        assert res[0] == "F"
+
+    _, resp = wf.requester.send_request(
+        app_route="/task/update_statuses",
+        message={
+            "task_ids": t.task_id,
+            "new_status": "D",
+            "workflow_status": "F",
+            "workflow_id": wf.workflow_id,
+        },
+        request_type="put",
+    )
+
+    with Session(bind=db_engine) as session:
+        from sqlalchemy import text
+
+        res = session.execute(
+            text(f"select status from task where id= {t.task_id}")
+        ).fetchone()
+        assert res[0] == "D"
+        res = session.execute(
+            text(f"select status from workflow where id= {wf.workflow_id}")
+        ).fetchone()
+        assert res[0] == "F"

@@ -34,7 +34,7 @@ class Node:
         Args:
             task_template_version: The associated TaskTemplateVersion.
             node_args: key-value pairs of arg_name and a value.
-            requester: Requester object to communicate with the flask services.
+            requester: Requester object to communicate with the FastApi services.
         """
         self._node_id: Optional[int] = None
         self.task_template_version = task_template_version
