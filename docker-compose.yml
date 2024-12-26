@@ -19,11 +19,11 @@ services:
   jobmon_frontend:
     build: 
       context: ./jobmon_gui
-      dockerfile: ./jobmon_gui/Dockerfile.local
+      dockerfile: ./Dockerfile.local
     platform: linux/amd64
     ports:
-      - "3000:3000"  # Map port 3000 for the frontend (adjust if needed)
+      - "3000:3000"
     volumes:
-      - ./jobmon_gui:/app/jobmon_gui:ro
+      - ./jobmon_gui/src:/app/src:ro
     env_file:
       - .env  # Load environment variables from the .env file
