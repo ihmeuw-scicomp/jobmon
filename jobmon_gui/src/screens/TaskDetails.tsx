@@ -9,8 +9,6 @@ import {CircularProgress, Grid} from "@mui/material";
 import {useQuery, useQueryClient} from "@tanstack/react-query";
 import {getTaskDetailsQueryFn} from "@jobmon_gui/queries/GetTaskDetails.ts";
 import Typography from "@mui/material/Typography";
-import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea.tsx";
-import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
 import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
 import IconButton from "@mui/material/IconButton";
 import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
@@ -28,7 +26,6 @@ export default function TaskDetails() {
         queryFn: getTaskDetailsQueryFn
     })
 
-    const [showTaskInfo, setShowTaskInfo] = useState(false)
     const [showTaskFSM, setShowTaskFSM] = useState(false)
     const location = useLocation();
 
@@ -78,26 +75,6 @@ export default function TaskDetails() {
                 <header className="div-level-2 header-1 ">
                     <p className='color-dark'>
                         Task Name: {task_details?.data?.task_name}&nbsp;
-                        <span>
-                            <HtmlTooltip
-                                title="Task Information"
-                                arrow={true}
-                                placement={"right"}
-                            >
-                                <IconButton
-                                    color="inherit"
-                                    sx={{
-                                        padding: 0,
-                                        fontSize: 'inherit',
-                                    }}
-                                >
-                                    <HiInformationCircle
-                                        style={{cursor: 'pointer'}}
-                                        onClick={() => setShowTaskInfo(true)}
-                                    />
-                                </IconButton>
-                            </HtmlTooltip>
-                        </span>
                     </p>
                     <p className="color-dark">
                         Task Dependencies&nbsp;
@@ -131,36 +108,6 @@ export default function TaskDetails() {
             <div id="wftable" className="div-level-2">
                 <TaskInstanceTable taskId={taskId}/>
             </div>
-            <JobmonModal
-                title={
-                    "Task Information"
-                }
-                children={
-                    <Grid container spacing={2}>
-                        <Grid item xs={3}><b>Task ID:</b></Grid>
-                        <Grid item xs={9}>
-                            <Link
-                                to={{pathname: `/task_details/${taskId}`}}
-                                key={taskId}
-                                onClick={() => setShowTaskInfo(false)}
-                            >
-                                {taskId}
-                            </Link>
-                        </Grid>
-                        <Grid item xs={3}><b>Task Status:</b></Grid>
-                        <Grid item xs={9}>{task_details?.data?.task_status}</Grid>
-                        <Grid item xs={3}><b>Task Command:</b></Grid>
-                        <Grid item
-                              xs={9}><ScrollableCodeBlock>{task_details?.data?.task_command}</ScrollableCodeBlock></Grid>
-                        <Grid item xs={3}><b>Task Status Date:</b></Grid>
-                        <Grid item
-                              xs={9}>{formatJobmonDate(task_details?.data?.task_status_date)}</Grid>
-                    </Grid>
-                }
-                open={showTaskInfo}
-                onClose={() => setShowTaskInfo(false)}
-                width="80%"
-            />
             <JobmonModal
                 title={
                     "Task Finite State Machine"

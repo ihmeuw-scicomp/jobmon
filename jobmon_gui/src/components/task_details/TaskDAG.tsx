@@ -16,6 +16,8 @@ import {getTaskDependenciesQuernFn} from '@jobmon_gui/queries/GetTaskDependancie
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
 import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea.tsx";
 import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
+import {getTaskDetailsQueryFn} from "@jobmon_gui/queries/GetTaskDetails.ts";
+
 
 type NodeListsProps = {
     taskId: string | number;
@@ -24,8 +26,8 @@ type NodeListsProps = {
 };
 
 export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) {
-    const navigate = useNavigate();
     const [showTaskInfo, setShowTaskInfo] = useState(false)
+    const [selectedTaskId, setSelectedTaskId] = useState(taskId);
 
     const taskDependencies = useQuery({
         queryKey: ['task_dependencies', taskId],
@@ -33,6 +35,11 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
         refetchInterval: 60_000,
     });
 
+    const task_details = useQuery({
+        queryKey: selectedTaskId ? ['task_details', selectedTaskId] : undefined,
+        queryFn: getTaskDetailsQueryFn,
+        enabled: !!selectedTaskId,
+    });
 
     const statusColorMap: Record<string, string> = {
         G: '#0072b2', // Registering
@@ -124,7 +131,7 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
 
     const handleNodeClick = (event: React.MouseEvent, node: Node) => {
         const taskId = node.id.replace(/^(up-|down-|task-)/, '');
-        // setTaskDetails(taskDependencies.data.task);
+        setSelectedTaskId(taskId);
         setShowTaskInfo(true);
     };
 
@@ -160,21 +167,21 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
                         <Grid item xs={3}><b>Task ID:</b></Grid>
                         <Grid item xs={9}>
                             <Link
-                                to={{pathname: `/task_details/${taskId}`}}
-                                key={taskId}
+                                to={{pathname: `/task_details/${selectedTaskId}`}}
+                                key={selectedTaskId}
                                 onClick={() => setShowTaskInfo(false)}
                             >
-                                {taskId}
+                                {selectedTaskId}
                             </Link>
                         </Grid>
                         <Grid item xs={3}><b>Task Status:</b></Grid>
-                        <Grid item xs={9}>Random</Grid>
+                        <Grid item xs={9}>{task_details?.data?.task_status}</Grid>
                         <Grid item xs={3}><b>Task Command:</b></Grid>
                         <Grid item
-                              xs={9}><ScrollableCodeBlock>Random</ScrollableCodeBlock></Grid>
+                              xs={9}><ScrollableCodeBlock>{task_details?.data?.task_command}</ScrollableCodeBlock></Grid>
                         <Grid item xs={3}><b>Task Status Date:</b></Grid>
                         <Grid item
-                              xs={9}>Random</Grid>
+                              xs={9}>{formatJobmonDate(task_details?.data?.task_status_date)}</Grid>
                     </Grid>
                 }
                 open={showTaskInfo}
