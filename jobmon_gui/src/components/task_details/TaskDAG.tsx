@@ -1,7 +1,7 @@
-import React, {useMemo} from 'react';
+import React, {useMemo, useState} from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import {useQuery} from '@tanstack/react-query';
-import {CircularProgress} from '@mui/material';
+import {CircularProgress, Grid} from '@mui/material';
 import Typography from '@mui/material/Typography';
 import ReactFlow, {
     Background,
@@ -10,9 +10,12 @@ import ReactFlow, {
     Node,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import {useNavigate} from 'react-router-dom';
+import {Link, useNavigate} from 'react-router-dom';
 import dagre from 'dagre';
 import {getTaskDependenciesQuernFn} from '@jobmon_gui/queries/GetTaskDependancies.ts';
+import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
+import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea.tsx";
+import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
 
 type NodeListsProps = {
     taskId: string | number;
@@ -22,11 +25,14 @@ type NodeListsProps = {
 
 export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) {
     const navigate = useNavigate();
+    const [showTaskInfo, setShowTaskInfo] = useState(false)
+
     const taskDependencies = useQuery({
         queryKey: ['task_dependencies', taskId],
         queryFn: getTaskDependenciesQuernFn,
         refetchInterval: 60_000,
     });
+
 
     const statusColorMap: Record<string, string> = {
         G: '#0072b2', // Registering
@@ -118,7 +124,8 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
 
     const handleNodeClick = (event: React.MouseEvent, node: Node) => {
         const taskId = node.id.replace(/^(up-|down-|task-)/, '');
-        navigate(`/task_details/${taskId}`);
+        // setTaskDetails(taskDependencies.data.task);
+        setShowTaskInfo(true);
     };
 
     if (taskDependencies.isError) {
@@ -144,6 +151,36 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
                     <Controls/>
                 </ReactFlow>
             )}
+            <JobmonModal
+                title={
+                    "Task Information"
+                }
+                children={
+                    <Grid container spacing={2}>
+                        <Grid item xs={3}><b>Task ID:</b></Grid>
+                        <Grid item xs={9}>
+                            <Link
+                                to={{pathname: `/task_details/${taskId}`}}
+                                key={taskId}
+                                onClick={() => setShowTaskInfo(false)}
+                            >
+                                {taskId}
+                            </Link>
+                        </Grid>
+                        <Grid item xs={3}><b>Task Status:</b></Grid>
+                        <Grid item xs={9}>Random</Grid>
+                        <Grid item xs={3}><b>Task Command:</b></Grid>
+                        <Grid item
+                              xs={9}><ScrollableCodeBlock>Random</ScrollableCodeBlock></Grid>
+                        <Grid item xs={3}><b>Task Status Date:</b></Grid>
+                        <Grid item
+                              xs={9}>Random</Grid>
+                    </Grid>
+                }
+                open={showTaskInfo}
+                onClose={() => setShowTaskInfo(false)}
+                width="80%"
+            />
         </div>
     );
 }
