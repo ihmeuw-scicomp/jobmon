@@ -587,27 +587,32 @@ async def update_array_max_running(workflow_id: int, request: Request) -> Any:
 
 @api_v3_router.get("/workflow/{workflow_id}/task_template_dag")
 async def task_template_dag(workflow_id: str) -> Any:
+    """Compute the shape of a Workflow's DAG by TaskTemplate."""
     with SessionLocal() as session:
         with session.begin():
-            dag_query = session.query(
-                Workflow.dag_id
-            ).filter(Workflow.id == workflow_id)
+            dag_query = session.query(Workflow.dag_id).filter(
+                Workflow.id == workflow_id
+            )
 
             dag_id = dag_query.scalar()
 
-            query = session.query(
-                Edge.node_id,
-                Edge.upstream_node_ids,
-                Edge.downstream_node_ids,
-                TaskTemplate.name
-            ).join(
-                Node, Edge.node_id == Node.id
-            ).join(
-                TaskTemplateVersion, Node.task_template_version_id == TaskTemplateVersion.id
-            ).join(
-                TaskTemplate, TaskTemplateVersion.task_template_id == TaskTemplate.id
-            ).filter(
-                Edge.dag_id == dag_id
+            query = (
+                session.query(
+                    Edge.node_id,
+                    Edge.upstream_node_ids,
+                    Edge.downstream_node_ids,
+                    TaskTemplate.name,
+                )
+                .join(Node, Edge.node_id == Node.id)
+                .join(
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join(
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .filter(Edge.dag_id == dag_id)
             )
 
             res = session.execute(query).fetchall()
@@ -617,7 +622,7 @@ async def task_template_dag(workflow_id: str) -> Any:
                     "node_id": row.node_id,
                     "upstream_node_ids": row.upstream_node_ids,
                     "downstream_node_ids": row.downstream_node_ids,
-                    "name": row.name
+                    "name": row.name,
                 }
                 for row in res
             ]

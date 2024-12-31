@@ -97,7 +97,7 @@ async def add_edges(dag_id: int, request: Request) -> Any:
             if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
                 insert_stmt = insert_stmt.prefix_with("IGNORE")
             if SessionLocal and "sqlite" in _CONFIG.get(
-                    "db", "sqlalchemy_database_uri"
+                "db", "sqlalchemy_database_uri"
             ):
                 insert_stmt = insert_stmt.prefix_with("OR IGNORE")
             session.execute(insert_stmt)
