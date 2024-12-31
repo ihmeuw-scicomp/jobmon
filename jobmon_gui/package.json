@@ -25,6 +25,7 @@
     "axios": "^0.23.0",
     "bootstrap": "^4.6.1",
     "caniuse-lite": "^1.0.30001680",
+    "compare-versions": "^6.1.1",
     "dagre": "^0.8.5",
     "dayjs": "^1.11.11",
     "dompurify": "^2.4.1",
