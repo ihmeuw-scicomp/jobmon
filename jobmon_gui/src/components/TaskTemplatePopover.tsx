@@ -14,8 +14,9 @@ type TaskTemplatePopoverProps = {
         num_attempts_max: number;
         MAXC: number;
     };
-    placement?: 'top' | 'bottom' | 'left' | 'right';
+    placement?: React.ComponentProps<typeof Popover>['placement'];
     ref?: React.Ref<any>;
+    style?: React.CSSProperties;
 };
 
 const INT_32_MAX = 2147483647;

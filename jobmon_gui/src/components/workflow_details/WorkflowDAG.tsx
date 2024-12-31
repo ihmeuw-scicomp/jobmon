@@ -9,6 +9,13 @@ import { useQuery } from "@tanstack/react-query";
 import { TTStatusResponse } from "@jobmon_gui/types/TaskTemplateStatus.ts";
 import {CircularProgress} from "@mui/material";
 
+interface TaskTemplateDAGResponse {
+    tt_dag: {
+        name: string;
+        downstream_task_template_id?: string;
+    }[];
+}
+
 export default function WorkflowDAG(workflowId) {
     const [nodes, setNodes] = useState([]);
     const [edges, setEdges] = useState([]);
@@ -60,7 +67,7 @@ export default function WorkflowDAG(workflowId) {
     useEffect(() => {
         if (!workflowId.workflowId) return;
 
-        axios.get(get_task_template_dag(workflowId.workflowId), {
+        axios.get<TaskTemplateDAGResponse>(get_task_template_dag(workflowId.workflowId), {
             ...jobmonAxiosConfig,
             data: null,
         }).then((r) => {
