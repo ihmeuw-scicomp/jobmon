@@ -356,7 +356,7 @@ async def get_array_max_concurrently_running(
 async def transition_to_killed(array_id: int, request: Request) -> Any:
     """Transition TIs from KILL_SELF  to ERROR_FATAL.
 
-    Also mark parent Taskswith status=ERROR_FATAL if they're in a killable state.
+    Also mark parent Tasks with status=ERROR_FATAL if they're in a killable state.
     """
     structlog.contextvars.bind_contextvars(array_id=array_id)
 

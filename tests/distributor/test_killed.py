@@ -65,7 +65,7 @@ def test_transition_to_killed(tool, db_engine, task_template):
     distributor_service.refresh_status_from_db(TaskInstanceStatus.KILL_SELF)
     distributor_service.process_status(TaskInstanceStatus.KILL_SELF)
 
-    # 6) Check that TIs are now in UNKNOWN_ERROR and that an error log was recorded
+    # 6) Check that TIs are now in ERROR_FATAL and that an error log was recorded
     with Session(bind=db_engine) as session:
         select_stmt = (
             select(TaskInstance)
