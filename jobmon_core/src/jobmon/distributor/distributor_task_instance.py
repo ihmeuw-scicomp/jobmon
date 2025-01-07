@@ -69,6 +69,15 @@ class DistributorTaskInstance:
     def array_step_id(self, val: int) -> None:
         self._array_step_id = val
 
+    @property
+    def distributor_id(self) -> str:
+        """Returns the distributor id of the TI."""
+        return self._distributor_id
+
+    @distributor_id.setter
+    def distributor_id(self, val: str) -> None:
+        self._distributor_id = val
+
     def transition_to_launched(
         self, distributor_id: str, next_report_increment: float
     ) -> None:

@@ -6,7 +6,23 @@ A GUI to visualize Jobmon Workflows.
 
 This application uses React, FastApi, and Bootstrap.
 
-## Testing Locally
+## Testing Locally (docker-compose)
+
+### Spin up the backend and frontend servers
+
+From the root of the repository run.
+
+1. `docker-compose build jobmon_server jobmon_frontend`
+2. `docker-compose up`
+
+### Then run test workflows
+
+From the root of the repository activate a python environment of your choice and then run.
+
+1. `pip install -e ./jobmon_core ./jobmon_client`
+2. `python jobmon_gui/local_testing/create_wfs.py`
+
+## Testing Locally (bare metal)
 
 ### Deploying the Jobmon Server Backend Locally
 
