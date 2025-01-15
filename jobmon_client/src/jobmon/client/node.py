@@ -102,7 +102,7 @@ class Node:
 
         hash_value = int(
             hashlib.sha256(
-                "".join(str_arg_ids + arg_values).encode("utf-8")
+                "_".join(str_arg_ids + arg_values).encode("utf-8")
             ).hexdigest(),
             16,
         )
