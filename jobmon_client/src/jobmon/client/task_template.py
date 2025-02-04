@@ -435,26 +435,7 @@ class TaskTemplate:
 
     def load_task_template_versions(self) -> None:
         """Load task template versions associated with this task template from the database."""
-        app_route = f"/task_template/{self.id}/versions"
-        return_code, response = self.requester.send_request(
-            app_route=app_route, message={}, request_type="get"
-        )
-
-        if return_code != StatusCodes.OK:
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST request through route "
-                f"{app_route}. Expected code 200. Response content: {response}"
-            )
-
-        task_template_versions = [
-            TaskTemplateVersion.from_wire(wire_args, self)
-            for wire_args in response["task_template_versions"]
-        ]
-        self._task_template_versions = task_template_versions
-
-        # activate the latest version
-        if self.task_template_versions:
-            self.set_active_task_template_version_id()
+        return
 
     def get_task_template_version(
         self,
