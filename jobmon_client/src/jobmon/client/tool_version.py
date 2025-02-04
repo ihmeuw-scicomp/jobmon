@@ -11,6 +11,8 @@ from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeClientToolVersion
 
+import time
+
 if TYPE_CHECKING:
     from jobmon.client.tool import Tool
 
@@ -94,10 +96,13 @@ class ToolVersion:
 
     def load_task_templates(self) -> None:
         """Get all task_templates associated with this tool version from the database."""
+        print(f"starting  load_task_templates at {time.time()}")
         app_route = f"/tool_version/{self.id}/task_templates"
+        print(f"getting {app_route} at {time.time()}")
         return_code, response = self.requester.send_request(
             app_route=app_route, message={}, request_type="get"
         )
+        print(f"respons {app_route} at {time.time()}")
 
         if return_code != StatusCodes.OK:
             raise InvalidResponse(
@@ -111,6 +116,7 @@ class ToolVersion:
         for task_template in task_templates:
             self.task_templates[task_template.template_name] = task_template
             task_template.load_task_template_versions()
+        print(f"finishing load_task_templates at {time.time()}")
 
     def get_task_template(self, template_name: str) -> TaskTemplate:
         """Get a single task_template associated with this tool version from the database."""

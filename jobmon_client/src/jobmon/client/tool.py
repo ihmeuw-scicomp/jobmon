@@ -20,6 +20,8 @@ from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeClientTool
 
+import time
+
 logger = logging.getLogger(__name__)
 
 
@@ -561,6 +563,7 @@ class Tool:
         self.active_tool_version.default_cluster_name = cluster_name
 
     def _load_tool_versions(self) -> List[ToolVersion]:
+        print(f"starting  load_tool_versions at {time.time()}")
         app_route = f"/tool/{self.id}/tool_versions"
         return_code, response = self.requester.send_request(
             app_route=app_route, message={}, request_type="get"
@@ -576,6 +579,7 @@ class Tool:
             ToolVersion.from_wire(wire_tuple, self)
             for wire_tuple in response["tool_versions"]
         ]
+        print(f"finishing load_tool_versions at {time.time()}")
         return tool_versions
 
     def _bind(self) -> None:

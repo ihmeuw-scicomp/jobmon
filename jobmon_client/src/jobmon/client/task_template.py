@@ -31,12 +31,15 @@ from jobmon.core.serializers import (
     SerializeClientTaskTemplate,
     SerializeTaskTemplateResourceUsage,
 )
+import time
 
 if TYPE_CHECKING:
     from jobmon.client.tool_version import ToolVersion
 
 logger = logging.getLogger(__name__)
 
+elapsed = 0
+count = 0
 
 class TaskTemplate:
     """Task Template outlines the structure of a Task to give it more context within the DAG.
@@ -436,9 +439,17 @@ class TaskTemplate:
     def load_task_template_versions(self) -> None:
         """Load task template versions associated with this task template from the database."""
         app_route = f"/task_template/{self.id}/versions"
+        start = time.time()
+        print(f"getting {app_route} at {time.time()}")
         return_code, response = self.requester.send_request(
             app_route=app_route, message={}, request_type="get"
         )
+        global elapsed
+        global count
+        elapsed += time.time() - start
+        count += 1
+        print(f"respons {app_route} at {time.time()}")
+        print(f"total in /task_template/{self.id}/versions globally: {elapsed}sec/{count}")
 
         if return_code != StatusCodes.OK:
             raise InvalidResponse(
