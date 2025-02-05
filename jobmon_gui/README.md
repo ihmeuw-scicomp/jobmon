@@ -29,13 +29,6 @@ For example:
 EDITABLES=true EXTRAS=mysql docker compose up --build jobmon_backend jobmon_frontend
 ```
 
-### Then run test workflows
-
-From the root of the repository activate a python environment of your choice and then run:
-
-1. `pip install -e ./jobmon_core ./jobmon_client`
-2. `python jobmon_gui/local_testing/create_wfs.py`
-
 ## Testing Locally (bare metal)
 
 ### Deploying the Jobmon Server Backend Locally
@@ -51,8 +44,7 @@ To deploy the Jobmon Server Backend locally:
     - This command will spin up a local version of the Jobmon Server, running on 127.0.0.1:8070 by default. You can then configure the React app to point to this URL for testing purposes.
 7. Run `python jobmon_gui/local_testing/create_wfs.py`
 
-**NOTE**: If you're running against the Jobmon production database you need to make sure that mysqlclient is installed 
-via conda, and not installed via pip. You will see auth errors if this is incorrectly installed. Do the following:
+**NOTE**: If you're running against the Jobmon production database you need to make sure that mysqlclient is installed via conda, and not installed via pip. You will see auth errors if this is incorrectly installed. Do the following:
 
 1. `pip uninstall mysqlclient`
 2. `conda install mysqlclient`
