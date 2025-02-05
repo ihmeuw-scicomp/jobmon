@@ -51,6 +51,6 @@ To deploy the Jobmon GUI Frontend locally:
 2. Install bun
 3. Navigate to the jobmon_gui subdirectory
 4. Run `bun install`
-5. Run `bun dev`
+5. Run `bun run dev`
 
 You can then access the site at: http://localhost:3000
