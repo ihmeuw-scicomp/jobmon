@@ -9,6 +9,19 @@ All notable changes to Jobmon will be documented in this file.
 ### Deprecated
 ### Removed
 
+## [3.4.0] - TBD
+### Added
+- Warn users if they haven't specified `naming_args` when using the task generator (PR 202).
+
+### Changed
+- Bulk kill TaskInstances to speed up workflow stopping (PR 209).
+- Switched from Flask to FastAPI (PR 169).
+
+### Fixed
+- Fixed a bug where users were getting hash collision errors for their Tasks that didn't have the same node_arg values (PR 214).
+- Fixed a bug where the wrong usage values were being populated in the Jobmon database from the slurm accounting databse (jobmon_usage PR 4).
+- Fixed a bug where timeouts set in the `workflow_resume` CLI were not being propagated properly (PR 215).
+
 ## [3.2.6] - TBD
 ### Added
 - Reaper "poll_interval_minutes" config key - default 5 minutes (PR 69).
