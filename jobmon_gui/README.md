@@ -6,13 +6,15 @@ A GUI to visualize Jobmon Workflows.
 
 This application uses React, FastApi, and Bootstrap.
 
-## Testing Locally (docker-compose)
+## Testing Locally (docker compose)
 
 ### Spin up the backend and frontend services
 
 From the root of the repository run:
 
-1. `docker compose up jobmon_backend jobmon_frontend`
+```bash
+docker compose up jobmon_backend jobmon_frontend
+```
 
 *Note:* If running for the first time or new package dependencies have been added, run with the `--build` flag.
 
