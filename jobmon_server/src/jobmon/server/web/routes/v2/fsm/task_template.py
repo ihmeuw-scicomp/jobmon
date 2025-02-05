@@ -81,7 +81,11 @@ def get_task_template_versions(task_template_id: int) -> Any:
             ttvs = session.execute(select_stmt).scalars().all()
             if ttvs:
                 max_id = max(ttv.id for ttv in ttvs)
-                wire_obj = [ttv.to_wire_as_client_task_template_version() for ttv in ttvs if ttv.id == max_id]
+                wire_obj = [
+                    ttv.to_wire_as_client_task_template_version()
+                    for ttv in ttvs
+                    if ttv.id == max_id
+                ]
             else:
                 wire_obj = []
 
