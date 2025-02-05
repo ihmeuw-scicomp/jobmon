@@ -8,16 +8,28 @@ This application uses React, FastApi, and Bootstrap.
 
 ## Testing Locally (docker-compose)
 
-### Spin up the backend and frontend servers
+### Spin up the backend and frontend services
 
-From the root of the repository run.
+From the root of the repository run:
 
-1. `docker-compose build jobmon_server jobmon_frontend`
-2. `docker-compose up`
+1. `docker compose up jobmon_backend jobmon_frontend`
+
+*Note:* If running for the first time or new package dependencies have been added, run with the `--build` flag.
+
+Situationally, you may want to run while specifying build-time arguments:
+
+- `EDITABLES=true` - to install the jobmon_core and jobmon_client packages in editable mode
+- `EXTRAS=mysql` - to install the mysql client, required for testing with the production database
+
+For example:
+
+```bash
+EDITABLES=true EXTRAS=mysql docker compose up --build jobmon_backend jobmon_frontend
+```
 
 ### Then run test workflows
 
-From the root of the repository activate a python environment of your choice and then run.
+From the root of the repository activate a python environment of your choice and then run:
 
 1. `pip install -e ./jobmon_core ./jobmon_client`
 2. `python jobmon_gui/local_testing/create_wfs.py`
