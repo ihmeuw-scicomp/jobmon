@@ -1,4 +1,4 @@
-"""This is the test the HTTP 400 errors."""
+"""Tests of the HTTP 400 errors."""
 
 import pytest
 
