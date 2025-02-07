@@ -25,4 +25,4 @@ export const set_wf_concurrency_url = (wf_id: number | string) => api_base_url +
 export const get_workflow_concurrency_url = (wf_id: number | string) => api_base_url + `/workflow/${wf_id}/get_max_concurrently_running`;
 export const get_task_template_concurrency_url = (wf_id: number | string, tt_version_id: number | string) => api_base_url + `/workflow/${wf_id}/get_array_max_concurrently_running/${tt_version_id}`;
 
-export const task_template_details_url = (workflowId: number, taskTemplateId: number) => api_base_url + `/get_task_template_details?workflow_id=${workflowId}&task_template_id=${taskTemplateId}`;
+export const get_task_template_details_url = (workflowId: number, taskTemplateId: number) => api_base_url + `/get_task_template_details?workflow_id=${workflowId}&task_template_id=${taskTemplateId}`;

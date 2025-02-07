@@ -1,7 +1,7 @@
 import axios from "axios";
 import {useQuery} from "@tanstack/react-query";
 
-import {task_template_details_url} from "@jobmon_gui/configs/ApiUrls.ts";
+import {get_task_template_details_url} from "@jobmon_gui/configs/ApiUrls.ts";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
 import {TaskTemplateDetailsResponse} from "@jobmon_gui/types/TaskTemplateDetails.ts";
 
@@ -22,7 +22,7 @@ export const getTaskTemplateDetailsQueryFn = async ({queryKey}: getTaskTemplateD
         return;
     }
 
-    return axios.get<TaskTemplateDetailsResponse>(task_template_details_url(wf_id, tt_id), {
+    return axios.get<TaskTemplateDetailsResponse>(get_task_template_details_url(wf_id, tt_id), {
             ...jobmonAxiosConfig,
             data: null,
         }
