@@ -1,6 +1,5 @@
 import React, {useState} from 'react';
-import {Link, useParams, useNavigate, useLocation} from 'react-router-dom';
-import Breadcrumb from 'react-bootstrap/Breadcrumb';
+import {useParams, useNavigate, useLocation} from 'react-router-dom';
 import TaskInstanceTable from '@jobmon_gui/components/task_details/TaskInstanceTable';
 import NodeLists from '@jobmon_gui/components/task_details/NodeLists';
 import TaskFSM from '@jobmon_gui/components/task_details/TaskFSM';
@@ -16,25 +15,25 @@ import {HtmlTooltip} from "@jobmon_gui/components/HtmlToolTip";
 import IconButton from "@mui/material/IconButton";
 import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
 import {getWorkflowTTStatusQueryFn} from "@jobmon_gui/queries/GetWorkflowTTStatus.ts";
+import {AppBreadcrumbs, BreadcrumbItem} from '@jobmon_gui/components/common/AppBreadcrumbs';
 
 
 export default function TaskDetails() {
     const queryClient = useQueryClient();
-    const navigate = useNavigate()
+    const navigate = useNavigate();
     let params = useParams();
-    const taskId = params.taskId
+    const taskId = params.taskId;
 
     const task_details = useQuery({
         queryKey: ["task_details", taskId],
         queryFn: getTaskDetailsQueryFn
-    })
+    });
 
-    const [showTaskInfo, setShowTaskInfo] = useState(false)
-    const [showTaskFSM, setShowTaskFSM] = useState(false)
+    const [showTaskInfo, setShowTaskInfo] = useState(false);
+    const [showTaskFSM, setShowTaskFSM] = useState(false);
     const location = useLocation();
 
     const handleHomeClick = () => {
-
         const searchParams = new URLSearchParams(location.search);
         const search = searchParams.toString();
         navigate({
@@ -42,6 +41,27 @@ export default function TaskDetails() {
             search: search ? `?${search}` : ''
         });
     };
+
+    const handleWorkflowMouseEnter = async () => {
+        queryClient.prefetchQuery({
+            queryKey: ["workflow_details", "details", task_details?.data?.workflow_id],
+            queryFn: getWorkflowDetailsQueryFn,
+        },)
+        queryClient.prefetchQuery({
+            queryKey: ["workflow_details", "tt_status", task_details?.data?.workflow_id],
+            queryFn: getWorkflowTTStatusQueryFn
+        },)
+    };
+
+    const breadcrumbItems: BreadcrumbItem[] = [
+        {label: 'Home', onClick: handleHomeClick},
+        {
+            label: `Workflow ID ${task_details?.data?.workflow_id}`,
+            to: `/workflow/${task_details?.data?.workflow_id}`,
+            onMouseEnter: handleWorkflowMouseEnter,
+        },
+        {label: `Task ID ${taskId}`, active: true},
+    ];
 
 
     if (task_details.isError) {
@@ -52,29 +72,7 @@ export default function TaskDetails() {
     }
     return (
         <div>
-            <Breadcrumb>
-                <Breadcrumb.Item>
-                    <button className="breadcrumb-button" onClick={handleHomeClick}>Home</button>
-                </Breadcrumb.Item>
-                <Breadcrumb.Item>
-                    <Link to={{pathname: `/workflow/${task_details?.data?.workflow_id}`}}
-                          onMouseEnter={async () => {
-                              queryClient.prefetchQuery({
-                                  queryKey: ["workflow_details", "details", task_details?.data?.workflow_id],
-                                  queryFn: getWorkflowDetailsQueryFn,
-                              },)
-                              queryClient.prefetchQuery({
-                                  queryKey: ["workflow_details", "tt_status", task_details?.data?.workflow_id],
-                                  queryFn: getWorkflowTTStatusQueryFn
-                              },)
-
-                          }}
-                    >
-                        Workflow ID {task_details?.data?.workflow_id}
-                    </Link>
-                </Breadcrumb.Item>
-                <Breadcrumb.Item active>Task ID {taskId}</Breadcrumb.Item>
-            </Breadcrumb>
+            <AppBreadcrumbs items={breadcrumbItems}/>
             <div>
                 <header className="div-level-2 header-1 ">
                     <p className='color-dark'>
