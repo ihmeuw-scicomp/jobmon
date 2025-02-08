@@ -27,15 +27,6 @@ export default function TaskTemplateDetails() {
 
     const TaskTemplateDetails = getTaskTemplateDetails(workflowId, taskTemplateId);
 
-    if (TaskTemplateDetails.isLoading) {
-        return (<CircularProgress />)
-    }
-    if (TaskTemplateDetails.isError || !TaskTemplateDetails.data) {
-        return (<Typography>Error loading template.</Typography>)
-    }
-
-    const { task_template_id, task_template_name, task_template_version_id } = TaskTemplateDetails.data;
-
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -64,6 +55,13 @@ export default function TaskTemplateDetails() {
         {label: `Workflow ID ${workflowId}`, to: `/workflow/${workflowId}`, onMouseEnter: handleWorkflowMouseEnter},
         {label: `Task Template ID ${taskTemplateId}`, active: true},
     ];
+    
+    if (TaskTemplateDetails.isLoading) {
+        return (<CircularProgress />)
+    }
+    if (TaskTemplateDetails.isError || !TaskTemplateDetails.data) {
+        return (<Typography>Error loading template.</Typography>)
+    }
 
     return (
         <Box>
@@ -71,15 +69,15 @@ export default function TaskTemplateDetails() {
 
             <Box sx={{justifyContent: 'start', pt: 3}}>
                 <TaskTemplateHeader
-                    taskTemplateId={task_template_id}
-                    taskTemplateName={task_template_name}
+                    taskTemplateId={TaskTemplateDetails.data.task_template_id}
+                    taskTemplateName={TaskTemplateDetails.data.task_template_name}
                 />
             </Box>
 
             <Box id="tt_progress" className="div-level-2">
                 <JobmonProgressBar
                     workflowId={workflowId}
-                    ttId={task_template_id}
+                    ttId={TaskTemplateDetails.data.task_template_id}
                     placement="bottom"
                 />
             </Box>
@@ -96,15 +94,15 @@ export default function TaskTemplateDetails() {
                 </Tabs>
             </Box>
             <TabPanel value={activeTab} index={0}>
-                <TaskTable taskTemplateName={task_template_name} workflowId={workflowId}/>
+                <TaskTable taskTemplateName={TaskTemplateDetails.data.task_template_name} workflowId={workflowId}/>
             </TabPanel>
             <TabPanel value={activeTab} index={1}>
-                <ClusteredErrors taskTemplateId={task_template_id} workflowId={workflowId}/>
+                <ClusteredErrors taskTemplateId={TaskTemplateDetails.data.task_template_id} workflowId={workflowId}/>
             </TabPanel>
             <TabPanel value={activeTab} index={2}>
                 <Usage
-                    taskTemplateName={task_template_name}
-                    taskTemplateVersionId={task_template_version_id}
+                    taskTemplateName={TaskTemplateDetails.data.task_template_name}
+                    taskTemplateVersionId={TaskTemplateDetails.data.task_template_version_id}
                     workflowId={workflowId}
                 />
             </TabPanel>
