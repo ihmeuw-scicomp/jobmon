@@ -4,7 +4,7 @@ from http import HTTPStatus as StatusCodes
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import Query, HTTPException, Request
+from fastapi import HTTPException, Query, Request
 import numpy as np
 import pandas as pd  # type:ignore
 import scipy.stats as st  # type:ignore
@@ -57,17 +57,24 @@ def get_task_template_details_for_workflow(
                 TaskTemplateVersion.task_template_id == task_template_id,
                 TaskTemplateVersion.task_template_id == TaskTemplate.id,
             ]
-            
-            sql = select(
-                TaskTemplate.id,
-                TaskTemplate.name,
-                TaskTemplateVersion.id.label("task_template_version_id"),
-            ).where(*query_filter).distinct()
-            
+
+            sql = (
+                select(
+                    TaskTemplate.id,
+                    TaskTemplate.name,
+                    TaskTemplateVersion.id.label("task_template_version_id"),
+                )
+                .where(*query_filter)
+                .distinct()
+            )
+
             row = session.execute(sql).one_or_none()
 
         if row is None:
-            raise HTTPException(status_code=404, detail="Task Template not found for the given workflow.")
+            raise HTTPException(
+                status_code=404,
+                detail="Task Template not found for the given workflow.",
+            )
 
         tt_details_data = {
             "task_template_id": row.id,

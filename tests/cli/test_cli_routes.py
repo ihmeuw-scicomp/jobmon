@@ -54,7 +54,9 @@ def test_get_task_template_details_for_workflow(db_engine, tool):
     # Test fetching task template details for workflow (Valid case)
     app_route = "/get_task_template_details"
     return_code, msg = wf.requester.send_request(
-        app_route=app_route, message={"workflow_id": wf.workflow_id, "task_template_id": tt1.id}, request_type="get"
+        app_route=app_route,
+        message={"workflow_id": wf.workflow_id, "task_template_id": tt1.id},
+        request_type="get",
     )
 
     assert return_code == 200
@@ -70,7 +72,9 @@ def test_get_task_template_details_for_workflow(db_engine, tool):
     app_route = "/get_task_template_details"
     with pytest.raises(InvalidRequest) as exc_info:
         wf.requester.send_request(
-            app_route=app_route, message={"workflow_id": 99999, "task_template_id": tt1.id}, request_type="get"
+            app_route=app_route,
+            message={"workflow_id": 99999, "task_template_id": tt1.id},
+            request_type="get",
         )
 
     assert "Client error with status code 404" in str(exc_info.value)
@@ -80,7 +84,9 @@ def test_get_task_template_details_for_workflow(db_engine, tool):
     app_route = "/get_task_template_details"
     with pytest.raises(InvalidRequest) as exc_info:
         wf.requester.send_request(
-            app_route=app_route, message={"workflow_id": wf.workflow_id, "task_template_id": 99999}, request_type="get"
+            app_route=app_route,
+            message={"workflow_id": wf.workflow_id, "task_template_id": 99999},
+            request_type="get",
         )
 
     assert "Client error with status code 404" in str(exc_info.value)
@@ -90,7 +96,9 @@ def test_get_task_template_details_for_workflow(db_engine, tool):
     app_route = "/get_task_template_details"
     with pytest.raises(InvalidRequest) as exc_info:
         wf.requester.send_request(
-            app_route=app_route, message={"workflow_id": None, "task_template_id": tt1.id}, request_type="get"
+            app_route=app_route,
+            message={"workflow_id": None, "task_template_id": tt1.id},
+            request_type="get",
         )
 
     assert "Client error with status code 422" in str(exc_info.value)
@@ -99,36 +107,44 @@ def test_get_task_template_details_for_workflow(db_engine, tool):
     app_route = "/get_task_template_details"
     with pytest.raises(InvalidRequest) as exc_info:
         wf.requester.send_request(
-            app_route=app_route, message={"workflow_id": wf.workflow_id, "task_template_id": None}, request_type="get"
+            app_route=app_route,
+            message={"workflow_id": wf.workflow_id, "task_template_id": None},
+            request_type="get",
         )
-    
+
     assert "Client error with status code 422" in str(exc_info.value)
 
     # Test fetching task template details for workflow (Invalid case - negative workflow id)
     app_route = "/get_task_template_details"
     with pytest.raises(InvalidRequest) as exc_info:
         wf.requester.send_request(
-            app_route=app_route, message={"workflow_id": -1, "task_template_id": tt1.id}, request_type="get"
+            app_route=app_route,
+            message={"workflow_id": -1, "task_template_id": tt1.id},
+            request_type="get",
         )
-    
+
     assert "Client error with status code 422" in str(exc_info.value)
 
     # Test fetching task template details for workflow (Invalid case - non-integer workflow id)
     app_route = "/get_task_template_details"
     with pytest.raises(InvalidRequest) as exc_info:
         wf.requester.send_request(
-            app_route=app_route, message={"workflow_id": 3.14, "task_template_id": tt1.id}, request_type="get"
+            app_route=app_route,
+            message={"workflow_id": 3.14, "task_template_id": tt1.id},
+            request_type="get",
         )
-    
+
     assert "Client error with status code 422" in str(exc_info.value)
 
     # Test fetching task template details for workflow (Invalid case - string task template id)
     app_route = "/get_task_template_details"
     with pytest.raises(InvalidRequest) as exc_info:
         wf.requester.send_request(
-            app_route=app_route, message={"workflow_id": wf.workflow_id, "task_template_id": "tt1"}, request_type="get"
+            app_route=app_route,
+            message={"workflow_id": wf.workflow_id, "task_template_id": "tt1"},
+            request_type="get",
         )
-    
+
     assert "Client error with status code 422" in str(exc_info.value)
 
 
