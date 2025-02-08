@@ -42,7 +42,10 @@ _CONFIG = get_jobmon_config()
 
 
 @api_v3_router.get("/get_task_template_details")
-def get_task_template_details_for_workflow(workflow_id: int, task_template_id: int) -> Any:
+def get_task_template_details_for_workflow(
+    workflow_id: int = Query(..., ge=1),
+    task_template_id: int = Query(..., ge=1),
+) -> Any:
     """Fetch Task Template details (ID, Name, and Version) for a given Workflow."""
     with SessionLocal() as session:
         with session.begin():
