@@ -416,3 +416,22 @@ def test_downstream_task(client_env, tool, db_engine):
         ).fetchall()
         assert len(res) == 1
         assert re.match(one_id_pattern, res[0][0])
+
+
+def test_node_args_hash(client_env, tool, db_engine):
+    """Test uniqueness of node arg hash."""
+    wf = tool.create_workflow()
+    tt = tool.get_task_template(
+        template_name="test_tt",
+        command_template="{_1_val} {_2_val}",
+        node_args=["_1_val", "_2_val"],
+    )
+    task1 = tt.create_task(name="task1", _1_val=69, _2_val=6)
+    task2 = tt.create_task(name="task1", _1_val=6, _2_val=96)
+    wf.add_tasks([task1, task2])
+    wf.bind()
+    assert wf.workflow_id is not None
+    wf._bind_tasks()
+    task1_node_hash = task1.node.node_args_hash
+    task2_node_hash = task2.node.node_args_hash
+    assert task1_node_hash != task2_node_hash
