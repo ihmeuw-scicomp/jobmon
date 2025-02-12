@@ -105,10 +105,11 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
             header: "Sample Error",
             size: 750,
             Cell: ({renderedCellValue, row}) => {
-                const truncatedValue = renderedCellValue
-                    ? (renderedCellValue.length > 100
-                        ? `...${renderedCellValue.slice(-100)}`
-                        : renderedCellValue)
+                const stringValue = typeof renderedCellValue === "string" ? renderedCellValue : String(renderedCellValue);
+                const truncatedValue = stringValue
+                    ? (stringValue .length > 100
+                        ? `...${stringValue .slice(-100)}`
+                        : stringValue )
                     : '';
 
                 return (
