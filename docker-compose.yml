@@ -15,7 +15,7 @@ services:
     env_file:
       - .env
     command: >
-      /bin/sh -c "jobmon_server init_db && fastapi run /app/main.py --port 80 --reload"
+      /bin/sh -c "fastapi run /app/main.py --port 80 --reload"
   jobmon_frontend:
     build: 
       context: ./jobmon_gui
