@@ -6,21 +6,28 @@ A GUI to visualize Jobmon Workflows.
 
 This application uses React, FastApi, and Bootstrap.
 
-## Testing Locally (docker-compose)
+## Testing Locally (docker compose)
 
-### Spin up the backend and frontend servers
+### Spin up the backend and frontend services
 
-From the root of the repository run.
+From the root of the repository run:
 
-1. `docker-compose build jobmon_server jobmon_frontend`
-2. `docker-compose up`
+```bash
+docker compose up jobmon_backend jobmon_frontend
+```
 
-### Then run test workflows
+*Note:* If running for the first time or new package dependencies have been added, run with the `--build` flag.
 
-From the root of the repository activate a python environment of your choice and then run.
+Situationally, you may want to run while specifying build-time arguments:
 
-1. `pip install -e ./jobmon_core ./jobmon_client`
-2. `python jobmon_gui/local_testing/create_wfs.py`
+- `EDITABLES=true` - to install the jobmon_core and jobmon_client packages in editable mode
+- `EXTRAS=mysql` - to install the mysql client, required for testing with the production database
+
+For example:
+
+```bash
+EDITABLES=true EXTRAS=mysql docker compose up --build jobmon_backend jobmon_frontend
+```
 
 ## Testing Locally (bare metal)
 
@@ -37,8 +44,7 @@ To deploy the Jobmon Server Backend locally:
     - This command will spin up a local version of the Jobmon Server, running on 127.0.0.1:8070 by default. You can then configure the React app to point to this URL for testing purposes.
 7. Run `python jobmon_gui/local_testing/create_wfs.py`
 
-**NOTE**: If you're running against the Jobmon production database you need to make sure that mysqlclient is installed 
-via conda, and not installed via pip. You will see auth errors if this is incorrectly installed. Do the following:
+**NOTE**: If you're running against the Jobmon production database you need to make sure that mysqlclient is installed via conda, and not installed via pip. You will see auth errors if this is incorrectly installed. Do the following:
 
 1. `pip uninstall mysqlclient`
 2. `conda install mysqlclient`

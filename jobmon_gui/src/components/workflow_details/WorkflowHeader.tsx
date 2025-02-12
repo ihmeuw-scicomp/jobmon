@@ -180,7 +180,9 @@ export default function WorkflowHeader({
             <Box sx={{display: 'flex', alignItems: 'center'}}>
                 <span>
                     {icon && <span className={className}>{icon}</span>}
-                    {wf_id} {wf_name ? `- ${wf_name}` : ''}
+                    <Typography variant="h5" component="span" sx={{pl: 1}}>
+                        {wf_id} {wf_name ? `- ${wf_name}` : ''}
+                    </Typography>
                 </span>
                 <span style={{transform: 'translateY(-5px)', paddingLeft: '10px'}}>
                     <HtmlTooltip
@@ -196,12 +198,18 @@ export default function WorkflowHeader({
                             <InfoIcon fontSize={"large"}/>
                         </IconButton>
                     </HtmlTooltip>
-                    <IconButton
-                        color="inherit"
-                        onClick={() => setShowTechnicalPanel(true)}
+                    <HtmlTooltip
+                        title="Technical Panel"
+                        arrow={true}
+                        placement={"bottom"}
                     >
-                        <BuildIcon/>
-                    </IconButton>
+                        <IconButton
+                            color="inherit"
+                            onClick={() => setShowTechnicalPanel(true)}
+                        >
+                            <BuildIcon/>
+                        </IconButton>
+                    </HtmlTooltip>
                 </span>
             </Box>
             <Box>
