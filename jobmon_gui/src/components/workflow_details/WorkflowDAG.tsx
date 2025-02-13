@@ -30,7 +30,6 @@ export default function WorkflowDAG(workflowId) {
             return axios
                 .get<TTStatusResponse>(workflow_tt_status_url + workflowId.workflowId, {
                     ...jobmonAxiosConfig,
-                    data: null,
                 })
                 .then((r) => {
                     return r.data;
