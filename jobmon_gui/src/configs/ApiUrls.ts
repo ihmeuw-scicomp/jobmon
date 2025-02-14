@@ -13,7 +13,7 @@ export const workflow_details_url = api_base_url + "/workflow_details_viz/"
 export const workflow_tt_status_url = api_base_url + "/workflow_tt_status_viz/";
 export const workflow_overview_url = api_base_url + "/workflow_overview_viz";
 
-export const get_task_template_dag = (workflow_id: number | string) => api_base_url + `/workflow/${workflow_id}/task_template_dag/`;
+export const get_task_template_dag = (workflow_id: number | string) => api_base_url + `/workflow/${workflow_id}/task_template_dag`;
 
 export const error_log_viz_url = api_base_url + "/tt_error_log_viz/";
 export const ti_details_url = api_base_url + "/task/get_ti_details_viz/";
