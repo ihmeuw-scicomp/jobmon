@@ -68,7 +68,6 @@ export default function WorkflowDAG(workflowId) {
 
         axios.get<TaskTemplateDAGResponse>(get_task_template_dag(workflowId.workflowId), {
             ...jobmonAxiosConfig,
-            data: null,
         }).then((r) => {
             const { nodes, edges } = createNodesAndEdgesFromTTDAG(r.data.tt_dag);
             setNodes(nodes);
