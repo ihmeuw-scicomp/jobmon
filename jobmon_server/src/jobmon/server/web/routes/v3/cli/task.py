@@ -56,8 +56,8 @@ _reversed_task_instance_label_mapping = {
 
 @api_v3_router.get("/task_status")
 def get_task_status(
-        task_ids: Optional[Union[int, list[int]]] = Query(...),
-        status: Optional[Union[str, list[str]]] = Query(None),
+    task_ids: Optional[Union[int, list[int]]] = Query(...),
+    status: Optional[Union[str, list[str]]] = Query(None),
 ) -> Any:
     """Get the status of a task."""
     logger.info(f"*********************task_ids: {task_ids}, status_request: {status}")
@@ -397,7 +397,7 @@ def get_task_resource_usage(task_id: int) -> Any:
 
 
 def _get_tasks_recursive(
-        task_ids: Set[int], direction: Direction, session: Session
+    task_ids: Set[int], direction: Direction, session: Session
 ) -> set:
     """Get all input task_ids'.
 
@@ -457,7 +457,7 @@ def _get_dag_and_wf_id(task_id: int, session: Session) -> tuple:
 
 
 def _get_node_dependencies(
-        nodes: set, dag_id: int, session: Session, direction: Direction
+    nodes: set, dag_id: int, session: Session, direction: Direction
 ) -> Set[int]:
     """Get all upstream nodes of a node.
 
@@ -515,7 +515,7 @@ def _get_subdag(node_ids: list, dag_id: int, session: Session) -> list:
 
 
 def _get_tasks_from_nodes(
-        workflow_id: int, nodes: List, task_status: List, session: Session
+    workflow_id: int, nodes: List, task_status: List, session: Session
 ) -> dict:
     """Get task ids of the given node ids.
 
@@ -643,8 +643,14 @@ def get_task_details_viz(task_id: int) -> Any:
                     TaskTemplate.id,
                 )
                 .join(Node, Task.node_id == Node.id)
-                .join(TaskTemplateVersion, Node.task_template_version_id == TaskTemplateVersion.id)
-                .join(TaskTemplate, TaskTemplateVersion.task_template_id == TaskTemplate.id)
+                .join(
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join(
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
                 .where(Task.id == task_id)
             )
             rows = session.execute(query).all()
@@ -655,7 +661,7 @@ def get_task_details_viz(task_id: int) -> Any:
             "task_name",
             "task_command",
             "task_status_date",
-            "task_template_id"
+            "task_template_id",
         )
         result = [dict(zip(column_names, row)) for row in rows]
 
