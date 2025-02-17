@@ -56,6 +56,11 @@ export default function TaskDetails() {
             to: `/workflow/${task_details?.data?.workflow_id}`,
             onMouseEnter: handleWorkflowMouseEnter,
         },
+        {
+            label: `TaskTemplate ID ${task_details?.data?.task_template_id}`,
+            to: `/workflow/${task_details?.data?.workflow_id}/task_template/${task_details?.data?.task_template_id}`,
+            onMouseEnter: handleWorkflowMouseEnter,
+        },
         {label: `Task ID ${taskId}`, active: true},
     ];
 
