@@ -20,6 +20,9 @@ All notable changes to the Jobmon GUI will be documented in this file.
 - Added a DAG visualization for Workflow and Tasks (PR 213).
 
 #### Changed
+- Restructured the Jobmon GUI pages - GUI hierarchy now goes Workflow > Task Template > Task/Task Instance (PR 220).
+- Added a TaskTemplate page that has a TaskTemplate tab and Workflow DAG tab (PR 220).
+- Created tabs for "Tasks", "Clustered Errors", "Resource Usage" on the Workflow Details page (PR 220).
 - Show WorkflowRun heartbeat_date instead of Workflow status_date on the workflow details page (PR 181).
 - Truncate file paths in TaskInstance table of `Task Details` page (PR 184).
 - Changed nav bar to match other apps (PR 182).
