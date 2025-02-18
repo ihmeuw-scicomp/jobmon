@@ -2,6 +2,10 @@
 
 from importlib import import_module
 
+from fastapi import APIRouter
+
+fsm_router = APIRouter(tags=["fsm"])
+
 for module in [
     "array",
     "cluster",

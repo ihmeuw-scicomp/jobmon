@@ -42,13 +42,19 @@ def test_wfargs_update(tool):
     wf1 = tool.create_workflow(wfa1)
     wf1.add_tasks([t1, t2, t3])
     wf1.bind()
+    assert wf1.workflow_id is not None
     wf1._bind_tasks()
+    for t in [t1, t2, t3]:
+        assert t.task_id is not None
 
     wfa2 = "v2"
     wf2 = tool.create_workflow(wfa2)
     wf2.add_tasks([t4, t5, t6])
     wf2.bind()
+    assert wf2.workflow_id is not None
     wf2._bind_tasks()
+    for t in [t4, t5, t6]:
+        assert t.task_id is not None
 
     # Make sure the second Workflow has a distinct Workflow ID & WorkflowRun ID
     assert wf1.workflow_id != wf2.workflow_id
@@ -59,8 +65,10 @@ def test_wfargs_update(tool):
     # Make sure the second Workflow has a distinct set of Tasks
     wfr1 = WorkflowRun(wf1.workflow_id)
     wfr1.bind()
+    assert wfr1.workflow_run_id is not None
     wfr2 = WorkflowRun(wf2.workflow_id)
     wfr2.bind()
+    assert wfr2.workflow_run_id is not None
     assert not (
         set([t.task_id for _, t in wf1.tasks.items()])
         & set([t.task_id for _, t in wf2.tasks.items()])
@@ -83,9 +91,13 @@ def test_attempt_resume_on_complete_workflow(tool):
 
     # bind workflow to db and move to done state
     wf1.bind()
+    assert wf1.workflow_id is not None
     wf1._bind_tasks()
+    for t in [t1, t2]:
+        assert t.task_id is not None
     wfr1 = WorkflowRun(wf1.workflow_id)
     wfr1.bind()
+    assert wfr1.workflow_run_id is not None
     wfr1._update_status(WorkflowRunStatus.BOUND)
     wfr1._update_status(WorkflowRunStatus.INSTANTIATED)
     wfr1._update_status(WorkflowRunStatus.LAUNCHED)
@@ -129,7 +141,10 @@ def test_resume_with_old_and_new_workflow_attributes(tool, db_engine):
 
     # bind workflow to db and move to ERROR state
     wf1.bind()
+    assert wf1.workflow_id is not None
     wf1._bind_tasks()
+    for t in [t1, t2]:
+        assert t.task_id is not None
     factory1 = WorkflowRunFactory(wf1.workflow_id)
     wfr1 = factory1.create_workflow_run()
     wfr1._update_status(WorkflowRunStatus.BOUND)
@@ -153,7 +168,10 @@ def test_resume_with_old_and_new_workflow_attributes(tool, db_engine):
 
     # bind workflow to db and run resume
     workflow2.bind()
+    assert workflow2.workflow_id is not None
     workflow2._bind_tasks()
+    for t in [t1, t2]:
+        assert t.task_id is not None
     fact2 = WorkflowRunFactory(workflow2.workflow_id)
     fact2.create_workflow_run()
 
@@ -181,7 +199,9 @@ def test_workflow_identical_args(tool, task_template):
     task = task_template.create_task(arg="sleep 1")
     wf1.add_task(task)
     wf1.bind()
+    assert wf1.workflow_id is not None
     wf1._bind_tasks()
+    assert task.task_id is not None
     WorkflowRunFactory(wf1.workflow_id).create_workflow_run()
 
     # tries to create an identical workflow without the restart flag
@@ -253,6 +273,7 @@ def test_workflow_attribute(db_engine, tool, client_env, task_template):
     t1 = task_template.create_task(arg="exit -0")
     wf1.add_task(t1)
     wf1.bind()
+    assert wf1.workflow_id is not None
 
     # check database entries are populated correctly
     with Session(bind=db_engine) as session:
@@ -297,6 +318,7 @@ def test_workflow_attribute(db_engine, tool, client_env, task_template):
     )
     wf2.add_task(t1)
     wf2.bind()
+    assert wf2.workflow_id is not None
 
     with Session(bind=db_engine) as session:
         wf_attributes = (
@@ -314,11 +336,13 @@ def test_chunk_size(tool, client_env, task_template):
     task_a = task_template.create_task(arg="echo a", upstream_tasks=[])  # To be clear
     wf_a.add_task(task_a)
     wf_a.bind()
+    assert wf_a.workflow_id is not None
 
     wf_b = tool.create_workflow(name="test_wf_chunks_b", chunk_size=10)
     task_b = task_template.create_task(arg="echo b", upstream_tasks=[])  # To be clear
     wf_b.add_task(task_b)
     wf_b.bind()
+    assert wf_b.workflow_id is not None
 
     assert wf_a._chunk_size == 3
     assert wf_b._chunk_size == 10
@@ -338,16 +362,19 @@ def test_add_tasks_dependencynotexist(tool, client_env, task_template):
         wf = tool.create_workflow(name="TestWF2")
         wf.add_tasks([t1, t3])
         wf.bind()
+        assert wf.workflow_id is not None
     assert "Upstream" in str(excinfo.value)
     wf = tool.create_workflow(name="TestWF3")
     wf.add_tasks([t1, t2, t3])
     wf.bind()
+    assert wf.workflow_id is not None
     assert len(wf.tasks) == 3
     wf = tool.create_workflow(name="TestWF4")
     wf.add_tasks([t1])
     wf.add_tasks([t2])
     wf.add_tasks([t3])
     wf.bind()
+    assert wf.workflow_id is not None
     assert len(wf.tasks) == 3
 
 
@@ -396,6 +423,7 @@ def test_workflow_validation(tool, task_template, caplog):
     # Test that a validate call fails if a different DAG is bound.
     # Bind wf1, and create a new workflow with the same args but a different DAG.
     wf1.bind()
+    assert wf1.workflow_id is not None
     wf3 = tool.create_workflow(workflow_args=wf1.workflow_args)
     t3 = task_template.create_task(arg="echo 3")
     wf3.add_task(t3)
@@ -403,6 +431,7 @@ def test_workflow_validation(tool, task_template, caplog):
         wf3._matching_wf_args_diff_hash()
     with pytest.raises(WorkflowAlreadyExists):
         wf3.bind()
+        assert wf3.workflow_id is not None
 
 
 def test_concurrency_limit(client_env, db_engine):
@@ -429,6 +458,7 @@ def test_concurrency_limit(client_env, db_engine):
     task = tt.create_task(arg="no", max_attempts=1)
     workflow1.add_task(task)
     workflow1.bind()
+    assert workflow1.workflow_id is not None
     workflow1._bind_tasks()
     assert (
         workflow1.max_concurrently_running
@@ -467,7 +497,10 @@ def test_concurrency_limit(client_env, db_engine):
     tasks2 = tt2.create_tasks(arg=temp_args)
     workflow2.add_tasks(tasks2)
     workflow2.bind()
+    assert workflow2.workflow_id is not None
     workflow2._bind_tasks()
+    for t in tasks2:
+        assert t.task_id is not None
     assert (
         workflow2.max_concurrently_running
         == MaxConcurrentlyRunning.MAXCONCURRENTLYRUNNING
@@ -514,7 +547,10 @@ def test_concurrency_limit(client_env, db_engine):
     tasks3_2 = tt32.create_tasks(arg=temp_args, max_concurrently_running=40)
     workflow3.add_tasks(tasks3_2)
     workflow3.bind()
+    assert workflow3.workflow_id is not None
     workflow3._bind_tasks()
+    for t in tasks3_1 + tasks3_2:
+        assert t.task_id is not None
     assert (
         workflow3.max_concurrently_running
         == MaxConcurrentlyRunning.MAXCONCURRENTLYRUNNING
@@ -550,9 +586,11 @@ def test_concurrency_limit(client_env, db_engine):
     tasks4 = tt4.create_tasks(arg=temp_args)
     workflow4.add_tasks(tasks4)
     workflow4.bind()
+    assert workflow4.workflow_id is not None
     workflow4._bind_tasks()
+    for t in tasks4:
+        assert t.task_id is not None
     assert workflow4.max_concurrently_running == 23
-    # verify server side
     with Session(bind=db_engine) as session:
         sql = f"""
                 SELECT max_concurrently_running 

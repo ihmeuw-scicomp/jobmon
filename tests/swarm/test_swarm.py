@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import text, update
 from sqlalchemy.orm import Session
 
-from jobmon.plugins.dummy import DummyDistributor
+from jobmon.plugins.dummy.dummy_distributor import DummyDistributor
 from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow import DistributorContext
@@ -15,7 +15,6 @@ from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import WorkflowRunStatus, TaskInstanceStatus
 from jobmon.core.exceptions import CallableReturnedInvalidObject
 from jobmon.distributor.distributor_service import DistributorService
-from jobmon.server.web import session_factory
 from jobmon.server.web._compat import subtract_time
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -152,7 +151,6 @@ def test_wedged_dag(db_engine, tool, task_template, requester_no_retry):
                 task_id = int(task_instance.task.id)
 
             if task_id == self.wedged_task_id:
-                session_factory.configure(bind=db_engine)
 
                 with Session(bind=db_engine) as session:
                     logger.info(

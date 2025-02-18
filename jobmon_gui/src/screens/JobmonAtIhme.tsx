@@ -1,32 +1,26 @@
-import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import '@jobmon_gui/styles/jobmon_gui.css'
+import { Box } from "@mui/material";
+import Mustache from 'mustache';
+import MarkdownLinkNewTabRenderer from "@jobmon_gui/utils/MarkdownLinkNewTabRender";
+import { markdown } from "@jobmon_gui/assets/content/JobmonAtIhme.md";
 
-const replacements = {
-    "JOBMON_DB_HOST": import.meta.env.VITE_APP_DOCS_DB_HOST,
-    "JOBMON_DB_USER": import.meta.env.VITE_APP_DOCS_DB_USER,
-    "JOBMON_DB_PASSWORD": import.meta.env.VITE_APP_DOCS_DB_PASSWORD,
-    "JOBMON_DB_DATABASE": import.meta.env.VITE_APP_DOCS_DB_DATABASE,
-    "JOBMON_DB_PORT": import.meta.env.VITE_APP_DOCS_DB_PORT,
-}
-export default function JobmonAtIHME(){
-    const [text, setText] = useState('')
-    useEffect(() => {
-        const path = require("../assets/content/JobmonAtIhme.md");
-        fetch(path)
-            .then(response => {
-                return response.text();
-            })
-            .then(text => {
-                const markdown = text.replace(/JOBMON_DB_HOST|JOBMON_DB_USER|JOBMON_DB_PASSWORD|JOBMON_DB_DATABASE|JOBMON_DB_PORT/g,
-                    matched => replacements[matched]);
-                setText(markdown);
-            });
-    }, []);
+const templateData = {
+    JOBMON_DB_HOST: import.meta.env.VITE_APP_DOCS_DB_HOST,
+    JOBMON_DB_USER: import.meta.env.VITE_APP_DOCS_DB_USER,
+    JOBMON_DB_PASSWORD: import.meta.env.VITE_APP_DOCS_DB_PASSWORD,
+    JOBMON_DB_DATABASE: import.meta.env.VITE_APP_DOCS_DB_DATABASE,
+    JOBMON_DB_PORT: import.meta.env.VITE_APP_DOCS_DB_PORT,
+    JOBMON_BASE_URL: import.meta.env.VITE_APP_BASE_URL,
+};
 
-    return(
-        <div className="markdown-container">
-            <ReactMarkdown>{text}</ReactMarkdown>
-        </div>
-    )
+export default function JobmonAtIHME() {
+    const templatedMarkdown = Mustache.render(markdown, templateData);
+
+    return (
+        <Box className="markdown-container">
+            <ReactMarkdown components={{ a: MarkdownLinkNewTabRenderer }}>
+                {templatedMarkdown}
+            </ReactMarkdown>
+        </Box>
+    );
 }

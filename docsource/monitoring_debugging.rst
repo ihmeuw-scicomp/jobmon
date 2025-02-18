@@ -96,6 +96,100 @@ By default the query returns 5 results but you can always increase the limit usi
 Jobmon Database
 ###############
 
+Jobmon Database API
+*******************
+
+This API allows users to query the database for detailed resource usage information. There are currently two routes:
+    1. **/wf_resource_usage** - which allows users to query resource usage by Workflow ID.
+    2. **/tool_resource_usage** - which allows users to query resource usage by Tool name.
+
+Base URL
+--------
+
+All API requests should be made to the base URL provided on the **"Jobmon at IHME"** page, accessible through
+the Jobmon GUI.
+
+Authentication
+--------------
+
+Currently, the Database API does not require authentication. In future releases, this may be updated, so check this
+section for any changes.
+
+Resource Usage by Workflow ID
+-----------------------------
+**Endpoint:** `GET <base_url>/workflow/<workflow_id>/wf_resource_usage`
+
+**Parameters:**
+    - Workflow ID
+
+**Description**: Gets the resource usage for all TaskInstances associated with a provided workflow ID.
+
+**Example Response**
+    - **Status Code:** `200 OK`
+    - **Content-Type:** `application/json`
+    - **Body:**
+
+      .. code-block::
+
+          [
+              {
+                  "task_id": 6213741,
+                  "task_name": "random_task_name",
+                  "task_status": "D",
+                  "task_num_attempts": 2,
+                  "task_instance_id": 91823412,
+                  "ti_usage_str": "wallclock=8 cpu=1, mem=7 GBs, io=5 GB",
+                  "ti_wallclock": 8,
+                  "ti_maxrss": 7,
+                  "ti_maxpss": 5,
+                  "ti_cpu": 1,
+                  "ti_io": 5,
+                  "ti_status": "D"
+              }
+          ]
+
+
+
+Resource Usage by Tool Name
+-----------------------------------
+**Endpoint:** `GET <base_url>/tool/<tool_name>/tool_resource_usage?start_date=<YYYY-MM-DD>&end_date=<YYYY-MM-DD>`
+
+**Parameters:**
+    - Tool name
+    - Start date
+    - End date
+
+**Description**: Pass a tool name to the route and it will return the requested resources, utilized resources and
+node_args for TaskInstances associated with that tool. NOTE: it is required to pass a start and end date.
+
+**Example Response**
+    - **Status Code:** `200 OK`
+    - **Content-Type:** `application/json`
+    - **Body:**
+
+      .. code-block::
+
+        [
+            {
+                "node_arg_val": "--provenance True",
+                "ti_id": 12345677,
+                "ti_maxrss": 50844672,
+                "ti_requested_resources": {"runtime": 21600, "memory": 10},
+                "ti_wallclock": 20
+            },
+            {
+                "node_arg_val": "--intrinsic False",
+                "ti_id": 12345678,
+                "ti_maxrss": 43960320,
+                "ti_requested_resources": {"runtime": 21600, "memory": 10},
+                "ti_wallclock": 22
+            }
+        ]
+
+Additional Routes
+-----------------
+If there are any other routes or features you would like to see in the API, please let the SciComp team know.
+
 Running Queries
 ***************
 If the command line status commands do not provide the information you need,

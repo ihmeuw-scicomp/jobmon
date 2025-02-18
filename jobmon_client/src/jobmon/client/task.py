@@ -135,7 +135,7 @@ class Task:
             upstream_tasks: Task objects that must be run prior to this
             task_attributes: dictionary of attributes and their values or list
                 of attributes that will be assigned later.
-            requester: requester object to communicate with the flask services.
+            requester: requester object to communicate with the FastApi services.
 
         Raise:
             ValueError: If the hashed command is not allowed as an SGE job name; see
@@ -530,4 +530,4 @@ class Task:
                 f"request through route {app_route}. Expected code "
                 f"200. Response content: {response}"
             )
-        return SerializeTaskResourceUsage.kwargs_from_wire(response)
+        return SerializeTaskResourceUsage.kwargs_from_wire(response["resource_usage"])

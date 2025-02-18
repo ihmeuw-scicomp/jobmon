@@ -760,6 +760,7 @@ workflow_resume
         * ``-w``, ``--workflow_id`` - required, the workflow ID to resume.
         * ``-c``, ``--cluster_name`` - required, the cluster name you'd like to resume on.
         * ``--reset-running-jobs`` - default False. Whether to kill currently running jobs or let them finish
+        * ``--timeout`` or ``-t`` - Allows users to set the Workflow timeout. Default is 180.
 
     Example usages:
         * ``jobmon workflow_resume -w 123 -c slurm`` - resume workflow ID 123 on the "slurm" cluster in the database.

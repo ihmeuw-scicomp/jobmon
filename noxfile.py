@@ -4,16 +4,15 @@ import os
 from pathlib import Path
 import shutil
 import tempfile
-
+from time import sleep
 
 import nox
 from nox.sessions import Session
 
-
 src_locations = ["jobmon_client/src", "jobmon_core/src", "jobmon_server/src"]
 test_locations = ["tests"]
 
-python = "3.8"
+python = "3.10"
 
 
 @nox.session(python=python, venv_backend="conda")
@@ -25,6 +24,9 @@ def tests(session: Session) -> None:
     args = session.posargs or test_locations
 
     session.run(
+        "coverage",
+        "run",
+        "-m",
         "pytest",
         *args,
         env={"SQLALCHEMY_WARN_20": "1"}
@@ -68,7 +70,7 @@ def typecheck(session: Session) -> None:
     args = session.posargs or src_locations
     session.install("mypy", "types-Flask", "types-requests", "types-PyMySQL", "types-filelock",
                     "types-PyYAML", "types-tabulate", "types-psutil", "types-Flask-Cors",
-                    "types-sqlalchemy-utils", "types-pkg-resources", "types-mysqlclient")
+                    "types-sqlalchemy-utils", "types-setuptools", "types-mysqlclient")
     session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
 
     session.run("mypy", "--explicit-package-bases", *args)
@@ -134,11 +136,8 @@ def clean(session: Session) -> None:
 
 
 @nox.session(python=python, venv_backend="conda")
-def launch_gui_test_server(session: Session) -> None:
-    session.conda_install("mysqlclient")
+def build_gui_test_env(session: Session) -> None:
+    session.conda_install("mysqlclient", "--channel", "conda-forge")
     if os.path.exists("/tmp/tests.sqlite"):
         os.remove("/tmp/tests.sqlite")
-    session.install("-e", "./jobmon_core")
-    session.install("-e", "./jobmon_client")
-    session.install("-e", "./jobmon_server[otlp]")
-    session.run("python", "jobmon_gui/local_testing/jobmon_gui/testing_servers/_create_sqlite_db.py")
+    session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")

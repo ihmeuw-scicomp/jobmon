@@ -87,9 +87,11 @@ class DistributorContext:
         assert self.process.stderr is not None  # keep mypy happy on optional type
         stderr_val = self.process.stderr.read(5)
         if stderr_val != "ALIVE":
+            stderr_all = self.process.stderr.read()
             err = self._shutdown()
             raise DistributorStartupTimeout(
-                f"Distributor process did not start, stderr='{err}'"
+                f"Distributor process did not start, stderr='{err}'\n\n"
+                f"Full stderr: {stderr_all}"
             )
         return self
 
@@ -182,7 +184,7 @@ class Workflow(object):
             workflow_attributes: Attributes that make this workflow different from other
                 workflows that the user wants to record.
             max_concurrently_running: How many running jobs to allow in parallel
-            requester: object to communicate with the flask services.
+            requester: object to communicate with the FastApi services.
             chunk_size: how many tasks to bind in a single request
             default_max_attempts: the default max attempts of the workflow for each array
         """
@@ -513,7 +515,7 @@ class Workflow(object):
 
         logger.info(
             f"Workflow ID {self.workflow_id} assigned. Progress can be monitored at "
-            f"{gui_url}/#/workflow/{self.workflow_id}/tasks"
+            f"{gui_url}/#/workflow/{self.workflow_id}"
         )
 
         # Check if this workflow is already complete and is runnable

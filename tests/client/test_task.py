@@ -92,7 +92,10 @@ def test_task_attribute(db_engine, tool):
     )
     workflow1.add_tasks([task1, task2, task3])
     workflow1.bind()
+    assert workflow1.workflow_id is not None
     workflow1._bind_tasks()
+    for t in [task1, task2, task3]:
+        assert t.task_id is not None
     client_wfr = WorkflowRun(workflow1.workflow_id)
     client_wfr.bind()
 
@@ -170,9 +173,12 @@ def test_reset_attempts_on_resume(db_engine, tool):
 
     # add workflow to database
     workflow1.bind()
+    assert workflow1.workflow_id is not None
     workflow1._bind_tasks()
+    assert task_a.task_id is not None
     wfr_1 = WorkflowRun(workflow1.workflow_id)
     wfr_1.bind()
+    assert wfr_1.workflow_run_id is not None
     wfr_1._update_status(WorkflowRunStatus.BOUND)
     wfr_1._update_status(WorkflowRunStatus.ERROR)
 
@@ -222,8 +228,10 @@ def test_binding_length(db_engine, client_env, tool):
     wf = tool.create_workflow()
     wf.add_task(task1)
     wf.bind()
+    assert wf.workflow_id is not None
     with pytest.raises(InvalidRequest) as resp:
         wf._bind_tasks()
+        assert task1.task_id is not None
     exc_msg = resp.value.args[0]
     assert "Client error with status code 400" in exc_msg
 
@@ -234,8 +242,10 @@ def test_binding_length(db_engine, client_env, tool):
     wf2 = tool.create_workflow()
     wf2.add_task(task2)
     wf2.bind()
+    assert wf2.workflow_id is not None
     with pytest.raises(InvalidRequest) as resp2:
         wf2._bind_tasks()
+        assert task2.task_id is not None
     exc_msg = resp2.value.args[0]
     assert "Task attributes are constrained to 255 characters" in exc_msg
     assert "Client error with status code 400" in exc_msg
@@ -254,7 +264,9 @@ def test_binding_tasks(db_engine, client_env, tool):
     wf = tool.create_workflow()
     wf.add_task(task1)
     wf.bind()
+    assert wf.workflow_id is not None
     wf._bind_tasks()
+    assert task1.task_id is not None
     # verify the task is correctly bind, so are the args
     assert task1.task_id is not None
     with Session(bind=db_engine) as session:
@@ -350,3 +362,57 @@ def test_default_max_attemps(db_engine, client_env, tool):
     # test wf always have a default max attempts so existing code works
     wf5 = tool.create_workflow(default_max_attempts=None)
     assert wf5.default_max_attempts == tool.default_max_attempts is not None
+
+
+def test_downstream_task(client_env, tool, db_engine):
+    """Test case to verify the downstream and the upstream tasks."""
+    wf = tool.create_workflow()
+    tt = tool.get_task_template(
+        template_name="test_tt",
+        command_template="{arg1} {arg2}",
+        node_args=["arg1"],
+        task_args=["arg2"],
+    )
+    task1 = tt.create_task(name="task1", arg1="abc1", arg2="def")
+    task2 = tt.create_task(
+        name="task2", arg1="abc2", arg2="def", upstream_tasks=[task1]
+    )
+    task3 = tt.create_task(
+        name="task3", arg1="abc3", arg2="def", upstream_tasks=[task1]
+    )
+    wf.add_tasks([task1, task2, task3])
+    wf.bind()
+    assert wf.workflow_id is not None
+    wf._bind_tasks()
+    assert task1.task_id is not None
+    assert task2.task_id is not None
+    assert task3.task_id is not None
+    # use the /task/get_downstream_tasks endpoint to verify the downstream tasks
+    with Session(bind=db_engine) as session:
+        # verify edge
+        import re
+
+        res = session.execute(
+            text(
+                f"select downstream_node_ids from task, edge where task.id={task1.task_id} and task.node_id=edge.node_id"
+            )
+        ).fetchall()
+        assert len(res) == 1
+        two_id_patten = r"^\"\[\s*-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?\s*\]\"$"  # '"[1, 2]"'
+        assert re.match(two_id_patten, res[0][0])
+
+        one_id_pattern = r"^\"\[\s*-?\d+(\.\d+)?\s*\]\"$"  # '"[1]"'
+        res = session.execute(
+            text(
+                f"select upstream_node_ids from task, edge where task.id={task2.task_id} and task.node_id=edge.node_id"
+            )
+        ).fetchall()
+        assert len(res) == 1
+        assert re.match(one_id_pattern, res[0][0])
+        res = session.execute(
+            text(
+                f"select upstream_node_ids from task, edge where task.id={task3.task_id} and task.node_id=edge.node_id"
+            )
+        ).fetchall()
+        assert len(res) == 1
+        assert re.match(one_id_pattern, res[0][0])

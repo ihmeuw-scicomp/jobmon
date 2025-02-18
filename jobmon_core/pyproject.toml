@@ -5,11 +5,13 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "jobmon_core"
 description="Shared functionality for Jobmon Namespace Packages"
-requires-python = ">=3.7"
+readme="README.md"
+requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     'aiohttp',
@@ -17,9 +19,12 @@ dependencies = [
     'psutil',
     'requests',
     'tenacity>=8.1',
-    'typing_extensions; python_version<"3.8"',
-    'grpcio<=1.64.1'
-] 
+    'docstring-parser',
+    'grpcio<=1.64.1',
+    'docutils',
+    'sphinx',
+    'python-dotenv',
+]
 dynamic = ["version"]
 
 [project.scripts]
@@ -32,6 +37,7 @@ otlp = [
     'opentelemetry-api',
     'opentelemetry-sdk',
     'opentelemetry-instrumentation',
+    'opentelemetry-instrumentation-fastapi',
     'opentelemetry-instrumentation-requests',
     'opentelemetry-exporter-otlp'
 ]

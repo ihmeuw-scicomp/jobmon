@@ -20,6 +20,7 @@ dist
 .coverage
 .coverage.*
 .test_report.xml
+jobmon.db
 
 # ignore cache directories
 *__pycache__*
@@ -40,3 +41,9 @@ docsource/api
 .idea/
 
 /jobmon_gui/node_modules/
+/corpora/
+.venv
+*.code-workspace
+/.env
+# ignore .env
+.env
