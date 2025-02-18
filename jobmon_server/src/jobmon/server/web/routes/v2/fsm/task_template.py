@@ -68,7 +68,7 @@ async def get_task_template(request: Request) -> Any:
 @api_v1_router.get("/task_template/{task_template_id}/versions")
 @api_v2_router.get("/task_template/{task_template_id}/versions")
 def get_task_template_versions(task_template_id: int) -> Any:
-    """Get the task_template_version."""
+    """Get the latest task_template_version."""
     # get task template version object
     structlog.contextvars.bind_contextvars(task_template_id=task_template_id)
     logger.info(f"Getting task template version for task template: {task_template_id}")
@@ -79,7 +79,15 @@ def get_task_template_versions(task_template_id: int) -> Any:
                 TaskTemplateVersion.task_template_id == task_template_id
             )
             ttvs = session.execute(select_stmt).scalars().all()
-            wire_obj = [ttv.to_wire_as_client_task_template_version() for ttv in ttvs]
+            if ttvs:
+                max_id = max(ttv.id for ttv in ttvs)
+                wire_obj = [
+                    ttv.to_wire_as_client_task_template_version()
+                    for ttv in ttvs
+                    if ttv.id == max_id
+                ]
+            else:
+                wire_obj = []
 
     resp = JSONResponse(
         content={"task_template_versions": wire_obj}, status_code=StatusCodes.OK
