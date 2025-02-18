@@ -601,6 +601,7 @@ class ClientCLI(CLI):
             help="timeout for resume command",
             required=False,
             default=180,
+            type=int,
         )
 
 
