@@ -7,6 +7,7 @@ import logging
 import signal
 import sys
 import time
+import traceback
 from typing import (
     Any,
     Callable,
@@ -326,10 +327,12 @@ class DistributorService:
 
         except Exception as e:
             # if other error, transition to No ID status
+            stack_trace = traceback.format_exc()
             logger.exception(e)
             for task_instance in task_instance_batch.task_instances:
                 distributor_command = DistributorCommand(
-                    task_instance.transition_to_no_distributor_id, no_id_err_msg=str(e)
+                    task_instance.transition_to_no_distributor_id,
+                    no_id_err_msg=stack_trace,
                 )
                 distributor_commands.append(distributor_command)
 
@@ -376,8 +379,9 @@ class DistributorService:
                 requested_resources=requested_resources,
             )
         except Exception as e:
+            stack_trace = traceback.format_exc()
             logger.exception(e)
-            task_instance.transition_to_no_distributor_id(no_id_err_msg=str(e))
+            task_instance.transition_to_no_distributor_id(no_id_err_msg=stack_trace)
 
         else:
             # move from register queue to launch queue

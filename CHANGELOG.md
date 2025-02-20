@@ -16,6 +16,7 @@ All notable changes to Jobmon will be documented in this file.
 ### Changed
 - Bulk kill TaskInstances to speed up workflow stopping (PR 209).
 - Switched from Flask to FastAPI (PR 169).
+- Display the full stack trace when the distributor service encounters an exception, rather than only showing "Retry Error" (PR 227).
 
 ### Fixed
 - Fixed a bug where users were getting hash collision errors for their Tasks that didn't have the same node_arg values (PR 214).
