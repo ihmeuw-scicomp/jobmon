@@ -166,7 +166,7 @@ export default function WorkflowHeader({
     const jobmon_version = wfDetails?.data?.wfr_jobmon_version
     const wfr_user = wfDetails?.data?.wfr_user
 
-    function normalizeVersion(version: string) {
+    function normalizeVersion(version: string): string {
         return version
             .replace(/\.dev/, '-dev')
             .replace(/(\d+)rc(\d+)/, '$1-rc.$2')
