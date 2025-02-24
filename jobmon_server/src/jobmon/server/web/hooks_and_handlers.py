@@ -123,7 +123,7 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
     @app.middleware("http")
     async def session_middleware(request: Request, call_next: Callable) -> Any:
         response = await call_next(request)
-        await teardown_session()  # Call the session teardown after Request
+        teardown_session()  # Call the session teardown after Request
         return response
 
     return app
