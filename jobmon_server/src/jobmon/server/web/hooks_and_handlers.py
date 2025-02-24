@@ -69,7 +69,10 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
 
     @app.middleware("http")
     async def add_requester_context(request: Request, call_next: Callable) -> None:
-        """Add structured logging context before each request from headers, body, or query params."""
+        """Add structured logging context.
+
+        It will add it before each request from headers, body, or query params.
+        """
         structlog.contextvars.clear_contextvars()
 
         context_data = None
