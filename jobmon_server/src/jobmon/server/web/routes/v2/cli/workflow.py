@@ -578,6 +578,12 @@ def workflows_by_user_form(
             )
             rows = session.execute(query, substitution_dict).all()
 
+        def serialize_datetime(obj: datetime) -> str:
+            """Serialize datetime objects into string format."""
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            raise TypeError(f"Type {obj.__class__.__name__} not serializable")
+
         column_names = (
             "wf_id",
             "wf_name",
@@ -594,7 +600,15 @@ def workflows_by_user_form(
         initial_status_counts = {
             label_mapping: 0 for label_mapping in set(_cli_label_mapping.values())
         }
-        result = [dict(zip(column_names, row), **initial_status_counts) for row in rows]
+        result = [
+            {
+                **dict(zip(column_names, row)),
+                **initial_status_counts,
+                "wf_submitted_date": serialize_datetime(row[2]),
+                "wf_status_date": serialize_datetime(row[3]),
+            }
+            for row in rows
+        ]
 
         res = JSONResponse(content={"workflows": result}, status_code=StatusCodes.OK)
     return res
