@@ -22,8 +22,8 @@ export const getWorkflowUsageQueryFn = async ({queryKey}: getWorkflowUsageQueryF
     if (!queryKey || queryKey.length != 4) {
         return;
     }
-    const taskTemplateVersionId = queryKey[3]
-    const workflowId = queryKey[4]
+    const taskTemplateVersionId = queryKey[2]
+    const workflowId = queryKey[3]
     const requestData = {
         task_template_version_id: taskTemplateVersionId,
         workflows: [workflowId],
