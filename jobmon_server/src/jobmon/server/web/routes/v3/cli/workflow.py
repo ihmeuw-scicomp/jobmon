@@ -569,7 +569,7 @@ def workflows_by_user_form(
             )
             rows = session.execute(query, substitution_dict).all()
 
-        def serialize_datetime(obj) -> str:
+        def serialize_datetime(obj: Union[datetime, str]) -> str:
             """Serialize datetime objects into string format."""
             if isinstance(obj, datetime):
                 return obj.isoformat()
