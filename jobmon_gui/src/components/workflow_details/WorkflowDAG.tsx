@@ -141,8 +141,8 @@ export default function WorkflowDAG(workflowId) {
     }, []);
 
     return (
-        <div style={{ height: 500 }}>
-            {nodes.length === 0 || edges.length === 0 ? (
+        <div style={{ height: "100vh", width: "100vw", position: "relative" }}>
+            {nodes.length === 0 ? (
                 <CircularProgress/>
             ) : (
                 <ReactFlow

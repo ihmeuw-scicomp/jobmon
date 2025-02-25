@@ -145,7 +145,7 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
 
     return (
         <div style={{width: '100%', height: '500px'}}>
-            {nodes.length === 0 || edges.length === 0 ? (
+            {nodes.length === 0 ? (
                 <CircularProgress/>
             ) : (
                 <ReactFlow
