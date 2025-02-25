@@ -12,6 +12,7 @@ from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
 
+
 # Dependency for removing session after each request
 async def teardown_session() -> AsyncGenerator:
     """Remove the session after each request."""
@@ -68,7 +69,10 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
 
     @app.middleware("http")
     async def add_requester_context(request: Request, call_next: Callable) -> None:
-        """Add structured logging context before each request from headers, body, or query params."""
+        """Add structured logging context.
+
+        It will add it before each request from headers, body, or query params.
+        """
         structlog.contextvars.clear_contextvars()
 
         context_data = None
@@ -113,7 +117,9 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
 
         # Step 3: Bind the context if found
         if context_data:
-            structlog.contextvars.bind_contextvars(path=request.url.path, **context_data)
+            structlog.contextvars.bind_contextvars(
+                path=request.url.path, **context_data
+            )
 
         # Step 4: Proceed with the request
         response = await call_next(request)
