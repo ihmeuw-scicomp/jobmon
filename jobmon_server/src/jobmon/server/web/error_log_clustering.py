@@ -8,7 +8,7 @@ nltk.download("punkt", quiet=True)
 def cluster_error_logs(df: DataFrame) -> DataFrame:
     """Cluster error logs using unsupervised learning."""
     count_vectorizer = ext.CountVectorizer()
-    if df["task_instance_stderr_log"].isin([None, '']).any():
+    if df["task_instance_stderr_log"].isin([None, ""]).any():
         doc_matrix = count_vectorizer.fit_transform(df["error"])
         sample_error = "error"
     else:
