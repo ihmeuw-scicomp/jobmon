@@ -485,3 +485,4 @@ async def set_task_resume_state(workflow_id: int, request: Request) -> Any:
         ()
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
+

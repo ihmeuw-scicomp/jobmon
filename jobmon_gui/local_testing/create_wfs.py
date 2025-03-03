@@ -96,12 +96,14 @@ def create_tired_wf():
 
 
 def create_wf(total, wf_type):
+    print(f"Creating {total} workflows of type {wf_type}")
     created = 0
     # create #total of workflows; if total is 0, create workflows continuously
     while total == 0 or created < total:
         print("Creating workflow")
         created += 1
         this_wf_type = wf_type
+        print(f"Workflow type: {this_wf_type}")
         if this_wf_type == "random":
             this_wf_type = random.choice(["simple", "tired"])
         if this_wf_type == "simple":

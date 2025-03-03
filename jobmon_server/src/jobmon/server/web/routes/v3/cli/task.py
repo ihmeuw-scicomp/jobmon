@@ -60,7 +60,7 @@ def get_task_status(
     status: Optional[Union[str, list[str]]] = Query(None),
 ) -> Any:
     """Get the status of a task."""
-    logger.info(f"*********************task_ids: {task_ids}, status_request: {status}")
+    logger.info(f"task_ids: {task_ids}, status_request: {status}")
     if task_ids is None:
         raise InvalidUsage("Missing task_ids in request", status_code=400)
 
@@ -263,6 +263,12 @@ async def update_task_statuses(request: Request) -> Any:
                 vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
                 session.execute(task_instance_update_stmt.values(**vals))
                 session.flush()
+                # if workflow status is None, get workflow status from db
+                if workflow_status is None:
+                    workflow_status = (
+                        session.query(Workflow.status)
+                        .filter(Workflow.id == workflow_id)
+                        .scalar())
                 # If workflow is done, need to set it to an error state before resuming
                 if workflow_status == constants.WorkflowStatus.DONE:
                     logger.info(f"reset workflow status for workflow_id: {workflow_id}")
@@ -274,6 +280,9 @@ async def update_task_statuses(request: Request) -> Any:
 
         message = f"updated to status {new_status}"
         resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "PUT, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "*"
     return resp
 
 

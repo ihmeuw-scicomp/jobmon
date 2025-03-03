@@ -1,7 +1,18 @@
 import React, {useMemo, useState} from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import {useQuery} from '@tanstack/react-query';
-import {CircularProgress, Grid} from '@mui/material';
+import {CircularProgress,
+    Grid,
+    Collapse,
+    Stack,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    FormControlLabel,
+    Checkbox,
+    IconButton,
+    Button} from '@mui/material';
 import Typography from '@mui/material/Typography';
 import ReactFlow, {
     Background,
@@ -9,6 +20,9 @@ import ReactFlow, {
     Edge,
     Node,
 } from 'reactflow';
+import axios from "axios";
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import 'reactflow/dist/style.css';
 import {Link, useNavigate} from 'react-router-dom';
 import dagre from 'dagre';
@@ -17,6 +31,8 @@ import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
 import {ScrollableCodeBlock} from "@jobmon_gui/components/ScrollableTextArea.tsx";
 import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
 import {getTaskDetailsQueryFn} from "@jobmon_gui/queries/GetTaskDetails.ts";
+import {update_task_status_url} from "@jobmon_gui/configs/ApiUrls.ts";
+import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
 
 
 type NodeListsProps = {
@@ -28,6 +44,10 @@ type NodeListsProps = {
 export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) {
     const [showTaskInfo, setShowTaskInfo] = useState(false)
     const [selectedTaskId, setSelectedTaskId] = useState(taskId);
+    const [updateTaskCollepsOpen, setUpdateTaskCollepsOpen] = useState(false);
+    const [newStatus, setNewStatus] = React.useState('G');
+    const [force, setForce] = React.useState(true);
+    const [recursive, setRecursive] = React.useState(true);
 
     const taskDependencies = useQuery({
         queryKey: ['task_dependencies', taskId],
@@ -143,6 +163,31 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
         return <CircularProgress/>;
     }
 
+    const handleTaskStatusUpdate = async () => {
+        const taskIds = [selectedTaskId]
+        const workflowId = task_details?.data?.workflow_id
+        try {
+          const response = await axios.put(
+            update_task_status_url,
+            {
+              task_ids: taskIds,
+              new_status: newStatus,
+              workflow_status: null,
+              workflow_id: workflowId,
+            },
+            jobmonAxiosConfig
+          );
+
+          console.log('Task statuses updated successfully:', response.data);
+          // Optionally, update your UI or state here with the new data
+          // Refresh task details
+          task_details.refetch();
+        } catch (error) {
+          console.error('Error updating task statuses:', error);
+          // Optionally, display an error message to the user here
+        }
+     }
+
     return (
         <div style={{width: '100%', height: '500px'}}>
             {nodes.length === 0 ? (
@@ -175,7 +220,63 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
                             </Link>
                         </Grid>
                         <Grid item xs={3}><b>Task Status:</b></Grid>
-                        <Grid item xs={9}>{task_details?.data?.task_status}</Grid>
+                        <Grid
+                              item
+                              xs={9}
+                            >
+                              {task_details?.data?.task_status}
+                              <IconButton onClick={() => setUpdateTaskCollepsOpen(prev => !prev)}>
+                                  {updateTaskCollepsOpen ? <KeyboardArrowUpIcon/> : <KeyboardArrowDownIcon/>}
+                              </IconButton>
+                            <Collapse in={updateTaskCollepsOpen} timeout="auto" unmountOnExit>
+                               <Stack
+                                  direction="row"
+                                  spacing={2}
+                                  alignItems="left"
+                                  sx={{ border: 1, p: 2 }}
+                                >
+                                   <b>Update Task Status: </b>
+                                   <FormControl variant="outlined" size="small">
+                                    <InputLabel id="new-status-label">New Status</InputLabel>
+                                    <Select
+                                      labelId="new-status-label"
+                                      id="new-status-select"
+                                      value={newStatus}
+                                      label="New Status"
+                                      onChange={(e) => setNewStatus(e.target.value as string)}
+                                      style={{ minWidth: 80 }}
+                                    >
+                                      <MenuItem value="D">D</MenuItem>
+                                      <MenuItem value="G">G</MenuItem>
+                                    </Select>
+                                  </FormControl>
+                                  <FormControlLabel
+                                    control={
+                                      <Checkbox
+                                        checked={force}
+                                        onChange={(e) => setForce(e.target.checked)}
+                                        color="primary"
+                                      />
+                                    }
+                                    label="Force"
+                                  />
+                                  <FormControlLabel
+                                    control={
+                                      <Checkbox
+                                        checked={recursive}
+                                        onChange={(e) => setRecursive(e.target.checked)}
+                                        color="primary"
+                                      />
+                                    }
+                                    label="Recursive"
+                                  />
+                                   <Button variant="contained" color="primary" onClick={handleTaskStatusUpdate}>
+                                    Update
+                                  </Button>
+                               </Stack>
+                            </Collapse>
+                        </Grid>
+
                         <Grid item xs={3}><b>Task Command:</b></Grid>
                         <Grid item
                               xs={9}><ScrollableCodeBlock>{task_details?.data?.task_command}</ScrollableCodeBlock></Grid>
