@@ -219,15 +219,24 @@ async def get_task_subdag(request: Request) -> Any:
 
 @api_v3_router.put("/task/update_statuses")
 async def update_task_statuses(request: Request) -> Any:
-    """Update the status of the tasks."""
+    """Update the status of the tasks.
+
+    This API is different from v2.
+    It integrated the logic in update_task_status from status_commands.py.
+    TODO:
+    - Once CLI moves to v3, modify simplify update_task_status to avoid duplication.
+    """
     data = cast(Dict, await request.json())
     try:
         task_ids = data["task_ids"]
         if isinstance(task_ids, int):
             task_ids = [task_ids]
         new_status = data["new_status"]
-        workflow_status = data["workflow_status"]
+        # get workflow_status, if not provided, get it from db
+        workflow_status = data.get("workflow_status", None)
         workflow_id = data["workflow_id"]
+        # get the recursive flag, if not provided, default to False
+        recursive = data.get("recursive", False)
     except KeyError as e:
         raise InvalidUsage(
             f"problem with {str(e)} in request to {request.url.path}", status_code=400
@@ -235,6 +244,27 @@ async def update_task_statuses(request: Request) -> Any:
 
     with SessionLocal() as session:
         with session.begin():
+            # If recursive is True, appends all dependent task_ids
+            # (upstream if new_status == 'D'; downstream if new_status == 'G').
+            if recursive:
+                if new_status == constants.TaskStatus.DONE:
+                    logger.info("recursive update including upstream tasks")
+                    direction = constants.Direction.UP
+                elif new_status == constants.TaskStatus.REGISTERING:
+                    logger.info("recursive update including downstream tasks")
+                    direction = constants.Direction.DOWN
+                else:
+                    raise InvalidUsage(
+                        f"Invalid new_status {new_status} for recursive update",
+                        status_code=400,
+                    )
+                task_ids = _get_tasks_recursive(set(task_ids), direction, session)
+            # if task_ids exceeds 10k, raise an error
+            if len(task_ids) > 10000:
+                raise InvalidUsage(
+                    f"task_ids exceeds 10k, please chunk the request into smaller ones",
+                    status_code=400,
+                )
             logger.info(
                 f"reset status of task_ids: {task_ids}, new_status: {new_status}"
             )

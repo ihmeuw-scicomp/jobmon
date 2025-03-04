@@ -1,7 +1,8 @@
 import React, {useMemo, useState} from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import {useQuery} from '@tanstack/react-query';
-import {CircularProgress,
+import {
+    CircularProgress,
     Grid,
     Collapse,
     Stack,
@@ -12,7 +13,8 @@ import {CircularProgress,
     FormControlLabel,
     Checkbox,
     IconButton,
-    Button} from '@mui/material';
+    Button, Tooltip
+} from '@mui/material';
 import Typography from '@mui/material/Typography';
 import ReactFlow, {
     Background,
@@ -44,10 +46,10 @@ type NodeListsProps = {
 export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) {
     const [showTaskInfo, setShowTaskInfo] = useState(false)
     const [selectedTaskId, setSelectedTaskId] = useState(taskId);
-    const [updateTaskCollepsOpen, setUpdateTaskCollepsOpen] = useState(false);
+    const [updateTaskCollepsOpen, setUpdateTaskCollepsOpen] = useState(true);
     const [newStatus, setNewStatus] = React.useState('G');
-    const [force, setForce] = React.useState(true);
     const [recursive, setRecursive] = React.useState(true);
+    const [taskUpdateMsg, setTaskUpdateMsg] = React.useState('')
 
     const taskDependencies = useQuery({
         queryKey: ['task_dependencies', taskId],
@@ -153,6 +155,10 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
         const taskId = node.id.replace(/^(up-|down-|task-)/, '');
         setSelectedTaskId(taskId);
         setShowTaskInfo(true);
+        // Extend the task update collapse by default
+        setUpdateTaskCollepsOpen(true)
+        // Clear the task update message
+        setTaskUpdateMsg('')
     };
 
     if (taskDependencies.isError) {
@@ -174,17 +180,16 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
               new_status: newStatus,
               workflow_status: null,
               workflow_id: workflowId,
+              recursive: recursive,
             },
             jobmonAxiosConfig
           );
-
-          console.log('Task statuses updated successfully:', response.data);
-          // Optionally, update your UI or state here with the new data
+          setTaskUpdateMsg('Task statuses updated successfully');
           // Refresh task details
           task_details.refetch();
+          taskDependencies.refetch();
         } catch (error) {
-          console.error('Error updating task statuses:', error);
-          // Optionally, display an error message to the user here
+          setTaskUpdateMsg('Error updating task statuses: ' + error.response.data.message);
         }
      }
 
@@ -250,29 +255,26 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
                                       <MenuItem value="G">G</MenuItem>
                                     </Select>
                                   </FormControl>
-                                  <FormControlLabel
-                                    control={
-                                      <Checkbox
-                                        checked={force}
-                                        onChange={(e) => setForce(e.target.checked)}
-                                        color="primary"
+                                  <Tooltip title="Recurivly modifies the task status if checked. Only updates the selected tasks if unchecked.">
+                                      <FormControlLabel
+                                        control={
+                                          <Checkbox
+                                            checked={recursive}
+                                            onChange={(e) => setRecursive(e.target.checked)}
+                                            color="primary"
+                                          />
+                                        }
+                                        label="Recursive"
                                       />
-                                    }
-                                    label="Force"
-                                  />
-                                  <FormControlLabel
-                                    control={
-                                      <Checkbox
-                                        checked={recursive}
-                                        onChange={(e) => setRecursive(e.target.checked)}
-                                        color="primary"
-                                      />
-                                    }
-                                    label="Recursive"
-                                  />
+                                   </Tooltip>
                                    <Button variant="contained" color="primary" onClick={handleTaskStatusUpdate}>
                                     Update
                                   </Button>
+                                   {taskUpdateMsg !== '' &&
+                                       <Typography color="red">
+                                           <i><br/>{taskUpdateMsg}</i>
+                                       </Typography>
+                                   }
                                </Stack>
                             </Collapse>
                         </Grid>
