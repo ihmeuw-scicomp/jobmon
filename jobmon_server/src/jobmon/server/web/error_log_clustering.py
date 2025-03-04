@@ -9,7 +9,9 @@ def cluster_error_logs(df: DataFrame) -> DataFrame:
     """Cluster error logs using unsupervised learning."""
     count_vectorizer = ext.CountVectorizer()
     df["processed_log"] = df["task_instance_stderr_log"].where(
-        df["task_instance_stderr_log"].notna() & (df["task_instance_stderr_log"] != ""), df["error"])
+        df["task_instance_stderr_log"].notna() & (df["task_instance_stderr_log"] != ""),
+        df["error"],
+    )
     doc_matrix = count_vectorizer.fit_transform(df["processed_log"])
 
     # TF-IDF transformation
