@@ -23,18 +23,18 @@ jobs:
   build_and_publish:
     environment: 'deploy'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
-    # A matrix with three sub-packages. We'll run the same job for each.
     strategy:
       matrix:
         subdir: [ "jobmon_client", "jobmon_core", "jobmon_server" ]
-      # Controls how many can run in parallel. 1 = sequential.
       max-parallel: 1
 
     steps:
       - uses: actions/checkout@v4
         with:
-          # Important for setuptools-scm to detect tags
           fetch-depth: 0
 
       - name: Set up Python
@@ -47,14 +47,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install build
 
-      # This step runs first in every matrix job, but if the user
-      # only wants one subdir, we skip.
       - name: Skip if the chosen subdir doesn't match
         if: ${{ inputs.subdir != 'all' && matrix.subdir != inputs.subdir }}
         run: |
           echo "Skipping ${{ matrix.subdir }} because user chose ${{ inputs.subdir }}"
 
-      # Actually build the package only if we're chosen or user picked 'all'.
       - name: Build package
         if: ${{ inputs.subdir == 'all' || matrix.subdir == inputs.subdir }}
         run: |
