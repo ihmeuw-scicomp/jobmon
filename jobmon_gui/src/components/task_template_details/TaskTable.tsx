@@ -31,7 +31,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         queryFn: getWorkflowTasksQueryFn,
         staleTime: 5000,
         enabled: !!workflowId && !!taskTemplateName,
-        refetchOnMount: false
+        refetchOnMount: true, // Refetch on mount to reflect task status updates
     })
 
 

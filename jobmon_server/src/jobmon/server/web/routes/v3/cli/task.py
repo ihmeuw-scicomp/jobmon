@@ -518,7 +518,7 @@ def _get_node_dependencies(
                 else edges.upstream_node_ids
             )
             if upstreams:
-                node_ids = node_ids.union(set(upstreams))
+                node_ids.update(upstreams)
         elif direction == Direction.DOWN:
             downstreams = (
                 json.loads(edges.downstream_node_ids)
@@ -526,10 +526,9 @@ def _get_node_dependencies(
                 else edges.downstream_node_ids
             )
             if downstreams:
-                node_ids = node_ids.union(set(downstreams))
+                node_ids.update(downstreams)
         else:
             raise ValueError(f"Invalid direction type. Expected one of: {Direction}")
-        print(node_ids)
     return node_ids
 
 
@@ -549,7 +548,7 @@ def _get_subdag(node_ids: list, dag_id: int, session: Session) -> list:
         node_descendants = _get_node_dependencies(
             node_descendants, dag_id, session, Direction.DOWN
         )
-        node_set = node_set.union(node_descendants)
+        node_set.update(node_descendants)
     return list(node_set)
 
 
