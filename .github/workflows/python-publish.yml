@@ -64,4 +64,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           skip-existing: true
-          dists: "${{ matrix.subdir }}/dist/*"
+          packages-dir: "${{ matrix.subdir }}/dist"
