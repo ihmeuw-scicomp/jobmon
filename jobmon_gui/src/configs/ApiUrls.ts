@@ -29,3 +29,4 @@ export const get_task_template_concurrency_url = (wf_id: number | string, tt_ver
 export const get_task_template_details_url = (workflowId: number, taskTemplateId: number) => api_base_url + `/get_task_template_details?workflow_id=${workflowId}&task_template_id=${taskTemplateId}`;
 
 export const update_task_status_url = api_base_url + `/task/update_statuses`;
+export const get_task_template_id_url = (task_template_version_id: number | string) => api_base_url + `/task_template/id/${task_template_version_id}`;

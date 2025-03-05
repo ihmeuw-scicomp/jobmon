@@ -33,8 +33,8 @@ def parse_arguments():
     parser.add_argument(
         '--wf-type',
         type=str,
-        help="Type of workflows: simple, tired, or random.",
-        choices=["simple", "tired", "random"],  # Specify the allowed values
+        help="Type of workflows: simple, tired, huge, or random.",
+        choices=["simple", "tired", "random", "huge"],  # Specify the allowed values
         default="simple"  # Set the default value
     )
 
@@ -74,6 +74,12 @@ def create_tired_wf(size_tier1=10, size_tier3=100):
         node_args=["arg"],
         task_args=["arg_filler"]
     )
+    tt4 = tool.get_task_template(
+        template_name="tired_task4",
+        command_template="echo {arg} || {arg_filler} || true || true",
+        node_args=["arg"],
+        task_args=["arg_filler"]
+    )
     tier1 = []
     for i in range(size_tier1):
         task = tt.create_task(
@@ -101,6 +107,13 @@ def create_tired_wf(size_tier1=10, size_tier3=100):
         )
         tier3.append(task)
     tasks = tasks + tier3
+    tier4 = tt4.create_task(
+        name=f"tired_task_second_tier",
+        arg="I am the last task",
+        upstream_tasks=tier3,
+        compute_resources={"queue": Q, "num_cores": 1},
+    )
+    tasks = tasks + [tier4]
     wf = tool.create_workflow(
         name=f"wf",
         default_cluster_name=C,

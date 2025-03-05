@@ -30,7 +30,8 @@ function WorkflowDetails() {
 
     const wfTTStatus = useQuery({
         queryKey: ["workflow_details", "tt_status", workflowId],
-        queryFn: getWorkflowTTStatusQueryFn
+        queryFn: getWorkflowTTStatusQueryFn,
+        refetchOnMount: true
     })
 
     const navigate = useNavigate();
