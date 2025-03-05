@@ -30,7 +30,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         queryKey: ["workflow_details", "tasks", workflowId, taskTemplateName],
         queryFn: getWorkflowTasksQueryFn,
         staleTime: 5000,
-        enabled: !!taskTemplateName,
+        enabled: !!workflowId && !!taskTemplateName,
         refetchOnMount: false
     })
 
@@ -185,7 +185,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
     };
 
     if (!taskTemplateName) {
-        return (<Typography sx={{pt: 5}}>Select a task template from above to view tasks</Typography>)
+        return (<Typography sx={{pt: 5}}>Could not retrieve tasks for this task template.</Typography>)
     }
 
     if (tasks.isError) {

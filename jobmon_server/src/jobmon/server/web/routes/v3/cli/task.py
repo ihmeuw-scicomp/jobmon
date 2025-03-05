@@ -17,11 +17,14 @@ from jobmon.core.constants import Direction
 from jobmon.core.serializers import SerializeTaskResourceUsage
 from jobmon.server.web.db_admin import get_session_local
 from jobmon.server.web.models.edge import Edge
+from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.task_resources import TaskResources
+from jobmon.server.web.models.task_template import TaskTemplate
+from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
@@ -630,14 +633,25 @@ def get_task_details_viz(task_id: int) -> Any:
     """Get status of Task from Task ID."""
     with SessionLocal() as session:
         with session.begin():
-            query = select(
-                Task.status,
-                Task.workflow_id,
-                Task.name,
-                Task.command,
-                Task.status_date,
-            ).where(
-                Task.id == task_id,
+            query = (
+                select(
+                    Task.status,
+                    Task.workflow_id,
+                    Task.name,
+                    Task.command,
+                    Task.status_date,
+                    TaskTemplate.id,
+                )
+                .join(Node, Task.node_id == Node.id)
+                .join(
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join(
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .where(Task.id == task_id)
             )
             rows = session.execute(query).all()
 
@@ -647,6 +661,7 @@ def get_task_details_viz(task_id: int) -> Any:
             "task_name",
             "task_command",
             "task_status_date",
+            "task_template_id",
         )
         result = [dict(zip(column_names, row)) for row in rows]
 

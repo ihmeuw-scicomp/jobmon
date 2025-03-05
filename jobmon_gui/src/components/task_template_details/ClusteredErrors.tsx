@@ -42,6 +42,7 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         queryFn: getClusteredErrorsFn,
         enabled: !!taskTemplateId
     })
+
     const prefetchErrorDetails = async (nextErrorDetailIndex: boolean | ErrorSampleModalDetails) => {
         /*
         Pre-fetch the next error detail to provide a better ux to the user, cache the results in the
@@ -103,17 +104,28 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
         columnHelper.accessor("sample_error", {
             header: "Sample Error",
             size: 750,
-            Cell: ({renderedCellValue, row}) => (
-                <Typography>
-                    <Button sx={{textTransform: 'none', textAlign: "left"}}
+            Cell: ({renderedCellValue, row}) => {
+                const stringValue = typeof renderedCellValue === "string" ? renderedCellValue : String(renderedCellValue);
+                const truncatedValue = stringValue
+                    ? (stringValue .length > 100
+                        ? `...${stringValue .slice(-100)}`
+                        : stringValue )
+                    : '';
+
+                return (
+                    <Typography>
+                        <Button
+                            sx={{textTransform: 'none', textAlign: "left"}}
                             onClick={() => setErrorDetailIndex({
                                 sample_index: 0,
                                 sample_ids: row.original.task_instance_ids
-                            })}>
-                        {renderedCellValue}
-                    </Button>
-                </Typography>
-            ),
+                            })}
+                        >
+                            {truncatedValue}
+                        </Button>
+                    </Typography>
+                );
+            },
         }),
         columnHelper.accessor("first_error_time", {
             header: "First Seen",

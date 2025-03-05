@@ -1,10 +1,11 @@
 """Routes for TaskTemplate."""
 
+from decimal import Decimal
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from fastapi import Query, Request
+from fastapi import HTTPException, Query, Request
 import numpy as np
 import pandas as pd  # type:ignore
 import scipy.stats as st  # type:ignore
@@ -39,6 +40,50 @@ from jobmon.server.web.server_side_exception import InvalidUsage
 logger = structlog.get_logger(__name__)
 SessionLocal = get_session_local()
 _CONFIG = get_jobmon_config()
+
+
+@api_v1_router.get("/get_task_template_details")
+@api_v2_router.get("/get_task_template_details")
+def get_task_template_details_for_workflow(
+    workflow_id: int = Query(..., ge=1),
+    task_template_id: int = Query(..., ge=1),
+) -> Any:
+    """Fetch Task Template details (ID, Name, and Version) for a given Workflow."""
+    with SessionLocal() as session:
+        with session.begin():
+            query_filter = [
+                Task.workflow_id == workflow_id,
+                Task.node_id == Node.id,
+                Node.task_template_version_id == TaskTemplateVersion.id,
+                TaskTemplateVersion.task_template_id == task_template_id,
+                TaskTemplateVersion.task_template_id == TaskTemplate.id,
+            ]
+
+            sql = (
+                select(
+                    TaskTemplate.id,
+                    TaskTemplate.name,
+                    TaskTemplateVersion.id.label("task_template_version_id"),
+                )
+                .where(*query_filter)
+                .distinct()
+            )
+
+            row = session.execute(sql).one_or_none()
+
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Task Template not found for the given workflow.",
+            )
+
+        tt_details_data = {
+            "task_template_id": row.id,
+            "task_template_name": row.name,
+            "task_template_version_id": row.task_template_version_id,
+        }
+
+        return JSONResponse(content=tt_details_data, status_code=StatusCodes.OK)
 
 
 @api_v1_router.get("/get_task_template_version")
@@ -377,6 +422,12 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
     # return DS
     return_dic: Dict[int, Any] = dict()
 
+    def serialize_decimal(value: Union[Decimal, float]) -> float:
+        """Convert Decimal to float for JSON serialization."""
+        if isinstance(value, Decimal):
+            return float(value)
+        return value
+
     with SessionLocal() as session:
         with session.begin():
             # user subquery as the Array table has to be joined on two columns
@@ -489,7 +540,16 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             return_dic[int(task_template_id)]["MAXC"] = (
                 max_concurrently if max_concurrently is not None else "NA"
             )
-        resp = JSONResponse(content=return_dic, status_code=StatusCodes.OK)
+
+        return_dic_serializable = {
+            key: {
+                k: serialize_decimal(v) if isinstance(v, (Decimal, float)) else v
+                for k, v in val.items()
+            }
+            for key, val in return_dic.items()
+        }
+
+        resp = JSONResponse(content=return_dic_serializable, status_code=StatusCodes.OK)
     return resp
 
 

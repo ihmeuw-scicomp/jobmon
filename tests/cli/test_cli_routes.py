@@ -3,6 +3,7 @@ import random
 import string
 
 import pandas as pd
+import pytest
 from sqlalchemy.orm import Session
 from sqlalchemy import select, text, update
 
@@ -14,11 +15,137 @@ from jobmon.core.constants import (
     WorkflowRunStatus,
     WorkflowStatus,
 )
+from jobmon.core.exceptions import InvalidRequest
 from jobmon.server.web.models import load_model
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.workflow import Workflow
 
 load_model()
+
+
+def test_get_task_template_details_for_workflow(db_engine, tool):
+    t = tool
+    wf = t.create_workflow(name="i_am_a_fake_wf")
+    tt1 = t.get_task_template(
+        template_name="tt1",
+        command_template="sleep {arg}",
+        node_args=["arg"],
+        default_compute_resources={"queue": "null.q"},
+        default_cluster_name="sequential",
+    )
+    tt2 = t.get_task_template(
+        template_name="tt2",
+        command_template="echo {arg}",
+        node_args=["arg"],
+        default_compute_resources={"queue": "null.q"},
+        default_cluster_name="sequential",
+    )
+
+    task_1 = tt1.create_task(arg=1)
+    task_2 = tt1.create_task(arg=2)
+    task_3 = tt2.create_task(arg=3)
+    wf.add_tasks([task_1, task_2, task_3])
+    wf.bind()
+    wf._bind_tasks()
+    factory = WorkflowRunFactory(wf.workflow_id)
+    wfr = factory.create_workflow_run()
+    wfr._update_status(WorkflowRunStatus.BOUND)
+
+    # Test fetching task template details for workflow (Valid case)
+    app_route = "/get_task_template_details"
+    return_code, msg = wf.requester.send_request(
+        app_route=app_route,
+        message={"workflow_id": wf.workflow_id, "task_template_id": tt1.id},
+        request_type="get",
+    )
+
+    assert return_code == 200
+    assert len(msg) == 3
+    assert "task_template_id" in msg.keys()
+    assert msg["task_template_id"] == tt1.id
+    assert "task_template_name" in msg.keys()
+    assert msg["task_template_name"] == "tt1"
+    assert "task_template_version_id" in msg.keys()
+    assert msg["task_template_version_id"] == tt1._active_task_template_version.id
+
+    # Test fetching task template details for workflow (Invalid case - non-existent workflow id)
+    app_route = "/get_task_template_details"
+    with pytest.raises(InvalidRequest) as exc_info:
+        wf.requester.send_request(
+            app_route=app_route,
+            message={"workflow_id": 99999, "task_template_id": tt1.id},
+            request_type="get",
+        )
+
+    assert "Client error with status code 404" in str(exc_info.value)
+    assert "Task Template not found for the given workflow." in str(exc_info.value)
+
+    # Test fetching task template details for workflow (Invalid case - non-existent task template id)
+    app_route = "/get_task_template_details"
+    with pytest.raises(InvalidRequest) as exc_info:
+        wf.requester.send_request(
+            app_route=app_route,
+            message={"workflow_id": wf.workflow_id, "task_template_id": 99999},
+            request_type="get",
+        )
+
+    assert "Client error with status code 404" in str(exc_info.value)
+    assert "Task Template not found for the given workflow." in str(exc_info.value)
+
+    # Test fetching task template details for workflow (Invalid case - missing workflow id)
+    app_route = "/get_task_template_details"
+    with pytest.raises(InvalidRequest) as exc_info:
+        wf.requester.send_request(
+            app_route=app_route,
+            message={"workflow_id": None, "task_template_id": tt1.id},
+            request_type="get",
+        )
+
+    assert "Client error with status code 422" in str(exc_info.value)
+
+    # Test fetching task template details for workflow (Invalid case - missing task template id)
+    app_route = "/get_task_template_details"
+    with pytest.raises(InvalidRequest) as exc_info:
+        wf.requester.send_request(
+            app_route=app_route,
+            message={"workflow_id": wf.workflow_id, "task_template_id": None},
+            request_type="get",
+        )
+
+    assert "Client error with status code 422" in str(exc_info.value)
+
+    # Test fetching task template details for workflow (Invalid case - negative workflow id)
+    app_route = "/get_task_template_details"
+    with pytest.raises(InvalidRequest) as exc_info:
+        wf.requester.send_request(
+            app_route=app_route,
+            message={"workflow_id": -1, "task_template_id": tt1.id},
+            request_type="get",
+        )
+
+    assert "Client error with status code 422" in str(exc_info.value)
+
+    # Test fetching task template details for workflow (Invalid case - non-integer workflow id)
+    app_route = "/get_task_template_details"
+    with pytest.raises(InvalidRequest) as exc_info:
+        wf.requester.send_request(
+            app_route=app_route,
+            message={"workflow_id": 3.14, "task_template_id": tt1.id},
+            request_type="get",
+        )
+
+    assert "Client error with status code 422" in str(exc_info.value)
+
+    # Test fetching task template details for workflow (Invalid case - string task template id)
+    app_route = "/get_task_template_details"
+    with pytest.raises(InvalidRequest) as exc_info:
+        wf.requester.send_request(
+            app_route=app_route,
+            message={"workflow_id": wf.workflow_id, "task_template_id": "tt1"},
+            request_type="get",
+        )
+
+    assert "Client error with status code 422" in str(exc_info.value)
 
 
 def test_get_task_template_version(db_engine, tool):

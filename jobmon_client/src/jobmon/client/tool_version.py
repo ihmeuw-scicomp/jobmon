@@ -110,7 +110,6 @@ class ToolVersion:
         ]
         for task_template in task_templates:
             self.task_templates[task_template.template_name] = task_template
-            task_template.load_task_template_versions()
 
     def get_task_template(self, template_name: str) -> TaskTemplate:
         """Get a single task_template associated with this tool version from the database."""

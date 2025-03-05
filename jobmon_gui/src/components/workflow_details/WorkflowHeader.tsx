@@ -166,8 +166,10 @@ export default function WorkflowHeader({
     const jobmon_version = wfDetails?.data?.wfr_jobmon_version
     const wfr_user = wfDetails?.data?.wfr_user
 
-    function normalizeVersion(version) {
-        return version.replace(/\.dev/, '-dev');
+    function normalizeVersion(version: string): string {
+        return version
+            .replace(/\.dev/, '-dev')
+            .replace(/(\d+)rc(\d+)/, '$1-rc.$2')
     }
 
     const normalizedVersion = normalizeVersion(jobmon_version);
@@ -180,7 +182,9 @@ export default function WorkflowHeader({
             <Box sx={{display: 'flex', alignItems: 'center'}}>
                 <span>
                     {icon && <span className={className}>{icon}</span>}
-                    {wf_id} {wf_name ? `- ${wf_name}` : ''}
+                    <Typography variant="h5" component="span" sx={{pl: 1}}>
+                        {wf_id} {wf_name ? `- ${wf_name}` : ''}
+                    </Typography>
                 </span>
                 <span style={{transform: 'translateY(-5px)', paddingLeft: '10px'}}>
                     <HtmlTooltip
@@ -196,12 +200,18 @@ export default function WorkflowHeader({
                             <InfoIcon fontSize={"large"}/>
                         </IconButton>
                     </HtmlTooltip>
-                    <IconButton
-                        color="inherit"
-                        onClick={() => setShowTechnicalPanel(true)}
+                    <HtmlTooltip
+                        title="Technical Panel"
+                        arrow={true}
+                        placement={"bottom"}
                     >
-                        <BuildIcon/>
-                    </IconButton>
+                        <IconButton
+                            color="inherit"
+                            onClick={() => setShowTechnicalPanel(true)}
+                        >
+                            <BuildIcon/>
+                        </IconButton>
+                    </HtmlTooltip>
                 </span>
             </Box>
             <Box>
