@@ -22,26 +22,26 @@ All notable changes to Jobmon will be documented in this file.
 ## [3.4.5] - 2025-02-26
 ### Fixed
 - Fixed the Jobmon test suite (PR 235).
-- Fixed a bug where the DAG viz wouldn't load if the the DAG only had a single node (PR 236).
+- Fixed a bug where the DAG viz wouldn't load if the DAG only had a single node (PR 236).
 
 ## [3.4.4] - 2025-02-25
 ### Fixed
 - Fixed a decimal serialization error in v2 get_workflow_tt_status_viz (PR 233).
-- Fixed a bug where resource usage data wasn't being shown do to incorrect indexing (PR 232).
+- Fixed a bug where resource usage data wasn't being shown do to incorrect indexing (PR 234).
 
 ## [3.4.3] - 2025-02-24
 ### Fixed
-- Fixed a datetime error in v2 get_task_details_viz (PR 231).
+- Fixed a datetime error in v2 get_task_details_viz (PR 232).
 
 ## [3.4.2] - 2025-02-24
 ### Fixed
-- Fixed a datetime error in v2 workflow_by_user_form (PR 229, 230)
+- Fixed a datetime error in v2 workflow_by_user_form (PR 231)
 - Fixed pod scaling problems in TAD.
 
 ## [3.4.1] - 2025-02-24
 ### Fixed
-- Removed an `await` in the requester context that was causing a bug
-- Made `app_requested_context` backward compatible
+- Removed an `await` in the requester context that was causing a bug (PR 229).
+- Made `app_requested_context` backward compatible (PR 230).
 
 ## [3.4.0] - 2025-02-24 (jenkins 22)
 ### Added
