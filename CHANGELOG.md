@@ -9,7 +9,41 @@ All notable changes to Jobmon will be documented in this file.
 ### Deprecated
 ### Removed
 
-## [3.4.0] - TBD
+
+## [3.4.7] - 2025-03-04
+### Changed
+- Added missing client ingress route in TAD.
+
+## [3.4.6] - 2025-03-04
+### Fixed
+- Fixed a bug in clustered error-ing where an exception would happen if there were no values in task_instance.error_log (PR 238).
+- Properly handle deserialization of empty strings in the task generator (PR 240).
+
+## [3.4.5] - 2025-02-26
+### Fixed
+- Fixed the Jobmon test suite (PR 235).
+- Fixed a bug where the DAG viz wouldn't load if the the DAG only had a single node (PR 236).
+
+## [3.4.4] - 2025-02-25
+### Fixed
+- Fixed a decimal serialization error in v2 get_workflow_tt_status_viz (PR 233).
+- Fixed a bug where resource usage data wasn't being shown do to incorrect indexing (PR 232).
+
+## [3.4.3] - 2025-02-24
+### Fixed
+- Fixed a datetime error in v2 get_task_details_viz (PR 231).
+
+## [3.4.2] - 2025-02-24
+### Fixed
+- Fixed a datetime error in v2 workflow_by_user_form (PR 229, 230)
+- Fixed pod scaling problems in TAD.
+
+## [3.4.1] - 2025-02-24
+### Fixed
+- Removed an `await` in the requester context that was causing a bug
+- Made `app_requested_context` backward compatible
+
+## [3.4.0] - 2025-02-24 (jenkins 22)
 ### Added
 - Warn users if they haven't specified `naming_args` when using the task generator (PR 202).
 
