@@ -81,6 +81,7 @@ export default function WorkflowHeader({
         refetchOnMount: true,
     })
     const [statusUpdateMsgDict, setStatusUpdateMsgDict] = useState({})
+    const [statusSelectionDict, setStatusSelectionDict] = useState({})
     const [wfTaskStatusUpdateMsg, setWfTaskStatusUpdateMsg] = useState("")
 
     axios.get<WorkflowData>(get_workflow_concurrency_url(wf_id), {
@@ -118,6 +119,11 @@ export default function WorkflowHeader({
             ...prevValues,
             [template.tt_version_id]: "Updating...",
         }));
+        // update the selected status
+        setStatusSelectionDict(prevValues => ({
+            ...prevValues,
+            [template.tt_version_id]: status,
+        }));
         // call the get_task_template_url post request with date {tool_version_id: template.tt_version_id, task_template_name: template.name}
         // then use teh task_template_id to call getTaskTemplateDetails
         // then update the task status
@@ -133,11 +139,18 @@ export default function WorkflowHeader({
                 const task_id_list = tasks.map(task => task.task_id);
                 // If task_id_list length > 10000 and recursive, update the message and exit early.
                 if (task_id_list.length > 10000 && recursive) {
-                  setStatusUpdateMsgDict(prevValues => ({
-                    ...prevValues,
-                    [template.tt_version_id]: "Error: Too many tasks to update recursively.",
-                  }));
-                  return;
+                      setStatusUpdateMsgDict(prevValues => ({
+                        ...prevValues,
+                        [template.tt_version_id]: "Error: Too many tasks to update recursively. Please use non-recursive update.",
+                      }));
+                      // remove recursive checkbox
+                      setRecursive(false)
+                      // clean the status selection
+                        setStatusSelectionDict(prevValues => ({
+                            ...prevValues,
+                            [template.tt_version_id]: "",
+                        }));
+                      return;
                 }
 
 
@@ -204,6 +217,10 @@ export default function WorkflowHeader({
                         [template.tt_version_id]: r.data.max_concurrently_running
                     }));
                     setStatusUpdateMsgDict((prevValues) => ({
+                        ...prevValues,
+                        [template.tt_version_id]: ""
+                    }));
+                    setStatusSelectionDict((prevValues) => ({
                         ...prevValues,
                         [template.tt_version_id]: ""
                     }));
@@ -488,6 +505,7 @@ export default function WorkflowHeader({
                                                   labelId="new-status-label"
                                                   id="new-status-select-{template.tt_id}"
                                                   label="New Status"
+                                                  value={statusSelectionDict[template.tt_version_id] || ""}
                                                   onChange={(e) => handleUpdateStatus(e.target.value as string, template)}
                                                   style={{ minWidth: 80 }}
                                                 >
