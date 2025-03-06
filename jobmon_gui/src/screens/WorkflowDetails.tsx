@@ -68,7 +68,8 @@ function WorkflowDetails() {
 
     // A callback that invalidates the progress bar query.
       const handlePopupClose = () => {
-        queryClient.invalidateQueries(['workflow_details', 'progress_bar', workflowId]);
+        queryClient.invalidateQueries({ queryKey: ['workflow_details', 'progress_bar', workflowId] });
+        queryClient.invalidateQueries({ queryKey: ['workflow_details', 'tt_status', workflowId] });
       };
 
     return (
