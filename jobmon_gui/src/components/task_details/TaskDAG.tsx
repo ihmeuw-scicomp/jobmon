@@ -172,6 +172,7 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
     const handleTaskStatusUpdate = async () => {
         const taskIds = [selectedTaskId]
         const workflowId = task_details?.data?.workflow_id
+        setTaskUpdateMsg('Updating...')
         try {
           const response = await axios.put(
             update_task_status_url,

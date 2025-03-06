@@ -220,6 +220,13 @@ async def get_task_subdag(request: Request) -> Any:
 @api_v3_router.put("/task/update_statuses")
 async def update_task_statuses(request: Request) -> Any:
     """Update the status of the tasks.
+    - When workflow_id='all', it updates all tasks in the workflow with
+    recursive=False. This improves performance.
+    - When recursive=True, it updates the tasks and it's dependencies all
+    the way up or down the DAG.
+    - When recursive=False, it updates only the tasks in the task_ids list.
+    - When workflow_status is None, it gets the workflow status from the db.
+    - After updating the tasks, it checks the workflow status and updates it.
 
     This API is different from v2.
     It integrated the logic in update_task_status from status_commands.py.
@@ -318,6 +325,20 @@ async def update_task_statuses(request: Request) -> Any:
                         Workflow.id == workflow_id
                     )
                     vals = {"status": constants.WorkflowStatus.FAILED}
+                    session.execute(workflow_update_stmt.values(**vals))
+            # If new_status is "D", check if all the tasks in the wf are done, and set wf to "D"
+            if new_status == constants.TaskStatus.DONE:
+                tasks_done = (
+                    session.query(Task.id)
+                    .filter(Task.workflow_id == workflow_id, Task.status != new_status)
+                    .all()
+                )
+                if not tasks_done:
+                    logger.info(f"set workflow status to DONE for workflow_id: {workflow_id}")
+                    workflow_update_stmt = update(Workflow).where(
+                        Workflow.id == workflow_id
+                    )
+                    vals = {"status": constants.WorkflowStatus.DONE}
                     session.execute(workflow_update_stmt.values(**vals))
 
         message = f"updated to status {new_status}"

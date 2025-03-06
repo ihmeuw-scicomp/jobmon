@@ -29,10 +29,7 @@ import humanizeDuration from 'humanize-duration';
 import {formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
 import {compare} from 'compare-versions';
 import AllInclusiveIcon from '@mui/icons-material/AllInclusive';
-import {TaskTemplateDetailsResponse} from "@jobmon_gui/types/TaskTemplateDetails.ts";
 import {
-    get_task_template_id_url,
-    get_task_template_details_url,
     update_task_status_url,
     task_table_url
 } from "@jobmon_gui/configs/ApiUrls.ts";
@@ -40,6 +37,7 @@ import {
 type WorkflowHeaderProps = {
     wf_id: number | string
     task_template_info: { tt_version_id: any; name: any; }[];
+    onTechnicalPanelClose: () => void;
 }
 
 interface WorkflowData {
@@ -70,6 +68,7 @@ import {Label} from "@mui/icons-material";
 export default function WorkflowHeader({
                                            wf_id,
                                            task_template_info,
+                                           onTechnicalPanelClose,
                                        }: WorkflowHeaderProps) {
     const {user} = useContext(AuthContext)
     const user_name = user?.preferred_username ? user?.preferred_username.split("@")[0] : "unknown"
@@ -132,6 +131,15 @@ export default function WorkflowHeader({
               .then(response => {
                 const tasks = response.data.tasks;
                 const task_id_list = tasks.map(task => task.task_id);
+                // If task_id_list length > 10000 and recursive, update the message and exit early.
+                if (task_id_list.length > 10000 && recursive) {
+                  setStatusUpdateMsgDict(prevValues => ({
+                    ...prevValues,
+                    [template.tt_version_id]: "Error: Too many tasks to update recursively.",
+                  }));
+                  return;
+                }
+
 
                 // Update the status of the tasks by returning the PUT request promise
                 return axios.put(
@@ -146,10 +154,14 @@ export default function WorkflowHeader({
                 );
               })
               .then(response => {
-                setStatusUpdateMsgDict(prevValues => ({
-                  ...prevValues,
-                  [template.tt_version_id]: "Success",
-                }));
+                  // if the response is successful and the message is not Updating,
+                  // update the message to "Success"
+                  if (response && statusUpdateMsgDict[template.tt_version_id] !== "Updating...") {
+                      setStatusUpdateMsgDict(prevValues => ({
+                          ...prevValues,
+                          [template.tt_version_id]: "Success",
+                      }));
+                  }
               })
               .catch(error => {
                 setStatusUpdateMsgDict(prevValues => ({
@@ -277,6 +289,13 @@ export default function WorkflowHeader({
     const disabled = !compare(normalizedVersion, "3.3", '>')
 
     const {icon, className} = statusIcons[wf_status] || {};
+
+    const handleClose = () => {
+        setShowTechnicalPanel(false);
+        if (onTechnicalPanelClose) {
+            onTechnicalPanelClose();
+        }
+    }
 
     return (
         <Box className="App-header">
@@ -489,7 +508,7 @@ export default function WorkflowHeader({
                         </Grid>
                     }
                     open={showTechnicalPanel}
-                    onClose={() => setShowTechnicalPanel(false)}
+                    onClose={handleClose}
                     width="80%"/>
             </Box>
         </Box>

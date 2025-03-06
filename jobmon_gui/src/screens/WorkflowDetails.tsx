@@ -31,7 +31,8 @@ function WorkflowDetails() {
     const wfTTStatus = useQuery({
         queryKey: ["workflow_details", "tt_status", workflowId],
         queryFn: getWorkflowTTStatusQueryFn,
-        refetchOnMount: true
+        refetchOnMount: true,
+        refetchOnWindowFocus: true
     })
 
     const navigate = useNavigate();
@@ -65,13 +66,18 @@ function WorkflowDetails() {
         }))
         : [];
 
+    // A callback that invalidates the progress bar query.
+      const handlePopupClose = () => {
+        queryClient.invalidateQueries(['workflow_details', 'progress_bar', workflowId]);
+      };
+
     return (
         <Box>
             <AppBreadcrumbs items={breadcrumbItems}/>
 
             <Box sx={{justifyContent: 'start', pt: 3}}>
                 <WorkflowHeader
-                    wf_id={workflowId} task_template_info={taskTemplateInfo}
+                    wf_id={workflowId} task_template_info={taskTemplateInfo} onTechnicalPanelClose={handlePopupClose}
                 />
             </Box>
 
