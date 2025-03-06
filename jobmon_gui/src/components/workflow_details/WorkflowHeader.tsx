@@ -15,7 +15,12 @@ import {
     TableRow,
     FormControlLabel,
     Checkbox,
-    Tooltip, InputLabel, Select, MenuItem, FormControl
+    Tooltip,
+    InputLabel,
+    Select,
+    MenuItem,
+    FormControl,
+    Divider
 } from "@mui/material";
 import {Box} from "@mui/system";
 import {useMutation, useQuery} from "@tanstack/react-query";
@@ -77,6 +82,7 @@ export default function WorkflowHeader({
         refetchOnMount: true,
     })
     const [statusUpdateMsgDict, setStatusUpdateMsgDict] = useState({})
+    const [wfTaskStatusUpdateMsg, setWfTaskStatusUpdateMsg] = useState("")
 
     axios.get<WorkflowData>(get_workflow_concurrency_url(wf_id), {
         ...jobmonAxiosConfig,
@@ -108,7 +114,11 @@ export default function WorkflowHeader({
     })
 
     const handleUpdateStatus = (status: string, template) => {
-        console.log(template)
+        // set the message to "Updating..."
+        setStatusUpdateMsgDict(prevValues => ({
+            ...prevValues,
+            [template.tt_version_id]: "Updating...",
+        }));
         // call the get_task_template_url post request with date {tool_version_id: template.tt_version_id, task_template_name: template.name}
         // then use teh task_template_id to call getTaskTemplateDetails
         // then update the task status
@@ -149,7 +159,29 @@ export default function WorkflowHeader({
               });
         }
 
+     const handleUpdateStatusAll = (status: string) => {
+         setWfTaskStatusUpdateMsg("Updating...");
+            axios
+                .put(
+                    update_task_status_url,
+                    {
+                        workflow_id: wf_id,
+                        new_status: status,
+                        recursive: false,
+                        task_ids: "all"
+                    },
+                    jobmonAxiosConfig
+                )
+                .then(response => {
+                    setWfTaskStatusUpdateMsg("Success");
+                })
+                .catch(error => {
+                    setWfTaskStatusUpdateMsg("Error: " + (error.message || error.toString()));
+                });
+     }
+
     useEffect(() => {
+        setWfTaskStatusUpdateMsg("") // reset status update message
         setStatusUpdateMsgDict({}) // reset status update message
         task_template_info.map(template => {
             const url = get_task_template_concurrency_url(wf_id, template.tt_version_id);
@@ -323,29 +355,64 @@ export default function WorkflowHeader({
                                 <StopWorkflowButton wf_id={wf_id} disabled={disabled}/>
                             </Grid>
                             <Grid item xs={10}>
-                                <Typography variant="h5">Workflow Concurrency Limit</Typography>
+                                <Typography variant="h5">Workflow</Typography>
                             </Grid>
                             <Grid item xs={9}>
-                                <TextField
-                                    value={wfFieldValues}
-                                    onChange={handleWfInputChange()}
-                                    inputProps={{
-                                        step: 1,
-                                        min: 0,
-                                        max: 2147483647,
-                                        type: "number",
-                                        "aria-labelledby": `workflow-input-number`,
-                                    }}
-                                    variant="outlined"
-                                    size="small"
-                                    fullWidth
-                                    disabled={disabled}
-                                />
+                                <Table>
+                                    <TableRow>
+                                        <TableCell align="center">Update Concurrency Limit</TableCell>
+                                        <TableCell align="center">
+                                            <Tooltip title={"Update the status of all tasks in the workflow"}>
+                                                <span>Update Task Status</span>
+                                            </Tooltip>
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell align="center">
+                                            <TextField
+                                                value={wfFieldValues}
+                                                onChange={handleWfInputChange()}
+                                                inputProps={{
+                                                    step: 1,
+                                                    min: 0,
+                                                    max: 2147483647,
+                                                    type: "number",
+                                                    "aria-labelledby": `workflow-input-number`,
+                                                }}
+                                                variant="outlined"
+                                                size="small"
+                                                fullWidth
+                                                disabled={disabled}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <FormControl variant="outlined" size="small">
+                                                <InputLabel id="new-status-label">New Status</InputLabel>
+                                                <Select
+                                                    labelId="new-status-label"
+                                                    id="new-status-select"
+                                                    label="New Status"
+                                                    onChange={(e) => handleUpdateStatusAll(e.target.value as string)}
+                                                    style={{minWidth: 80}}
+                                                >
+                                                    <MenuItem value="D">D</MenuItem>
+                                                    <MenuItem value="G">G</MenuItem>
+                                                </Select>
+                                                {wfTaskStatusUpdateMsg !== "" &&
+                                                <Typography variant="caption" color="error">
+                                                    {wfTaskStatusUpdateMsg}
+                                                </Typography>
+                                                }
+                                            </FormControl>
+                                        </TableCell>
+                                    </TableRow>
+                                </Table>
                             </Grid>
+                            <br/>
                             <Grid item xs={10}>
                                 <Typography variant="h5">Task Templates</Typography>
                                 <Typography>
-                                    <Tooltip title="Recurivly modifies the task status if checked. Only updates the selected tasks if unchecked.">
+                                    <Tooltip title="If recursive update is enabled, all related task statuses will be modified; if disabled, only the tasks in the selected template will be updated. For large workflows, it's recommended to disable recursion for better performance.">
                                       <FormControlLabel
                                         control={
                                           <Checkbox
@@ -359,64 +426,66 @@ export default function WorkflowHeader({
                                    </Tooltip>
                                 </Typography>
                             </Grid>
-                            {task_template_info?.map((template) => (
-                                <React.Fragment key={template.tt_version_id}>
-                                    <Grid item xs={3}>
-                                        <Typography sx={gridHeaderStyles}>{template.name}</Typography>
-                                    </Grid>
-                                    <Grid item xs={9}>
-                                            <Table>
-                                                <TableRow>
-                                                    <TableCell align="center">Concurrency Limit</TableCell>
-                                                    <TableCell align="center">
-                                                        Task Status Update&nbsp;
-                                                        {recursive && <AllInclusiveIcon/> }
-                                                    </TableCell>
-                                                    <TableCell align="center"></TableCell>
-                                                </TableRow>
-                                                <TableRow>
-                                                    <TableCell align="center">
-                                                        <TextField
-                                                            value={fieldValues[template.tt_version_id]}
-                                                            onChange={handleInputChange(template.tt_version_id)}
-                                                            inputProps={{
-                                                                step: 1,
-                                                                min: 0,
-                                                                max: 2147483647,
-                                                                type: "number",
-                                                                "aria-labelledby": `input-number-${template.tt_version_id}`,
-                                                            }}
-                                                            variant="outlined"
-                                                            size="small"
-                                                            disabled={disabled}
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell align="center">
-                                                          <FormControl variant="outlined" size="small">
-                                                            <InputLabel id="new-status-label">New Status</InputLabel>
-                                                            <Select
-                                                              labelId="new-status-label"
-                                                              id="new-status-select-{template.tt_id}"
-                                                              label="New Status"
-                                                              onChange={(e) => handleUpdateStatus(e.target.value as string, template)}
-                                                              style={{ minWidth: 80 }}
-                                                            >
-                                                              <MenuItem value="D">D</MenuItem>
-                                                              <MenuItem value="G">G</MenuItem>
-                                                            </Select>
-                                                              {statusUpdateMsgDict[template.tt_version_id] !== "" &&
-                                                                  <Typography variant="caption" color="error">
-                                                                      {statusUpdateMsgDict[template.tt_version_id]}
-                                                                    </Typography>
-                                                              }
-                                                          </FormControl>
-                                                    </TableCell>
-                                                </TableRow>
-                                            </Table>
+                            <Table>
+                                    <TableRow>
+                                        <TableCell align="center">Task Template Name</TableCell>
+                                        <TableCell align="center">Update Concurrency Limit</TableCell>
+                                        <TableCell align="center">
+                                            {recursive ?
+                                                <Tooltip title="Update all tasks in the template recursively">
+                                                    <span>Update Task Status &nbsp; <AllInclusiveIcon/></span>
+                                                </Tooltip> :
+                                                <Tooltip title="Update only the tasks in the selected template">
+                                                    <span>Update Task Status</span>
+                                                </Tooltip>
+                                            }
+                                        </TableCell>
+                                        <TableCell align="center"></TableCell>
+                                    </TableRow>
+                                {task_template_info?.map((template) => (
 
-                                    </Grid>
-                                </React.Fragment>
-                            ))}
+                                    <TableRow>
+                                        <TableCell align={"center"}><Typography sx={gridHeaderStyles}>{template.name}</Typography></TableCell>
+                                        <TableCell align="center">
+                                            <TextField
+                                                value={fieldValues[template.tt_version_id]}
+                                                onChange={handleInputChange(template.tt_version_id)}
+                                                inputProps={{
+                                                    step: 1,
+                                                    min: 0,
+                                                    max: 2147483647,
+                                                    type: "number",
+                                                    "aria-labelledby": `input-number-${template.tt_version_id}`,
+                                                }}
+                                                variant="outlined"
+                                                size="small"
+                                                disabled={disabled}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                              <FormControl variant="outlined" size="small">
+                                                <InputLabel id="new-status-label">New Status</InputLabel>
+                                                <Select
+                                                  labelId="new-status-label"
+                                                  id="new-status-select-{template.tt_id}"
+                                                  label="New Status"
+                                                  onChange={(e) => handleUpdateStatus(e.target.value as string, template)}
+                                                  style={{ minWidth: 80 }}
+                                                >
+                                                  <MenuItem value="D">D</MenuItem>
+                                                  <MenuItem value="G">G</MenuItem>
+                                                </Select>
+                                                  {statusUpdateMsgDict[template.tt_version_id] !== "" &&
+                                                      <Typography variant="caption" color="error">
+                                                          {statusUpdateMsgDict[template.tt_version_id]}
+                                                        </Typography>
+                                                  }
+                                              </FormControl>
+                                        </TableCell>
+                                    </TableRow>
+
+                                  ))}
+                            </Table>
                         </Grid>
                     }
                     open={showTechnicalPanel}

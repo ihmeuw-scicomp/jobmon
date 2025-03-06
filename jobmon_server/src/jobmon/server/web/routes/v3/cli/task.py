@@ -224,19 +224,27 @@ async def update_task_statuses(request: Request) -> Any:
     This API is different from v2.
     It integrated the logic in update_task_status from status_commands.py.
     TODO:
-    - Once CLI moves to v3, modify simplify update_task_status to avoid duplication.
+    - Once CLI moves to v3, simplify update_task_status to avoid duplication.
     """
     data = cast(Dict, await request.json())
     try:
-        task_ids = data["task_ids"]
-        if isinstance(task_ids, int):
-            task_ids = [task_ids]
-        new_status = data["new_status"]
-        # get workflow_status, if not provided, get it from db
-        workflow_status = data.get("workflow_status", None)
+        # workflow_id is required; if not set, raise KeyError
         workflow_id = data["workflow_id"]
         # get the recursive flag, if not provided, default to False
         recursive = data.get("recursive", False)
+        # get workflow_status, if not provided, get it from db
+        workflow_status = data.get("workflow_status", None)
+        # task_ids is required; if not set, raise KeyError;
+        # if it is an int, convert it to a list
+        # if it is "all", get all tasks from the workflow_id, and disable recursive
+        task_ids = data["task_ids"]
+        if isinstance(task_ids, int):
+            task_ids = [task_ids]
+        if task_ids == "all":
+            recursive = False
+        # new_status is required; if not set, raise KeyError
+        new_status = data["new_status"]
+
     except KeyError as e:
         raise InvalidUsage(
             f"problem with {str(e)} in request to {request.url.path}", status_code=400
@@ -244,6 +252,14 @@ async def update_task_statuses(request: Request) -> Any:
 
     with SessionLocal() as session:
         with session.begin():
+            # if task_ids is "all", get all tasks from the workflow_id
+            if task_ids == "all":
+                task_ids = (
+                    session.query(Task.id)
+                    .filter(Task.workflow_id == workflow_id)
+                    .all()
+                )
+                task_ids = [task_id for task_id, in task_ids]
             # If recursive is True, appends all dependent task_ids
             # (upstream if new_status == 'D'; downstream if new_status == 'G').
             if recursive:
@@ -259,15 +275,11 @@ async def update_task_statuses(request: Request) -> Any:
                         status_code=400,
                     )
                 task_ids = _get_tasks_recursive(set(task_ids), direction, session)
-            # if task_ids exceeds 10k, raise an error
-            if len(task_ids) > 10000:
-                raise InvalidUsage(
-                    f"task_ids exceeds 10k, please chunk the request into smaller ones",
-                    status_code=400,
+
+                logger.info(
+                    f"reset status to new_status: {new_status}"
                 )
-            logger.info(
-                f"reset status of task_ids: {task_ids}, new_status: {new_status}"
-            )
+
             update_stmt = update(Task).where(
                 and_(Task.id.in_(task_ids), Task.status != new_status)
             )
@@ -322,9 +334,6 @@ def get_task_dependencies(task_id: int) -> Any:
     with SessionLocal() as session:
         with session.begin():
             dag_id, workflow_id, node_id = _get_dag_and_wf_id(task_id, session)
-            logger.info(
-                f"task_id: {task_id}, dag_id: {dag_id}, workflow_id: {workflow_id}"
-            )
             up_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.UP)
             down_nodes = _get_node_dependencies(
                 {node_id}, dag_id, session, Direction.DOWN
@@ -437,44 +446,72 @@ def get_task_resource_usage(task_id: int) -> Any:
 
 def _get_tasks_recursive(
     task_ids: Set[int], direction: Direction, session: Session
-) -> set:
-    """Get all input task_ids'.
+) -> Set[int]:
+    """Get all task IDs connected in the specified direction (upstream or downstream)
+    using an iterative approach.
 
-    Either downstream or upsteam tasks based on direction;
-    return all recursive(including input set) task_ids in the defined direction.
+    Starting with the given task_ids, the function traverses the dependency graph
+    and returns all tasks found, including the input set. It also verifies that all
+    tasks belong to the same workflow.
+
+    Args:
+        task_ids (Set[int]): Initial set of task IDs.
+        direction (Direction): Either Direction.UP or Direction.DOWN.
+        session (Session): SQLAlchemy session for database operations.
+
+    Returns:
+        Set[int]: The complete set of task IDs connected in the specified direction.
     """
-    tasks_recursive = set()
-    next_nodes = set()
-    _workflow_id_first = None
-    for task_id in task_ids:
-        dag_id, workflow_id, node_id = _get_dag_and_wf_id(task_id, session)
-        next_nodes_sub = (
-            _get_node_dependencies({node_id}, dag_id, session, Direction.DOWN)
-            if direction == constants.Direction.DOWN
-            else _get_node_dependencies({node_id}, dag_id, session, Direction.UP)
+    # recusrive on nodes instead of tasks, which is more efficient
+
+    # make sure all tasks belong to the same workflow
+    distinct_workflow_ids = session.query(Task.workflow_id).filter(
+        Task.id.in_(task_ids)
+    ).distinct().all()
+
+    if len(distinct_workflow_ids) == 1:
+        # All tasks share the same workflow_id.
+        workflow_id = distinct_workflow_ids[0][0]  # Extract the workflow_id value
+    else:
+        # The tasks belong to different workflows.
+        raise InvalidUsage(
+            f"{task_ids} in request belong to different workflow_ids ",
+            status_code=400,
         )
-        if _workflow_id_first is None:
-            workflow_id_first = workflow_id
-        elif workflow_id != workflow_id_first:
-            raise InvalidUsage(
-                f"{task_ids} in request belong to different workflow_ids"
-                f"({workflow_id_first}, {workflow_id})",
-                status_code=400,
-            )
-        next_nodes.update(next_nodes_sub)
 
-    if len(next_nodes) > 0:
-        next_task_dict = _get_tasks_from_nodes(
-            workflow_id_first, list(next_nodes), [], session
+    # get dag_id of the workflow_id
+    dag_id = session.query(Workflow.dag_id).filter(Workflow.id == workflow_id).scalar()
+
+    # get the node_ids of the task_ids
+    node_ids = session.query(Task.node_id).filter(Task.id.in_(task_ids)).all()
+    node_ids = [node_id for node_id, in node_ids]
+
+    # This set will accumulate all discovered node IDs.
+    nodes_recursive: Set[int] = set()
+    # Use a stack (list) for iterative traversal.
+    stack = list(node_ids)
+
+
+    while stack:
+        current_node = stack.pop()
+        # Skip if we've already processed this task.
+        if current_node in nodes_recursive:
+            continue
+
+        # Mark the current node as visited.
+        nodes_recursive.add(current_node)
+        # Get the node dependencies for the current node based on the specified direction.
+        node_deps = _get_node_dependencies(
+            {current_node},
+            dag_id,
+            session,
+            Direction.DOWN if direction == constants.Direction.DOWN else Direction.UP,
         )
-        if len(next_task_dict) > 0:
-            task_recursive_sub = _get_tasks_recursive(
-                set(next_task_dict.keys()), direction, session
-            )
-            tasks_recursive.update(task_recursive_sub)
-
-    tasks_recursive.update(task_ids)
-
+        if node_deps:
+            # Add the node dependencies to the stack for further processing.
+            stack.extend(node_deps)
+    # get task_ids from node_ids
+    tasks_recursive = _get_tasks_from_nodes(workflow_id, list(nodes_recursive), [], session)
     return tasks_recursive
 
 
@@ -498,7 +535,7 @@ def _get_dag_and_wf_id(task_id: int, session: Session) -> tuple:
 def _get_node_dependencies(
     nodes: set, dag_id: int, session: Session, direction: Direction
 ) -> Set[int]:
-    """Get all upstream nodes of a node.
+    """Get all upstream or downstream nodes of a node.
 
     Args:
         nodes (set): set of nodes
@@ -507,10 +544,11 @@ def _get_node_dependencies(
         direction (Direction): either up or down
     """
     select_stmt = select(Edge).where(
-        Edge.dag_id == dag_id, Edge.node_id.in_(list(nodes))
+        Edge.dag_id == int(dag_id), Edge.node_id.in_(list(nodes))
     )
     node_ids: Set[int] = set()
-    for (edges,) in session.execute(select_stmt).all():
+    for row in session.execute(select_stmt).all():
+        edges = row[0]
         if direction == Direction.UP:
             upstreams = (
                 json.loads(edges.upstream_node_ids)

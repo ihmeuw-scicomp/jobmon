@@ -76,9 +76,8 @@ def create_tired_wf(size_tier1=10, size_tier3=100):
     )
     tt4 = tool.get_task_template(
         template_name="tired_task4",
-        command_template="echo {arg} || {arg_filler} || true || true",
-        node_args=["arg"],
-        task_args=["arg_filler"]
+        command_template="echo {arg} || true || true",
+        node_args=["arg"]
     )
     tier1 = []
     for i in range(size_tier1):
@@ -91,7 +90,7 @@ def create_tired_wf(size_tier1=10, size_tier3=100):
         tier1.append(task)
     tier2 = tt2.create_task(
         name=f"tired_task_second_tier",
-        arg="I am the last task",
+        arg="I am the second task",
         upstream_tasks=tier1,
         compute_resources={"queue": Q, "num_cores": 1},
     )
@@ -140,7 +139,7 @@ def create_wf(total, wf_type):
         elif this_wf_type == "tired":
             create_tired_wf()
         elif this_wf_type == "huge":
-            create_tired_wf(100, 100000)
+            create_tired_wf(100, 90000)
         sleep(10)
 
 
