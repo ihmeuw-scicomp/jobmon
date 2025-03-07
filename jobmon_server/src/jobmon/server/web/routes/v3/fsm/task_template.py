@@ -210,4 +210,3 @@ def get_task_template_id_for_task_template_version(
             ttid = ttv.task_template_id
 
     return ttid
-

@@ -220,16 +220,19 @@ async def get_task_subdag(request: Request) -> Any:
 @api_v3_router.put("/task/update_statuses")
 async def update_task_statuses(request: Request) -> Any:
     """Update the status of the tasks.
-    - When workflow_id='all', it updates all tasks in the workflow with
-    recursive=False. This improves performance.
-    - When recursive=True, it updates the tasks and it's dependencies all
-    the way up or down the DAG.
-    - When recursive=False, it updates only the tasks in the task_ids list.
-    - When workflow_status is None, it gets the workflow status from the db.
-    - After updating the tasks, it checks the workflow status and updates it.
 
-    This API is different from v2.
-    It integrated the logic in update_task_status from status_commands.py.
+    Description:
+        - When workflow_id='all', it updates all tasks in the workflow with
+        recursive=False. This improves performance.
+        - When recursive=True, it updates the tasks and it's dependencies all
+        the way up or down the DAG.
+        - When recursive=False, it updates only the tasks in the task_ids list.
+        - When workflow_status is None, it gets the workflow status from the db.
+        - After updating the tasks, it checks the workflow status and updates it.
+
+    Notes:
+        This API is different from v2.
+        It integrated the logic in update_task_status from status_commands.py.
     TODO:
     - Once CLI moves to v3, simplify update_task_status to avoid duplication.
     """
@@ -262,9 +265,7 @@ async def update_task_statuses(request: Request) -> Any:
             # if task_ids is "all", get all tasks from the workflow_id
             if task_ids == "all":
                 task_ids = (
-                    session.query(Task.id)
-                    .filter(Task.workflow_id == workflow_id)
-                    .all()
+                    session.query(Task.id).filter(Task.workflow_id == workflow_id).all()
                 )
                 task_ids = [task_id for task_id, in task_ids]
             # If recursive is True, appends all dependent task_ids
@@ -283,9 +284,7 @@ async def update_task_statuses(request: Request) -> Any:
                     )
                 task_ids = _get_tasks_recursive(set(task_ids), direction, session)
 
-                logger.info(
-                    f"reset status to new_status: {new_status}"
-                )
+                logger.info(f"reset status to new_status: {new_status}")
 
             update_stmt = update(Task).where(
                 and_(Task.id.in_(task_ids), Task.status != new_status)
@@ -317,7 +316,8 @@ async def update_task_statuses(request: Request) -> Any:
                     workflow_status = (
                         session.query(Workflow.status)
                         .filter(Workflow.id == workflow_id)
-                        .scalar())
+                        .scalar()
+                    )
                 # If workflow is done, need to set it to an error state before resuming
                 if workflow_status == constants.WorkflowStatus.DONE:
                     logger.info(f"reset workflow status for workflow_id: {workflow_id}")
@@ -326,7 +326,7 @@ async def update_task_statuses(request: Request) -> Any:
                     )
                     vals = {"status": constants.WorkflowStatus.FAILED}
                     session.execute(workflow_update_stmt.values(**vals))
-            # If new_status is "D", check if all the tasks in the wf are done, and set wf to "D"
+            # If new_status is "D", check if all the tasks in the wf are done, and set wf.
             if new_status == constants.TaskStatus.DONE:
                 tasks_done = (
                     session.query(Task.id)
@@ -334,7 +334,9 @@ async def update_task_statuses(request: Request) -> Any:
                     .all()
                 )
                 if not tasks_done:
-                    logger.info(f"set workflow status to DONE for workflow_id: {workflow_id}")
+                    logger.info(
+                        f"set workflow status to DONE for workflow_id: {workflow_id}"
+                    )
                     workflow_update_stmt = update(Workflow).where(
                         Workflow.id == workflow_id
                     )
@@ -468,8 +470,7 @@ def get_task_resource_usage(task_id: int) -> Any:
 def _get_tasks_recursive(
     task_ids: Set[int], direction: Direction, session: Session
 ) -> Set[int]:
-    """Get all task IDs connected in the specified direction (upstream or downstream)
-    using an iterative approach.
+    """Get all task IDs connected in the specified direction iteratively.
 
     Starting with the given task_ids, the function traverses the dependency graph
     and returns all tasks found, including the input set. It also verifies that all
@@ -486,9 +487,9 @@ def _get_tasks_recursive(
     # recusrive on nodes instead of tasks, which is more efficient
 
     # make sure all tasks belong to the same workflow
-    distinct_workflow_ids = session.query(Task.workflow_id).filter(
-        Task.id.in_(task_ids)
-    ).distinct().all()
+    distinct_workflow_ids = (
+        session.query(Task.workflow_id).filter(Task.id.in_(task_ids)).distinct().all()
+    )
 
     if len(distinct_workflow_ids) == 1:
         # All tasks share the same workflow_id.
@@ -504,14 +505,13 @@ def _get_tasks_recursive(
     dag_id = session.query(Workflow.dag_id).filter(Workflow.id == workflow_id).scalar()
 
     # get the node_ids of the task_ids
-    node_ids = session.query(Task.node_id).filter(Task.id.in_(task_ids)).all()
-    node_ids = [node_id for node_id, in node_ids]
+    rows = session.query(Task.node_id).filter(Task.id.in_(task_ids)).all()
+    node_ids = [int(row[0]) for row in rows]
 
     # This set will accumulate all discovered node IDs.
     nodes_recursive: Set[int] = set()
     # Use a stack (list) for iterative traversal.
     stack = list(node_ids)
-
 
     while stack:
         current_node = stack.pop()
@@ -530,10 +530,12 @@ def _get_tasks_recursive(
         )
         if node_deps:
             # Add the node dependencies to the stack for further processing.
-            stack.extend(node_deps)
+            stack.extend(list(node_deps))
     # get task_ids from node_ids
-    tasks_recursive = _get_tasks_from_nodes(workflow_id, list(nodes_recursive), [], session)
-    return tasks_recursive
+    tasks_recursive = _get_tasks_from_nodes(
+        workflow_id, list(nodes_recursive), [], session
+    )
+    return set(tasks_recursive.keys())
 
 
 def _get_dag_and_wf_id(task_id: int, session: Session) -> tuple:
