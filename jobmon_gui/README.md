@@ -44,6 +44,11 @@ To deploy the Jobmon Server Backend locally:
     - This command will spin up a local version of the Jobmon Server, running on 127.0.0.1:8070 by default. You can then configure the React app to point to this URL for testing purposes.
 7. Run `python jobmon_gui/local_testing/create_wfs.py`
 
+To start the Jobmon Server Backend locally in docker:
+
+docker compose -f docker-compose.yml -p jobmon up -d jobmon_server_dev
+
+
 **NOTE**: If you're running against the Jobmon production database you need to make sure that mysqlclient is installed via conda, and not installed via pip. You will see auth errors if this is incorrectly installed. Do the following:
 
 1. `pip uninstall mysqlclient`

@@ -52,6 +52,8 @@ export default function JobmonProgressBar({
                     return r.data[workflowId];
                 });
         },
+        refetchOnWindowFocus: 'always',
+        refetchOnMount: 'always',
     });
 
     const wfTTStatus = useQuery({
@@ -66,6 +68,8 @@ export default function JobmonProgressBar({
                     return r.data;
                 });
         },
+        refetchOnWindowFocus: 'always',
+        refetchOnMount: 'always',
     });
 
     if (workflow_status.isLoading) {
