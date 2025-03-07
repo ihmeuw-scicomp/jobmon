@@ -65,6 +65,11 @@ import {
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
 import {Label} from "@mui/icons-material";
 
+interface WorkflowResponse {
+  tasks: any[]; // Replace `any` with the correct type of tasks
+  // other properties
+}
+
 export default function WorkflowHeader({
                                            wf_id,
                                            task_template_info,
@@ -135,7 +140,7 @@ export default function WorkflowHeader({
                 ...jobmonAxiosConfig,
               })
               .then(response => {
-                const tasks = response.data.tasks;
+                const tasks = (response.data as WorkflowResponse).tasks;
                 const task_id_list = tasks.map(task => task.task_id);
                 // If task_id_list length > 10000 and recursive, update the message and exit early.
                 if (task_id_list.length > 10000 && recursive) {
