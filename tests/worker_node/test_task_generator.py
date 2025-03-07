@@ -216,6 +216,24 @@ def test_simple_type(client_env, simple_type: Any) -> None:
     assert result == str(simple_type)
 
 
+def test_serialize_empty_string(client_env) -> None:
+    """Ensure the empty string is properly serialized."""
+    # Instantiate the TaskGenerator
+    tool = Tool("test_tool")
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func,
+        serializers={},
+        tool_name="test_tool",
+        default_cluster_name="sequential",
+    )
+
+    # Exercise by calling serialize
+    result = task_gen.serialize("", str)
+
+    # Verify the result is the serialized empty string
+    assert result == task_generator.SERIALIZED_EMPTY_STRING
+
+
 class FakeYearRange:
     """A fake YearRange class for testing"""
 
@@ -447,6 +465,21 @@ def test_deserialize_simple_type(
 
     # Verify the result matches the expected result
     assert result == expected_result
+
+
+def test_deserialize_empty_string(client_env) -> None:
+    """Ensure the empty string is properly deserialized."""
+    # Instantiate the TaskGenerator
+    tool = Tool("test_tool")
+    task_gen = task_generator.TaskGenerator(
+        task_function=my_func, serializers={}, tool_name="test_tool"
+    )
+
+    # Exercise by calling deserialize
+    result = task_gen.deserialize(obj=task_generator.SERIALIZED_EMPTY_STRING, obj_type=str)
+
+    # Verify the result is the empty string
+    assert result == ""
 
 
 def test_deserializer_specified_type(client_env) -> None:

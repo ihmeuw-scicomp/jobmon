@@ -1,9 +1,4 @@
 import "@jobmon_gui/styles/jobmon_gui.css";
-import {BiRun} from "react-icons/bi";
-import {IoMdCloseCircle, IoMdCloseCircleOutline} from "react-icons/io";
-import {AiFillSchedule, AiFillCheckCircle} from "react-icons/ai";
-import {TbHandStop} from "react-icons/tb";
-import {HiRocketLaunch} from "react-icons/hi2";
 import React, {useContext, useState, useEffect} from "react";
 import {JobmonModal} from "@jobmon_gui/components/JobmonModal.tsx";
 import {
@@ -63,12 +58,12 @@ import {
     set_wf_concurrency_url
 } from "@jobmon_gui/configs/ApiUrls.ts";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
-import {Label} from "@mui/icons-material";
 
 interface WorkflowResponse {
   tasks: any[]; // Replace `any` with the correct type of tasks
   // other properties
 }
+
 
 export default function WorkflowHeader({
                                            wf_id,
