@@ -6,6 +6,7 @@ export type TaskDetails = {
     task_status: TaskStatusCodes
     task_status_date: string
     workflow_id: number
+    task_template_id: number
 }
 export type TaskDetailsResponse = {
     task_details: TaskDetails[]

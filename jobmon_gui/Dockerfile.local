@@ -1,17 +1,20 @@
 # Use the official Bun image
 FROM oven/bun:latest
 
-# Copy application files
-COPY . /app
-
-# Set the working directory
+# Create and set working directory
 WORKDIR /app
+
+# Copy only package files first (for caching)
+COPY package.json bun.lockb* ./
 
 # Install dependencies
 RUN bun install
 
+# Now copy the rest of your application (optional if you rely solely on volume mounting)
+COPY . .
+
 # Expose the port your app will run on
 EXPOSE 3000
 
-# Start the Bun app
-CMD ["bun", "run", "start"]
+# Use Bun's built-in dev command for hot reloading
+CMD ["bun", "run", "dev"]

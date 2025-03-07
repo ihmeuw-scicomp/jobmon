@@ -109,6 +109,16 @@ class TaskInstanceBatch:
             app_route=app_route, message=data, request_type="post"
         )
 
+    def transition_to_killed(self) -> None:
+        """Mark all TIs in this batch as killed in the DB (ERROR_FATAL)."""
+        # 1) Make an HTTP call to the server if you have a relevant endpoint
+        #    that transitions them to a 'killed' or ERROR_FATAL state in bulk.
+        app_route = f"/array/{self.array_id}/transition_to_killed"
+        data = {"batch_number": self.batch_number}
+        self.requester.send_request(
+            app_route=app_route, message=data, request_type="post"
+        )
+
     def __hash__(self) -> int:
         """Hash to encompass tool version id, workflow args, tasks and dag."""
         hash_value = hashlib.sha1()

@@ -8,7 +8,11 @@ nltk.download("punkt", quiet=True)
 def cluster_error_logs(df: DataFrame) -> DataFrame:
     """Cluster error logs using unsupervised learning."""
     count_vectorizer = ext.CountVectorizer()
-    doc_matrix = count_vectorizer.fit_transform(df["task_instance_stderr_log"])
+    df["processed_log"] = df["task_instance_stderr_log"].where(
+        df["task_instance_stderr_log"].notna() & (df["task_instance_stderr_log"] != ""),
+        df["error"],
+    )
+    doc_matrix = count_vectorizer.fit_transform(df["processed_log"])
 
     # TF-IDF transformation
     tf_idf_transformer = ext.TfidfTransformer()
@@ -24,7 +28,7 @@ def cluster_error_logs(df: DataFrame) -> DataFrame:
             group_instance_count=("error_score", "count"),
             task_instance_ids=("task_instance_id", lambda x: list(set(x))),
             task_ids=("task_id", lambda x: list(set(x))),
-            sample_error=("error", "first"),
+            sample_error=("processed_log", "first"),
             first_error_time=("error_time", "first"),
             workflow_run_id=("workflow_run_id", "first"),
             workflow_id=("workflow_id", "first"),

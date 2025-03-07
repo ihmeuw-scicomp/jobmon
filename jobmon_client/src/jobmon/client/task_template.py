@@ -173,6 +173,8 @@ class TaskTemplate:
     def active_task_template_version(self) -> TaskTemplateVersion:
         """The TaskTemplateVersion to use when spawning tasks."""
         if not self.task_template_versions:
+            self.load_task_template_versions()
+        if not self.task_template_versions:
             raise AttributeError(
                 "Cannot access attribute active_task_template_version because there are no "
                 f"TaskTemplateVersions associated with task_template_name={self.template_name}"

@@ -187,3 +187,26 @@ async def add_task_template_version(task_template_id: int, request: Request) -> 
         status_code=StatusCodes.OK,
     )
     return resp
+
+
+@api_v3_router.get("/task_template/id/{task_template_version_id}")
+def get_task_template_id_for_task_template_version(
+    task_template_version_id: int,
+) -> int:
+    """Get the task_template_id for a given task_template_version_id."""
+    structlog.contextvars.bind_contextvars(
+        task_template_version_id=task_template_version_id
+    )
+    logger.info(
+        f"Getting task template id for task template version: {task_template_version_id}"
+    )
+
+    with SessionLocal() as session:
+        with session.begin():
+            select_stmt = select(TaskTemplateVersion).where(
+                TaskTemplateVersion.id == task_template_version_id
+            )
+            ttv = session.execute(select_stmt).scalars().one()
+            ttid = ttv.task_template_id
+
+    return ttid

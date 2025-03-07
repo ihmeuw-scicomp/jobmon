@@ -12,7 +12,6 @@ from unittest.mock import patch, PropertyMock
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
-
 from jobmon.client.api import Tool
 from jobmon.client.cli import ClientCLI as CLI
 from jobmon.client.status_commands import (
@@ -929,6 +928,8 @@ def test_get_filepaths(db_engine, tool):
 
 
 def test_resume_workflow_from_cli(tool, task_template, db_engine, cli):
+    from jobmon.client.workflow_run import WorkflowRunFactory
+
     workflow = tool.create_workflow()
 
     # Create a small example DAG.
@@ -962,13 +963,24 @@ def test_resume_workflow_from_cli(tool, task_template, db_engine, cli):
         session.commit()
 
     # Signal a resume, assert it returned accordingly.
-    resume_str = f"workflow_resume -w {workflow.workflow_id} -c sequential"
+    resume_str = f"workflow_resume -w {workflow.workflow_id} -c sequential -t 200"
     args = cli.parse_args(resume_str)
     assert args.workflow_id == workflow.workflow_id
     assert not args.reset_running_jobs
-    resume_workflow_from_id(
-        args.workflow_id, args.cluster_name, args.reset_running_jobs
-    )
+    assert args.timeout == 200
+
+    with patch.object(WorkflowRunFactory, "set_workflow_resume") as mock_set_resume:
+
+        resume_workflow_from_id(
+            workflow_id=args.workflow_id,
+            cluster_name=args.cluster_name,
+            reset_if_running=args.reset_running_jobs,
+            timeout=args.timeout,
+        )
+
+        mock_set_resume.assert_called_once_with(
+            reset_running_jobs=args.reset_running_jobs, resume_timeout=args.timeout
+        )
 
     # Check that the swarm is complete
     with Session(bind=db_engine) as session:

@@ -124,7 +124,8 @@ export default function WorkflowList() {
                 return response.data?.workflows;
             });
         },
-        enabled: workflowSettings.getRefreshData()
+        enabled: workflowSettings.getRefreshData(),
+        refetchOnMount: true, // This forces a refetch when the component mounts
     })
 
 

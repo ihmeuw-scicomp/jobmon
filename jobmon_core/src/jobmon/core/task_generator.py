@@ -586,6 +586,10 @@ class TaskGenerator:
             if obj_type == bool:
                 deserialized_result = ast.literal_eval(obj)  # type: ignore
 
+            # If the object is our serialized empty string, return an empty string
+            elif obj_type == str and obj == SERIALIZED_EMPTY_STRING:
+                deserialized_result = ""
+
             # For all other simple types, we can simply call the type on ``obj``
             else:
                 deserialized_result = obj_type(obj)
