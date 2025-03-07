@@ -46,8 +46,8 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args foo='1'"
-        " --args bar='b a z'"
+        " foo='1'"
+        " bar='b a z'"
     )
 
     assert task.command == expected_command
@@ -89,8 +89,8 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name list_function"
-        " --args foo='[a,b b]'"
-        " --args bar='[c\"]'"
+        " foo='[a,b b]'"
+        " bar='[c\"]'"
     )
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
@@ -144,8 +144,8 @@ def test_naming_args(
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args foo='1'"
-        " --args bar='baz'"
+        " foo='1'"
+        " bar='baz'"
     )
     assert task.command == expected_command
     assert task.compute_resources == compute_resources
@@ -476,7 +476,9 @@ def test_deserialize_empty_string(client_env) -> None:
     )
 
     # Exercise by calling deserialize
-    result = task_gen.deserialize(obj=task_generator.SERIALIZED_EMPTY_STRING, obj_type=str)
+    result = task_gen.deserialize(
+        obj=task_generator.SERIALIZED_EMPTY_STRING, obj_type=str
+    )
 
     # Verify the result is the empty string
     assert result == ""
@@ -772,8 +774,8 @@ def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
             f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
             f" --module_name tests.worker_node.test_task_generator"
             " --func_name simple_function"
-            f" --args foo='{i}'"
-            " --args bar='baz'"
+            f" foo='{i}'"
+            " bar='baz'"
         )
 
         assert tasks[i - 1].command == expected_command
@@ -813,8 +815,8 @@ def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
             f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
             f" --module_name tests.worker_node.test_task_generator"
             " --func_name simple_function"
-            f" --args foo='{i}'"
-            " --args bar='[a,b]'"
+            f" foo='{i}'"
+            " bar='[a,b]'"
         )
 
         assert tasks[i - 1].command == expected_command
@@ -1018,12 +1020,12 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args yr='2020-2021'"
-        " --args v='[1.0, 2.0]'"
-        " --args fSpec='/path/to/file'"
-        " --args dSpec='/path/to/dir'"
-        " --args vm='1.0'"
-        " --args q='[0.1, 0.9]'"
+        " yr='2020-2021'"
+        " v='[1.0, 2.0]'"
+        " fSpec='/path/to/file'"
+        " dSpec='/path/to/dir'"
+        " vm='1.0'"
+        " q='[0.1, 0.9]'"
     )
     assert task1.name == "simple_function:yr=2020-2021:v=1.0,_2.0"
     assert task1.command == expected_command
@@ -1043,12 +1045,12 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args yr='2020-2021'"
-        " --args v='[1.0, 2.0]'"
-        " --args fSpec='/path/to/file'"
-        " --args dSpec='/path/to/dir'"
-        " --args vm='1.0'"
-        " --args q='None'"
+        " yr='2020-2021'"
+        " v='[1.0, 2.0]'"
+        " fSpec='/path/to/file'"
+        " dSpec='/path/to/dir'"
+        " vm='1.0'"
+        " q='None'"
     )
     assert task2.name == "simple_function:yr=2020-2021:v=1.0,_2.0"
     assert task2.command == expected_command
@@ -1070,12 +1072,12 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args yr='2020-2021'"
-        " --args v='[1.0, 2.0]'"
-        " --args fSpec='/path/to/file'"
-        " --args dSpec='/path/to/dir'"
-        " --args vm='1.0'"
-        " --args q='[0.1, 0.9]'"
+        " yr='2020-2021'"
+        " v='[1.0, 2.0]'"
+        " fSpec='/path/to/file'"
+        " dSpec='/path/to/dir'"
+        " vm='1.0'"
+        " q='[0.1, 0.9]'"
     )
     assert tasks[0].command == expected_command1
     # Verify command
@@ -1083,12 +1085,12 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args yr='2020-2021'"
-        " --args v='[1.0, 2.0]'"
-        " --args fSpec='/path/to/file'"
-        " --args dSpec='/path/to/dir'"
-        " --args vm='1.0'"
-        " --args q='None'"
+        " yr='2020-2021'"
+        " v='[1.0, 2.0]'"
+        " fSpec='/path/to/file'"
+        " dSpec='/path/to/dir'"
+        " vm='1.0'"
+        " q='None'"
     )
     assert tasks[1].command == expected_command2
 
@@ -1318,8 +1320,8 @@ def test_naming_func(client_env, monkeypatch: pytest.fixture) -> None:
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
         f" --module_name tests.worker_node.test_task_generator"
         " --func_name simple_function"
-        " --args foo='1'"
-        " --args bar='baz'"
+        " foo='1'"
+        " bar='baz'"
     )
     assert task.command == expected_command
     assert task.compute_resources == compute_resources

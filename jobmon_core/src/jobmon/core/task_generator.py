@@ -270,7 +270,7 @@ class TaskGenerator:
     Users can also supply serializers for custom types by providing a dictionary of type to
     a tuple of serialization and deserialization functions. Serializers can return either a
     string or a list of strings. Lists of strings are represented on the command line as
-    ``--arg-name value1 --arg-name value2``. If you're serializing to a list of strings, the
+    ``arg_name='[value1,value2]'``. If you're serializing to a list of strings, the
     deserializer should be prepared to handle either a single string or a list of strings.
 
     Note:
@@ -417,11 +417,11 @@ class TaskGenerator:
 
     def _generate_task_template(self) -> None:
         """Generate and store the task template."""
-        # args convert to --args foo=1 --args bar=2
-        args_template = " --args ".join(
+        # args convert to foo=1 bar=2
+        args_template = " ".join(
             f"{arg_name}={{{arg_name}}}" for arg_name in self.params
         )
-        args_template = " --args " + args_template
+        args_template = " " + args_template
         if self.module_source_path:
             self._task_template = self.tool.get_task_template(
                 template_name=self.name,
