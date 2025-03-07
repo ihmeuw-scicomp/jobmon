@@ -115,7 +115,14 @@ class WorkerNodeCLI(CLI):
             print(task_generator.help())
             return ReturnCodes.OK
         try:
-            task_generator.run(args.args)
+            if len(args.args) != 1:
+                raise ValueError(
+                    "Internal error parsing command line arguments. Expected to find a single "
+                    f"element in the parsed args list, but found {len(args.args)}.\n"
+                    f"Parsed args: {args.args}"
+                )
+
+            task_generator.run(args.args[0])
             return ReturnCodes.OK
         except Exception as e:
             print(e)
@@ -136,18 +143,6 @@ class WorkerNodeCLI(CLI):
             required=True,
         )
         generator_parser.add_argument(
-            "--args",
-            type=str,
-            help="Followed by the key=value; .\n"
-            "For example: \n"
-            "If you method has two argument: def func(foo: int, bar: str), pass\n"
-            "    --args foo=1 --args bar='test'\n"
-            "If you method has two argument: def func(foo: int, bar: List[str), pass\n"
-            "    --args foo=1 --args bar=[a,b]\n",
-            required=False,
-            action="append",
-        )
-        generator_parser.add_argument(
             "--arghelp",
             type=str,
             help="Show the help message for the task generator. For example: --arghelp",
@@ -159,6 +154,18 @@ class WorkerNodeCLI(CLI):
             help="The directory the module source code located; "
             "you do not need this if the module is installed in your system.",
             required=False,
+        )
+        generator_parser.add_argument(
+            "args",
+            type=str,
+            nargs="*",
+            action="append",
+            help=(
+                "Arbitrary key-value pairs to pass to the task generator. Expected form is:\n"
+                "    key1='val1' key2='val2' ..."
+                "For lists of values, expected form is:\n"
+                "    key1='[val1,val2,val3]'"
+            ),
         )
 
     def _add_worker_node_job_parser(self) -> None:
