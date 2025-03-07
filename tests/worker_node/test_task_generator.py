@@ -476,7 +476,9 @@ def test_deserialize_empty_string(client_env) -> None:
     )
 
     # Exercise by calling deserialize
-    result = task_gen.deserialize(obj=task_generator.SERIALIZED_EMPTY_STRING, obj_type=str)
+    result = task_gen.deserialize(
+        obj=task_generator.SERIALIZED_EMPTY_STRING, obj_type=str
+    )
 
     # Verify the result is the empty string
     assert result == ""
