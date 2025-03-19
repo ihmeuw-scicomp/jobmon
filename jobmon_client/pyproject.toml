@@ -21,8 +21,7 @@ dependencies = [
     'pyyaml',
     'tabulate',
 ]
-# The following line "should" work but must be commented out when using an expliciate version number
-# dynamic = ["version"]
+dynamic = ["version"]
 
 [project.scripts]
 jobmon = "jobmon.client.cli:main"
