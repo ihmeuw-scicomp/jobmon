@@ -43,7 +43,7 @@ otlp = [
 ]
 
 [tool.setuptools]
-license-files = ["../LICENSE"]
+license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
