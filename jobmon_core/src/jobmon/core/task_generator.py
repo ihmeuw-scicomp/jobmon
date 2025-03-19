@@ -268,15 +268,13 @@ class TaskGenerator:
             serializable types
 
     Users can also supply serializers for custom types by providing a dictionary of type to
-    a tuple of serialization and deserialization functions. Serializers can return either a
-    string or a list of strings. Lists of strings are represented on the command line as
-    ``--arg-name value1 --arg-name value2``. If you're serializing to a list of strings, the
-    deserializer should be prepared to handle either a single string or a list of strings.
+    a tuple of serialization and deserialization functions. Serializers must always turn
+    objects into a single string. Lists of strings are represented on the command line as
+    ``arg_name='[value1,value2]'``.
 
     Note:
         While lists, tuples and sets (and their ``Optional`` counterparts) can currently
         serialize empty collections, we can't currently serialize custom types as empty lists.
-
     """
 
     def __init__(
@@ -417,11 +415,11 @@ class TaskGenerator:
 
     def _generate_task_template(self) -> None:
         """Generate and store the task template."""
-        # args convert to --args foo=1 --args bar=2
-        args_template = " --args ".join(
+        # args convert to foo=1 bar=2
+        args_template = " ".join(
             f"{arg_name}={{{arg_name}}}" for arg_name in self.params
         )
-        args_template = " --args " + args_template
+        args_template = " " + args_template
         if self.module_source_path:
             self._task_template = self.tool.get_task_template(
                 template_name=self.name,
@@ -766,7 +764,7 @@ class TaskGenerator:
         """Run the task_function with the given args and return any result."""
         # Parse the args
         parsed_arg_value_pairs: Dict[str, Union[str, List[str]]] = dict()
-        # args is a list of string like ["arg1=1", "arg2=[2, 3]", "arg1=4]
+        # args is a list of string like ["arg1=1", "arg2=[2, 3]", "arg1=4"]
         for arg in args:
             arg_name, arg_value = arg.split("=")
             # if the arg_name key, already exists, append the value to the list
