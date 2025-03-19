@@ -33,7 +33,7 @@ server = ["jobmon_server"]
 ihme = ["jobmon_installer_ihme"]
 
 [tool.setuptools]
-license-files = ["../LICENSE"]
+license-files = ["LICENSE"]
 
 [tool.setuptools_scm]
 root = ".."
