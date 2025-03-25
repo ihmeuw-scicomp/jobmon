@@ -10,7 +10,7 @@ All notable changes to Jobmon will be documented in this file.
 ### Removed
 
 
-## [3.4.8] - 2025-03-18
+## [3.4.8] - 2025-03-19
 ### Added
 - Added the ability for the user to change their task statuses in the Jobmon GUI (PR 243).
 
