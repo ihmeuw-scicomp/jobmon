@@ -10,6 +10,21 @@ All notable changes to Jobmon will be documented in this file.
 ### Removed
 
 
+## [3.4.8] - 2025-03-19
+### Added
+- Added the ability for the user to change their task statuses in the Jobmon GUI (PR 243).
+
+### Changed
+- Upped the number of workers in the pods from 4 -> 6.
+- Each subpackage has its own license (PR 246).
+
+### Fixed
+- Fixed a bug where task instance were stuck in `triaging` state (jobmon_slurm PR 159).
+
+### Removed
+- Removed pin in jobmon_client pyproject.toml (PR 248).
+- Removed `--args` separator from TaskTemplate (PR 244).
+
 ## [3.4.7] - 2025-03-04
 ### Changed
 - Added missing client ingress route in TAD.
