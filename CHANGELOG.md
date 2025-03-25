@@ -9,6 +9,17 @@ All notable changes to Jobmon will be documented in this file.
 ### Deprecated
 ### Removed
 
+## [3.4.11] - TBD
+### Fixed
+- Fixed bug in requester where ValueErrors weren't being handled (PR 250).
+
+## [3.4.10] - 2025-03-25
+### Fixed
+- Fixed resource retry for new slurm API. Fixes bug where tasks were going into "U" state instead of "Z" state (jobmon_slurm PR 160).
+
+## [3.4.9] - 2025-03-19
+### Removed
+- Removed pin in jobmon_client pyproject.toml (PR 248).
 
 ## [3.4.8] - 2025-03-19
 ### Added
@@ -22,7 +33,6 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed a bug where task instance were stuck in `triaging` state (jobmon_slurm PR 159).
 
 ### Removed
-- Removed pin in jobmon_client pyproject.toml (PR 248).
 - Removed `--args` separator from TaskTemplate (PR 244).
 
 ## [3.4.7] - 2025-03-04

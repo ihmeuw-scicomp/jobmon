@@ -282,8 +282,12 @@ def get_content(response: Any) -> Tuple[int, Any]:
     if "application/json" in response.headers.get("Content-Type", ""):
         try:
             content = response.json()
-        except TypeError:  # for test_client, response.json is a dict not fn
+        except TypeError:
+            # for test_client, response.json is a dict not fn
             content = response.json
+        except (json.decoder.JSONDecodeError, ValueError):
+            # For cases where the response body is empty or malformed JSON
+            content = response.text
     else:
         content = response.content
     return response.status_code, content
