@@ -12,6 +12,7 @@ All notable changes to Jobmon will be documented in this file.
 ## [3.4.11] - TBD
 ### Fixed
 - Fixed bug in requester where ValueErrors weren't being handled (PR 250).
+- Fixed a bug where dates were appearing in UTC (not in user's specified timezone) in the Jobmon GUI (PR 251).
 
 ## [3.4.10] - 2025-03-25
 ### Fixed
