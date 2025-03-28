@@ -15,6 +15,6 @@ export const formatDayjsDate = (date: dayjs.Dayjs)=> {
 export const formatJobmonDate = (date: string|null|undefined)=> {
     if(!date)
         return ""
-    dayjs.extend(utc)
-    return formatDayjsDate(dayjs(date))
+    dayjs.extend(timezone);
+    return formatDayjsDate(dayjs.tz(date, "America/Los_Angeles"));
 }
