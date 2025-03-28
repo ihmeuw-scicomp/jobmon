@@ -16,5 +16,5 @@ export const formatJobmonDate = (date: string|null|undefined)=> {
     if(!date)
         return ""
     dayjs.extend(utc)
-    return formatDayjsDate(dayjs.utc(date))
+    return formatDayjsDate(dayjs(date))
 }
