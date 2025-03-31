@@ -1197,7 +1197,7 @@ def _format_options(
             # it can be typing._GenericAlias for list type annotation
             annotation_name = str(annotation).upper()
 
-        lines.append(f".. option:: --{param} <{annotation_name}>")
+        lines.append(f".. option:: {param}='<{annotation_name}>'")
         lines.append("")
         if param in param_docs and param_docs[param].description:
             for line in statemachine.string2lines(
