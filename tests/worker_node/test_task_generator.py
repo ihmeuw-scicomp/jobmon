@@ -54,6 +54,42 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
     assert task.compute_resources == compute_resources
 
 
+def test_upstream_task(client_env, monkeypatch: pytest.fixture) -> None:
+    """Verify that we get a good looking command string."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool = Tool("test_tool")
+
+    @task_generator.task_generator(
+        serializers={}, tool_name="test_tool", default_cluster_name="sequential"
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    compute_resources = {}
+
+    # Create an upstream task
+    upstream_task = simple_function.create_task(
+        compute_resources=compute_resources, foo=1, bar="b a z"
+    )
+
+    # Create a downstream task
+    downstream_task = simple_function.create_task(
+        compute_resources=compute_resources,
+        foo=2,
+        bar="b u z z",
+        upstream_tasks=[upstream_task],
+    )
+
+    assert downstream_task.upstream_tasks == [upstream_task]
+
+
+
 def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
     """Verify we can properly pass args that serialize as lists.
 
@@ -779,6 +815,42 @@ def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
         )
 
         assert tasks[i - 1].command == expected_command
+
+
+def test_upstream_task_array(client_env, monkeypatch: pytest.fixture) -> None:
+    """Verify that we get a good looking command string for an array task."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool_name = f"test_tool_array_{randint(0, 1000)}"
+
+    @task_generator.task_generator(serializers={}, tool_name=tool_name)
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    compute_resources = {}
+
+    # Exercise
+    upstream_tasks = simple_function.create_tasks(
+        cluster_name="sequential",
+        compute_resources=compute_resources,
+        foo=[1, 2],
+        bar="baz",
+    )
+
+    downstream_tasks = simple_function.create_tasks(
+        cluster_name="sequential",
+        compute_resources=compute_resources,
+        foo=[1, 2],
+        bar="buzz",
+        upstream_tasks=upstream_tasks,
+    )
+
+    assert downstream_tasks.upstream_tasks == upstream_tasks
 
 
 def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
