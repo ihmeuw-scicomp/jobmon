@@ -662,7 +662,6 @@ class TaskGenerator:
         cluster_name: str = "",
         compute_resources: Optional[Dict] = None,
         resource_scales: Optional[Dict[str, Any]] = None,
-        upstream_tasks: List[Task] = [],
         **kwargs: Any,
     ) -> Task:
         """Create a task for the task_function with the given kwargs."""
@@ -709,7 +708,6 @@ class TaskGenerator:
             resource_scales=resource_scales,
             max_attempts=self.max_attempts,
             executable=executable_path,
-            upstream_tasks=upstream_tasks,
             **kwargs_for_task,  # type: ignore
         )
 
@@ -720,7 +718,6 @@ class TaskGenerator:
         cluster_name: str = "",
         compute_resources: Optional[Dict] = None,
         resource_scales: Optional[Dict[str, Any]] = None,
-        upstream_tasks: Optional[List[Task]] = None,
         **kwargs: Any,
     ) -> List[Task]:
         """Create a task array for the task_function with the given kwargs."""
@@ -758,7 +755,6 @@ class TaskGenerator:
             resource_scales=resource_scales,
             max_attempts=self.max_attempts,
             executable=executable_path,
-            upstream_tasks=upstream_tasks,
             **kwargs_for_task,  # type: ignore
         )
 
