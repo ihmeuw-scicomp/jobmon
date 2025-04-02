@@ -55,7 +55,7 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
 
 
 def test_upstream_task(client_env, monkeypatch: pytest.fixture) -> None:
-    """Verify that we get a good looking command string."""
+    """Verify that we get expected upstream task."""
     # Set up function
     monkeypatch.setattr(
         task_generator,
@@ -818,7 +818,7 @@ def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
 
 
 def test_upstream_task_array(client_env, monkeypatch: pytest.fixture) -> None:
-    """Verify that we get a good looking command string for an array task."""
+    """Verify that we get expected upstream tasks."""
     # Set up function
     monkeypatch.setattr(
         task_generator,
