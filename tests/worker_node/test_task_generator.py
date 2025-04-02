@@ -86,7 +86,7 @@ def test_upstream_task(client_env, monkeypatch: pytest.fixture) -> None:
         upstream_tasks=[upstream_task],
     )
 
-    assert downstream_task.upstream_tasks == [upstream_task]
+    assert downstream_task.upstream_tasks == {upstream_task}
 
 
 
@@ -850,7 +850,8 @@ def test_upstream_task_array(client_env, monkeypatch: pytest.fixture) -> None:
         upstream_tasks=upstream_tasks,
     )
 
-    assert downstream_tasks.upstream_tasks == upstream_tasks
+    for downstream_task in downstream_tasks:
+        assert downstream_task.upstream_tasks == set(upstream_tasks)
 
 
 def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
