@@ -10,6 +10,9 @@ All notable changes to Jobmon will be documented in this file.
 ### Removed
 
 ## [3.4.11] - TBD
+### Added
+- Added the ability to specify upstream tasks in TaskGenerator create_task(s) methods.
+
 ### Fixed
 - Fixed bug in requester where ValueErrors weren't being handled (PR 250).
 
