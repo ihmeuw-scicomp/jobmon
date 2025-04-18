@@ -50,7 +50,7 @@ export default function TaskDetails() {
     };
 
     const breadcrumbItems: BreadcrumbItem[] = [
-        {label: 'Home', onClick: handleHomeClick},
+        {label: 'Home', to: "/", onClick: handleHomeClick},
         {
             label: `Workflow ID ${task_details?.data?.workflow_id}`,
             to: `/workflow/${task_details?.data?.workflow_id}`,
@@ -78,9 +78,15 @@ export default function TaskDetails() {
                     <p className='color-dark'>
                         Task Name: {task_details?.data?.task_name}&nbsp;
                     </p>
-                    <p className="color-dark">
-                        Task Dependencies&nbsp;
-                        <span>
+                </header>
+            </div>
+            <div id="wftable" className="div-level-2">
+                <TaskInstanceTable taskId={taskId}/>
+            </div>
+            <header className="div-level-2 header-1 ">
+                <p className="color-dark">
+                    Task Dependencies&nbsp;
+                    <span>
                         <HtmlTooltip
                             title="Task Finite State Machine"
                             arrow={true}
@@ -100,16 +106,12 @@ export default function TaskDetails() {
                                 </IconButton>
                             </HtmlTooltip>
                         </span>
-                    </p>
-                </header>
-            </div>
-            <div className='row pt-2 mx-0 px-0'>
-                <TaskDAG taskId={taskId} taskName={task_details?.data?.task_name}
-                         taskStatus={task_details?.data?.task_status}/>
-            </div>
-            <div id="wftable" className="div-level-2">
-                <TaskInstanceTable taskId={taskId}/>
-            </div>
+                </p>
+                <div className='row pt-2 mx-0 px-0'>
+                    <TaskDAG taskId={taskId} taskName={task_details?.data?.task_name}
+                             taskStatus={task_details?.data?.task_status}/>
+                </div>
+            </header>
             <JobmonModal
                 title={
                     "Task Finite State Machine"
@@ -133,10 +135,12 @@ export default function TaskDetails() {
                         <Grid item xs={9}> Task errored with a resource error, the resources will be adjusted before
                             retrying.</Grid>
                         <Grid item xs={3}><b>Error Fatal (F):</b></Grid>
-                        <Grid item xs={9}> Task errored out and has used all of the attempts, therefore has failed for
+                        <Grid item xs={9}> Task errored out and has used all of the attempts, therefore has failed
+                            for
                             this WorkflowRun. <br/>It can be resumed in a new WFR.</Grid>
                         <Grid item xs={3}><b>Done (D):</b></Grid>
-                        <Grid item xs={9}> Task ran successfully to completion; it has a TaskInstance that successfully
+                        <Grid item xs={9}> Task ran successfully to completion; it has a TaskInstance that
+                            successfully
                             completed.</Grid>
                     </Grid>
                 }
