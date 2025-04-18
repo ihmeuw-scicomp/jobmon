@@ -15,6 +15,7 @@ All notable changes to Jobmon will be documented in this file.
 
 ### Changed
 - Swapped the location of the DAG viz and TaskInstance table on the Task Details page (PR 255).
+- Changed tasks in "G" state (registering) to white in Task DAG viz (PR 255).
 
 ### Fixed
 - Fixed a bug where dates were appearing in UTC (not in user's specified timezone) in the Jobmon GUI (PR 251).
