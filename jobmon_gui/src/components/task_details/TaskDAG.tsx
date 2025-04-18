@@ -64,7 +64,7 @@ export default function TaskDAG({taskId, taskName, taskStatus}: NodeListsProps) 
     });
 
     const statusColorMap: Record<string, string> = {
-        G: '#0072b2', // Registering
+        G: '#FFFFFF', // Registering
         Q: '#0072b2', // Queued
         I: '#0072b2', // Instantiating
         O: '#0072b2', // Launched
