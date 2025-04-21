@@ -29,6 +29,8 @@ import {
     ErrorDetails,
     ErrorSampleModalDetails
 } from "@jobmon_gui/types/ClusteredErrors.ts";
+import {Link} from "react-router-dom";
+import {getTaskDetailsQueryFn} from "@jobmon_gui/queries/GetTaskDetails.ts";
 
 export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredErrorsProps) {
     const columnHelper = createMRTColumnHelper<ColumnType>()
@@ -276,16 +278,31 @@ export default function ClusteredErrors({taskTemplateId, workflowId}: ClusteredE
                         <Grid item xs={3}><Typography sx={labelStyles}>Error Time:</Typography></Grid>
                         <Grid item xs={9}>{formatJobmonDate(error.error_time)}</Grid>
 
-                        <Grid item xs={3}><Typography sx={labelStyles}>task_id:</Typography></Grid>
-                        <Grid item xs={9}>{error.task_id}</Grid>
+                        <Grid item xs={3}><Typography sx={labelStyles}>Task ID:</Typography></Grid>
+                        <Grid item xs={9}>
+                            <nav>
+                                <Link
+                                    to={{pathname: `/task_details/${error.task_id}`, search: location.search}}
+                                    key={error.task_id}
+                                    onMouseEnter={async () => {
+                                        queryClient.prefetchQuery({
+                                            queryKey: ["task_details", error.task_id],
+                                            queryFn: getTaskDetailsQueryFn
+                                        })
 
+                                    }}
+                                >
+                                    {error.task_id}
+                                </Link>
+                            </nav>
+                        </Grid>
                         <Grid item xs={3}><Typography sx={labelStyles}>Task Instance Error ID:</Typography></Grid>
                         <Grid item xs={9}>{error.task_instance_err_id}</Grid>
 
-                        <Grid item xs={3}><Typography sx={labelStyles}>workflow_id:</Typography></Grid>
+                        <Grid item xs={3}><Typography sx={labelStyles}>Workflow ID:</Typography></Grid>
                         <Grid item xs={9}>{error.workflow_id}</Grid>
 
-                        <Grid item xs={3}><Typography sx={labelStyles}>workflow_run_id:</Typography></Grid>
+                        <Grid item xs={3}><Typography sx={labelStyles}>WorkflowRun ID:</Typography></Grid>
                         <Grid item xs={9}>{error.workflow_run_id}</Grid>
 
                         <Grid item xs={12}><Typography sx={labelStyles}>Error Message:</Typography></Grid>

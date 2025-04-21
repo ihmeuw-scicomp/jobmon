@@ -9,13 +9,25 @@ All notable changes to Jobmon will be documented in this file.
 ### Deprecated
 ### Removed
 
-## [3.4.11] - TBD
+## [3.4.13] - 2025-04-21
 ### Added
-- Added the ability to specify upstream tasks in TaskGenerator create_task(s) methods.
+- Added a link to the TaskDetails page from the clustered errors modal (PR 255).
+
+### Changed
+- Swapped the location of the DAG viz and TaskInstance table on the Task Details page (PR 255).
+- Changed tasks in "G" state (registering) to white in Task DAG viz (PR 255).
 
 ### Fixed
-- Fixed bug in requester where ValueErrors weren't being handled (PR 250).
 - Fixed a bug where dates were appearing in UTC (not in user's specified timezone) in the Jobmon GUI (PR 251).
+- Fixed broken home button on TaskDetails page (PR 255).
+
+## [3.4.12] - 2025-04-03
+### Added
+- Added the ability to specify upstream tasks in TaskGenerator create_task(s) methods (PR 254).
+
+## [3.4.11] - 2025-03-31
+### Fixed
+- Fixed bug in requester where ValueErrors weren't being handled (PR 250).
 
 ## [3.4.10] - 2025-03-25
 ### Fixed
