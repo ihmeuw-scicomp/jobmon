@@ -4,13 +4,16 @@ import {Task, Tasks} from "@jobmon_gui/types/TaskTable.ts";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import {task_table_url} from "@jobmon_gui/configs/ApiUrls.ts";
+import timezone from 'dayjs/plugin/timezone';
 
 type getWorkflowTasksQueryFnArgs = {
     queryKey: (string | number | null | string[] | number[] | null[])[]
 }
 
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 export const getWorkflowTasksQueryFn = async ({queryKey}: getWorkflowTasksQueryFnArgs) => {
-    dayjs.extend(utc)
     if (!queryKey || queryKey.length != 4) {
         return;
     }
@@ -25,7 +28,7 @@ export const getWorkflowTasksQueryFn = async ({queryKey}: getWorkflowTasksQueryF
         }
     ).then((r) => {
         return r.data.tasks.map((task: Task) => {
-            task.task_status_date = dayjs.utc(task.task_status_date, 'YYYY-MM-DD HH:mm:SS')
+            task.task_status_date = dayjs.tz(task.task_status_date, 'YYYY-MM-DD HH:mm:ss', 'America/Los_Angeles');
             return task
         })
     })

@@ -14,7 +14,7 @@ import {useTaskTableStore} from "@jobmon_gui/stores/TaskTable.ts";
 import {LocalizationProvider} from "@mui/x-date-pickers";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
-import {formatDayjsDate} from "@jobmon_gui/utils/DayTime.ts";
+import {formatDayjsDate, formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
 import {getTaskDetailsQueryFn} from "@jobmon_gui/queries/GetTaskDetails.ts";
 import {getWorkflowTasksQueryFn} from "@jobmon_gui/queries/GetWorkflowTasks.ts";
 import {Task, TaskTableProps} from "@jobmon_gui/types/TaskTable.ts";
@@ -89,7 +89,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
             filterVariant: 'datetime-range',
             size: 350,
             Cell: ({renderedCellValue}) => (
-                dayjs.isDayjs(renderedCellValue) ? formatDayjsDate(renderedCellValue) : renderedCellValue
+               formatJobmonDate(renderedCellValue)
             )
         }),
     ];
