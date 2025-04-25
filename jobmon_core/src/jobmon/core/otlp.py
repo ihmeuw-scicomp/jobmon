@@ -201,6 +201,9 @@ def add_span_details_processor(
 
 class _ProcessResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:
+
+        config = JobmonConfig()
+
         attrs: Mapping[str, Union[str, bool, int, float]] = {
             str(resources.PROCESS_PID): int(os.getpid()),  # Explicit cast to int
             str(resources.PROCESS_RUNTIME_NAME): str(
@@ -209,20 +212,27 @@ class _ProcessResourceDetector(resources.ResourceDetector):
             str(resources.PROCESS_OWNER): str(
                 getpass.getuser()
             ),  # Explicit cast to str
+            str(resources.DEPLOYMENT_ENVIRONMENT): config.get("otlp", "deployment_environment"),
         }
         return resources.Resource(attrs)
 
 
 class _ServiceResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:
+        config = JobmonConfig()
         attrs = {
             resources.SERVICE_NAME: "jobmon",
             resources.SERVICE_VERSION: __version__,
+            str(resources.DEPLOYMENT_ENVIRONMENT): config.get("otlp", "deployment_environment"),
         }
         return resources.Resource(attrs)
 
 
 class _HostResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:
-        attrs = {resources.HOST_NAME: socket.gethostname()}
+        config = JobmonConfig()
+        attrs = {
+            resources.HOST_NAME: socket.gethostname(),
+            str(resources.DEPLOYMENT_ENVIRONMENT): config.get("otlp", "deployment_environment"),
+        }
         return resources.Resource(attrs)
