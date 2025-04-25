@@ -20,6 +20,10 @@ from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
 
 
+config = JobmonConfig()
+deployment_environment = config.get("otlp", "deployment_environment")
+
+
 class OtlpAPI:
     """OpenTelemetry API."""
 
@@ -71,7 +75,6 @@ class OtlpAPI:
         _logs.set_logger_provider(self.logger_provider)
 
     def _configure_providers(self) -> None:
-        config = JobmonConfig()
 
         span_exporter = config.get("otlp", "span_exporter")
         if span_exporter:
@@ -201,7 +204,6 @@ def add_span_details_processor(
 
 class _ProcessResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:
-        config = JobmonConfig()
         attrs: Mapping[str, Union[str, bool, int, float]] = {
             str(resources.PROCESS_PID): int(os.getpid()),  # Explicit cast to int
             str(resources.PROCESS_RUNTIME_NAME): str(
@@ -210,27 +212,25 @@ class _ProcessResourceDetector(resources.ResourceDetector):
             str(resources.PROCESS_OWNER): str(
                 getpass.getuser()
             ),  # Explicit cast to str
-            str(resources.DEPLOYMENT_ENVIRONMENT): str(config.get("otlp", "deployment_environment")),
+            str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
         }
         return resources.Resource(attrs)
 
 
 class _ServiceResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:
-        config = JobmonConfig()
         attrs = {
             resources.SERVICE_NAME: "jobmon",
             resources.SERVICE_VERSION: __version__,
-            str(resources.DEPLOYMENT_ENVIRONMENT): str(config.get("otlp", "deployment_environment")),
+            str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
         }
         return resources.Resource(attrs)
 
 
 class _HostResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:
-        config = JobmonConfig()
         attrs = {
             resources.HOST_NAME: socket.gethostname(),
-            str(resources.DEPLOYMENT_ENVIRONMENT): str(config.get("otlp", "deployment_environment")),
+            str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
         }
         return resources.Resource(attrs)
