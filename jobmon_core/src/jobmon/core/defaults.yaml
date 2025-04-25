@@ -17,6 +17,7 @@ oidc:
 otlp:
   http_enabled: false
   web_enabled: false
+  deployment_environment: prod
 reaper:
   poll_interval_minutes: 5
 worker_node:

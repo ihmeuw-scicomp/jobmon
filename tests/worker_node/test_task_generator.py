@@ -89,7 +89,6 @@ def test_upstream_task(client_env, monkeypatch: pytest.fixture) -> None:
     assert downstream_task.upstream_tasks == {upstream_task}
 
 
-
 def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
     """Verify we can properly pass args that serialize as lists.
 
