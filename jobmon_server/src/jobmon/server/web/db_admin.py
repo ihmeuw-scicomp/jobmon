@@ -7,7 +7,7 @@ from typing import Dict, Tuple, cast
 
 from alembic import command
 from alembic.config import Config
-from dnspython import resolver
+from dns import resolver
 from sqlalchemy import create_engine, event, exc
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.engine.interfaces import DBAPIConnection
@@ -41,7 +41,7 @@ _DEFAULT_MAX_TTL = 300  # 5 min max TTL to prevent stale IPs
 def _resolve_from_dns(hostname: str) -> Tuple[str, int]:
     """Resolve hostname to IP with retries. Returns (ip, ttl_seconds)."""
     answers = resolver.resolve(hostname, "A", lifetime=2)  # Fail-fast after 2 seconds
-    ttl = answers.rrset.ttl or _DEFAULT_MAX_TTL
+    ttl = getattr(answers.rrset, 'ttl', None) or _DEFAULT_MAX_TTL
     return answers[0].address, ttl
 
 
