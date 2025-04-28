@@ -94,13 +94,25 @@ def get_engine_from_config(uri: str) -> Engine:
     automated cache-and-recycle driven by the DNS record's TTL.
     """
     parsed = make_url(uri)
+
+    if parsed.drivername.startswith("sqlite"):
+        # SQLite: No DNS resolution or advanced pooling needed
+        engine = create_engine(
+            uri,
+            connect_args={"check_same_thread": False},  # Allow multi-threaded use
+            pool_size=1,  # Single connection is sufficient for SQLite
+            max_overflow=0,
+            pool_recycle=-1,  # No recycling for local file
+            future=True,
+        )
+        return engine
+
+    # Non-SQLite (networked databases)
     hostname = parsed.host
-
-    # Add null check for hostname
     if hostname is None:
-        raise ValueError("URI must have a hostname")
+        raise ValueError("URI must have a hostname for non-SQLite databases")
 
-    # Do an initial lookup so we can set the starting pool_recycle
+    # Initial DNS lookup for pool_recycle
     _, initial_ttl = get_ip_with_ttl(hostname)
     recycle_interval = min(initial_ttl, _DEFAULT_MAX_TTL)
 
@@ -116,16 +128,14 @@ def get_engine_from_config(uri: str) -> Engine:
             raise ValueError("Hostname cannot be None")
 
         ip_now, ttl_now = get_ip_with_ttl(hostname)
-        # Adjust recycle so connections don't live past their DNS validity
+        # Adjust recycle so connections don't outlive DNS TTL
         engine.pool._recycle = min(ttl_now, _DEFAULT_MAX_TTL)
         conn = create_engine(
             parsed.set(host=ip_now), connect_args={"connect_timeout": 2}
         ).raw_connection()
-
-        # Explicitly cast the return value to DBAPIConnection
         return cast(DBAPIConnection, conn)
 
-    # We need *some* dummy URL here so SQLAlchemy knows which dialect/driver
+    # Placeholder URL for dialect/driver detection
     placeholder = parsed.set(host="127.0.0.1", port=1)
 
     engine = create_engine(
@@ -165,8 +175,7 @@ def get_engine_from_config(uri: str) -> Engine:
         old_ip = conn_record.info.get("peer_ip")
         current_ip, _ = get_ip_with_ttl(hostname)
         if old_ip != current_ip:
-            # Fix: Use None instead of dbapi_conn for the first argument
-            conn_record.invalidate(None)  # kill the socket
+            conn_record.invalidate(None)  # Kill the socket
             raise exc.DisconnectionError(
                 f"Host IP changed from {old_ip} → {current_ip}; reconnecting"
             )
