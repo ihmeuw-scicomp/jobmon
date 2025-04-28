@@ -100,9 +100,6 @@ def get_engine_from_config(uri: str) -> Engine:
         engine = create_engine(
             uri,
             connect_args={"check_same_thread": False},  # Allow multi-threaded use
-            pool_size=1,  # Single connection is sufficient for SQLite
-            max_overflow=0,
-            pool_recycle=-1,  # No recycling for local file
             future=True,
         )
         return engine
