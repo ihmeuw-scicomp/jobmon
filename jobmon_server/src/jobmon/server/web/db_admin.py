@@ -3,7 +3,7 @@ from importlib.resources import files
 import logging
 import threading
 import time
-from typing import Dict, Tuple, cast
+from typing import cast, Dict, Tuple
 
 from alembic import command
 from alembic.config import Config
@@ -41,7 +41,7 @@ _DEFAULT_MAX_TTL = 300  # 5 min max TTL to prevent stale IPs
 def _resolve_from_dns(hostname: str) -> Tuple[str, int]:
     """Resolve hostname to IP with retries. Returns (ip, ttl_seconds)."""
     answers = resolver.resolve(hostname, "A", lifetime=2)  # Fail-fast after 2 seconds
-    ttl = getattr(answers.rrset, 'ttl', None) or _DEFAULT_MAX_TTL
+    ttl = getattr(answers.rrset, "ttl", None) or _DEFAULT_MAX_TTL
     return answers[0].address, ttl
 
 
@@ -95,7 +95,7 @@ def get_engine_from_config(uri: str) -> Engine:
     """
     parsed = make_url(uri)
     hostname = parsed.host
-    
+
     # Add null check for hostname
     if hostname is None:
         raise ValueError("URI must have a hostname")
@@ -114,14 +114,14 @@ def get_engine_from_config(uri: str) -> Engine:
         """
         if hostname is None:
             raise ValueError("Hostname cannot be None")
-            
+
         ip_now, ttl_now = get_ip_with_ttl(hostname)
         # Adjust recycle so connections don't live past their DNS validity
         engine.pool._recycle = min(ttl_now, _DEFAULT_MAX_TTL)
         conn = create_engine(
             parsed.set(host=ip_now), connect_args={"connect_timeout": 2}
         ).raw_connection()
-        
+
         # Explicitly cast the return value to DBAPIConnection
         return cast(DBAPIConnection, conn)
 
@@ -145,7 +145,7 @@ def get_engine_from_config(uri: str) -> Engine:
         """Stash the IP we used when this connection was first made."""
         if hostname is None:
             raise ValueError("Hostname cannot be None")
-            
+
         ip_used, _ = get_ip_with_ttl(hostname)
         conn_record.info["peer_ip"] = ip_used
 
@@ -161,7 +161,7 @@ def get_engine_from_config(uri: str) -> Engine:
         """
         if hostname is None:
             raise ValueError("Hostname cannot be None")
-            
+
         old_ip = conn_record.info.get("peer_ip")
         current_ip, _ = get_ip_with_ttl(hostname)
         if old_ip != current_ip:
