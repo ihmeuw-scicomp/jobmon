@@ -89,7 +89,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
             filterVariant: 'datetime-range',
             size: 350,
             Cell: ({renderedCellValue}) => (
-               formatJobmonDate(renderedCellValue)
+               formatJobmonDate(renderedCellValue.toString())
             )
         }),
     ];
