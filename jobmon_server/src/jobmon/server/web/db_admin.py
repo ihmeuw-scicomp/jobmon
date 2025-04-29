@@ -138,8 +138,6 @@ def get_engine_from_config(uri: str) -> Engine:
     engine = create_engine(
         str(placeholder),
         creator=_creator,
-        pool_size=20,
-        max_overflow=10,
         pool_recycle=recycle_interval,
         pool_pre_ping=True,
         future=True,
