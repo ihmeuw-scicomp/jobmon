@@ -22,8 +22,9 @@ from tenacity import (
     wait_exponential,
 )
 
-
+from MySQLdb.connections import Connection as MySQLConnection
 from jobmon.server.web.config import get_jobmon_config
+import MySQLdb
 
 logger = logging.getLogger(__name__)
 
@@ -113,24 +114,43 @@ def get_engine_from_config(uri: str) -> Engine:
     _, initial_ttl = get_ip_with_ttl(hostname)
     recycle_interval = min(initial_ttl, _DEFAULT_MAX_TTL)
 
-    def _creator() -> DBAPIConnection:
-        """This is called once per new DBAPI connection.
-
-        We:
-          1. resolve the host (getting fresh TTL)
-          2. bump pool_recycle so old sockets get closed at the right time
-          3. open a raw driver connection straight to that IP
-        """
+    def _creator() -> MySQLConnection:
+        """This is called once per new DBAPI connection using MySQLdb."""
         if hostname is None:
             raise ValueError("Hostname cannot be None")
 
         ip_now, ttl_now = get_ip_with_ttl(hostname)
         # Adjust recycle so connections don't outlive DNS TTL
-        engine.pool._recycle = min(ttl_now, _DEFAULT_MAX_TTL)
-        conn = create_engine(
-            parsed.set(host=ip_now), connect_args={"connect_timeout": 2}
-        ).raw_connection()
-        return cast(DBAPIConnection, conn)
+        # Note: As mentioned before, accessing _recycle might be fragile.
+        # You might rely solely on the checkout check instead.
+        # engine.pool._recycle = min(ttl_now, _DEFAULT_MAX_TTL)
+
+        # Get connection parameters from the parsed URL
+        db_user = parsed.username
+        db_password = parsed.password
+        db_name = parsed.database
+        db_port = parsed.port or 3306 # Default MySQL port if not specified
+
+        try:
+            conn = MySQLdb.connect(
+                host=ip_now,
+                port=db_port,
+                user=db_user,
+                passwd=db_password, # Note: parameter name is passwd for MySQLdb
+                db=db_name,         # Note: parameter name is db for MySQLdb
+                connect_timeout=2,
+                ssl_mode="REQUIRED",
+                # Add other necessary MySQLdb connection parameters if needed
+            )
+            # MySQLdb connection objects are the DBAPIConnection type expected
+            return conn
+        except MySQLdb.Error as e: # Catch specific MySQL errors
+            # Log the error appropriately
+            print(f"Error connecting with MySQLdb: {e}")
+            raise # Re-raise the exception so SQLAlchemy knows creation failed
+        except Exception as e: # Catch other potential errors
+            print(f"An unexpected error occurred during connection: {e}")
+            raise
 
     # Placeholder URL for dialect/driver detection
     placeholder = parsed.set(host="127.0.0.1", port=1)
@@ -161,7 +181,7 @@ def get_engine_from_config(uri: str) -> Engine:
     def _on_checkout(
         dbapi_conn: DBAPIConnection,
         conn_record: _ConnectionRecord,
-        conn_proxy: Connection,
+        conn_proxy: MySQLConnection,
     ) -> None:
         """Every time the pool gives out a connection, check IP matches current DNS IP.
 
