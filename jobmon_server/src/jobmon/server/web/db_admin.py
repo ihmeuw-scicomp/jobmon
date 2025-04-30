@@ -139,7 +139,7 @@ def get_engine_from_config(uri: str) -> Engine:
                 passwd=db_password, # Note: parameter name is passwd for MySQLdb
                 db=db_name,         # Note: parameter name is db for MySQLdb
                 connect_timeout=2,
-                ssl_mode=parsed.get("ssl_mode", "REQUIRED"),
+                ssl_mode="REQUIRED",
                 # Add other necessary MySQLdb connection parameters if needed
             )
             # MySQLdb connection objects are the DBAPIConnection type expected
