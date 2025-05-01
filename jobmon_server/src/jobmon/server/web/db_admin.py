@@ -3,7 +3,7 @@ from importlib.resources import files
 import logging
 import threading
 import time
-from typing import Dict, Tuple
+from typing import cast, Dict, Tuple
 
 from alembic import command
 from alembic.config import Config
