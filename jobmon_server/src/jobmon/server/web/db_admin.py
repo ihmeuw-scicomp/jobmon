@@ -3,13 +3,15 @@ from importlib.resources import files
 import logging
 import threading
 import time
-from typing import cast, Dict, Tuple
+from typing import Dict, Tuple
 
 from alembic import command
 from alembic.config import Config
 from dns import resolver
+import MySQLdb
+from MySQLdb.connections import Connection as MySQLConnection
 from sqlalchemy import create_engine, event, exc
-from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.engine.interfaces import DBAPIConnection
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.orm import sessionmaker
@@ -22,9 +24,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from MySQLdb.connections import Connection as MySQLConnection
 from jobmon.server.web.config import get_jobmon_config
-import MySQLdb
 
 logger = logging.getLogger(__name__)
 
@@ -129,26 +129,26 @@ def get_engine_from_config(uri: str) -> Engine:
         db_user = parsed.username
         db_password = parsed.password
         db_name = parsed.database
-        db_port = parsed.port or 3306 # Default MySQL port if not specified
+        db_port = parsed.port or 3306  # Default MySQL port if not specified
 
         try:
             conn = MySQLdb.connect(
                 host=ip_now,
                 port=db_port,
                 user=db_user,
-                passwd=db_password, # Note: parameter name is passwd for MySQLdb
-                db=db_name,         # Note: parameter name is db for MySQLdb
+                passwd=db_password,  # Note: parameter name is passwd for MySQLdb
+                db=db_name,  # Note: parameter name is db for MySQLdb
                 connect_timeout=2,
                 ssl_mode="REQUIRED",
                 # Add other necessary MySQLdb connection parameters if needed
             )
             # MySQLdb connection objects are the DBAPIConnection type expected
             return conn
-        except MySQLdb.Error as e: # Catch specific MySQL errors
+        except MySQLdb.Error as e:  # Catch specific MySQL errors
             # Log the error appropriately
             print(f"Error connecting with MySQLdb: {e}")
-            raise # Re-raise the exception so SQLAlchemy knows creation failed
-        except Exception as e: # Catch other potential errors
+            raise  # Re-raise the exception so SQLAlchemy knows creation failed
+        except Exception as e:  # Catch other potential errors
             print(f"An unexpected error occurred during connection: {e}")
             raise
 
