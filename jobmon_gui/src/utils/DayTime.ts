@@ -14,7 +14,12 @@ export const formatDayjsDate = (date: dayjs.Dayjs) => {
         .format(useDisplayTimeFormatStore.getState().timeFormat);
 };
 
-export const formatJobmonDate = (date: string | null | undefined) => {
+export const formatJobmonDate = (date: string | dayjs.Dayjs | null | undefined) => {
     if (!date) return "";
-    return formatDayjsDate(dayjs.tz(date, "America/Los_Angeles"));
+
+    const parsedDate = typeof date === "string"
+        ? dayjs.tz(date, "America/Los_Angeles")
+        : date;
+
+    return formatDayjsDate(parsedDate);
 };
