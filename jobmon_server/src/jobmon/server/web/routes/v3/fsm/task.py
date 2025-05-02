@@ -5,17 +5,18 @@ import json
 from typing import Any, cast, Dict, List, Set, Union
 
 from fastapi import Request
-from sqlalchemy import desc, insert, ScalarResult, select, tuple_, update
+from sqlalchemy import desc, insert, select, tuple_, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
+from sqlalchemy.dialects.mysql.dml import Insert as MySQLInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.sqlite.dml import Insert as SQLiteInsert
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core import constants
-from jobmon.server.web.config import get_jobmon_config
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_dialect_name, get_sessionmaker
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_arg import TaskArg
 from jobmon.server.web.models.task_attribute import TaskAttribute
@@ -29,8 +30,8 @@ from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
-_CONFIG = get_jobmon_config()
+SessionMaker = get_sessionmaker()
+DIALECT = get_dialect_name()
 
 
 @api_v3_router.put("/task/bind_tasks_no_args")
@@ -47,7 +48,7 @@ async def bind_tasks_no_args(request: Request) -> Any:
     # command(6), max_attempts(7), reset_if_running(8),resource_scales(9),
     # fallback_queues(10) }
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # Retrieve existing task_ids
             task_select_stmt = select(Task).where(
@@ -174,15 +175,12 @@ async def bind_task_args(request: Request) -> Any:
             {"task_id": task_id, "arg_id": arg_id, "val": value}
             for task_id, arg_id, value in task_args
         ]
-        session = SessionLocal()
         try:
-            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
+            if DIALECT == "mysql":
                 arg_insert_stmt = (
                     insert(TaskArg).values(task_arg_values).prefix_with("IGNORE")
                 )
-            elif SessionLocal and "sqlite" in _CONFIG.get(
-                "db", "sqlalchemy_database_uri"
-            ):
+            elif DIALECT == "sqlite":
                 arg_insert_stmt = (
                     sqlite_insert(TaskArg)
                     .values(task_arg_values)
@@ -190,12 +188,9 @@ async def bind_task_args(request: Request) -> Any:
                 )
             else:
                 raise ServerError(
-                    "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                    + _CONFIG.get("db", "sqlalchemy_database_uri")
-                    if SessionLocal
-                    else "None"
+                    f"invalid sql dialect. Only (mysql, sqlite) are supported. Got {DIALECT}"
                 )
-            with SessionLocal() as session:
+            with SessionMaker() as session:
                 with session.begin():
                     session.execute(arg_insert_stmt)
 
@@ -222,7 +217,7 @@ async def bind_task_attributes(request: Request) -> Any:
         all_attribute_names |= set(attribute.keys())
 
     if any(all_attribute_names):
-        with SessionLocal() as session:
+        with SessionMaker() as session:
             with session.begin():
                 attribute_type_ids = _add_or_get_attribute_types(all_attribute_names)
                 # Build our insert values. On conflicts, update the existing value
@@ -241,128 +236,76 @@ async def bind_task_attributes(request: Request) -> Any:
                 # Insert and handle the conflicts
                 if insert_values:
                     try:
-                        if SessionLocal and "mysql" in _CONFIG.get(
-                            "db", "sqlalchemy_database_uri"
-                        ):
-                            attr_insert_stmt = mysql_insert(TaskAttribute).values(
-                                insert_values
+                        # Declare the variable with the Union type
+                        stmt_to_execute: Union[MySQLInsert, SQLiteInsert, None] = None
+                        if DIALECT == "mysql":
+                            mysql_stmt: MySQLInsert = mysql_insert(
+                                TaskAttribute
+                            ).values(insert_values)
+                            mysql_stmt = mysql_stmt.on_duplicate_key_update(
+                                value=mysql_stmt.inserted.value
                             )
-                            attr_insert_stmt = attr_insert_stmt.on_duplicate_key_update(
-                                value=attr_insert_stmt.inserted.value
+                            stmt_to_execute = mysql_stmt
+                        elif DIALECT == "sqlite":
+                            sqlite_stmt: SQLiteInsert = sqlite_insert(
+                                TaskAttribute
+                            ).values(insert_values)
+                            sqlite_stmt = sqlite_stmt.on_conflict_do_update(
+                                index_elements=[
+                                    TaskAttribute.task_id,
+                                    TaskAttribute.task_attribute_type_id,
+                                ],
+                                set_=dict(value=sqlite_stmt.excluded.value),
                             )
-                            session.execute(attr_insert_stmt)
-
-                        elif SessionLocal and "sqlite" in _CONFIG.get(
-                            "db", "sqlalchemy_database_uri"
-                        ):
-                            for attr_to_add in insert_values:
-                                attr_insert_stmt = (  # type: ignore
-                                    sqlite_insert(TaskAttribute)  # type: ignore
-                                    .values(attr_to_add)
-                                    .on_conflict_do_update(
-                                        index_elements=[
-                                            "task_id",
-                                            "task_attribute_type_id",
-                                        ],
-                                        set_=dict(value=attr_to_add["value"]),
-                                    )
-                                )
-                                session.execute(attr_insert_stmt)
+                            stmt_to_execute = sqlite_stmt
                         else:
                             raise ServerError(
-                                "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                                + _CONFIG.get("db", "sqlalchemy_database_uri")
-                                if SessionLocal
-                                else "None"
+                                f"invalid sql dialect. Only (mysql, sqlite) are supported. "
+                                f"Got {DIALECT}"
                             )
+                        if stmt_to_execute is not None:
+                            session.execute(stmt_to_execute)
                     except (DataError, IntegrityError) as e:
-                        # Attributes too long, message back
+                        # Attributes likely too long, message back
                         raise InvalidUsage(
-                            "Task attributes are constrained to 255 characters, "
-                            f"you may have values that are too long. Message: {str(e)}",
+                            "Task Attributes are constrained to 255 characters, you may "
+                            f"have values that are too long. Message: {str(e)}",
                             status_code=400,
                         ) from e
-            ()
+
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 
 
 def _add_or_get_attribute_types(names: Union[List[str], Set[str]]) -> Dict[str, int]:
     # Query for existing attribute types, to avoid integrity conflicts
-    names = set(names)
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
-            existing_rows_select = select(TaskAttributeType).where(
-                TaskAttributeType.name.in_(names)
-            )
-            existing_rows_raw: ScalarResult[TaskAttributeType] = session.execute(
-                existing_rows_select
-            ).scalars()
-            existing_rows = {attr.name: attr.id for attr in existing_rows_raw}
+            query = select(TaskAttributeType).where(TaskAttributeType.name.in_(names))
+            existing_attr_types = session.execute(query).scalars().all()
+            existing_attr_map = {at.name: at.id for at in existing_attr_types}
 
-            existing_names = set(existing_rows.keys())
-
-            # Insert the remaining names, found from the difference between old and new
-            # Keep the IGNORE prefix in case other agents add attributes first, prevent errors
-            # while trying to minimize collisions
-            new_names = names - existing_names  # type: ignore
-
-            # We'll eventually return the combination of existing + new attribute type ids
-            return_dict = existing_rows
-            if any(new_names):
-                new_attribute_types = [{"name": name} for name in new_names]
+            # Identify new attribute types to insert
+            new_names = set(names) - set(existing_attr_map.keys())
+            if new_names:
+                insert_values = [{"name": name} for name in new_names]
                 try:
-                    if SessionLocal and "mysql" in _CONFIG.get(
-                        "db", "sqlalchemy_database_uri"
-                    ):
-                        insert_stmt = (
-                            insert(TaskAttributeType)
-                            .values(new_attribute_types)
-                            .prefix_with("IGNORE")
-                        )
-                    elif SessionLocal and "sqlite" in _CONFIG.get(
-                        "db", "sqlalchemy_database_uri"
-                    ):
-                        insert_stmt = (
-                            sqlite_insert(TaskAttributeType)
-                            .values(new_attribute_types)
-                            .on_conflict_do_nothing()
-                        )
-                    else:
-                        raise ServerError(
-                            "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                            + _CONFIG.get("db", "sqlalchemy_database_uri")
-                            if SessionLocal
-                            else "None"
-                        )
+                    insert_stmt = insert(TaskAttributeType).values(insert_values)
                     session.execute(insert_stmt)
-
-                except DataError as e:
+                except (DataError, IntegrityError) as e:
                     raise InvalidUsage(
-                        "Attribute types are constrained to 255 characters, your "
-                        f"attributes might be too long. Message: {str(e)}",
+                        "Attribute type names are constrained to 255 characters, you may have "
+                        f"values that are too long. Message: {str(e)}",
                         status_code=400,
                     ) from e
+                # Fetch the newly inserted attribute types to get their IDs
+                query = select(TaskAttributeType).where(
+                    TaskAttributeType.name.in_(names)
+                )
+                existing_attr_types = session.execute(query).scalars().all()
 
-                # Query the IDs of the newly inserted rows
-                new_rows_select = select(TaskAttributeType).where(
-                    TaskAttributeType.name.in_(new_names)
-                )
-                new_attribute_type_ids = (
-                    session.execute(new_rows_select).scalars().all()
-                )
-
-                # Update our return dict
-                return_dict.update(
-                    {
-                        # Code to keep typechecker happy
-                        attribute.name if attribute.name else "NA": (  # type: ignore
-                            attribute.id if attribute.id else -1  # type: ignore
-                        )
-                        for attribute in new_attribute_type_ids
-                    }
-                )
-    return return_dict  # type: ignore
+            # Map type names to IDs for return
+            return {type_obj.name: type_obj.id for type_obj in existing_attr_types}
 
 
 @api_v3_router.post("/task/bind_resources")
@@ -370,7 +313,7 @@ async def bind_task_resources(request: Request) -> Any:
     """Add the task resources for a given task."""
     data = cast(Dict, await request.json())
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             tr_id = data.get("task_resources_type_id", None)
             req_resc = json.dumps(data.get("requested_resources", None))
@@ -398,7 +341,7 @@ def get_most_recent_ti_error(task_id: int) -> Any:
     structlog.contextvars.bind_contextvars(task_id=task_id)
     logger.info(f"Getting most recent ji error for ti {task_id}")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = (
                 select(TaskInstanceErrorLog)
@@ -436,7 +379,7 @@ async def set_task_resume_state(workflow_id: int, request: Request) -> Any:
     data = cast(Dict, await request.json())
     reset_if_running = bool(data["reset_if_running"])
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # Ensure that the workflow is resumable
             # Necessary?

@@ -6,7 +6,6 @@ from pkgutil import iter_modules
 from typing import Any
 
 from sqlalchemy import CheckConstraint, event, func, String
-from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 import structlog
@@ -48,10 +47,10 @@ def load_model() -> None:
         import_module(f"{__name__}.{module_name}")
 
 
-def load_metadata(engine: Engine) -> None:
+def load_metadata() -> None:
     """Load metadata into a database."""
     # load metadata
-    from jobmon.server.web.db_admin import get_session_local
+    from jobmon.server.web.db import get_sessionmaker
     from jobmon.server.web.models.arg_type import add_arg_types
     from jobmon.server.web.models.cluster_type import add_cluster_types
     from jobmon.server.web.models.cluster import add_clusters
@@ -68,8 +67,8 @@ def load_metadata(engine: Engine) -> None:
         add_workflow_run_statuses,
     )
 
-    SessionLocal = get_session_local()
-    with SessionLocal() as session:
+    SessionMaker = get_sessionmaker()
+    with SessionMaker() as session:
         with session.begin():
             metadata_loaders = [
                 add_arg_types,

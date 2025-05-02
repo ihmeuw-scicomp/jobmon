@@ -15,7 +15,7 @@ import structlog
 from jobmon.core import constants
 from jobmon.core.constants import Direction
 from jobmon.core.serializers import SerializeTaskResourceUsage
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.task import Task
@@ -31,7 +31,7 @@ from jobmon.server.web.server_side_exception import InvalidUsage
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 _task_instance_label_mapping = {
     "Q": "PENDING",
@@ -73,7 +73,7 @@ def get_task_status(
     if status and isinstance(status, str):
         status = [status]
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 Task.id == TaskInstance.task_id,
@@ -159,7 +159,7 @@ async def get_task_subdag(request: Request) -> Any:
         raise InvalidUsage(f"Missing {task_ids} in request", status_code=400)
     if task_status is None:
         task_status = []
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = (
                 select(
@@ -260,7 +260,7 @@ async def update_task_statuses(request: Request) -> Any:
             f"problem with {str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # if task_ids is "all", get all tasks from the workflow_id
             if task_ids == "all":
@@ -354,7 +354,7 @@ async def update_task_statuses(request: Request) -> Any:
 @api_v3_router.get("/task_dependencies/{task_id}")
 def get_task_dependencies(task_id: int) -> Any:
     """Get task's downstream and upstream tasks and their status."""
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             dag_id, workflow_id, node_id = _get_dag_and_wf_id(task_id, session)
             up_nodes = _get_node_dependencies({node_id}, dag_id, session, Direction.UP)
@@ -418,7 +418,7 @@ async def get_tasks_recursive(direction: str, request: Request) -> Any:
     task_ids = set(data.get("task_ids", []))
 
     try:
-        with SessionLocal() as session:
+        with SessionMaker() as session:
             with session.begin():
                 tasks_recursive = _get_tasks_recursive(task_ids, direct, session)
             resp = JSONResponse(
@@ -432,37 +432,39 @@ async def get_tasks_recursive(direction: str, request: Request) -> Any:
 @api_v3_router.get("/task_resource_usage")
 def get_task_resource_usage(task_id: int) -> Any:
     """Return the resource usage for a given Task ID."""
-    with SessionLocal() as session:
-        with SessionLocal.begin():
+    with SessionMaker() as session:
+        with session.begin():
+            # Select the fields required by SerializeTaskResourceUsage.to_wire
             select_stmt = (
                 select(
                     Task.num_attempts,
                     TaskInstance.nodename,
                     TaskInstance.wallclock,
-                    TaskInstance.maxpss,
+                    TaskInstance.maxrss,
                 )
-                .join_from(Task, TaskInstance, Task.id == TaskInstance.task_id)
-                .where(
-                    TaskInstance.task_id == task_id,
-                    TaskInstance.status == constants.TaskInstanceStatus.DONE,
+                .join_from(
+                    TaskInstance,
+                    Task,  # Join Task table
+                    TaskInstance.task_id == Task.id,
                 )
+                .where(TaskInstance.task_id == task_id, TaskInstance.status == "D")
             )
-            result = session.execute(select_stmt).one_or_none()
+            results = session.execute(select_stmt).all()
 
-            if result is None:
-                resource_usage = SerializeTaskResourceUsage.to_wire(
-                    None, None, None, None
-                )
-            else:
-                resource_usage = SerializeTaskResourceUsage.to_wire(
-                    result.num_attempts,
-                    result.nodename,
-                    result.wallclock,
-                    result.maxpss,
-                )
+        resource_usage_list = []
+        for result in results:
+            # Pass the correct 4 arguments
+            resource_usage = SerializeTaskResourceUsage.to_wire(
+                result[0],  # num_attempts
+                result[1],  # nodename
+                result[2],  # wallclock (runtime)
+                result[3],  # maxrss (memory)
+            )
+            resource_usage_list.append(resource_usage)
 
         resp = JSONResponse(
-            content={"resource_usage": resource_usage}, status_code=StatusCodes.OK
+            content={"resource_usage": resource_usage_list},
+            status_code=StatusCodes.OK,
         )
     return resp
 
@@ -650,7 +652,7 @@ async def get_downstream_tasks(request: Request) -> Any:
 
     task_ids = data["task_ids"]
     dag_id = data["dag_id"]
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             tasks_and_edges = session.execute(
                 select(Task.id, Task.node_id, Edge.downstream_node_ids).where(
@@ -673,7 +675,7 @@ async def get_downstream_tasks(request: Request) -> Any:
 @api_v3_router.get("/task/get_ti_details_viz/{task_id}")
 def get_task_details(task_id: int) -> Any:
     """Get information about TaskInstances associated with specific Task ID."""
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query = (
                 select(
@@ -730,7 +732,7 @@ def get_task_details(task_id: int) -> Any:
 @api_v3_router.get("/task/get_task_details_viz/{task_id}")
 def get_task_details_viz(task_id: int) -> Any:
     """Get status of Task from Task ID."""
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query = (
                 select(

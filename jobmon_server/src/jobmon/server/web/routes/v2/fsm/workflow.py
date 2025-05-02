@@ -13,8 +13,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 import structlog
 
-from jobmon.server.web.config import get_jobmon_config
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_dialect_name, get_sessionmaker
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.dag import Dag
 from jobmon.server.web.models.queue import Queue
@@ -25,13 +24,12 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_attribute import WorkflowAttribute
 from jobmon.server.web.models.workflow_attribute_type import WorkflowAttributeType
 from jobmon.server.web.models.workflow_status import WorkflowStatus
-from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
-from jobmon.server.web.server_side_exception import InvalidUsage
+from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
-_CONFIG = get_jobmon_config()
+SessionMaker = get_sessionmaker()
+DIALECT = get_dialect_name()
 
 
 def _add_workflow_attributes(
@@ -54,7 +52,6 @@ def _add_workflow_attributes(
         session.add_all(wf_attributes_list)
 
 
-@api_v1_router.post("/workflow")
 @api_v2_router.post("/workflow")
 async def bind_workflow(request: Request) -> Any:
     """Bind a workflow to the database."""
@@ -82,7 +79,7 @@ async def bind_workflow(request: Request) -> Any:
         task_hash=str(thash),
     )
     logger.info("Bind workflow")
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(Workflow).where(
                 Workflow.tool_version_id == tv_id,
@@ -137,7 +134,6 @@ async def bind_workflow(request: Request) -> Any:
     return resp
 
 
-@api_v1_router.get("/workflow/{workflow_args_hash}")
 @api_v2_router.get("/workflow/{workflow_args_hash}")
 async def get_matching_workflows_by_workflow_args(
     workflow_args_hash: str, request: Request
@@ -153,7 +149,7 @@ async def get_matching_workflows_by_workflow_args(
     structlog.contextvars.bind_contextvars(workflow_args_hash=str(workflow_args_hash))
     logger.info(f"Looking for wf with hash {workflow_args_hash}")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = (
                 select(Workflow.task_hash, Workflow.tool_version_id, Dag.hash)
@@ -195,7 +191,7 @@ def _upsert_wf_attribute(
 ) -> None:
     with session.begin_nested():
         wf_attrib_id = _add_or_get_wf_attribute_type(name, session)
-        if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
+        if DIALECT == "mysql":
             insert_vals1 = mysql_insert(WorkflowAttribute).values(
                 workflow_id=workflow_id,
                 workflow_attribute_type_id=wf_attrib_id,
@@ -204,7 +200,7 @@ def _upsert_wf_attribute(
             upsert_stmt = insert_vals1.on_duplicate_key_update(
                 value=insert_vals1.inserted.value
             )
-        elif SessionLocal and "sqlite" in _CONFIG.get("db", "sqlalchemy_database_uri"):
+        elif DIALECT == "sqlite":
             insert_vals2: sqlalchemy.dialects.sqlite.dml.Insert = sqlite_insert(
                 WorkflowAttribute
             ).values(
@@ -216,11 +212,12 @@ def _upsert_wf_attribute(
                 index_elements=["workflow_id", "workflow_attribute_type_id"],
                 set_=dict(value=value),
             )
+        else:
+            raise ServerError(f"Unsupported SQL dialect '{DIALECT}'")
         session.execute(upsert_stmt)
         session.flush()
 
 
-@api_v1_router.put("/workflow/{workflow_id}/workflow_attributes")
 @api_v2_router.put("/workflow/{workflow_id}/workflow_attributes")
 async def update_workflow_attribute(workflow_id: int, request: Request) -> Any:
     """Update the attributes for a given workflow."""
@@ -237,17 +234,14 @@ async def update_workflow_attribute(workflow_id: int, request: Request) -> Any:
     logger.debug("Update attributes")
     attributes = data["workflow_attributes"]
     if attributes:
-        session = SessionLocal()
-        with session.begin():
-            for name, val in attributes.items():
-                _upsert_wf_attribute(workflow_id, name, val, session)
-        ()
-        session.close()
+        with SessionMaker() as session:
+            with session.begin():
+                for name, val in attributes.items():
+                    _upsert_wf_attribute(workflow_id, name, val, session)
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 
 
-@api_v1_router.post("/workflow/{workflow_id}/set_resume")
 @api_v2_router.post("/workflow/{workflow_id}/set_resume")
 async def set_resume(workflow_id: int, request: Request) -> Any:
     """Set resume on a workflow."""
@@ -261,7 +255,7 @@ async def set_resume(workflow_id: int, request: Request) -> Any:
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(Workflow).where(Workflow.id == workflow_id)
             workflow = session.execute(select_stmt).scalars().one_or_none()
@@ -275,13 +269,12 @@ async def set_resume(workflow_id: int, request: Request) -> Any:
     return resp
 
 
-@api_v1_router.get("/workflow/{workflow_id}/is_resumable")
 @api_v2_router.get("/workflow/{workflow_id}/is_resumable")
 def workflow_is_resumable(workflow_id: int) -> Any:
     """Check if a workflow is in a resumable state."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(Workflow).where(Workflow.id == workflow_id)
             workflow = session.execute(select_stmt).scalars().one()
@@ -294,13 +287,12 @@ def workflow_is_resumable(workflow_id: int) -> Any:
     return resp
 
 
-@api_v1_router.get("/workflow/{workflow_id}/get_max_concurrently_running")
 @api_v2_router.get("/workflow/{workflow_id}/get_max_concurrently_running")
 async def get_max_concurrently_running(workflow_id: int, request: Request) -> Any:
     """Return the maximum concurrency of this workflow."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(Workflow).where(Workflow.id == workflow_id)
             workflow = session.execute(select_stmt).scalars().one()
@@ -312,7 +304,6 @@ async def get_max_concurrently_running(workflow_id: int, request: Request) -> An
     return resp
 
 
-@api_v1_router.put("/workflow/{workflow_id}/update_max_concurrently_running")
 @api_v2_router.put("/workflow/{workflow_id}/update_max_concurrently_running")
 async def update_max_running(workflow_id: int, request: Request) -> Any:
     """Update the number of tasks that can be running concurrently for a given workflow."""
@@ -327,7 +318,7 @@ async def update_max_running(workflow_id: int, request: Request) -> Any:
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             update_stmt = (
                 update(Workflow)
@@ -352,7 +343,6 @@ async def update_max_running(workflow_id: int, request: Request) -> Any:
     return resp
 
 
-@api_v1_router.post("/workflow/{workflow_id}/task_status_updates")
 @api_v2_router.post("/workflow/{workflow_id}/task_status_updates")
 async def task_status_updates(workflow_id: int, request: Request) -> Any:
     """Returns all tasks in the database that have the specified status.
@@ -374,7 +364,7 @@ async def task_status_updates(workflow_id: int, request: Request) -> Any:
         filter_criteria = (Task.workflow_id == workflow_id,)
 
     # get time from db
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             db_time = session.execute(select(func.now())).scalar()
             str_time = db_time.strftime("%Y-%m-%d %H:%M:%S") if db_time else None
@@ -394,12 +384,11 @@ async def task_status_updates(workflow_id: int, request: Request) -> Any:
     return resp
 
 
-@api_v1_router.get("/workflow/{workflow_id}/fetch_workflow_metadata")
 @api_v2_router.get("/workflow/{workflow_id}/fetch_workflow_metadata")
 def fetch_workflow_metadata(workflow_id: int) -> Any:
     """Get metadata associated with specified Workflow ID."""
     # Query for a workflow object
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             wf = session.execute(
                 select(Workflow).where(Workflow.id == workflow_id)
@@ -417,11 +406,10 @@ def fetch_workflow_metadata(workflow_id: int) -> Any:
     return resp
 
 
-@api_v1_router.get("/workflow/get_tasks/{workflow_id}")
 @api_v2_router.get("/workflow/get_tasks/{workflow_id}")
 def get_tasks_from_workflow(workflow_id: int, max_task_id: int, chunk_size: int) -> Any:
     """Return tasks associated with specified Workflow ID."""
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             if max_task_id == 0:
                 # Performance suffers heavily if we do a search with WHERE task.id > 0
@@ -498,12 +486,11 @@ def get_tasks_from_workflow(workflow_id: int, max_task_id: int, chunk_size: int)
     return resp
 
 
-@api_v1_router.get("/workflow_status/available_status")
 @api_v2_router.get("/workflow_status/available_status")
 def get_available_workflow_statuses() -> Any:
     """Return all available workflow statuses."""
     # an easy testing route to verify db is loaded
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(WorkflowStatus.label).distinct()
             res = session.execute(select_stmt).scalars().all()

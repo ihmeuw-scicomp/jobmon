@@ -25,7 +25,7 @@ def set_environment():
 def main():
     from jobmon.core.configuration import JobmonConfig
     from jobmon.server.web.api import get_app
-    from jobmon.server.web.db_admin import init_db
+    from jobmon.server.web.db import init_db
 
     init_db()
     app = get_app()

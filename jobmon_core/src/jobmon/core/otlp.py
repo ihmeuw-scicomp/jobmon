@@ -113,12 +113,15 @@ class OtlpAPI:
 
     @classmethod
     def instrument_sqlalchemy(cls: Type[OtlpAPI]) -> None:
-        """Instrument SQLAlchemy."""
-        if not cls._sqlalchemy_instrumented:
-            from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+        """Instrument SQLAlchemy globally *and* any pre-existing Engine."""
+        if cls._sqlalchemy_instrumented:
+            return
 
-            SQLAlchemyInstrumentor().instrument()
-            cls._sqlalchemy_instrumented = True
+        from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
+        SQLAlchemyInstrumentor().instrument()  # global monkey-patch
+
+        cls._sqlalchemy_instrumented = True
 
     @classmethod
     def instrument_app(cls: Type[OtlpAPI], app: Any) -> None:

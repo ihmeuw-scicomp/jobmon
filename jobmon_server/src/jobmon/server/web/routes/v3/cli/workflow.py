@@ -17,7 +17,7 @@ from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core.constants import WorkflowStatus as Statuses
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_template import TaskTemplate
@@ -31,7 +31,7 @@ from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 _cli_label_mapping = {
     "A": "PENDING",
@@ -68,7 +68,7 @@ async def get_workflow_validation_status(request: Request) -> Any:
         resp = JSONResponse(content={"validation": True}, status_code=StatusCodes.OK)
         return resp
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # execute query
             query_filter = [Task.workflow_id == Workflow.id, Task.id.in_(task_ids)]
@@ -103,7 +103,7 @@ def get_workflow_tasks(
     status_request = status
     logger.debug(f"Get tasks for workflow in status {status_request}")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             if status_request:
                 query_filter = [
@@ -164,7 +164,7 @@ def get_workflow_user_validation(workflow_id: int, username: str) -> Any:
     Used to validate permissions for a self-service request.
     """
     logger.debug(f"Validate user name {username} for workflow")
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [WorkflowRun.workflow_id == workflow_id]
             sql = (select(WorkflowRun.user).where(*query_filter)).distinct()
@@ -185,7 +185,7 @@ def get_workflow_run_for_workflow_reset(workflow_id: int, username: str) -> Any:
         2. This last workflow_run must have been started by the input username.
         3. This last workflow_run is in status 'E'
     """
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 WorkflowRun.workflow_id == workflow_id,
@@ -212,7 +212,7 @@ async def reset_workflow(workflow_id: int, request: Request) -> Any:
     """Update the workflow's status, all its tasks' statuses to 'G'."""
     data = await request.json()
     partial_reset = data.get("partial_reset", False)
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             current_time = session.query(func.now()).scalar()
 
@@ -273,7 +273,7 @@ def get_workflow_status(
         # convert user request into sql filter
         # directly producing workflow_ids, and thus where_clause
         if user_request:
-            session = SessionLocal()
+            session = SessionMaker()
             with session.begin():
                 query_filter = [WorkflowRun.user.in_(user_request)]
                 sql = (
@@ -287,7 +287,7 @@ def get_workflow_status(
     # performance improvement one: only query the limited number of workflows
     workflow_request = workflow_request[:limit]
     # performance improvement two: split query
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 Workflow.id.in_(workflow_request),  # type: ignore
@@ -309,7 +309,7 @@ def get_workflow_status(
     row_map = dict()
     for r in rows1:
         row_map[r[0]] = r
-    session = SessionLocal()
+    session = SessionMaker()
     with session.begin():
         query_filter = [
             Task.workflow_id.in_(workflow_request),
@@ -332,7 +332,7 @@ def get_workflow_status(
         d["TASKS"] = r[1]
         d["STATUS"] = r[2]
         d["CREATED_DATE"] = row_map[r[0]][3]
-        session = SessionLocal()
+        session = SessionMaker()
         with session.begin():
             q_filter = [Task.workflow_id == d["WF_ID"], Task.status == d["STATUS"]]
             q = select(Task.num_attempts).where(*q_filter)
@@ -419,7 +419,7 @@ def get_workflow_status_viz(workflow_ids: list[int] = Query(None)) -> Any:
     # return DS
     return_dic: Dict[int, Any] = dict()
     for wf_id in wf_ids:
-        with SessionLocal() as session:
+        with SessionMaker() as session:
             with session.begin():
                 sql = select(
                     func.min(Task.num_attempts).label("min"),
@@ -441,7 +441,7 @@ def get_workflow_status_viz(workflow_ids: list[int] = Query(None)) -> Any:
             "num_attempts_min": int(attempts.min),  # type: ignore
             "num_attempts_max": int(attempts.max),  # type: ignore
         }
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 Task.workflow_id.in_(wf_ids),
@@ -474,7 +474,7 @@ def workflows_by_user_form(
     status: Optional[str] = Query(None),
 ) -> Any:
     """Fetch associated workflows and workflow runs by username."""
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             where_clauses = []
             substitution_dict = {}
@@ -614,7 +614,7 @@ def workflows_by_user_form(
 def task_details_by_wf_id(workflow_id: int, tt_name: str) -> Any:
     """Fetch Task details associated with Workflow ID and TaskTemplate name."""
     task_template_name = tt_name
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             sql = (
                 select(
@@ -658,7 +658,7 @@ def task_details_by_wf_id(workflow_id: int, tt_name: str) -> Any:
 @api_v3_router.get("/workflow_details_viz/{workflow_id}")
 def wf_details_by_wf_id(workflow_id: int) -> Any:
     """Fetch name, args, dates, tool for a Workflow provided WF ID."""
-    session = SessionLocal()
+    session = SessionMaker()
     with session.begin():
         latest_workflow_run_subquery = (
             session.query(WorkflowRun.workflow_id, func.max(WorkflowRun.heartbeat_date))
@@ -716,3 +716,44 @@ def wf_details_by_wf_id(workflow_id: int) -> Any:
 
     resp = JSONResponse(content=result, status_code=200)
     return resp
+
+
+def get_shared_workflow_ids(workflow_args: Dict[str, Any]) -> List[int]:
+    """Return a list of workflow ids that share the same args."""
+    with SessionMaker() as session:
+        with session.begin():
+            where_clauses = []
+            if "status" in workflow_args and workflow_args["status"]:
+                where_clauses.append(Workflow.status.in_(workflow_args["status"]))
+            if "id" in workflow_args and workflow_args["id"]:
+                where_clauses.append(Workflow.id.in_(workflow_args["id"]))
+            if "name" in workflow_args and workflow_args["name"]:
+                where_clauses.append(Workflow.name == workflow_args["name"])
+            if "owner" in workflow_args and workflow_args["owner"]:
+                where_clauses.append(
+                    Workflow.id.in_(
+                        select(WorkflowRun.workflow_id).where(
+                            WorkflowRun.user == workflow_args["owner"]
+                        )
+                    )
+                )
+            if "tool" in workflow_args and workflow_args["tool"]:
+                where_clauses.append(
+                    Workflow.tool_version_id.in_(
+                        select(ToolVersion.id).where(
+                            ToolVersion.tool_id.in_(
+                                select(Tool.id).where(
+                                    Tool.name == workflow_args["tool"]
+                                )
+                            )
+                        )
+                    )
+                )
+            if "wf_arg" in workflow_args and workflow_args["wf_arg"]:
+                pass  # Handle workflow arguments if needed
+
+            if where_clauses:
+                sql = select(Workflow.id).where(*where_clauses)
+                result = session.execute(sql).scalars().all()
+                return list(result)
+            return []
