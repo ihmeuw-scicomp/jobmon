@@ -663,6 +663,7 @@ class TaskGenerator:
         compute_resources: Optional[Dict] = None,
         resource_scales: Optional[Dict[str, Any]] = None,
         upstream_tasks: List[Task] = [],
+        task_attributes: Union[List[str], Dict[str, Any]] = {},
         **kwargs: Any,
     ) -> Task:
         """Create a task for the task_function with the given kwargs."""
@@ -710,6 +711,7 @@ class TaskGenerator:
             max_attempts=self.max_attempts,
             executable=executable_path,
             upstream_tasks=upstream_tasks,
+            task_attributes=task_attributes,
             **kwargs_for_task,  # type: ignore
         )
 

@@ -1,5 +1,5 @@
 import pytest
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from unittest.mock import Mock
 from random import randint
 
@@ -87,6 +87,45 @@ def test_upstream_task(client_env, monkeypatch: pytest.fixture) -> None:
     )
 
     assert downstream_task.upstream_tasks == {upstream_task}
+
+
+@pytest.mark.parametrize(
+    ["task_attributes"], [{"fake_attr": "fake_value"}, ["fake_attr"], Dict()]
+)
+def test_task_attributes(
+    client_env,
+    monkeypatch: pytest.fixture,
+    task_attributes: Union[List[str], Dict[str, Any]],
+) -> None:
+    """Verify that we get expected task attributes."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool = Tool("test_tool")
+
+    @task_generator.task_generator(
+        serializers={}, tool_name="test_tool", default_cluster_name="sequential"
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    compute_resources = {}
+
+    task = simple_function.create_task(
+        compute_resources=compute_resources,
+        foo=1,
+        bar="b a z",
+        task_attributes=task_attributes,
+    )
+
+    if isinstance(task_attributes, Dict):
+        assert task.attributes == task_attributes
+    elif isinstance(task_attributes, List):
+        assert set(task.attributes.keys()) == set(task_attributes)
 
 
 def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:

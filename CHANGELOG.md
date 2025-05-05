@@ -9,6 +9,10 @@ All notable changes to Jobmon will be documented in this file.
 ### Deprecated
 ### Removed
 
+## [3.4.14] - 2025-05-05
+### Added
+- Added the ability to specify task attributes in TaskGenerator create_task(s) methods (PR XXX).
+
 ## [3.4.13] - 2025-04-21
 ### Added
 - Added a link to the TaskDetails page from the clustered errors modal (PR 255).
