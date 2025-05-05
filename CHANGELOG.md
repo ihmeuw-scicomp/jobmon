@@ -11,7 +11,7 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [3.4.14] - 2025-05-05
 ### Added
-- Added the ability to specify task attributes in TaskGenerator create_task(s) methods (PR XXX).
+- Added the ability to specify task attributes in TaskGenerator create_task(s) methods (PR 264).
 
 ## [3.4.13] - 2025-04-21
 ### Added
