@@ -88,9 +88,10 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
             header: "Status Date",
             filterVariant: 'datetime-range',
             size: 350,
-            Cell: ({renderedCellValue}) => (
-               formatJobmonDate(renderedCellValue.toString())
-            )
+            Cell: ({cell}) => {
+                const rawValue = cell.getValue() as dayjs.Dayjs;
+                return formatDayjsDate(rawValue);
+            }
         }),
     ];
 
