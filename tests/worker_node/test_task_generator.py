@@ -123,9 +123,9 @@ def test_task_attributes(
     )
 
     if isinstance(task_attributes, Dict):
-        assert task.attributes == task_attributes
+        assert task.task_attributes == task_attributes
     elif isinstance(task_attributes, List):
-        assert set(task.attributes.keys()) == set(task_attributes)
+        assert set(task.task_attributes.keys()) == set(task_attributes)
 
 
 def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
