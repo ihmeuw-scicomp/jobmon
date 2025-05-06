@@ -13,6 +13,9 @@ All notable changes to Jobmon will be documented in this file.
 ### Added
 - Added the ability to specify task attributes in TaskGenerator create_task method (PR 264).
 
+### Fixed
+- Fixed a bug where name_func could not be passed through task_generator decorators (PR 264).
+
 ## [3.4.13] - 2025-04-21
 ### Added
 - Added a link to the TaskDetails page from the clustered errors modal (PR 255).
