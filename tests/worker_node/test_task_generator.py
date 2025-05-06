@@ -125,7 +125,7 @@ def test_upstream_task(client_env, monkeypatch: pytest.fixture) -> None:
 
 
 @pytest.mark.parametrize(
-    ["task_attributes"], [{"fake_attr": "fake_value"}, ["fake_attr"], Dict()]
+    ["task_attributes"], [[{"fake_attr": "fake_value"}], [["fake_attr"]], [{}]]
 )
 def test_task_attributes(
     client_env,
