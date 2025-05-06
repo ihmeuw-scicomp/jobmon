@@ -54,6 +54,41 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
     assert task.compute_resources == compute_resources
 
 
+def test_name_func(client_env, monkeypatch: pytest.fixture) -> None:
+    """Verify that name_func works as expected."""
+    # Set up function
+    monkeypatch.setattr(
+        task_generator,
+        "_find_executable_path",
+        Mock(return_value=task_generator.TASK_RUNNER_NAME),
+    )
+    tool = Tool("test_tool")
+
+    def name_func(prefix: str, kwargs_for_name: Dict[str, Any]) -> str:
+        """Simple naming function."""
+        return f"fake_function_name_{prefix}"
+
+    @task_generator.task_generator(
+        serializers={},
+        tool_name="test_tool",
+        default_cluster_name="sequential",
+        name_func=name_func,
+    )
+    def simple_function(foo: int, bar: str) -> None:
+        """Simple task_function."""
+        pass
+
+    compute_resources = {}
+
+    # Exercise
+    task = simple_function.create_task(
+        compute_resources=compute_resources, foo=1, bar="b a z"
+    )
+
+    # Verify task name
+    assert task.name == "fake_function_name_simple_function"
+
+
 def test_upstream_task(client_env, monkeypatch: pytest.fixture) -> None:
     """Verify that we get expected upstream task."""
     # Set up function
