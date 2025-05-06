@@ -200,7 +200,7 @@ check the error in the Standard Error column of the TaskInstances table on the T
 Common causes include insufficient permissions to submit jobs to a particular partition or exceeding resource limits
 for a specific queue.
 
-DistributorNotAlive error
+DistributorNotAlive Error
 -------------------------
 This issue usually occurs when a user runs their command from a login node instead of a submit node. Try calling `srun`
 and see if that resolves the error.
