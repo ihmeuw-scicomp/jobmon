@@ -663,6 +663,7 @@ class TaskGenerator:
         compute_resources: Optional[Dict] = None,
         resource_scales: Optional[Dict[str, Any]] = None,
         upstream_tasks: List[Task] = [],
+        task_attributes: Union[List[str], Dict[str, Any]] = {},
         **kwargs: Any,
     ) -> Task:
         """Create a task for the task_function with the given kwargs."""
@@ -710,6 +711,7 @@ class TaskGenerator:
             max_attempts=self.max_attempts,
             executable=executable_path,
             upstream_tasks=upstream_tasks,
+            task_attributes=task_attributes,
             **kwargs_for_task,  # type: ignore
         )
 
@@ -889,6 +891,7 @@ def task_generator(
     naming_args: Optional[List[str]] = None,
     max_attempts: Optional[int] = None,
     module_source_path: Optional[str] = None,
+    name_func: Optional[Callable] = None,
     default_cluster_name: str = "",
     default_compute_resources: Optional[Dict[str, Any]] = None,
     default_resource_scales: Optional[Dict[str, float]] = None,
@@ -905,6 +908,7 @@ def task_generator(
             naming_args=naming_args,
             max_attempts=max_attempts,
             module_source_path=module_source_path,
+            name_func=name_func,
             default_cluster_name=default_cluster_name,
             default_compute_resources=default_compute_resources,
             default_resource_scales=default_resource_scales,
