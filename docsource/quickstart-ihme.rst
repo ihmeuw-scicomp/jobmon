@@ -37,7 +37,7 @@ To install both at once via pip::
     pip install jobmon[ihme]
 
 Then issue a "jobmon_config update" command to configure the web service and port, as described on
-the hub at
+the HUB at
 `Jobmon Conda Versions <https://hub.ihme.washington.edu/display/DataScience/Jobmon+Conda+Versions>`_
 
 
@@ -48,6 +48,12 @@ the hub at
         extra-index-url = https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple
         trusted-host = artifactory.ihme.washington.edu
 
+
+New Releases
+************
+New Jobmon releases, including updates to jobmon_installer_ihme, will be announced in the #jobmon_users Slack channel.
+Release details- such as installer version, dates and included packages, are also available on the HUB at
+`Jobmon Conda Versions. <https://hub.ihme.washington.edu/display/DataScience/Jobmon+Conda+Versions>`_
 
 Jobmon Learning
 ###############
