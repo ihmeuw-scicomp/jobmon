@@ -509,10 +509,6 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
                 .where(Task.workflow_id == workflow_id)
                 .group_by(TaskTemplate.id)
             )
-            # We'll also need information on total number of attempted,
-            # so we can report on failure rate
-            sql = sql.join(TaskInstance, Task.id == TaskInstance.task_id)
-            sql = sql.group_by(TaskTemplate.id)
             if DIALECT == "mysql":
                 sql = sql.prefix_with("STRAIGHT_JOIN")
             attempts0 = session.execute(sql).all()

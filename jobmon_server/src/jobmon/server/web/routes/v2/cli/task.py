@@ -246,7 +246,17 @@ async def update_task_statuses(request: Request) -> Any:
                 task_instance_update_stmt = update(TaskInstance).where(
                     and_(
                         TaskInstance.task_id.in_(task_ids),
-                        TaskInstance.status != constants.TaskInstanceStatus.KILL_SELF,
+                        TaskInstance.status.notin_(
+                            [
+                                constants.TaskInstanceStatus.ERROR_FATAL,
+                                constants.TaskInstanceStatus.DONE,
+                                constants.TaskInstanceStatus.ERROR,
+                                constants.TaskInstanceStatus.UNKNOWN_ERROR,
+                                constants.TaskInstanceStatus.RESOURCE_ERROR,
+                                constants.TaskInstanceStatus.KILL_SELF,
+                                constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID,
+                            ]
+                        ),
                     )
                 )
                 vals = {"status": constants.TaskInstanceStatus.KILL_SELF}

@@ -449,21 +449,24 @@ def get_task_resource_usage(task_id: int) -> Any:
                 )
                 .where(TaskInstance.task_id == task_id, TaskInstance.status == "D")
             )
-            results = session.execute(select_stmt).all()
+            results = session.execute(select_stmt)..one_or_none()
 
-        resource_usage_list = []
-        for result in results:
-            # Pass the correct 4 arguments
-            resource_usage = SerializeTaskResourceUsage.to_wire(
-                result[0],  # num_attempts
-                result[1],  # nodename
-                result[2],  # wallclock (runtime)
-                result[3],  # maxrss (memory)
-            )
-            resource_usage_list.append(resource_usage)
+            result = session.execute(select_stmt).one_or_none()
+
+            if result is None:
+                resource_usage = SerializeTaskResourceUsage.to_wire(
+                    None, None, None, None
+                )
+            else:
+                resource_usage = SerializeTaskResourceUsage.to_wire(
+                    result.num_attempts,
+                    result.nodename,
+                    result.wallclock,
+                    result.maxrss,
+                )
 
         resp = JSONResponse(
-            content={"resource_usage": resource_usage_list},
+            content={"resource_usage": resource_usage},
             status_code=StatusCodes.OK,
         )
     return resp
