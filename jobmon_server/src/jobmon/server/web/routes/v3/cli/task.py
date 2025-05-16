@@ -449,8 +449,6 @@ def get_task_resource_usage(task_id: int) -> Any:
                 )
                 .where(TaskInstance.task_id == task_id, TaskInstance.status == "D")
             )
-            results = session.execute(select_stmt)..one_or_none()
-
             result = session.execute(select_stmt).one_or_none()
 
             if result is None:
