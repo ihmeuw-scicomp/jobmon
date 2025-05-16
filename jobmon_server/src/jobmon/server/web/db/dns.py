@@ -46,7 +46,7 @@ from sqlalchemy.engine import Engine, URL
 from sqlalchemy.engine.interfaces import DBAPIConnection, Dialect
 from sqlalchemy.pool import _ConnectionRecord
 
-__all__ = ["get_dns_engine", "clear_dns_cache"]
+__all__ = ["get_dns_engine", "clear_dns_cache", "get_ip_with_ttl"]
 
 logger = logging.getLogger(__name__)
 
@@ -206,3 +206,15 @@ def get_dns_engine(  # noqa: C901
             )
 
     return engine
+
+
+def get_ip_with_ttl(host: str) -> Tuple[str, int]:
+    """Get the current IP address and TTL for a hostname.
+    
+    Args:
+        host (str): The hostname to resolve
+        
+    Returns:
+        Tuple[str, int]: A tuple of (ip_address, ttl_in_seconds)
+    """
+    return _cached_ip(host)

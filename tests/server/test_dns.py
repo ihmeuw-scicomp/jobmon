@@ -4,10 +4,10 @@ import pytest
 from types import SimpleNamespace
 
 # import the module under test
-db = importlib.import_module("jobmon.server.web.db_admin")
+db = importlib.import_module("jobmon.server.web.db.dns")
 
 
-# a tiny FakeAnswers that mimics dnspython’s Answer
+# a tiny FakeAnswers that mimics dnspython's Answer
 class FakeAnswers(list):
     def __init__(self, records, ttl):
         super().__init__(records)
@@ -81,7 +81,7 @@ def test_cache_expiry_triggers_new_dns(monkeypatch):
 def test_dns_failure_uses_fallback_and_short_ttl(monkeypatch):
     host = "db.example.local"
 
-    # pre-seed cache with a “known-good” IP that’s already expired
+    # pre-seed cache with a "known-good" IP that's already expired
     # so we go past the cache-hit check and into the retry/fallback logic
     t0 = 1_000_000.0
     monkeypatch.setattr(db.time, "time", lambda: t0)
