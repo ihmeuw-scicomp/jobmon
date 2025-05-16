@@ -1,4 +1,4 @@
-"""dns_pool.py — generic SQLAlchemy engine factory with DNS-aware pooling.
+"""dns.py — generic SQLAlchemy engine factory with DNS-aware pooling.
 
 `get_dns_engine()` behaves exactly like :pyfunc:`sqlalchemy.create_engine`, **but**
 ensures that every connection the pool hands out is opened against the *current*

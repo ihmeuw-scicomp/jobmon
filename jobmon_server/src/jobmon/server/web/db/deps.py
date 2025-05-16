@@ -1,4 +1,4 @@
-# jobmon/server/db/deps.py
+# jobmon/server/web/db/deps.py
 from __future__ import annotations
 
 from contextlib import contextmanager

@@ -403,8 +403,7 @@ async def transition_to_killed(array_id: int, request: Request) -> Any:
                 .values(status=TaskStatus.ERROR_FATAL, status_date=func.now())
             ).execution_options(synchronize_session=False)
             session.execute(update_task_stmt)
-            # The trailing () is not required but you can keep it for consistency
-            # if that's how your code style is set.
+
 
     # 2) Now transition the TIs themselves to ERROR_FATAL.
     #    This is in a separate session, just like _update_task_instance
