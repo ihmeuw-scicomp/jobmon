@@ -210,10 +210,10 @@ def get_dns_engine(  # noqa: C901
 
 def get_ip_with_ttl(host: str) -> Tuple[str, int]:
     """Get the current IP address and TTL for a hostname.
-    
+
     Args:
         host (str): The hostname to resolve
-        
+
     Returns:
         Tuple[str, int]: A tuple of (ip_address, ttl_in_seconds)
     """
