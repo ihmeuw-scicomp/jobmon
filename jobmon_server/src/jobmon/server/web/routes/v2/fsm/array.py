@@ -404,7 +404,6 @@ async def transition_to_killed(array_id: int, request: Request) -> Any:
             ).execution_options(synchronize_session=False)
             session.execute(update_task_stmt)
 
-
     # 2) Now transition the TIs themselves to ERROR_FATAL.
     #    This is in a separate session, just like _update_task_instance
     #    is invoked in transition_to_launched.
