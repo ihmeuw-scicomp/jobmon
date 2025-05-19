@@ -140,11 +140,16 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
     url = make_url(uri)
     host = url.host
     logger.debug("get_dns_engine: url=%s", str(url))
-    if host is None:
-        raise ValueError("DNS url have no host: {url!s}")
 
-    # If not DNS, use a standard URL - return non-DNS cached engine.
-    if host == "127.0.0.1" or host == "localhost" or _is_ip_address(host):
+    is_sqlite_url = url.drivername.startswith("sqlite")
+
+    # If host is None AND it's not a SQLite URL, then it's an invalid URL for this function.
+    if host is None and not is_sqlite_url:
+        raise ValueError(f"URL has no host and is not a SQLite URL: {url!s}")
+
+    # If it's SQLite, or a non-DNS hostname (localhost), or an IP address, use a standard engine.
+    # For SQLite, host will be None. (host and _is_ip_address(host)) handles this.
+    if is_sqlite_url or host == "127.0.0.1" or host == "localhost" or (host and _is_ip_address(host)):
         logger.info("Creating non-DNS engine for %s", url)
 
         # Restore the connect_args before creating the standard engine
