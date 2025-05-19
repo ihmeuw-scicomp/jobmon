@@ -163,6 +163,9 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
 
         return create_engine(str(url), *engine_args, **engine_kwargs)
 
+    # If we've reached here, it's a DNS-aware case, and host should not be None.
+    assert host is not None, "Host should be a string at this point for DNS resolution"
+
     # Make sure that we can create a fully valid SQLAlchemy engine
     # with the current URL, which will break if the URL is malformed.
     minimal_dialect = create_engine(str(url), _initialize=False).dialect
