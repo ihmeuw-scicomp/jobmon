@@ -147,9 +147,14 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
     if host is None and not is_sqlite_url:
         raise ValueError(f"URL has no host and is not a SQLite URL: {url!s}")
 
-    # If it's SQLite, or a non-DNS hostname (localhost), or an IP address, use a standard engine.
+    # For SQLite, or a non-DNS hostname (localhost), or an IP address, use a standard engine.
     # For SQLite, host will be None. (host and _is_ip_address(host)) handles this.
-    if is_sqlite_url or host == "127.0.0.1" or host == "localhost" or (host and _is_ip_address(host)):
+    if (
+        is_sqlite_url
+        or host == "127.0.0.1"
+        or host == "localhost"
+        or (host and _is_ip_address(host))
+    ):
         logger.info("Creating non-DNS engine for %s", url)
 
         # Restore the connect_args before creating the standard engine
