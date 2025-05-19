@@ -7,7 +7,7 @@ export default defineConfig({
     base: '/',
     plugins: [react(), mdPlugin({mode: [Mode.MARKDOWN]})],
     server: {
-        host: true, // Allows access from external IPs
+        host: '0.0.0.0', // Allows access from external IPs
         port: 3000,
     },
     define: {

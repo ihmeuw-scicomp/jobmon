@@ -54,7 +54,6 @@ def db_engine() -> Engine:
     config = get_jobmon_config()
     from jobmon.server.web.db import init_db
 
-    # load_model()  # Remove this, as env.py already calls it
     init_db()  # Then initialize DB (runs migrations + metadata load)
 
     # verify db created

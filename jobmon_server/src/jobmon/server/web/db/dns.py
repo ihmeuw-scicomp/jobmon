@@ -32,8 +32,8 @@ connection is opened to the fresh IP.
 
 from __future__ import annotations
 
-import functools
 import importlib
+import ipaddress
 import logging
 import threading
 import time
@@ -42,7 +42,7 @@ from typing import Any, Dict, Tuple, Type
 
 from dns import resolver
 from sqlalchemy import create_engine, event, exc
-from sqlalchemy.engine import Engine, URL
+from sqlalchemy.engine import Engine, make_url, URL
 from sqlalchemy.engine.interfaces import DBAPIConnection, Dialect
 from sqlalchemy.pool import _ConnectionRecord
 
@@ -118,70 +118,87 @@ def _import_explicit_driver(drivername: str) -> ModuleType | None:
 # ---------------------------------------------------------------------------
 # Engine factory
 # ---------------------------------------------------------------------------
-@functools.lru_cache(maxsize=4)
-def get_dns_engine(  # noqa: C901
-    uri: str | URL, *engine_args: Any, **engine_kwargs: Any
-) -> Engine:
-    """Return a SQLAlchemy ``Engine`` that respects dynamic DNS.
+def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> Engine:
+    """Create a DNS-powered engine from a SQLAlchemy URL.
 
-    Parameters
-    ----------
-    uri : str | sqlalchemy.engine.URL
-        Full database URL.
-    *engine_args / **engine_kwargs
-        Forwarded verbatim to :pyfunc:`sqlalchemy.create_engine` *except* the
-        reserved keywords ``creator``, ``pool_pre_ping`` and ``pool_recycle``,
-        which are managed internally.  Passing ``creator`` will raise
-        ``ValueError``.
+    With a normal SQLAlchemy engine, the hostname in the URL is looked up
+    exactly once, on connection pool creation. If a DNS entry TTL expires
+    or otherwise updates, this will prevent failover on reconnect, because
+    the old, cached address will still be used.
+
+    This function fixes the problem by intercepting the connection factory
+    to resolve DNS on each reconnect.
     """
-    url: URL = URL.create(uri) if isinstance(uri, str) else uri
+    logger.debug("get_dns_engine: uri=%s engine_kwargs=%s", uri, engine_kwargs)
 
-    # SQLite – passthrough - use the original URI string directly
-    if url.drivername.startswith("sqlite"):
-        # str(url) can mangle absolute paths, pass the original uri string
-        return create_engine(uri, *engine_args, future=True, **engine_kwargs)
+    # Extract and save user connect_args
+    user_connect_args = engine_kwargs.pop("connect_args", {})
 
+    # Connection pools are singletons created by engine spec (args & kwargs)
+    # so they are effectively cached forever.
+    #
+    url = make_url(uri)
     host = url.host
+    logger.debug("get_dns_engine: url=%s", str(url))
     if host is None:
-        raise ValueError("URI must include a hostname for DNS-aware pooling")
+        raise ValueError("DNS url have no host: {url!s}")
 
-    if "creator" in engine_kwargs:
-        raise ValueError("'creator' cannot be supplied – it would bypass DNS logic")
+    # If not DNS, use a standard URL - return non-DNS cached engine.
+    if host == "127.0.0.1" or host == "localhost" or _is_ip_address(host):
+        logger.info("Creating non-DNS engine for %s", url)
 
-    # Reasonable defaults that the caller may override *except* creator
-    _, ttl = _cached_ip(host)
-    engine_kwargs.setdefault("pool_pre_ping", True)
-    engine_kwargs.setdefault("pool_recycle", max(min(ttl, 60), 30))
+        # Restore the connect_args before creating the standard engine
+        if user_connect_args:
+            engine_kwargs["connect_args"] = user_connect_args
 
-    dbapi_module = _import_explicit_driver(url.drivername)
-    dialect_cls = _get_dialect_cls(url)
-    minimal_dialect = dialect_cls()
+        return create_engine(str(url), *engine_args, **engine_kwargs)
 
-    # ---------------------------------------------------------------
-    # Creator (runs for each new physical connection)
-    # ---------------------------------------------------------------
-    def creator() -> DBAPIConnection:  # noqa: D401
+    # Make sure that we can create a fully valid SQLAlchemy engine
+    # with the current URL, which will break if the URL is malformed.
+    minimal_dialect = create_engine(str(url), _initialize=False).dialect
+    dbapi_module = getattr(minimal_dialect, "dbapi", None)
+
+    # This will throw errors in automap_base.prepare() if the dialect
+    # chosen doesn't match actual database. Dialect names are things like:
+    # 'mysql+pymysql', 'postgresql+psycopg2', not just 'mysql'.
+    logger.info(
+        "Creating DNS-aware engine for %s with dialect %r",
+        url,
+        minimal_dialect.name,
+    )
+
+    # Get the connection factory method from the dialect.
+    def creator() -> DBAPIConnection:
+        """Return a connection to the currently resolved IP address."""
         ip_now, _ = _cached_ip(host)
         connect_url = url.set(host=ip_now)
         cargs, cparams = minimal_dialect.create_connect_args(connect_url)
+
+        # Merge user-supplied connect_args into the parameters
+        if user_connect_args:
+            cparams.update(user_connect_args)
+            logger.info(
+                "Updated connection params with user args: %s", user_connect_args
+            )
+
         module = dbapi_module or minimal_dialect.dbapi
         if module is None:
             raise RuntimeError(
-                f"Could not determine DBAPI module for dialect '{url.drivername}'. "
-                f"Ensure the driver is installed or explicitly specified in the URL "
-                f"(e.g., 'postgresql+psycopg2')."
+                f"Could not determine DBAPI module for dialect {minimal_dialect.name}"
             )
         return module.connect(*cargs, **cparams)
 
-    engine_kwargs["creator"] = creator
-
     # Prevent SQLAlchemy from doing its own DNS look-up.
     placeholder = url.set(host="127.0.0.1", port=url.port or 1)
+
+    # Debug logging to see what parameters are being passed to the engine
+    logger.error(f"ENGINE KWARGS: {engine_kwargs}")
 
     engine = create_engine(
         str(placeholder),
         *engine_args,
         future=True,
+        creator=creator,
         **engine_kwargs,
     )
 
@@ -218,3 +235,12 @@ def get_ip_with_ttl(host: str) -> Tuple[str, int]:
         Tuple[str, int]: A tuple of (ip_address, ttl_in_seconds)
     """
     return _cached_ip(host)
+
+
+def _is_ip_address(host: str) -> bool:
+    """Check if a string is a valid IP address."""
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        return False
