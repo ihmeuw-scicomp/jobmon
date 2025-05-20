@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   jobmon_backend:
     build: 
@@ -20,7 +19,6 @@ services:
     build: 
       context: ./jobmon_gui
       dockerfile: ./Dockerfile.local
-    platform: linux/amd64
     ports:
       - "3000:3000"
     volumes:
@@ -28,16 +26,16 @@ services:
     env_file:
       - .env  # Load environment variables from the .env file
 
-  jobmon_server_dev:
-    build:
-      context: ./
-      dockerfile: ./Dockerfile.server.dev
-    ports:
-      - "8070:8070"
-    volumes:
-      - ./jobmon_core:/app/jobmon_core:ro
-      - ./jobmon_server:/app/jobmon_server:ro
-      - ./jobmon_client:/app/jobmon_client:ro
-    env_file:
-      - .env
-    command: bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ./.nox/build_gui_test_env && python jobmon_gui/local_testing/main.py"
+  # jobmon_server_dev:
+  #   build:
+  #     context: ./
+  #     dockerfile: ./Dockerfile.server.dev
+  #   ports:
+  #     - "8070:8070"
+  #   volumes:
+  #     - ./jobmon_core:/app/jobmon_core:ro
+  #     - ./jobmon_server:/app/jobmon_server:ro
+  #     - ./jobmon_client:/app/jobmon_client:ro
+  #   env_file:
+  #     - .env
+  #   command: bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ./.nox/build_gui_test_env && python jobmon_gui/local_testing/main.py"

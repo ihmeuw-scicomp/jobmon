@@ -133,17 +133,36 @@ class JobmonConfig:
         # doesn't exist yet.
         section_dict = self._config.get(section, {}).copy()
 
-        # Overlay values from dict_config, if any
-        if self._dict_config:
-            section_dict.update(self._dict_config.get(section, {}))
-
         # Check environment for variables related to this section and overlay them
         prefix = f"{ENV_VAR_PREFIX}{section.upper()}__"
-        for env_key in os.environ.keys():
-            if env_key.startswith(prefix):
-                # Extract the original key name by removing the prefix
-                key = env_key[len(prefix) :].lower()
-                section_dict[key] = os.environ[env_key]
+
+        def _merge_path(target: Dict[str, Any], path: list[str], value: str) -> None:
+            """Recursively merge value into target following path segments."""
+            cur = target
+            for idx, seg in enumerate(path):
+                seg_lower = seg.lower()
+                if idx == len(path) - 1:  # last segment – assign
+                    cur[seg_lower] = value
+                else:
+                    cur = cur.setdefault(seg_lower, {})
+
+        for env_key, env_val in os.environ.items():
+            if not env_key.startswith(prefix):
+                continue
+
+            # Strip prefix -> "SQLALCHEMY_CONNECT_ARGS__SSL"
+            remainder = env_key[len(prefix) :]
+            # Split on double underscores—   JOBMON__DB__A__B  => ["A", "B"]
+            path_segments = [seg for seg in remainder.split("__") if seg]
+            if not path_segments:
+                continue
+
+            _merge_path(section_dict, path_segments, env_val)
+
+        # Overlay values from dict_config, if any (higher precedence than env vars)
+        if self._dict_config and section in self._dict_config:
+            # Need recursive merge for nested structures
+            section_dict = self._merge_dicts(section_dict, self._dict_config[section])
 
         return section_dict
 

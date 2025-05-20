@@ -190,6 +190,21 @@ Additional Routes
 -----------------
 If there are any other routes or features you would like to see in the API, please let the SciComp team know.
 
+Common Errors
+*************
+
+TaskInstance NO_DISTRIBUTOR_ID
+------------------------------
+A NO_DISTRIBUTOR_ID error typically indicates an issue when Jobmon calls the underlying Slurm API. For more details,
+check the error in the Standard Error column of the TaskInstances table on the Task Details page in the Jobmon GUI.
+Common causes include insufficient permissions to submit jobs to a particular partition or exceeding resource limits
+for a specific queue.
+
+DistributorNotAlive Error
+-------------------------
+This issue usually occurs when a user runs their command from a login node instead of a submit node. Try calling `srun`
+and see if that resolves the error.
+
 Running Queries
 ***************
 If the command line status commands do not provide the information you need,
