@@ -1,0 +1,6 @@
+[tool.uv.workspace]
+members = [
+    "jobmon_client",
+    "jobmon_core",
+    "jobmon_server"
+] 
