@@ -3,20 +3,26 @@
 from decimal import Decimal
 from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from fastapi import HTTPException, Query, Request
 import numpy as np
-import pandas as pd  # type:ignore
-import scipy.stats as st  # type:ignore
-from sqlalchemy import Row, Select, select
-from sqlalchemy.sql import func
+import pandas as pd
+from scipy import stats as st  # type: ignore
+from sqlalchemy import func, Select, select
+from sqlalchemy.engine import Row
 from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
-from jobmon.server.web.config import get_jobmon_config
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_dialect_name, get_sessionmaker
 from jobmon.server.web.error_log_clustering import cluster_error_logs
 from jobmon.server.web.models.arg import Arg
 from jobmon.server.web.models.array import Array
@@ -31,25 +37,38 @@ from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
-from jobmon.server.web.routes.v1.cli import cli_router as api_v1_router
 from jobmon.server.web.routes.v2.cli import cli_router as api_v2_router
-from jobmon.server.web.routes.v3.cli.workflow import _cli_label_mapping
 from jobmon.server.web.server_side_exception import InvalidUsage
 
-# new structlog logger per flask request context. internally stored as flask.g.logger
+# Logger per request context
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
-_CONFIG = get_jobmon_config()
+SessionMaker = get_sessionmaker()
+DIALECT = get_dialect_name()
+
+# Map task status to something more user-friendly
+_cli_label_mapping: Dict[str, str] = {
+    "G": "PENDING",
+    "Q": "SCHEDULED",
+    "R": "RUNNING",
+    "D": "DONE",
+    "F": "FATAL",
+    "K": "SCHEDULED",
+    "A": "SCHEDULED",
+    "H": "SCHEDULED",
+    "S": "SCHEDULED",
+    "U": "SCHEDULED",
+    "W": "SCHEDULED",
+    "T": "SCHEDULED",
+}
 
 
-@api_v1_router.get("/get_task_template_details")
 @api_v2_router.get("/get_task_template_details")
 def get_task_template_details_for_workflow(
     workflow_id: int = Query(..., ge=1),
     task_template_id: int = Query(..., ge=1),
 ) -> Any:
-    """Fetch Task Template details (ID, Name, and Version) for a given Workflow."""
-    with SessionLocal() as session:
+    """Get the details of a task template for a given workflow."""
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 Task.workflow_id == workflow_id,
@@ -86,22 +105,21 @@ def get_task_template_details_for_workflow(
         return JSONResponse(content=tt_details_data, status_code=StatusCodes.OK)
 
 
-@api_v1_router.get("/get_task_template_version")
 @api_v2_router.get("/get_task_template_version")
 def get_task_template_version_for_tasks(
     task_id: Optional[int] = None, workflow_id: Optional[int] = None
 ) -> Any:
-    """Get the task_template_version_ids."""
-    # parse args
-    t_id = task_id
-    wf_id = workflow_id
-    # This route only accept one task id or one wf id;
-    # If provided both, ignor wf id
-    with SessionLocal() as session:
+    """Get the task template version for the given tasks or workflow."""
+    if not (task_id or workflow_id):
+        raise InvalidUsage(
+            "Must provide either task_id or workflow_id", status_code=400
+        )
+
+    with SessionMaker() as session:
         with session.begin():
-            if t_id:
+            if task_id:
                 query_filter = [
-                    Task.id == t_id,
+                    Task.id == task_id,
                     Task.node_id == Node.id,
                     Node.task_template_version_id == TaskTemplateVersion.id,
                     TaskTemplateVersion.task_template_id == TaskTemplate.id,
@@ -113,7 +131,7 @@ def get_task_template_version_for_tasks(
 
             else:
                 query_filter = [
-                    Task.workflow_id == wf_id,
+                    Task.workflow_id == workflow_id,
                     Task.node_id == Node.id,
                     Node.task_template_version_id == TaskTemplateVersion.id,
                     TaskTemplateVersion.task_template_id == TaskTemplate.id,
@@ -133,22 +151,34 @@ def get_task_template_version_for_tasks(
     return resp
 
 
-@api_v1_router.get("/get_requested_cores")
 @api_v2_router.get("/get_requested_cores")
-def get_requested_cores(task_template_version_ids: Optional[str] = None) -> Any:
-    """Get the min, max, and arg of requested cores."""
-    # parse args
-    ttvis = task_template_version_ids
-    if ttvis is None:
-        raise ValueError(
-            "No task_template_version_ids returned in /get_requested_cores"
+def get_requested_cores(task_template_version_ids: Optional[str] = Query(None)) -> Any:
+    """Get the requested cores for the given task template version ids."""
+    if not task_template_version_ids:
+        raise InvalidUsage("Must provide task_template_version_ids", status_code=400)
+
+    # Parse the string like "(id1,id2)" into a list of ints
+    try:
+        # Remove parens, split by comma, filter empty strings, convert to int
+        parsed_ids = [
+            int(id_str)
+            for id_str in task_template_version_ids.strip("()").split(",")
+            if id_str
+        ]
+        if not parsed_ids:  # Handle case like "()"
+            raise ValueError("No valid IDs found in the string.")
+    except ValueError as e:
+        raise InvalidUsage(
+            f"Invalid format for task_template_version_ids. Expected format like "
+            f"'(1,2,3)'. Error: {e}",
+            status_code=400,
         )
-    ttvis = [int(i) for i in ttvis[1:-1].split(",")]  # type: ignore
-    # null core should be treated as 1 instead of 0
-    with SessionLocal() as session:
+
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
-                TaskTemplateVersion.id.in_(ttvis),
+                # Use the parsed list of integers here
+                TaskTemplateVersion.id.in_(parsed_ids),
                 TaskTemplateVersion.id == Node.task_template_version_id,
                 Task.node_id == Node.id,
                 Task.task_resources_id == TaskResources.id,
@@ -186,23 +216,36 @@ def get_requested_cores(task_template_version_ids: Optional[str] = None) -> Any:
     return resp
 
 
-@api_v1_router.get("/get_most_popular_queue")
 @api_v2_router.get("/get_most_popular_queue")
 def get_most_popular_queue(
     task_template_version_ids: Optional[str] = Query(...),
 ) -> Any:
-    """Get the most popular queue of the task template."""
-    # parse args
-    ttvis = task_template_version_ids
-    if ttvis is None:
-        raise ValueError(
-            "No task_template_version_ids returned in /get_most_popular_queue."
+    """Get the most popular queue for the given task template version ids."""
+    if not task_template_version_ids:
+        raise InvalidUsage("Must provide task_template_version_ids", status_code=400)
+
+    # Parse the string like "(id1,id2)" into a list of ints
+    try:
+        # Remove parens, split by comma, filter empty strings, convert to int
+        parsed_ids = [
+            int(id_str)
+            for id_str in task_template_version_ids.strip("()").split(",")
+            if id_str
+        ]
+        if not parsed_ids:  # Handle case like "()"
+            raise ValueError("No valid IDs found in the string.")
+    except ValueError as e:
+        raise InvalidUsage(
+            f"Invalid format for task_template_version_ids. Expected format like "
+            f"'(1,2,3)'. Error: {e}",
+            status_code=400,
         )
-    ttvis = [int(i) for i in ttvis[1:-1].split(",")]  # type: ignore
-    with SessionLocal() as session:
+
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
-                TaskTemplateVersion.id.in_(ttvis),
+                # Use the parsed list of integers here
+                TaskTemplateVersion.id.in_(parsed_ids),
                 TaskTemplateVersion.id == Node.task_template_version_id,
                 Task.node_id == Node.id,
                 TaskInstance.task_id == Task.id,
@@ -252,49 +295,51 @@ def get_most_popular_queue(
     return resp
 
 
-@api_v1_router.post("/task_template_resource_usage")
 @api_v2_router.post("/task_template_resource_usage")
 async def get_task_template_resource_usage(request: Request) -> Any:
-    """Return the aggregate resource usage for a give TaskTemplate.
-
-    Need to use cross_origin decorator when using the GUI to call a post route.
-    This enables Cross Origin Resource Sharing (CORS) on the route. Default is
-    most permissive settings.
-    """
+    """Get the resource usage for the given task template."""
     data = await request.json()
-    try:
-        task_template_version_id = data.pop("task_template_version_id")
-    except Exception as e:
-        raise InvalidUsage(
-            f"{str(e)} in request to /task_template_resource_usage", status_code=400
-        ) from e
 
-    workflows = data.pop("workflows", None)
-    node_args = data.pop("node_args", None)
-    ci = data.pop("ci", None)
-    viz = bool(data.pop("viz", False))
-
-    with SessionLocal() as session:
+    # Use 'workflows' key to match client/test expectations
+    workflows = data.get("workflows", None)
+    with SessionMaker() as session:
         with session.begin():
+            # Query joining all potentially necessary tables
+            sql = (
+                select(TaskInstance.wallclock, TaskInstance.maxrss, Node.id, Task.id)
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(Task, Node, Task.node_id == Node.id)
+                .join_from(
+                    Node,
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join_from(
+                    TaskInstance,
+                    WorkflowRun,
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                )
+                .join_from(
+                    WorkflowRun, Workflow, WorkflowRun.workflow_id == Workflow.id
+                )
+            )
+
+            # Base filter conditions
             query_filter = [
-                TaskTemplateVersion.id == task_template_version_id,
+                TaskTemplateVersion.id == data.pop("task_template_version_id"),
                 Task.status == "D",
                 TaskInstance.status == "D",
-                TaskTemplateVersion.id == Node.task_template_version_id,
-                Node.id == Task.node_id,
-                Task.id == TaskInstance.task_id,
             ]
+
+            # Add workflow filter if workflows list is provided
             if workflows:
-                query_filter += [
-                    TaskInstance.workflow_run_id == WorkflowRun.id,
-                    WorkflowRun.workflow_id == Workflow.id,
-                    Workflow.id.in_(workflows),
-                ]
-            sql = select(
-                TaskInstance.wallclock, TaskInstance.maxrss, Node.id, Task.id
-            ).where(*query_filter)
+                query_filter.append(Workflow.id.in_(workflows))
+
+            # Apply all filter conditions
+            sql = sql.where(*query_filter)
+
             rows_raw = session.execute(sql).all()
-            session.commit()
+
         column_names = ("r", "m", "node_id", "task_id")
         rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
         result = []
@@ -302,20 +347,25 @@ async def get_task_template_resource_usage(request: Request) -> Any:
             for r in rows:
                 if r["r"] is None:  # type: ignore
                     r["r"] = 0
-                if node_args:
-                    session = SessionLocal()
+                if data.get("node_args", None):
+                    # This nested query is inefficient, but matches original logic for now
+                    session = SessionMaker()
                     with session.begin():
                         node_f = [
                             NodeArg.arg_id == Arg.id,
-                            NodeArg.node_id == r["node_id"],
-                        ]  # type: ignore
+                            NodeArg.node_id == r["node_id"],  # type: ignore
+                        ]
                         node_s = select(Arg.name, NodeArg.val).where(*node_f)
                         node_rows = session.execute(node_s).all()
-                        session.commit()
                     _include = False
                     for n in node_rows:
                         if not _include:
-                            if n[0] in node_args.keys() and n[1] in node_args[n[0]]:
+                            # Ensure data["node_args"] exists before accessing keys
+                            node_args_filter = data.get("node_args", {})
+                            if (
+                                n[0] in node_args_filter.keys()
+                                and n[1] in node_args_filter[n[0]]
+                            ):
                                 _include = True
                     if _include:
                         result.append(r)
@@ -336,64 +386,66 @@ async def get_task_template_resource_usage(request: Request) -> Any:
             num_tasks = len(runtimes)
             # set 0 to NaN; thus, numpy ignores them
             if 0 in mems:
-                mems.remove(0)
+                mems = [m for m in mems if m != 0]  # More robust removal
             if 0 in runtimes:
-                runtimes.remove(0)
+                runtimes = [rt for rt in runtimes if rt != 0]  # More robust removal
+
+            # Check lengths before calculating stats
+            min_mem, max_mem, mean_mem, median_mem = 0, 0, 0.0, 0.0
             if len(mems) > 0:
                 min_mem = int(np.min(mems))
                 max_mem = int(np.max(mems))
                 mean_mem = round(float(np.mean(mems)), 2)
                 median_mem = round(float(np.percentile(mems, 50)), 2)
-            else:
-                min_mem = 0
-                max_mem = 0
-                mean_mem = 0
-                median_mem = 0
+
+            min_runtime, max_runtime, mean_runtime, median_runtime = 0, 0, 0.0, 0.0
             if len(runtimes) > 0:
                 min_runtime = int(np.min(runtimes))
                 max_runtime = int(np.max(runtimes))
                 mean_runtime = round(float(np.mean(runtimes)), 2)
                 median_runtime = round(float(np.percentile(runtimes, 50)), 2)
-            else:
-                min_runtime = 0
-                max_runtime = 0
-                mean_runtime = 0
-                median_runtime = 0
 
-            if ci is None:
-                ci_mem = [None, None]
-                ci_runtime = [None, None]
-            else:
+            ci_mem = [None, None]
+            ci_runtime = [None, None]
+            ci_value = data.get("ci", None)
+            if ci_value is not None:
                 try:
-                    ci = float(ci)
+                    ci_float = float(ci_value)
 
                     def _calculate_ci(d: List, ci: float) -> List[Any]:
-                        interval = st.t.interval(
-                            confidence=ci,
-                            df=len(d) - 1,
-                            loc=np.mean(d),
-                            scale=st.sem(d),
-                        )
-                        return [
-                            round(float(interval[0]), 2),
-                            round(float(interval[1]), 2),
-                        ]
+                        # Need at least 2 data points for CI calculation with st.sem
+                        if len(d) < 2:
+                            return [None, None]
+                        try:
+                            interval = st.t.interval(
+                                confidence=ci,
+                                df=len(d) - 1,
+                                loc=np.mean(d),
+                                scale=st.sem(d),
+                            )
+                            # Handle potential NaN results from st.sem if variance is zero
+                            if np.isnan(interval[0]) or np.isnan(interval[1]):
+                                return [None, None]
+                            return [
+                                round(float(interval[0]), 2),
+                                round(float(interval[1]), 2),
+                            ]
+                        except (
+                            Exception
+                        ) as ci_err:  # Catch potential errors during interval calculation
+                            logger.warn(f"Error calculating CI: {ci_err}")
+                            return [None, None]
 
-                    if len(mems) > 0:
-                        ci_mem = _calculate_ci(mems, ci)
-                    else:
-                        ci_mem = [None, None]
-                    if len(runtimes) > 0:
-                        ci_runtime = _calculate_ci(runtimes, ci)
-                    else:
-                        ci_runtime = [None, None]
+                    ci_mem = _calculate_ci(mems, ci_float)
+                    ci_runtime = _calculate_ci(runtimes, ci_float)
 
                 except ValueError as e:
                     logger.warn(
-                        f"Unable to convert {ci} to float. Use None. Exception: {str(e)}"
+                        f"Unable to convert {ci_value} to float for CI. Use None. "
+                        f"Exception: {str(e)}"
                     )
-                    ci_mem = [None, None]
-                    ci_runtime = [None, None]
+                except Exception as e:  # Catch any other unexpected errors
+                    logger.warn(f"Unexpected error during CI calculation: {str(e)}")
 
             resource_usage = SerializeTaskTemplateResourceUsage.to_wire(
                 num_tasks,
@@ -409,18 +461,18 @@ async def get_task_template_resource_usage(request: Request) -> Any:
                 ci_runtime,
             )
 
-        if viz:
-            resource_usage += (result,)
-        resp = JSONResponse(content=resource_usage, status_code=StatusCodes.OK)
+    # Handle 'viz' parameter similar to original
+    if data.get("viz", False):
+        resource_usage += (result,)
+
+    resp = JSONResponse(content=resource_usage, status_code=StatusCodes.OK)
     return resp
 
 
-@api_v1_router.get("/workflow_tt_status_viz/{workflow_id}")
 @api_v2_router.get("/workflow_tt_status_viz/{workflow_id}")
 def get_workflow_tt_status_viz(workflow_id: int) -> Any:
-    """Get the status of the workflows for GUI."""
-    # return DS
-    return_dic: Dict[int, Any] = dict()
+    """Get the status visualization for the given workflow."""
+    return_dic: Dict[int, Dict[str, Any]] = {}
 
     def serialize_decimal(value: Union[Decimal, float]) -> float:
         """Convert Decimal to float for JSON serialization."""
@@ -428,8 +480,9 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             return float(value)
         return value
 
-    with SessionLocal() as session:
-        with session.begin():
+    # Wrap this in a try/except, since we may have empty tables
+    try:
+        with SessionMaker() as session:
             # user subquery as the Array table has to be joined on two columns
             sub_query = (
                 select(
@@ -472,7 +525,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
             # the optimizer may choose a suboptimal execution plan for large datasets.
             # Has to be conditional since not all database engines support STRAIGHT_JOIN.
-            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
+            if DIALECT == "mysql":
                 sql = sql.prefix_with("STRAIGHT_JOIN")
             rows = session.execute(sql).all()
             session.flush()
@@ -500,7 +553,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
                 .where(Task.workflow_id == workflow_id)
                 .group_by(TaskTemplate.id)
             )
-            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
+            if DIALECT == "mysql":
                 sql = sql.prefix_with("STRAIGHT_JOIN")
             attempts0 = session.execute(sql).all()
 
@@ -550,10 +603,15 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
         }
 
         resp = JSONResponse(content=return_dic_serializable, status_code=StatusCodes.OK)
+    except Exception as e:
+        logger.error(f"Error in get_workflow_tt_status_viz: {str(e)}")
+        resp = JSONResponse(
+            content={"error": "Internal Server Error"},
+            status_code=StatusCodes.INTERNAL_SERVER_ERROR,
+        )
     return resp
 
 
-@api_v1_router.get("/tt_error_log_viz/{wf_id}/{tt_id}")
 @api_v2_router.get("/tt_error_log_viz/{wf_id}/{tt_id}")
 @api_v2_router.get("/tt_error_log_viz/{wf_id}/{tt_id}/{ti_id}")
 def get_tt_error_log_viz(
@@ -571,7 +629,7 @@ def get_tt_error_log_viz(
     output_clustered_errors = cluster_errors.lower() == "true"
     offset = (page - 1) * page_size
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 TaskTemplateVersion.task_template_id == tt_id,

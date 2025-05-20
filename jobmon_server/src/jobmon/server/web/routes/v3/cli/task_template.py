@@ -15,8 +15,7 @@ from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
-from jobmon.server.web.config import get_jobmon_config
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_dialect_name, get_sessionmaker
 from jobmon.server.web.error_log_clustering import cluster_error_logs
 from jobmon.server.web.models.arg import Arg
 from jobmon.server.web.models.array import Array
@@ -37,8 +36,8 @@ from jobmon.server.web.server_side_exception import InvalidUsage
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
-_CONFIG = get_jobmon_config()
+SessionMaker = get_sessionmaker()
+DIALECT = get_dialect_name()
 
 
 @api_v3_router.get("/get_task_template_details")
@@ -47,7 +46,7 @@ def get_task_template_details_for_workflow(
     task_template_id: int = Query(..., ge=1),
 ) -> Any:
     """Fetch Task Template details (ID, Name, and Version) for a given Workflow."""
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 Task.workflow_id == workflow_id,
@@ -94,7 +93,7 @@ def get_task_template_version_for_tasks(
     wf_id = workflow_id
     # This route only accept one task id or one wf id;
     # If provided both, ignor wf id
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             if t_id:
                 query_filter = [
@@ -141,7 +140,7 @@ def get_requested_cores(task_template_version_ids: Optional[str] = None) -> Any:
         )
     ttvis = [int(i) for i in ttvis[1:-1].split(",")]  # type: ignore
     # null core should be treated as 1 instead of 0
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 TaskTemplateVersion.id.in_(ttvis),
@@ -194,7 +193,7 @@ def get_most_popular_queue(
             "No task_template_version_ids returned in /get_most_popular_queue."
         )
     ttvis = [int(i) for i in ttvis[1:-1].split(",")]  # type: ignore
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 TaskTemplateVersion.id.in_(ttvis),
@@ -268,7 +267,9 @@ async def get_task_template_resource_usage(request: Request) -> Any:
     ci = data.pop("ci", None)
     viz = bool(data.pop("viz", False))
 
-    with SessionLocal() as session:
+    # Initialize resp to ensure it's defined even if the with block fails early
+    resp = JSONResponse(content={}, status_code=StatusCodes.INTERNAL_SERVER_ERROR)
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 TaskTemplateVersion.id == task_template_version_id,
@@ -297,7 +298,7 @@ async def get_task_template_resource_usage(request: Request) -> Any:
                 if r["r"] is None:  # type: ignore
                     r["r"] = 0
                 if node_args:
-                    session = SessionLocal()
+                    session = SessionMaker()
                     with session.begin():
                         node_f = [
                             NodeArg.arg_id == Arg.id,
@@ -359,35 +360,48 @@ async def get_task_template_resource_usage(request: Request) -> Any:
                 ci_runtime = [None, None]
             else:
                 try:
-                    ci = float(ci)
+                    ci_float = float(ci)
 
                     def _calculate_ci(d: List, ci: float) -> List[Any]:
-                        interval = st.t.interval(
-                            confidence=ci,
-                            df=len(d) - 1,
-                            loc=np.mean(d),
-                            scale=st.sem(d),
-                        )
-                        return [
-                            round(float(interval[0]), 2),
-                            round(float(interval[1]), 2),
-                        ]
+                        # Need at least 2 data points for CI calculation with st.sem
+                        if len(d) < 2:
+                            return [None, None]
+                        try:
+                            interval = st.t.interval(
+                                confidence=ci,
+                                df=len(d) - 1,
+                                loc=np.mean(d),
+                                scale=st.sem(d),
+                            )
+                            # Handle potential NaN results from st.sem if variance is zero
+                            if np.isnan(interval[0]) or np.isnan(interval[1]):
+                                return [None, None]
+                            return [
+                                round(float(interval[0]), 2),
+                                round(float(interval[1]), 2),
+                            ]
+                        except ValueError as e:
+                            logger.warn(
+                                f"Unable to convert {ci} to float for CI. Use None. "
+                                f"Exception: {str(e)}"
+                            )
+                            return [None, None]
+                        except Exception as e:  # Catch any other unexpected errors
+                            logger.warn(
+                                f"Unexpected error during CI calculation: {str(e)}"
+                            )
+                            return [None, None]
 
-                    if len(mems) > 0:
-                        ci_mem = _calculate_ci(mems, ci)
-                    else:
-                        ci_mem = [None, None]
-                    if len(runtimes) > 0:
-                        ci_runtime = _calculate_ci(runtimes, ci)
-                    else:
-                        ci_runtime = [None, None]
+                    ci_mem = _calculate_ci(mems, ci_float)
+                    ci_runtime = _calculate_ci(runtimes, ci_float)
 
                 except ValueError as e:
                     logger.warn(
-                        f"Unable to convert {ci} to float. Use None. Exception: {str(e)}"
+                        f"Unable to convert {ci} to float for CI. Use None. "
+                        f"Exception: {str(e)}"
                     )
-                    ci_mem = [None, None]
-                    ci_runtime = [None, None]
+                except Exception as e:  # Catch any other unexpected errors
+                    logger.warn(f"Unexpected error during CI calculation: {str(e)}")
 
             resource_usage = SerializeTaskTemplateResourceUsage.to_wire(
                 num_tasks,
@@ -406,6 +420,7 @@ async def get_task_template_resource_usage(request: Request) -> Any:
         if viz:
             resource_usage += (result,)
         resp = JSONResponse(content=resource_usage, status_code=StatusCodes.OK)
+    # Move the return statement outside the with block
     return resp
 
 
@@ -421,7 +436,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
             return float(value)
         return value
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # user subquery as the Array table has to be joined on two columns
             sub_query = (
@@ -462,10 +477,11 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
                 .where(Task.workflow_id == workflow_id)
                 .order_by(Task.id)
             )
-            # For performance reasons, use STRAIGHT_JOIN to set the join order. If not set,
+            # Find all task by these task templates
+            # Uses STRAIGHT_JOIN to ensure the join order for large queries, where
             # the optimizer may choose a suboptimal execution plan for large datasets.
             # Has to be conditional since not all database engines support STRAIGHT_JOIN.
-            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
+            if DIALECT == "mysql":
                 sql = sql.prefix_with("STRAIGHT_JOIN")
             rows = session.execute(sql).all()
             session.flush()
@@ -493,7 +509,7 @@ def get_workflow_tt_status_viz(workflow_id: int) -> Any:
                 .where(Task.workflow_id == workflow_id)
                 .group_by(TaskTemplate.id)
             )
-            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
+            if DIALECT == "mysql":
                 sql = sql.prefix_with("STRAIGHT_JOIN")
             attempts0 = session.execute(sql).all()
 
@@ -563,7 +579,7 @@ def get_tt_error_log_viz(
     output_clustered_errors = cluster_errors.lower() == "true"
     offset = (page - 1) * page_size
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 TaskTemplateVersion.task_template_id == tt_id,

@@ -5,17 +5,15 @@ from fastapi import Query
 from sqlalchemy import select
 from starlette.responses import JSONResponse
 
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
-from jobmon.server.web.routes.v1.cli import cli_router as api_v1_router
 from jobmon.server.web.routes.v2.cli import cli_router as api_v2_router
 
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 
-@api_v1_router.get("/array/{workflow_id}/get_array_tasks")
 @api_v2_router.get("/array/{workflow_id}/get_array_tasks")
 def get_array_task_instances(
     workflow_id: int,
@@ -45,7 +43,7 @@ def get_array_task_instances(
     if limit is None:
         limit = 5
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = (
                 select(

@@ -7,7 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_404_NOT_FOUND
 import structlog
 
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
@@ -19,7 +19,7 @@ async def teardown_session() -> AsyncGenerator:
     try:
         yield
     finally:
-        get_session_local().remove()  # type: ignore
+        get_sessionmaker().remove()  # type: ignore
 
 
 def _handle_error(

@@ -10,21 +10,18 @@ from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 import structlog
 
-from jobmon.server.web.config import get_jobmon_config
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_dialect_name, get_sessionmaker
 from jobmon.server.web.models.dag import Dag
 from jobmon.server.web.models.edge import Edge
-from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
-from jobmon.server.web.server_side_exception import InvalidUsage
+from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
-_CONFIG = get_jobmon_config()
+SessionMaker = get_sessionmaker()
+DIALECT = get_dialect_name()
 
 
-@api_v1_router.post("/dag")
 @api_v2_router.post("/dag")
 async def add_dag(request: Request) -> Any:
     """Add a new dag to the database.
@@ -39,7 +36,7 @@ async def add_dag(request: Request) -> Any:
     structlog.contextvars.bind_contextvars(dag_hash=str(dag_hash))
     logger.info(f"Add dag:{dag_hash}")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         try:
             with session.begin():
                 dag = Dag(hash=dag_hash)
@@ -64,7 +61,6 @@ async def add_dag(request: Request) -> Any:
     return resp
 
 
-@api_v1_router.post("/dag/{dag_id}/edges")
 @api_v2_router.post("/dag/{dag_id}/edges")
 async def add_edges(dag_id: int, request: Request) -> Any:
     """Add edges to the edge table."""
@@ -94,15 +90,15 @@ async def add_edges(dag_id: int, request: Request) -> Any:
 
     # Bulk insert the nodes and node args with raw SQL, for performance. Ignore duplicate
     # keys
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             insert_stmt = insert(Edge).values(edges_to_add)
-            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
+            if DIALECT == "mysql":
                 insert_stmt = insert_stmt.prefix_with("IGNORE")
-            if SessionLocal and "sqlite" in _CONFIG.get(
-                "db", "sqlalchemy_database_uri"
-            ):
+            elif DIALECT == "sqlite":
                 insert_stmt = insert_stmt.prefix_with("OR IGNORE")
+            else:
+                raise ServerError(f"Unsupported SQL dialect '{DIALECT}'")
             session.execute(insert_stmt)
             ()
 

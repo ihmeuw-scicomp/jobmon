@@ -44,7 +44,7 @@ class ServerCLI(CLI):
 
     def init_db(self, args: argparse.Namespace) -> None:
         """Entrypoint to initialize new Jobmon database."""
-        from jobmon.server.web.db_admin import init_db
+        from jobmon.server.web.db import init_db
 
         # Adjust the package path to where alembic.ini is located within your package
         init_db()
@@ -52,7 +52,7 @@ class ServerCLI(CLI):
     def terminate_db(self, args: argparse.Namespace) -> None:
         """Entrypoint to terminate a Jobmon database."""
         from jobmon.core.configuration import JobmonConfig
-        from jobmon.server.web.db_admin import terminate_db
+        from jobmon.server.web.db import terminate_db
 
         sqlalchemy_database_uri = args.sqlalchemy_database_uri
         if not sqlalchemy_database_uri:
@@ -64,7 +64,7 @@ class ServerCLI(CLI):
     def upgrade_db(self, args: argparse.Namespace) -> None:
         """Entrypoint to upgrade a Jobmon database."""
         from jobmon.core.configuration import JobmonConfig
-        from jobmon.server.web.db_admin import apply_migrations
+        from jobmon.server.web.db import apply_migrations
 
         sqlalchemy_database_uri = args.sqlalchemy_database_uri
         if not sqlalchemy_database_uri:

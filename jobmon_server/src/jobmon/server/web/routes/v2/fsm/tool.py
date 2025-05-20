@@ -10,7 +10,7 @@ from sqlalchemy import select
 from starlette.responses import JSONResponse
 import structlog
 
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.node_arg import NodeArg
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -18,15 +18,13 @@ from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.tool import Tool
 from jobmon.server.web.models.tool_version import ToolVersion
 from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 
-@api_v1_router.post("/tool")
 @api_v2_router.post("/tool")
 async def add_tool(request: Request) -> Any:
     """Add a tool to the database."""
@@ -40,7 +38,7 @@ async def add_tool(request: Request) -> Any:
 
     # add tool to db
     try:
-        with SessionLocal() as session:
+        with SessionMaker() as session:
             with session.begin():
                 logger.info(f"Adding tool {tool_name}")
                 tool = Tool(name=tool_name)
@@ -49,7 +47,7 @@ async def add_tool(request: Request) -> Any:
                 session.refresh(tool)
                 wire_format = tool.to_wire_as_client_tool()
     except sqlalchemy.exc.IntegrityError:
-        with SessionLocal() as session:
+        with SessionMaker() as session:
             with session.begin():
                 select_stmt = select(Tool).where(Tool.name == tool_name)
                 tool = session.execute(select_stmt).scalars().one()
@@ -59,7 +57,6 @@ async def add_tool(request: Request) -> Any:
     return resp
 
 
-@api_v1_router.get("/tool/{tool_id}/tool_versions")
 @api_v2_router.get("/tool/{tool_id}/tool_versions")
 def get_tool_versions(tool_id: int, request: Request) -> Any:
     """Get the Tool Version."""
@@ -74,7 +71,7 @@ def get_tool_versions(tool_id: int, request: Request) -> Any:
         ) from e
 
     # get data from db
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(ToolVersion).where(ToolVersion.tool_id == tool_id)
             tool_versions = session.execute(select_stmt).scalars().all()
@@ -88,7 +85,6 @@ def get_tool_versions(tool_id: int, request: Request) -> Any:
     return resp
 
 
-@api_v1_router.get("/tool/{tool_name}/tool_resource_usage")
 @api_v2_router.get("/tool/{tool_name}/tool_resource_usage")
 def get_tool_resource_usage(
     tool_name: str,
@@ -155,7 +151,7 @@ def get_tool_resource_usage(
             status_code=StatusCodes.BAD_REQUEST,
         )
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             sql = (
                 select(

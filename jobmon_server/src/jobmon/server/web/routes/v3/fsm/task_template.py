@@ -12,7 +12,7 @@ from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core import constants
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.arg import Arg
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
@@ -21,7 +21,7 @@ from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 
 @api_v3_router.post("/task_template")
@@ -42,7 +42,7 @@ async def get_task_template(request: Request) -> Any:
 
     # add to DB
     try:
-        with SessionLocal() as session:
+        with SessionMaker() as session:
             with session.begin():
                 task_template = TaskTemplate(tool_version_id=tool_version_id, name=name)
                 session.add(task_template)
@@ -50,7 +50,7 @@ async def get_task_template(request: Request) -> Any:
                 session.refresh(task_template)
                 ttid = task_template.id
     except sqlalchemy.exc.IntegrityError:
-        with SessionLocal() as session:
+        with SessionMaker() as session:
             with session.begin():
                 select_stmt = select(TaskTemplate).where(
                     TaskTemplate.tool_version_id == tool_version_id,
@@ -58,7 +58,6 @@ async def get_task_template(request: Request) -> Any:
                 )
                 task_template = session.execute(select_stmt).scalars().one()
                 ttid = task_template.id
-        ()
     resp = JSONResponse(content={"task_template_id": ttid}, status_code=StatusCodes.OK)
     return resp
 
@@ -70,7 +69,7 @@ def get_task_template_versions(task_template_id: int) -> Any:
     structlog.contextvars.bind_contextvars(task_template_id=task_template_id)
     logger.info(f"Getting task template version for task template: {task_template_id}")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(TaskTemplateVersion).where(
                 TaskTemplateVersion.task_template_id == task_template_id
@@ -131,7 +130,7 @@ async def add_task_template_version(task_template_id: int, request: Request) -> 
         constants.ArgType.TASK_ARG: [],
         constants.ArgType.OP_ARG: [],
     }
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         for arg_name in node_args:
             arg_mapping_dct[constants.ArgType.NODE_ARG].append(
                 _add_or_get_arg(arg_name, session)
@@ -181,7 +180,6 @@ async def add_task_template_version(task_template_id: int, request: Request) -> 
                 ttv = session.execute(select_stmt).scalars().one()
 
                 task_template_version = ttv.to_wire_as_client_task_template_version()
-        ()
     resp = JSONResponse(
         content={"task_template_version": task_template_version},
         status_code=StatusCodes.OK,
@@ -201,7 +199,7 @@ def get_task_template_id_for_task_template_version(
         f"Getting task template id for task template version: {task_template_version_id}"
     )
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(TaskTemplateVersion).where(
                 TaskTemplateVersion.id == task_template_version_id
