@@ -44,14 +44,63 @@ Refer to the [quickstart](https://jobmon.readthedocs.io/en/latest/quickstart.htm
 ## Requirements
 
 - Python 3.8+
+- uv (Python package manager, https://github.com/astral-sh/uv)
 
 ## Documentation
 
 For comprehensive documentation, visit [readthedocs](https://jobmon.readthedocs.io/en/latest/#).
 
+## Developer Setup
+
+To contribute to JobMon, you'll need to set up a local development environment. This project uses `uv` for package management and `nox` for task automation.
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-org/jobmon.git # Replace with your actual repo URL
+    cd jobmon
+    ```
+
+2.  **Install uv:**
+    Follow the official installation instructions for `uv` (e.g., `pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`).
+
+3.  **Configure IHME Artifactory Index:**
+    JobMon dependencies may be hosted on the IHME Artifactory. You need to configure `uv` (and `pip`) to use this index. The recommended way is to create or update your `pip.conf` file:
+    *   Linux/macOS: `~/.config/pip/pip.conf` (preferred) or `~/.pip/pip.conf`
+    *   Windows: `%APPDATA%\pip\pip.ini` or `%USERPROFILE%\pip\pip.ini`
+
+    Add the following content:
+    ```ini
+    [global]
+    extra-index-url = https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple
+    # trusted-host = artifactory.ihme.washington.edu # May be needed if not HTTPS or cert issues
+    ```
+    Alternatively, you can set the `UV_EXTRA_INDEX_URL` environment variable:
+    ```bash
+    export UV_EXTRA_INDEX_URL="https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple"
+    ```
+
+4.  **Set up a sub-project (e.g., `jobmon_client`):
+    ```bash
+    cd jobmon_client  # Or jobmon_core, jobmon_server
+    uv venv .venv     # Create a virtual environment
+    source .venv/bin/activate # Activate the environment (use .venv\Scripts\activate on Windows)
+    uv pip sync uv.lock       # Install dependencies from the lock file
+    ```
+
+5.  **Run Nox sessions:**
+    Nox is used for linting, testing, etc. From the repository root:
+    ```bash
+    nox -s tests lint # Example: run tests and linters
+    # List available sessions with: nox -l
+    ```
+
+## Usage
+
+Refer to the [quickstart](https://jobmon.readthedocs.io/en/latest/quickstart.html#create-a-workflow) to get started with a sample workflow
+
 ## Contributing
 
-We encourage contributions from the community. If you're interested in improving JobMon or adding new features, please refer to our [developer guide](https://jobmon.readthedocs.io/en/latest/developers_guide/developer-start.html) for python client contributions or the GUI [README.md](jobmon_gui/README.md) for visualization contributions.
+We encourage contributions from the community. If you're interested in improving JobMon or adding new features, please refer to our [developer guide](https://jobmon.readthedocs.io/en/latest/developers_guide/developer-start.html) for python client contributions or the GUI [README.md](jobmon_gui/README.md) for visualization contributions. The local development setup now uses `uv` and `nox` as described in the "Developer Setup" section.
 
 ## Branching Strategy
 

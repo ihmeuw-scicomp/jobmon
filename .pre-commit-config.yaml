@@ -1,0 +1,15 @@
+repos:
+-   repo: local
+    hooks:
+    -   id: nox-lint
+        name: Nox Lint
+        entry: nox -s lint
+        language: system
+        types: [python]
+        pass_filenames: false
+    -   id: nox-typecheck
+        name: Nox Typecheck
+        entry: nox -s typecheck
+        language: system
+        types: [python]
+        pass_filenames: false 
