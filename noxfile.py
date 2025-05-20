@@ -27,6 +27,7 @@ def tests(session: Session) -> None:
         "run",
         "-m",
         "pytest",
+        "--junitxml=.test_report.xml",
         *args,
         env={"SQLALCHEMY_WARN_20": "1"}
     )
