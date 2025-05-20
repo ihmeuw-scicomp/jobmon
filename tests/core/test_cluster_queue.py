@@ -2,7 +2,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from jobmon.core.requester import Requester
-from jobmon.core.serializers import SerializeQueue, SerializeCluster
+from jobmon.core.serializers import SerializeCluster, SerializeQueue
 
 
 def test_cluster_queue(db_engine, client_env):

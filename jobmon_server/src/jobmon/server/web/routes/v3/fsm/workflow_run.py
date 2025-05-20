@@ -2,12 +2,12 @@
 
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict, List
+from typing import Any, Dict, List, cast
 
+import structlog
 from fastapi import Request
 from sqlalchemy import and_, case, func, insert, select, update
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition
@@ -19,7 +19,6 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
-
 
 logger = structlog.get_logger(__name__)
 SessionMaker = get_sessionmaker()

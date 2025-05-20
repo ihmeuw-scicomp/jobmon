@@ -4,15 +4,14 @@ import ast
 from http import HTTPStatus as StatusCodes
 from typing import Any
 
+import structlog
 from sqlalchemy import select
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
-
 
 logger = structlog.get_logger(__name__)
 SessionMaker = get_sessionmaker()

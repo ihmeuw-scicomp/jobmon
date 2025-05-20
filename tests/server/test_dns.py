@@ -1,7 +1,8 @@
 # tests/test_dns_cache.py
 import importlib
-import pytest
 from types import SimpleNamespace
+
+import pytest
 
 # import the module under test
 db = importlib.import_module("jobmon.server.web.db.dns")

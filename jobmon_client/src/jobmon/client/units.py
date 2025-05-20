@@ -1,5 +1,5 @@
-from datetime import timedelta
 import re
+from datetime import timedelta
 from typing import Tuple
 
 from jobmon.core.exceptions import InvalidMemoryFormat, InvalidMemoryUnit

@@ -1,10 +1,7 @@
-from sqlalchemy import text
-from sqlalchemy.orm import Session
 import unittest
-from unittest import mock
 
-from sqlalchemy import Engine, inspect
-from sqlalchemy.engine import create_engine
+from sqlalchemy import inspect, text
+from sqlalchemy.orm import Session
 
 from jobmon.server.web.db import get_engine
 

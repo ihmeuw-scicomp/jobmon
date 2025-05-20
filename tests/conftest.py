@@ -1,7 +1,7 @@
 import logging
 import multiprocessing as mp
 import os
-import requests
+import pathlib
 import signal
 import socket
 import sys
@@ -9,11 +9,11 @@ import tempfile
 from time import sleep
 from types import TracebackType
 from typing import Any, Optional
-import uvicorn
-import pathlib
 
 import pytest
+import requests
 import sqlalchemy
+import uvicorn
 from sqlalchemy.engine import Engine
 
 from jobmon.client.api import Tool
@@ -98,8 +98,8 @@ class WebServerProcess:
 
             signal.signal(signal.SIGTERM, sigterm_handler)
 
-            from jobmon.server.web.api import get_app
             from jobmon.server.web import log_config
+            from jobmon.server.web.api import get_app
 
             dict_config = {
                 "version": 1,

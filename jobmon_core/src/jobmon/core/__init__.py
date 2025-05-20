@@ -1,6 +1,6 @@
 import importlib
-from importlib.metadata import version
 import pkgutil
+from importlib.metadata import version
 
 __version__ = version("jobmon_core")
 

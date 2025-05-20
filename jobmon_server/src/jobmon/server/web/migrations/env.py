@@ -2,12 +2,12 @@ import logging
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, event, Index, pool
+from sqlalchemy import Index, engine_from_config, event, pool
 from sqlalchemy.schema import MetaData
 from sqlalchemy.sql.schema import ForeignKeyConstraint
 
 from jobmon.core.configuration import JobmonConfig
-from jobmon.server.web.models import add_string_length_constraint, Base, load_model
+from jobmon.server.web.models import Base, add_string_length_constraint, load_model
 
 logger = logging.getLogger("alembic")
 

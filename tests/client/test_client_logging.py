@@ -1,7 +1,6 @@
 import logging
 from datetime import date
 
-
 from jobmon.client.logging import JobmonLoggerConfig
 
 

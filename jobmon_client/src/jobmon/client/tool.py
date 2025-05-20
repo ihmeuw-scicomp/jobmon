@@ -6,8 +6,8 @@ The Tool may evolve over time.
 from __future__ import annotations
 
 import getpass
-from http import HTTPStatus as StatusCodes
 import logging
+from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Optional, Union
 
 import yaml
@@ -26,13 +26,9 @@ logger = logging.getLogger(__name__)
 class InvalidToolError(Exception):
     """Exception for Tools that do not exist in the DB."""
 
-    pass
-
 
 class InvalidToolVersionError(Exception):
     """Exception for Tool version that is not valid."""
-
-    pass
 
 
 class Tool:

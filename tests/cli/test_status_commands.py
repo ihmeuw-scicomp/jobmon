@@ -1,14 +1,14 @@
 import argparse
 import ast
-from contextlib import redirect_stdout
 import datetime
 import getpass
-from io import StringIO
 import logging
-import pandas as pd
+from contextlib import redirect_stdout
+from io import StringIO
+from unittest.mock import PropertyMock, patch
 
+import pandas as pd
 import pytest
-from unittest.mock import patch, PropertyMock
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
@@ -18,23 +18,23 @@ from jobmon.client.status_commands import (
     _create_yaml,
     get_filepaths,
     get_sub_task_tree,
-    task_status,
     resume_workflow_from_id,
-    workflow_status,
-    workflow_tasks,
+    task_status,
     update_task_status,
     validate_username,
     validate_workflow,
+    workflow_status,
+    workflow_tasks,
 )
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow import DistributorContext
 from jobmon.client.workflow_run import WorkflowRunFactory
-from jobmon.core.constants import TaskStatus, WorkflowStatus, WorkflowRunStatus
-from jobmon.core.exceptions import InvalidRequest, ConfigError
+from jobmon.core.constants import TaskStatus, WorkflowRunStatus, WorkflowStatus
+from jobmon.core.exceptions import ConfigError, InvalidRequest
 from jobmon.core.requester import Requester
 from jobmon.server.web.models import load_model
-from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task import Task
+from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.workflow import Workflow as WorkflowModel
 
 load_model()

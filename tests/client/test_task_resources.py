@@ -1,4 +1,5 @@
 from contextlib import nullcontext
+
 import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session

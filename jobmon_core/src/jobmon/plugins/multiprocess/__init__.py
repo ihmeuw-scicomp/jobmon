@@ -30,8 +30,6 @@ def get_cluster_distributor_class() -> Type[ClusterDistributor]:
 
 def get_cluster_worker_node_class() -> Type[ClusterWorkerNode]:
     """Return the cluster worker node class for the Multiprocess executor."""
-    from jobmon.plugins.multiprocess.multiproc_distributor import (
-        MultiprocessWorkerNode,
-    )
+    from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessWorkerNode
 
     return MultiprocessWorkerNode

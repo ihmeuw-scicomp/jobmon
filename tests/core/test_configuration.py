@@ -1,6 +1,5 @@
-from pathlib import Path
-
 from unittest.mock import mock_open
+
 import pytest
 
 from jobmon.core.configuration import JobmonConfig

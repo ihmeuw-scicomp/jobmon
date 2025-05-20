@@ -3,10 +3,10 @@
 from http import HTTPStatus as StatusCodes
 from typing import Any, Sequence, Tuple, Union
 
-from fastapi import Query, Request
-from sqlalchemy import func, Row, Select, select, text, update
-from starlette.responses import JSONResponse
 import structlog
+from fastapi import Query, Request
+from sqlalchemy import Row, Select, func, select, text, update
+from starlette.responses import JSONResponse
 
 from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.server.web.db import get_sessionmaker

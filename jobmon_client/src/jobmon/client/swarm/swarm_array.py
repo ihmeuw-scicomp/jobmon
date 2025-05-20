@@ -7,7 +7,6 @@ from typing import Set
 
 from jobmon.client.swarm.swarm_task import SwarmTask
 
-
 logger = logging.getLogger(__name__)
 
 

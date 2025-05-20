@@ -9,7 +9,6 @@ from jobmon.client.task_resources import TaskResources
 from jobmon.core.cluster import Cluster
 from jobmon.core.cluster_protocol import ClusterQueue
 
-
 logger = logging.getLogger(__name__)
 
 

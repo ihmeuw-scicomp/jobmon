@@ -4,16 +4,13 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-
 from jobmon.client.status_commands import concurrency_limit
-from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
-from jobmon.distributor.distributor_service import DistributorService
-from jobmon.plugins.multiprocess.multiproc_distributor import (
-    MultiprocessDistributor,
-)
-from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
+from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus
+from jobmon.distributor.distributor_service import DistributorService
+from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
+from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 from jobmon.server.web.models import load_model
 
 load_model()

@@ -2,7 +2,7 @@
 
 from typing import Dict, List
 
-from sqlalchemy import Column, ForeignKeyConstraint, Index, Integer, Text, VARCHAR
+from sqlalchemy import VARCHAR, Column, ForeignKeyConstraint, Index, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from jobmon.core.serializers import SerializeClientTaskTemplateVersion

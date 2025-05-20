@@ -1,16 +1,16 @@
 """Routes for Tasks."""
 
+import json
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
-import json
-from typing import Any, cast, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union, cast
 
-from fastapi import Query, Request
 import pandas as pd
+import structlog
+from fastapi import Query, Request
 from sqlalchemy import and_, select, update
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.core import constants
 from jobmon.core.constants import Direction

@@ -12,7 +12,6 @@ from jobmon.core.configuration import JobmonConfig
 from jobmon.core.exceptions import WorkflowNotResumable
 from jobmon.core.requester import Requester
 
-
 logger = logging.getLogger(__name__)
 
 

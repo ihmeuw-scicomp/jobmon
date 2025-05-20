@@ -1,14 +1,13 @@
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from jobmon.core.constants import TaskInstanceStatus
-from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.workflow_run import WorkflowRunFactory
+from jobmon.core.constants import TaskInstanceStatus
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.server.web.models import load_model
 from jobmon.server.web.models.task_instance import TaskInstance
-from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 
 load_model()
 

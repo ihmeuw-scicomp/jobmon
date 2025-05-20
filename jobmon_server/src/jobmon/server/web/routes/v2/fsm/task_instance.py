@@ -2,15 +2,15 @@
 
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, DefaultDict, Dict, Optional
+from typing import Any, DefaultDict, Dict, Optional, cast
 
-from fastapi import Request
 import sqlalchemy
+import structlog
+from fastapi import Request
 from sqlalchemy import and_, select, update
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition

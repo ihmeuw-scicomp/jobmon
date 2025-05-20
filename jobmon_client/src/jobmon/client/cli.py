@@ -77,6 +77,7 @@ class ClientCLI(CLI):
     def workflow_status(args: argparse.Namespace) -> None:
         """Workflow status checking options."""
         from tabulate import tabulate
+
         from jobmon.client.status_commands import workflow_status as workflow_status_cmd
 
         df = workflow_status_cmd(args.workflow_id, args.user, args.json, args.limit)
@@ -89,6 +90,7 @@ class ClientCLI(CLI):
     def workflow_tasks(args: argparse.Namespace) -> None:
         """Check the tasks for a given workflow."""
         from tabulate import tabulate
+
         from jobmon.client.status_commands import workflow_tasks as workflow_tasks_cmd
 
         df = workflow_tasks_cmd(args.workflow_id, args.status, args.json, args.limit)
@@ -111,6 +113,7 @@ class ClientCLI(CLI):
     def task_status(args: argparse.Namespace) -> None:
         """Check task status."""
         from tabulate import tabulate
+
         from jobmon.client.status_commands import task_status as task_status_cmd
 
         df = task_status_cmd(args.task_ids, args.status, args.json)
@@ -231,6 +234,7 @@ class ClientCLI(CLI):
     @staticmethod
     def get_filepaths(args: argparse.Namespace) -> None:
         from tabulate import tabulate
+
         from jobmon.client.status_commands import get_filepaths
 
         df = get_filepaths(

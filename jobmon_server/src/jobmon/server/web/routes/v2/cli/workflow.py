@@ -4,17 +4,11 @@ from datetime import datetime
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from fastapi import Query, Request
 import pandas as pd
-from sqlalchemy import (
-    func,
-    Select,
-    select,
-    text,
-    update,
-)
-from starlette.responses import JSONResponse
 import structlog
+from fastapi import Query, Request
+from sqlalchemy import Select, func, select, text, update
+from starlette.responses import JSONResponse
 
 from jobmon.core.constants import WorkflowStatus as Statuses
 from jobmon.server.web.db import get_sessionmaker

@@ -5,11 +5,10 @@ from pathlib import Path
 from pkgutil import iter_modules
 from typing import Any
 
-from sqlalchemy import CheckConstraint, event, func, String
+import structlog
+from sqlalchemy import CheckConstraint, String, event, func
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm.decl_api import DeclarativeMeta
-import structlog
-
 
 logger = structlog.get_logger(__name__)
 
@@ -52,20 +51,14 @@ def load_metadata() -> None:
     # load metadata
     from jobmon.server.web.db import get_sessionmaker
     from jobmon.server.web.models.arg_type import add_arg_types
-    from jobmon.server.web.models.cluster_type import add_cluster_types
     from jobmon.server.web.models.cluster import add_clusters
+    from jobmon.server.web.models.cluster_type import add_cluster_types
     from jobmon.server.web.models.queue import add_queues
-    from jobmon.server.web.models.task_resources_type import (
-        add_task_resources_types,
-    )
+    from jobmon.server.web.models.task_instance_status import add_task_instance_statuses
+    from jobmon.server.web.models.task_resources_type import add_task_resources_types
     from jobmon.server.web.models.task_status import add_task_statuses
-    from jobmon.server.web.models.task_instance_status import (
-        add_task_instance_statuses,
-    )
+    from jobmon.server.web.models.workflow_run_status import add_workflow_run_statuses
     from jobmon.server.web.models.workflow_status import add_workflow_statuses
-    from jobmon.server.web.models.workflow_run_status import (
-        add_workflow_run_statuses,
-    )
 
     SessionMaker = get_sessionmaker()
     with SessionMaker() as session:

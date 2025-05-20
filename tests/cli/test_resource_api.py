@@ -1,11 +1,11 @@
-from unittest.mock import patch, PropertyMock
+from unittest.mock import PropertyMock, patch
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from jobmon.client.tool import Tool
 from jobmon.client.cli import ClientCLI as CLI
 from jobmon.client.status_commands import task_template_resources
+from jobmon.client.tool import Tool
 
 
 def test_resource_usage(db_engine, client_env):

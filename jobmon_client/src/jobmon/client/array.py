@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
 import copy
+import logging
+from collections.abc import Iterable
 from http import HTTPStatus as StatusCodes
 from itertools import product
-import logging
-from typing import Any, Callable, Dict, Iterator, List, Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Union
 
 from jobmon.client.node import Node
 from jobmon.client.task import Task, validate_task_resource_scales
@@ -13,7 +13,6 @@ from jobmon.client.task_template_version import TaskTemplateVersion
 from jobmon.core.constants import MaxConcurrentlyRunning
 from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
-
 
 if TYPE_CHECKING:
     from jobmon.client.workflow import Workflow

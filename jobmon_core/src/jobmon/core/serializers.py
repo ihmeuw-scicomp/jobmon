@@ -1,8 +1,8 @@
 """Serializing data when going to and from the database."""
 
 import ast
-from datetime import datetime
 import json
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 

@@ -4,8 +4,8 @@ import string
 
 import pandas as pd
 import pytest
-from sqlalchemy.orm import Session
 from sqlalchemy import select, text, update
+from sqlalchemy.orm import Session
 
 from jobmon.client.api import Tool
 from jobmon.client.workflow_run import WorkflowRunFactory

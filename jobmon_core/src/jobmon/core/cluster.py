@@ -14,7 +14,6 @@ from jobmon.core.cluster_type import ClusterType
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeCluster, SerializeQueue
 
-
 logger = logging.getLogger(__name__)
 
 

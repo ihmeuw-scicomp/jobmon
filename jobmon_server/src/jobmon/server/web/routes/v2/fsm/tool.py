@@ -2,13 +2,13 @@
 
 from datetime import datetime, timedelta
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
-from fastapi import Request
 import sqlalchemy
+import structlog
+from fastapi import Request
 from sqlalchemy import select
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.node_arg import NodeArg

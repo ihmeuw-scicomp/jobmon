@@ -1,11 +1,8 @@
-import ast
 import html
 import os
-import pickle
 from typing import List
 
 from jobmon.core import task_generator
-from jobmon.client.api import Tool
 
 # Get the full path of the current script
 script_path = os.path.abspath(__file__)

@@ -1,6 +1,6 @@
 """Task Template database table."""
 
-from sqlalchemy import ForeignKey, Integer, UniqueConstraint, VARCHAR
+from sqlalchemy import VARCHAR, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from jobmon.core.serializers import SerializeClientTaskTemplate

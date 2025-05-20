@@ -1,11 +1,11 @@
 """Multiprocess executes tasks in parallel if multiple threads are available."""
 
 import logging
-from multiprocessing import JoinableQueue, Process, Queue
 import os
 import queue
 import shutil
 import subprocess
+from multiprocessing import JoinableQueue, Process, Queue
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import psutil

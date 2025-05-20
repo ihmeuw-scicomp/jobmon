@@ -8,8 +8,9 @@ def web_server_in_memory(db_engine):
     """
     # The create_app call sets up database connections
 
-    from jobmon.server.web.api import get_app
     from fastapi.testclient import TestClient
+
+    from jobmon.server.web.api import get_app
 
     app = get_app(versions=["v2"])
     client = TestClient(app)
@@ -35,6 +36,7 @@ def requester_in_memory(monkeypatch, web_server_in_memory, api_prefix):
     test_client
     """
     import requests
+
     from jobmon.core import requester
 
     monkeypatch.setenv("JOBMON__HTTP__ROUTE_PREFIX", api_prefix)

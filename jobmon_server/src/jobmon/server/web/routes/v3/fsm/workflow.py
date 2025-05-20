@@ -2,17 +2,17 @@
 
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
-from fastapi import HTTPException, Request
 import pandas as pd
 import sqlalchemy
+import structlog
+from fastapi import HTTPException, Request
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.server.web.db import get_dialect_name, get_sessionmaker
 from jobmon.server.web.models.array import Array

@@ -1,13 +1,13 @@
+import structlog
 from authlib.integrations.base_client import OAuthError
 from fastapi import HTTPException
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
-import structlog
 
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.auth import oauth
 from jobmon.server.web.routes.auth.oidc import oidc_router as api_auth_router
-from jobmon.server.web.routes.utils import get_user, User
+from jobmon.server.web.routes.utils import User, get_user
 
 logger = structlog.get_logger(__name__)
 

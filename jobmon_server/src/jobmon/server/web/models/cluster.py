@@ -2,8 +2,8 @@
 
 from typing import Tuple
 
-from sqlalchemy import Column, ForeignKey, Integer, select, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+from sqlalchemy import Column, ForeignKey, Integer, String, select
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from jobmon.core.serializers import SerializeCluster
 from jobmon.server.web.models import Base

@@ -1,5 +1,5 @@
-from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.client.workflow import DistributorContext
+from jobmon.client.workflow_run import WorkflowRunFactory
 
 
 def test_distributor_context(tool, task_template, client_env):

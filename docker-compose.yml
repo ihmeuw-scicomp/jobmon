@@ -2,15 +2,15 @@ services:
   jobmon_backend:
     build: 
       context: ./
-      dockerfile: ./jobmon_server/Dockerfile
+      dockerfile: ./jobmon_server/Dockerfile.local
       args:
-        EDITABLE: "${EDITABLE:-false}"  # Pass the EDITABLE argument with a default of false
-        EXTRAS: "${EXTRAS:-}"          # Pass the EXTRAS argument with a default of empty
+        EDITABLE: "${EDITABLE:-true}"  # Default to true for local dev
+        EXTRAS: "${EXTRAS:-mysql}" # Default to common dev extras (adjust as needed)
     ports:
       - "8070:80"
     volumes:
-      - ./jobmon_core:/app/jobmon/jobmon_core:ro
-      - ./jobmon_server:/app/jobmon/jobmon_server:ro
+      - ./jobmon_core:/app/jobmon_core:ro
+      - ./jobmon_server:/app/jobmon_server:ro
     env_file:
       - .env
     command: >

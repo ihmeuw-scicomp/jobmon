@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from dotenv import load_dotenv
 import yaml
+from dotenv import load_dotenv
 
 from jobmon.core import CONFIG_FILE_FROM_INSTALLER_PLUGIN
 from jobmon.core.cli import CLI

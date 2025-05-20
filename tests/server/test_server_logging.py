@@ -2,10 +2,9 @@ import json
 
 import pytest
 
-from jobmon.core.requester import Requester
 from jobmon.core.exceptions import InvalidResponse
-from jobmon.server.web import routes
-from jobmon.server.web import log_config
+from jobmon.core.requester import Requester
+from jobmon.server.web import log_config, routes
 
 
 @pytest.fixture(scope="function")

@@ -1,12 +1,9 @@
-from sqlalchemy import text
-from sqlalchemy.orm import Session
-import pandas as pd
 import random
-import time
-
-from jobmon.server.web.error_log_clustering import cluster_error_logs
 
 import nltk
+import pandas as pd
+
+from jobmon.server.web.error_log_clustering import cluster_error_logs
 
 nltk.download("punkt_tab")
 

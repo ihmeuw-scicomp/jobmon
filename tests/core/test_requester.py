@@ -1,9 +1,9 @@
 import time
+
 import pytest
-from unittest import mock
 import requests
-from tenacity import stop_after_attempt
-from jobmon.core.exceptions import InvalidResponse, InvalidRequest
+
+from jobmon.core.exceptions import InvalidRequest, InvalidResponse
 from jobmon.core.requester import Requester
 
 

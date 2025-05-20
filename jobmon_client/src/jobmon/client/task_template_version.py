@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import hashlib
-from http import HTTPStatus as StatusCodes
 import logging
+from http import HTTPStatus as StatusCodes
 from string import Formatter
-from typing import Any, Dict, List, Optional, Tuple, Type, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
 from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester

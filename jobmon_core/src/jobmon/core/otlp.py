@@ -7,7 +7,6 @@ import socket
 import sys
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Type, Union
 
-
 from opentelemetry import _logs, trace
 from opentelemetry.sdk import resources
 from opentelemetry.sdk._logs import LoggerProvider
@@ -18,7 +17,6 @@ from opentelemetry.trace import Tracer
 
 from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
-
 
 config = JobmonConfig()
 deployment_environment = config.get("otlp", "deployment_environment")

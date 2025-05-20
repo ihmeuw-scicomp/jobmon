@@ -51,6 +51,9 @@ mysql = [
     'mysqlclient',
 ]
 
+[tool.uv.sources]
+jobmon_core = { workspace = true }
+
 [tool.setuptools]
 license-files = ["LICENSE"]
 

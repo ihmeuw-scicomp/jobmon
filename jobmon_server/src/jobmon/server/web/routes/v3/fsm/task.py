@@ -1,9 +1,10 @@
 """Routes for Tasks."""
 
-from http import HTTPStatus as StatusCodes
 import json
-from typing import Any, cast, Dict, List, Set, Union
+from http import HTTPStatus as StatusCodes
+from typing import Any, Dict, List, Set, Union, cast
 
+import structlog
 from fastapi import Request
 from sqlalchemy import desc, insert, select, tuple_, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
@@ -13,7 +14,6 @@ from sqlalchemy.dialects.sqlite.dml import Insert as SQLiteInsert
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.core import constants
 from jobmon.server.web.db import get_dialect_name, get_sessionmaker

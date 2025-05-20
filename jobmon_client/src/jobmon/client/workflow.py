@@ -8,11 +8,11 @@ import itertools
 import logging
 import logging.config
 import os
-from subprocess import PIPE, Popen, TimeoutExpired
 import sys
-from types import TracebackType
-from typing import Any, Dict, Iterator, List, Optional, Sequence, TYPE_CHECKING, Union
 import uuid
+from subprocess import PIPE, Popen, TimeoutExpired
+from types import TracebackType
+from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence, Union
 
 import psutil
 
@@ -403,7 +403,6 @@ class Workflow(object):
             cluster_name: name of cluster to set default values for.
             yaml_file: the yaml file that is providing the compute resource values.
         """
-        pass
 
     def set_default_compute_resources_from_dict(
         self, cluster_name: str, dictionary: Dict[str, Any]

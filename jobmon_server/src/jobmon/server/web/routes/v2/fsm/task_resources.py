@@ -4,9 +4,9 @@ import ast
 from http import HTTPStatus as StatusCodes
 from typing import Any
 
+import structlog
 from sqlalchemy import select
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.queue import Queue
