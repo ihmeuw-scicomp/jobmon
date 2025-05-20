@@ -11,7 +11,7 @@ import structlog
 
 from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
@@ -22,7 +22,7 @@ from jobmon.server.web.server_side_exception import InvalidUsage
 
 
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 
 @api_v3_router.post("/workflow_run")
@@ -43,7 +43,7 @@ async def add_workflow_run(request: Request) -> Any:
 
     logger.info(f"Add wfr for workflow_id:{workflow_id}.")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             workflow = session.execute(
                 select(Workflow).where(Workflow.id == workflow_id)
@@ -116,7 +116,7 @@ async def terminate_workflow_run(workflow_run_id: int, request: Request) -> Any:
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(WorkflowRun).where(WorkflowRun.id == workflow_run_id)
             workflow_run = session.execute(select_stmt).scalars().one()
@@ -192,7 +192,7 @@ async def log_workflow_run_heartbeat(workflow_run_id: int, request: Request) -> 
 
     logger.debug(f"WFR {workflow_run_id} heartbeat data")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(WorkflowRun).where(WorkflowRun.id == workflow_run_id)
             workflow_run = session.execute(select_stmt).scalars().one()
@@ -226,7 +226,7 @@ async def log_workflow_run_status_update(workflow_run_id: int, request: Request)
 
     logger.info(f"Log status update for workflow_run_id:{workflow_run_id}.")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(WorkflowRun).where(WorkflowRun.id == workflow_run_id)
             workflow_run = session.execute(select_stmt).scalars().one()
@@ -257,7 +257,7 @@ async def task_instances_status_check(workflow_run_id: int, request: Request) ->
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # get time from db
             db_time = session.execute(select(func.now())).scalar()
@@ -320,7 +320,7 @@ async def set_status_for_triaging(workflow_run_id: int, request: Request) -> Any
         ) from e
     logger.info(f"Set to triaging those overdue tis for wfr {workflow_run_id}")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
 
             condition1 = TaskInstance.workflow_run_id == workflow_run_id

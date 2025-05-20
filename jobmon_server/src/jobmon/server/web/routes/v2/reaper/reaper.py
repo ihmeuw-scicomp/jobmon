@@ -9,21 +9,19 @@ from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core.exceptions import InvalidStateTransition
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_run_status import WorkflowRunStatus
 from jobmon.server.web.models.workflow_status import WorkflowStatus
-from jobmon.server.web.routes.v1.reaper import reaper_router as api_v1_router
 from jobmon.server.web.routes.v2.reaper import reaper_router as api_v2_router
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 
-@api_v1_router.put("/workflow/{workflow_id}/fix_status_inconsistency")
 @api_v2_router.put("/workflow/{workflow_id}/fix_status_inconsistency")
 async def fix_wf_inconsistency(workflow_id: int, request: Request) -> Any:
     """Find wf in F with all tasks in D and fix them.
@@ -36,7 +34,7 @@ async def fix_wf_inconsistency(workflow_id: int, request: Request) -> Any:
     logger.debug(
         f"Fix inconsistencies starting at workflow {workflow_id} by {increase_step}"
     )
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             sql0 = select(Workflow.id)
             rows = session.execute(sql0).all()
@@ -58,7 +56,7 @@ async def fix_wf_inconsistency(workflow_id: int, request: Request) -> Any:
     # count(s) will have the total number of tasks, sum(s) is those in D.
     # If the two are equal, then the workflow Tasks are all D and therefore the workflow
     # should be D.
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 Workflow.id > workflow_id,
@@ -80,7 +78,7 @@ async def fix_wf_inconsistency(workflow_id: int, request: Request) -> Any:
             logger.debug("No inconsistent F-D workflows to fix.")
         else:
             logger.info("Fixing inconsistent F-D workflow: {ids}")
-            session = SessionLocal()
+            session = SessionMaker()
             with session.begin():
                 update_stmt = (
                     update(Workflow)
@@ -97,11 +95,10 @@ async def fix_wf_inconsistency(workflow_id: int, request: Request) -> Any:
     return resp
 
 
-@api_v1_router.get("/workflow/{workflow_id}/workflow_name_and_args")
 @api_v2_router.get("/workflow/{workflow_id}/workflow_name_and_args")
 def get_wf_name_and_args(workflow_id: int) -> Any:
     """Return workflow name and args associated with specified workflow ID."""
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [Workflow.id == workflow_id]
             sql = select(Workflow.name, Workflow.workflow_args).where(*query_filter)
@@ -120,7 +117,6 @@ def get_wf_name_and_args(workflow_id: int) -> Any:
     return resp
 
 
-@api_v1_router.get("/lost_workflow_run")
 @api_v2_router.get("/lost_workflow_run")
 def get_lost_workflow_runs(
     status: Union[str, list[str]] = Query(...), version: str = Query(...)
@@ -128,7 +124,7 @@ def get_lost_workflow_runs(
     """Return all workflow runs that are currently in the specified state."""
     if isinstance(status, str):
         status = [status]
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 WorkflowRun.status.in_(status),
@@ -144,7 +140,6 @@ def get_lost_workflow_runs(
     return resp
 
 
-@api_v1_router.put("/workflow_run/{workflow_run_id}/reap")
 @api_v2_router.put("/workflow_run/{workflow_run_id}/reap")
 def reap_workflow_run(workflow_run_id: int) -> Any:
     """If the last task was more than 2 minutes ago, transition wfr to A state.
@@ -156,7 +151,7 @@ def reap_workflow_run(workflow_run_id: int) -> Any:
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
     logger.info(f"Reap wfr: {workflow_run_id}")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # get the wfr
             query_filter = [
@@ -200,7 +195,7 @@ def reap_workflow_run(workflow_run_id: int) -> Any:
                 logger.debug(f"Unable to reap workflow_run {wfr_id}: {e}")
 
     # update status
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query1 = f"""UPDATE workflow_run
                         SET status="{target_wfr_status}"

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from collections import defaultdict
 import itertools as it
 import logging
 import signal
 import sys
 import time
+import traceback
 from typing import (
     Any,
     Callable,
@@ -325,10 +327,12 @@ class DistributorService:
 
         except Exception as e:
             # if other error, transition to No ID status
+            stack_trace = traceback.format_exc()
             logger.exception(e)
             for task_instance in task_instance_batch.task_instances:
                 distributor_command = DistributorCommand(
-                    task_instance.transition_to_no_distributor_id, no_id_err_msg=str(e)
+                    task_instance.transition_to_no_distributor_id,
+                    no_id_err_msg=stack_trace,
                 )
                 distributor_commands.append(distributor_command)
 
@@ -375,8 +379,9 @@ class DistributorService:
                 requested_resources=requested_resources,
             )
         except Exception as e:
+            stack_trace = traceback.format_exc()
             logger.exception(e)
-            task_instance.transition_to_no_distributor_id(no_id_err_msg=str(e))
+            task_instance.transition_to_no_distributor_id(no_id_err_msg=stack_trace)
 
         else:
             # move from register queue to launch queue
@@ -394,16 +399,25 @@ class DistributorService:
         )
         task_instance.transition_to_error(r_msg, r_value)
 
-    def kill_self(self, task_instance: DistributorTaskInstance) -> None:
-        """Terminate a task instance that has received a Kill Self signal.
+    def kill_self_batch(self, task_instance_batch: TaskInstanceBatch) -> None:
+        """Terminate all TIs in this batch.
 
-        This signal is sent from a cold workflow resume, and transitions the task instance
-        to an ERROR_FATAL state with no retries.
+        Args:
+            task_instance_batch: The batch of task instances to terminate.
         """
-        self.cluster_interface.terminate_task_instances([task_instance.distributor_id])
-        task_instance.transition_to_error(
-            "Task instance was self-killed.", TaskInstanceStatus.ERROR_FATAL
-        )
+        # 1) Collect the distributor IDs to terminate
+        distributor_ids = [
+            ti.distributor_id
+            for ti in task_instance_batch.task_instances
+            if ti.distributor_id is not None
+        ]
+
+        # 2) If there are jobs to terminate, call the cluster
+        if distributor_ids:
+            self.cluster_interface.terminate_task_instances(distributor_ids)
+
+        # 3) Mark them as killed in the DB
+        task_instance_batch.transition_to_killed()
 
     def no_heartbeat_error(self, task_instance: DistributorTaskInstance) -> None:
         """Move a task instance in NO_HEARTBEAT state to a recoverable error state.
@@ -560,17 +574,15 @@ class DistributorService:
                         task_instance
                     )
 
-                    # change to new status and move to new set
-                    task_instance.status = new_status
-
                     try:
-                        self._task_instance_status_map[task_instance.status].add(
-                            task_instance
-                        )
+                        self._task_instance_status_map[new_status].add(task_instance)
+                        # change to new status and move to new set
+                        task_instance.status = new_status
+
                     except KeyError:
                         # If the task instance is in a terminal state, e.g. D, E, etc.,
                         # expire it from the distributor
-                        continue
+                        del self._task_instances[task_instance_id]
 
     def _check_queued_for_work(self) -> Generator[DistributorCommand, None, None]:
         queued_task_instances = list(
@@ -608,17 +620,19 @@ class DistributorService:
             yield DistributorCommand(self.triage_error, task_instance)
 
     def _check_kill_self_for_work(self) -> Generator[DistributorCommand, None, None]:
-        """Handle TIs in KILL_SELF state.
+        """Handle TIs in KILL_SELF state, grouped by their TaskInstanceBatch."""
+        kill_self_task_instances = list(
+            self._task_instance_status_map[TaskInstanceStatus.KILL_SELF]
+        )
 
-        For TaskInstances with KILL_SELF status, terminate it and
-        transition it to error accordingly.
-        """
-        kill_self_task_instances = self._task_instance_status_map[
-            TaskInstanceStatus.KILL_SELF
-        ]
+        # Group TIs by their batch
+        batch_map = defaultdict(list)
+        for ti in kill_self_task_instances:
+            batch_map[ti.batch].append(ti)
 
-        for task_instance in kill_self_task_instances:
-            yield DistributorCommand(self.kill_self, task_instance)
+        for batch_obj, _ in batch_map.items():
+            # If you'd like to verify they still have KILL_SELF status, etc., do it here.
+            yield DistributorCommand(self.kill_self_batch, batch_obj)
 
     def _check_no_heartbeat_for_work(self) -> Generator[DistributorCommand, None, None]:
         """Handle TIs in NO_HEARTBEAT state.

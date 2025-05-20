@@ -1,5 +1,10 @@
 FROM python:3.12
 
+# Install the core certificate bundle (6-7 MB)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 # Set build-time arguments
 ARG EXTRAS=""
 ARG EDITABLE=false

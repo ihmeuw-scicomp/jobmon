@@ -13,31 +13,36 @@ All notable changes to the Jobmon GUI will be documented in this file.
 
 ### User-Facing
 #### Added
-- Added the Jobmon ReadTheDocs link to the navigation bar.
-- Added authentication.
-- Added a user menu where users can specify timezone and date display.
-- Added a workflow technical panel - workflow stopage, workflow and tasktemplate concurrency limit.
+- Added the Jobmon ReadTheDocs link to the navigation bar (PR 180).
+- Added authentication (PR 191).
+- Added a user menu where users can specify timezone and date display (PR 193).
+- Added a workflow technical panel - workflow stoppage, workflow and TaskTemplate concurrency limit (PRs 199, 201).
+- Added a DAG visualization for Workflow and Tasks (PR 213).
 
 #### Changed
-- Show WorkflowRun heartbeat_date instead of Workflow status_date on the workflow details page.
-- Truncate file paths in TaskInstance table of `Task Details` page.
-- Changed nav bar to match other apps.
-- Optimized the clustered error logs on the `Workflow Details` page to be faster.
-- Truncated the workflow details URL.
-- Persist users table settings to a zustand store.
-- Changed behavior of back button on Workflow Details page. Previously it would flip between task and resource usage tabs. It will now take users home.
+- Restructured the Jobmon GUI pages - GUI hierarchy now goes Workflow > Task Template > Task/Task Instance (PR 220).
+- Added a TaskTemplate page that has a TaskTemplate tab and Workflow DAG tab (PR 220).
+- Created tabs for "Tasks", "Clustered Errors", "Resource Usage" on the Workflow Details page (PR 220).
+- Show WorkflowRun heartbeat_date instead of Workflow status_date on the workflow details page (PR 181).
+- Truncate file paths in TaskInstance table of `Task Details` page (PR 184).
+- Changed nav bar to match other apps (PR 182).
+- Optimized the clustered error logs on the `Workflow Details` page to be faster (PR 192).
+- Truncated the workflow details URL (PR 188).
+- Persist users table settings to a zustand store (PR 193).
+- Changed behavior of back button on Workflow Details page. Previously it would flip between task and resource usage tabs. It will now take users home (PR 195).
 
 #### Fixed
-- Bug where users weren't able to type more than one character in the Task table.
-- Fixed bug where progress bars would round up to 100% even though all tasks weren't completed.
+- Bug where users weren't able to type more than one character in the Task table (PR 194).
+- Fixed bug where progress bars would round up to 100% even though all tasks weren't completed (PR 203).
+- Fixed a bug where the wrong error type was being clustered and shown in the clustered errors section (PR 212).
 
 #### Removed
-- Removed the auto-filtering of WorkflowList search functionality.
+- Removed the auto-filtering of WorkflowList search functionality (PR 196).
 
 
 ### Developer
 #### Changed
- - Switched from NPM to bun.
+ - Switched from NPM to bun (PR 179).
 
 ## [3.3.1] - 2024-10-01
 

@@ -1,5 +1,5 @@
 import axios from "axios";
-import {error_log_viz_url, usage_url} from "@jobmon_gui/configs/ApiUrls.ts";
+import {error_log_viz_url} from "@jobmon_gui/configs/ApiUrls.ts";
 import {jobmonAxiosConfig} from "@jobmon_gui/configs/Axios.ts";
 import dayjs from "dayjs";
 import {ClusteredErrorList} from "@jobmon_gui/types/ClusteredErrors.ts";

@@ -1,4 +1,3 @@
-version: "3.9"
 services:
   jobmon_backend:
     build: 
@@ -15,15 +14,28 @@ services:
     env_file:
       - .env
     command: >
-      /bin/sh -c "jobmon_server init_db && fastapi run /app/main.py --port 80 --reload"
+      /bin/sh -c "fastapi run /app/main.py --port 80 --reload"
   jobmon_frontend:
     build: 
       context: ./jobmon_gui
-      dockerfile: ./jobmon_gui/Dockerfile.local
-    platform: linux/amd64
+      dockerfile: ./Dockerfile.local
     ports:
-      - "3000:3000"  # Map port 3000 for the frontend (adjust if needed)
+      - "3000:3000"
     volumes:
-      - ./jobmon_gui:/app/jobmon_gui:ro
+      - ./jobmon_gui/src:/app/src:ro
     env_file:
       - .env  # Load environment variables from the .env file
+
+  # jobmon_server_dev:
+  #   build:
+  #     context: ./
+  #     dockerfile: ./Dockerfile.server.dev
+  #   ports:
+  #     - "8070:8070"
+  #   volumes:
+  #     - ./jobmon_core:/app/jobmon_core:ro
+  #     - ./jobmon_server:/app/jobmon_server:ro
+  #     - ./jobmon_client:/app/jobmon_client:ro
+  #   env_file:
+  #     - .env
+  #   command: bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ./.nox/build_gui_test_env && python jobmon_gui/local_testing/main.py"

@@ -5,17 +5,18 @@ import json
 from typing import Any, cast, Dict, List, Set, Union
 
 from fastapi import Request
-from sqlalchemy import desc, insert, ScalarResult, select, tuple_, update
+from sqlalchemy import desc, insert, select, tuple_, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
+from sqlalchemy.dialects.mysql.dml import Insert as MySQLInsert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.sqlite.dml import Insert as SQLiteInsert
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core import constants
-from jobmon.server.web.config import get_jobmon_config
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_dialect_name, get_sessionmaker
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_arg import TaskArg
 from jobmon.server.web.models.task_attribute import TaskAttribute
@@ -25,16 +26,14 @@ from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLo
 from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
-_CONFIG = get_jobmon_config()
+SessionMaker = get_sessionmaker()
+DIALECT = get_dialect_name()
 
 
-@api_v1_router.put("/task/bind_tasks_no_args")
 @api_v2_router.put("/task/bind_tasks_no_args")
 async def bind_tasks_no_args(request: Request) -> Any:
     """Bind the task objects to the database."""
@@ -45,16 +44,17 @@ async def bind_tasks_no_args(request: Request) -> Any:
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
     logger.info("Binding tasks")
     # receive from client the tasks in a format of:
-    # {<hash>:[node_id(1), task_args_hash(2), array_id(3), task_resources_id(4), name(5),
-    # command(6), max_attempts(7), reset_if_running(8),resource_scales(9),
-    # fallback_queues(10) }
+    # {<hash>:[node_id(0), task_args_hash(1), array_id(2), task_resources_id(3), name(4),
+    # command(5), max_attempts(6), reset_if_running(7),resource_scales(8),
+    # fallback_queues(9) ]} # Indices adjusted based on previous deduction
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # Retrieve existing task_ids
             task_select_stmt = select(Task).where(
                 (Task.workflow_id == workflow_id),
                 tuple_(Task.node_id, Task.task_args_hash).in_(
+                    # Use list indices from client data structure
                     [tuple_(task[0], task[1]) for task in tasks.values()]
                 ),
             )
@@ -70,17 +70,18 @@ async def bind_tasks_no_args(request: Request) -> Any:
                 {}
             )  # Reverse dictionary of inputs, maps hash back to values
             for hashval, items in tasks.items():
+                # Unpack using indices based on client data structure
                 (
-                    node_id,
-                    arg_hash,
-                    array_id,
-                    task_resources_id,
-                    name,
-                    command,
-                    max_att,
-                    reset,
-                    resource_scales,
-                    fallback_queues,
+                    node_id,  # 0
+                    arg_hash,  # 1
+                    array_id,  # 2
+                    task_resources_id,  # 3
+                    name,  # 4
+                    command,  # 5
+                    max_att,  # 6
+                    reset,  # 7
+                    resource_scales,  # 8
+                    fallback_queues,  # 9
                 ) = items
 
                 id_tuple = (node_id, arg_hash)
@@ -89,6 +90,7 @@ async def bind_tasks_no_args(request: Request) -> Any:
                 # task status and update the args/attributes
                 if id_tuple in present_tasks.keys():
                     task = present_tasks[id_tuple]
+                    # Assuming task.reset exists and works correctly
                     task.reset(
                         name=name,
                         command=command,
@@ -98,7 +100,8 @@ async def bind_tasks_no_args(request: Request) -> Any:
 
                 # If not, add the task
                 else:
-                    task = {  # type: ignore
+                    # Construct dict based on old logic
+                    task_dict = {
                         "workflow_id": workflow_id,
                         "node_id": node_id,
                         "task_args_hash": arg_hash,
@@ -111,7 +114,7 @@ async def bind_tasks_no_args(request: Request) -> Any:
                         "resource_scales": str(resource_scales),
                         "fallback_queues": str(fallback_queues),
                     }
-                    tasks_to_add.append(task)
+                    tasks_to_add.append(task_dict)
 
                 task_hash_lookup[id_tuple] = hashval
 
@@ -148,7 +151,7 @@ async def bind_tasks_no_args(request: Request) -> Any:
             # Done here to prevent modifying tasks, and necessitating a refresh.
             return_tasks = {}
 
-            for task in prebound_tasks + new_tasks:  # type: ignore
+            for task in prebound_tasks + new_tasks:  # Combine lists
                 id_tuple = (task.node_id, task.task_args_hash)
                 hashval = task_hash_lookup[id_tuple]
                 return_tasks[hashval] = [task.id, task.status]
@@ -165,7 +168,6 @@ async def bind_tasks_no_args(request: Request) -> Any:
     return resp
 
 
-@api_v1_router.put("/task/bind_task_args")
 @api_v2_router.put("/task/bind_task_args")
 async def bind_task_args(request: Request) -> Any:
     """Add task args and associated task ids to the database."""
@@ -177,15 +179,13 @@ async def bind_task_args(request: Request) -> Any:
             {"task_id": task_id, "arg_id": arg_id, "val": value}
             for task_id, arg_id, value in task_args
         ]
-        session = SessionLocal()
         try:
-            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
+            # Use DIALECT for checks
+            if DIALECT == "mysql":
                 arg_insert_stmt = (
                     insert(TaskArg).values(task_arg_values).prefix_with("IGNORE")
                 )
-            elif SessionLocal and "sqlite" in _CONFIG.get(
-                "db", "sqlalchemy_database_uri"
-            ):
+            elif DIALECT == "sqlite":
                 arg_insert_stmt = (
                     sqlite_insert(TaskArg)
                     .values(task_arg_values)
@@ -193,12 +193,10 @@ async def bind_task_args(request: Request) -> Any:
                 )
             else:
                 raise ServerError(
-                    "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                    + _CONFIG.get("db", "sqlalchemy_database_uri")
-                    if SessionLocal
-                    else "None"
+                    f"Invalid SQL dialect. Only (mysql, sqlite) are supported. Got {DIALECT}"
                 )
-            with SessionLocal() as session:
+            # Use SessionMaker
+            with SessionMaker() as session:
                 with session.begin():
                     session.execute(arg_insert_stmt)
 
@@ -213,7 +211,6 @@ async def bind_task_args(request: Request) -> Any:
     return resp
 
 
-@api_v1_router.put("/task/bind_task_attributes")
 @api_v2_router.put("/task/bind_task_attributes")
 async def bind_task_attributes(request: Request) -> Any:
     """Add task attributes and associated attribute types to the database."""
@@ -226,7 +223,7 @@ async def bind_task_attributes(request: Request) -> Any:
         all_attribute_names |= set(attribute.keys())
 
     if any(all_attribute_names):
-        with SessionLocal() as session:
+        with SessionMaker() as session:
             with session.begin():
                 attribute_type_ids = _add_or_get_attribute_types(all_attribute_names)
                 # Build our insert values. On conflicts, update the existing value
@@ -245,137 +242,85 @@ async def bind_task_attributes(request: Request) -> Any:
                 # Insert and handle the conflicts
                 if insert_values:
                     try:
-                        if SessionLocal and "mysql" in _CONFIG.get(
-                            "db", "sqlalchemy_database_uri"
-                        ):
-                            attr_insert_stmt = mysql_insert(TaskAttribute).values(
-                                insert_values
+                        # Declare the variable with the Union type
+                        stmt_to_execute: Union[MySQLInsert, SQLiteInsert, None] = None
+                        # Use DIALECT
+                        if DIALECT == "mysql":
+                            mysql_stmt: MySQLInsert = mysql_insert(
+                                TaskAttribute
+                            ).values(insert_values)
+                            mysql_stmt = mysql_stmt.on_duplicate_key_update(
+                                value=mysql_stmt.inserted.value
                             )
-                            attr_insert_stmt = attr_insert_stmt.on_duplicate_key_update(
-                                value=attr_insert_stmt.inserted.value
+                            stmt_to_execute = mysql_stmt
+                        elif DIALECT == "sqlite":
+                            sqlite_stmt: SQLiteInsert = sqlite_insert(
+                                TaskAttribute
+                            ).values(insert_values)
+                            sqlite_stmt = sqlite_stmt.on_conflict_do_update(
+                                index_elements=[
+                                    TaskAttribute.task_id,
+                                    TaskAttribute.task_attribute_type_id,
+                                ],
+                                set_=dict(value=sqlite_stmt.excluded.value),
                             )
-                            session.execute(attr_insert_stmt)
-
-                        elif SessionLocal and "sqlite" in _CONFIG.get(
-                            "db", "sqlalchemy_database_uri"
-                        ):
-                            for attr_to_add in insert_values:
-                                attr_insert_stmt = (  # type: ignore
-                                    sqlite_insert(TaskAttribute)  # type: ignore
-                                    .values(attr_to_add)
-                                    .on_conflict_do_update(
-                                        index_elements=[
-                                            "task_id",
-                                            "task_attribute_type_id",
-                                        ],
-                                        set_=dict(value=attr_to_add["value"]),
-                                    )
-                                )
-                                session.execute(attr_insert_stmt)
+                            stmt_to_execute = sqlite_stmt
                         else:
                             raise ServerError(
-                                "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                                + _CONFIG.get("db", "sqlalchemy_database_uri")
-                                if SessionLocal
-                                else "None"
+                                f"Invalid SQL dialect. Only (mysql, sqlite) are supported. "
+                                f"Got {DIALECT}"
                             )
+                        if stmt_to_execute is not None:
+                            session.execute(stmt_to_execute)
                     except (DataError, IntegrityError) as e:
-                        # Attributes too long, message back
+                        # Attributes likely too long, message back
                         raise InvalidUsage(
-                            "Task attributes are constrained to 255 characters, "
-                            f"you may have values that are too long. Message: {str(e)}",
+                            "Task Attributes are constrained to 255 characters, you may "
+                            f"have values that are too long. Message: {str(e)}",
                             status_code=400,
                         ) from e
-            ()
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 
 
 def _add_or_get_attribute_types(names: Union[List[str], Set[str]]) -> Dict[str, int]:
     # Query for existing attribute types, to avoid integrity conflicts
-    names = set(names)
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
-            existing_rows_select = select(TaskAttributeType).where(
-                TaskAttributeType.name.in_(names)
-            )
-            existing_rows_raw: ScalarResult[TaskAttributeType] = session.execute(
-                existing_rows_select
-            ).scalars()
-            existing_rows = {attr.name: attr.id for attr in existing_rows_raw}
+            query = select(TaskAttributeType).where(TaskAttributeType.name.in_(names))
+            existing_attr_types = session.execute(query).scalars().all()
+            existing_attr_map = {at.name: at.id for at in existing_attr_types}
 
-            existing_names = set(existing_rows.keys())
-
-            # Insert the remaining names, found from the difference between old and new
-            # Keep the IGNORE prefix in case other agents add attributes first, prevent errors
-            # while trying to minimize collisions
-            new_names = names - existing_names  # type: ignore
-
-            # We'll eventually return the combination of existing + new attribute type ids
-            return_dict = existing_rows
-            if any(new_names):
-                new_attribute_types = [{"name": name} for name in new_names]
+            # Identify new attribute types to insert
+            new_names = set(names) - set(existing_attr_map.keys())
+            if new_names:
+                insert_values = [{"name": name} for name in new_names]
                 try:
-                    if SessionLocal and "mysql" in _CONFIG.get(
-                        "db", "sqlalchemy_database_uri"
-                    ):
-                        insert_stmt = (
-                            insert(TaskAttributeType)
-                            .values(new_attribute_types)
-                            .prefix_with("IGNORE")
-                        )
-                    elif SessionLocal and "sqlite" in _CONFIG.get(
-                        "db", "sqlalchemy_database_uri"
-                    ):
-                        insert_stmt = (
-                            sqlite_insert(TaskAttributeType)
-                            .values(new_attribute_types)
-                            .on_conflict_do_nothing()
-                        )
-                    else:
-                        raise ServerError(
-                            "invalid sql dialect. Only (mysql, sqlite) are supported. Got"
-                            + _CONFIG.get("db", "sqlalchemy_database_uri")
-                            if SessionLocal
-                            else "None"
-                        )
+                    insert_stmt = insert(TaskAttributeType).values(insert_values)
                     session.execute(insert_stmt)
-
-                except DataError as e:
+                except (DataError, IntegrityError) as e:
                     raise InvalidUsage(
-                        "Attribute types are constrained to 255 characters, your "
-                        f"attributes might be too long. Message: {str(e)}",
+                        "Attribute type names are constrained to 255 characters, you may have "
+                        f"values that are too long. Message: {str(e)}",
                         status_code=400,
                     ) from e
-
-                # Query the IDs of the newly inserted rows
-                new_rows_select = select(TaskAttributeType).where(
+                # Fetch the newly inserted attribute types to get their IDs
+                query = select(TaskAttributeType).where(
                     TaskAttributeType.name.in_(new_names)
                 )
-                new_attribute_type_ids = (
-                    session.execute(new_rows_select).scalars().all()
-                )
+                new_attr_types = session.execute(query).scalars().all()
+                new_attr_map = {at.name: at.id for at in new_attr_types}
+                existing_attr_map.update(new_attr_map)
 
-                # Update our return dict
-                return_dict.update(
-                    {
-                        # Code to keep typechecker happy
-                        attribute.name if attribute.name else "NA": (  # type: ignore
-                            attribute.id if attribute.id else -1  # type: ignore
-                        )
-                        for attribute in new_attribute_type_ids
-                    }
-                )
-    return return_dict  # type: ignore
+    return existing_attr_map
 
 
-@api_v1_router.post("/task/bind_resources")
 @api_v2_router.post("/task/bind_resources")
 async def bind_task_resources(request: Request) -> Any:
     """Add the task resources for a given task."""
     data = cast(Dict, await request.json())
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             tr_id = data.get("task_resources_type_id", None)
             req_resc = json.dumps(data.get("requested_resources", None))
@@ -385,26 +330,17 @@ async def bind_task_resources(request: Request) -> Any:
                 requested_resources=req_resc,  # type: ignore
             )
             session.add(new_resources)
-        ()
         resp = JSONResponse(content=new_resources.id, status_code=StatusCodes.OK)
     return resp
 
 
-@api_v1_router.get("/task/{task_id}/most_recent_ti_error")
 @api_v2_router.get("/task/{task_id}/most_recent_ti_error")
 def get_most_recent_ti_error(task_id: int) -> Any:
-    """Route to determine the cause of the most recent task_instance's error.
-
-    Args:
-        task_id (int): the ID of the task.
-
-    Return:
-        error message
-    """
+    """Route to determine the cause of the most recent task_instance's error."""
     structlog.contextvars.bind_contextvars(task_id=task_id)
     logger.info(f"Getting most recent ji error for ti {task_id}")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = (
                 select(TaskInstanceErrorLog)
@@ -433,20 +369,14 @@ def get_most_recent_ti_error(task_id: int) -> Any:
     return resp
 
 
-@api_v1_router.post("/task/{workflow_id}/set_resume_state")
 @api_v2_router.post("/task/{workflow_id}/set_resume_state")
 async def set_task_resume_state(workflow_id: int, request: Request) -> Any:
-    """An endpoint to set all tasks to a resumable state for a workflow.
-
-    Conditioned on the workflow already being in an appropriate resume state.
-    """
+    """An endpoint to set all tasks to a resumable state for a workflow."""
     data = cast(Dict, await request.json())
     reset_if_running = bool(data["reset_if_running"])
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
-            # Ensure that the workflow is resumable
-            # Necessary?
             workflow = session.execute(
                 select(Workflow).where(Workflow.id == workflow_id)
             ).scalar()
@@ -460,13 +390,6 @@ async def set_task_resume_state(workflow_id: int, request: Request) -> Any:
                 )
                 return resp
 
-            # Set task reset. If calling this bulk route,
-            # don't update any metadata besides what's
-            # already bound in the database.
-
-            # Logic: reset_if_running -> Reset all tasks not in "D" state
-            # else, reset all tasks not in "D" or "R" state
-            # for performance, also excclude TaskStatus.REGISTERING
             excluded_states = [TaskStatus.DONE, TaskStatus.REGISTERING]
             if not reset_if_running:
                 excluded_states.append(TaskStatus.RUNNING)
@@ -482,6 +405,5 @@ async def set_task_resume_state(workflow_id: int, request: Request) -> Any:
                     status_date=func.now(),
                 )
             )
-        ()
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp

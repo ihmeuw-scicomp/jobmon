@@ -6,7 +6,6 @@ build-backend = "setuptools.build_meta"
 name = "jobmon_client"
 description="A dependency management utility with retires and resource management for HPC computation."
 # The following line needs to be upaatd to the correct version number on each release
-version = "3.3.0"
 readme="README.md"
 requires-python = ">=3.9"
 classifiers = [
@@ -22,8 +21,7 @@ dependencies = [
     'pyyaml',
     'tabulate',
 ]
-# The following line "should" work but must be commented out when using an expliciate version number
-# dynamic = ["version"]
+dynamic = ["version"]
 
 [project.scripts]
 jobmon = "jobmon.client.cli:main"
@@ -33,7 +31,7 @@ server = ["jobmon_server"]
 ihme = ["jobmon_installer_ihme"]
 
 [tool.setuptools]
-license-files = ["../LICENSE"]
+license-files = ["LICENSE"]
 
 [tool.setuptools_scm]
 root = ".."

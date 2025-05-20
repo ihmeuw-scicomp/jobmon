@@ -268,15 +268,13 @@ class TaskGenerator:
             serializable types
 
     Users can also supply serializers for custom types by providing a dictionary of type to
-    a tuple of serialization and deserialization functions. Serializers can return either a
-    string or a list of strings. Lists of strings are represented on the command line as
-    ``--arg-name value1 --arg-name value2``. If you're serializing to a list of strings, the
-    deserializer should be prepared to handle either a single string or a list of strings.
+    a tuple of serialization and deserialization functions. Serializers must always turn
+    objects into a single string. Lists of strings are represented on the command line as
+    ``arg_name='[value1,value2]'``.
 
     Note:
         While lists, tuples and sets (and their ``Optional`` counterparts) can currently
         serialize empty collections, we can't currently serialize custom types as empty lists.
-
     """
 
     def __init__(
@@ -417,11 +415,11 @@ class TaskGenerator:
 
     def _generate_task_template(self) -> None:
         """Generate and store the task template."""
-        # args convert to --args foo=1 --args bar=2
-        args_template = " --args ".join(
+        # args convert to foo=1 bar=2
+        args_template = " ".join(
             f"{arg_name}={{{arg_name}}}" for arg_name in self.params
         )
-        args_template = " --args " + args_template
+        args_template = " " + args_template
         if self.module_source_path:
             self._task_template = self.tool.get_task_template(
                 template_name=self.name,
@@ -586,6 +584,10 @@ class TaskGenerator:
             if obj_type == bool:
                 deserialized_result = ast.literal_eval(obj)  # type: ignore
 
+            # If the object is our serialized empty string, return an empty string
+            elif obj_type == str and obj == SERIALIZED_EMPTY_STRING:
+                deserialized_result = ""
+
             # For all other simple types, we can simply call the type on ``obj``
             else:
                 deserialized_result = obj_type(obj)
@@ -660,6 +662,8 @@ class TaskGenerator:
         cluster_name: str = "",
         compute_resources: Optional[Dict] = None,
         resource_scales: Optional[Dict[str, Any]] = None,
+        upstream_tasks: List[Task] = [],
+        task_attributes: Union[List[str], Dict[str, Any]] = {},
         **kwargs: Any,
     ) -> Task:
         """Create a task for the task_function with the given kwargs."""
@@ -706,6 +710,8 @@ class TaskGenerator:
             resource_scales=resource_scales,
             max_attempts=self.max_attempts,
             executable=executable_path,
+            upstream_tasks=upstream_tasks,
+            task_attributes=task_attributes,
             **kwargs_for_task,  # type: ignore
         )
 
@@ -716,6 +722,7 @@ class TaskGenerator:
         cluster_name: str = "",
         compute_resources: Optional[Dict] = None,
         resource_scales: Optional[Dict[str, Any]] = None,
+        upstream_tasks: Optional[List[Task]] = None,
         **kwargs: Any,
     ) -> List[Task]:
         """Create a task array for the task_function with the given kwargs."""
@@ -753,6 +760,7 @@ class TaskGenerator:
             resource_scales=resource_scales,
             max_attempts=self.max_attempts,
             executable=executable_path,
+            upstream_tasks=upstream_tasks,
             **kwargs_for_task,  # type: ignore
         )
 
@@ -762,7 +770,7 @@ class TaskGenerator:
         """Run the task_function with the given args and return any result."""
         # Parse the args
         parsed_arg_value_pairs: Dict[str, Union[str, List[str]]] = dict()
-        # args is a list of string like ["arg1=1", "arg2=[2, 3]", "arg1=4]
+        # args is a list of string like ["arg1=1", "arg2=[2, 3]", "arg1=4"]
         for arg in args:
             arg_name, arg_value = arg.split("=")
             # if the arg_name key, already exists, append the value to the list
@@ -883,6 +891,7 @@ def task_generator(
     naming_args: Optional[List[str]] = None,
     max_attempts: Optional[int] = None,
     module_source_path: Optional[str] = None,
+    name_func: Optional[Callable] = None,
     default_cluster_name: str = "",
     default_compute_resources: Optional[Dict[str, Any]] = None,
     default_resource_scales: Optional[Dict[str, float]] = None,
@@ -899,6 +908,7 @@ def task_generator(
             naming_args=naming_args,
             max_attempts=max_attempts,
             module_source_path=module_source_path,
+            name_func=name_func,
             default_cluster_name=default_cluster_name,
             default_compute_resources=default_compute_resources,
             default_resource_scales=default_resource_scales,
@@ -1195,7 +1205,7 @@ def _format_options(
             # it can be typing._GenericAlias for list type annotation
             annotation_name = str(annotation).upper()
 
-        lines.append(f".. option:: --{param} <{annotation_name}>")
+        lines.append(f".. option:: {param}='<{annotation_name}>'")
         lines.append("")
         if param in param_docs and param_docs[param].description:
             for line in statemachine.string2lines(

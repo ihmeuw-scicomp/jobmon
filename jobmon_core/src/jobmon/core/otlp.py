@@ -20,6 +20,10 @@ from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
 
 
+config = JobmonConfig()
+deployment_environment = config.get("otlp", "deployment_environment")
+
+
 class OtlpAPI:
     """OpenTelemetry API."""
 
@@ -71,7 +75,6 @@ class OtlpAPI:
         _logs.set_logger_provider(self.logger_provider)
 
     def _configure_providers(self) -> None:
-        config = JobmonConfig()
 
         span_exporter = config.get("otlp", "span_exporter")
         if span_exporter:
@@ -110,12 +113,15 @@ class OtlpAPI:
 
     @classmethod
     def instrument_sqlalchemy(cls: Type[OtlpAPI]) -> None:
-        """Instrument SQLAlchemy."""
-        if not cls._sqlalchemy_instrumented:
-            from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+        """Instrument SQLAlchemy globally *and* any pre-existing Engine."""
+        if cls._sqlalchemy_instrumented:
+            return
 
-            SQLAlchemyInstrumentor().instrument()
-            cls._sqlalchemy_instrumented = True
+        from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
+        SQLAlchemyInstrumentor().instrument()  # global monkey-patch
+
+        cls._sqlalchemy_instrumented = True
 
     @classmethod
     def instrument_app(cls: Type[OtlpAPI], app: Any) -> None:
@@ -209,6 +215,7 @@ class _ProcessResourceDetector(resources.ResourceDetector):
             str(resources.PROCESS_OWNER): str(
                 getpass.getuser()
             ),  # Explicit cast to str
+            str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
         }
         return resources.Resource(attrs)
 
@@ -218,11 +225,15 @@ class _ServiceResourceDetector(resources.ResourceDetector):
         attrs = {
             resources.SERVICE_NAME: "jobmon",
             resources.SERVICE_VERSION: __version__,
+            str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
         }
         return resources.Resource(attrs)
 
 
 class _HostResourceDetector(resources.ResourceDetector):
     def detect(self) -> resources.Resource:
-        attrs = {resources.HOST_NAME: socket.gethostname()}
+        attrs = {
+            resources.HOST_NAME: socket.gethostname(),
+            str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
+        }
         return resources.Resource(attrs)

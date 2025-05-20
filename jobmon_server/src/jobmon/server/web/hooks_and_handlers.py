@@ -7,7 +7,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_404_NOT_FOUND
 import structlog
 
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
@@ -19,7 +19,7 @@ async def teardown_session() -> AsyncGenerator:
     try:
         yield
     finally:
-        get_session_local().remove()  # type: ignore
+        get_sessionmaker().remove()  # type: ignore
 
 
 def _handle_error(
@@ -69,25 +69,59 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
 
     @app.middleware("http")
     async def add_requester_context(request: Request, call_next: Callable) -> None:
-        """Add structured logging context before each request."""
+        """Add structured logging context.
+
+        It will add it before each request from headers, body, or query params.
+        """
         structlog.contextvars.clear_contextvars()
 
-        # Extract the context from the custom header
+        context_data = None
+
+        # Step 1: Check headers for X-Server-Structlog-Context (newer clients)
         context_str = request.headers.get("X-Server-Structlog-Context")
         if context_str:
             try:
                 context_data = json.loads(context_str)
-                structlog.contextvars.bind_contextvars(
-                    path=request.url.path, **context_data
-                )
             except json.JSONDecodeError:
-                # Handle invalid JSON in the header gracefully
                 structlog.contextvars.bind_contextvars(
                     path=request.url.path,
                     error="Invalid JSON in X-Server-Structlog-Context header",
                 )
 
-        # Process the request and return the response
+        # Step 2: If not found in headers, check request body or query params (older clients)
+        if context_data is None:
+            if request.method in ["POST", "PUT"]:
+                try:
+                    # Read the request body
+                    body = await request.body()
+                    if body:
+                        data = json.loads(body.decode("utf-8"))
+                        if "server_structlog_context" in data:
+                            context_data = data.pop("server_structlog_context")
+                            # Reset the request body without server_structlog_context
+                            new_body = json.dumps(data).encode("utf-8")
+                            request._body = new_body
+                            request.scope["body"] = new_body
+                except json.JSONDecodeError:
+                    pass  # Ignore if body is not JSON
+            elif request.method == "GET":
+                context_str = request.query_params.get("server_structlog_context")
+                if context_str:
+                    try:
+                        context_data = json.loads(context_str)
+                    except json.JSONDecodeError:
+                        structlog.contextvars.bind_contextvars(
+                            path=request.url.path,
+                            error="Invalid JSON in server_structlog_context query param",
+                        )
+
+        # Step 3: Bind the context if found
+        if context_data:
+            structlog.contextvars.bind_contextvars(
+                path=request.url.path, **context_data
+            )
+
+        # Step 4: Proceed with the request
         response = await call_next(request)
         return response
 

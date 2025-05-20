@@ -9,6 +9,102 @@ All notable changes to Jobmon will be documented in this file.
 ### Deprecated
 ### Removed
 
+## [3.4.14] - 2025-05-05
+### Added
+- Added the ability to specify task attributes in TaskGenerator create_task method (PR 264).
+
+### Fixed
+- Fixed a bug where name_func could not be passed through task_generator decorators (PR 264).
+
+## [3.4.13] - 2025-04-21
+### Added
+- Added a link to the TaskDetails page from the clustered errors modal (PR 255).
+
+### Changed
+- Swapped the location of the DAG viz and TaskInstance table on the Task Details page (PR 255).
+- Changed tasks in "G" state (registering) to white in Task DAG viz (PR 255).
+
+### Fixed
+- Fixed a bug where dates were appearing in UTC (not in user's specified timezone) in the Jobmon GUI (PR 251).
+- Fixed broken home button on TaskDetails page (PR 255).
+
+## [3.4.12] - 2025-04-03
+### Added
+- Added the ability to specify upstream tasks in TaskGenerator create_task(s) methods (PR 254).
+
+## [3.4.11] - 2025-03-31
+### Fixed
+- Fixed bug in requester where ValueErrors weren't being handled (PR 250).
+
+## [3.4.10] - 2025-03-25
+### Fixed
+- Fixed resource retry for new slurm API. Fixes bug where tasks were going into "U" state instead of "Z" state (jobmon_slurm PR 160).
+
+## [3.4.9] - 2025-03-19
+### Removed
+- Removed pin in jobmon_client pyproject.toml (PR 248).
+
+## [3.4.8] - 2025-03-19
+### Added
+- Added the ability for the user to change their task statuses in the Jobmon GUI (PR 243).
+
+### Changed
+- Upped the number of workers in the pods from 4 -> 6.
+- Each subpackage has its own license (PR 246).
+
+### Fixed
+- Fixed a bug where task instance were stuck in `triaging` state (jobmon_slurm PR 159).
+
+### Removed
+- Removed `--args` separator from TaskTemplate (PR 244).
+
+## [3.4.7] - 2025-03-04
+### Changed
+- Added missing client ingress route in TAD.
+
+## [3.4.6] - 2025-03-04
+### Fixed
+- Fixed a bug in clustered error-ing where an exception would happen if there were no values in task_instance.error_log (PR 238).
+- Properly handle deserialization of empty strings in the task generator (PR 240).
+
+## [3.4.5] - 2025-02-26
+### Fixed
+- Fixed the Jobmon test suite (PR 235).
+- Fixed a bug where the DAG viz wouldn't load if the DAG only had a single node (PR 236).
+
+## [3.4.4] - 2025-02-25
+### Fixed
+- Fixed a decimal serialization error in v2 get_workflow_tt_status_viz (PR 233).
+- Fixed a bug where resource usage data wasn't being shown do to incorrect indexing (PR 234).
+
+## [3.4.3] - 2025-02-24
+### Fixed
+- Fixed a datetime error in v2 get_task_details_viz (PR 232).
+
+## [3.4.2] - 2025-02-24
+### Fixed
+- Fixed a datetime error in v2 workflow_by_user_form (PR 231)
+- Fixed pod scaling problems in TAD.
+
+## [3.4.1] - 2025-02-24
+### Fixed
+- Removed an `await` in the requester context that was causing a bug (PR 229).
+- Made `app_requested_context` backward compatible (PR 230).
+
+## [3.4.0] - 2025-02-24 (jenkins 22)
+### Added
+- Warn users if they haven't specified `naming_args` when using the task generator (PR 202).
+
+### Changed
+- Bulk kill TaskInstances to speed up workflow stopping (PR 209).
+- Switched from Flask to FastAPI (PR 169).
+- Display the full stack trace when the distributor service encounters an exception, rather than only showing "Retry Error" (PR 227).
+
+### Fixed
+- Fixed a bug where users were getting hash collision errors for their Tasks that didn't have the same node_arg values (PR 214).
+- Fixed a bug where the wrong usage values were being populated in the Jobmon database from the slurm accounting databse (jobmon_usage PR 4).
+- Fixed a bug where timeouts set in the `workflow_resume` CLI were not being propagated properly (PR 215).
+
 ## [3.2.6] - TBD
 ### Added
 - Reaper "poll_interval_minutes" config key - default 5 minutes (PR 69).

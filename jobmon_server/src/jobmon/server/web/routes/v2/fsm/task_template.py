@@ -12,20 +12,18 @@ from starlette.responses import JSONResponse
 import structlog
 
 from jobmon.core import constants
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.arg import Arg
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.template_arg_map import TemplateArgMap
-from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 
-@api_v1_router.post("/task_template")
 @api_v2_router.post("/task_template")
 async def get_task_template(request: Request) -> Any:
     """Add a task template for a given tool to the database."""
@@ -44,7 +42,7 @@ async def get_task_template(request: Request) -> Any:
 
     # add to DB
     try:
-        with SessionLocal() as session:
+        with SessionMaker() as session:
             with session.begin():
                 task_template = TaskTemplate(tool_version_id=tool_version_id, name=name)
                 session.add(task_template)
@@ -52,7 +50,7 @@ async def get_task_template(request: Request) -> Any:
                 session.refresh(task_template)
                 ttid = task_template.id
     except sqlalchemy.exc.IntegrityError:
-        with SessionLocal() as session:
+        with SessionMaker() as session:
             with session.begin():
                 select_stmt = select(TaskTemplate).where(
                     TaskTemplate.tool_version_id == tool_version_id,
@@ -65,21 +63,28 @@ async def get_task_template(request: Request) -> Any:
     return resp
 
 
-@api_v1_router.get("/task_template/{task_template_id}/versions")
 @api_v2_router.get("/task_template/{task_template_id}/versions")
 def get_task_template_versions(task_template_id: int) -> Any:
-    """Get the task_template_version."""
+    """Get the latest task_template_version."""
     # get task template version object
     structlog.contextvars.bind_contextvars(task_template_id=task_template_id)
     logger.info(f"Getting task template version for task template: {task_template_id}")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(TaskTemplateVersion).where(
                 TaskTemplateVersion.task_template_id == task_template_id
             )
             ttvs = session.execute(select_stmt).scalars().all()
-            wire_obj = [ttv.to_wire_as_client_task_template_version() for ttv in ttvs]
+            if ttvs:
+                max_id = max(ttv.id for ttv in ttvs)
+                wire_obj = [
+                    ttv.to_wire_as_client_task_template_version()
+                    for ttv in ttvs
+                    if ttv.id == max_id
+                ]
+            else:
+                wire_obj = []
 
     resp = JSONResponse(
         content={"task_template_versions": wire_obj}, status_code=StatusCodes.OK
@@ -110,7 +115,6 @@ def _add_or_get_arg(name: str, session: Session) -> Arg:
     return arg
 
 
-@api_v1_router.post("/task_template/{task_template_id}/add_version")
 @api_v2_router.post("/task_template/{task_template_id}/add_version")
 async def add_task_template_version(task_template_id: int, request: Request) -> Any:
     """Add a tool to the database."""
@@ -135,7 +139,7 @@ async def add_task_template_version(task_template_id: int, request: Request) -> 
         constants.ArgType.TASK_ARG: [],
         constants.ArgType.OP_ARG: [],
     }
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         for arg_name in node_args:
             arg_mapping_dct[constants.ArgType.NODE_ARG].append(
                 _add_or_get_arg(arg_name, session)

@@ -8,11 +8,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
 from structlog import get_logger
 
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 
 logger = get_logger(__name__)
 
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 
 # ############################ SHARED LANDING ROUTES ##########################################
@@ -25,7 +25,7 @@ def is_alive() -> Any:
 
 
 def _get_time() -> str:
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         db_time = session.execute(select(func.now())).scalar()
         str_time = (
             db_time.strftime("%Y-%m-%d %H:%M:%S") if db_time else "0000-00-00 00:00:00"
@@ -55,7 +55,7 @@ def health() -> Any:
 # ############################ TESTING ROUTES ################################################
 def test_route() -> None:
     """Test route to force a 500 error."""
-    session = SessionLocal()
+    session = SessionMaker()
     with session.begin():
         session.execute(text("SELECT * FROM blip_bloop_table")).all()
         session.commit()

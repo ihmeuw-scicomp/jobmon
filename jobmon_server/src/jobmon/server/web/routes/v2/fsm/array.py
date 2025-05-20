@@ -11,19 +11,17 @@ import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.server.web._compat import add_time
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_status import TaskStatus
-from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
 
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 
-@api_v1_router.post("/array")
 @api_v2_router.post("/array")
 async def add_array(request: Request) -> Any:
     """Return an array ID by workflow and task template version ID.
@@ -40,7 +38,7 @@ async def add_array(request: Request) -> Any:
     )
 
     # Check if the array is already bound, if so return it
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(Array).where(
                 Array.workflow_id == workflow_id,
@@ -81,7 +79,6 @@ async def add_array(request: Request) -> Any:
     return resp
 
 
-@api_v1_router.post("/array/{array_id}/queue_task_batch")
 @api_v2_router.post("/array/{array_id}/queue_task_batch")
 async def record_array_batch_num(array_id: int, request: Request) -> Any:
     """Record a batch number to associate sets of task instances with an array submission."""
@@ -95,7 +92,7 @@ async def record_array_batch_num(array_id: int, request: Request) -> Any:
         Task.status.in_([TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]),
     )
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # Acquire locks on tasks to be updated
             task_locks = (
@@ -176,7 +173,6 @@ async def record_array_batch_num(array_id: int, request: Request) -> Any:
     return resp
 
 
-@api_v1_router.post("/array/{array_id}/transition_to_launched")
 @api_v2_router.post("/array/{array_id}/transition_to_launched")
 async def transition_array_to_launched(array_id: int, request: Request) -> Any:
     """Transition TIs associated with an array_id and batch_num to launched."""
@@ -186,7 +182,7 @@ async def transition_array_to_launched(array_id: int, request: Request) -> Any:
     batch_num = data["batch_number"]
     next_report = data["next_report_increment"]
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # Acquire a lock and update tasks to launched
             task_ids_query = (
@@ -236,7 +232,7 @@ def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> No
         TaskInstance.array_batch_num == batch_num,
     )
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # Acquire a lock and update tasks to launched
             task_instance_ids_query = (
@@ -263,7 +259,6 @@ def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> No
             session.execute(update_stmt)
 
 
-@api_v1_router.post("/array/{array_id}/log_distributor_id")
 @api_v2_router.post("/array/{array_id}/log_distributor_id")
 async def log_array_distributor_id(array_id: int, request: Request) -> Any:
     """Add distributor_id, stderr/stdout paths to the DB for all TIs in an array."""
@@ -301,7 +296,7 @@ async def log_array_distributor_id(array_id: int, request: Request) -> Any:
     )
 
     # Acquire locks and update TaskInstances
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # locks for the updates
             session.execute(task_instance_ids_query)
@@ -340,7 +335,7 @@ async def get_array_max_concurrently_running(
             Array.task_template_version_id == task_template_version_id,
         )
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             array = session.execute(select_stmt).scalars().one()
 
@@ -349,3 +344,103 @@ async def get_array_max_concurrently_running(
             status_code=StatusCodes.OK,
         )
     return resp
+
+
+@api_v2_router.post("/array/{array_id}/transition_to_killed")
+async def transition_to_killed(array_id: int, request: Request) -> Any:
+    """Transition TIs from KILL_SELF  to ERROR_FATAL.
+
+    Also mark parent Tasks with status=ERROR_FATAL if they're in a killable state.
+    """
+    structlog.contextvars.bind_contextvars(array_id=array_id)
+
+    data = cast(Dict, await request.json())
+    batch_num = data["batch_number"]
+
+    # 1) Acquire locks on the parent Tasks, and set them to ERROR_FATAL
+    #    if they're in a killable state.
+    #    This is analogous to how transition_to_launched locks tasks
+    #    that are INSTANTIATING and sets them to LAUNCHED.
+
+    with SessionMaker() as session:
+        with session.begin():
+            # Find Task IDs belonging to TIs in this array & batch
+            task_ids_query = (
+                select(TaskInstance.task_id)
+                .where(
+                    TaskInstance.array_id == array_id,
+                    TaskInstance.array_batch_num == batch_num,
+                    TaskInstance.status == TaskInstanceStatus.KILL_SELF,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            task_ids = session.execute(task_ids_query).scalars().all()
+
+            # We'll define "killable" Task states. Adjust as appropriate.
+            killable_task_states = (
+                TaskStatus.LAUNCHED,
+                TaskStatus.RUNNING,
+            )
+            task_condition = and_(
+                Task.array_id == array_id,
+                Task.id.in_(task_ids),
+                Task.status.in_(killable_task_states),
+            )
+
+            # Lock them with_for_update
+            task_locks = (
+                select(Task.id)
+                .where(task_condition)
+                .with_for_update()
+                .execution_options(synchronize_session=False)
+            )
+            session.execute(task_locks)
+
+            # Transition them to ERROR_FATAL
+            update_task_stmt = (
+                update(Task)
+                .where(task_condition)
+                .values(status=TaskStatus.ERROR_FATAL, status_date=func.now())
+            ).execution_options(synchronize_session=False)
+            session.execute(update_task_stmt)
+
+    # 2) Now transition the TIs themselves to ERROR_FATAL.
+    #    This is in a separate session, just like _update_task_instance
+    #    is invoked in transition_to_launched.
+    _update_task_instance_killed(array_id, batch_num)
+
+    # 3) Return success
+    return JSONResponse(content={}, status_code=StatusCodes.OK)
+
+
+def _update_task_instance_killed(array_id: int, batch_num: int) -> None:
+    """Bulk update TaskInstances in (array_id, batch_num) from KILL_SELF."""
+    # In this example, we assume you specifically want to move TIs in KILL_SELF -> ERROR_FATAL.
+    # Adapt as needed if you also want to kill TIs in LAUNCHED, RUNNING, etc.
+    ti_condition = and_(
+        TaskInstance.array_id == array_id,
+        TaskInstance.array_batch_num == batch_num,
+        TaskInstance.status == TaskInstanceStatus.KILL_SELF,
+    )
+
+    with SessionMaker() as session:
+        with session.begin():
+            # Acquire a lock on these TIs
+            task_instance_ids_query = (
+                select(TaskInstance.id)
+                .where(ti_condition)
+                .with_for_update()
+                .execution_options(synchronize_session=False)
+            )
+            session.execute(task_instance_ids_query)
+
+            # Transition them all to ERROR_FATAL
+            update_stmt = (
+                update(TaskInstance)
+                .where(ti_condition)
+                .values(
+                    status=TaskInstanceStatus.ERROR_FATAL,
+                    status_date=func.now(),
+                )
+            ).execution_options(synchronize_session=False)
+            session.execute(update_stmt)

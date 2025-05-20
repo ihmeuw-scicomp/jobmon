@@ -17,7 +17,7 @@ dependencies = [
     'jobmon_core',
     'fastapi[standard]>=0.103.2',
     'fastapi-plugins>=0.12.0',
-    'pymysql', # install MySQLdb/mysqlclient for more performance
+    'pymysql>=1.1.0', # install MySQLdb/mysqlclient for more performance
     'sqlalchemy>=2.0.0',
     'sqlalchemy_utils',
     'structlog',
@@ -31,6 +31,7 @@ dependencies = [
     'httpx',
     'authlib',
     'itsdangerous',
+    'dnspython',
 ]
 dynamic = ["version"]
 
@@ -51,7 +52,7 @@ mysql = [
 ]
 
 [tool.setuptools]
-license-files = ["../LICENSE"]
+license-files = ["LICENSE"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

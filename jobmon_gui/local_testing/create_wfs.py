@@ -33,8 +33,8 @@ def parse_arguments():
     parser.add_argument(
         '--wf-type',
         type=str,
-        help="Type of workflows: simple, tired, or random.",
-        choices=["simple", "tired", "random"],  # Specify the allowed values
+        help="Type of workflows: simple, tired, huge, or random.",
+        choices=["simple", "tired", "random", "huge"],  # Specify the allowed values
         default="simple"  # Set the default value
     )
 
@@ -51,7 +51,7 @@ def create_simple_wf():
     print("Simple workflow completed!")
 
 
-def create_tired_wf():
+def create_tired_wf(size_tier1=10, size_tier3=100):
     """Use dummy cluster to create a fake tired workflow."""
     from jobmon.client.api import Tool
     tool = Tool("multiprocess")
@@ -59,7 +59,7 @@ def create_tired_wf():
     Q = "null.q"
     tt = tool.get_task_template(
         template_name="tired_task1",
-        command_template="sleep {arg} || true || {arg_filler}",
+        command_template="echo {arg} || true || {arg_filler}",
         node_args=["arg"],
         task_args=["arg_filler"]
     )
@@ -68,9 +68,19 @@ def create_tired_wf():
         command_template="echo {arg}",
         node_args=["arg"]
     )
-    num_tasks = random.randint(1, 10)
+    tt3 = tool.get_task_template(
+        template_name="tired_task3",
+        command_template="echo {arg} || {arg_filler} || true",
+        node_args=["arg"],
+        task_args=["arg_filler"]
+    )
+    tt4 = tool.get_task_template(
+        template_name="tired_task4",
+        command_template="echo {arg} || true || true",
+        node_args=["arg"]
+    )
     tier1 = []
-    for i in range(num_tasks):
+    for i in range(size_tier1):
         task = tt.create_task(
             name=f"tired_task_{i}",
             arg=i,
@@ -78,13 +88,31 @@ def create_tired_wf():
             compute_resources={"queue": Q, "num_cores": 1},
         )
         tier1.append(task)
-    task = tt2.create_task(
+    tier2 = tt2.create_task(
         name=f"tired_task_second_tier",
-        arg="I am the last task",
+        arg="I am the second task",
         upstream_tasks=tier1,
         compute_resources={"queue": Q, "num_cores": 1},
     )
-    tasks = tier1 + [task]
+    tasks = tier1 + [tier2]
+    tier3 = []
+    for i in range(size_tier3):
+        task = tt3.create_task(
+            name=f"tired3_task_{i}",
+            arg=i,
+            upstream_tasks=[tier2],
+            arg_filler=f"Task {i} is tired",
+            compute_resources={"queue": Q, "num_cores": 1},
+        )
+        tier3.append(task)
+    tasks = tasks + tier3
+    tier4 = tt4.create_task(
+        name=f"tired_task_second_tier",
+        arg="I am the last task",
+        upstream_tasks=tier3,
+        compute_resources={"queue": Q, "num_cores": 1},
+    )
+    tasks = tasks + [tier4]
     wf = tool.create_workflow(
         name=f"wf",
         default_cluster_name=C,
@@ -96,18 +124,22 @@ def create_tired_wf():
 
 
 def create_wf(total, wf_type):
+    print(f"Creating {total} workflows of type {wf_type}")
     created = 0
     # create #total of workflows; if total is 0, create workflows continuously
     while total == 0 or created < total:
         print("Creating workflow")
         created += 1
         this_wf_type = wf_type
+        print(f"Workflow type: {this_wf_type}")
         if this_wf_type == "random":
             this_wf_type = random.choice(["simple", "tired"])
         if this_wf_type == "simple":
             create_simple_wf()
         elif this_wf_type == "tired":
             create_tired_wf()
+        elif this_wf_type == "huge":
+            create_tired_wf(100, 90000)
         sleep(10)
 
 

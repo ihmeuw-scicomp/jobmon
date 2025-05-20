@@ -1,6 +1,6 @@
 import React from 'react';
-import MemoryBoxPlot from '@jobmon_gui/components/workflow_details/MemoryBoxPlot';
-import RuntimeBoxPlot from '@jobmon_gui/components/workflow_details/RuntimeBoxPlot';
+import MemoryBoxPlot from '@jobmon_gui/components/task_template_details/MemoryBoxPlot';
+import RuntimeBoxPlot from '@jobmon_gui/components/task_template_details/RuntimeBoxPlot';
 import {formatBytes, bytes_to_gib} from '@jobmon_gui/utils/formatters'
 import humanizeDuration from 'humanize-duration';
 import {useQuery} from "@tanstack/react-query";
@@ -21,7 +21,7 @@ export default function Usage({taskTemplateName, taskTemplateVersionId, workflow
         staleTime: 5000,
     })
     if (!taskTemplateName) {
-        return (<Typography sx={{pt: 5}}>Select a task template from above to view resource usage</Typography>)
+        return (<Typography sx={{pt: 5}}>Could not retrieve resource usage for this task template.</Typography>)
     }
 
     if (usageInfo.isLoading) {

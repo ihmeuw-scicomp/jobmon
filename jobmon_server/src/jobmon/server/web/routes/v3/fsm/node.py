@@ -8,15 +8,15 @@ from sqlalchemy import insert, select
 from starlette.responses import JSONResponse
 import structlog
 
-from jobmon.server.web.config import get_jobmon_config
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_dialect_name, get_sessionmaker
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.node_arg import NodeArg
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
+from jobmon.server.web.server_side_exception import ServerError
 
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
-_CONFIG = get_jobmon_config()
+SessionMaker = get_sessionmaker()
+DIALECT = get_dialect_name()
 
 
 @api_v3_router.post("/nodes")
@@ -31,7 +31,7 @@ async def add_nodes(request: Request) -> Any:
 
     # Bulk insert the nodes and node args with raw SQL, for performance. Ignore duplicate
     # keys
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             node_keys = [
                 (n["task_template_version_id"], n["node_args_hash"])
@@ -43,12 +43,12 @@ async def add_nodes(request: Request) -> Any:
                     for ttv, arghash in node_keys
                 ]
             )
-            if SessionLocal and "mysql" in _CONFIG.get("db", "sqlalchemy_database_uri"):
+            if DIALECT == "mysql":
                 node_insert_stmt = node_insert_stmt.prefix_with("IGNORE")
-            if SessionLocal and "sqlite" in _CONFIG.get(
-                "db", "sqlalchemy_database_uri"
-            ):
+            elif DIALECT == "sqlite":
                 node_insert_stmt = node_insert_stmt.prefix_with("OR IGNORE")
+            else:
+                raise ServerError(f"Unsupported SQL dialect '{DIALECT}'")
 
             session.execute(node_insert_stmt)
             session.flush()
@@ -96,18 +96,16 @@ async def add_nodes(request: Request) -> Any:
 
 
 def _insert_node_args(node_args_list: list) -> None:
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             if node_args_list:
                 node_arg_insert_stmt = insert(NodeArg).values(node_args_list)
-                if SessionLocal and "mysql" in _CONFIG.get(
-                    "db", "sqlalchemy_database_uri"
-                ):
+                if DIALECT == "mysql":
                     node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("IGNORE")
-                if SessionLocal and "sqlite" in _CONFIG.get(
-                    "db", "sqlalchemy_database_uri"
-                ):
+                elif DIALECT == "sqlite":
                     node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("OR IGNORE")
+                else:
+                    raise ServerError(f"Unsupported SQL dialect '{DIALECT}'")
 
                 session.execute(node_arg_insert_stmt)
                 ()

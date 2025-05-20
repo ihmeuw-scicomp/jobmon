@@ -11,7 +11,7 @@ import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.server.web._compat import add_time
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -19,7 +19,7 @@ from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 
 @api_v3_router.post("/array")
@@ -38,7 +38,7 @@ async def add_array(request: Request) -> Any:
     )
 
     # Check if the array is already bound, if so return it
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(Array).where(
                 Array.workflow_id == workflow_id,
@@ -92,7 +92,7 @@ async def record_array_batch_num(array_id: int, request: Request) -> Any:
         Task.status.in_([TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]),
     )
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # Acquire locks on tasks to be updated
             task_locks = (
@@ -182,7 +182,7 @@ async def transition_array_to_launched(array_id: int, request: Request) -> Any:
     batch_num = data["batch_number"]
     next_report = data["next_report_increment"]
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # Acquire a lock and update tasks to launched
             task_ids_query = (
@@ -233,7 +233,7 @@ def _update_task_instance(array_id: int, batch_num: int, next_report: int) -> No
         TaskInstance.array_batch_num == batch_num,
     )
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # Acquire a lock and update tasks to launched
             task_instance_ids_query = (
@@ -297,7 +297,7 @@ async def log_array_distributor_id(array_id: int, request: Request) -> Any:
     )
 
     # Acquire locks and update TaskInstances
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             # locks for the updates
             session.execute(task_instance_ids_query)
@@ -336,7 +336,7 @@ async def get_array_max_concurrently_running(
             Array.task_template_version_id == task_template_version_id,
         )
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             array = session.execute(select_stmt).scalars().one()
 

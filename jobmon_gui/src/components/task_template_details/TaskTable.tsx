@@ -14,7 +14,7 @@ import {useTaskTableStore} from "@jobmon_gui/stores/TaskTable.ts";
 import {LocalizationProvider} from "@mui/x-date-pickers";
 import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
-import {formatDayjsDate} from "@jobmon_gui/utils/DayTime.ts";
+import {formatDayjsDate, formatJobmonDate} from "@jobmon_gui/utils/DayTime.ts";
 import {getTaskDetailsQueryFn} from "@jobmon_gui/queries/GetTaskDetails.ts";
 import {getWorkflowTasksQueryFn} from "@jobmon_gui/queries/GetWorkflowTasks.ts";
 import {Task, TaskTableProps} from "@jobmon_gui/types/TaskTable.ts";
@@ -30,8 +30,8 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
         queryKey: ["workflow_details", "tasks", workflowId, taskTemplateName],
         queryFn: getWorkflowTasksQueryFn,
         staleTime: 5000,
-        enabled: !!taskTemplateName,
-        refetchOnMount: false
+        enabled: !!workflowId && !!taskTemplateName,
+        refetchOnMount: true, // Refetch on mount to reflect task status upgrade
     })
 
 
@@ -88,9 +88,10 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
             header: "Status Date",
             filterVariant: 'datetime-range',
             size: 350,
-            Cell: ({renderedCellValue}) => (
-                dayjs.isDayjs(renderedCellValue) ? formatDayjsDate(renderedCellValue) : renderedCellValue
-            )
+            Cell: ({cell}) => {
+                const rawValue = cell.getValue() as dayjs.Dayjs;
+                return formatDayjsDate(rawValue);
+            }
         }),
     ];
 
@@ -185,7 +186,7 @@ export default function TaskTable({taskTemplateName, workflowId}: TaskTableProps
     };
 
     if (!taskTemplateName) {
-        return (<Typography sx={{pt: 5}}>Select a task template from above to view tasks</Typography>)
+        return (<Typography sx={{pt: 5}}>Could not retrieve tasks for this task template.</Typography>)
     }
 
     if (tasks.isError) {

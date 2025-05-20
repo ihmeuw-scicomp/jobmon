@@ -15,7 +15,7 @@ import structlog
 from jobmon.core import constants
 from jobmon.core.constants import Direction
 from jobmon.core.serializers import SerializeTaskResourceUsage
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -23,13 +23,12 @@ from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLo
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.routes.v1.cli import cli_router as api_v1_router
 from jobmon.server.web.routes.v2.cli import cli_router as api_v2_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 _task_instance_label_mapping = {
     "Q": "PENDING",
@@ -52,7 +51,6 @@ _reversed_task_instance_label_mapping = {
 }
 
 
-@api_v1_router.get("/task_status")
 @api_v2_router.get("/task_status")
 def get_task_status(
     task_ids: Optional[Union[int, list[int]]] = Query(...),
@@ -72,7 +70,7 @@ def get_task_status(
     if status and isinstance(status, str):
         status = [status]
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query_filter = [
                 Task.id == TaskInstance.task_id,
@@ -143,7 +141,6 @@ def get_task_status(
     return resp
 
 
-@api_v1_router.post("/task/subdag")
 @api_v2_router.post("/task/subdag")
 async def get_task_subdag(request: Request) -> Any:
     """Used to get the sub dag  of a given task.
@@ -159,7 +156,7 @@ async def get_task_subdag(request: Request) -> Any:
         raise InvalidUsage(f"Missing {task_ids} in request", status_code=400)
     if task_status is None:
         task_status = []
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = (
                 select(
@@ -217,7 +214,6 @@ async def get_task_subdag(request: Request) -> Any:
     return resp
 
 
-@api_v1_router.put("/task/update_statuses")
 @api_v2_router.put("/task/update_statuses")
 async def update_task_statuses(request: Request) -> Any:
     """Update the status of the tasks."""
@@ -234,7 +230,7 @@ async def update_task_statuses(request: Request) -> Any:
             f"problem with {str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             logger.info(
                 f"reset status of task_ids: {task_ids}, new_status: {new_status}"
@@ -248,18 +244,20 @@ async def update_task_statuses(request: Request) -> Any:
             # If job is supposed to be rerun, set task instances to "K"
             if new_status == constants.TaskStatus.REGISTERING:
                 task_instance_update_stmt = update(TaskInstance).where(
-                    TaskInstance.task_id.in_(task_ids),
-                    TaskInstance.status.notin_(
-                        [
-                            constants.TaskInstanceStatus.ERROR_FATAL,
-                            constants.TaskInstanceStatus.DONE,
-                            constants.TaskInstanceStatus.ERROR,
-                            constants.TaskInstanceStatus.UNKNOWN_ERROR,
-                            constants.TaskInstanceStatus.RESOURCE_ERROR,
-                            constants.TaskInstanceStatus.KILL_SELF,
-                            constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID,
-                        ]
-                    ),
+                    and_(
+                        TaskInstance.task_id.in_(task_ids),
+                        TaskInstance.status.notin_(
+                            [
+                                constants.TaskInstanceStatus.ERROR_FATAL,
+                                constants.TaskInstanceStatus.DONE,
+                                constants.TaskInstanceStatus.ERROR,
+                                constants.TaskInstanceStatus.UNKNOWN_ERROR,
+                                constants.TaskInstanceStatus.RESOURCE_ERROR,
+                                constants.TaskInstanceStatus.KILL_SELF,
+                                constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID,
+                            ]
+                        ),
+                    )
                 )
                 vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
                 session.execute(task_instance_update_stmt.values(**vals))
@@ -278,11 +276,10 @@ async def update_task_statuses(request: Request) -> Any:
     return resp
 
 
-@api_v1_router.get("/task_dependencies/{task_id}")
 @api_v2_router.get("/task_dependencies/{task_id}")
 def get_task_dependencies(task_id: int) -> Any:
     """Get task's downstream and upstream tasks and their status."""
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             dag_id, workflow_id, node_id = _get_dag_and_wf_id(task_id, session)
             logger.info(
@@ -336,7 +333,6 @@ def get_task_dependencies(task_id: int) -> Any:
     return resp
 
 
-@api_v1_router.put("/tasks_recursive/{direction}")
 @api_v2_router.put("/tasks_recursive/{direction}")
 async def get_tasks_recursive(direction: str, request: Request) -> Any:
     """Get all input task_ids'.
@@ -350,7 +346,7 @@ async def get_tasks_recursive(direction: str, request: Request) -> Any:
     task_ids = set(data.get("task_ids", []))
 
     try:
-        with SessionLocal() as session:
+        with SessionMaker() as session:
             with session.begin():
                 tasks_recursive = _get_tasks_recursive(task_ids, direct, session)
             resp = JSONResponse(
@@ -361,12 +357,11 @@ async def get_tasks_recursive(direction: str, request: Request) -> Any:
         raise e
 
 
-@api_v1_router.get("/task_resource_usage")
 @api_v2_router.get("/task_resource_usage")
 def get_task_resource_usage(task_id: int) -> Any:
     """Return the resource usage for a given Task ID."""
-    with SessionLocal() as session:
-        with SessionLocal.begin():
+    with SessionMaker() as session:
+        with session.begin():
             select_stmt = (
                 select(
                     Task.num_attempts,
@@ -548,7 +543,6 @@ def _get_tasks_from_nodes(
     return task_dict
 
 
-@api_v1_router.post("/task/get_downstream_tasks")
 @api_v2_router.post("/task/get_downstream_tasks")
 async def get_downstream_tasks(request: Request) -> Any:
     """Get only the direct downstreams of a task."""
@@ -556,7 +550,7 @@ async def get_downstream_tasks(request: Request) -> Any:
 
     task_ids = data["task_ids"]
     dag_id = data["dag_id"]
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             tasks_and_edges = session.execute(
                 select(Task.id, Task.node_id, Edge.downstream_node_ids).where(
@@ -576,11 +570,10 @@ async def get_downstream_tasks(request: Request) -> Any:
     return resp
 
 
-@api_v1_router.get("/task/get_ti_details_viz/{task_id}")
 @api_v2_router.get("/task/get_ti_details_viz/{task_id}")
 def get_task_details(task_id: int) -> Any:
     """Get information about TaskInstances associated with specific Task ID."""
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query = (
                 select(
@@ -634,11 +627,10 @@ def get_task_details(task_id: int) -> Any:
     return resp
 
 
-@api_v1_router.get("/task/get_task_details_viz/{task_id}")
 @api_v2_router.get("/task/get_task_details_viz/{task_id}")
 def get_task_details_viz(task_id: int) -> Any:
     """Get status of Task from Task ID."""
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             query = select(
                 Task.status,
@@ -658,7 +650,10 @@ def get_task_details_viz(task_id: int) -> Any:
             "task_command",
             "task_status_date",
         )
+
         result = [dict(zip(column_names, row)) for row in rows]
+        if result and "task_status_date" in result[0]:
+            result[0]["task_status_date"] = result[0]["task_status_date"].isoformat()
         resp = JSONResponse(
             content={"task_details": result}, status_code=StatusCodes.OK
         )

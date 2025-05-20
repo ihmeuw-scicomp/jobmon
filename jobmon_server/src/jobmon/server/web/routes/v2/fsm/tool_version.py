@@ -9,18 +9,16 @@ from sqlalchemy import select
 from starlette.responses import JSONResponse
 import structlog
 
-from jobmon.server.web.db_admin import get_session_local
+from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.tool_version import ToolVersion
-from jobmon.server.web.routes.v1.fsm import fsm_router as api_v1_router
 from jobmon.server.web.routes.v2.fsm import fsm_router as api_v2_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 logger = structlog.get_logger(__name__)
-SessionLocal = get_session_local()
+SessionMaker = get_sessionmaker()
 
 
-@api_v1_router.post("/tool_version")
 @api_v2_router.post("/tool_version")
 async def add_tool_version(request: Request) -> Any:
     """Add a new version for a Tool."""
@@ -34,7 +32,7 @@ async def add_tool_version(request: Request) -> Any:
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         try:
             with session.begin():
                 tool_version = ToolVersion(tool_id=tool_id)
@@ -54,7 +52,6 @@ async def add_tool_version(request: Request) -> Any:
     return resp
 
 
-@api_v1_router.get("/tool_version/{tool_version_id}/task_templates")
 @api_v2_router.get("/tool_version/{tool_version_id}/task_templates")
 def get_task_templates(tool_version_id: int) -> Any:
     """Get the Tool Version."""
@@ -62,7 +59,7 @@ def get_task_templates(tool_version_id: int) -> Any:
     structlog.contextvars.bind_contextvars(tool_version_id=tool_version_id)
     logger.info("Getting available task_templates")
 
-    with SessionLocal() as session:
+    with SessionMaker() as session:
         with session.begin():
             select_stmt = select(TaskTemplate).where(
                 TaskTemplate.tool_version_id == tool_version_id

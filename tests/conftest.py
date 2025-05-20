@@ -10,6 +10,7 @@ from time import sleep
 from types import TracebackType
 from typing import Any, Optional
 import uvicorn
+import pathlib
 
 import pytest
 import sqlalchemy
@@ -26,13 +27,15 @@ _api_prefix = "/api/v2"
 def pytest_sessionstart(session):
     # Create a unique SQLite file in a temporary directory
     tmp_dir = tempfile.mkdtemp()
-    sqlite_file = os.path.join(tmp_dir, "tests.sqlite")
+    # Resolve the path to be absolute *before* creating the URI
+    sqlite_file = pathlib.Path(tmp_dir, "tests.sqlite").resolve()
 
     # Print information for debugging purposes
     print("Running code before test file import")
     print(f"SQLite file created at: {sqlite_file}")
 
-    os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{sqlite_file}"
+    # Use four slashes for an absolute path SQLite URI
+    os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{sqlite_file}"
     os.environ["JOBMON__OTLP__WEB_ENABLED"] = "false"
     os.environ["JOBMON__OTLP__SPAN_EXPORTER"] = ""
     os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
@@ -49,11 +52,9 @@ def db_engine() -> Engine:
     from jobmon.server.web.config import get_jobmon_config
 
     config = get_jobmon_config()
-    from jobmon.server.web.db_admin import init_db
-    from jobmon.server.web.models import load_model
+    from jobmon.server.web.db import init_db
 
-    init_db()
-    load_model()
+    init_db()  # Then initialize DB (runs migrations + metadata load)
 
     # verify db created
     eng = sqlalchemy.create_engine(config.get("db", "sqlalchemy_database_uri"))
