@@ -17,8 +17,8 @@ python = "3.10"
 @nox.session(python=python, venv_backend="venv")
 def tests(session: Session) -> None:
     """Run the test suite."""
-    session.run("uv", "pip", "install", "pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
-    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
+    session.run("uv", "pip", "install", "pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock")
+    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
 
     args = session.posargs or test_locations
 
@@ -54,9 +54,7 @@ def lint(session: Session) -> None:
         "flake8-annotations",
         "flake8-import-order",
         "flake8-docstrings",
-        "flake8-black",
-        "--extra-index-url",
-        "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple"
+        "flake8-black"
     )
     session.run("flake8", *args)
 
@@ -64,7 +62,7 @@ def lint(session: Session) -> None:
 @nox.session(python=python, venv_backend="venv")
 def black(session):
     args = session.posargs or src_locations + test_locations
-    session.run("uv", "pip", "install", "black", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
+    session.run("uv", "pip", "install", "black")
     session.run("black", *args)
 
 
@@ -87,18 +85,16 @@ def typecheck(session: Session) -> None:
         "types-Flask-Cors",
         "types-sqlalchemy-utils",
         "types-setuptools",
-        "types-mysqlclient",
-        "--extra-index-url",
-        "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple"
+        "types-mysqlclient"
     )
-    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
+    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
 
     session.run("mypy", "--explicit-package-bases", *args)
 
 
 @nox.session(python=python, venv_backend="venv")
 def schema_diagram(session: Session) -> None:
-    session.run("uv", "pip", "install", "-e", "./jobmon_server", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
+    session.run("uv", "pip", "install", "-e", "./jobmon_server")
     outpath = Path(__file__).parent / "docsource" / "developers_guide" / "diagrams" / "erd.svg"
     with tempfile.TemporaryDirectory() as tmpdir:
         session.chdir(tmpdir)
@@ -129,7 +125,7 @@ def schema_diagram(session: Session) -> None:
 @nox.session(python=python, venv_backend="venv")
 def build(session: Session) -> None:
     args = session.posargs or src_locations
-    session.run("uv", "pip", "install", "build", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
+    session.run("uv", "pip", "install", "build")
 
     for src_dir in args:
         namespace_dir = str(Path(src_dir).parent)
@@ -157,7 +153,7 @@ def clean(session: Session) -> None:
 
 @nox.session(python=python, venv_backend="venv")
 def build_gui_test_env(session: Session) -> None:
-    session.run("uv", "pip", "install", "mysqlclient", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
+    session.run("uv", "pip", "install", "mysqlclient")
     if os.path.exists("/tmp/tests.sqlite"):
         os.remove("/tmp/tests.sqlite")
-    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
+    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
