@@ -1,14 +1,15 @@
-import pytest
+from random import randint
 from typing import Any, Dict, List, Optional, Tuple, Union
 from unittest.mock import Mock
-from random import randint
 
+import pytest
+
+from jobmon.client.api import Tool
 from jobmon.core import task_generator
 from jobmon.core.task_generator import (
     TaskGeneratorDocumenter,
     TaskGeneratorModuleDocumenter,
 )
-from jobmon.client.api import Tool
 
 
 def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
@@ -29,7 +30,6 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     compute_resources = {}
 
@@ -76,7 +76,6 @@ def test_name_func(client_env, monkeypatch: pytest.fixture) -> None:
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     compute_resources = {}
 
@@ -104,7 +103,6 @@ def test_upstream_task(client_env, monkeypatch: pytest.fixture) -> None:
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     compute_resources = {}
 
@@ -146,7 +144,6 @@ def test_task_attributes(
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     compute_resources = {}
 
@@ -181,7 +178,6 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
     )
     def list_function(foo: List[str], bar: List[str]) -> None:
         """Example task_function."""
-        pass
 
     compute_resources = {}
 
@@ -237,7 +233,6 @@ def test_naming_args(
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     compute_resources = {}
 
@@ -280,7 +275,6 @@ def test_max_attempts(client_env, monkeypatch: pytest.fixture) -> None:
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     compute_resources = {}
 
@@ -297,7 +291,6 @@ def my_func() -> None:
 
     Converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#243
     """
-    pass
 
 
 @pytest.mark.parametrize(
@@ -686,7 +679,6 @@ def test_deserialize_multi_annotated_collection(client_env) -> None:
     converted from https://stash.ihme.washington.edu/projects/FHSENG/repos/fhs-lib-orchestration-interface/browse/tests/test_task_generator.py#511
     """
     # this is no longer supported as deserialize will only take str
-    pass
 
 
 @pytest.mark.parametrize(
@@ -862,7 +854,6 @@ def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
     @task_generator.task_generator(serializers={}, tool_name=tool_name)
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     compute_resources = {}
 
@@ -903,7 +894,6 @@ def test_upstream_task_array(client_env, monkeypatch: pytest.fixture) -> None:
     @task_generator.task_generator(serializers={}, tool_name=tool_name)
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     compute_resources = {}
 
@@ -940,7 +930,6 @@ def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
     @task_generator.task_generator(serializers={}, tool_name=tool_name)
     def simple_function(foo: int, bar: List[str]) -> None:
         """Simple task_function."""
-        pass
 
     compute_resources = {}
 
@@ -971,16 +960,16 @@ def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
 def test_fhs_serializers(client_env) -> None:
     """Test the serializers for the FHS task generator."""
     from tests.worker_node.task_generator_fhs import (
-        YearRange,
-        Versions,
-        FHSFileSpec,
         FHSDirSpec,
-        VersionMetadata,
+        FHSFileSpec,
         Quantiles,
-        versions_to_list,
-        versions_from_list,
-        quantiles_to_list,
+        VersionMetadata,
+        Versions,
+        YearRange,
         quantiles_from_list,
+        quantiles_to_list,
+        versions_from_list,
+        versions_to_list,
     )
 
     yr = YearRange(2020, 2021)
@@ -1009,7 +998,6 @@ def test_fhs_serializers(client_env) -> None:
         q: Optional[Quantiles],
     ) -> None:
         """Simple task_function."""
-        pass
 
     tg = task_generator.TaskGenerator(
         task_function=my_func,
@@ -1050,16 +1038,16 @@ def test_fhs_deserizalizers(client_env, monkeypatch) -> None:
     tool = Tool("test_tool")
 
     from tests.worker_node.task_generator_fhs import (
-        YearRange,
-        Versions,
-        FHSFileSpec,
         FHSDirSpec,
-        VersionMetadata,
+        FHSFileSpec,
         Quantiles,
-        versions_to_list,
-        versions_from_list,
-        quantiles_to_list,
+        VersionMetadata,
+        Versions,
+        YearRange,
         quantiles_from_list,
+        quantiles_to_list,
+        versions_from_list,
+        versions_to_list,
     )
 
     testing_serializer = {
@@ -1080,7 +1068,6 @@ def test_fhs_deserizalizers(client_env, monkeypatch) -> None:
         q: Optional[Quantiles],
     ) -> None:
         """Simple task_function."""
-        pass
 
     tg = task_generator.TaskGenerator(
         task_function=test_function,
@@ -1108,16 +1095,16 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         Mock(return_value=task_generator.TASK_RUNNER_NAME),
     )
     from tests.worker_node.task_generator_fhs import (
-        YearRange,
-        Versions,
-        FHSFileSpec,
         FHSDirSpec,
-        VersionMetadata,
+        FHSFileSpec,
         Quantiles,
-        versions_to_list,
-        versions_from_list,
-        quantiles_to_list,
+        VersionMetadata,
+        Versions,
+        YearRange,
         quantiles_from_list,
+        quantiles_to_list,
+        versions_from_list,
+        versions_to_list,
     )
 
     yr = YearRange(2020, 2021)
@@ -1149,7 +1136,6 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         q: Optional[Quantiles],
     ) -> None:
         """Simple task_function."""
-        pass
 
     task1 = simple_function.create_task(
         cluster_name="sequential",
@@ -1254,7 +1240,6 @@ def test_task_template_not_generated_when_instance_only_generated_once(
 
     def test_func(foo: int) -> None:
         """Simple task_function."""
-        pass
 
     tg = task_generator.TaskGenerator(
         default_cluster_name="sequential",
@@ -1294,7 +1279,6 @@ def test_get_tasks_by_node_args_simple(client_env, monkeypatch):
 
     def test_func(foo: int) -> None:
         """Simple task_function."""
-        pass
 
     tg = task_generator.TaskGenerator(
         default_cluster_name="sequential",
@@ -1339,7 +1323,6 @@ def test_get_tasks_by_node_args_list(client_env, monkeypatch):
 
     def test_func(foo: List[int]) -> None:
         """Simple task_function."""
-        pass
 
     tg = task_generator.TaskGenerator(
         default_cluster_name="sequential",
@@ -1384,7 +1367,6 @@ def test_get_tasks_by_node_args_obj(client_env, monkeypatch):
 
     def test_func(foo: FakeYearRange) -> None:
         """Simple task_function."""
-        pass
 
     tg = task_generator.TaskGenerator(
         default_cluster_name="sequential",
@@ -1450,7 +1432,6 @@ def test_naming_func(client_env, monkeypatch: pytest.fixture) -> None:
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     compute_resources = {}
 
@@ -1491,7 +1472,6 @@ def test_computer_resource_type_protection(client_env, monkeypatch):
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     # Exercise & Verify an error is raised
     with pytest.raises(
@@ -1527,8 +1507,8 @@ def test_task_generator_doc(client_env, monkeypatch):
 
     tool = Tool("test_tool")
 
-    from docutils.parsers.rst import directives
     from docutils.core import publish_string
+    from docutils.parsers.rst import directives
 
     directives.register_directive("task_generator", TaskGeneratorDocumenter)
     rst = f"""
@@ -1560,8 +1540,8 @@ def test_task_generator_docs(client_env, monkeypatch):
 
     tool = Tool("test_tool")
 
-    from docutils.parsers.rst import directives
     from docutils.core import publish_string
+    from docutils.parsers.rst import directives
 
     directives.register_directive(
         "task_generator_module", TaskGeneratorModuleDocumenter
@@ -1601,7 +1581,6 @@ def test_default_computer_resource(client_env, monkeypatch):
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     # create a task
     t1 = simple_function.create_task(cluster_name="sequential", foo=1, bar="baz")
@@ -1649,7 +1628,6 @@ def test_default_computer_resource_yaml(client_env, monkeypatch):
     )
     def simple_function(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     # create a task
     t1 = simple_function.create_task(cluster_name="sequential", foo=1, bar="baz")
@@ -1688,7 +1666,6 @@ def test_rsc_overide(client_env, monkeypatch):
     )
     def simple_function1(foo: int, bar: str) -> None:
         """Simple task_function."""
-        pass
 
     # task without cluster name should use the tg cluster name
     t1 = simple_function1.create_task(foo=1, bar="baz")

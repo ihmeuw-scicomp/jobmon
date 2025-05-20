@@ -1,5 +1,5 @@
-from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 from jobmon.core.constants import TaskInstanceStatus
+from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 
 
 def test_seq_kill_self_state():

@@ -3,7 +3,6 @@ from typing import Optional
 
 from jobmon.core.configuration import JobmonConfig
 
-
 # a singleton to holp jobmon config that enables testing
 _jobmon_config = None
 

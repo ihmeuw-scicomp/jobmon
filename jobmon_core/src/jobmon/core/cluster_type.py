@@ -6,12 +6,12 @@ import importlib
 import pkgutil
 from typing import Any, Dict, Type
 
+import jobmon.plugins
 from jobmon.core.cluster_protocol import (
     ClusterDistributor,
     ClusterQueue,
     ClusterWorkerNode,
 )
-import jobmon.plugins
 
 
 class ClusterType:

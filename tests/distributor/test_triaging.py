@@ -1,17 +1,16 @@
-import pytest
-from sqlalchemy.orm import Session
-from sqlalchemy import select, update
 from unittest import mock
 
-from jobmon.core.constants import TaskInstanceStatus
-from jobmon.client.workflow_run import WorkflowRunFactory
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
-from jobmon.distributor.distributor_service import DistributorService
-from jobmon.plugins.multiprocess.multiproc_distributor import (
-    MultiprocessDistributor,
-)
-from jobmon.server.web._compat import subtract_time
+import pytest
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session
+
 from jobmon.client.api import Tool
+from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.workflow_run import WorkflowRunFactory
+from jobmon.core.constants import TaskInstanceStatus
+from jobmon.distributor.distributor_service import DistributorService
+from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
+from jobmon.server.web._compat import subtract_time
 from jobmon.server.web.models import load_model
 
 load_model()

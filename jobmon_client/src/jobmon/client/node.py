@@ -10,7 +10,6 @@ from jobmon.client.task_template_version import TaskTemplateVersion
 from jobmon.core.constants import SpecialChars
 from jobmon.core.requester import Requester
 
-
 logger = logging.getLogger(__name__)
 
 

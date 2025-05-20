@@ -1,15 +1,15 @@
 """Routes for TaskTemplates."""
 
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict
+from typing import Any, Dict, cast
 
-from fastapi import Request
 import sqlalchemy
+import structlog
+from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.core import constants
 from jobmon.server.web.db import get_sessionmaker

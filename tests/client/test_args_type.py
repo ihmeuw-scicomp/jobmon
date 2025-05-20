@@ -1,8 +1,8 @@
-import pytest
 import os
-import numpy as np
 
-from jobmon.core.constants import WorkflowRunStatus
+import numpy as np
+import pytest
+
 from jobmon.client.api import Tool
 
 

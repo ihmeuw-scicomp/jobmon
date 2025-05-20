@@ -10,7 +10,6 @@ from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 
-
 SessionMaker = get_sessionmaker()
 
 

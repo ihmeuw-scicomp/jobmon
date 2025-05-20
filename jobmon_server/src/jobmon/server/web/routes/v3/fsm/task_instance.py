@@ -2,15 +2,15 @@
 
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, DefaultDict, Dict, Optional
+from typing import Any, DefaultDict, Dict, Optional, cast
 
-from fastapi import Request
 import sqlalchemy
+import structlog
+from fastapi import Request
 from sqlalchemy import and_, select, update
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition
@@ -23,7 +23,6 @@ from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import ServerError
-
 
 logger = structlog.get_logger(__name__)
 SessionMaker = get_sessionmaker()

@@ -1,12 +1,12 @@
 """Routes used by the main jobmon client."""
 
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict
+from typing import Any, Dict, cast
 
+import structlog
 from fastapi import Request
 from sqlalchemy import insert, select
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.server.web.db import get_dialect_name, get_sessionmaker
 from jobmon.server.web.models.node import Node

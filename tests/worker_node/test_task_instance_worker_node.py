@@ -3,13 +3,13 @@ import os
 import random
 import time
 from typing import Dict
-
 from unittest.mock import patch
+
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.cluster import Cluster
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
@@ -19,9 +19,8 @@ from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistri
 from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 from jobmon.server.web.models import load_model
 from jobmon.server.web.models.task_instance import TaskInstance
-from jobmon.worker_node.worker_node_task_instance import WorkerNodeTaskInstance
 from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
-
+from jobmon.worker_node.worker_node_task_instance import WorkerNodeTaskInstance
 
 load_model()
 

@@ -1,14 +1,13 @@
 import pytest
+from mock import PropertyMock, patch
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from jobmon.core.constants import WorkflowRunStatus, WorkflowStatus
+from jobmon.server import __version__
 from jobmon.server.web.models import load_model
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun as WFR
-from mock import patch, PropertyMock
-
-from jobmon.core.constants import WorkflowRunStatus, WorkflowStatus
-from jobmon.server import __version__
 
 load_model()
 
@@ -224,8 +223,8 @@ def test_halted_state(db_engine, requester_no_retry, tool, sleepy_task_template)
 
 
 def test_aborted_state(db_engine, requester_no_retry, tool, sleepy_task_template):
-    from jobmon.server.workflow_reaper.workflow_reaper import WorkflowReaper
     from jobmon.client.workflow_run import WorkflowRun
+    from jobmon.server.workflow_reaper.workflow_reaper import WorkflowReaper
 
     # create a workflow without binding the tasks. log a heartbeat so it doesn't get reaped
     task = sleepy_task_template.create_task(sleep=10)
@@ -281,8 +280,8 @@ def test_aborted_state(db_engine, requester_no_retry, tool, sleepy_task_template
 
 
 def test_reaper_version(db_engine, requester_no_retry, tool, sleepy_task_template):
-    from jobmon.server.workflow_reaper.workflow_reaper import WorkflowReaper
     from jobmon.client.workflow_run import WorkflowRun
+    from jobmon.server.workflow_reaper.workflow_reaper import WorkflowReaper
 
     # create a workflow without binding the tasks. log a heartbeat so it doesn't get reaped
     task = sleepy_task_template.create_task(sleep=10)

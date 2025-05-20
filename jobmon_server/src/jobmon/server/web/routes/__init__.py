@@ -1,7 +1,7 @@
 """Routes used by task instances on worker nodes."""
 
-from http import HTTPStatus as StatusCodes
 import os
+from http import HTTPStatus as StatusCodes
 from typing import Any
 
 from fastapi.responses import JSONResponse

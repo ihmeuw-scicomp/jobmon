@@ -2,10 +2,10 @@
 
 import datetime
 
+import structlog
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-import structlog
 
 from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.core.serializers import SerializeWorkflowRun
@@ -14,7 +14,6 @@ from jobmon.server.web._compat import add_time
 from jobmon.server.web.models import Base
 from jobmon.server.web.models.workflow_run_status import WorkflowRunStatus
 from jobmon.server.web.models.workflow_status import WorkflowStatus
-
 
 logger = structlog.get_logger(__name__)
 

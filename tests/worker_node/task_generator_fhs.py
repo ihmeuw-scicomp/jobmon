@@ -1,7 +1,6 @@
 import ast
-
-from typing import Optional, Callable, List, Any, Union
 import os
+from typing import Any, Callable, List, Optional, Union
 
 from jobmon.core.task_generator import task_generator
 

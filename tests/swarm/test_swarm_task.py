@@ -2,9 +2,9 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from jobmon.core.constants import WorkflowRunStatus
-from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.workflow_run import WorkflowRunFactory
+from jobmon.core.constants import WorkflowRunStatus
 
 
 @pytest.mark.parametrize(

@@ -42,7 +42,7 @@ from typing import Any, Dict, Tuple, Type
 
 from dns import resolver
 from sqlalchemy import create_engine, event, exc
-from sqlalchemy.engine import Engine, make_url, URL
+from sqlalchemy.engine import URL, Engine, make_url
 from sqlalchemy.engine.interfaces import DBAPIConnection, Dialect
 from sqlalchemy.pool import _ConnectionRecord
 

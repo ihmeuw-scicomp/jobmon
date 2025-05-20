@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from importlib.metadata import version
 import logging
+from importlib.metadata import version
 from typing import Type
 
 from jobmon.core.cluster_protocol import (

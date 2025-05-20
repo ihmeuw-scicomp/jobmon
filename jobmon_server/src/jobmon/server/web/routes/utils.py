@@ -1,8 +1,8 @@
 from typing import Any, List, Mapping
 
+import structlog
 from fastapi import HTTPException
 from starlette.requests import Request
-import structlog
 from typing_extensions import TypedDict
 
 from jobmon.core.configuration import JobmonConfig

@@ -3,4 +3,8 @@ members = [
     "jobmon_client",
     "jobmon_core",
     "jobmon_server"
-] 
+]
+
+[tool.isort]
+profile = "black"
+line_length = 88 # Usually black's default, but good to be explicit 

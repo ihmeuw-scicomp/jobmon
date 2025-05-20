@@ -1,25 +1,18 @@
 """Routes for TaskTemplate."""
 
+import json
 from decimal import Decimal
 from http import HTTPStatus as StatusCodes
-import json
-from typing import (
-    Any,
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    Union,
-)
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from fastapi import HTTPException, Query, Request
 import numpy as np
 import pandas as pd
+import structlog
+from fastapi import HTTPException, Query, Request
 from scipy import stats as st  # type: ignore
-from sqlalchemy import func, Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.engine import Row
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
 from jobmon.server.web.db import get_dialect_name, get_sessionmaker

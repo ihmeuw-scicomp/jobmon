@@ -1,15 +1,21 @@
 repos:
 -   repo: local
     hooks:
+    -   id: nox-format
+        name: Nox Format
+        entry: nox -r -s format
+        language: system
+        types: [python]
+        pass_filenames: false
     -   id: nox-lint
         name: Nox Lint
-        entry: nox -s lint
+        entry: nox -r -s lint
         language: system
         types: [python]
         pass_filenames: false
     -   id: nox-typecheck
         name: Nox Typecheck
-        entry: nox -s typecheck
+        entry: nox -r -s typecheck
         language: system
         types: [python]
-        pass_filenames: false 
+        pass_filenames: false

@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import ast
-from collections import deque
-from datetime import datetime
 import json
 import logging
 import numbers
 import time
+from collections import deque
+from datetime import datetime
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -17,7 +18,6 @@ from typing import (
     List,
     Optional,
     Set,
-    TYPE_CHECKING,
     Union,
 )
 

@@ -1,7 +1,7 @@
 import pytest
 
 from jobmon.client.api import Tool
-from jobmon.client.workflow_run import WorkflowRunFactory, WorkflowRun
+from jobmon.client.workflow_run import WorkflowRun, WorkflowRunFactory
 from jobmon.core.constants import WorkflowRunStatus
 from jobmon.core.exceptions import WorkflowNotResumable
 

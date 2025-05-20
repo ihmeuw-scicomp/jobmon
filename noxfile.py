@@ -33,7 +33,7 @@ def tests(session: Session) -> None:
     )
 
 
-@nox.session(python=python, venv_backend="venv")
+@nox.session(venv_backend="venv")
 def lint(session: Session) -> None:
     """Lint code using various plugins.
 
@@ -53,21 +53,33 @@ def lint(session: Session) -> None:
         "install",
         "flake8",
         "flake8-annotations",
-        "flake8-import-order",
         "flake8-docstrings",
         "flake8-black"
     )
     session.run("flake8", *args)
 
 
-@nox.session(python=python, venv_backend="venv")
-def black(session):
+@nox.session(venv_backend="venv")
+def format(session):
     args = session.posargs or src_locations + test_locations
-    session.run("uv", "pip", "install", "black")
+    session.run(
+        "uv", "pip", "install", 
+        "black", 
+        "isort", 
+        "autoflake"
+    )
+    session.run(
+        "autoflake",
+        "--in-place",
+        "--remove-all-unused-imports",
+        "--recursive",
+        *args
+    )
+    session.run("isort", *args) 
     session.run("black", *args)
 
 
-@nox.session(python=python, venv_backend="venv")
+@nox.session(venv_backend="venv")
 def typecheck(session: Session) -> None:
     """Type check code."""
     args = session.posargs or src_locations
@@ -93,7 +105,7 @@ def typecheck(session: Session) -> None:
     session.run("mypy", "--explicit-package-bases", *args)
 
 
-@nox.session(python=python, venv_backend="venv")
+@nox.session(venv_backend="venv")
 def schema_diagram(session: Session) -> None:
     session.run("uv", "pip", "install", "-e", "./jobmon_server")
     outpath = Path(__file__).parent / "docsource" / "developers_guide" / "diagrams" / "erd.svg"
@@ -123,7 +135,7 @@ def schema_diagram(session: Session) -> None:
         session.run("cp", "erd.svg", str(outpath))
 
 
-@nox.session(python=python, venv_backend="venv")
+@nox.session(venv_backend="venv")
 def build(session: Session) -> None:
     args = session.posargs or src_locations
     session.run("uv", "pip", "install", "build")
@@ -133,7 +145,7 @@ def build(session: Session) -> None:
         session.run("python", "-m", "build", "--outdir", "dist", namespace_dir)
 
 
-@nox.session(python=python, venv_backend="venv")
+@nox.session(venv_backend="venv")
 def clean(session: Session) -> None:
     dirs_to_remove = ['out', 'dist', 'build', ".eggs",
                       '.pytest_cache', 'docsource/api', '.mypy_cache']
@@ -152,7 +164,7 @@ def clean(session: Session) -> None:
             os.remove(file)
 
 
-@nox.session(python=python, venv_backend="venv")
+@nox.session(venv_backend="venv")
 def build_gui_test_env(session: Session) -> None:
     session.run("uv", "pip", "install", "mysqlclient")
     if os.path.exists("/tmp/tests.sqlite"):

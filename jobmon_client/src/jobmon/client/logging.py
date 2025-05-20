@@ -7,7 +7,6 @@ import logging.config
 import sys
 from typing import Dict, Optional, Type
 
-
 _DEFAULT_LOG_FORMAT = (
     "%(asctime)s [%(name)-12s] %(module)s %(levelname)-8s: %(message)s"
 )
