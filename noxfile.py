@@ -11,10 +11,8 @@ from nox.sessions import Session
 src_locations = ["jobmon_client/src", "jobmon_core/src", "jobmon_server/src"]
 test_locations = ["tests"]
 
-python = "3.10"
 
-
-@nox.session(python=python, venv_backend="venv")
+@nox.session(venv_backend="venv")
 def tests(session: Session) -> None:
     """Run the test suite."""
     session.run("uv", "pip", "install", "pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock")
