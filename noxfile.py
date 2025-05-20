@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 import shutil
 import tempfile
-from time import sleep
 
 import nox
 from nox.sessions import Session
@@ -15,11 +14,11 @@ test_locations = ["tests"]
 python = "3.10"
 
 
-@nox.session(python=python, venv_backend="conda")
+@nox.session(python=python, venv_backend="venv")
 def tests(session: Session) -> None:
     """Run the test suite."""
-    session.install("pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock")
-    session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
+    session.run("uv", "pip", "install", "pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
+    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
 
     args = session.posargs or test_locations
 
@@ -33,7 +32,7 @@ def tests(session: Session) -> None:
     )
 
 
-@nox.session(python=python, venv_backend="conda")
+@nox.session(python=python, venv_backend="venv")
 def lint(session: Session) -> None:
     """Lint code using various plugins.
 
@@ -47,38 +46,59 @@ def lint(session: Session) -> None:
     # TODO: work these in over time?
     # "darglint",
     # "flake8-bandit"
-    session.install(
+    session.run(
+        "uv",
+        "pip",
+        "install",
         "flake8",
         "flake8-annotations",
         "flake8-import-order",
         "flake8-docstrings",
-        "flake8-black"
+        "flake8-black",
+        "--extra-index-url",
+        "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple"
     )
     session.run("flake8", *args)
 
 
-@nox.session(python=python, venv_backend="conda")
+@nox.session(python=python, venv_backend="venv")
 def black(session):
     args = session.posargs or src_locations + test_locations
-    session.install("black")
+    session.run("uv", "pip", "install", "black", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
     session.run("black", *args)
 
 
-@nox.session(python=python, venv_backend="conda")
+@nox.session(python=python, venv_backend="venv")
 def typecheck(session: Session) -> None:
     """Type check code."""
     args = session.posargs or src_locations
-    session.install("mypy", "types-Flask", "types-requests", "types-PyMySQL", "types-filelock",
-                    "types-PyYAML", "types-tabulate", "types-psutil", "types-Flask-Cors",
-                    "types-sqlalchemy-utils", "types-setuptools", "types-mysqlclient")
-    session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
+    session.run(
+        "uv",
+        "pip",
+        "install",
+        "mypy",
+        "types-Flask",
+        "types-requests",
+        "types-PyMySQL",
+        "types-filelock",
+        "types-PyYAML",
+        "types-tabulate",
+        "types-psutil",
+        "types-Flask-Cors",
+        "types-sqlalchemy-utils",
+        "types-setuptools",
+        "types-mysqlclient",
+        "--extra-index-url",
+        "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple"
+    )
+    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
 
     session.run("mypy", "--explicit-package-bases", *args)
 
 
-@nox.session(python=python, venv_backend="conda")
+@nox.session(python=python, venv_backend="venv")
 def schema_diagram(session: Session) -> None:
-    session.install("-e", "./jobmon_server")
+    session.run("uv", "pip", "install", "-e", "./jobmon_server", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
     outpath = Path(__file__).parent / "docsource" / "developers_guide" / "diagrams" / "erd.svg"
     with tempfile.TemporaryDirectory() as tmpdir:
         session.chdir(tmpdir)
@@ -106,17 +126,17 @@ def schema_diagram(session: Session) -> None:
         session.run("cp", "erd.svg", str(outpath))
 
 
-@nox.session(python=python, venv_backend="conda")
+@nox.session(python=python, venv_backend="venv")
 def build(session: Session) -> None:
     args = session.posargs or src_locations
-    session.install("build")
+    session.run("uv", "pip", "install", "build", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
 
     for src_dir in args:
         namespace_dir = str(Path(src_dir).parent)
         session.run("python", "-m", "build", "--outdir", "dist", namespace_dir)
 
 
-@nox.session(python=python, venv_backend="conda")
+@nox.session(python=python, venv_backend="venv")
 def clean(session: Session) -> None:
     dirs_to_remove = ['out', 'dist', 'build', ".eggs",
                       '.pytest_cache', 'docsource/api', '.mypy_cache']
@@ -135,9 +155,9 @@ def clean(session: Session) -> None:
             os.remove(file)
 
 
-@nox.session(python=python, venv_backend="conda")
+@nox.session(python=python, venv_backend="venv")
 def build_gui_test_env(session: Session) -> None:
-    session.conda_install("mysqlclient", "--channel", "conda-forge")
+    session.run("uv", "pip", "install", "mysqlclient", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
     if os.path.exists("/tmp/tests.sqlite"):
         os.remove("/tmp/tests.sqlite")
-    session.install("-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
+    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server", "--extra-index-url", "https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple")
