@@ -190,7 +190,7 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
         # Merge user-supplied connect_args into the parameters
         if user_connect_args:
             cparams.update(user_connect_args)
-            logger.info(
+            logger.debug(
                 "Updated connection params with user args: %s", user_connect_args
             )
 
@@ -199,13 +199,13 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
             raise RuntimeError(
                 f"Could not determine DBAPI module for dialect {minimal_dialect.name}"
             )
+        logger.info(f"Successfully created DNS-aware engine for {url}.")
+        if user_connect_args:
+            logger.debug(f"Applied user_connect_args: {user_connect_args}")
         return module.connect(*cargs, **cparams)
 
     # Prevent SQLAlchemy from doing its own DNS look-up.
     placeholder = url.set(host="127.0.0.1", port=url.port or 1)
-
-    # Debug logging to see what parameters are being passed to the engine
-    logger.error(f"ENGINE KWARGS: {engine_kwargs}")
 
     engine = create_engine(
         str(placeholder),

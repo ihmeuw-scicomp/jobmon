@@ -52,47 +52,91 @@ For comprehensive documentation, visit [readthedocs](https://jobmon.readthedocs.
 
 ## Developer Setup
 
-To contribute to JobMon, you'll need to set up a local development environment. This project uses `uv` for package management and `nox` for task automation.
+Contributing to JobMon? Here's how to set up your environment. This project utilizes `uv` for Python package management, Docker for containerization, and Nox for task automation. The root `pyproject.toml` defines the workspace structure for `uv`.
 
+**Prerequisites:**
 1.  **Clone the repository:**
     ```bash
     git clone https://github.com/your-org/jobmon.git # Replace with your actual repo URL
     cd jobmon
     ```
+2.  **Install `uv`:**
+    Follow the official `uv` installation instructions (e.g., `pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`).
 
-2.  **Install uv:**
-    Follow the official installation instructions for `uv` (e.g., `pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`).
-
-3.  **Configure IHME Artifactory Index:**
-    JobMon dependencies may be hosted on the IHME Artifactory. You need to configure `uv` (and `pip`) to use this index. The recommended way is to create or update your `pip.conf` file:
+**Configuring IHME Artifactory Index (Conditional):**
+This step is **crucial if you plan to generate or update `uv.lock` files** (e.g., using `nox -s update_locks`, or `uv pip compile` commands). If you are only using existing `uv.lock` files for tasks like running tests or linting, and all dependencies are publicly mirrored or vendored, you might not need this.
+*   The recommended way is to create or update your `pip.conf` file:
     *   Linux/macOS: `~/.config/pip/pip.conf` (preferred) or `~/.pip/pip.conf`
     *   Windows: `%APPDATA%\pip\pip.ini` or `%USERPROFILE%\pip\pip.ini`
-
-    Add the following content:
+*   Add the following content:
     ```ini
     [global]
     extra-index-url = https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple
     # trusted-host = artifactory.ihme.washington.edu # May be needed if not HTTPS or cert issues
     ```
-    Alternatively, you can set the `UV_EXTRA_INDEX_URL` environment variable:
+*   Alternatively, set the `UV_EXTRA_INDEX_URL` environment variable specifically when needed:
     ```bash
     export UV_EXTRA_INDEX_URL="https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple"
     ```
 
-4.  **Set up a sub-project (e.g., `jobmon_client`):
-    ```bash
-    cd jobmon_client  # Or jobmon_core, jobmon_server
-    uv venv .venv     # Create a virtual environment
-    source .venv/bin/activate # Activate the environment (use .venv\Scripts\activate on Windows)
-    uv pip sync uv.lock       # Install dependencies from the lock file
-    ```
+**Development Workflows:**
 
-5.  **Run Nox sessions:**
-    Nox is used for linting, testing, etc. From the repository root:
-    ```bash
-    nox -s tests lint # Example: run tests and linters
-    # List available sessions with: nox -l
-    ```
+Choose one of the following workflows:
+
+1.  **Nox Workflow Automation (Recommended):**
+    Nox (via `noxfile.py`) provides the most straightforward way to manage common development tasks. It uses `uv` to create isolated environments, ensuring consistency.
+    *   **Setup:**
+        *   Install Nox: `uv pip install nox` (or `pip install nox`).
+    *   **Usage:**
+        *   List available sessions: `nox -l`
+        *   Run specific sessions: `nox -s tests lint format`
+        *   The `nox -s update_locks` session requires the IHME Artifactory Index configuration (see above).
+    *   Refer to the "Nox Sessions" section below for a detailed list of available commands and their functions.
+
+2.  **Docker-based Development:**
+    Use Docker and the provided `docker-compose.yml` for a fully containerized development environment. This is ideal for ensuring consistency across different machines or for mimicking production-like setups.
+    *   **Setup:**
+        *   Ensure Docker and Docker Compose are installed.
+        *   (Optional) Create a `.env` file in the root directory if specific environment variables are needed for the services (e.g., database configurations). The `docker-compose.yml` references an `.env` file.
+    *   **Services defined in `docker-compose.yml`:**
+        *   `jobmon_backend`: Runs the FastAPI server (from `jobmon_server`) with hot reloading. Code from `jobmon_core` and `jobmon_server` is mounted.
+        *   `jobmon_frontend`: Runs the GUI (from `jobmon_gui`). Source code is mounted.
+    *   **Usage:**
+        *   Start all services: `docker-compose up` (add `-d` for detached mode).
+        *   Stop services: `docker-compose down`.
+        *   View logs for a specific service: `docker-compose logs jobmon_backend`.
+
+3.  **Manual `uv` Workspace Setup (for IDEs or Custom Workflows):**
+    If you prefer a single, manually managed Python environment for the entire workspace:
+    *   **Setup:**
+        1.  Ensure `uv` is installed.
+        2.  Configure the IHME Artifactory Index (see above) if you plan to modify dependencies or (re)generate lock files.
+        3.  From the repository root, create and activate a virtual environment:
+            ```bash
+            uv venv .venv
+            source .venv/bin/activate  # Or .venv\Scripts\activate on Windows
+            ```
+        4.  Install all workspace projects in editable mode:
+            ```bash
+            uv pip install -e ./jobmon_core -e ./jobmon_client -e ./jobmon_server
+            ```
+            This installs the sub-projects and their direct dependencies as defined in their respective `pyproject.toml` files, using your local source code. This setup works seamlessly because the individual `pyproject.toml` files (e.g., in `jobmon_client`) use `[tool.uv.sources] <dependency_name> = { workspace = true }` to instruct `uv` to use the local versions of other workspace packages. For most development tasks (testing, linting, etc.), using the Nox workflow (Option 1) is still recommended as it handles isolated environments and tool installations more robustly.
+
+### Nox Sessions
+
+The `noxfile.py` in this project defines several sessions for common development tasks:
+
+*   `nox -s tests`: Runs the test suite using pytest.
+*   `nox -s lint`: Lints the codebase using flake8 and associated plugins to check for style, import order, docstrings, and annotations.
+*   `nox -s format`: Formats the code using black (for code style), isort (for import sorting), and autoflake (to remove unused imports).
+*   `nox -s typecheck`: Performs static type checking using mypy.
+*   `nox -s schema_diagram`: Generates an Entity Relationship Diagram (ERD) for the database schema using schemacrawler and Docker. The output is saved to `docsource/developers_guide/diagrams/erd.svg`.
+*   `nox -s build`: Builds the Python packages for each sub-project (`jobmon_client`, `jobmon_core`, `jobmon_server`).
+*   `nox -s clean`: Removes all build artifacts, caches (like `.pytest_cache`, `.mypy_cache`), `.egg-info` directories, and virtual environments (`.venv`).
+*   `nox -s build_gui_test_env`: Prepares the environment for GUI testing by installing necessary dependencies and setting up a test database.
+*   `nox -s update_locks`: Generates/updates `uv.lock` files for all sub-projects (`jobmon_core`, `jobmon_client`, `jobmon_server`) based on their `pyproject.toml` files. This ensures reproducible dependencies. **Requires the IHME Artifactory index to be configured (see step 3 under Developer Setup) if private packages are needed.**
+
+You can run a specific session using `nox -s <session_name>`. To list all available sessions, use `nox -l`.
 
 ## Usage
 

@@ -145,21 +145,69 @@ def build(session: Session) -> None:
 
 @nox.session(venv_backend="venv")
 def clean(session: Session) -> None:
-    dirs_to_remove = ['out', 'dist', 'build', ".eggs",
-                      '.pytest_cache', 'docsource/api', '.mypy_cache']
-    egg_info = glob.glob("jobmon_*/src/*.egg-info")
-    dirs_to_remove.extend(egg_info)
-    builds = glob.glob("jobmon_*/build")
-    dirs_to_remove.extend(builds)
+    """Clean up all build artifacts, caches, and local virtual environments."""
+    session.log("Removing build artifacts, caches, and .egg-info directories...")
+    dirs_to_remove = [
+        'out', 'dist', '.eggs',
+        '.pytest_cache', 'docsource/api', '.mypy_cache',
+        '.venv',  # If you have a root .venv
+    ]
+    
+    # Add sub-project specific .venv directories
+    for project_root_name in ["jobmon_client", "jobmon_core", "jobmon_server"]:
+        project_path = Path(project_root_name)
+        if project_path.is_dir(): # Ensure the base project dir exists
+            venv_path = project_path / ".venv"
+            if venv_path.exists() and venv_path.is_dir():
+                dirs_to_remove.append(str(venv_path))
 
-    for path in dirs_to_remove:
-        if os.path.exists(path):
-            shutil.rmtree(path)
+    # Broader .egg-info and build patterns
+    # Using Path.rglob to find these recursively might be more robust
+    # For simplicity, keeping glob for now but being more specific
+    # Add root patterns first
+    if Path("build").exists(): dirs_to_remove.append("build")
+    if Path(".coverage").exists(): os.remove(".coverage") # direct file removal
+    if Path(".test_report.xml").exists(): os.remove(".test_report.xml") # direct file removal
 
-    files_to_remove = ['test_report.xml', '.coverage']
-    for file in files_to_remove:
-        if os.path.exists(file):
-            os.remove(file)
+    # Using rglob for .egg-info, jobmon_*/build, etc.
+    repo_root = Path(".")
+    for egg_info_path in repo_root.rglob("*.egg-info"):
+        if egg_info_path.is_dir():
+            dirs_to_remove.append(str(egg_info_path))
+    
+    for build_dir_path in repo_root.glob("jobmon_*/build"):
+        if build_dir_path.is_dir():
+            dirs_to_remove.append(str(build_dir_path))
+
+    # Remove duplicate strings that might have been added
+    unique_dirs_to_remove = sorted(list(set(dirs_to_remove)))
+
+    for path_str in unique_dirs_to_remove:
+        path_obj = Path(path_str)
+        if path_obj.exists():
+            if path_obj.is_dir():
+                session.log(f"Removing directory: {path_obj}")
+                shutil.rmtree(path_obj, ignore_errors=True)
+            elif path_obj.is_file(): # Should not happen with current list, but good practice
+                session.log(f"Removing file: {path_obj}")
+                try:
+                    path_obj.unlink()
+                except OSError as e:
+                    session.warn(f"Could not remove file {path_obj}: {e}")
+    
+    # Files that might not be caught by directory removals or are at root
+    session.log("Removing specific root files if they exist...")
+    files_at_root_to_remove = ['.test_report.xml', '.coverage']
+    for file_str in files_at_root_to_remove:
+        file_obj = Path(file_str)
+        if file_obj.exists() and file_obj.is_file():
+            session.log(f"Removing file: {file_obj}")
+            try:
+                file_obj.unlink()
+            except OSError as e:
+                session.warn(f"Could not remove file {file_obj}: {e}")
+
+    session.log("Clean-up finished.")
 
 
 @nox.session(venv_backend="venv")
@@ -168,3 +216,50 @@ def build_gui_test_env(session: Session) -> None:
     if os.path.exists("/tmp/tests.sqlite"):
         os.remove("/tmp/tests.sqlite")
     session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
+
+
+# New session to update uv.lock files
+@nox.session(venv_backend="venv") # Runs with the Python nox is invoked with, uv handles target Python for compile
+def update_locks(session: Session) -> None:
+    """Generate uv.lock files for all sub-projects."""
+    session.install("uv")
+
+    # Ensure UV_EXTRA_INDEX_URL is set in the environment
+    # For example, export UV_EXTRA_INDEX_URL=https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple
+    extra_index_url = os.environ.get("UV_EXTRA_INDEX_URL")
+    if not extra_index_url:
+        session.warn(
+            "UV_EXTRA_INDEX_URL environment variable is not set. "
+            "Lock file generation might fail or miss private packages."
+        )
+        # Optionally, you could make this an error: session.error("UV_EXTRA_INDEX_URL is required")
+        # Or proceed, and let uv fail if the index is truly needed and not found in global pip.conf
+
+    python_target_version = "3.12" # Align with production Dockerfile Python version
+    compile_args = [
+        "--all-extras",
+        f"--python={python_target_version}"
+    ]
+    if extra_index_url:
+        compile_args.extend(["--extra-index-url", extra_index_url])
+
+    projects = {
+        "jobmon_core": "jobmon_core/pyproject.toml",
+        "jobmon_client": "jobmon_client/pyproject.toml",
+        "jobmon_server": "jobmon_server/pyproject.toml",
+    }
+
+    session.log(
+        "Compiling lock files for each project. UV will use the `[tool.uv.sources]` "
+        "declarations in individual `pyproject.toml` files to resolve local workspace "
+        "dependencies correctly."
+    )
+    for _, pyproject_path in projects.items():
+        lock_path = str(Path(pyproject_path).parent / "uv.lock")
+        session.log(f"Generating {lock_path} from {pyproject_path}...")
+        session.run(
+            "uv", "pip", "compile", pyproject_path, 
+            "-o", lock_path, 
+            *compile_args
+        )
+    session.log("All uv.lock files updated successfully.")
