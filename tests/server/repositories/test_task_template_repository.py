@@ -64,29 +64,27 @@ def task_template_repo_real_session(
 def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
     """Fixture to populate the database with data for resource detail tests."""
     # Tool
-    tool = Tool(id=1, name="test_tool")
+    tool = Tool(name="test_tool")
     dbsession.add(tool)
     dbsession.commit()
 
     # ToolVersion
-    tool_version = ToolVersion(id=1, tool_id=tool.id)
+    tool_version = ToolVersion(tool_id=tool.id)
     dbsession.add(tool_version)
     dbsession.commit()
 
     # Task Template
-    task_template = TaskTemplate(id=1, name="test_tt", tool_version_id=tool_version.id)
+    task_template = TaskTemplate(name="test_tt", tool_version_id=tool_version.id)
     dbsession.add(task_template)
     dbsession.commit()
 
     # Task Template Version
     ttv1 = TaskTemplateVersion(
-        id=1,
         task_template_id=task_template.id,
         command_template="echo hello",
         arg_mapping_hash="dummy_hash_123",
     )
     ttv2 = TaskTemplateVersion(  # For testing with multiple TTVs if needed later
-        id=2,
         task_template_id=task_template.id,
         command_template="echo world",
         arg_mapping_hash="dummy_hash_456",
@@ -96,18 +94,15 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
 
     # Nodes for ttv1
     node1_ttv1 = Node(
-        id=10,
         task_template_version_id=ttv1.id,
         node_args_hash="node_hash_ttv1_1",
     )
     node2_ttv1 = Node(
-        id=11,
         task_template_version_id=ttv1.id,
         node_args_hash="node_hash_ttv1_2",
     )
     # Node for ttv2 (for future isolation tests or different scenarios)
     node1_ttv2 = Node(
-        id=12,
         task_template_version_id=ttv2.id,
         node_args_hash="node_hash_ttv2_1",
     )
@@ -115,8 +110,8 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
     dbsession.commit()
 
     # Args for node_args filtering
-    arg1 = Arg(id=1, name="country")
-    arg2 = Arg(id=2, name="city")
+    arg1 = Arg(name="country")
+    arg2 = Arg(name="city")
     dbsession.add_all([arg1, arg2])
     dbsession.commit()
 
@@ -130,14 +125,13 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
     dbsession.commit()
 
     # Dag
-    dag1 = Dag(id=1, hash="dag_hash_1")
-    dag2 = Dag(id=2, hash="dag_hash_2")  # For workflow filtering
+    dag1 = Dag(hash="dag_hash_1")
+    dag2 = Dag(hash="dag_hash_2")  # For workflow filtering
     dbsession.add_all([dag1, dag2])
     dbsession.commit()
 
     # Workflows
     workflow1 = Workflow(
-        id=1,
         tool_version_id=tool_version.id,
         dag_id=dag1.id,
         workflow_args_hash="wf_args_hash_1",
@@ -146,7 +140,6 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
         max_concurrently_running=5,
     )
     workflow2 = Workflow(  # For workflow filtering
-        id=2,
         tool_version_id=tool_version.id,
         dag_id=dag2.id,
         workflow_args_hash="wf_args_hash_2",
@@ -159,30 +152,27 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
 
     # TaskResources must be defined before Tasks that reference them
     tr1_mem1g = TaskResources(
-        id=1,
         requested_resources='{"memory": "1g", "cores": 1}',
         task_resources_type_id="O",
     )
     tr2_mem2g = TaskResources(
-        id=2,
         requested_resources='{"memory": "2g", "cores": 2}',
         task_resources_type_id="O",
     )
     tr3_mem05g = TaskResources(
-        id=3, requested_resources='{"memory": "0.5g"}', task_resources_type_id="O"
+        requested_resources='{"memory": "0.5g"}', task_resources_type_id="O"
     )
     tr4_mem02g = TaskResources(
-        id=4, requested_resources='{"memory": "0.2g"}', task_resources_type_id="O"
+        requested_resources='{"memory": "0.2g"}', task_resources_type_id="O"
     )
     tr5_mem3g_ttv2 = TaskResources(
-        id=5, requested_resources='{"memory": "3g"}', task_resources_type_id="O"
+        requested_resources='{"memory": "3g"}', task_resources_type_id="O"
     )
     dbsession.add_all([tr1_mem1g, tr2_mem2g, tr3_mem05g, tr4_mem02g, tr5_mem3g_ttv2])
     dbsession.commit()
 
     # Tasks (associated with nodes of ttv1)
     task1_n1_ttv1 = Task(
-        id=100,
         node_id=node1_ttv1.id,
         workflow_id=workflow1.id,  # Explicitly set workflow_id
         task_resources_id=tr1_mem1g.id,  # Link to TaskResources
@@ -193,7 +183,6 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
         task_args_hash="task_hash_100",
     )
     task2_n2_ttv1 = Task(
-        id=101,
         node_id=node2_ttv1.id,
         workflow_id=workflow2.id,  # Explicitly set workflow_id (or workflow1 if intended for same wf)
         task_resources_id=tr2_mem2g.id,  # Link to TaskResources
@@ -204,7 +193,6 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
         task_args_hash="task_hash_101",
     )
     task_with_only_running_ti = Task(
-        id=102,
         node_id=node1_ttv1.id,
         workflow_id=workflow1.id,  # Explicitly set workflow_id
         task_resources_id=tr4_mem02g.id,  # Link to appropriate TaskResources
@@ -216,7 +204,6 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
     )
     # Task for node1_ttv2 (should not appear in ttv1 results)
     task1_n1_ttv2 = Task(
-        id=103,
         node_id=node1_ttv2.id,
         workflow_id=workflow1.id,  # Explicitly set workflow_id (adjust if needed for test logic)
         task_resources_id=tr5_mem3g_ttv2.id,  # Link to TaskResources
@@ -232,18 +219,15 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
     dbsession.commit()
 
     # WorkflowRuns
-    wfr1_wf1 = WorkflowRun(id=1, workflow_id=workflow1.id, user="user1", status="D")
-    wfr2_wf2 = WorkflowRun(id=2, workflow_id=workflow2.id, user="user2", status="D")
-    wfr3_wf1_done = WorkflowRun(
-        id=3, workflow_id=workflow1.id, user="user1", status="G"
-    )
+    wfr1_wf1 = WorkflowRun(workflow_id=workflow1.id, user="user1", status="D")
+    wfr2_wf2 = WorkflowRun(workflow_id=workflow2.id, user="user2", status="D")
+    wfr3_wf1_done = WorkflowRun(workflow_id=workflow1.id, user="user1", status="G")
     dbsession.add_all([wfr1_wf1, wfr2_wf2, wfr3_wf1_done])
     dbsession.commit()
 
     # TaskInstances
     # For task1_n1_ttv1 (id=100)
     ti1_task100_attempt1_done = TaskInstance(
-        id=200,
         task_id=task1_n1_ttv1.id,
         workflow_run_id=wfr1_wf1.id,
         status=TaskInstanceStatus.DONE,
@@ -256,7 +240,6 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
         array_batch_num=1,
     )
     ti2_task100_attempt2_error = TaskInstance(
-        id=201,
         task_id=task1_n1_ttv1.id,
         workflow_run_id=wfr1_wf1.id,
         status=TaskInstanceStatus.ERROR,
@@ -269,7 +252,6 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
         array_batch_num=1,
     )
     ti3_task100_attempt3_done_wfr3 = TaskInstance(
-        id=202,
         task_id=task1_n1_ttv1.id,
         workflow_run_id=wfr3_wf1_done.id,
         status=TaskInstanceStatus.DONE,
@@ -284,7 +266,6 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
 
     # For task2_n2_ttv1 (id=101)
     ti4_task101_attempt1_done_wfr2 = TaskInstance(
-        id=203,
         task_id=task2_n2_ttv1.id,
         workflow_run_id=wfr2_wf2.id,
         status=TaskInstanceStatus.DONE,
@@ -297,7 +278,6 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
         array_batch_num=1,
     )
     ti5_task101_attempt2_resource_error_wfr2 = TaskInstance(
-        id=204,
         task_id=task2_n2_ttv1.id,
         workflow_run_id=wfr2_wf2.id,
         status=TaskInstanceStatus.RESOURCE_ERROR,
@@ -312,7 +292,6 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
 
     # For task_with_only_running_ti (id=102) - should NOT be picked up
     ti_running_task102 = TaskInstance(
-        id=205,
         task_id=task_with_only_running_ti.id,
         workflow_run_id=wfr1_wf1.id,
         status=TaskInstanceStatus.RUNNING,
@@ -327,7 +306,6 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
 
     # TI for task on ttv2 (should not appear in ttv1 results)
     ti_task103_ttv2_wfr1 = TaskInstance(
-        id=206,
         task_id=task1_n1_ttv2.id,
         workflow_run_id=wfr1_wf1.id,
         status=TaskInstanceStatus.DONE,
@@ -342,7 +320,6 @@ def resource_details_db_data(dbsession: SQLAlchemySession) -> dict:
 
     # TI for task1_n1_ttv1 which is fatal, should be picked up
     ti6_task100_attempt4_fatal = TaskInstance(
-        id=207,
         task_id=task1_n1_ttv1.id,
         workflow_run_id=wfr1_wf1.id,
         status=TaskInstanceStatus.ERROR_FATAL,
@@ -597,11 +574,11 @@ class TestGetTaskResourceDetails:
             )
 
     @pytest.mark.parametrize(
-        "filter_type, workflow_ids, node_args_filter, expected_key",
+        "filter_type, workflow_id_key, node_args_filter, expected_key",
         [
             (
                 "workflow_filter",
-                [1],  # Corresponds to workflow1 ID
+                "workflow1",  # Key to get workflow1 from fixture
                 None,
                 "expected_task_details_ttv1_wf1_filter",
             ),
@@ -619,13 +596,13 @@ class TestGetTaskResourceDetails:
             ),
             (
                 "workflow_and_node_args_filter",
-                [1],  # workflow1
+                "workflow1",  # Key to get workflow1 from fixture
                 {"country": ["USA"], "city": ["NewYork"]},
                 "expected_task_details_ttv1_wf1_and_node_args_USA_NewYork",
             ),
             (
                 "workflow_filter_no_match",
-                [999],  # Non-existent workflow ID
+                999,  # Non-existent workflow ID (literal value)
                 None,
                 [],  # Expect empty list
             ),
@@ -663,11 +640,22 @@ class TestGetTaskResourceDetails:
         task_template_repo_real_session: TaskTemplateRepository,
         resource_details_db_data: dict,
         filter_type: str,
-        workflow_ids: Optional[List[int]],
+        workflow_id_key: Union[str, int, None],
         node_args_filter: Optional[Dict[str, List[str]]],
         expected_key: Union[str, list],  # Can be a key or an empty list
     ) -> None:
         ttv1 = resource_details_db_data["ttv1"]
+
+        # Resolve workflow IDs dynamically
+        if workflow_id_key is None:
+            workflow_ids = None
+        elif isinstance(workflow_id_key, str):
+            # Get workflow ID from fixture data
+            workflow = resource_details_db_data[workflow_id_key]
+            workflow_ids = [workflow.id]
+        else:
+            # Use literal value (like 999 for non-existent workflow)
+            workflow_ids = [workflow_id_key]
 
         if isinstance(expected_key, str):
             expected_results = resource_details_db_data[expected_key]
@@ -681,7 +669,9 @@ class TestGetTaskResourceDetails:
             node_args=node_args_filter,
         )
 
-        assert len(result) == len(expected_results)
+        assert len(result) == len(
+            expected_results
+        ), f"Failed for {filter_type}: expected {len(expected_results)} results, got {len(result)}"
         result_sorted = sorted(
             result,
             key=lambda x: (x.task_id, x.attempt_number_of_instance or 0, x.r or 0),
