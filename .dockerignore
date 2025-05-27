@@ -1,1 +1,3 @@
 ./.nox
+./.venv
+./node_modules

@@ -32,6 +32,7 @@ dependencies = [
     'authlib',
     'itsdangerous',
     'dnspython',
+    'pydantic',
 ]
 dynamic = ["version"]
 

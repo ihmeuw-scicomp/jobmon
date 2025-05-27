@@ -13,7 +13,7 @@ import TabPanel from "@jobmon_gui/components/common/TabPanel";
 import ClusteredErrors from "@jobmon_gui/components/task_template_details/ClusteredErrors";
 import TaskTable from "@jobmon_gui/components/task_template_details/TaskTable";
 import TaskTemplateHeader from "@jobmon_gui/components/task_template_details/TaskTemplateHeader";
-import Usage from "@jobmon_gui/components/task_template_details/Usage";
+import Usage from "@jobmon_gui/components/task_template_details/usage/Usage";
 import {getTaskTemplateDetails} from "@jobmon_gui/queries/GetTaskTemplateDetails.ts";
 import {getWorkflowDetailsQueryFn} from "@jobmon_gui/queries/GetWorkflowDetails.ts";
 import {getWorkflowTTStatusQueryFn} from "@jobmon_gui/queries/GetWorkflowTTStatus.ts";
