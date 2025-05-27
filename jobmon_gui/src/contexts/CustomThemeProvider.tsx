@@ -1,7 +1,10 @@
-import React, {PropsWithChildren} from 'react'
-import {createTheme, responsiveFontSizes, ThemeProvider} from '@mui/material/styles';
-import "@fontsource/archivo"
-
+import React, { PropsWithChildren } from 'react';
+import {
+  createTheme,
+  responsiveFontSizes,
+  ThemeProvider,
+} from '@mui/material/styles';
+import '@fontsource/archivo';
 
 declare module '@mui/material/styles' {
   interface TypographyVariants {
@@ -21,8 +24,7 @@ declare module '@mui/material/Typography' {
   }
 }
 
-
-const CustomThemeProvider = ({children} : PropsWithChildren) => {
+const CustomThemeProvider = ({ children }: PropsWithChildren) => {
   let theme = createTheme({
     palette: {
       primary: {
@@ -38,7 +40,7 @@ const CustomThemeProvider = ({children} : PropsWithChildren) => {
       },
       text: {
         primary: 'rgba(77,77,79,1)',
-        secondary: 'rgba(0,0,0)'
+        secondary: 'rgba(0,0,0)',
       },
       error: {
         light: '#FED3C6',
@@ -63,9 +65,19 @@ const CustomThemeProvider = ({children} : PropsWithChildren) => {
     },
     typography: {
       fontFamily: [
-      'Archivo', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    'sans-serif',].join(','),
+        'Archivo',
+        '-apple-system',
+        'BlinkMacSystemFont',
+        'Segoe UI',
+        'Roboto',
+        'Oxygen',
+        'Ubuntu',
+        'Cantarell',
+        'Fira Sans',
+        'Droid Sans',
+        'Helvetica Neue',
+        'sans-serif',
+      ].join(','),
       banner: {
         fontFamily: 'Archivo',
         fontWeight: 300,
@@ -73,7 +85,7 @@ const CustomThemeProvider = ({children} : PropsWithChildren) => {
         lineHeight: 1.167,
         letterSpacing: '0em',
         color: 'white',
-      }
+      },
     },
   });
   theme = createTheme(theme, {
@@ -90,11 +102,7 @@ const CustomThemeProvider = ({children} : PropsWithChildren) => {
 
   theme = responsiveFontSizes(theme);
 
-  return (
-    <ThemeProvider theme={theme}>
-      {children}
-    </ThemeProvider>
-  )
-}
+  return <ThemeProvider theme={theme}>{children}</ThemeProvider>;
+};
 
-export default CustomThemeProvider
+export default CustomThemeProvider;

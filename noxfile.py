@@ -281,3 +281,98 @@ def generate_api_types(session: Session) -> None:
             f"The backend must be running and accessible at {openapi_schema_path}. "
             f"Original error: {e}"
         )
+
+
+@nox.session(venv_backend="venv")
+def lint_frontend(session: Session) -> None:
+    """Lint frontend TypeScript/React code."""
+    session.log("Running frontend linting...")
+    session.chdir("jobmon_gui")
+    
+    # Check if node_modules exists, if not install dependencies
+    if not Path("node_modules").exists():
+        session.log("Installing frontend dependencies...")
+        session.run("npm", "install", external=True)
+    
+    # Run TypeScript type checking
+    session.log("Running TypeScript type checking...")
+    session.run("npx", "tsc", "--noEmit", external=True)
+    
+    # Run ESLint
+    session.log("Running ESLint...")
+    session.run("npx", "eslint", "src", "--ext", ".ts,.tsx", external=True)
+
+
+@nox.session(venv_backend="venv")
+def typecheck_frontend(session: Session) -> None:
+    """Type check frontend TypeScript code."""
+    session.log("Running frontend type checking...")
+    session.chdir("jobmon_gui")
+    
+    # Check if node_modules exists, if not install dependencies
+    if not Path("node_modules").exists():
+        session.log("Installing frontend dependencies...")
+        session.run("npm", "install", external=True)
+    
+    # Run TypeScript type checking
+    session.run("npx", "tsc", "--noEmit", external=True)
+
+
+@nox.session(venv_backend="venv")
+def format_frontend(session: Session) -> None:
+    """Format frontend TypeScript/React code."""
+    session.log("Running frontend formatting...")
+    session.chdir("jobmon_gui")
+    
+    # Check if node_modules exists, if not install dependencies
+    if not Path("node_modules").exists():
+        session.log("Installing frontend dependencies...")
+        session.run("npm", "install", external=True)
+    
+    # Install prettier if not already installed
+    session.run("npm", "install", "--save-dev", "prettier", external=True)
+    
+    # Run prettier
+    session.run("npx", "prettier", "--write", "src/**/*.{ts,tsx,js,jsx,json,css,md}", external=True)
+
+
+@nox.session(venv_backend="venv")
+def lint_all(session: Session) -> None:
+    """Lint both backend and frontend code."""
+    session.log("Running linting for both backend and frontend...")
+    
+    # Run backend linting
+    session.log("=== Backend Linting ===")
+    session.notify("lint")
+    
+    # Run frontend linting
+    session.log("=== Frontend Linting ===")
+    session.notify("lint_frontend")
+
+
+@nox.session(venv_backend="venv")
+def typecheck_all(session: Session) -> None:
+    """Type check both backend and frontend code."""
+    session.log("Running type checking for both backend and frontend...")
+    
+    # Run backend type checking
+    session.log("=== Backend Type Checking ===")
+    session.notify("typecheck")
+    
+    # Run frontend type checking
+    session.log("=== Frontend Type Checking ===")
+    session.notify("typecheck_frontend")
+
+
+@nox.session(venv_backend="venv")
+def format_all(session: Session) -> None:
+    """Format both backend and frontend code."""
+    session.log("Running formatting for both backend and frontend...")
+    
+    # Run backend formatting
+    session.log("=== Backend Formatting ===")
+    session.notify("format")
+    
+    # Run frontend formatting
+    session.log("=== Frontend Formatting ===")
+    session.notify("format_frontend")

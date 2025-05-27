@@ -4,9735 +4,9735 @@
  */
 
 export interface paths {
-    "/api/auth/oidc/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Login
-         * @description login.
-         *
-         *     Handles user login via OIDC.
-         */
-        get: operations["login_api_auth_oidc_login_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/oidc/auth": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Auth
-         * @description auth.
-         *
-         *     Validates authorization data from OIDC identify provider.
-         */
-        get: operations["auth_api_auth_oidc_auth_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/oidc/userinfo": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Userinfo
-         * @description userinfo.
-         *
-         *     Returns the user's information from the user's session cookie.
-         *     Used to check if the user is logged in.
-         */
-        get: operations["userinfo_api_auth_oidc_userinfo_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/auth/oidc/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Logout
-         * @description logout.
-         *
-         *     Delete the user's session cookie.
-         */
-        get: operations["logout_api_auth_oidc_logout_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/array": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Array
-         * @description Return an array ID by workflow and task template version ID.
-         *
-         *     If not found, bind the array.
-         */
-        post: operations["add_array_api_v3_array_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/array/{array_id}/queue_task_batch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Record Array Batch Num
-         * @description Record a batch number to associate sets of task instances with an array submission.
-         */
-        post: operations["record_array_batch_num_api_v3_array__array_id__queue_task_batch_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/array/{array_id}/transition_to_launched": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Transition Array To Launched
-         * @description Transition TIs associated with an array_id and batch_num to launched.
-         */
-        post: operations["transition_array_to_launched_api_v3_array__array_id__transition_to_launched_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/array/{array_id}/log_distributor_id": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Array Distributor Id
-         * @description Add distributor_id, stderr/stdout paths to the DB for all TIs in an array.
-         */
-        post: operations["log_array_distributor_id_api_v3_array__array_id__log_distributor_id_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/get_array_max_concurrently_running/{task_template_version_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Array Max Concurrently Running
-         * @description Return the maximum concurrency of this array.
-         */
-        get: operations["get_array_max_concurrently_running_api_v3_workflow__workflow_id__get_array_max_concurrently_running__task_template_version_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/array/{array_id}/get_array_max_concurrently_running": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Array Max Concurrently Running
-         * @description Return the maximum concurrency of this array.
-         */
-        get: operations["get_array_max_concurrently_running_api_v3_array__array_id__get_array_max_concurrently_running_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/cluster/{cluster_name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Cluster By Name
-         * @description Get the id, cluster_type_name and connection_parameters of a Cluster.
-         */
-        get: operations["get_cluster_by_name_api_v3_cluster__cluster_name__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/dag": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Dag
-         * @description Add a new dag to the database.
-         *
-         *     Args:
-         *         request: The request object.
-         */
-        post: operations["add_dag_api_v3_dag_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/dag/{dag_id}/edges": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Edges
-         * @description Add edges to the edge table.
-         */
-        post: operations["add_edges_api_v3_dag__dag_id__edges_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/nodes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Nodes
-         * @description Add a chunk of nodes to the database.
-         *
-         *     Args:
-         *         request: The request object.
-         */
-        post: operations["add_nodes_api_v3_nodes_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/cluster/{cluster_id}/queue/{queue_name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Queue By Cluster Queue Names
-         * @description Get the id, name, cluster_name and parameters of a Queue.
-         *
-         *     Based on cluster_name and queue_name.
-         */
-        get: operations["get_queue_by_cluster_queue_names_api_v3_cluster__cluster_id__queue__queue_name__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task/bind_tasks_no_args": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Bind Tasks No Args
-         * @description Bind the task objects to the database.
-         */
-        put: operations["bind_tasks_no_args_api_v3_task_bind_tasks_no_args_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task/bind_task_args": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Bind Task Args
-         * @description Add task args and associated task ids to the database.
-         */
-        put: operations["bind_task_args_api_v3_task_bind_task_args_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task/bind_task_attributes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Bind Task Attributes
-         * @description Add task attributes and associated attribute types to the database.
-         */
-        put: operations["bind_task_attributes_api_v3_task_bind_task_attributes_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task/bind_resources": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Bind Task Resources
-         * @description Add the task resources for a given task.
-         */
-        post: operations["bind_task_resources_api_v3_task_bind_resources_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task/{task_id}/most_recent_ti_error": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Most Recent Ti Error
-         * @description Route to determine the cause of the most recent task_instance's error.
-         *
-         *     Args:
-         *         task_id (int): the ID of the task.
-         *
-         *     Return:
-         *         error message
-         */
-        get: operations["get_most_recent_ti_error_api_v3_task__task_id__most_recent_ti_error_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task/{workflow_id}/set_resume_state": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Set Task Resume State
-         * @description An endpoint to set all tasks to a resumable state for a workflow.
-         *
-         *     Conditioned on the workflow already being in an appropriate resume state.
-         */
-        post: operations["set_task_resume_state_api_v3_task__workflow_id__set_resume_state_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_instance/{task_instance_id}/log_running": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Running
-         * @description Log a task_instance as running.
-         *
-         *     Args:
-         *         task_instance_id: id of the task_instance to log as running
-         *         request: fastapi request object
-         */
-        post: operations["log_running_api_v3_task_instance__task_instance_id__log_running_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_instance/{task_instance_id}/log_report_by": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Ti Report By
-         * @description Log a task_instance as being responsive with a new report_by_date.
-         *
-         *     This is done at the worker node heartbeat_interval rate, so it may not happen at the same
-         *     rate that the reconciler updates batch submitted report_by_dates (also because it causes
-         *     a lot of traffic if all workers are logging report by_dates often compared to if the
-         *     reconciler runs often).
-         *
-         *     Args:
-         *         task_instance_id: id of the task_instance to log
-         *         request: fastapi request object
-         */
-        post: operations["log_ti_report_by_api_v3_task_instance__task_instance_id__log_report_by_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_instance/log_report_by/batch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Ti Report By Batch
-         * @description Log task_instances as being responsive with a new report_by_date.
-         *
-         *     This is done at the worker node heartbeat_interval rate, so it may not happen at the same
-         *     rate that the reconciler updates batch submitted report_by_dates (also because it causes
-         *     a lot of traffic if all workers are logging report by_dates often compared to if the
-         *     reconciler runs often).
-         *
-         *     Args:
-         *         task_instance_id: id of the task_instance to log
-         *         request: fastapi request object
-         */
-        post: operations["log_ti_report_by_batch_api_v3_task_instance_log_report_by_batch_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_instance/{task_instance_id}/log_done": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Done
-         * @description Log a task_instance as done.
-         *
-         *     Args:
-         *         task_instance_id: id of the task_instance to log done
-         *         request: fastapi request object
-         */
-        post: operations["log_done_api_v3_task_instance__task_instance_id__log_done_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_instance/{task_instance_id}/log_error_worker_node": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Error Worker Node
-         * @description Log a task_instance as errored.
-         *
-         *     Args:
-         *         task_instance_id (str): id of the task_instance to log done
-         *         request (Request): fastapi request object
-         */
-        post: operations["log_error_worker_node_api_v3_task_instance__task_instance_id__log_error_worker_node_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_instance/{task_instance_id}/task_instance_error_log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Instance Error Log
-         * @description Route to return all task_instance_error_log entries of the task_instance_id.
-         *
-         *     Args:
-         *         task_instance_id (int): ID of the task instance
-         *
-         *     Return:
-         *         jsonified task_instance_error_log result set
-         */
-        get: operations["get_task_instance_error_log_api_v3_task_instance__task_instance_id__task_instance_error_log_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/get_array_task_instance_id/{array_id}/{batch_num}/{step_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Array Task Instance Id
-         * @description Given an array ID and an index, select a single task instance ID.
-         *
-         *     Task instance IDs that are associated with the array are ordered, and selected by index.
-         *     This route will be called once per array task instance worker node, so must be scalable.
-         */
-        get: operations["get_array_task_instance_id_api_v3_get_array_task_instance_id__array_id___batch_num___step_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_instance/{task_instance_id}/log_no_distributor_id": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log No Distributor Id
-         * @description Log a task_instance_id that did not get an distributor_id upon submission.
-         */
-        post: operations["log_no_distributor_id_api_v3_task_instance__task_instance_id__log_no_distributor_id_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_instance/{task_instance_id}/log_distributor_id": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Distributor Id
-         * @description Log a task_instance's distributor id.
-         *
-         *     Args:
-         *         task_instance_id: id of the task_instance to log
-         *         request: fastapi request object
-         */
-        post: operations["log_distributor_id_api_v3_task_instance__task_instance_id__log_distributor_id_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_instance/{task_instance_id}/log_known_error": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Known Error
-         * @description Log a task_instance as errored.
-         *
-         *     Args:
-         *         task_instance_id (int): id for task instance.
-         *         request (Request): fastapi request object.
-         */
-        post: operations["log_known_error_api_v3_task_instance__task_instance_id__log_known_error_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_instance/{task_instance_id}/log_unknown_error": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Unknown Error
-         * @description Log a task_instance as errored.
-         *
-         *     Args:
-         *         task_instance_id (int): id for task instance
-         *         request (Request): fastapi request object
-         */
-        post: operations["log_unknown_error_api_v3_task_instance__task_instance_id__log_unknown_error_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_instance/instantiate_task_instances": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Instantiate Task Instances
-         * @description Sync status of given task intance IDs.
-         */
-        post: operations["instantiate_task_instances_api_v3_task_instance_instantiate_task_instances_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_template": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Task Template
-         * @description Add a task template for a given tool to the database.
-         */
-        post: operations["get_task_template_api_v3_task_template_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_template/{task_template_id}/versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Template Versions
-         * @description Get the task_template_version.
-         */
-        get: operations["get_task_template_versions_api_v3_task_template__task_template_id__versions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_template/{task_template_id}/add_version": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Task Template Version
-         * @description Add a tool to the database.
-         */
-        post: operations["add_task_template_version_api_v3_task_template__task_template_id__add_version_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_template/id/{task_template_version_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Template Id For Task Template Version
-         * @description Get the task_template_id for a given task_template_version_id.
-         */
-        get: operations["get_task_template_id_for_task_template_version_api_v3_task_template_id__task_template_version_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_resources/{task_resources_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Task Resources
-         * @description Return an task_resources.
-         */
-        post: operations["get_task_resources_api_v3_task_resources__task_resources_id__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/tool": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Tool
-         * @description Add a tool to the database.
-         */
-        post: operations["add_tool_api_v3_tool_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/tool/{tool_id}/tool_versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Tool Versions
-         * @description Get the Tool Version.
-         */
-        get: operations["get_tool_versions_api_v3_tool__tool_id__tool_versions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/tool/{tool_name}/tool_resource_usage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Tool Resource Usage
-         * @description Gets resource usage and node args for all TaskInstances associated with a given tool.
-         *
-         *     We limit this to one week time spans to not overwhelm the database.
-         *
-         *     Args:
-         *         tool_name (str): Name of the tool.
-         *         start_date (str): The start date in 'YYYY-MM-DD' format (query parameter).
-         *         end_date (str): The end date in 'YYYY-MM-DD' format (query parameter).
-         *
-         *     Returns:
-         *         List[Dict[str, Any]]: A list of dictionaries containing TaskInstance ID,
-         *         node argument value, TaskInstance maxrss, TaskInstance wallclock, and
-         *         requested resources.
-         *
-         *     Example Call:
-         *         /tool/large_wf_tool/tool_resource_usage?start_date=2024-07-11&end_date=2024-07-18
-         *
-         *     Example Response:
-         *         [
-         *             {
-         *                 "node_arg_val": "--provenance True",
-         *                 "ti_id": 12345677,
-         *                 "ti_maxrss": 50844672,
-         *                 "ti_requested_resources": {"runtime": 21600, "memory": 10},
-         *                 "ti_wallclock": 20
-         *             },
-         *             {
-         *                 "node_arg_val": "--intrinsic False",
-         *                 "ti_id": 12345678,
-         *                 "ti_maxrss": 43960320,
-         *                 "ti_requested_resources": {"runtime": 21600, "memory": 10},
-         *                 "ti_wallclock": 22
-         *             }
-         *         ]
-         */
-        get: operations["get_tool_resource_usage_api_v3_tool__tool_name__tool_resource_usage_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/tool_version": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Tool Version
-         * @description Add a new version for a Tool.
-         */
-        post: operations["add_tool_version_api_v3_tool_version_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/tool_version/{tool_version_id}/task_templates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Templates
-         * @description Get the Tool Version.
-         */
-        get: operations["get_task_templates_api_v3_tool_version__tool_version_id__task_templates_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Bind Workflow
-         * @description Bind a workflow to the database.
-         */
-        post: operations["bind_workflow_api_v3_workflow_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_args_hash}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Matching Workflows By Workflow Args
-         * @description Return any dag hashes that are assigned to workflows with identical workflow args.
-         */
-        get: operations["get_matching_workflows_by_workflow_args_api_v3_workflow__workflow_args_hash__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/workflow_attributes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Workflow Attribute
-         * @description Update the attributes for a given workflow.
-         */
-        put: operations["update_workflow_attribute_api_v3_workflow__workflow_id__workflow_attributes_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/set_resume": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Set Resume
-         * @description Set resume on a workflow.
-         */
-        post: operations["set_resume_api_v3_workflow__workflow_id__set_resume_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/is_resumable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Workflow Is Resumable
-         * @description Check if a workflow is in a resumable state.
-         */
-        get: operations["workflow_is_resumable_api_v3_workflow__workflow_id__is_resumable_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/get_max_concurrently_running": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Max Concurrently Running
-         * @description Return the maximum concurrency of this workflow.
-         */
-        get: operations["get_max_concurrently_running_api_v3_workflow__workflow_id__get_max_concurrently_running_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/update_max_concurrently_running": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Max Running
-         * @description Update the number of tasks that can be running concurrently for a given workflow.
-         */
-        put: operations["update_max_running_api_v3_workflow__workflow_id__update_max_concurrently_running_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/task_status_updates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Task Status Updates
-         * @description Returns all tasks in the database that have the specified status.
-         *
-         *     Args:
-         *         workflow_id (int): the ID of the workflow.
-         *         request (Request): the request object.
-         */
-        post: operations["task_status_updates_api_v3_workflow__workflow_id__task_status_updates_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/fetch_workflow_metadata": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Fetch Workflow Metadata
-         * @description Get metadata associated with specified Workflow ID.
-         */
-        get: operations["fetch_workflow_metadata_api_v3_workflow__workflow_id__fetch_workflow_metadata_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/get_tasks/{workflow_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Tasks From Workflow
-         * @description Return tasks associated with specified Workflow ID.
-         */
-        get: operations["get_tasks_from_workflow_api_v3_workflow_get_tasks__workflow_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_status/available_status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Available Workflow Statuses
-         * @description Return all available workflow statuses.
-         */
-        get: operations["get_available_workflow_statuses_api_v3_workflow_status_available_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/update_array_max_concurrently_running": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Array Max Running
-         * @description Update the number of tasks that can be running concurrently for a given Array.
-         */
-        put: operations["update_array_max_running_api_v3_workflow__workflow_id__update_array_max_concurrently_running_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/task_template_dag": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Task Template Dag
-         * @description Compute the shape of a Workflow's DAG by TaskTemplate.
-         */
-        get: operations["task_template_dag_api_v3_workflow__workflow_id__task_template_dag_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Workflow Run
-         * @description Add a workflow run to the db.
-         */
-        post: operations["add_workflow_run_api_v3_workflow_run_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_run/{workflow_run_id}/terminate_task_instances": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Terminate Workflow Run
-         * @description Terminate a workflow run and get its tasks in order.
-         */
-        put: operations["terminate_workflow_run_api_v3_workflow_run__workflow_run_id__terminate_task_instances_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_run/{workflow_run_id}/log_heartbeat": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Workflow Run Heartbeat
-         * @description Log a heartbeat for the workflow run to show that the client side is still alive.
-         */
-        post: operations["log_workflow_run_heartbeat_api_v3_workflow_run__workflow_run_id__log_heartbeat_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_run/{workflow_run_id}/update_status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Log Workflow Run Status Update
-         * @description Update the status of the workflow run.
-         */
-        put: operations["log_workflow_run_status_update_api_v3_workflow_run__workflow_run_id__update_status_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_run/{workflow_run_id}/sync_status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Task Instances Status Check
-         * @description Sync status of given task intance IDs.
-         */
-        post: operations["task_instances_status_check_api_v3_workflow_run__workflow_run_id__sync_status_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_run/{workflow_run_id}/set_status_for_triaging": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Set Status For Triaging
-         * @description Two triaging related status sets.
-         *
-         *     Query all task instances that are submitted to distributor or running which haven't
-         *     reported as alive in the allocated time, and set them for Triaging(from Running)
-         *     and Kill_self(from Launched).
-         */
-        post: operations["set_status_for_triaging_api_v3_workflow_run__workflow_run_id__set_status_for_triaging_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/array/{workflow_id}/get_array_tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Array Task Instances
-         * @description Return error/output filepaths for task instances filtered by array name.
-         *
-         *     The user can also optionally filter by job name as well.
-         *
-         *     To avoid overly-large returned results, the user must also pass in a workflow ID.
-         */
-        get: operations["get_array_task_instances_api_v3_array__workflow_id__get_array_tasks_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Status
-         * @description Get the status of a task.
-         */
-        get: operations["get_task_status_api_v3_task_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task/subdag": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Task Subdag
-         * @description Used to get the sub dag  of a given task.
-         *
-         *     It returns a list of sub tasks as well as a list of sub nodes.
-         */
-        post: operations["get_task_subdag_api_v3_task_subdag_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task/update_statuses": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Task Statuses
-         * @description Update the status of the tasks.
-         *
-         *     Description:
-         *         - When workflow_id='all', it updates all tasks in the workflow with
-         *         recursive=False. This improves performance.
-         *         - When recursive=True, it updates the tasks and it's dependencies all
-         *         the way up or down the DAG.
-         *         - When recursive=False, it updates only the tasks in the task_ids list.
-         *         - When workflow_status is None, it gets the workflow status from the db.
-         *         - After updating the tasks, it checks the workflow status and updates it.
-         *
-         *     Notes:
-         *         This API is different from v2.
-         *         It integrated the logic in update_task_status from status_commands.py.
-         *     TODO:
-         *     - Once CLI moves to v3, simplify update_task_status to avoid duplication.
-         */
-        put: operations["update_task_statuses_api_v3_task_update_statuses_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_dependencies/{task_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Dependencies
-         * @description Get task's downstream and upstream tasks and their status.
-         */
-        get: operations["get_task_dependencies_api_v3_task_dependencies__task_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/tasks_recursive/{direction}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Get Tasks Recursive
-         * @description Get all input task_ids'.
-         *
-         *     Either downstream or upsteam tasks based on direction;
-         *     return all recursive(including input set) task_ids in the defined direction.
-         */
-        put: operations["get_tasks_recursive_api_v3_tasks_recursive__direction__put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_resource_usage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Resource Usage
-         * @description Return the resource usage for a given Task ID.
-         */
-        get: operations["get_task_resource_usage_api_v3_task_resource_usage_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task/get_downstream_tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Downstream Tasks
-         * @description Get only the direct downstreams of a task.
-         */
-        post: operations["get_downstream_tasks_api_v3_task_get_downstream_tasks_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task/get_ti_details_viz/{task_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Details
-         * @description Get information about TaskInstances associated with specific Task ID.
-         */
-        get: operations["get_task_details_api_v3_task_get_ti_details_viz__task_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task/get_task_details_viz/{task_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Details Viz
-         * @description Get status of Task from Task ID.
-         */
-        get: operations["get_task_details_viz_api_v3_task_get_task_details_viz__task_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_validation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Workflow Validation Status
-         * @description Check if workflow is valid.
-         */
-        post: operations["get_workflow_validation_status_api_v3_workflow_validation_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/workflow_tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow Tasks
-         * @description Get the tasks for a given workflow.
-         */
-        get: operations["get_workflow_tasks_api_v3_workflow__workflow_id__workflow_tasks_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/validate_username/{username}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow User Validation
-         * @description Return all usernames associated with a given workflow_id's workflow runs.
-         *
-         *     Used to validate permissions for a self-service request.
-         */
-        get: operations["get_workflow_user_validation_api_v3_workflow__workflow_id__validate_username__username__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/validate_for_workflow_reset/{username}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow Run For Workflow Reset
-         * @description Last workflow_run_id associated with a given workflow_id started by the username.
-         *
-         *     Used to validate for workflow_reset:
-         *         1. The last workflow_run of the current workflow must be in error state.
-         *         2. This last workflow_run must have been started by the input username.
-         *         3. This last workflow_run is in status 'E'
-         */
-        get: operations["get_workflow_run_for_workflow_reset_api_v3_workflow__workflow_id__validate_for_workflow_reset__username__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/reset": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Reset Workflow
-         * @description Update the workflow's status, all its tasks' statuses to 'G'.
-         */
-        put: operations["reset_workflow_api_v3_workflow__workflow_id__reset_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow Status
-         * @description Get the status of the workflow.
-         */
-        get: operations["get_workflow_status_api_v3_workflow_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_status_viz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow Status Viz
-         * @description Get the status of the workflows for GUI.
-         */
-        get: operations["get_workflow_status_viz_api_v3_workflow_status_viz_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_overview_viz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Workflows By User Form
-         * @description Fetch associated workflows and workflow runs by username.
-         */
-        get: operations["workflows_by_user_form_api_v3_workflow_overview_viz_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_table_viz/{workflow_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Task Details By Wf Id
-         * @description Fetch Task details associated with Workflow ID and TaskTemplate name.
-         */
-        get: operations["task_details_by_wf_id_api_v3_task_table_viz__workflow_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_details_viz/{workflow_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Wf Details By Wf Id
-         * @description Fetch name, args, dates, tool for a Workflow provided WF ID.
-         */
-        get: operations["wf_details_by_wf_id_api_v3_workflow_details_viz__workflow_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/get_task_template_details": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Template Details For Workflow
-         * @description Fetch Task Template details (ID, Name, and Version) for a given Workflow.
-         */
-        get: operations["get_task_template_details_for_workflow_api_v3_get_task_template_details_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/get_task_template_version": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Template Version For Tasks
-         * @description Get the task_template_version_ids.
-         */
-        get: operations["get_task_template_version_for_tasks_api_v3_get_task_template_version_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/get_requested_cores": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Requested Cores
-         * @description Get the min, max, and arg of requested cores.
-         */
-        get: operations["get_requested_cores_api_v3_get_requested_cores_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/get_most_popular_queue": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Most Popular Queue
-         * @description Get the most popular queue of the task template.
-         */
-        get: operations["get_most_popular_queue_api_v3_get_most_popular_queue_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/task_template_resource_usage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Task Template Resource Usage
-         * @description Return the aggregate resource usage for a give TaskTemplate.
-         *
-         *     Need to use cross_origin decorator when using the GUI to call a post route.
-         *     This enables Cross Origin Resource Sharing (CORS) on the route. Default is
-         *     most permissive settings.
-         */
-        post: operations["get_task_template_resource_usage_api_v3_task_template_resource_usage_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_tt_status_viz/{workflow_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow Tt Status Viz
-         * @description Get the status of the workflows for GUI.
-         */
-        get: operations["get_workflow_tt_status_viz_api_v3_workflow_tt_status_viz__workflow_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/tt_error_log_viz/{wf_id}/{tt_id}/{ti_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Tt Error Log Viz
-         * @description Get the error logs for a task template id for GUI.
-         */
-        get: operations["get_tt_error_log_viz_api_v3_tt_error_log_viz__wf_id___tt_id___ti_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/tt_error_log_viz/{wf_id}/{tt_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Tt Error Log Viz
-         * @description Get the error logs for a task template id for GUI.
-         */
-        get: operations["get_tt_error_log_viz_api_v3_tt_error_log_viz__wf_id___tt_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/fix_status_inconsistency": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Fix Wf Inconsistency
-         * @description Find wf in F with all tasks in D and fix them.
-         *
-         *     For flexibility, pass in the step size. It is easier to redeploy the reaper than the
-         *     service.
-         */
-        put: operations["fix_wf_inconsistency_api_v3_workflow__workflow_id__fix_status_inconsistency_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow/{workflow_id}/workflow_name_and_args": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Wf Name And Args
-         * @description Return workflow name and args associated with specified workflow ID.
-         */
-        get: operations["get_wf_name_and_args_api_v3_workflow__workflow_id__workflow_name_and_args_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/lost_workflow_run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Lost Workflow Runs
-         * @description Return all workflow runs that are currently in the specified state.
-         */
-        get: operations["get_lost_workflow_runs_api_v3_lost_workflow_run_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/workflow_run/{workflow_run_id}/reap": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Reap Workflow Run
-         * @description If the last task was more than 2 minutes ago, transition wfr to A state.
-         *
-         *     Also check WorkflowRun status_date to avoid possible race condition where reaper
-         *     checks tasks from a different WorkflowRun with the same workflow id. Avoid setting
-         *     while waiting for a resume (when workflow is in suspended state).
-         */
-        put: operations["reap_workflow_run_api_v3_workflow_run__workflow_run_id__reap_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Is Alive
-         * @description Test connectivity to the database.
-         */
-        get: operations["is_alive_api_v3__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/time": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Pst Now
-         * @description Get the current time in the Pacific.
-         */
-        get: operations["get_pst_now_api_v3_time_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Health
-         * @description Test connectivity to the app.
-         */
-        get: operations["health_api_v3_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/test_bad": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Test Route
-         * @description Test route.
-         */
-        get: operations["test_route_api_v3_test_bad_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v3/api_version": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Api Version
-         * @description Test connectivity to the database.
-         */
-        get: operations["api_version_api_v3_api_version_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/array": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Array
-         * @description Return an array ID by workflow and task template version ID.
-         *
-         *     If not found, bind the array.
-         */
-        post: operations["add_array_api_v2_array_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/array/{array_id}/queue_task_batch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Record Array Batch Num
-         * @description Record a batch number to associate sets of task instances with an array submission.
-         */
-        post: operations["record_array_batch_num_api_v2_array__array_id__queue_task_batch_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/array/{array_id}/transition_to_launched": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Transition Array To Launched
-         * @description Transition TIs associated with an array_id and batch_num to launched.
-         */
-        post: operations["transition_array_to_launched_api_v2_array__array_id__transition_to_launched_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/array/{array_id}/log_distributor_id": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Array Distributor Id
-         * @description Add distributor_id, stderr/stdout paths to the DB for all TIs in an array.
-         */
-        post: operations["log_array_distributor_id_api_v2_array__array_id__log_distributor_id_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/get_array_max_concurrently_running/{task_template_version_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Array Max Concurrently Running
-         * @description Return the maximum concurrency of this array.
-         */
-        get: operations["get_array_max_concurrently_running_api_v2_workflow__workflow_id__get_array_max_concurrently_running__task_template_version_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/array/{array_id}/get_array_max_concurrently_running": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Array Max Concurrently Running
-         * @description Return the maximum concurrency of this array.
-         */
-        get: operations["get_array_max_concurrently_running_api_v2_array__array_id__get_array_max_concurrently_running_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/array/{array_id}/transition_to_killed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Transition To Killed
-         * @description Transition TIs from KILL_SELF  to ERROR_FATAL.
-         *
-         *     Also mark parent Tasks with status=ERROR_FATAL if they're in a killable state.
-         */
-        post: operations["transition_to_killed_api_v2_array__array_id__transition_to_killed_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/cluster/{cluster_name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Cluster By Name
-         * @description Get the id, cluster_type_name and connection_parameters of a Cluster.
-         */
-        get: operations["get_cluster_by_name_api_v2_cluster__cluster_name__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/dag": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Dag
-         * @description Add a new dag to the database.
-         *
-         *     Args:
-         *         request: The request object.
-         */
-        post: operations["add_dag_api_v2_dag_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/dag/{dag_id}/edges": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Edges
-         * @description Add edges to the edge table.
-         */
-        post: operations["add_edges_api_v2_dag__dag_id__edges_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/nodes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Nodes
-         * @description Add a chunk of nodes to the database.
-         *
-         *     Args:
-         *         request: The request object.
-         */
-        post: operations["add_nodes_api_v2_nodes_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/cluster/{cluster_id}/queue/{queue_name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Queue By Cluster Queue Names
-         * @description Get the id, name, cluster_name and parameters of a Queue.
-         *
-         *     Based on cluster_name and queue_name.
-         */
-        get: operations["get_queue_by_cluster_queue_names_api_v2_cluster__cluster_id__queue__queue_name__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task/bind_tasks_no_args": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Bind Tasks No Args
-         * @description Bind the task objects to the database.
-         */
-        put: operations["bind_tasks_no_args_api_v2_task_bind_tasks_no_args_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task/bind_task_args": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Bind Task Args
-         * @description Add task args and associated task ids to the database.
-         */
-        put: operations["bind_task_args_api_v2_task_bind_task_args_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task/bind_task_attributes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Bind Task Attributes
-         * @description Add task attributes and associated attribute types to the database.
-         */
-        put: operations["bind_task_attributes_api_v2_task_bind_task_attributes_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task/bind_resources": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Bind Task Resources
-         * @description Add the task resources for a given task.
-         */
-        post: operations["bind_task_resources_api_v2_task_bind_resources_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task/{task_id}/most_recent_ti_error": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Most Recent Ti Error
-         * @description Route to determine the cause of the most recent task_instance's error.
-         */
-        get: operations["get_most_recent_ti_error_api_v2_task__task_id__most_recent_ti_error_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task/{workflow_id}/set_resume_state": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Set Task Resume State
-         * @description An endpoint to set all tasks to a resumable state for a workflow.
-         */
-        post: operations["set_task_resume_state_api_v2_task__workflow_id__set_resume_state_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_instance/{task_instance_id}/log_running": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Running
-         * @description Log a task_instance as running.
-         *
-         *     Args:
-         *         task_instance_id: id of the task_instance to log as running
-         *         request: fastapi request object
-         */
-        post: operations["log_running_api_v2_task_instance__task_instance_id__log_running_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_instance/{task_instance_id}/log_report_by": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Ti Report By
-         * @description Log a task_instance as being responsive with a new report_by_date.
-         *
-         *     This is done at the worker node heartbeat_interval rate, so it may not happen at the same
-         *     rate that the reconciler updates batch submitted report_by_dates (also because it causes
-         *     a lot of traffic if all workers are logging report by_dates often compared to if the
-         *     reconciler runs often).
-         *
-         *     Args:
-         *         task_instance_id: id of the task_instance to log
-         *         request: fastapi request object
-         */
-        post: operations["log_ti_report_by_api_v2_task_instance__task_instance_id__log_report_by_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_instance/log_report_by/batch": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Ti Report By Batch
-         * @description Log task_instances as being responsive with a new report_by_date.
-         *
-         *     This is done at the worker node heartbeat_interval rate, so it may not happen at the same
-         *     rate that the reconciler updates batch submitted report_by_dates (also because it causes
-         *     a lot of traffic if all workers are logging report by_dates often compared to if the
-         *     reconciler runs often).
-         *
-         *     Args:
-         *         task_instance_id: id of the task_instance to log
-         *         request: fastapi request object
-         */
-        post: operations["log_ti_report_by_batch_api_v2_task_instance_log_report_by_batch_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_instance/{task_instance_id}/log_done": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Done
-         * @description Log a task_instance as done.
-         *
-         *     Args:
-         *         task_instance_id: id of the task_instance to log done
-         *         request: fastapi request object
-         */
-        post: operations["log_done_api_v2_task_instance__task_instance_id__log_done_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_instance/{task_instance_id}/log_error_worker_node": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Error Worker Node
-         * @description Log a task_instance as errored.
-         *
-         *     Args:
-         *         task_instance_id (str): id of the task_instance to log done
-         *         request (Request): fastapi request object
-         */
-        post: operations["log_error_worker_node_api_v2_task_instance__task_instance_id__log_error_worker_node_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_instance/{task_instance_id}/task_instance_error_log": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Instance Error Log
-         * @description Route to return all task_instance_error_log entries of the task_instance_id.
-         *
-         *     Args:
-         *         task_instance_id (int): ID of the task instance
-         *
-         *     Return:
-         *         jsonified task_instance_error_log result set
-         */
-        get: operations["get_task_instance_error_log_api_v2_task_instance__task_instance_id__task_instance_error_log_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/get_array_task_instance_id/{array_id}/{batch_num}/{step_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Array Task Instance Id
-         * @description Given an array ID and an index, select a single task instance ID.
-         *
-         *     Task instance IDs that are associated with the array are ordered, and selected by index.
-         *     This route will be called once per array task instance worker node, so must be scalable.
-         */
-        get: operations["get_array_task_instance_id_api_v2_get_array_task_instance_id__array_id___batch_num___step_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_instance/{task_instance_id}/log_no_distributor_id": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log No Distributor Id
-         * @description Log a task_instance_id that did not get an distributor_id upon submission.
-         */
-        post: operations["log_no_distributor_id_api_v2_task_instance__task_instance_id__log_no_distributor_id_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_instance/{task_instance_id}/log_distributor_id": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Distributor Id
-         * @description Log a task_instance's distributor id.
-         *
-         *     Args:
-         *         task_instance_id: id of the task_instance to log
-         *         request: fastapi request object
-         */
-        post: operations["log_distributor_id_api_v2_task_instance__task_instance_id__log_distributor_id_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_instance/{task_instance_id}/log_known_error": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Known Error
-         * @description Log a task_instance as errored.
-         *
-         *     Args:
-         *         task_instance_id (int): id for task instance.
-         *         request (Request): fastapi request object.
-         */
-        post: operations["log_known_error_api_v2_task_instance__task_instance_id__log_known_error_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_instance/{task_instance_id}/log_unknown_error": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Unknown Error
-         * @description Log a task_instance as errored.
-         *
-         *     Args:
-         *         task_instance_id (int): id for task instance
-         *         request (Request): fastapi request object
-         */
-        post: operations["log_unknown_error_api_v2_task_instance__task_instance_id__log_unknown_error_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_instance/instantiate_task_instances": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Instantiate Task Instances
-         * @description Sync status of given task intance IDs.
-         */
-        post: operations["instantiate_task_instances_api_v2_task_instance_instantiate_task_instances_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_template": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Task Template
-         * @description Add a task template for a given tool to the database.
-         */
-        post: operations["get_task_template_api_v2_task_template_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_template/{task_template_id}/versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Template Versions
-         * @description Get the latest task_template_version.
-         */
-        get: operations["get_task_template_versions_api_v2_task_template__task_template_id__versions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_template/{task_template_id}/add_version": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Task Template Version
-         * @description Add a tool to the database.
-         */
-        post: operations["add_task_template_version_api_v2_task_template__task_template_id__add_version_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_resources/{task_resources_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Task Resources
-         * @description Return an task_resources.
-         */
-        post: operations["get_task_resources_api_v2_task_resources__task_resources_id__post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/tool": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Tool
-         * @description Add a tool to the database.
-         */
-        post: operations["add_tool_api_v2_tool_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/tool/{tool_id}/tool_versions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Tool Versions
-         * @description Get the Tool Version.
-         */
-        get: operations["get_tool_versions_api_v2_tool__tool_id__tool_versions_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/tool/{tool_name}/tool_resource_usage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Tool Resource Usage
-         * @description Gets resource usage and node args for all TaskInstances associated with a given tool.
-         *
-         *     We limit this to one week time spans to not overwhelm the database.
-         *
-         *     Args:
-         *         tool_name (str): Name of the tool.
-         *         start_date (str): The start date in 'YYYY-MM-DD' format (query parameter).
-         *         end_date (str): The end date in 'YYYY-MM-DD' format (query parameter).
-         *
-         *     Returns:
-         *         List[Dict[str, Any]]: A list of dictionaries containing TaskInstance ID,
-         *         node argument value, TaskInstance maxrss, TaskInstance wallclock, and
-         *         requested resources.
-         *
-         *     Example Call:
-         *         /tool/large_wf_tool/tool_resource_usage?start_date=2024-07-11&end_date=2024-07-18
-         *
-         *     Example Response:
-         *         [
-         *             {
-         *                 "node_arg_val": "--provenance True",
-         *                 "ti_id": 12345677,
-         *                 "ti_maxrss": 50844672,
-         *                 "ti_requested_resources": {"runtime": 21600, "memory": 10},
-         *                 "ti_wallclock": 20
-         *             },
-         *             {
-         *                 "node_arg_val": "--intrinsic False",
-         *                 "ti_id": 12345678,
-         *                 "ti_maxrss": 43960320,
-         *                 "ti_requested_resources": {"runtime": 21600, "memory": 10},
-         *                 "ti_wallclock": 22
-         *             }
-         *         ]
-         */
-        get: operations["get_tool_resource_usage_api_v2_tool__tool_name__tool_resource_usage_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/tool_version": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Tool Version
-         * @description Add a new version for a Tool.
-         */
-        post: operations["add_tool_version_api_v2_tool_version_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/tool_version/{tool_version_id}/task_templates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Templates
-         * @description Get the Tool Version.
-         */
-        get: operations["get_task_templates_api_v2_tool_version__tool_version_id__task_templates_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Bind Workflow
-         * @description Bind a workflow to the database.
-         */
-        post: operations["bind_workflow_api_v2_workflow_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_args_hash}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Matching Workflows By Workflow Args
-         * @description Return any dag hashes that are assigned to workflows with identical workflow args.
-         */
-        get: operations["get_matching_workflows_by_workflow_args_api_v2_workflow__workflow_args_hash__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/workflow_attributes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Workflow Attribute
-         * @description Update the attributes for a given workflow.
-         */
-        put: operations["update_workflow_attribute_api_v2_workflow__workflow_id__workflow_attributes_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/set_resume": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Set Resume
-         * @description Set resume on a workflow.
-         */
-        post: operations["set_resume_api_v2_workflow__workflow_id__set_resume_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/is_resumable": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Workflow Is Resumable
-         * @description Check if a workflow is in a resumable state.
-         */
-        get: operations["workflow_is_resumable_api_v2_workflow__workflow_id__is_resumable_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/get_max_concurrently_running": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Max Concurrently Running
-         * @description Return the maximum concurrency of this workflow.
-         */
-        get: operations["get_max_concurrently_running_api_v2_workflow__workflow_id__get_max_concurrently_running_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/update_max_concurrently_running": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Max Running
-         * @description Update the number of tasks that can be running concurrently for a given workflow.
-         */
-        put: operations["update_max_running_api_v2_workflow__workflow_id__update_max_concurrently_running_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/task_status_updates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Task Status Updates
-         * @description Returns all tasks in the database that have the specified status.
-         *
-         *     Args:
-         *         workflow_id (int): the ID of the workflow.
-         *         request (Request): the request object.
-         */
-        post: operations["task_status_updates_api_v2_workflow__workflow_id__task_status_updates_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/fetch_workflow_metadata": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Fetch Workflow Metadata
-         * @description Get metadata associated with specified Workflow ID.
-         */
-        get: operations["fetch_workflow_metadata_api_v2_workflow__workflow_id__fetch_workflow_metadata_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/get_tasks/{workflow_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Tasks From Workflow
-         * @description Return tasks associated with specified Workflow ID.
-         */
-        get: operations["get_tasks_from_workflow_api_v2_workflow_get_tasks__workflow_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_status/available_status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Available Workflow Statuses
-         * @description Return all available workflow statuses.
-         */
-        get: operations["get_available_workflow_statuses_api_v2_workflow_status_available_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Add Workflow Run
-         * @description Add a workflow run to the db.
-         */
-        post: operations["add_workflow_run_api_v2_workflow_run_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_run/{workflow_run_id}/terminate_task_instances": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Terminate Workflow Run
-         * @description Terminate a workflow run and get its tasks in order.
-         */
-        put: operations["terminate_workflow_run_api_v2_workflow_run__workflow_run_id__terminate_task_instances_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_run/{workflow_run_id}/log_heartbeat": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Log Workflow Run Heartbeat
-         * @description Log a heartbeat for the workflow run to show that the client side is still alive.
-         */
-        post: operations["log_workflow_run_heartbeat_api_v2_workflow_run__workflow_run_id__log_heartbeat_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_run/{workflow_run_id}/update_status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Log Workflow Run Status Update
-         * @description Update the status of the workflow run.
-         */
-        put: operations["log_workflow_run_status_update_api_v2_workflow_run__workflow_run_id__update_status_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_run/{workflow_run_id}/sync_status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Task Instances Status Check
-         * @description Sync status of given task intance IDs.
-         */
-        post: operations["task_instances_status_check_api_v2_workflow_run__workflow_run_id__sync_status_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_run/{workflow_run_id}/set_status_for_triaging": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Set Status For Triaging
-         * @description Two triaging related status sets.
-         *
-         *     Query all task instances that are submitted to distributor or running which haven't
-         *     reported as alive in the allocated time, and set them for Triaging(from Running)
-         *     and Kill_self(from Launched).
-         */
-        post: operations["set_status_for_triaging_api_v2_workflow_run__workflow_run_id__set_status_for_triaging_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/array/{workflow_id}/get_array_tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Array Task Instances
-         * @description Return error/output filepaths for task instances filtered by array name.
-         *
-         *     The user can also optionally filter by job name as well.
-         *
-         *     To avoid overly-large returned results, the user must also pass in a workflow ID.
-         */
-        get: operations["get_array_task_instances_api_v2_array__workflow_id__get_array_tasks_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Status
-         * @description Get the status of a task.
-         */
-        get: operations["get_task_status_api_v2_task_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task/subdag": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Task Subdag
-         * @description Used to get the sub dag  of a given task.
-         *
-         *     It returns a list of sub tasks as well as a list of sub nodes.
-         */
-        post: operations["get_task_subdag_api_v2_task_subdag_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task/update_statuses": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Update Task Statuses
-         * @description Update the status of the tasks.
-         */
-        put: operations["update_task_statuses_api_v2_task_update_statuses_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_dependencies/{task_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Dependencies
-         * @description Get task's downstream and upstream tasks and their status.
-         */
-        get: operations["get_task_dependencies_api_v2_task_dependencies__task_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/tasks_recursive/{direction}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Get Tasks Recursive
-         * @description Get all input task_ids'.
-         *
-         *     Either downstream or upsteam tasks based on direction;
-         *     return all recursive(including input set) task_ids in the defined direction.
-         */
-        put: operations["get_tasks_recursive_api_v2_tasks_recursive__direction__put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_resource_usage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Resource Usage
-         * @description Return the resource usage for a given Task ID.
-         */
-        get: operations["get_task_resource_usage_api_v2_task_resource_usage_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task/get_downstream_tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Downstream Tasks
-         * @description Get only the direct downstreams of a task.
-         */
-        post: operations["get_downstream_tasks_api_v2_task_get_downstream_tasks_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task/get_ti_details_viz/{task_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Details
-         * @description Get information about TaskInstances associated with specific Task ID.
-         */
-        get: operations["get_task_details_api_v2_task_get_ti_details_viz__task_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task/get_task_details_viz/{task_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Details Viz
-         * @description Get status of Task from Task ID.
-         */
-        get: operations["get_task_details_viz_api_v2_task_get_task_details_viz__task_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/get_task_template_details": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Template Details For Workflow
-         * @description Get the details of a task template for a given workflow.
-         */
-        get: operations["get_task_template_details_for_workflow_api_v2_get_task_template_details_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/get_task_template_version": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Task Template Version For Tasks
-         * @description Get the task template version for the given tasks or workflow.
-         */
-        get: operations["get_task_template_version_for_tasks_api_v2_get_task_template_version_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/get_requested_cores": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Requested Cores
-         * @description Get the requested cores for the given task template version ids.
-         */
-        get: operations["get_requested_cores_api_v2_get_requested_cores_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/get_most_popular_queue": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Most Popular Queue
-         * @description Get the most popular queue for the given task template version ids.
-         */
-        get: operations["get_most_popular_queue_api_v2_get_most_popular_queue_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_template_resource_usage": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Task Template Resource Usage
-         * @description Get the resource usage for the given task template.
-         */
-        post: operations["get_task_template_resource_usage_api_v2_task_template_resource_usage_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_tt_status_viz/{workflow_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow Tt Status Viz
-         * @description Get the status visualization for the given workflow.
-         */
-        get: operations["get_workflow_tt_status_viz_api_v2_workflow_tt_status_viz__workflow_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/tt_error_log_viz/{wf_id}/{tt_id}/{ti_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Tt Error Log Viz
-         * @description Get the error logs for a task template id for GUI.
-         */
-        get: operations["get_tt_error_log_viz_api_v2_tt_error_log_viz__wf_id___tt_id___ti_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/tt_error_log_viz/{wf_id}/{tt_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Tt Error Log Viz
-         * @description Get the error logs for a task template id for GUI.
-         */
-        get: operations["get_tt_error_log_viz_api_v2_tt_error_log_viz__wf_id___tt_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_validation": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Get Workflow Validation Status
-         * @description Check if workflow is valid.
-         */
-        post: operations["get_workflow_validation_status_api_v2_workflow_validation_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/workflow_tasks": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow Tasks
-         * @description Get the tasks for a given workflow.
-         */
-        get: operations["get_workflow_tasks_api_v2_workflow__workflow_id__workflow_tasks_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/validate_username/{username}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow User Validation
-         * @description Return all usernames associated with a given workflow_id's workflow runs.
-         *
-         *     Used to validate permissions for a self-service request.
-         */
-        get: operations["get_workflow_user_validation_api_v2_workflow__workflow_id__validate_username__username__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/validate_for_workflow_reset/{username}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow Run For Workflow Reset
-         * @description Last workflow_run_id associated with a given workflow_id started by the username.
-         *
-         *     Used to validate for workflow_reset:
-         *         1. The last workflow_run of the current workflow must be in error state.
-         *         2. This last workflow_run must have been started by the input username.
-         *         3. This last workflow_run is in status 'E'
-         */
-        get: operations["get_workflow_run_for_workflow_reset_api_v2_workflow__workflow_id__validate_for_workflow_reset__username__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/reset": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Reset Workflow
-         * @description Update the workflow's status, all its tasks' statuses to 'G'.
-         */
-        put: operations["reset_workflow_api_v2_workflow__workflow_id__reset_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow Status
-         * @description Get the status of the workflow.
-         */
-        get: operations["get_workflow_status_api_v2_workflow_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_status_viz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Workflow Status Viz
-         * @description Get the status of the workflows for GUI.
-         */
-        get: operations["get_workflow_status_viz_api_v2_workflow_status_viz_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_overview_viz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Workflows By User Form
-         * @description Fetch associated workflows and workflow runs by username.
-         */
-        get: operations["workflows_by_user_form_api_v2_workflow_overview_viz_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/task_table_viz/{workflow_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Task Details By Wf Id
-         * @description Fetch Task details associated with Workflow ID and TaskTemplate name.
-         */
-        get: operations["task_details_by_wf_id_api_v2_task_table_viz__workflow_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_details_viz/{workflow_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Wf Details By Wf Id
-         * @description Fetch name, args, dates, tool for a Workflow provided WF ID.
-         */
-        get: operations["wf_details_by_wf_id_api_v2_workflow_details_viz__workflow_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/fix_status_inconsistency": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Fix Wf Inconsistency
-         * @description Find wf in F with all tasks in D and fix them.
-         *
-         *     For flexibility, pass in the step size. It is easier to redeploy the reaper than the
-         *     service.
-         */
-        put: operations["fix_wf_inconsistency_api_v2_workflow__workflow_id__fix_status_inconsistency_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow/{workflow_id}/workflow_name_and_args": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Wf Name And Args
-         * @description Return workflow name and args associated with specified workflow ID.
-         */
-        get: operations["get_wf_name_and_args_api_v2_workflow__workflow_id__workflow_name_and_args_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/lost_workflow_run": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Lost Workflow Runs
-         * @description Return all workflow runs that are currently in the specified state.
-         */
-        get: operations["get_lost_workflow_runs_api_v2_lost_workflow_run_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/workflow_run/{workflow_run_id}/reap": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Reap Workflow Run
-         * @description If the last task was more than 2 minutes ago, transition wfr to A state.
-         *
-         *     Also check WorkflowRun status_date to avoid possible race condition where reaper
-         *     checks tasks from a different WorkflowRun with the same workflow id. Avoid setting
-         *     while waiting for a resume (when workflow is in suspended state).
-         */
-        put: operations["reap_workflow_run_api_v2_workflow_run__workflow_run_id__reap_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Is Alive
-         * @description Test connectivity to the database.
-         */
-        get: operations["is_alive_api_v2__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/time": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Pst Now
-         * @description Get the current time in the Pacific.
-         */
-        get: operations["get_pst_now_api_v2_time_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Health
-         * @description Test connectivity to the app.
-         */
-        get: operations["health_api_v2_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/test_bad": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Test Route
-         * @description Test route.
-         */
-        get: operations["test_route_api_v2_test_bad_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v2/api_version": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Api Version
-         * @description Test connectivity to the database.
-         */
-        get: operations["api_version_api_v2_api_version_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
+  '/api/auth/oidc/login': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Login
+     * @description login.
+     *
+     *     Handles user login via OIDC.
+     */
+    get: operations['login_api_auth_oidc_login_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/oidc/auth': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Auth
+     * @description auth.
+     *
+     *     Validates authorization data from OIDC identify provider.
+     */
+    get: operations['auth_api_auth_oidc_auth_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/oidc/userinfo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Userinfo
+     * @description userinfo.
+     *
+     *     Returns the user's information from the user's session cookie.
+     *     Used to check if the user is logged in.
+     */
+    get: operations['userinfo_api_auth_oidc_userinfo_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/oidc/logout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Logout
+     * @description logout.
+     *
+     *     Delete the user's session cookie.
+     */
+    get: operations['logout_api_auth_oidc_logout_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/array': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Array
+     * @description Return an array ID by workflow and task template version ID.
+     *
+     *     If not found, bind the array.
+     */
+    post: operations['add_array_api_v3_array_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/array/{array_id}/queue_task_batch': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Record Array Batch Num
+     * @description Record a batch number to associate sets of task instances with an array submission.
+     */
+    post: operations['record_array_batch_num_api_v3_array__array_id__queue_task_batch_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/array/{array_id}/transition_to_launched': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Transition Array To Launched
+     * @description Transition TIs associated with an array_id and batch_num to launched.
+     */
+    post: operations['transition_array_to_launched_api_v3_array__array_id__transition_to_launched_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/array/{array_id}/log_distributor_id': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Array Distributor Id
+     * @description Add distributor_id, stderr/stdout paths to the DB for all TIs in an array.
+     */
+    post: operations['log_array_distributor_id_api_v3_array__array_id__log_distributor_id_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/get_array_max_concurrently_running/{task_template_version_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Array Max Concurrently Running
+     * @description Return the maximum concurrency of this array.
+     */
+    get: operations['get_array_max_concurrently_running_api_v3_workflow__workflow_id__get_array_max_concurrently_running__task_template_version_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/array/{array_id}/get_array_max_concurrently_running': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Array Max Concurrently Running
+     * @description Return the maximum concurrency of this array.
+     */
+    get: operations['get_array_max_concurrently_running_api_v3_array__array_id__get_array_max_concurrently_running_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/cluster/{cluster_name}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Cluster By Name
+     * @description Get the id, cluster_type_name and connection_parameters of a Cluster.
+     */
+    get: operations['get_cluster_by_name_api_v3_cluster__cluster_name__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/dag': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Dag
+     * @description Add a new dag to the database.
+     *
+     *     Args:
+     *         request: The request object.
+     */
+    post: operations['add_dag_api_v3_dag_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/dag/{dag_id}/edges': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Edges
+     * @description Add edges to the edge table.
+     */
+    post: operations['add_edges_api_v3_dag__dag_id__edges_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/nodes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Nodes
+     * @description Add a chunk of nodes to the database.
+     *
+     *     Args:
+     *         request: The request object.
+     */
+    post: operations['add_nodes_api_v3_nodes_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/cluster/{cluster_id}/queue/{queue_name}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Queue By Cluster Queue Names
+     * @description Get the id, name, cluster_name and parameters of a Queue.
+     *
+     *     Based on cluster_name and queue_name.
+     */
+    get: operations['get_queue_by_cluster_queue_names_api_v3_cluster__cluster_id__queue__queue_name__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task/bind_tasks_no_args': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Bind Tasks No Args
+     * @description Bind the task objects to the database.
+     */
+    put: operations['bind_tasks_no_args_api_v3_task_bind_tasks_no_args_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task/bind_task_args': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Bind Task Args
+     * @description Add task args and associated task ids to the database.
+     */
+    put: operations['bind_task_args_api_v3_task_bind_task_args_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task/bind_task_attributes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Bind Task Attributes
+     * @description Add task attributes and associated attribute types to the database.
+     */
+    put: operations['bind_task_attributes_api_v3_task_bind_task_attributes_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task/bind_resources': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Bind Task Resources
+     * @description Add the task resources for a given task.
+     */
+    post: operations['bind_task_resources_api_v3_task_bind_resources_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task/{task_id}/most_recent_ti_error': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Most Recent Ti Error
+     * @description Route to determine the cause of the most recent task_instance's error.
+     *
+     *     Args:
+     *         task_id (int): the ID of the task.
+     *
+     *     Return:
+     *         error message
+     */
+    get: operations['get_most_recent_ti_error_api_v3_task__task_id__most_recent_ti_error_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task/{workflow_id}/set_resume_state': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Set Task Resume State
+     * @description An endpoint to set all tasks to a resumable state for a workflow.
+     *
+     *     Conditioned on the workflow already being in an appropriate resume state.
+     */
+    post: operations['set_task_resume_state_api_v3_task__workflow_id__set_resume_state_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_instance/{task_instance_id}/log_running': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Running
+     * @description Log a task_instance as running.
+     *
+     *     Args:
+     *         task_instance_id: id of the task_instance to log as running
+     *         request: fastapi request object
+     */
+    post: operations['log_running_api_v3_task_instance__task_instance_id__log_running_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_instance/{task_instance_id}/log_report_by': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Ti Report By
+     * @description Log a task_instance as being responsive with a new report_by_date.
+     *
+     *     This is done at the worker node heartbeat_interval rate, so it may not happen at the same
+     *     rate that the reconciler updates batch submitted report_by_dates (also because it causes
+     *     a lot of traffic if all workers are logging report by_dates often compared to if the
+     *     reconciler runs often).
+     *
+     *     Args:
+     *         task_instance_id: id of the task_instance to log
+     *         request: fastapi request object
+     */
+    post: operations['log_ti_report_by_api_v3_task_instance__task_instance_id__log_report_by_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_instance/log_report_by/batch': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Ti Report By Batch
+     * @description Log task_instances as being responsive with a new report_by_date.
+     *
+     *     This is done at the worker node heartbeat_interval rate, so it may not happen at the same
+     *     rate that the reconciler updates batch submitted report_by_dates (also because it causes
+     *     a lot of traffic if all workers are logging report by_dates often compared to if the
+     *     reconciler runs often).
+     *
+     *     Args:
+     *         task_instance_id: id of the task_instance to log
+     *         request: fastapi request object
+     */
+    post: operations['log_ti_report_by_batch_api_v3_task_instance_log_report_by_batch_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_instance/{task_instance_id}/log_done': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Done
+     * @description Log a task_instance as done.
+     *
+     *     Args:
+     *         task_instance_id: id of the task_instance to log done
+     *         request: fastapi request object
+     */
+    post: operations['log_done_api_v3_task_instance__task_instance_id__log_done_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_instance/{task_instance_id}/log_error_worker_node': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Error Worker Node
+     * @description Log a task_instance as errored.
+     *
+     *     Args:
+     *         task_instance_id (str): id of the task_instance to log done
+     *         request (Request): fastapi request object
+     */
+    post: operations['log_error_worker_node_api_v3_task_instance__task_instance_id__log_error_worker_node_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_instance/{task_instance_id}/task_instance_error_log': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Instance Error Log
+     * @description Route to return all task_instance_error_log entries of the task_instance_id.
+     *
+     *     Args:
+     *         task_instance_id (int): ID of the task instance
+     *
+     *     Return:
+     *         jsonified task_instance_error_log result set
+     */
+    get: operations['get_task_instance_error_log_api_v3_task_instance__task_instance_id__task_instance_error_log_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/get_array_task_instance_id/{array_id}/{batch_num}/{step_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Array Task Instance Id
+     * @description Given an array ID and an index, select a single task instance ID.
+     *
+     *     Task instance IDs that are associated with the array are ordered, and selected by index.
+     *     This route will be called once per array task instance worker node, so must be scalable.
+     */
+    get: operations['get_array_task_instance_id_api_v3_get_array_task_instance_id__array_id___batch_num___step_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_instance/{task_instance_id}/log_no_distributor_id': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log No Distributor Id
+     * @description Log a task_instance_id that did not get an distributor_id upon submission.
+     */
+    post: operations['log_no_distributor_id_api_v3_task_instance__task_instance_id__log_no_distributor_id_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_instance/{task_instance_id}/log_distributor_id': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Distributor Id
+     * @description Log a task_instance's distributor id.
+     *
+     *     Args:
+     *         task_instance_id: id of the task_instance to log
+     *         request: fastapi request object
+     */
+    post: operations['log_distributor_id_api_v3_task_instance__task_instance_id__log_distributor_id_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_instance/{task_instance_id}/log_known_error': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Known Error
+     * @description Log a task_instance as errored.
+     *
+     *     Args:
+     *         task_instance_id (int): id for task instance.
+     *         request (Request): fastapi request object.
+     */
+    post: operations['log_known_error_api_v3_task_instance__task_instance_id__log_known_error_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_instance/{task_instance_id}/log_unknown_error': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Unknown Error
+     * @description Log a task_instance as errored.
+     *
+     *     Args:
+     *         task_instance_id (int): id for task instance
+     *         request (Request): fastapi request object
+     */
+    post: operations['log_unknown_error_api_v3_task_instance__task_instance_id__log_unknown_error_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_instance/instantiate_task_instances': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Instantiate Task Instances
+     * @description Sync status of given task intance IDs.
+     */
+    post: operations['instantiate_task_instances_api_v3_task_instance_instantiate_task_instances_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_template': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Task Template
+     * @description Add a task template for a given tool to the database.
+     */
+    post: operations['get_task_template_api_v3_task_template_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_template/{task_template_id}/versions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Template Versions
+     * @description Get the task_template_version.
+     */
+    get: operations['get_task_template_versions_api_v3_task_template__task_template_id__versions_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_template/{task_template_id}/add_version': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Task Template Version
+     * @description Add a tool to the database.
+     */
+    post: operations['add_task_template_version_api_v3_task_template__task_template_id__add_version_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_template/id/{task_template_version_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Template Id For Task Template Version
+     * @description Get the task_template_id for a given task_template_version_id.
+     */
+    get: operations['get_task_template_id_for_task_template_version_api_v3_task_template_id__task_template_version_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_resources/{task_resources_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Task Resources
+     * @description Return an task_resources.
+     */
+    post: operations['get_task_resources_api_v3_task_resources__task_resources_id__post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/tool': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Tool
+     * @description Add a tool to the database.
+     */
+    post: operations['add_tool_api_v3_tool_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/tool/{tool_id}/tool_versions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Tool Versions
+     * @description Get the Tool Version.
+     */
+    get: operations['get_tool_versions_api_v3_tool__tool_id__tool_versions_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/tool/{tool_name}/tool_resource_usage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Tool Resource Usage
+     * @description Gets resource usage and node args for all TaskInstances associated with a given tool.
+     *
+     *     We limit this to one week time spans to not overwhelm the database.
+     *
+     *     Args:
+     *         tool_name (str): Name of the tool.
+     *         start_date (str): The start date in 'YYYY-MM-DD' format (query parameter).
+     *         end_date (str): The end date in 'YYYY-MM-DD' format (query parameter).
+     *
+     *     Returns:
+     *         List[Dict[str, Any]]: A list of dictionaries containing TaskInstance ID,
+     *         node argument value, TaskInstance maxrss, TaskInstance wallclock, and
+     *         requested resources.
+     *
+     *     Example Call:
+     *         /tool/large_wf_tool/tool_resource_usage?start_date=2024-07-11&end_date=2024-07-18
+     *
+     *     Example Response:
+     *         [
+     *             {
+     *                 "node_arg_val": "--provenance True",
+     *                 "ti_id": 12345677,
+     *                 "ti_maxrss": 50844672,
+     *                 "ti_requested_resources": {"runtime": 21600, "memory": 10},
+     *                 "ti_wallclock": 20
+     *             },
+     *             {
+     *                 "node_arg_val": "--intrinsic False",
+     *                 "ti_id": 12345678,
+     *                 "ti_maxrss": 43960320,
+     *                 "ti_requested_resources": {"runtime": 21600, "memory": 10},
+     *                 "ti_wallclock": 22
+     *             }
+     *         ]
+     */
+    get: operations['get_tool_resource_usage_api_v3_tool__tool_name__tool_resource_usage_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/tool_version': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Tool Version
+     * @description Add a new version for a Tool.
+     */
+    post: operations['add_tool_version_api_v3_tool_version_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/tool_version/{tool_version_id}/task_templates': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Templates
+     * @description Get the Tool Version.
+     */
+    get: operations['get_task_templates_api_v3_tool_version__tool_version_id__task_templates_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Bind Workflow
+     * @description Bind a workflow to the database.
+     */
+    post: operations['bind_workflow_api_v3_workflow_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_args_hash}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Matching Workflows By Workflow Args
+     * @description Return any dag hashes that are assigned to workflows with identical workflow args.
+     */
+    get: operations['get_matching_workflows_by_workflow_args_api_v3_workflow__workflow_args_hash__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/workflow_attributes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update Workflow Attribute
+     * @description Update the attributes for a given workflow.
+     */
+    put: operations['update_workflow_attribute_api_v3_workflow__workflow_id__workflow_attributes_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/set_resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Set Resume
+     * @description Set resume on a workflow.
+     */
+    post: operations['set_resume_api_v3_workflow__workflow_id__set_resume_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/is_resumable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Workflow Is Resumable
+     * @description Check if a workflow is in a resumable state.
+     */
+    get: operations['workflow_is_resumable_api_v3_workflow__workflow_id__is_resumable_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/get_max_concurrently_running': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Max Concurrently Running
+     * @description Return the maximum concurrency of this workflow.
+     */
+    get: operations['get_max_concurrently_running_api_v3_workflow__workflow_id__get_max_concurrently_running_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/update_max_concurrently_running': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update Max Running
+     * @description Update the number of tasks that can be running concurrently for a given workflow.
+     */
+    put: operations['update_max_running_api_v3_workflow__workflow_id__update_max_concurrently_running_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/task_status_updates': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Task Status Updates
+     * @description Returns all tasks in the database that have the specified status.
+     *
+     *     Args:
+     *         workflow_id (int): the ID of the workflow.
+     *         request (Request): the request object.
+     */
+    post: operations['task_status_updates_api_v3_workflow__workflow_id__task_status_updates_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/fetch_workflow_metadata': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Fetch Workflow Metadata
+     * @description Get metadata associated with specified Workflow ID.
+     */
+    get: operations['fetch_workflow_metadata_api_v3_workflow__workflow_id__fetch_workflow_metadata_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/get_tasks/{workflow_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Tasks From Workflow
+     * @description Return tasks associated with specified Workflow ID.
+     */
+    get: operations['get_tasks_from_workflow_api_v3_workflow_get_tasks__workflow_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_status/available_status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Available Workflow Statuses
+     * @description Return all available workflow statuses.
+     */
+    get: operations['get_available_workflow_statuses_api_v3_workflow_status_available_status_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/update_array_max_concurrently_running': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update Array Max Running
+     * @description Update the number of tasks that can be running concurrently for a given Array.
+     */
+    put: operations['update_array_max_running_api_v3_workflow__workflow_id__update_array_max_concurrently_running_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/task_template_dag': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Task Template Dag
+     * @description Compute the shape of a Workflow's DAG by TaskTemplate.
+     */
+    get: operations['task_template_dag_api_v3_workflow__workflow_id__task_template_dag_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_run': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Workflow Run
+     * @description Add a workflow run to the db.
+     */
+    post: operations['add_workflow_run_api_v3_workflow_run_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_run/{workflow_run_id}/terminate_task_instances': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Terminate Workflow Run
+     * @description Terminate a workflow run and get its tasks in order.
+     */
+    put: operations['terminate_workflow_run_api_v3_workflow_run__workflow_run_id__terminate_task_instances_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_run/{workflow_run_id}/log_heartbeat': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Workflow Run Heartbeat
+     * @description Log a heartbeat for the workflow run to show that the client side is still alive.
+     */
+    post: operations['log_workflow_run_heartbeat_api_v3_workflow_run__workflow_run_id__log_heartbeat_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_run/{workflow_run_id}/update_status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Log Workflow Run Status Update
+     * @description Update the status of the workflow run.
+     */
+    put: operations['log_workflow_run_status_update_api_v3_workflow_run__workflow_run_id__update_status_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_run/{workflow_run_id}/sync_status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Task Instances Status Check
+     * @description Sync status of given task intance IDs.
+     */
+    post: operations['task_instances_status_check_api_v3_workflow_run__workflow_run_id__sync_status_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_run/{workflow_run_id}/set_status_for_triaging': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Set Status For Triaging
+     * @description Two triaging related status sets.
+     *
+     *     Query all task instances that are submitted to distributor or running which haven't
+     *     reported as alive in the allocated time, and set them for Triaging(from Running)
+     *     and Kill_self(from Launched).
+     */
+    post: operations['set_status_for_triaging_api_v3_workflow_run__workflow_run_id__set_status_for_triaging_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/array/{workflow_id}/get_array_tasks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Array Task Instances
+     * @description Return error/output filepaths for task instances filtered by array name.
+     *
+     *     The user can also optionally filter by job name as well.
+     *
+     *     To avoid overly-large returned results, the user must also pass in a workflow ID.
+     */
+    get: operations['get_array_task_instances_api_v3_array__workflow_id__get_array_tasks_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Status
+     * @description Get the status of a task.
+     */
+    get: operations['get_task_status_api_v3_task_status_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task/subdag': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Task Subdag
+     * @description Used to get the sub dag  of a given task.
+     *
+     *     It returns a list of sub tasks as well as a list of sub nodes.
+     */
+    post: operations['get_task_subdag_api_v3_task_subdag_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task/update_statuses': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update Task Statuses
+     * @description Update the status of the tasks.
+     *
+     *     Description:
+     *         - When workflow_id='all', it updates all tasks in the workflow with
+     *         recursive=False. This improves performance.
+     *         - When recursive=True, it updates the tasks and it's dependencies all
+     *         the way up or down the DAG.
+     *         - When recursive=False, it updates only the tasks in the task_ids list.
+     *         - When workflow_status is None, it gets the workflow status from the db.
+     *         - After updating the tasks, it checks the workflow status and updates it.
+     *
+     *     Notes:
+     *         This API is different from v2.
+     *         It integrated the logic in update_task_status from status_commands.py.
+     *     TODO:
+     *     - Once CLI moves to v3, simplify update_task_status to avoid duplication.
+     */
+    put: operations['update_task_statuses_api_v3_task_update_statuses_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_dependencies/{task_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Dependencies
+     * @description Get task's downstream and upstream tasks and their status.
+     */
+    get: operations['get_task_dependencies_api_v3_task_dependencies__task_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/tasks_recursive/{direction}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Get Tasks Recursive
+     * @description Get all input task_ids'.
+     *
+     *     Either downstream or upsteam tasks based on direction;
+     *     return all recursive(including input set) task_ids in the defined direction.
+     */
+    put: operations['get_tasks_recursive_api_v3_tasks_recursive__direction__put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_resource_usage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Resource Usage
+     * @description Return the resource usage for a given Task ID.
+     */
+    get: operations['get_task_resource_usage_api_v3_task_resource_usage_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task/get_downstream_tasks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Downstream Tasks
+     * @description Get only the direct downstreams of a task.
+     */
+    post: operations['get_downstream_tasks_api_v3_task_get_downstream_tasks_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task/get_ti_details_viz/{task_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Details
+     * @description Get information about TaskInstances associated with specific Task ID.
+     */
+    get: operations['get_task_details_api_v3_task_get_ti_details_viz__task_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task/get_task_details_viz/{task_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Details Viz
+     * @description Get status of Task from Task ID.
+     */
+    get: operations['get_task_details_viz_api_v3_task_get_task_details_viz__task_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_validation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Workflow Validation Status
+     * @description Check if workflow is valid.
+     */
+    post: operations['get_workflow_validation_status_api_v3_workflow_validation_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/workflow_tasks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow Tasks
+     * @description Get the tasks for a given workflow.
+     */
+    get: operations['get_workflow_tasks_api_v3_workflow__workflow_id__workflow_tasks_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/validate_username/{username}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow User Validation
+     * @description Return all usernames associated with a given workflow_id's workflow runs.
+     *
+     *     Used to validate permissions for a self-service request.
+     */
+    get: operations['get_workflow_user_validation_api_v3_workflow__workflow_id__validate_username__username__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/validate_for_workflow_reset/{username}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow Run For Workflow Reset
+     * @description Last workflow_run_id associated with a given workflow_id started by the username.
+     *
+     *     Used to validate for workflow_reset:
+     *         1. The last workflow_run of the current workflow must be in error state.
+     *         2. This last workflow_run must have been started by the input username.
+     *         3. This last workflow_run is in status 'E'
+     */
+    get: operations['get_workflow_run_for_workflow_reset_api_v3_workflow__workflow_id__validate_for_workflow_reset__username__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/reset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Reset Workflow
+     * @description Update the workflow's status, all its tasks' statuses to 'G'.
+     */
+    put: operations['reset_workflow_api_v3_workflow__workflow_id__reset_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow Status
+     * @description Get the status of the workflow.
+     */
+    get: operations['get_workflow_status_api_v3_workflow_status_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_status_viz': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow Status Viz
+     * @description Get the status of the workflows for GUI.
+     */
+    get: operations['get_workflow_status_viz_api_v3_workflow_status_viz_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_overview_viz': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Workflows By User Form
+     * @description Fetch associated workflows and workflow runs by username.
+     */
+    get: operations['workflows_by_user_form_api_v3_workflow_overview_viz_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_table_viz/{workflow_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Task Details By Wf Id
+     * @description Fetch Task details associated with Workflow ID and TaskTemplate name.
+     */
+    get: operations['task_details_by_wf_id_api_v3_task_table_viz__workflow_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_details_viz/{workflow_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Wf Details By Wf Id
+     * @description Fetch name, args, dates, tool for a Workflow provided WF ID.
+     */
+    get: operations['wf_details_by_wf_id_api_v3_workflow_details_viz__workflow_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/get_task_template_details': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Template Details For Workflow
+     * @description Fetch Task Template details (ID, Name, and Version) for a given Workflow.
+     */
+    get: operations['get_task_template_details_for_workflow_api_v3_get_task_template_details_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/get_task_template_version': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Template Version For Tasks
+     * @description Get the task_template_version_ids.
+     */
+    get: operations['get_task_template_version_for_tasks_api_v3_get_task_template_version_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/get_requested_cores': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Requested Cores
+     * @description Get the min, max, and arg of requested cores.
+     */
+    get: operations['get_requested_cores_api_v3_get_requested_cores_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/get_most_popular_queue': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Most Popular Queue
+     * @description Get the most popular queue of the task template.
+     */
+    get: operations['get_most_popular_queue_api_v3_get_most_popular_queue_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/task_template_resource_usage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Task Template Resource Usage
+     * @description Return the aggregate resource usage for a give TaskTemplate.
+     *
+     *     Need to use cross_origin decorator when using the GUI to call a post route.
+     *     This enables Cross Origin Resource Sharing (CORS) on the route. Default is
+     *     most permissive settings.
+     */
+    post: operations['get_task_template_resource_usage_api_v3_task_template_resource_usage_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_tt_status_viz/{workflow_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow Tt Status Viz
+     * @description Get the status of the workflows for GUI.
+     */
+    get: operations['get_workflow_tt_status_viz_api_v3_workflow_tt_status_viz__workflow_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/tt_error_log_viz/{wf_id}/{tt_id}/{ti_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Tt Error Log Viz
+     * @description Get the error logs for a task template id for GUI.
+     */
+    get: operations['get_tt_error_log_viz_api_v3_tt_error_log_viz__wf_id___tt_id___ti_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/tt_error_log_viz/{wf_id}/{tt_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Tt Error Log Viz
+     * @description Get the error logs for a task template id for GUI.
+     */
+    get: operations['get_tt_error_log_viz_api_v3_tt_error_log_viz__wf_id___tt_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/fix_status_inconsistency': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Fix Wf Inconsistency
+     * @description Find wf in F with all tasks in D and fix them.
+     *
+     *     For flexibility, pass in the step size. It is easier to redeploy the reaper than the
+     *     service.
+     */
+    put: operations['fix_wf_inconsistency_api_v3_workflow__workflow_id__fix_status_inconsistency_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow/{workflow_id}/workflow_name_and_args': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Wf Name And Args
+     * @description Return workflow name and args associated with specified workflow ID.
+     */
+    get: operations['get_wf_name_and_args_api_v3_workflow__workflow_id__workflow_name_and_args_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/lost_workflow_run': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Lost Workflow Runs
+     * @description Return all workflow runs that are currently in the specified state.
+     */
+    get: operations['get_lost_workflow_runs_api_v3_lost_workflow_run_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/workflow_run/{workflow_run_id}/reap': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Reap Workflow Run
+     * @description If the last task was more than 2 minutes ago, transition wfr to A state.
+     *
+     *     Also check WorkflowRun status_date to avoid possible race condition where reaper
+     *     checks tasks from a different WorkflowRun with the same workflow id. Avoid setting
+     *     while waiting for a resume (when workflow is in suspended state).
+     */
+    put: operations['reap_workflow_run_api_v3_workflow_run__workflow_run_id__reap_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Is Alive
+     * @description Test connectivity to the database.
+     */
+    get: operations['is_alive_api_v3__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/time': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Pst Now
+     * @description Get the current time in the Pacific.
+     */
+    get: operations['get_pst_now_api_v3_time_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Health
+     * @description Test connectivity to the app.
+     */
+    get: operations['health_api_v3_health_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/test_bad': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Test Route
+     * @description Test route.
+     */
+    get: operations['test_route_api_v3_test_bad_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v3/api_version': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Api Version
+     * @description Test connectivity to the database.
+     */
+    get: operations['api_version_api_v3_api_version_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/array': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Array
+     * @description Return an array ID by workflow and task template version ID.
+     *
+     *     If not found, bind the array.
+     */
+    post: operations['add_array_api_v2_array_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/array/{array_id}/queue_task_batch': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Record Array Batch Num
+     * @description Record a batch number to associate sets of task instances with an array submission.
+     */
+    post: operations['record_array_batch_num_api_v2_array__array_id__queue_task_batch_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/array/{array_id}/transition_to_launched': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Transition Array To Launched
+     * @description Transition TIs associated with an array_id and batch_num to launched.
+     */
+    post: operations['transition_array_to_launched_api_v2_array__array_id__transition_to_launched_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/array/{array_id}/log_distributor_id': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Array Distributor Id
+     * @description Add distributor_id, stderr/stdout paths to the DB for all TIs in an array.
+     */
+    post: operations['log_array_distributor_id_api_v2_array__array_id__log_distributor_id_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/get_array_max_concurrently_running/{task_template_version_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Array Max Concurrently Running
+     * @description Return the maximum concurrency of this array.
+     */
+    get: operations['get_array_max_concurrently_running_api_v2_workflow__workflow_id__get_array_max_concurrently_running__task_template_version_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/array/{array_id}/get_array_max_concurrently_running': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Array Max Concurrently Running
+     * @description Return the maximum concurrency of this array.
+     */
+    get: operations['get_array_max_concurrently_running_api_v2_array__array_id__get_array_max_concurrently_running_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/array/{array_id}/transition_to_killed': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Transition To Killed
+     * @description Transition TIs from KILL_SELF  to ERROR_FATAL.
+     *
+     *     Also mark parent Tasks with status=ERROR_FATAL if they're in a killable state.
+     */
+    post: operations['transition_to_killed_api_v2_array__array_id__transition_to_killed_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/cluster/{cluster_name}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Cluster By Name
+     * @description Get the id, cluster_type_name and connection_parameters of a Cluster.
+     */
+    get: operations['get_cluster_by_name_api_v2_cluster__cluster_name__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/dag': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Dag
+     * @description Add a new dag to the database.
+     *
+     *     Args:
+     *         request: The request object.
+     */
+    post: operations['add_dag_api_v2_dag_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/dag/{dag_id}/edges': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Edges
+     * @description Add edges to the edge table.
+     */
+    post: operations['add_edges_api_v2_dag__dag_id__edges_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/nodes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Nodes
+     * @description Add a chunk of nodes to the database.
+     *
+     *     Args:
+     *         request: The request object.
+     */
+    post: operations['add_nodes_api_v2_nodes_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/cluster/{cluster_id}/queue/{queue_name}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Queue By Cluster Queue Names
+     * @description Get the id, name, cluster_name and parameters of a Queue.
+     *
+     *     Based on cluster_name and queue_name.
+     */
+    get: operations['get_queue_by_cluster_queue_names_api_v2_cluster__cluster_id__queue__queue_name__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task/bind_tasks_no_args': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Bind Tasks No Args
+     * @description Bind the task objects to the database.
+     */
+    put: operations['bind_tasks_no_args_api_v2_task_bind_tasks_no_args_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task/bind_task_args': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Bind Task Args
+     * @description Add task args and associated task ids to the database.
+     */
+    put: operations['bind_task_args_api_v2_task_bind_task_args_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task/bind_task_attributes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Bind Task Attributes
+     * @description Add task attributes and associated attribute types to the database.
+     */
+    put: operations['bind_task_attributes_api_v2_task_bind_task_attributes_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task/bind_resources': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Bind Task Resources
+     * @description Add the task resources for a given task.
+     */
+    post: operations['bind_task_resources_api_v2_task_bind_resources_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task/{task_id}/most_recent_ti_error': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Most Recent Ti Error
+     * @description Route to determine the cause of the most recent task_instance's error.
+     */
+    get: operations['get_most_recent_ti_error_api_v2_task__task_id__most_recent_ti_error_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task/{workflow_id}/set_resume_state': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Set Task Resume State
+     * @description An endpoint to set all tasks to a resumable state for a workflow.
+     */
+    post: operations['set_task_resume_state_api_v2_task__workflow_id__set_resume_state_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_instance/{task_instance_id}/log_running': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Running
+     * @description Log a task_instance as running.
+     *
+     *     Args:
+     *         task_instance_id: id of the task_instance to log as running
+     *         request: fastapi request object
+     */
+    post: operations['log_running_api_v2_task_instance__task_instance_id__log_running_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_instance/{task_instance_id}/log_report_by': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Ti Report By
+     * @description Log a task_instance as being responsive with a new report_by_date.
+     *
+     *     This is done at the worker node heartbeat_interval rate, so it may not happen at the same
+     *     rate that the reconciler updates batch submitted report_by_dates (also because it causes
+     *     a lot of traffic if all workers are logging report by_dates often compared to if the
+     *     reconciler runs often).
+     *
+     *     Args:
+     *         task_instance_id: id of the task_instance to log
+     *         request: fastapi request object
+     */
+    post: operations['log_ti_report_by_api_v2_task_instance__task_instance_id__log_report_by_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_instance/log_report_by/batch': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Ti Report By Batch
+     * @description Log task_instances as being responsive with a new report_by_date.
+     *
+     *     This is done at the worker node heartbeat_interval rate, so it may not happen at the same
+     *     rate that the reconciler updates batch submitted report_by_dates (also because it causes
+     *     a lot of traffic if all workers are logging report by_dates often compared to if the
+     *     reconciler runs often).
+     *
+     *     Args:
+     *         task_instance_id: id of the task_instance to log
+     *         request: fastapi request object
+     */
+    post: operations['log_ti_report_by_batch_api_v2_task_instance_log_report_by_batch_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_instance/{task_instance_id}/log_done': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Done
+     * @description Log a task_instance as done.
+     *
+     *     Args:
+     *         task_instance_id: id of the task_instance to log done
+     *         request: fastapi request object
+     */
+    post: operations['log_done_api_v2_task_instance__task_instance_id__log_done_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_instance/{task_instance_id}/log_error_worker_node': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Error Worker Node
+     * @description Log a task_instance as errored.
+     *
+     *     Args:
+     *         task_instance_id (str): id of the task_instance to log done
+     *         request (Request): fastapi request object
+     */
+    post: operations['log_error_worker_node_api_v2_task_instance__task_instance_id__log_error_worker_node_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_instance/{task_instance_id}/task_instance_error_log': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Instance Error Log
+     * @description Route to return all task_instance_error_log entries of the task_instance_id.
+     *
+     *     Args:
+     *         task_instance_id (int): ID of the task instance
+     *
+     *     Return:
+     *         jsonified task_instance_error_log result set
+     */
+    get: operations['get_task_instance_error_log_api_v2_task_instance__task_instance_id__task_instance_error_log_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/get_array_task_instance_id/{array_id}/{batch_num}/{step_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Array Task Instance Id
+     * @description Given an array ID and an index, select a single task instance ID.
+     *
+     *     Task instance IDs that are associated with the array are ordered, and selected by index.
+     *     This route will be called once per array task instance worker node, so must be scalable.
+     */
+    get: operations['get_array_task_instance_id_api_v2_get_array_task_instance_id__array_id___batch_num___step_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_instance/{task_instance_id}/log_no_distributor_id': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log No Distributor Id
+     * @description Log a task_instance_id that did not get an distributor_id upon submission.
+     */
+    post: operations['log_no_distributor_id_api_v2_task_instance__task_instance_id__log_no_distributor_id_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_instance/{task_instance_id}/log_distributor_id': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Distributor Id
+     * @description Log a task_instance's distributor id.
+     *
+     *     Args:
+     *         task_instance_id: id of the task_instance to log
+     *         request: fastapi request object
+     */
+    post: operations['log_distributor_id_api_v2_task_instance__task_instance_id__log_distributor_id_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_instance/{task_instance_id}/log_known_error': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Known Error
+     * @description Log a task_instance as errored.
+     *
+     *     Args:
+     *         task_instance_id (int): id for task instance.
+     *         request (Request): fastapi request object.
+     */
+    post: operations['log_known_error_api_v2_task_instance__task_instance_id__log_known_error_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_instance/{task_instance_id}/log_unknown_error': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Unknown Error
+     * @description Log a task_instance as errored.
+     *
+     *     Args:
+     *         task_instance_id (int): id for task instance
+     *         request (Request): fastapi request object
+     */
+    post: operations['log_unknown_error_api_v2_task_instance__task_instance_id__log_unknown_error_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_instance/instantiate_task_instances': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Instantiate Task Instances
+     * @description Sync status of given task intance IDs.
+     */
+    post: operations['instantiate_task_instances_api_v2_task_instance_instantiate_task_instances_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_template': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Task Template
+     * @description Add a task template for a given tool to the database.
+     */
+    post: operations['get_task_template_api_v2_task_template_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_template/{task_template_id}/versions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Template Versions
+     * @description Get the latest task_template_version.
+     */
+    get: operations['get_task_template_versions_api_v2_task_template__task_template_id__versions_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_template/{task_template_id}/add_version': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Task Template Version
+     * @description Add a tool to the database.
+     */
+    post: operations['add_task_template_version_api_v2_task_template__task_template_id__add_version_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_resources/{task_resources_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Task Resources
+     * @description Return an task_resources.
+     */
+    post: operations['get_task_resources_api_v2_task_resources__task_resources_id__post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/tool': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Tool
+     * @description Add a tool to the database.
+     */
+    post: operations['add_tool_api_v2_tool_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/tool/{tool_id}/tool_versions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Tool Versions
+     * @description Get the Tool Version.
+     */
+    get: operations['get_tool_versions_api_v2_tool__tool_id__tool_versions_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/tool/{tool_name}/tool_resource_usage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Tool Resource Usage
+     * @description Gets resource usage and node args for all TaskInstances associated with a given tool.
+     *
+     *     We limit this to one week time spans to not overwhelm the database.
+     *
+     *     Args:
+     *         tool_name (str): Name of the tool.
+     *         start_date (str): The start date in 'YYYY-MM-DD' format (query parameter).
+     *         end_date (str): The end date in 'YYYY-MM-DD' format (query parameter).
+     *
+     *     Returns:
+     *         List[Dict[str, Any]]: A list of dictionaries containing TaskInstance ID,
+     *         node argument value, TaskInstance maxrss, TaskInstance wallclock, and
+     *         requested resources.
+     *
+     *     Example Call:
+     *         /tool/large_wf_tool/tool_resource_usage?start_date=2024-07-11&end_date=2024-07-18
+     *
+     *     Example Response:
+     *         [
+     *             {
+     *                 "node_arg_val": "--provenance True",
+     *                 "ti_id": 12345677,
+     *                 "ti_maxrss": 50844672,
+     *                 "ti_requested_resources": {"runtime": 21600, "memory": 10},
+     *                 "ti_wallclock": 20
+     *             },
+     *             {
+     *                 "node_arg_val": "--intrinsic False",
+     *                 "ti_id": 12345678,
+     *                 "ti_maxrss": 43960320,
+     *                 "ti_requested_resources": {"runtime": 21600, "memory": 10},
+     *                 "ti_wallclock": 22
+     *             }
+     *         ]
+     */
+    get: operations['get_tool_resource_usage_api_v2_tool__tool_name__tool_resource_usage_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/tool_version': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Tool Version
+     * @description Add a new version for a Tool.
+     */
+    post: operations['add_tool_version_api_v2_tool_version_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/tool_version/{tool_version_id}/task_templates': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Templates
+     * @description Get the Tool Version.
+     */
+    get: operations['get_task_templates_api_v2_tool_version__tool_version_id__task_templates_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Bind Workflow
+     * @description Bind a workflow to the database.
+     */
+    post: operations['bind_workflow_api_v2_workflow_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_args_hash}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Matching Workflows By Workflow Args
+     * @description Return any dag hashes that are assigned to workflows with identical workflow args.
+     */
+    get: operations['get_matching_workflows_by_workflow_args_api_v2_workflow__workflow_args_hash__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/workflow_attributes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update Workflow Attribute
+     * @description Update the attributes for a given workflow.
+     */
+    put: operations['update_workflow_attribute_api_v2_workflow__workflow_id__workflow_attributes_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/set_resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Set Resume
+     * @description Set resume on a workflow.
+     */
+    post: operations['set_resume_api_v2_workflow__workflow_id__set_resume_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/is_resumable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Workflow Is Resumable
+     * @description Check if a workflow is in a resumable state.
+     */
+    get: operations['workflow_is_resumable_api_v2_workflow__workflow_id__is_resumable_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/get_max_concurrently_running': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Max Concurrently Running
+     * @description Return the maximum concurrency of this workflow.
+     */
+    get: operations['get_max_concurrently_running_api_v2_workflow__workflow_id__get_max_concurrently_running_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/update_max_concurrently_running': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update Max Running
+     * @description Update the number of tasks that can be running concurrently for a given workflow.
+     */
+    put: operations['update_max_running_api_v2_workflow__workflow_id__update_max_concurrently_running_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/task_status_updates': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Task Status Updates
+     * @description Returns all tasks in the database that have the specified status.
+     *
+     *     Args:
+     *         workflow_id (int): the ID of the workflow.
+     *         request (Request): the request object.
+     */
+    post: operations['task_status_updates_api_v2_workflow__workflow_id__task_status_updates_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/fetch_workflow_metadata': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Fetch Workflow Metadata
+     * @description Get metadata associated with specified Workflow ID.
+     */
+    get: operations['fetch_workflow_metadata_api_v2_workflow__workflow_id__fetch_workflow_metadata_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/get_tasks/{workflow_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Tasks From Workflow
+     * @description Return tasks associated with specified Workflow ID.
+     */
+    get: operations['get_tasks_from_workflow_api_v2_workflow_get_tasks__workflow_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_status/available_status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Available Workflow Statuses
+     * @description Return all available workflow statuses.
+     */
+    get: operations['get_available_workflow_statuses_api_v2_workflow_status_available_status_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_run': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Add Workflow Run
+     * @description Add a workflow run to the db.
+     */
+    post: operations['add_workflow_run_api_v2_workflow_run_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_run/{workflow_run_id}/terminate_task_instances': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Terminate Workflow Run
+     * @description Terminate a workflow run and get its tasks in order.
+     */
+    put: operations['terminate_workflow_run_api_v2_workflow_run__workflow_run_id__terminate_task_instances_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_run/{workflow_run_id}/log_heartbeat': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Log Workflow Run Heartbeat
+     * @description Log a heartbeat for the workflow run to show that the client side is still alive.
+     */
+    post: operations['log_workflow_run_heartbeat_api_v2_workflow_run__workflow_run_id__log_heartbeat_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_run/{workflow_run_id}/update_status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Log Workflow Run Status Update
+     * @description Update the status of the workflow run.
+     */
+    put: operations['log_workflow_run_status_update_api_v2_workflow_run__workflow_run_id__update_status_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_run/{workflow_run_id}/sync_status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Task Instances Status Check
+     * @description Sync status of given task intance IDs.
+     */
+    post: operations['task_instances_status_check_api_v2_workflow_run__workflow_run_id__sync_status_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_run/{workflow_run_id}/set_status_for_triaging': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Set Status For Triaging
+     * @description Two triaging related status sets.
+     *
+     *     Query all task instances that are submitted to distributor or running which haven't
+     *     reported as alive in the allocated time, and set them for Triaging(from Running)
+     *     and Kill_self(from Launched).
+     */
+    post: operations['set_status_for_triaging_api_v2_workflow_run__workflow_run_id__set_status_for_triaging_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/array/{workflow_id}/get_array_tasks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Array Task Instances
+     * @description Return error/output filepaths for task instances filtered by array name.
+     *
+     *     The user can also optionally filter by job name as well.
+     *
+     *     To avoid overly-large returned results, the user must also pass in a workflow ID.
+     */
+    get: operations['get_array_task_instances_api_v2_array__workflow_id__get_array_tasks_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Status
+     * @description Get the status of a task.
+     */
+    get: operations['get_task_status_api_v2_task_status_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task/subdag': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Task Subdag
+     * @description Used to get the sub dag  of a given task.
+     *
+     *     It returns a list of sub tasks as well as a list of sub nodes.
+     */
+    post: operations['get_task_subdag_api_v2_task_subdag_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task/update_statuses': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Update Task Statuses
+     * @description Update the status of the tasks.
+     */
+    put: operations['update_task_statuses_api_v2_task_update_statuses_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_dependencies/{task_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Dependencies
+     * @description Get task's downstream and upstream tasks and their status.
+     */
+    get: operations['get_task_dependencies_api_v2_task_dependencies__task_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/tasks_recursive/{direction}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Get Tasks Recursive
+     * @description Get all input task_ids'.
+     *
+     *     Either downstream or upsteam tasks based on direction;
+     *     return all recursive(including input set) task_ids in the defined direction.
+     */
+    put: operations['get_tasks_recursive_api_v2_tasks_recursive__direction__put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_resource_usage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Resource Usage
+     * @description Return the resource usage for a given Task ID.
+     */
+    get: operations['get_task_resource_usage_api_v2_task_resource_usage_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task/get_downstream_tasks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Downstream Tasks
+     * @description Get only the direct downstreams of a task.
+     */
+    post: operations['get_downstream_tasks_api_v2_task_get_downstream_tasks_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task/get_ti_details_viz/{task_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Details
+     * @description Get information about TaskInstances associated with specific Task ID.
+     */
+    get: operations['get_task_details_api_v2_task_get_ti_details_viz__task_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task/get_task_details_viz/{task_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Details Viz
+     * @description Get status of Task from Task ID.
+     */
+    get: operations['get_task_details_viz_api_v2_task_get_task_details_viz__task_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/get_task_template_details': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Template Details For Workflow
+     * @description Get the details of a task template for a given workflow.
+     */
+    get: operations['get_task_template_details_for_workflow_api_v2_get_task_template_details_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/get_task_template_version': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Task Template Version For Tasks
+     * @description Get the task template version for the given tasks or workflow.
+     */
+    get: operations['get_task_template_version_for_tasks_api_v2_get_task_template_version_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/get_requested_cores': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Requested Cores
+     * @description Get the requested cores for the given task template version ids.
+     */
+    get: operations['get_requested_cores_api_v2_get_requested_cores_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/get_most_popular_queue': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Most Popular Queue
+     * @description Get the most popular queue for the given task template version ids.
+     */
+    get: operations['get_most_popular_queue_api_v2_get_most_popular_queue_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_template_resource_usage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Task Template Resource Usage
+     * @description Get the resource usage for the given task template.
+     */
+    post: operations['get_task_template_resource_usage_api_v2_task_template_resource_usage_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_tt_status_viz/{workflow_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow Tt Status Viz
+     * @description Get the status visualization for the given workflow.
+     */
+    get: operations['get_workflow_tt_status_viz_api_v2_workflow_tt_status_viz__workflow_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/tt_error_log_viz/{wf_id}/{tt_id}/{ti_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Tt Error Log Viz
+     * @description Get the error logs for a task template id for GUI.
+     */
+    get: operations['get_tt_error_log_viz_api_v2_tt_error_log_viz__wf_id___tt_id___ti_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/tt_error_log_viz/{wf_id}/{tt_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Tt Error Log Viz
+     * @description Get the error logs for a task template id for GUI.
+     */
+    get: operations['get_tt_error_log_viz_api_v2_tt_error_log_viz__wf_id___tt_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_validation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get Workflow Validation Status
+     * @description Check if workflow is valid.
+     */
+    post: operations['get_workflow_validation_status_api_v2_workflow_validation_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/workflow_tasks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow Tasks
+     * @description Get the tasks for a given workflow.
+     */
+    get: operations['get_workflow_tasks_api_v2_workflow__workflow_id__workflow_tasks_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/validate_username/{username}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow User Validation
+     * @description Return all usernames associated with a given workflow_id's workflow runs.
+     *
+     *     Used to validate permissions for a self-service request.
+     */
+    get: operations['get_workflow_user_validation_api_v2_workflow__workflow_id__validate_username__username__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/validate_for_workflow_reset/{username}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow Run For Workflow Reset
+     * @description Last workflow_run_id associated with a given workflow_id started by the username.
+     *
+     *     Used to validate for workflow_reset:
+     *         1. The last workflow_run of the current workflow must be in error state.
+     *         2. This last workflow_run must have been started by the input username.
+     *         3. This last workflow_run is in status 'E'
+     */
+    get: operations['get_workflow_run_for_workflow_reset_api_v2_workflow__workflow_id__validate_for_workflow_reset__username__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/reset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Reset Workflow
+     * @description Update the workflow's status, all its tasks' statuses to 'G'.
+     */
+    put: operations['reset_workflow_api_v2_workflow__workflow_id__reset_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow Status
+     * @description Get the status of the workflow.
+     */
+    get: operations['get_workflow_status_api_v2_workflow_status_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_status_viz': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow Status Viz
+     * @description Get the status of the workflows for GUI.
+     */
+    get: operations['get_workflow_status_viz_api_v2_workflow_status_viz_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_overview_viz': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Workflows By User Form
+     * @description Fetch associated workflows and workflow runs by username.
+     */
+    get: operations['workflows_by_user_form_api_v2_workflow_overview_viz_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/task_table_viz/{workflow_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Task Details By Wf Id
+     * @description Fetch Task details associated with Workflow ID and TaskTemplate name.
+     */
+    get: operations['task_details_by_wf_id_api_v2_task_table_viz__workflow_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_details_viz/{workflow_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Wf Details By Wf Id
+     * @description Fetch name, args, dates, tool for a Workflow provided WF ID.
+     */
+    get: operations['wf_details_by_wf_id_api_v2_workflow_details_viz__workflow_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/fix_status_inconsistency': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Fix Wf Inconsistency
+     * @description Find wf in F with all tasks in D and fix them.
+     *
+     *     For flexibility, pass in the step size. It is easier to redeploy the reaper than the
+     *     service.
+     */
+    put: operations['fix_wf_inconsistency_api_v2_workflow__workflow_id__fix_status_inconsistency_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow/{workflow_id}/workflow_name_and_args': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Wf Name And Args
+     * @description Return workflow name and args associated with specified workflow ID.
+     */
+    get: operations['get_wf_name_and_args_api_v2_workflow__workflow_id__workflow_name_and_args_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/lost_workflow_run': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Lost Workflow Runs
+     * @description Return all workflow runs that are currently in the specified state.
+     */
+    get: operations['get_lost_workflow_runs_api_v2_lost_workflow_run_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/workflow_run/{workflow_run_id}/reap': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Reap Workflow Run
+     * @description If the last task was more than 2 minutes ago, transition wfr to A state.
+     *
+     *     Also check WorkflowRun status_date to avoid possible race condition where reaper
+     *     checks tasks from a different WorkflowRun with the same workflow id. Avoid setting
+     *     while waiting for a resume (when workflow is in suspended state).
+     */
+    put: operations['reap_workflow_run_api_v2_workflow_run__workflow_run_id__reap_put'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Is Alive
+     * @description Test connectivity to the database.
+     */
+    get: operations['is_alive_api_v2__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/time': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Pst Now
+     * @description Get the current time in the Pacific.
+     */
+    get: operations['get_pst_now_api_v2_time_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/health': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Health
+     * @description Test connectivity to the app.
+     */
+    get: operations['health_api_v2_health_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/test_bad': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Test Route
+     * @description Test route.
+     */
+    get: operations['test_route_api_v2_test_bad_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v2/api_version': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Api Version
+     * @description Test connectivity to the database.
+     */
+    get: operations['api_version_api_v2_api_version_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
-        /** TaskResourceVizItem */
-        TaskResourceVizItem: {
-            /** R */
-            r?: number | null;
-            /** M */
-            m?: number | null;
-            /** Node Id */
-            node_id: number;
-            /** Task Id */
-            task_id: number;
-            /** Requested Resources */
-            requested_resources?: string | null;
-            /** Attempt Number Of Instance */
-            attempt_number_of_instance?: number | null;
-            /** Status */
-            status?: string | null;
-        };
-        /** TaskTemplateResourceUsageRequest */
-        TaskTemplateResourceUsageRequest: {
-            /** Task Template Version Id */
-            task_template_version_id: number;
-            /** Workflows */
-            workflows?: number[] | null;
-            /** Node Args */
-            node_args?: {
-                [key: string]: string[];
-            } | null;
-            /** Ci */
-            ci?: string | null;
-            /**
-             * Viz
-             * @default false
-             */
-            viz: boolean;
-        };
-        /** TaskTemplateResourceUsageResponse */
-        TaskTemplateResourceUsageResponse: {
-            /** Num Tasks */
-            num_tasks?: number | null;
-            /** Min Mem */
-            min_mem?: number | null;
-            /** Max Mem */
-            max_mem?: number | null;
-            /** Mean Mem */
-            mean_mem?: number | null;
-            /** Min Runtime */
-            min_runtime?: number | null;
-            /** Max Runtime */
-            max_runtime?: number | null;
-            /** Mean Runtime */
-            mean_runtime?: number | null;
-            /** Median Mem */
-            median_mem?: number | null;
-            /** Median Runtime */
-            median_runtime?: number | null;
-            /** Ci Mem */
-            ci_mem?: (number | null)[] | null;
-            /** Ci Runtime */
-            ci_runtime?: (number | null)[] | null;
-            /** Result Viz */
-            result_viz?: components["schemas"]["TaskResourceVizItem"][] | null;
-        };
-        /** User */
-        User: {
-            /** Sub */
-            sub: string;
-            /** Email */
-            email: string;
-            /** Preferred Username */
-            preferred_username: string;
-            /** Name */
-            name: string;
-            /** Updated At */
-            updated_at: number;
-            /** Given Name */
-            given_name: string;
-            /** Family Name */
-            family_name: string;
-            /** Groups */
-            groups: string[];
-            /** Nonce */
-            nonce: string;
-            /** At Hash */
-            at_hash: string;
-            /** Sid */
-            sid: string;
-            /** Aud */
-            aud: string;
-            /** Exp */
-            exp: number;
-            /** Iat */
-            iat: number;
-            /** Iss */
-            iss: string;
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-        };
+  schemas: {
+    /** HTTPValidationError */
+    HTTPValidationError: {
+      /** Detail */
+      detail?: components['schemas']['ValidationError'][];
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    /** TaskResourceVizItem */
+    TaskResourceVizItem: {
+      /** R */
+      r?: number | null;
+      /** M */
+      m?: number | null;
+      /** Node Id */
+      node_id: number;
+      /** Task Id */
+      task_id: number;
+      /** Requested Resources */
+      requested_resources?: string | null;
+      /** Attempt Number Of Instance */
+      attempt_number_of_instance?: number | null;
+      /** Status */
+      status?: string | null;
+    };
+    /** TaskTemplateResourceUsageRequest */
+    TaskTemplateResourceUsageRequest: {
+      /** Task Template Version Id */
+      task_template_version_id: number;
+      /** Workflows */
+      workflows?: number[] | null;
+      /** Node Args */
+      node_args?: {
+        [key: string]: string[];
+      } | null;
+      /** Ci */
+      ci?: string | null;
+      /**
+       * Viz
+       * @default false
+       */
+      viz: boolean;
+    };
+    /** TaskTemplateResourceUsageResponse */
+    TaskTemplateResourceUsageResponse: {
+      /** Num Tasks */
+      num_tasks?: number | null;
+      /** Min Mem */
+      min_mem?: number | null;
+      /** Max Mem */
+      max_mem?: number | null;
+      /** Mean Mem */
+      mean_mem?: number | null;
+      /** Min Runtime */
+      min_runtime?: number | null;
+      /** Max Runtime */
+      max_runtime?: number | null;
+      /** Mean Runtime */
+      mean_runtime?: number | null;
+      /** Median Mem */
+      median_mem?: number | null;
+      /** Median Runtime */
+      median_runtime?: number | null;
+      /** Ci Mem */
+      ci_mem?: (number | null)[] | null;
+      /** Ci Runtime */
+      ci_runtime?: (number | null)[] | null;
+      /** Result Viz */
+      result_viz?: components['schemas']['TaskResourceVizItem'][] | null;
+    };
+    /** User */
+    User: {
+      /** Sub */
+      sub: string;
+      /** Email */
+      email: string;
+      /** Preferred Username */
+      preferred_username: string;
+      /** Name */
+      name: string;
+      /** Updated At */
+      updated_at: number;
+      /** Given Name */
+      given_name: string;
+      /** Family Name */
+      family_name: string;
+      /** Groups */
+      groups: string[];
+      /** Nonce */
+      nonce: string;
+      /** At Hash */
+      at_hash: string;
+      /** Sid */
+      sid: string;
+      /** Aud */
+      aud: string;
+      /** Exp */
+      exp: number;
+      /** Iat */
+      iat: number;
+      /** Iss */
+      iss: string;
+    };
+    /** ValidationError */
+    ValidationError: {
+      /** Location */
+      loc: (string | number)[];
+      /** Message */
+      msg: string;
+      /** Error Type */
+      type: string;
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    login_api_auth_oidc_login_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    auth_api_auth_oidc_auth_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    userinfo_api_auth_oidc_userinfo_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["User"];
-                };
-            };
-        };
-    };
-    logout_api_auth_oidc_logout_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    add_array_api_v3_array_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    record_array_batch_num_api_v3_array__array_id__queue_task_batch_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                array_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    transition_array_to_launched_api_v3_array__array_id__transition_to_launched_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                array_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_array_distributor_id_api_v3_array__array_id__log_distributor_id_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                array_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_array_max_concurrently_running_api_v3_workflow__workflow_id__get_array_max_concurrently_running__task_template_version_id__get: {
-        parameters: {
-            query?: {
-                array_id?: number | null;
-            };
-            header?: never;
-            path: {
-                workflow_id: number | null;
-                task_template_version_id: number | null;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_array_max_concurrently_running_api_v3_array__array_id__get_array_max_concurrently_running_get: {
-        parameters: {
-            query?: {
-                workflow_id?: number | null;
-                task_template_version_id?: number | null;
-            };
-            header?: never;
-            path: {
-                array_id: number | null;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_cluster_by_name_api_v3_cluster__cluster_name__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                cluster_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_dag_api_v3_dag_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    add_edges_api_v3_dag__dag_id__edges_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                dag_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_nodes_api_v3_nodes_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_queue_by_cluster_queue_names_api_v3_cluster__cluster_id__queue__queue_name__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                cluster_id: number;
-                queue_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    bind_tasks_no_args_api_v3_task_bind_tasks_no_args_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    bind_task_args_api_v3_task_bind_task_args_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    bind_task_attributes_api_v3_task_bind_task_attributes_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    bind_task_resources_api_v3_task_bind_resources_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_most_recent_ti_error_api_v3_task__task_id__most_recent_ti_error_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_task_resume_state_api_v3_task__workflow_id__set_resume_state_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_running_api_v3_task_instance__task_instance_id__log_running_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_ti_report_by_api_v3_task_instance__task_instance_id__log_report_by_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_ti_report_by_batch_api_v3_task_instance_log_report_by_batch_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    log_done_api_v3_task_instance__task_instance_id__log_done_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_error_worker_node_api_v3_task_instance__task_instance_id__log_error_worker_node_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_instance_error_log_api_v3_task_instance__task_instance_id__task_instance_error_log_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_array_task_instance_id_api_v3_get_array_task_instance_id__array_id___batch_num___step_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                array_id: number;
-                batch_num: number;
-                step_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_no_distributor_id_api_v3_task_instance__task_instance_id__log_no_distributor_id_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_distributor_id_api_v3_task_instance__task_instance_id__log_distributor_id_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_known_error_api_v3_task_instance__task_instance_id__log_known_error_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_unknown_error_api_v3_task_instance__task_instance_id__log_unknown_error_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    instantiate_task_instances_api_v3_task_instance_instantiate_task_instances_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_task_template_api_v3_task_template_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_task_template_versions_api_v3_task_template__task_template_id__versions_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_template_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_task_template_version_api_v3_task_template__task_template_id__add_version_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_template_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_template_id_for_task_template_version_api_v3_task_template_id__task_template_version_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_template_version_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": number;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_resources_api_v3_task_resources__task_resources_id__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_resources_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_tool_api_v3_tool_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_tool_versions_api_v3_tool__tool_id__tool_versions_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tool_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_tool_resource_usage_api_v3_tool__tool_name__tool_resource_usage_get: {
-        parameters: {
-            query?: {
-                start_date?: string | null;
-                end_date?: string | null;
-            };
-            header?: never;
-            path: {
-                tool_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_tool_version_api_v3_tool_version_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_task_templates_api_v3_tool_version__tool_version_id__task_templates_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tool_version_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    bind_workflow_api_v3_workflow_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_matching_workflows_by_workflow_args_api_v3_workflow__workflow_args_hash__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_args_hash: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_workflow_attribute_api_v3_workflow__workflow_id__workflow_attributes_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_resume_api_v3_workflow__workflow_id__set_resume_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    workflow_is_resumable_api_v3_workflow__workflow_id__is_resumable_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_max_concurrently_running_api_v3_workflow__workflow_id__get_max_concurrently_running_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_max_running_api_v3_workflow__workflow_id__update_max_concurrently_running_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    task_status_updates_api_v3_workflow__workflow_id__task_status_updates_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    fetch_workflow_metadata_api_v3_workflow__workflow_id__fetch_workflow_metadata_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_tasks_from_workflow_api_v3_workflow_get_tasks__workflow_id__get: {
-        parameters: {
-            query: {
-                max_task_id: number;
-                chunk_size: number;
-            };
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_available_workflow_statuses_api_v3_workflow_status_available_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    update_array_max_running_api_v3_workflow__workflow_id__update_array_max_concurrently_running_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    task_template_dag_api_v3_workflow__workflow_id__task_template_dag_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_workflow_run_api_v3_workflow_run_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    terminate_workflow_run_api_v3_workflow_run__workflow_run_id__terminate_task_instances_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_workflow_run_heartbeat_api_v3_workflow_run__workflow_run_id__log_heartbeat_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_workflow_run_status_update_api_v3_workflow_run__workflow_run_id__update_status_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    task_instances_status_check_api_v3_workflow_run__workflow_run_id__sync_status_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_status_for_triaging_api_v3_workflow_run__workflow_run_id__set_status_for_triaging_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_array_task_instances_api_v3_array__workflow_id__get_array_tasks_get: {
-        parameters: {
-            query: {
-                array_name: string;
-                job_name?: string | null;
-                limit?: number | null;
-            };
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_status_api_v3_task_status_get: {
-        parameters: {
-            query: {
-                task_ids: number | number[] | null;
-                status?: string | string[] | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_subdag_api_v3_task_subdag_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    update_task_statuses_api_v3_task_update_statuses_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_task_dependencies_api_v3_task_dependencies__task_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_tasks_recursive_api_v3_tasks_recursive__direction__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                direction: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_resource_usage_api_v3_task_resource_usage_get: {
-        parameters: {
-            query: {
-                task_id: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_downstream_tasks_api_v3_task_get_downstream_tasks_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_task_details_api_v3_task_get_ti_details_viz__task_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_details_viz_api_v3_task_get_task_details_viz__task_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_workflow_validation_status_api_v3_workflow_validation_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_workflow_tasks_api_v3_workflow__workflow_id__workflow_tasks_get: {
-        parameters: {
-            query: {
-                limit: number;
-                status?: string[] | null;
-            };
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_workflow_user_validation_api_v3_workflow__workflow_id__validate_username__username__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-                username: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_workflow_run_for_workflow_reset_api_v3_workflow__workflow_id__validate_for_workflow_reset__username__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-                username: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reset_workflow_api_v3_workflow__workflow_id__reset_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_workflow_status_api_v3_workflow_status_get: {
-        parameters: {
-            query?: {
-                workflow_id?: number | string | (number | string)[] | null;
-                limit?: number | null;
-                user?: string[] | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_workflow_status_viz_api_v3_workflow_status_viz_get: {
-        parameters: {
-            query?: {
-                workflow_ids?: number[];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    workflows_by_user_form_api_v3_workflow_overview_viz_get: {
-        parameters: {
-            query?: {
-                user?: string | null;
-                tool?: string | null;
-                wf_name?: string | null;
-                wf_args?: string | null;
-                wf_attribute_value?: string | null;
-                wf_attribute_key?: string | null;
-                wf_id?: string | null;
-                date_submitted?: string | null;
-                date_submitted_end?: string | null;
-                status?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    task_details_by_wf_id_api_v3_task_table_viz__workflow_id__get: {
-        parameters: {
-            query: {
-                tt_name: string;
-            };
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    wf_details_by_wf_id_api_v3_workflow_details_viz__workflow_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_template_details_for_workflow_api_v3_get_task_template_details_get: {
-        parameters: {
-            query: {
-                workflow_id: number;
-                task_template_id: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_template_version_for_tasks_api_v3_get_task_template_version_get: {
-        parameters: {
-            query?: {
-                task_id?: number | null;
-                workflow_id?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_requested_cores_api_v3_get_requested_cores_get: {
-        parameters: {
-            query?: {
-                task_template_version_ids?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_most_popular_queue_api_v3_get_most_popular_queue_get: {
-        parameters: {
-            query: {
-                task_template_version_ids: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_template_resource_usage_api_v3_task_template_resource_usage_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TaskTemplateResourceUsageRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TaskTemplateResourceUsageResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_workflow_tt_status_viz_api_v3_workflow_tt_status_viz__workflow_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_tt_error_log_viz_api_v3_tt_error_log_viz__wf_id___tt_id___ti_id__get: {
-        parameters: {
-            query?: {
-                page?: number;
-                page_size?: number;
-                just_recent_errors?: string;
-                cluster_errors?: string;
-            };
-            header?: never;
-            path: {
-                wf_id: number;
-                tt_id: number | null;
-                ti_id: number | null;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_tt_error_log_viz_api_v3_tt_error_log_viz__wf_id___tt_id__get: {
-        parameters: {
-            query?: {
-                ti_id?: number | null;
-                page?: number;
-                page_size?: number;
-                just_recent_errors?: string;
-                cluster_errors?: string;
-            };
-            header?: never;
-            path: {
-                wf_id: number;
-                tt_id: number | null;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    fix_wf_inconsistency_api_v3_workflow__workflow_id__fix_status_inconsistency_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_wf_name_and_args_api_v3_workflow__workflow_id__workflow_name_and_args_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_lost_workflow_runs_api_v3_lost_workflow_run_get: {
-        parameters: {
-            query: {
-                status: string | string[];
-                version: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reap_workflow_run_api_v3_workflow_run__workflow_run_id__reap_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    is_alive_api_v3__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_pst_now_api_v3_time_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    health_api_v3_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    test_route_api_v3_test_bad_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    api_version_api_v3_api_version_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    add_array_api_v2_array_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    record_array_batch_num_api_v2_array__array_id__queue_task_batch_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                array_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    transition_array_to_launched_api_v2_array__array_id__transition_to_launched_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                array_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_array_distributor_id_api_v2_array__array_id__log_distributor_id_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                array_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_array_max_concurrently_running_api_v2_workflow__workflow_id__get_array_max_concurrently_running__task_template_version_id__get: {
-        parameters: {
-            query?: {
-                array_id?: number | null;
-            };
-            header?: never;
-            path: {
-                workflow_id: number | null;
-                task_template_version_id: number | null;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_array_max_concurrently_running_api_v2_array__array_id__get_array_max_concurrently_running_get: {
-        parameters: {
-            query?: {
-                workflow_id?: number | null;
-                task_template_version_id?: number | null;
-            };
-            header?: never;
-            path: {
-                array_id: number | null;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    transition_to_killed_api_v2_array__array_id__transition_to_killed_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                array_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_cluster_by_name_api_v2_cluster__cluster_name__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                cluster_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_dag_api_v2_dag_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    add_edges_api_v2_dag__dag_id__edges_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                dag_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_nodes_api_v2_nodes_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_queue_by_cluster_queue_names_api_v2_cluster__cluster_id__queue__queue_name__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                cluster_id: number;
-                queue_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    bind_tasks_no_args_api_v2_task_bind_tasks_no_args_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    bind_task_args_api_v2_task_bind_task_args_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    bind_task_attributes_api_v2_task_bind_task_attributes_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    bind_task_resources_api_v2_task_bind_resources_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_most_recent_ti_error_api_v2_task__task_id__most_recent_ti_error_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_task_resume_state_api_v2_task__workflow_id__set_resume_state_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_running_api_v2_task_instance__task_instance_id__log_running_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_ti_report_by_api_v2_task_instance__task_instance_id__log_report_by_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_ti_report_by_batch_api_v2_task_instance_log_report_by_batch_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    log_done_api_v2_task_instance__task_instance_id__log_done_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_error_worker_node_api_v2_task_instance__task_instance_id__log_error_worker_node_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_instance_error_log_api_v2_task_instance__task_instance_id__task_instance_error_log_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_array_task_instance_id_api_v2_get_array_task_instance_id__array_id___batch_num___step_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                array_id: number;
-                batch_num: number;
-                step_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_no_distributor_id_api_v2_task_instance__task_instance_id__log_no_distributor_id_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_distributor_id_api_v2_task_instance__task_instance_id__log_distributor_id_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_known_error_api_v2_task_instance__task_instance_id__log_known_error_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_unknown_error_api_v2_task_instance__task_instance_id__log_unknown_error_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_instance_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    instantiate_task_instances_api_v2_task_instance_instantiate_task_instances_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_task_template_api_v2_task_template_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_task_template_versions_api_v2_task_template__task_template_id__versions_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_template_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_task_template_version_api_v2_task_template__task_template_id__add_version_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_template_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_resources_api_v2_task_resources__task_resources_id__post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_resources_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_tool_api_v2_tool_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_tool_versions_api_v2_tool__tool_id__tool_versions_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tool_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_tool_resource_usage_api_v2_tool__tool_name__tool_resource_usage_get: {
-        parameters: {
-            query?: {
-                start_date?: string | null;
-                end_date?: string | null;
-            };
-            header?: never;
-            path: {
-                tool_name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    add_tool_version_api_v2_tool_version_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_task_templates_api_v2_tool_version__tool_version_id__task_templates_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                tool_version_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    bind_workflow_api_v2_workflow_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_matching_workflows_by_workflow_args_api_v2_workflow__workflow_args_hash__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_args_hash: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_workflow_attribute_api_v2_workflow__workflow_id__workflow_attributes_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_resume_api_v2_workflow__workflow_id__set_resume_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    workflow_is_resumable_api_v2_workflow__workflow_id__is_resumable_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_max_concurrently_running_api_v2_workflow__workflow_id__get_max_concurrently_running_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_max_running_api_v2_workflow__workflow_id__update_max_concurrently_running_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    task_status_updates_api_v2_workflow__workflow_id__task_status_updates_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    fetch_workflow_metadata_api_v2_workflow__workflow_id__fetch_workflow_metadata_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_tasks_from_workflow_api_v2_workflow_get_tasks__workflow_id__get: {
-        parameters: {
-            query: {
-                max_task_id: number;
-                chunk_size: number;
-            };
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_available_workflow_statuses_api_v2_workflow_status_available_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    add_workflow_run_api_v2_workflow_run_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    terminate_workflow_run_api_v2_workflow_run__workflow_run_id__terminate_task_instances_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_workflow_run_heartbeat_api_v2_workflow_run__workflow_run_id__log_heartbeat_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    log_workflow_run_status_update_api_v2_workflow_run__workflow_run_id__update_status_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    task_instances_status_check_api_v2_workflow_run__workflow_run_id__sync_status_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    set_status_for_triaging_api_v2_workflow_run__workflow_run_id__set_status_for_triaging_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_array_task_instances_api_v2_array__workflow_id__get_array_tasks_get: {
-        parameters: {
-            query: {
-                array_name: string;
-                job_name?: string | null;
-                limit?: number | null;
-            };
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_status_api_v2_task_status_get: {
-        parameters: {
-            query: {
-                task_ids: number | number[] | null;
-                status?: string | string[] | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_subdag_api_v2_task_subdag_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    update_task_statuses_api_v2_task_update_statuses_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_task_dependencies_api_v2_task_dependencies__task_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_tasks_recursive_api_v2_tasks_recursive__direction__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                direction: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_resource_usage_api_v2_task_resource_usage_get: {
-        parameters: {
-            query: {
-                task_id: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_downstream_tasks_api_v2_task_get_downstream_tasks_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_task_details_api_v2_task_get_ti_details_viz__task_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_details_viz_api_v2_task_get_task_details_viz__task_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                task_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_template_details_for_workflow_api_v2_get_task_template_details_get: {
-        parameters: {
-            query: {
-                workflow_id: number;
-                task_template_id: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_template_version_for_tasks_api_v2_get_task_template_version_get: {
-        parameters: {
-            query?: {
-                task_id?: number | null;
-                workflow_id?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_requested_cores_api_v2_get_requested_cores_get: {
-        parameters: {
-            query?: {
-                task_template_version_ids?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_most_popular_queue_api_v2_get_most_popular_queue_get: {
-        parameters: {
-            query: {
-                task_template_version_ids: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_task_template_resource_usage_api_v2_task_template_resource_usage_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_workflow_tt_status_viz_api_v2_workflow_tt_status_viz__workflow_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_tt_error_log_viz_api_v2_tt_error_log_viz__wf_id___tt_id___ti_id__get: {
-        parameters: {
-            query?: {
-                page?: number;
-                page_size?: number;
-                just_recent_errors?: string;
-                cluster_errors?: string;
-            };
-            header?: never;
-            path: {
-                wf_id: number;
-                tt_id: number | null;
-                ti_id: number | null;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_tt_error_log_viz_api_v2_tt_error_log_viz__wf_id___tt_id__get: {
-        parameters: {
-            query?: {
-                ti_id?: number | null;
-                page?: number;
-                page_size?: number;
-                just_recent_errors?: string;
-                cluster_errors?: string;
-            };
-            header?: never;
-            path: {
-                wf_id: number;
-                tt_id: number | null;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_workflow_validation_status_api_v2_workflow_validation_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_workflow_tasks_api_v2_workflow__workflow_id__workflow_tasks_get: {
-        parameters: {
-            query: {
-                limit: number;
-                status?: string[] | null;
-            };
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_workflow_user_validation_api_v2_workflow__workflow_id__validate_username__username__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-                username: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_workflow_run_for_workflow_reset_api_v2_workflow__workflow_id__validate_for_workflow_reset__username__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-                username: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reset_workflow_api_v2_workflow__workflow_id__reset_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_workflow_status_api_v2_workflow_status_get: {
-        parameters: {
-            query?: {
-                workflow_id?: number | string | (number | string)[] | null;
-                limit?: number | null;
-                user?: string[] | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_workflow_status_viz_api_v2_workflow_status_viz_get: {
-        parameters: {
-            query?: {
-                workflow_ids?: number[];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    workflows_by_user_form_api_v2_workflow_overview_viz_get: {
-        parameters: {
-            query?: {
-                user?: string | null;
-                tool?: string | null;
-                wf_name?: string | null;
-                wf_args?: string | null;
-                wf_attribute_value?: string | null;
-                wf_attribute_key?: string | null;
-                wf_id?: string | null;
-                date_submitted?: string | null;
-                date_submitted_end?: string | null;
-                status?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    task_details_by_wf_id_api_v2_task_table_viz__workflow_id__get: {
-        parameters: {
-            query: {
-                tt_name: string;
-            };
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    wf_details_by_wf_id_api_v2_workflow_details_viz__workflow_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    fix_wf_inconsistency_api_v2_workflow__workflow_id__fix_status_inconsistency_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_wf_name_and_args_api_v2_workflow__workflow_id__workflow_name_and_args_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_lost_workflow_runs_api_v2_lost_workflow_run_get: {
-        parameters: {
-            query: {
-                status: string | string[];
-                version: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reap_workflow_run_api_v2_workflow_run__workflow_run_id__reap_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                workflow_run_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    is_alive_api_v2__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    get_pst_now_api_v2_time_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    health_api_v2_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    test_route_api_v2_test_bad_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
-    api_version_api_v2_api_version_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-        };
-    };
+  login_api_auth_oidc_login_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  auth_api_auth_oidc_auth_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  userinfo_api_auth_oidc_userinfo_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['User'];
+        };
+      };
+    };
+  };
+  logout_api_auth_oidc_logout_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  add_array_api_v3_array_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  record_array_batch_num_api_v3_array__array_id__queue_task_batch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        array_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  transition_array_to_launched_api_v3_array__array_id__transition_to_launched_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        array_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_array_distributor_id_api_v3_array__array_id__log_distributor_id_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        array_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_array_max_concurrently_running_api_v3_workflow__workflow_id__get_array_max_concurrently_running__task_template_version_id__get: {
+    parameters: {
+      query?: {
+        array_id?: number | null;
+      };
+      header?: never;
+      path: {
+        workflow_id: number | null;
+        task_template_version_id: number | null;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_array_max_concurrently_running_api_v3_array__array_id__get_array_max_concurrently_running_get: {
+    parameters: {
+      query?: {
+        workflow_id?: number | null;
+        task_template_version_id?: number | null;
+      };
+      header?: never;
+      path: {
+        array_id: number | null;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_cluster_by_name_api_v3_cluster__cluster_name__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        cluster_name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  add_dag_api_v3_dag_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  add_edges_api_v3_dag__dag_id__edges_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        dag_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  add_nodes_api_v3_nodes_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_queue_by_cluster_queue_names_api_v3_cluster__cluster_id__queue__queue_name__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        cluster_id: number;
+        queue_name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  bind_tasks_no_args_api_v3_task_bind_tasks_no_args_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  bind_task_args_api_v3_task_bind_task_args_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  bind_task_attributes_api_v3_task_bind_task_attributes_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  bind_task_resources_api_v3_task_bind_resources_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_most_recent_ti_error_api_v3_task__task_id__most_recent_ti_error_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  set_task_resume_state_api_v3_task__workflow_id__set_resume_state_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_running_api_v3_task_instance__task_instance_id__log_running_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_ti_report_by_api_v3_task_instance__task_instance_id__log_report_by_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_ti_report_by_batch_api_v3_task_instance_log_report_by_batch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  log_done_api_v3_task_instance__task_instance_id__log_done_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_error_worker_node_api_v3_task_instance__task_instance_id__log_error_worker_node_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_instance_error_log_api_v3_task_instance__task_instance_id__task_instance_error_log_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_array_task_instance_id_api_v3_get_array_task_instance_id__array_id___batch_num___step_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        array_id: number;
+        batch_num: number;
+        step_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_no_distributor_id_api_v3_task_instance__task_instance_id__log_no_distributor_id_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_distributor_id_api_v3_task_instance__task_instance_id__log_distributor_id_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_known_error_api_v3_task_instance__task_instance_id__log_known_error_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_unknown_error_api_v3_task_instance__task_instance_id__log_unknown_error_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  instantiate_task_instances_api_v3_task_instance_instantiate_task_instances_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_task_template_api_v3_task_template_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_task_template_versions_api_v3_task_template__task_template_id__versions_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_template_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  add_task_template_version_api_v3_task_template__task_template_id__add_version_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_template_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_template_id_for_task_template_version_api_v3_task_template_id__task_template_version_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_template_version_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': number;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_resources_api_v3_task_resources__task_resources_id__post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_resources_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  add_tool_api_v3_tool_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_tool_versions_api_v3_tool__tool_id__tool_versions_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tool_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_tool_resource_usage_api_v3_tool__tool_name__tool_resource_usage_get: {
+    parameters: {
+      query?: {
+        start_date?: string | null;
+        end_date?: string | null;
+      };
+      header?: never;
+      path: {
+        tool_name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  add_tool_version_api_v3_tool_version_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_task_templates_api_v3_tool_version__tool_version_id__task_templates_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tool_version_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  bind_workflow_api_v3_workflow_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_matching_workflows_by_workflow_args_api_v3_workflow__workflow_args_hash__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_args_hash: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  update_workflow_attribute_api_v3_workflow__workflow_id__workflow_attributes_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  set_resume_api_v3_workflow__workflow_id__set_resume_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  workflow_is_resumable_api_v3_workflow__workflow_id__is_resumable_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_max_concurrently_running_api_v3_workflow__workflow_id__get_max_concurrently_running_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  update_max_running_api_v3_workflow__workflow_id__update_max_concurrently_running_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  task_status_updates_api_v3_workflow__workflow_id__task_status_updates_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  fetch_workflow_metadata_api_v3_workflow__workflow_id__fetch_workflow_metadata_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_tasks_from_workflow_api_v3_workflow_get_tasks__workflow_id__get: {
+    parameters: {
+      query: {
+        max_task_id: number;
+        chunk_size: number;
+      };
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_available_workflow_statuses_api_v3_workflow_status_available_status_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  update_array_max_running_api_v3_workflow__workflow_id__update_array_max_concurrently_running_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  task_template_dag_api_v3_workflow__workflow_id__task_template_dag_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  add_workflow_run_api_v3_workflow_run_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  terminate_workflow_run_api_v3_workflow_run__workflow_run_id__terminate_task_instances_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_workflow_run_heartbeat_api_v3_workflow_run__workflow_run_id__log_heartbeat_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_workflow_run_status_update_api_v3_workflow_run__workflow_run_id__update_status_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  task_instances_status_check_api_v3_workflow_run__workflow_run_id__sync_status_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  set_status_for_triaging_api_v3_workflow_run__workflow_run_id__set_status_for_triaging_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_array_task_instances_api_v3_array__workflow_id__get_array_tasks_get: {
+    parameters: {
+      query: {
+        array_name: string;
+        job_name?: string | null;
+        limit?: number | null;
+      };
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_status_api_v3_task_status_get: {
+    parameters: {
+      query: {
+        task_ids: number | number[] | null;
+        status?: string | string[] | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_subdag_api_v3_task_subdag_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  update_task_statuses_api_v3_task_update_statuses_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_task_dependencies_api_v3_task_dependencies__task_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_tasks_recursive_api_v3_tasks_recursive__direction__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        direction: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_resource_usage_api_v3_task_resource_usage_get: {
+    parameters: {
+      query: {
+        task_id: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_downstream_tasks_api_v3_task_get_downstream_tasks_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_task_details_api_v3_task_get_ti_details_viz__task_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_details_viz_api_v3_task_get_task_details_viz__task_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_validation_status_api_v3_workflow_validation_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_workflow_tasks_api_v3_workflow__workflow_id__workflow_tasks_get: {
+    parameters: {
+      query: {
+        limit: number;
+        status?: string[] | null;
+      };
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_user_validation_api_v3_workflow__workflow_id__validate_username__username__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+        username: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_run_for_workflow_reset_api_v3_workflow__workflow_id__validate_for_workflow_reset__username__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+        username: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  reset_workflow_api_v3_workflow__workflow_id__reset_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_status_api_v3_workflow_status_get: {
+    parameters: {
+      query?: {
+        workflow_id?: number | string | (number | string)[] | null;
+        limit?: number | null;
+        user?: string[] | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_status_viz_api_v3_workflow_status_viz_get: {
+    parameters: {
+      query?: {
+        workflow_ids?: number[];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  workflows_by_user_form_api_v3_workflow_overview_viz_get: {
+    parameters: {
+      query?: {
+        user?: string | null;
+        tool?: string | null;
+        wf_name?: string | null;
+        wf_args?: string | null;
+        wf_attribute_value?: string | null;
+        wf_attribute_key?: string | null;
+        wf_id?: string | null;
+        date_submitted?: string | null;
+        date_submitted_end?: string | null;
+        status?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  task_details_by_wf_id_api_v3_task_table_viz__workflow_id__get: {
+    parameters: {
+      query: {
+        tt_name: string;
+      };
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  wf_details_by_wf_id_api_v3_workflow_details_viz__workflow_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_template_details_for_workflow_api_v3_get_task_template_details_get: {
+    parameters: {
+      query: {
+        workflow_id: number;
+        task_template_id: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_template_version_for_tasks_api_v3_get_task_template_version_get: {
+    parameters: {
+      query?: {
+        task_id?: number | null;
+        workflow_id?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_requested_cores_api_v3_get_requested_cores_get: {
+    parameters: {
+      query?: {
+        task_template_version_ids?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_most_popular_queue_api_v3_get_most_popular_queue_get: {
+    parameters: {
+      query: {
+        task_template_version_ids: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_template_resource_usage_api_v3_task_template_resource_usage_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TaskTemplateResourceUsageRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TaskTemplateResourceUsageResponse'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_tt_status_viz_api_v3_workflow_tt_status_viz__workflow_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_tt_error_log_viz_api_v3_tt_error_log_viz__wf_id___tt_id___ti_id__get: {
+    parameters: {
+      query?: {
+        page?: number;
+        page_size?: number;
+        just_recent_errors?: string;
+        cluster_errors?: string;
+      };
+      header?: never;
+      path: {
+        wf_id: number;
+        tt_id: number | null;
+        ti_id: number | null;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_tt_error_log_viz_api_v3_tt_error_log_viz__wf_id___tt_id__get: {
+    parameters: {
+      query?: {
+        ti_id?: number | null;
+        page?: number;
+        page_size?: number;
+        just_recent_errors?: string;
+        cluster_errors?: string;
+      };
+      header?: never;
+      path: {
+        wf_id: number;
+        tt_id: number | null;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  fix_wf_inconsistency_api_v3_workflow__workflow_id__fix_status_inconsistency_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_wf_name_and_args_api_v3_workflow__workflow_id__workflow_name_and_args_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_lost_workflow_runs_api_v3_lost_workflow_run_get: {
+    parameters: {
+      query: {
+        status: string | string[];
+        version: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  reap_workflow_run_api_v3_workflow_run__workflow_run_id__reap_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  is_alive_api_v3__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_pst_now_api_v3_time_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  health_api_v3_health_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  test_route_api_v3_test_bad_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  api_version_api_v3_api_version_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  add_array_api_v2_array_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  record_array_batch_num_api_v2_array__array_id__queue_task_batch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        array_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  transition_array_to_launched_api_v2_array__array_id__transition_to_launched_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        array_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_array_distributor_id_api_v2_array__array_id__log_distributor_id_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        array_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_array_max_concurrently_running_api_v2_workflow__workflow_id__get_array_max_concurrently_running__task_template_version_id__get: {
+    parameters: {
+      query?: {
+        array_id?: number | null;
+      };
+      header?: never;
+      path: {
+        workflow_id: number | null;
+        task_template_version_id: number | null;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_array_max_concurrently_running_api_v2_array__array_id__get_array_max_concurrently_running_get: {
+    parameters: {
+      query?: {
+        workflow_id?: number | null;
+        task_template_version_id?: number | null;
+      };
+      header?: never;
+      path: {
+        array_id: number | null;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  transition_to_killed_api_v2_array__array_id__transition_to_killed_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        array_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_cluster_by_name_api_v2_cluster__cluster_name__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        cluster_name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  add_dag_api_v2_dag_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  add_edges_api_v2_dag__dag_id__edges_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        dag_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  add_nodes_api_v2_nodes_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_queue_by_cluster_queue_names_api_v2_cluster__cluster_id__queue__queue_name__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        cluster_id: number;
+        queue_name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  bind_tasks_no_args_api_v2_task_bind_tasks_no_args_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  bind_task_args_api_v2_task_bind_task_args_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  bind_task_attributes_api_v2_task_bind_task_attributes_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  bind_task_resources_api_v2_task_bind_resources_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_most_recent_ti_error_api_v2_task__task_id__most_recent_ti_error_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  set_task_resume_state_api_v2_task__workflow_id__set_resume_state_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_running_api_v2_task_instance__task_instance_id__log_running_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_ti_report_by_api_v2_task_instance__task_instance_id__log_report_by_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_ti_report_by_batch_api_v2_task_instance_log_report_by_batch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  log_done_api_v2_task_instance__task_instance_id__log_done_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_error_worker_node_api_v2_task_instance__task_instance_id__log_error_worker_node_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_instance_error_log_api_v2_task_instance__task_instance_id__task_instance_error_log_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_array_task_instance_id_api_v2_get_array_task_instance_id__array_id___batch_num___step_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        array_id: number;
+        batch_num: number;
+        step_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_no_distributor_id_api_v2_task_instance__task_instance_id__log_no_distributor_id_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_distributor_id_api_v2_task_instance__task_instance_id__log_distributor_id_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_known_error_api_v2_task_instance__task_instance_id__log_known_error_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_unknown_error_api_v2_task_instance__task_instance_id__log_unknown_error_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_instance_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  instantiate_task_instances_api_v2_task_instance_instantiate_task_instances_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_task_template_api_v2_task_template_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_task_template_versions_api_v2_task_template__task_template_id__versions_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_template_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  add_task_template_version_api_v2_task_template__task_template_id__add_version_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_template_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_resources_api_v2_task_resources__task_resources_id__post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_resources_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  add_tool_api_v2_tool_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_tool_versions_api_v2_tool__tool_id__tool_versions_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tool_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_tool_resource_usage_api_v2_tool__tool_name__tool_resource_usage_get: {
+    parameters: {
+      query?: {
+        start_date?: string | null;
+        end_date?: string | null;
+      };
+      header?: never;
+      path: {
+        tool_name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  add_tool_version_api_v2_tool_version_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_task_templates_api_v2_tool_version__tool_version_id__task_templates_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        tool_version_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  bind_workflow_api_v2_workflow_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_matching_workflows_by_workflow_args_api_v2_workflow__workflow_args_hash__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_args_hash: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  update_workflow_attribute_api_v2_workflow__workflow_id__workflow_attributes_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  set_resume_api_v2_workflow__workflow_id__set_resume_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  workflow_is_resumable_api_v2_workflow__workflow_id__is_resumable_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_max_concurrently_running_api_v2_workflow__workflow_id__get_max_concurrently_running_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  update_max_running_api_v2_workflow__workflow_id__update_max_concurrently_running_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  task_status_updates_api_v2_workflow__workflow_id__task_status_updates_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  fetch_workflow_metadata_api_v2_workflow__workflow_id__fetch_workflow_metadata_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_tasks_from_workflow_api_v2_workflow_get_tasks__workflow_id__get: {
+    parameters: {
+      query: {
+        max_task_id: number;
+        chunk_size: number;
+      };
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_available_workflow_statuses_api_v2_workflow_status_available_status_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  add_workflow_run_api_v2_workflow_run_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  terminate_workflow_run_api_v2_workflow_run__workflow_run_id__terminate_task_instances_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_workflow_run_heartbeat_api_v2_workflow_run__workflow_run_id__log_heartbeat_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  log_workflow_run_status_update_api_v2_workflow_run__workflow_run_id__update_status_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  task_instances_status_check_api_v2_workflow_run__workflow_run_id__sync_status_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  set_status_for_triaging_api_v2_workflow_run__workflow_run_id__set_status_for_triaging_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_array_task_instances_api_v2_array__workflow_id__get_array_tasks_get: {
+    parameters: {
+      query: {
+        array_name: string;
+        job_name?: string | null;
+        limit?: number | null;
+      };
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_status_api_v2_task_status_get: {
+    parameters: {
+      query: {
+        task_ids: number | number[] | null;
+        status?: string | string[] | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_subdag_api_v2_task_subdag_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  update_task_statuses_api_v2_task_update_statuses_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_task_dependencies_api_v2_task_dependencies__task_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_tasks_recursive_api_v2_tasks_recursive__direction__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        direction: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_resource_usage_api_v2_task_resource_usage_get: {
+    parameters: {
+      query: {
+        task_id: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_downstream_tasks_api_v2_task_get_downstream_tasks_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_task_details_api_v2_task_get_ti_details_viz__task_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_details_viz_api_v2_task_get_task_details_viz__task_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        task_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_template_details_for_workflow_api_v2_get_task_template_details_get: {
+    parameters: {
+      query: {
+        workflow_id: number;
+        task_template_id: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_template_version_for_tasks_api_v2_get_task_template_version_get: {
+    parameters: {
+      query?: {
+        task_id?: number | null;
+        workflow_id?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_requested_cores_api_v2_get_requested_cores_get: {
+    parameters: {
+      query?: {
+        task_template_version_ids?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_most_popular_queue_api_v2_get_most_popular_queue_get: {
+    parameters: {
+      query: {
+        task_template_version_ids: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_task_template_resource_usage_api_v2_task_template_resource_usage_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_workflow_tt_status_viz_api_v2_workflow_tt_status_viz__workflow_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_tt_error_log_viz_api_v2_tt_error_log_viz__wf_id___tt_id___ti_id__get: {
+    parameters: {
+      query?: {
+        page?: number;
+        page_size?: number;
+        just_recent_errors?: string;
+        cluster_errors?: string;
+      };
+      header?: never;
+      path: {
+        wf_id: number;
+        tt_id: number | null;
+        ti_id: number | null;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_tt_error_log_viz_api_v2_tt_error_log_viz__wf_id___tt_id__get: {
+    parameters: {
+      query?: {
+        ti_id?: number | null;
+        page?: number;
+        page_size?: number;
+        just_recent_errors?: string;
+        cluster_errors?: string;
+      };
+      header?: never;
+      path: {
+        wf_id: number;
+        tt_id: number | null;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_validation_status_api_v2_workflow_validation_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_workflow_tasks_api_v2_workflow__workflow_id__workflow_tasks_get: {
+    parameters: {
+      query: {
+        limit: number;
+        status?: string[] | null;
+      };
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_user_validation_api_v2_workflow__workflow_id__validate_username__username__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+        username: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_run_for_workflow_reset_api_v2_workflow__workflow_id__validate_for_workflow_reset__username__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+        username: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  reset_workflow_api_v2_workflow__workflow_id__reset_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_status_api_v2_workflow_status_get: {
+    parameters: {
+      query?: {
+        workflow_id?: number | string | (number | string)[] | null;
+        limit?: number | null;
+        user?: string[] | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_status_viz_api_v2_workflow_status_viz_get: {
+    parameters: {
+      query?: {
+        workflow_ids?: number[];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  workflows_by_user_form_api_v2_workflow_overview_viz_get: {
+    parameters: {
+      query?: {
+        user?: string | null;
+        tool?: string | null;
+        wf_name?: string | null;
+        wf_args?: string | null;
+        wf_attribute_value?: string | null;
+        wf_attribute_key?: string | null;
+        wf_id?: string | null;
+        date_submitted?: string | null;
+        date_submitted_end?: string | null;
+        status?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  task_details_by_wf_id_api_v2_task_table_viz__workflow_id__get: {
+    parameters: {
+      query: {
+        tt_name: string;
+      };
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  wf_details_by_wf_id_api_v2_workflow_details_viz__workflow_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  fix_wf_inconsistency_api_v2_workflow__workflow_id__fix_status_inconsistency_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_wf_name_and_args_api_v2_workflow__workflow_id__workflow_name_and_args_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_lost_workflow_runs_api_v2_lost_workflow_run_get: {
+    parameters: {
+      query: {
+        status: string | string[];
+        version: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  reap_workflow_run_api_v2_workflow_run__workflow_run_id__reap_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        workflow_run_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  is_alive_api_v2__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  get_pst_now_api_v2_time_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  health_api_v2_health_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  test_route_api_v2_test_bad_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
+  api_version_api_v2_api_version_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': unknown;
+        };
+      };
+    };
+  };
 }

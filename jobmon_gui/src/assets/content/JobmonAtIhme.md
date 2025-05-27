@@ -13,7 +13,7 @@ To use either of the clusters with Jobmon users need to install their Jobmon plu
 wants to use Slurm with Jobmon, they would need to have the core Jobmon software and the
 Jobmon Slurm plugin installed.
 
-##  pip install
+## pip install
 
 To install just core jobmon (no cluster plugins) via pip:
 
@@ -25,7 +25,7 @@ To install the preconfigured Slurm plugin:
 
 ```shell
     pip install jobmon_installer_ihme
-``` 
+```
 
 To install both at once via pip:
 
@@ -36,24 +36,23 @@ To install both at once via pip:
 Then issue a "jobmon_config update" command to configure the web service and port, as described on
 the hub at [Jobmon Conda Versions](https://hub.ihme.washington.edu/display/DataScience/Jobmon+Conda+Versions)
 
-
 > **_NOTE:_**
+
     If you get the error **"Could not find a version that satisfies the requirement jobmon (from version: )"** then create (or append) the following to your ``~/.pip/pip.conf``:
-    
+
         [global]
         extra-index-url = https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple
         trusted-host = artifactory.ihme.washington.edu
 
 ## Running on the Slurm Cluster
 
-When running your Jobmon Workflow on the production Slurm cluster (gen-slurm-slogin-p01.cluster.ihme.washington.edu) 
-please make sure that you set your ``cluster_name`` to ``slurm`` in Jobmon.
+When running your Jobmon Workflow on the production Slurm cluster (gen-slurm-slogin-p01.cluster.ihme.washington.edu)
+please make sure that you set your `cluster_name` to `slurm` in Jobmon.
 
-When running your Jobmon Workflow on the test Slurm cluster (gen-slurm-slogin-s01.cluster.ihme.washington.edu) please 
-make sure  that you set your ``cluster_name`` to ``slurm_stage`` in Jobmon.
+When running your Jobmon Workflow on the test Slurm cluster (gen-slurm-slogin-s01.cluster.ihme.washington.edu) please
+make sure that you set your `cluster_name` to `slurm_stage` in Jobmon.
 
 You can set your queue to all.q, long.q, or d.q on both the production and test slurm clusters.
-
 
 ## Jobmon Learning
 
@@ -85,6 +84,7 @@ Port: {{JOBMON_DB_PORT}}
 Please note to access the Jobmon database you need to switch your VPN to "All Internet Traffic" in your Big-IP Edge Client.
 
 ## Jobmon Database API
+
 The base URL for the Jobmon Database API is:
 
 ```shell
