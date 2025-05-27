@@ -1,7 +1,7 @@
 import {defineConfig} from "vite"
 import react from "@vitejs/plugin-react"
 import path from "path";
-import mdPlugin, {Mode} from "vite-plugin-markdown"
+import { plugin as mdPlugin, Mode } from "vite-plugin-markdown"
 // https://vitejs.dev/config/
 export default defineConfig({
     base: '/',

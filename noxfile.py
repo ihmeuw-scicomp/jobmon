@@ -296,11 +296,11 @@ def lint_frontend(session: Session) -> None:
     
     # Run TypeScript type checking
     session.log("Running TypeScript type checking...")
-    session.run("npx", "tsc", "--noEmit", external=True)
+    session.run("npm", "run", "typecheck", external=True)
     
     # Run ESLint
     session.log("Running ESLint...")
-    session.run("npx", "eslint", "src", "--ext", ".ts,.tsx", external=True)
+    session.run("npm", "run", "lint", external=True)
 
 
 @nox.session(venv_backend="venv")
@@ -315,7 +315,7 @@ def typecheck_frontend(session: Session) -> None:
         session.run("npm", "install", external=True)
     
     # Run TypeScript type checking
-    session.run("npx", "tsc", "--noEmit", external=True)
+    session.run("npm", "run", "typecheck", external=True)
 
 
 @nox.session(venv_backend="venv")
@@ -329,11 +329,8 @@ def format_frontend(session: Session) -> None:
         session.log("Installing frontend dependencies...")
         session.run("npm", "install", external=True)
     
-    # Install prettier if not already installed
-    session.run("npm", "install", "--save-dev", "prettier", external=True)
-    
     # Run prettier
-    session.run("npx", "prettier", "--write", "src/**/*.{ts,tsx,js,jsx,json,css,md}", external=True)
+    session.run("npm", "run", "format", external=True)
 
 
 @nox.session(venv_backend="venv")

@@ -67,10 +67,10 @@
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "tsc && vite build",
     "serve": "serve dist",
-    "lint": "eslint src --ext .ts,.tsx",
-    "lint:fix": "eslint src --ext .ts,.tsx --fix",
-    "format": "prettier --write src/**/*.{ts,tsx,js,jsx,json,css,md}",
-    "format:check": "prettier --check src/**/*.{ts,tsx,js,jsx,json,css,md}",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write src/**/*.{ts,tsx,css,md}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,css,md}",
     "typecheck": "tsc --noEmit"
   },
   "overrides": {

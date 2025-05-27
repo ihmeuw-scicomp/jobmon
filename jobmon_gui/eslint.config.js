@@ -38,6 +38,7 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-undef': 'off', // TypeScript handles this
+      // No indent rules - let Prettier handle all formatting
     },
   },
   {

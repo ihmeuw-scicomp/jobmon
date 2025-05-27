@@ -1,2 +1,2 @@
 export const loginButtonText =
-  import.meta.env.VITE_APP_LOGIN_BUTTON_TEXT || 'Login';
+    import.meta.env.VITE_APP_LOGIN_BUTTON_TEXT || 'Login';

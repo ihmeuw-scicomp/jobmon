@@ -6,43 +6,43 @@ import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
 import { TaskTemplateDetailsResponse } from '@jobmon_gui/types/TaskTemplateDetails.ts';
 
 type getTaskTemplateDetailsQueryFnArgs = {
-  queryKey: (string | number | undefined)[];
+    queryKey: (string | number | undefined)[];
 };
 
 export const getTaskTemplateDetailsQueryFn = async ({
-  queryKey,
+    queryKey,
 }: getTaskTemplateDetailsQueryFnArgs) => {
-  if (!queryKey || queryKey.length != 3) {
-    return;
-  }
+    if (!queryKey || queryKey.length != 3) {
+        return;
+    }
 
-  const wf_id = queryKey[1] as number;
-  const tt_id = queryKey[2] as number;
+    const wf_id = queryKey[1] as number;
+    const tt_id = queryKey[2] as number;
 
-  if (!wf_id || !tt_id) {
-    return;
-  }
+    if (!wf_id || !tt_id) {
+        return;
+    }
 
-  return axios
-    .get<TaskTemplateDetailsResponse>(
-      get_task_template_details_url(wf_id, tt_id),
-      {
-        ...jobmonAxiosConfig,
-        data: null,
-      }
-    )
-    .then(response => {
-      return response.data;
-    });
+    return axios
+        .get<TaskTemplateDetailsResponse>(
+            get_task_template_details_url(wf_id, tt_id),
+            {
+                ...jobmonAxiosConfig,
+                data: null,
+            }
+        )
+        .then(response => {
+            return response.data;
+        });
 };
 
 export const getTaskTemplateDetails = (
-  workflowId: number | string,
-  taskTemplateId: number | string
+    workflowId: number | string,
+    taskTemplateId: number | string
 ) => {
-  return useQuery({
-    queryKey: ['task_template_details', workflowId, taskTemplateId],
-    queryFn: getTaskTemplateDetailsQueryFn,
-    enabled: !!workflowId && !!taskTemplateId,
-  });
+    return useQuery({
+        queryKey: ['task_template_details', workflowId, taskTemplateId],
+        queryFn: getTaskTemplateDetailsQueryFn,
+        enabled: !!workflowId && !!taskTemplateId,
+    });
 };

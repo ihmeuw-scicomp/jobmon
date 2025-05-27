@@ -4,23 +4,23 @@ import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
 import { TaskDetailsResponse } from '@jobmon_gui/types/TaskDetails.ts';
 
 type getTaskDetailsQueryFnFnArgs = {
-  queryKey: (string | number | undefined)[];
+    queryKey: (string | number | undefined)[];
 };
 
 export const getTaskDetailsQueryFn = async ({
-  queryKey,
+    queryKey,
 }: getTaskDetailsQueryFnFnArgs) => {
-  if (!queryKey || queryKey.length != 2) {
-    return;
-  }
-  const taskId = queryKey[1];
-  return axios
-    .get<TaskDetailsResponse>(`${task_details_url}${taskId}#`, {
-      ...jobmonAxiosConfig,
-      data: null,
-    })
-    .then(r => {
-      console.log('task_details', r.data);
-      return r.data.task_details[0];
-    });
+    if (!queryKey || queryKey.length != 2) {
+        return;
+    }
+    const taskId = queryKey[1];
+    return axios
+        .get<TaskDetailsResponse>(`${task_details_url}${taskId}#`, {
+            ...jobmonAxiosConfig,
+            data: null,
+        })
+        .then(r => {
+            console.log('task_details', r.data);
+            return r.data.task_details[0];
+        });
 };

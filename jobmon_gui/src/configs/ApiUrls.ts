@@ -14,7 +14,7 @@ export const workflow_tt_status_url = api_base_url + '/workflow_tt_status_viz/';
 export const workflow_overview_url = api_base_url + '/workflow_overview_viz';
 
 export const get_task_template_dag = (workflow_id: number | string) =>
-  api_base_url + `/workflow/${workflow_id}/task_template_dag`;
+    api_base_url + `/workflow/${workflow_id}/task_template_dag`;
 
 export const error_log_viz_url = api_base_url + '/tt_error_log_viz/';
 export const ti_details_url = api_base_url + '/task/get_ti_details_viz/';
@@ -22,28 +22,28 @@ export const task_details_url = api_base_url + '/task/get_task_details_viz/';
 export const task_dependencies_url = api_base_url + '/task_dependencies/';
 
 export const workflow_set_resume_url = (wf_id: number | string) =>
-  api_base_url + `/workflow/${wf_id}/set_resume`;
+    api_base_url + `/workflow/${wf_id}/set_resume`;
 export const set_task_template_concurrency_url = (wf_id: number | string) =>
-  api_base_url + `/workflow/${wf_id}/update_array_max_concurrently_running`;
+    api_base_url + `/workflow/${wf_id}/update_array_max_concurrently_running`;
 export const set_wf_concurrency_url = (wf_id: number | string) =>
-  api_base_url + `/workflow/${wf_id}/update_max_concurrently_running`;
+    api_base_url + `/workflow/${wf_id}/update_max_concurrently_running`;
 export const get_workflow_concurrency_url = (wf_id: number | string) =>
-  api_base_url + `/workflow/${wf_id}/get_max_concurrently_running`;
+    api_base_url + `/workflow/${wf_id}/get_max_concurrently_running`;
 export const get_task_template_concurrency_url = (
-  wf_id: number | string,
-  tt_version_id: number | string
+    wf_id: number | string,
+    tt_version_id: number | string
 ) =>
-  api_base_url +
-  `/workflow/${wf_id}/get_array_max_concurrently_running/${tt_version_id}`;
+    api_base_url +
+    `/workflow/${wf_id}/get_array_max_concurrently_running/${tt_version_id}`;
 
 export const get_task_template_details_url = (
-  workflowId: number,
-  taskTemplateId: number
+    workflowId: number,
+    taskTemplateId: number
 ) =>
-  api_base_url +
-  `/get_task_template_details?workflow_id=${workflowId}&task_template_id=${taskTemplateId}`;
+    api_base_url +
+    `/get_task_template_details?workflow_id=${workflowId}&task_template_id=${taskTemplateId}`;
 
 export const update_task_status_url = api_base_url + `/task/update_statuses`;
 export const get_task_template_id_url = (
-  task_template_version_id: number | string
+    task_template_version_id: number | string
 ) => api_base_url + `/task_template/id/${task_template_version_id}`;

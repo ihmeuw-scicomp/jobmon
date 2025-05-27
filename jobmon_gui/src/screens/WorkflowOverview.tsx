@@ -10,14 +10,14 @@ import Box from '@mui/material/Box';
 import WorkflowFilters from '@jobmon_gui/components/workflow_overview/WorkflowFilters';
 
 function WorkflowOverview() {
-  init_apm('workflow_overview_page');
+    init_apm('workflow_overview_page');
 
-  return (
-    <Box>
-      <WorkflowFilters />
-      <WorkflowList />
-    </Box>
-  );
+    return (
+        <Box>
+            <WorkflowFilters />
+            <WorkflowList />
+        </Box>
+    );
 }
 
 export default WorkflowOverview;
