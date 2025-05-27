@@ -3,11 +3,10 @@
 import datetime
 from typing import Tuple
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, VARCHAR
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 import structlog
+from sqlalchemy import VARCHAR, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 
 from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.core.serializers import SerializeDistributorWorkflow
@@ -15,7 +14,6 @@ from jobmon.server.web.models import Base
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_run_status import WorkflowRunStatus
 from jobmon.server.web.models.workflow_status import WorkflowStatus
-
 
 logger = structlog.get_logger(__name__)
 

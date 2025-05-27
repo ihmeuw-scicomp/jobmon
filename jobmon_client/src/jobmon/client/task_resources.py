@@ -3,19 +3,18 @@
 from __future__ import annotations
 
 import hashlib
-from http import HTTPStatus as StatusCodes
 import json
 import logging
-from math import ceil
 import numbers
 import re
+from http import HTTPStatus as StatusCodes
+from math import ceil
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
 from jobmon.client.units import MemUnit, TimeUnit
 from jobmon.core.cluster_protocol import ClusterQueue
 from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
-
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,8 @@
 """Task Table for the Database."""
 
+import structlog
 from sqlalchemy import (
+    VARCHAR,
     Column,
     DateTime,
     ForeignKey,
@@ -8,18 +10,15 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    VARCHAR,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-import structlog
 
 from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.core.serializers import SerializeDistributorTask, SerializeSwarmTask
 from jobmon.server.web.models import Base
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.task_status import TaskStatus
-
 
 logger = structlog.get_logger(__name__)
 

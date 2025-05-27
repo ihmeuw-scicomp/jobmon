@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import copy
 import hashlib
-from http import HTTPStatus as StatusCodes
 import logging
+from http import HTTPStatus as StatusCodes
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -14,7 +15,6 @@ from typing import (
     Optional,
     Tuple,
     Type,
-    TYPE_CHECKING,
     Union,
 )
 

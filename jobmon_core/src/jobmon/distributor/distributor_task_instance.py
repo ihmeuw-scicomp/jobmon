@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List, Set, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Set, Tuple
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.requester import Requester

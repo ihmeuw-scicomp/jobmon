@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import ast
-from collections.abc import Mapping, Sequence
 import json
 import logging
+from collections.abc import Mapping, Sequence
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker

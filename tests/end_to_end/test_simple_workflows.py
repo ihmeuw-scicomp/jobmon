@@ -1,10 +1,10 @@
 import os
 import sys
 
-from jobmon.core.constants import TaskStatus, WorkflowRunStatus
-from jobmon.client.tool import Tool
-
 import pytest
+
+from jobmon.client.tool import Tool
+from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 
 
 @pytest.fixture

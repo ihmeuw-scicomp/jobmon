@@ -3,15 +3,13 @@ from __future__ import annotations
 import ast
 import hashlib
 import logging
-from typing import Any, Dict, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Set
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.requester import Requester
 
 if TYPE_CHECKING:
-    from jobmon.distributor.distributor_task_instance import (
-        DistributorTaskInstance,
-    )
+    from jobmon.distributor.distributor_task_instance import DistributorTaskInstance
 
 
 logger = logging.getLogger(__name__)

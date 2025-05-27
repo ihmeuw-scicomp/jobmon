@@ -1,10 +1,11 @@
 import os
-import pytest
 import uuid
 
-from jobmon.client.tool import Tool
+import pytest
+
 from jobmon.client.task_template import TaskTemplate
 from jobmon.client.task_template_version import TaskTemplateVersion
+from jobmon.client.tool import Tool
 
 
 @pytest.fixture(scope="function")

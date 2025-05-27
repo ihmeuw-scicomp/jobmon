@@ -10,16 +10,17 @@ from typing import (
     Callable,
     Collection,
     Dict,
-    get_args,
     Iterable,
     List,
     Optional,
     Type,
     Union,
+    get_args,
 )
 
 import docstring_parser
-from docutils import nodes, statemachine  # type: ignore
+from docutils import nodes  # type: ignore
+from docutils import statemachine
 from docutils.parsers.rst import Directive  # type: ignore
 from sphinx import application  # type: ignore
 from sphinx.util import nodes as sphinx_nodes  # type: ignore

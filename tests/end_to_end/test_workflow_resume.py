@@ -2,13 +2,13 @@ import os
 import sys
 import time
 
-from mock import patch
 import pytest
+from mock import patch
 
+from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.tool import Tool
 from jobmon.client.workflow_run import WorkflowRunFactory
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
-from jobmon.core.constants import WorkflowRunStatus, TaskInstanceStatus
+from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
 from jobmon.core.exceptions import WorkflowAlreadyExists, WorkflowNotResumable
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor

@@ -1,7 +1,7 @@
 """Queue Table in the Database."""
 
-from sqlalchemy import Column, ForeignKey, Integer, select, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+from sqlalchemy import Column, ForeignKey, Integer, String, UniqueConstraint, select
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from jobmon.core.serializers import SerializeQueue
 from jobmon.server.web.models import Base

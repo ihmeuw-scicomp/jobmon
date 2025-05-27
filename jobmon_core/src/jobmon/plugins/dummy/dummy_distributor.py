@@ -1,17 +1,16 @@
 """Dummy distributor that runs one task at a time."""
 
-from collections import OrderedDict
 import logging
 import os
 import random
 import shutil
+from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from jobmon.core.cluster_protocol import ClusterDistributor, ClusterWorkerNode
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.worker_node.cli import WorkerNodeCLI
 from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
-
 
 logger = logging.getLogger(__name__)
 

@@ -30,6 +30,10 @@ jobmon = "jobmon.client.cli:main"
 server = ["jobmon_server"]
 ihme = ["jobmon_installer_ihme"]
 
+[tool.uv.sources]
+jobmon_core = { workspace = true }
+jobmon_server = { workspace = true }
+
 [tool.setuptools]
 license-files = ["LICENSE"]
 

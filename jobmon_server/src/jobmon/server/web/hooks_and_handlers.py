@@ -1,11 +1,11 @@
 import json
 from typing import Any, AsyncGenerator, Callable, Optional
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_404_NOT_FOUND
-import structlog
 
 from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError

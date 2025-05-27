@@ -8,7 +8,6 @@ from typing import Any
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeWorkflowRun
 
-
 logger = logging.getLogger(__file__)
 
 

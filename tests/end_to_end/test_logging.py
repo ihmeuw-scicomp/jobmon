@@ -4,8 +4,8 @@ from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
 from jobmon.distributor.distributor_service import DistributorService
-from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
+from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 
 
 def test_sequential_logging(tool, task_template, tmp_path):

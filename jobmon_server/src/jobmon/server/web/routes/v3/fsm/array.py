@@ -2,12 +2,12 @@
 
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict
+from typing import Any, Dict, cast
 
+import structlog
 from fastapi import Request
 from sqlalchemy import and_, case, func, insert, literal_column, select, update
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.server.web._compat import add_time

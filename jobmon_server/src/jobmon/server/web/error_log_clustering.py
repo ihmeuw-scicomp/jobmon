@@ -1,6 +1,6 @@
 import nltk
-from pandas import DataFrame
 import sklearn.feature_extraction.text as ext
+from pandas import DataFrame
 
 nltk.download("punkt", quiet=True)
 

@@ -1,17 +1,12 @@
+import importlib
+import importlib.machinery
+import importlib.util
 import os
 import sys
-import importlib
-import importlib.util
-import importlib.machinery
-
 from typing import Optional
 
-from jobmon.core.task_generator import (
-    task_generator,
-    TaskGeneratorModuleDocumenter,
-    TaskGeneratorDocumenter,
-)
 from jobmon.client.api import Tool
+from jobmon.core.task_generator import task_generator
 
 # Get the full path of the current script
 script_path = os.path.abspath(__file__)

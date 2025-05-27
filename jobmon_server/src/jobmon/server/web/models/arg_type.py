@@ -1,7 +1,7 @@
 """ArgType table in the database."""
 
 from sqlalchemy import Column, Integer, String
-from sqlalchemy.orm import relationship, Session
+from sqlalchemy.orm import Session, relationship
 
 from jobmon.core import constants
 from jobmon.server.web.models import Base

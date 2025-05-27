@@ -1,20 +1,19 @@
 """Routes for Tool Versions."""
 
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict
+from typing import Any, Dict, cast
 
-from fastapi import Request
 import sqlalchemy
+import structlog
+from fastapi import Request
 from sqlalchemy import select
 from starlette.responses import JSONResponse
-import structlog
 
 from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.tool_version import ToolVersion
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
-
 
 logger = structlog.get_logger(__name__)
 SessionMaker = get_sessionmaker()

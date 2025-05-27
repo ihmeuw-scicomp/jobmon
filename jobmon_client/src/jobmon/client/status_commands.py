@@ -20,7 +20,6 @@ from jobmon.core.exceptions import WorkflowRunStateError
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
 
-
 logger = logging.getLogger(__name__)
 
 
