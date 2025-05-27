@@ -34,6 +34,13 @@ jobs:
         uses: actions/setup-python@v3
         with:
           python-version: '3.11' # Pin to Python 3.11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: 'jobmon_gui/package-lock.json'
           
       - name: Install uv and nox
         run: pip install --upgrade uv nox
@@ -47,8 +54,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-uv-
         
-      - name: Type checking and Linting
+      - name: Backend Type checking and Linting
         run: nox -s typecheck lint
+
+      - name: Frontend Type checking and Linting
+        run: nox -s typecheck_frontend lint_frontend
 
       - name: Run tests
         id: tests
