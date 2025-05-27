@@ -41,10 +41,6 @@ pip install jobmon_client[server]
 
 Refer to the [quickstart](https://jobmon.readthedocs.io/en/latest/quickstart.html#create-a-workflow) to get started with a sample workflow
 
-## Requirements
-
-- Python 3.8+
-- uv (Python package manager, https://github.com/astral-sh/uv)
 
 ## Documentation
 
@@ -57,27 +53,11 @@ Contributing to JobMon? Here's how to set up your environment. This project util
 **Prerequisites:**
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-org/jobmon.git # Replace with your actual repo URL
+    git clone https://github.com/ihmeuw-scicomp/jobmon.git # Replace with your actual repo URL
     cd jobmon
     ```
 2.  **Install `uv`:**
     Follow the official `uv` installation instructions (e.g., `pip install uv` or `curl -LsSf https://astral.sh/uv/install.sh | sh`).
-
-**Configuring IHME Artifactory Index (Conditional):**
-This step is **crucial if you plan to generate or update `uv.lock` files** (e.g., using `nox -s update_locks`, or `uv pip compile` commands). If you are only using existing `uv.lock` files for tasks like running tests or linting, and all dependencies are publicly mirrored or vendored, you might not need this.
-*   The recommended way is to create or update your `pip.conf` file:
-    *   Linux/macOS: `~/.config/pip/pip.conf` (preferred) or `~/.pip/pip.conf`
-    *   Windows: `%APPDATA%\pip\pip.ini` or `%USERPROFILE%\pip\pip.ini`
-*   Add the following content:
-    ```ini
-    [global]
-    extra-index-url = https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple
-    # trusted-host = artifactory.ihme.washington.edu # May be needed if not HTTPS or cert issues
-    ```
-*   Alternatively, set the `UV_EXTRA_INDEX_URL` environment variable specifically when needed:
-    ```bash
-    export UV_EXTRA_INDEX_URL="https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple"
-    ```
 
 **Development Workflows:**
 
@@ -90,7 +70,6 @@ Choose one of the following workflows:
     *   **Usage:**
         *   List available sessions: `nox -l`
         *   Run specific sessions: `nox -s tests lint format`
-        *   The `nox -s update_locks` session requires the IHME Artifactory Index configuration (see above).
     *   Refer to the "Nox Sessions" section below for a detailed list of available commands and their functions.
 
 2.  **Docker-based Development:**
@@ -110,31 +89,74 @@ Choose one of the following workflows:
     If you prefer a single, manually managed Python environment for the entire workspace:
     *   **Setup:**
         1.  Ensure `uv` is installed.
-        2.  Configure the IHME Artifactory Index (see above) if you plan to modify dependencies or (re)generate lock files.
-        3.  From the repository root, create and activate a virtual environment:
+        2.  From the repository root, create and activate a virtual environment:
             ```bash
             uv venv .venv
             source .venv/bin/activate  # Or .venv\Scripts\activate on Windows
             ```
-        4.  Install all workspace projects in editable mode:
+        3.  Install all workspace projects with development dependencies:
             ```bash
-            uv pip install -e ./jobmon_core -e ./jobmon_client -e ./jobmon_server
+            uv sync --extra dev
             ```
-            This installs the sub-projects and their direct dependencies as defined in their respective `pyproject.toml` files, using your local source code. This setup works seamlessly because the individual `pyproject.toml` files (e.g., in `jobmon_client`) use `[tool.uv.sources] <dependency_name> = { workspace = true }` to instruct `uv` to use the local versions of other workspace packages. For most development tasks (testing, linting, etc.), using the Nox workflow (Option 1) is still recommended as it handles isolated environments and tool installations more robustly.
+            This installs all workspace packages in editable mode along with their development dependencies. The workspace configuration in `pyproject.toml` ensures that local versions of workspace packages are used automatically.
+
+**Pre-commit Setup (Recommended):**
+To ensure code quality and consistency, set up pre-commit hooks:
+1.  **Install pre-commit** (if not already installed via `uv sync --extra dev`):
+    ```bash
+    uv pip install pre-commit
+    ```
+2.  **Install the git hook scripts:**
+    ```bash
+    pre-commit install
+    ```
+3.  **Run against all files** (optional, to check current state):
+    ```bash
+    pre-commit run --all-files
+    ```
+
+Once installed, pre-commit will automatically run the configured hooks (linting, formatting, type checking) on staged files before each commit.
+
+<details>
+<summary><strong>Advanced: IHME Artifactory Configuration (Only needed for lock file generation)</strong></summary>
+
+This configuration is only required if you need to generate or update `uv.lock` files using `nox -s update_locks`. Most developers working on JobMon will not need this.
+
+Set the `UV_EXTRA_INDEX_URL` environment variable:
+```bash
+export UV_EXTRA_INDEX_URL="https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple"
+```
+
+You can add this to your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) to make it persistent across sessions.
+</details>
 
 ### Nox Sessions
 
 The `noxfile.py` in this project defines several sessions for common development tasks:
 
+**Backend Development:**
 *   `nox -s tests`: Runs the test suite using pytest.
-*   `nox -s lint`: Lints the codebase using flake8 and associated plugins to check for style, import order, docstrings, and annotations.
-*   `nox -s format`: Formats the code using black (for code style), isort (for import sorting), and autoflake (to remove unused imports).
-*   `nox -s typecheck`: Performs static type checking using mypy.
+*   `nox -s lint`: Lints the backend codebase using flake8 and associated plugins to check for style, import order, docstrings, and annotations.
+*   `nox -s format`: Formats the backend code using black (for code style), isort (for import sorting), and autoflake (to remove unused imports).
+*   `nox -s typecheck`: Performs static type checking on backend code using mypy.
+
+**Frontend Development:**
+*   `nox -s lint_frontend`: Lints the frontend TypeScript/React code using ESLint and performs TypeScript type checking.
+*   `nox -s format_frontend`: Formats the frontend code using Prettier.
+*   `nox -s typecheck_frontend`: Performs TypeScript type checking on frontend code.
+
+**Combined Operations:**
+*   `nox -s lint_all`: Runs linting for both backend and frontend code.
+*   `nox -s format_all`: Runs formatting for both backend and frontend code.
+*   `nox -s typecheck_all`: Runs type checking for both backend and frontend code.
+
+**Utility Sessions:**
 *   `nox -s schema_diagram`: Generates an Entity Relationship Diagram (ERD) for the database schema using schemacrawler and Docker. The output is saved to `docsource/developers_guide/diagrams/erd.svg`.
 *   `nox -s build`: Builds the Python packages for each sub-project (`jobmon_client`, `jobmon_core`, `jobmon_server`).
 *   `nox -s clean`: Removes all build artifacts, caches (like `.pytest_cache`, `.mypy_cache`), `.egg-info` directories, and virtual environments (`.venv`).
 *   `nox -s build_gui_test_env`: Prepares the environment for GUI testing by installing necessary dependencies and setting up a test database.
-*   `nox -s update_locks`: Generates/updates `uv.lock` files for all sub-projects (`jobmon_core`, `jobmon_client`, `jobmon_server`) based on their `pyproject.toml` files. This ensures reproducible dependencies. **Requires the IHME Artifactory index to be configured (see step 3 under Developer Setup) if private packages are needed.**
+*   `nox -s update_locks`: Generates/updates `uv.lock` files for all sub-projects (`jobmon_core`, `jobmon_client`, `jobmon_server`) based on their `pyproject.toml` files. This ensures reproducible dependencies. **Requires the IHME Artifactory index to be configured via `UV_EXTRA_INDEX_URL` environment variable.**
+*   `nox -s generate_api_types`: Generates TypeScript types from the FastAPI backend's OpenAPI schema using npx.
 
 You can run a specific session using `nox -s <session_name>`. To list all available sessions, use `nox -l`.
 

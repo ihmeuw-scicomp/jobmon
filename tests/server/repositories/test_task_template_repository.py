@@ -27,7 +27,6 @@ from jobmon.server.web.repositories.task_template_repository import (
 
 # Import schemas from your application
 from jobmon.server.web.schemas.task_template import (  # If RequestedResourcesModel is indeed used or intended to be, ensure it's imported; RequestedResourcesModel,
-    ResourceUsageStats,
     TaskResourceDetailItem,
     TaskTemplateResourceUsageRequest,
 )
