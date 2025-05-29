@@ -4,6 +4,8 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- Added optional authentication support for Jobmon server and GUI (PR TBD). Authentication can now be disabled via `JOBMON__AUTH__ENABLED=false` server-side and `VITE_APP_AUTH_ENABLED=false` client-side environment variables for development and testing environments.
+
 ### Changed
 ### Fixed
 ### Deprecated
