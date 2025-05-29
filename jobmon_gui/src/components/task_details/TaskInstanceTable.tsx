@@ -226,7 +226,9 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
                         </Grid>
                         <Grid item xs={12}>
                             <ScrollableCodeBlock>
-                                {rowDetail.ti_stdout_log}
+                                <pre>
+                                    {rowDetail.ti_stdout_log}
+                                </pre>
                             </ScrollableCodeBlock>
                         </Grid>
                     </Grid>
@@ -257,7 +259,9 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
                         </Grid>
                         <Grid item xs={12}>
                             <ScrollableCodeBlock>
-                                {rowDetail.ti_stderr_log}
+                                <pre>
+                                    {rowDetail.ti_stderr_log}
+                                </pre>
                             </ScrollableCodeBlock>
                         </Grid>
                         <Grid item xs={12}>
