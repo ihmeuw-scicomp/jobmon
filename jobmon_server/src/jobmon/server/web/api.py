@@ -69,22 +69,51 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         docs_static_uri, StaticFiles(directory=docs_static_path), name="docs_static"
     )
 
+    # Check if auth is enabled first (needed for CORS configuration)
+    auth_enabled = is_auth_enabled()
+
     # Add middlewares
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],  # Adjust the origins as needed
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["Content-Type"],
-    )
+    # Configure CORS origins based on environment and auth setting
+    allowed_origins = []
+
+    # Get CORS origins from config or environment
+    try:
+        cors_origins = config.get("cors", "allowed_origins")
+        allowed_origins = [origin.strip() for origin in cors_origins.split(",")]
+    except Exception:
+        # Default CORS origins for development
+        allowed_origins = [
+            "http://localhost:3000",  # Default Vite dev server
+            "http://localhost:3001",  # Alternative frontend port
+            "http://127.0.0.1:3000",  # IPv4 localhost
+            "http://127.0.0.1:3001",  # IPv4 localhost alternative
+        ]
+
+    # Configure CORS middleware based on auth status
+    if auth_enabled:
+        # When auth is enabled, we need credentials, so specify exact origins
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=allowed_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+        )
+    else:
+        # When auth is disabled, we can use wildcard since no credentials are needed
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+        )
+
     app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
     app.add_middleware(
         SessionMiddleware, secret_key=config.get("session", "secret_key")
     )
     app.add_middleware(SecurityHeadersMiddleware, csp=True)
-
-    # Check if auth is enabled
-    auth_enabled = is_auth_enabled()
 
     # Include routers with conditional authentication
     versions = versions or (["auth", "v3", "v2"] if auth_enabled else ["v3", "v2"])
