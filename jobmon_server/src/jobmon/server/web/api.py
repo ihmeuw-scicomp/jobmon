@@ -15,7 +15,11 @@ from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 from jobmon.server.web.log_config import configure_logging, configure_structlog
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
-from jobmon.server.web.routes.utils import get_user
+from jobmon.server.web.routes.utils import (
+    get_user,
+    get_user_or_anonymous,
+    is_auth_enabled,
+)
 
 
 def get_app(versions: Optional[List[str]] = None) -> FastAPI:
@@ -79,8 +83,11 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     )
     app.add_middleware(SecurityHeadersMiddleware, csp=True)
 
-    # Include routers
-    versions = versions or ["auth", "v3", "v2"]
+    # Check if auth is enabled
+    auth_enabled = is_auth_enabled()
+
+    # Include routers with conditional authentication
+    versions = versions or (["auth", "v3", "v2"] if auth_enabled else ["v3", "v2"])
     url_prefix = "/api"  # Adjust as necessary
     for version in versions:
         mod = import_module(f"jobmon.server.web.routes.{version}")
@@ -89,7 +96,10 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         # Include the router with a version-specific prefix
         dependencies = None
         if version == "v3":
-            dependencies = [Depends(get_user)]
+            if auth_enabled:
+                dependencies = [Depends(get_user)]
+            else:
+                dependencies = [Depends(get_user_or_anonymous)]
         app.include_router(api_router, prefix=url_prefix, dependencies=dependencies)
 
     # Custom documentation endpoints
