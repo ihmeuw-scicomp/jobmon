@@ -41,11 +41,39 @@ const AuthContextDefaultValue: AuthContextType = {
 const AuthContext = createContext<AuthContextType>(AuthContextDefaultValue);
 
 export const AuthProvider = (props: PropsWithChildren) => {
-    // const [user, setUser] = useState<UserType | null>(null)
+    // Check if auth is enabled via environment variable
+    // VITE_APP_AUTH_ENABLED defaults to true if not set
+    const authEnabled = import.meta.env.VITE_APP_AUTH_ENABLED !== 'false';
+
+    // Create anonymous user data for unauthenticated mode
+    const anonymousUser: UserType = {
+        sub: 'anonymous',
+        email: 'anonymous@localhost',
+        preferred_username: 'anonymous',
+        name: 'Anonymous User',
+        updated_at: 0,
+        given_name: 'Anonymous',
+        family_name: 'User',
+        nonce: '',
+        at_hash: '',
+        sid: '',
+        aud: '',
+        exp: 0,
+        iat: 0,
+        iss: 'localhost',
+        is_admin: false,
+    };
 
     const user = useQuery({
         queryKey: ['userinfo'],
         queryFn: async () => {
+            if (!authEnabled) {
+                // Return anonymous user immediately when auth is disabled
+                localStorage.setItem('userInfo', JSON.stringify(anonymousUser));
+                return anonymousUser;
+            }
+
+            // Original auth logic for when auth is enabled
             return axios
                 .get<UserType>(userInfoURL, jobmonAxiosConfig)
                 .then(r => {
@@ -54,22 +82,36 @@ export const AuthProvider = (props: PropsWithChildren) => {
                 });
         },
         retry: false,
+        enabled: true, // Always enabled, but returns anonymous user if auth disabled
     });
 
     const loginHandler = () => {
-        ExternalRedirect(loginURL);
+        if (authEnabled) {
+            ExternalRedirect(loginURL);
+        } else {
+            // No-op when auth is disabled
+            console.log('Authentication is disabled - login not available');
+        }
     };
 
     const logoutHandler = () => {
-        localStorage.removeItem('userInfo');
-        ExternalRedirect(logoutURL);
+        if (authEnabled) {
+            localStorage.removeItem('userInfo');
+            ExternalRedirect(logoutURL);
+        } else {
+            // No-op when auth is disabled
+            console.log('Authentication is disabled - logout not available');
+        }
     };
-    if (user.isError || !user.data) {
+
+    // Only show login screen if auth is enabled AND there's an error
+    if (authEnabled && (user.isError || !user.data)) {
         localStorage.removeItem('userInfo');
         return <LoginScreen />;
     }
-    const userData = user.data;
-    // Render something in case the redirect fails
+
+    const userData = user.data || anonymousUser;
+
     return (
         <AuthContext.Provider
             value={{
