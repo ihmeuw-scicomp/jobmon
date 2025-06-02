@@ -1,26 +1,17 @@
-/**
- * @jest-environment jsdom
- */
-
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import axios from 'axios';
 import { AuthProvider } from '../contexts/AuthContext';
+import { describe, it, beforeEach, expect, vi } from 'vitest';
 
 // Mock axios
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+vi.mock('axios');
+const mockedAxios = axios as any;
 
 // Mock Vite environment variables
-const mockEnv = (authEnabled: string = 'true') => {
-    Object.defineProperty(import.meta, 'env', {
-        value: {
-            VITE_APP_AUTH_ENABLED: authEnabled,
-        },
-        writable: true,
-    });
+const mockEnv = (authEnabled: string | undefined = 'true') => {
+    vi.stubEnv('VITE_APP_AUTH_ENABLED', authEnabled);
 };
 
 // Test component that consumes AuthContext
@@ -39,7 +30,8 @@ describe('AuthContext', () => {
                 },
             },
         });
-        jest.clearAllMocks();
+        vi.clearAllMocks();
+        vi.unstubAllEnvs();
     });
 
     describe('when authentication is enabled', () => {
@@ -66,7 +58,7 @@ describe('AuthContext', () => {
                 is_admin: false,
             };
 
-            mockedAxios.get.mockResolvedValueOnce({ data: mockUser });
+            mockedAxios.get.mockResolvedValue({ data: mockUser });
 
             render(
                 <QueryClientProvider client={queryClient}>
@@ -83,13 +75,13 @@ describe('AuthContext', () => {
             });
 
             expect(mockedAxios.get).toHaveBeenCalledWith(
-                expect.stringContaining('/api/auth/user'),
+                expect.stringContaining('/api/auth/oidc/userinfo'),
                 expect.any(Object)
             );
         });
 
         it('should show login screen when auth is enabled and user fetch fails', async () => {
-            mockedAxios.get.mockRejectedValueOnce(new Error('Unauthorized'));
+            mockedAxios.get.mockRejectedValue(new Error('Unauthorized'));
 
             render(
                 <QueryClientProvider client={queryClient}>
@@ -173,7 +165,7 @@ describe('AuthContext', () => {
                 is_admin: false,
             };
 
-            mockedAxios.get.mockResolvedValueOnce({ data: mockUser });
+            mockedAxios.get.mockResolvedValue({ data: mockUser });
 
             render(
                 <QueryClientProvider client={queryClient}>
@@ -213,7 +205,7 @@ describe('AuthContext', () => {
                 is_admin: false,
             };
 
-            mockedAxios.get.mockResolvedValueOnce({ data: mockUser });
+            mockedAxios.get.mockResolvedValue({ data: mockUser });
 
             render(
                 <QueryClientProvider client={queryClient}>

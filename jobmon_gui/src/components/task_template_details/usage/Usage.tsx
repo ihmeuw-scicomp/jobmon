@@ -7,14 +7,14 @@ import {
     calculateResourceEfficiency,
     calculateMedian,
     getResourceClusterKey,
-} from './usageCalculations';
+} from '@jobmon_gui/components/task_template_details/usage/usageCalculations';
 import { bytes_to_gib } from '@jobmon_gui/utils/formatters';
-import { useUsageFilters } from '../../../hooks/useUsageFilters';
+import { useUsageFilters } from '@jobmon_gui/hooks/useUsageFilters';
 
 // Components
-import UsageKPICards from './UsageKPICards';
-import UsageFilters from './UsageFilters';
-import UsagePlotSection from './UsagePlotSection';
+import UsageKPICards from '@jobmon_gui/components/task_template_details/usage/UsageKPICards';
+import UsageFilters from '@jobmon_gui/components/task_template_details/usage/UsageFilters';
+import UsagePlotSection from '@jobmon_gui/components/task_template_details/usage/UsagePlotSection';
 
 // Types and queries
 import {
@@ -75,6 +75,43 @@ export default function Usage({
         clearFilters,
     } = useUsageFilters({ rawTaskNodesFromApi });
 
+    // Helper function to extract filtered requested resource values
+    const getFilteredRequestedResourceValues = useMemo(() => {
+        return (fieldName: 'runtime' | 'memory'): (number | undefined)[] => {
+            if (!rawTaskNodesFromApi) return [];
+            return rawTaskNodesFromApi
+                .filter(d => {
+                    const clusterKey = getResourceClusterKey(d.requested_resources);
+                    return (
+                        selectedAttempts.has(
+                            String(d.attempt_number_of_instance || 1)
+                        ) &&
+                        selectedStatuses.has(
+                            String(d.status || 'UNKNOWN').toUpperCase()
+                        ) &&
+                        (clusterKey === null ||
+                            selectedResourceClusters.has(clusterKey))
+                    );
+                })
+                .map(item => {
+                    try {
+                        const reqRes = item.requested_resources
+                            ? JSON.parse(item.requested_resources)
+                            : {};
+                        const val = Number(reqRes[fieldName]);
+                        return !isNaN(val) ? val : undefined;
+                    } catch {
+                        return undefined;
+                    }
+                });
+        };
+    }, [
+        rawTaskNodesFromApi,
+        selectedAttempts,
+        selectedStatuses,
+        selectedResourceClusters,
+    ]);
+
     // State for plot interactions
     const [selectedData, setSelectedData] = useState<ScatterDataPoint[]>([]);
 
@@ -83,72 +120,12 @@ export default function Usage({
 
     // Calculate median requested resources from FILTERED nodes (dynamic based on current filters)
     const filteredRequestedRuntimes = useMemo(() => {
-        if (!rawTaskNodesFromApi) return [];
-        return rawTaskNodesFromApi
-            .filter(d => {
-                const clusterKey = getResourceClusterKey(d.requested_resources);
-                return (
-                    selectedAttempts.has(
-                        String(d.attempt_number_of_instance || 1)
-                    ) &&
-                    selectedStatuses.has(
-                        String(d.status || 'UNKNOWN').toUpperCase()
-                    ) &&
-                    (clusterKey === null ||
-                        selectedResourceClusters.has(clusterKey))
-                );
-            })
-            .map(item => {
-                try {
-                    const reqRes = item.requested_resources
-                        ? JSON.parse(item.requested_resources)
-                        : {};
-                    const val = Number(reqRes.runtime);
-                    return !isNaN(val) ? val : undefined;
-                } catch {
-                    return undefined;
-                }
-            });
-    }, [
-        rawTaskNodesFromApi,
-        selectedAttempts,
-        selectedStatuses,
-        selectedResourceClusters,
-    ]);
+        return getFilteredRequestedResourceValues('runtime');
+    }, [getFilteredRequestedResourceValues]);
 
     const filteredRequestedMemoriesGiB = useMemo(() => {
-        if (!rawTaskNodesFromApi) return [];
-        return rawTaskNodesFromApi
-            .filter(d => {
-                const clusterKey = getResourceClusterKey(d.requested_resources);
-                return (
-                    selectedAttempts.has(
-                        String(d.attempt_number_of_instance || 1)
-                    ) &&
-                    selectedStatuses.has(
-                        String(d.status || 'UNKNOWN').toUpperCase()
-                    ) &&
-                    (clusterKey === null ||
-                        selectedResourceClusters.has(clusterKey))
-                );
-            })
-            .map(item => {
-                try {
-                    const reqRes = item.requested_resources
-                        ? JSON.parse(item.requested_resources)
-                        : {};
-                    const val = Number(reqRes.memory); // Assuming this is already in GiB
-                    return !isNaN(val) ? val : undefined;
-                } catch {
-                    return undefined;
-                }
-            });
-    }, [
-        rawTaskNodesFromApi,
-        selectedAttempts,
-        selectedStatuses,
-        selectedResourceClusters,
-    ]);
+        return getFilteredRequestedResourceValues('memory');
+    }, [getFilteredRequestedResourceValues]);
 
     const medianRequestedRuntime = useMemo(
         () => calculateMedian(filteredRequestedRuntimes),

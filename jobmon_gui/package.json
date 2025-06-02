@@ -18,7 +18,6 @@
     "@testing-library/jest-dom": "^5.16.4",
     "@testing-library/react": "^13.2.0",
     "@testing-library/user-event": "^13.5.0",
-    "@types/jest": "^27.5.1",
     "@types/react": "^18.0.9",
     "@types/react-dom": "^18.0.4",
     "@vitejs/plugin-react": "^4.2.1",
@@ -67,6 +66,9 @@
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "tsc && vite build",
     "serve": "serve dist",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write src/**/*.{ts,tsx,css,md}",
@@ -104,8 +106,11 @@
     "@typescript-eslint/eslint-plugin": "^8.33.0",
     "@typescript-eslint/parser": "^8.33.0",
     "eslint": "^9.27.0",
+    "jsdom": "^24.0.0",
     "nodemon": "^1.3.3",
     "prettier": "^3.5.3",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vitest": "^1.6.0",
+    "@vitest/ui": "^1.6.0"
   }
 }
