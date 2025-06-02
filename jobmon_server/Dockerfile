@@ -22,7 +22,8 @@ ENV VALID_CORE_EXTRAS="otlp"
 ENV VALID_SERVER_EXTRAS="otlp mysql"
 
 # Copy source code
-COPY ./ ./ # Copies everything, including the new script from jobmon_server/
+# Copies everything, including the new script from jobmon_server/
+COPY ./ ./
 
 # Install dependencies using the script
 # Pass Docker ARGs as ENV VARs to the script
