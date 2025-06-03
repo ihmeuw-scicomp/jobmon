@@ -1,13 +1,16 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
-import ReactFlow, { MiniMap, Controls, Background, useReactFlow } from 'reactflow';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import ReactFlow, { MiniMap, Controls, Background } from 'reactflow';
 import dagre from 'dagre';
-import axios from "axios";
-import { jobmonAxiosConfig } from "@jobmon_gui/configs/Axios.ts";
-import { get_task_template_dag, workflow_tt_status_url } from "@jobmon_gui/configs/ApiUrls.ts";
-import TaskTemplatePopover from "@jobmon_gui/components/TaskTemplatePopover.tsx";
-import { useQuery } from "@tanstack/react-query";
-import { TTStatusResponse } from "@jobmon_gui/types/TaskTemplateStatus.ts";
-import {CircularProgress} from "@mui/material";
+import axios from 'axios';
+import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
+import {
+    get_task_template_dag,
+    workflow_tt_status_url,
+} from '@jobmon_gui/configs/ApiUrls.ts';
+import TaskTemplatePopover from '@jobmon_gui/components/TaskTemplatePopover.tsx';
+import { useQuery } from '@tanstack/react-query';
+import { TTStatusResponse } from '@jobmon_gui/types/TaskTemplateStatus.ts';
+import { CircularProgress } from '@mui/material';
 
 interface TaskTemplateDAGResponse {
     tt_dag: {
@@ -16,28 +19,35 @@ interface TaskTemplateDAGResponse {
     }[];
 }
 
-export default function WorkflowDAG(workflowId) {
+export default function WorkflowDAG(workflowId: {
+    workflowId: string | number;
+}) {
     const [nodes, setNodes] = useState([]);
     const [edges, setEdges] = useState([]);
     const [selectedNode, setSelectedNode] = useState(null);
     const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
     const popoverRef = useRef(null);
-    const [tt_data, setTTData] = useState<typeof wfTTStatus.data[any] | undefined>(undefined);
+    const [tt_data, setTTData] = useState<TTStatusResponse[string] | undefined>(
+        undefined
+    );
 
     const wfTTStatus = useQuery({
         queryKey: ['workflow_details', 'tt_status', workflowId.workflowId],
         queryFn: async () => {
             return axios
-                .get<TTStatusResponse>(workflow_tt_status_url + workflowId.workflowId, {
-                    ...jobmonAxiosConfig,
-                })
-                .then((r) => {
+                .get<TTStatusResponse>(
+                    workflow_tt_status_url + workflowId.workflowId,
+                    {
+                        ...jobmonAxiosConfig,
+                    }
+                )
+                .then(r => {
                     return r.data;
                 });
         },
     });
 
-    const createNodesAndEdgesFromTTDAG = (tt_dag) => {
+    const createNodesAndEdgesFromTTDAG = tt_dag => {
         const nodes = [];
         const edges = [];
         const nodeSet = new Set();
@@ -56,7 +66,11 @@ export default function WorkflowDAG(workflowId) {
             }
 
             if (targetId) {
-                edges.push({ id: `e${index}`, source: sourceId, target: targetId });
+                edges.push({
+                    id: `e${index}`,
+                    source: sourceId,
+                    target: targetId,
+                });
             }
         });
 
@@ -66,15 +80,23 @@ export default function WorkflowDAG(workflowId) {
     useEffect(() => {
         if (!workflowId.workflowId) return;
 
-        axios.get<TaskTemplateDAGResponse>(get_task_template_dag(workflowId.workflowId), {
-            ...jobmonAxiosConfig,
-        }).then((r) => {
-            const { nodes, edges } = createNodesAndEdgesFromTTDAG(r.data.tt_dag);
-            setNodes(nodes);
-            setEdges(edges);
-        }).catch((error) => {
-            console.error('Error fetching task template DAG:', error);
-        });
+        axios
+            .get<TaskTemplateDAGResponse>(
+                get_task_template_dag(workflowId.workflowId),
+                {
+                    ...jobmonAxiosConfig,
+                }
+            )
+            .then(r => {
+                const { nodes, edges } = createNodesAndEdgesFromTTDAG(
+                    r.data.tt_dag
+                );
+                setNodes(nodes);
+                setEdges(edges);
+            })
+            .catch(error => {
+                console.error('Error fetching task template DAG:', error);
+            });
     }, [workflowId]);
 
     const getLayoutNodes = (nodes, edges) => {
@@ -88,11 +110,11 @@ export default function WorkflowDAG(workflowId) {
         });
         g.setDefaultEdgeLabel(() => ({}));
 
-        nodes.forEach((node) => {
+        nodes.forEach(node => {
             g.setNode(node.id, { width: 172, height: 36 });
         });
 
-        edges.forEach((edge) => {
+        edges.forEach(edge => {
             g.setEdge(edge.source, edge.target, {
                 minlen: 1,
                 weight: 1,
@@ -101,7 +123,7 @@ export default function WorkflowDAG(workflowId) {
 
         dagre.layout(g);
 
-        nodes.forEach((node) => {
+        nodes.forEach(node => {
             const nodeWithPosition = g.node(node.id);
             node.position = {
                 x: nodeWithPosition.x - 172 / 2,
@@ -119,7 +141,9 @@ export default function WorkflowDAG(workflowId) {
     const handleNodeHover = (event, node) => {
         setSelectedNode(node);
         setPopoverPosition(node.position);
-        setTTData(Object.values(wfTTStatus.data).find(item => item.name === node.id));
+        setTTData(
+            Object.values(wfTTStatus.data).find(item => item.name === node.id)
+        );
     };
 
     const handleNodeLeave = () => {
@@ -127,23 +151,26 @@ export default function WorkflowDAG(workflowId) {
     };
 
     useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (popoverRef.current && !popoverRef.current.contains(event.target)) {
+        const handleClickOutside = event => {
+            if (
+                popoverRef.current &&
+                !popoverRef.current.contains(event.target)
+            ) {
                 setSelectedNode(null);
             }
         };
 
-        document.addEventListener("mousedown", handleClickOutside);
+        document.addEventListener('mousedown', handleClickOutside);
 
         return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
+            document.removeEventListener('mousedown', handleClickOutside);
         };
     }, []);
 
     return (
-        <div style={{ height: "100vh", width: "100vw", position: "relative" }}>
+        <div style={{ height: '100vh', width: '100vw', position: 'relative' }}>
             {nodes.length === 0 ? (
-                <CircularProgress/>
+                <CircularProgress />
             ) : (
                 <ReactFlow
                     nodes={laidOutNodes}

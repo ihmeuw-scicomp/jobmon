@@ -28,7 +28,7 @@ jobmon = "jobmon.client.cli:main"
 
 [project.optional-dependencies]
 server = ["jobmon_server"]
-ihme = ["jobmon_installer_ihme"]
+# ihme = ["jobmon_installer_ihme"]
 
 [tool.uv.sources]
 jobmon_core = { workspace = true }

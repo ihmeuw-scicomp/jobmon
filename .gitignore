@@ -46,3 +46,4 @@ docsource/api
 /.env
 # ignore .env
 .env
+node_modules/*

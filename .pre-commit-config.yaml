@@ -2,20 +2,38 @@ repos:
 -   repo: local
     hooks:
     -   id: nox-format
-        name: Nox Format
+        name: Nox Format (Backend)
         entry: nox -r -s format
         language: system
         types: [python]
         pass_filenames: false
     -   id: nox-lint
-        name: Nox Lint
+        name: Nox Lint (Backend)
         entry: nox -r -s lint
         language: system
         types: [python]
         pass_filenames: false
     -   id: nox-typecheck
-        name: Nox Typecheck
+        name: Nox Typecheck (Backend)
         entry: nox -r -s typecheck
         language: system
         types: [python]
+        pass_filenames: false
+    -   id: nox-format-frontend
+        name: Nox Format (Frontend)
+        entry: nox -r -s format_frontend
+        language: system
+        files: ^jobmon_gui/src/.*\.(ts|tsx|js|jsx|json|css|md)$
+        pass_filenames: false
+    -   id: nox-lint-frontend
+        name: Nox Lint (Frontend)
+        entry: nox -r -s lint_frontend
+        language: system
+        files: ^jobmon_gui/src/.*\.(ts|tsx)$
+        pass_filenames: false
+    -   id: nox-typecheck-frontend
+        name: Nox Typecheck (Frontend)
+        entry: nox -r -s typecheck_frontend
+        language: system
+        files: ^jobmon_gui/src/.*\.(ts|tsx)$
         pass_filenames: false

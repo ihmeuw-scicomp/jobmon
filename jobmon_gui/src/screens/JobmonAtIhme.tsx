@@ -1,8 +1,8 @@
 import ReactMarkdown from 'react-markdown';
-import { Box } from "@mui/material";
+import { Box } from '@mui/material';
 import Mustache from 'mustache';
-import MarkdownLinkNewTabRenderer from "@jobmon_gui/utils/MarkdownLinkNewTabRender";
-import { markdown } from "@jobmon_gui/assets/content/JobmonAtIhme.md";
+import MarkdownLinkNewTabRenderer from '@jobmon_gui/utils/MarkdownLinkNewTabRender';
+import { markdown } from '@jobmon_gui/assets/content/JobmonAtIhme.md';
 
 const templateData = {
     JOBMON_DB_HOST: import.meta.env.VITE_APP_DOCS_DB_HOST,

@@ -1,14 +1,14 @@
 import React from 'react';
 import ProgressBar from 'react-bootstrap/ProgressBar';
-import {OverlayTrigger} from 'react-bootstrap';
-import {useQuery} from '@tanstack/react-query';
+import { OverlayTrigger } from 'react-bootstrap';
+import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import {CircularProgress} from '@mui/material';
+import { CircularProgress } from '@mui/material';
 import Typography from '@mui/material/Typography';
-import {jobmonAxiosConfig} from '@jobmon_gui/configs/Axios';
-import {workflow_tt_status_url} from '@jobmon_gui/configs/ApiUrls';
-import {TTStatusResponse} from '@jobmon_gui/types/TaskTemplateStatus';
-import TaskTemplatePopover from "@jobmon_gui/components/TaskTemplatePopover.tsx";
+import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios';
+import { workflow_tt_status_url } from '@jobmon_gui/configs/ApiUrls';
+import { TTStatusResponse } from '@jobmon_gui/types/TaskTemplateStatus';
+import TaskTemplatePopover from '@jobmon_gui/components/TaskTemplatePopover.tsx';
 
 type WfDetails = {
     DONE: number;
@@ -33,22 +33,25 @@ type JobmonProgressBarProps = {
 };
 
 export default function JobmonProgressBar({
-                                              workflowId,
-                                              ttId,
-                                              placement = 'bottom',
-                                          }: JobmonProgressBarProps) {
+    workflowId,
+    ttId,
+    placement = 'bottom',
+}: JobmonProgressBarProps) {
     const workflow_status = useQuery({
         queryKey: ['workflow_details', 'progress_bar', workflowId],
         queryFn: async () => {
-            const baseUrl = import.meta.env.VITE_APP_BASE_URL + '/workflow_status_viz';
+            const baseUrl =
+                import.meta.env.VITE_APP_BASE_URL + '/workflow_status_viz';
             const url = new URL(baseUrl);
             const wf_ids = [workflowId];
-            wf_ids.forEach((id) => url.searchParams.append('workflow_ids', id.toString()));
+            wf_ids.forEach(id =>
+                url.searchParams.append('workflow_ids', id.toString())
+            );
             return axios
                 .get<WfDetailsResponse>(url.toString(), {
                     ...jobmonAxiosConfig,
                 })
-                .then((r) => {
+                .then(r => {
                     return r.data[workflowId];
                 });
         },
@@ -64,7 +67,7 @@ export default function JobmonProgressBar({
                     ...jobmonAxiosConfig,
                     data: null,
                 })
-                .then((r) => {
+                .then(r => {
                     return r.data;
                 });
         },
@@ -73,23 +76,32 @@ export default function JobmonProgressBar({
     });
 
     if (workflow_status.isLoading) {
-        return <CircularProgress/>;
+        return <CircularProgress />;
     }
     if (workflow_status.isError) {
-        return <Typography>Unable to retrieve workflow status. Please reload and try again.</Typography>;
+        return (
+            <Typography>
+                Unable to retrieve workflow status. Please reload and try again.
+            </Typography>
+        );
     }
 
     if (!!ttId && wfTTStatus.isLoading) {
-        return <CircularProgress/>;
+        return <CircularProgress />;
     }
     if (!!ttId && wfTTStatus.isError) {
-        return <Typography>Error loading workflow task template details. Please refresh and try again.</Typography>;
+        return (
+            <Typography>
+                Error loading workflow task template details. Please refresh and
+                try again.
+            </Typography>
+        );
     }
 
-    const data = !!ttId ? wfTTStatus.data[ttId] : workflow_status.data;
+    const data = ttId ? wfTTStatus.data[ttId] : workflow_status.data;
 
     if (!data) {
-        return <CircularProgress/>;
+        return <CircularProgress />;
     }
 
     function getLabel(value) {
@@ -110,7 +122,7 @@ export default function JobmonProgressBar({
         <OverlayTrigger
             placement={placement}
             trigger={['hover', 'focus']}
-            overlay={(popoverProps) => (
+            overlay={popoverProps => (
                 <TaskTemplatePopover
                     data={data}
                     placement={popoverProps.placement}

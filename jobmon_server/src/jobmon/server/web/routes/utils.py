@@ -6,6 +6,7 @@ from starlette.requests import Request
 from typing_extensions import TypedDict
 
 from jobmon.core.configuration import JobmonConfig
+from jobmon.core.exceptions import ConfigError
 
 _CONFIG = JobmonConfig()
 
@@ -99,3 +100,41 @@ def is_super_user(user: User) -> bool:
     """
     admin_group = _CONFIG.get("oidc", "admin_group")
     return admin_group in user["groups"]
+
+
+def is_auth_enabled() -> bool:
+    """Check if authentication is enabled."""
+    config = JobmonConfig()
+    try:
+        return config.get_boolean("auth", "enabled")
+    except ConfigError:
+        return True  # Default to enabled for backwards compatibility
+
+
+def create_anonymous_user() -> User:
+    """Create an anonymous user for unauthenticated mode."""
+    return User(
+        sub="anonymous",
+        email="anonymous@localhost",
+        preferred_username="anonymous",
+        name="Anonymous User",
+        updated_at=0,
+        given_name="Anonymous",
+        family_name="User",
+        groups=["anonymous"],
+        nonce="",
+        at_hash="",
+        sid="",
+        aud="",
+        exp=0,
+        iat=0,
+        iss="localhost",
+    )
+
+
+def get_user_or_anonymous(request: Request) -> User:
+    """Get user or return anonymous user when auth is disabled."""
+    if not is_auth_enabled():
+        return create_anonymous_user()
+
+    return get_user(request)

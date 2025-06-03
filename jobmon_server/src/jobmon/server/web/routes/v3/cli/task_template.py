@@ -7,20 +7,18 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd  # type:ignore
-import scipy.stats as st  # type:ignore
 import structlog
-from fastapi import HTTPException, Query, Request
+from fastapi import Depends, HTTPException, Query
 from sqlalchemy import Row, Select, select
+from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 
-from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
 from jobmon.server.web.db import get_dialect_name, get_sessionmaker
+from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.error_log_clustering import cluster_error_logs
-from jobmon.server.web.models.arg import Arg
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.node import Node
-from jobmon.server.web.models.node_arg import NodeArg
 from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -28,11 +26,16 @@ from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLo
 from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
-from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
+from jobmon.server.web.repositories.task_template_repository import (
+    TaskTemplateRepository,
+)
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.routes.v3.cli.workflow import _cli_label_mapping
-from jobmon.server.web.server_side_exception import InvalidUsage
+from jobmon.server.web.schemas.task_template import (
+    TaskTemplateResourceUsageRequest,
+    TaskTemplateResourceUsageResponse,
+)
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
@@ -246,182 +249,33 @@ def get_most_popular_queue(
     return resp
 
 
-@api_v3_router.post("/task_template_resource_usage")
-async def get_task_template_resource_usage(request: Request) -> Any:
+@api_v3_router.post(
+    "/task_template_resource_usage", response_model=TaskTemplateResourceUsageResponse
+)
+async def get_task_template_resource_usage(
+    request_data: TaskTemplateResourceUsageRequest, db: Session = Depends(get_db)
+) -> TaskTemplateResourceUsageResponse:
     """Return the aggregate resource usage for a give TaskTemplate.
 
     Need to use cross_origin decorator when using the GUI to call a post route.
     This enables Cross Origin Resource Sharing (CORS) on the route. Default is
     most permissive settings.
     """
-    data = await request.json()
+    repo = TaskTemplateRepository(db)
     try:
-        task_template_version_id = data.pop("task_template_version_id")
+        viz_data = repo.get_task_template_resource_usage(request_data)
     except Exception as e:
-        raise InvalidUsage(
-            f"{str(e)} in request to /task_template_resource_usage", status_code=400
+        logger.error(f"Error fetching resource usage: {e}")
+        raise HTTPException(
+            status_code=StatusCodes.INTERNAL_SERVER_ERROR,
+            detail="Error processing resource usage data.",
         ) from e
 
-    workflows = data.pop("workflows", None)
-    node_args = data.pop("node_args", None)
-    ci = data.pop("ci", None)
-    viz = bool(data.pop("viz", False))
+    response_data = {}
+    if request_data.viz and viz_data is not None:
+        response_data["result_viz"] = viz_data
 
-    # Initialize resp to ensure it's defined even if the with block fails early
-    resp = JSONResponse(content={}, status_code=StatusCodes.INTERNAL_SERVER_ERROR)
-    with SessionMaker() as session:
-        with session.begin():
-            query_filter = [
-                TaskTemplateVersion.id == task_template_version_id,
-                Task.status == "D",
-                TaskInstance.status == "D",
-                TaskTemplateVersion.id == Node.task_template_version_id,
-                Node.id == Task.node_id,
-                Task.id == TaskInstance.task_id,
-            ]
-            if workflows:
-                query_filter += [
-                    TaskInstance.workflow_run_id == WorkflowRun.id,
-                    WorkflowRun.workflow_id == Workflow.id,
-                    Workflow.id.in_(workflows),
-                ]
-            sql = select(
-                TaskInstance.wallclock, TaskInstance.maxrss, Node.id, Task.id
-            ).where(*query_filter)
-            rows_raw = session.execute(sql).all()
-            session.commit()
-        column_names = ("r", "m", "node_id", "task_id")
-        rows: List[Dict[str, Any]] = [dict(zip(column_names, ti)) for ti in rows_raw]
-        result = []
-        if rows:
-            for r in rows:
-                if r["r"] is None:  # type: ignore
-                    r["r"] = 0
-                if node_args:
-                    session = SessionMaker()
-                    with session.begin():
-                        node_f = [
-                            NodeArg.arg_id == Arg.id,
-                            NodeArg.node_id == r["node_id"],
-                        ]  # type: ignore
-                        node_s = select(Arg.name, NodeArg.val).where(*node_f)
-                        node_rows = session.execute(node_s).all()
-                        session.commit()
-                    _include = False
-                    for n in node_rows:
-                        if not _include:
-                            if n[0] in node_args.keys() and n[1] in node_args[n[0]]:
-                                _include = True
-                    if _include:
-                        result.append(r)
-                else:
-                    result.append(r)
-
-        if len(result) == 0:
-            resource_usage = SerializeTaskTemplateResourceUsage.to_wire(
-                None, None, None, None, None, None, None, None, None, None, None
-            )
-        else:
-            runtimes = []
-            mems = []
-            for row in result:
-                runtimes.append(int(row["r"]))  # type: ignore
-                mems.append(max(0, 0 if row["m"] is None else int(row["m"])))  # type: ignore
-
-            num_tasks = len(runtimes)
-            # set 0 to NaN; thus, numpy ignores them
-            if 0 in mems:
-                mems.remove(0)
-            if 0 in runtimes:
-                runtimes.remove(0)
-            if len(mems) > 0:
-                min_mem = int(np.min(mems))
-                max_mem = int(np.max(mems))
-                mean_mem = round(float(np.mean(mems)), 2)
-                median_mem = round(float(np.percentile(mems, 50)), 2)
-            else:
-                min_mem = 0
-                max_mem = 0
-                mean_mem = 0
-                median_mem = 0
-            if len(runtimes) > 0:
-                min_runtime = int(np.min(runtimes))
-                max_runtime = int(np.max(runtimes))
-                mean_runtime = round(float(np.mean(runtimes)), 2)
-                median_runtime = round(float(np.percentile(runtimes, 50)), 2)
-            else:
-                min_runtime = 0
-                max_runtime = 0
-                mean_runtime = 0
-                median_runtime = 0
-
-            if ci is None:
-                ci_mem = [None, None]
-                ci_runtime = [None, None]
-            else:
-                try:
-                    ci_float = float(ci)
-
-                    def _calculate_ci(d: List, ci: float) -> List[Any]:
-                        # Need at least 2 data points for CI calculation with st.sem
-                        if len(d) < 2:
-                            return [None, None]
-                        try:
-                            interval = st.t.interval(
-                                confidence=ci,
-                                df=len(d) - 1,
-                                loc=np.mean(d),
-                                scale=st.sem(d),
-                            )
-                            # Handle potential NaN results from st.sem if variance is zero
-                            if np.isnan(interval[0]) or np.isnan(interval[1]):
-                                return [None, None]
-                            return [
-                                round(float(interval[0]), 2),
-                                round(float(interval[1]), 2),
-                            ]
-                        except ValueError as e:
-                            logger.warn(
-                                f"Unable to convert {ci} to float for CI. Use None. "
-                                f"Exception: {str(e)}"
-                            )
-                            return [None, None]
-                        except Exception as e:  # Catch any other unexpected errors
-                            logger.warn(
-                                f"Unexpected error during CI calculation: {str(e)}"
-                            )
-                            return [None, None]
-
-                    ci_mem = _calculate_ci(mems, ci_float)
-                    ci_runtime = _calculate_ci(runtimes, ci_float)
-
-                except ValueError as e:
-                    logger.warn(
-                        f"Unable to convert {ci} to float for CI. Use None. "
-                        f"Exception: {str(e)}"
-                    )
-                except Exception as e:  # Catch any other unexpected errors
-                    logger.warn(f"Unexpected error during CI calculation: {str(e)}")
-
-            resource_usage = SerializeTaskTemplateResourceUsage.to_wire(
-                num_tasks,
-                min_mem,
-                max_mem,
-                mean_mem,
-                min_runtime,
-                max_runtime,
-                mean_runtime,
-                median_mem,
-                median_runtime,
-                ci_mem,
-                ci_runtime,
-            )
-
-        if viz:
-            resource_usage += (result,)
-        resp = JSONResponse(content=resource_usage, status_code=StatusCodes.OK)
-    # Move the return statement outside the with block
-    return resp
+    return TaskTemplateResourceUsageResponse(**response_data)
 
 
 @api_v3_router.get("/workflow_tt_status_viz/{workflow_id}")

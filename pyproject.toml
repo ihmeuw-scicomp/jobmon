@@ -5,6 +5,50 @@ members = [
     "jobmon_server"
 ]
 
+[project]
+name = "jobmon-workspace"
+version = "0.1.0"
+readme = "README.md"
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "jobmon_client",
+    "jobmon_core",
+    "jobmon_server",
+    "pytest-xdist",
+    "pytest-cov",
+    "mock",
+    "filelock",
+    "pytest-mock",
+    "flake8",
+    "flake8-annotations",
+    "flake8-docstrings",
+    "flake8-black",
+    "black",
+    "isort",
+    "autoflake",
+    "mypy",
+    "types-Flask",
+    "types-requests",
+    "types-PyMySQL",
+    "types-PyYAML",
+    "types-tabulate",
+    "types-psutil",
+    "types-Flask-Cors",
+    "types-sqlalchemy-utils",
+    "types-setuptools",
+    "types-mysqlclient",
+    "build",
+    "nox"
+]
+
+[tool.uv.sources]
+jobmon_client = { workspace = true }
+jobmon_core = { workspace = true }
+jobmon_server = { workspace = true }
+
 [tool.isort]
 profile = "black"
 line_length = 88 # Usually black's default, but good to be explicit 

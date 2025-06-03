@@ -15,8 +15,9 @@ test_locations = ["tests"]
 @nox.session(venv_backend="venv")
 def tests(session: Session) -> None:
     """Run the test suite."""
-    session.run("uv", "pip", "install", "pytest", "pytest-xdist", "pytest-cov", "mock", "filelock", "pytest-mock")
-    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
+    session.install("uv")
+    # Install all dev dependencies, including pytest and workspace packages
+    session.run("uv", "sync", "--active", "--extra", "dev")
 
     args = session.posargs or test_locations
 
@@ -41,31 +42,19 @@ def lint(session: Session) -> None:
     flake8-annotations -is a plugin for Flake8 that detects the absence of PEP 3107-style
     function annotations and PEP 484-style type comments.
     """
+    session.install("uv")
     args = session.posargs or src_locations
-    # TODO: work these in over time?
-    # "darglint",
-    # "flake8-bandit"
-    session.run(
-        "uv",
-        "pip",
-        "install",
-        "flake8",
-        "flake8-annotations",
-        "flake8-docstrings",
-        "flake8-black"
-    )
+    # Install all dev dependencies, including linters and workspace packages
+    session.run("uv", "sync", "--active", "--extra", "dev")
     session.run("flake8", *args)
 
 
 @nox.session(venv_backend="venv")
 def format(session):
+    session.install("uv")
     args = session.posargs or src_locations + test_locations
-    session.run(
-        "uv", "pip", "install", 
-        "black", 
-        "isort", 
-        "autoflake"
-    )
+    # Install all dev dependencies, including formatters and workspace packages
+    session.run("uv", "sync", "--active", "--extra", "dev")
     session.run(
         "autoflake",
         "--in-place",
@@ -80,32 +69,22 @@ def format(session):
 @nox.session(venv_backend="venv")
 def typecheck(session: Session) -> None:
     """Type check code."""
+    session.install("uv")
     args = session.posargs or src_locations
-    session.run(
-        "uv",
-        "pip",
-        "install",
-        "mypy",
-        "types-Flask",
-        "types-requests",
-        "types-PyMySQL",
-        "types-filelock",
-        "types-PyYAML",
-        "types-tabulate",
-        "types-psutil",
-        "types-Flask-Cors",
-        "types-sqlalchemy-utils",
-        "types-setuptools",
-        "types-mysqlclient"
-    )
-    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
-
+    # Install all dev dependencies, including mypy, types, and workspace packages
+    session.run("uv", "sync", "--active", "--extra", "dev")
     session.run("mypy", "--explicit-package-bases", *args)
 
 
 @nox.session(venv_backend="venv")
 def schema_diagram(session: Session) -> None:
-    session.run("uv", "pip", "install", "-e", "./jobmon_server")
+    session.install("uv")
+    # This session specifically installs jobmon_server.
+    # If jobmon_server and its dependencies are part of 'dev' extras,
+    # 'uv sync --active --extra dev' would also work here.
+    # For now, keeping it specific if it has unique needs beyond general dev.
+    # If jobmon_server is already in dev dependencies, this could be:
+    session.run("uv", "pip", "install", "--active", "-e", "./jobmon_server")
     outpath = Path(__file__).parent / "docsource" / "developers_guide" / "diagrams" / "erd.svg"
     with tempfile.TemporaryDirectory() as tmpdir:
         session.chdir(tmpdir)
@@ -135,8 +114,10 @@ def schema_diagram(session: Session) -> None:
 
 @nox.session(venv_backend="venv")
 def build(session: Session) -> None:
+    session.install("uv")
     args = session.posargs or src_locations
-    session.run("uv", "pip", "install", "build")
+    # Install build tool and ensure workspace packages are available
+    session.run("uv", "sync", "--active", "--extra", "dev")
 
     for src_dir in args:
         namespace_dir = str(Path(src_dir).parent)
@@ -212,10 +193,13 @@ def clean(session: Session) -> None:
 
 @nox.session(venv_backend="venv")
 def build_gui_test_env(session: Session) -> None:
-    session.run("uv", "pip", "install", "mysqlclient")
+    session.install("uv")
+    # Install dev dependencies which now include mysqlclient and workspace packages
+    session.run("uv", "sync", "--active", "--extra", "dev")
     if os.path.exists("/tmp/tests.sqlite"):
         os.remove("/tmp/tests.sqlite")
-    session.run("uv", "pip", "install", "-e", "./jobmon_core", "-e", "./jobmon_client", "-e", "./jobmon_server")
+    # The workspace packages (jobmon_core, jobmon_client, jobmon_server)
+    # are already installed as part of 'uv sync --active --extra dev'
 
 
 # New session to update uv.lock files
@@ -263,3 +247,129 @@ def update_locks(session: Session) -> None:
             *compile_args
         )
     session.log("All uv.lock files updated successfully.")
+
+
+@nox.session(venv_backend="venv")
+def generate_api_types(session: Session) -> None:
+    """Generate TypeScript types from the FastAPI backend's OpenAPI schema using npx."""
+
+    backend_url = os.environ.get("JOBMON_BACKEND_URL", "http://localhost:8070")
+    # Adjusted path to match FastAPI app's openapi_url configuration
+    openapi_schema_path = f"{backend_url}/api/openapi.json" 
+    output_file = str(Path("jobmon_gui/src/types/apiSchema.ts"))
+
+    session.log(f"Generating TypeScript types from {openapi_schema_path} to {output_file} using npx...")
+    
+    output_dir = Path(output_file).parent
+    if not output_dir.exists():
+        session.log(f"Creating output directory: {output_dir}")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        session.run(
+            "npx",
+            "openapi-typescript",
+            openapi_schema_path,
+            "--output",
+            output_file,
+            external=True
+        )
+        session.log(f"TypeScript API types generated successfully at {output_file}")
+    except nox.command.CommandFailed as e:
+        session.error(
+            f"Failed to generate API types. Ensure Node.js and npx are installed and in your PATH. "
+            f"The backend must be running and accessible at {openapi_schema_path}. "
+            f"Original error: {e}"
+        )
+
+
+@nox.session(venv_backend="venv")
+def lint_frontend(session: Session) -> None:
+    """Lint frontend TypeScript/React code."""
+    session.log("Running frontend linting...")
+    session.chdir("jobmon_gui")
+    
+    # Check if node_modules exists, if not install dependencies
+    if not Path("node_modules").exists():
+        session.log("Installing frontend dependencies...")
+        session.run("npm", "install", external=True)
+    
+    # Run TypeScript type checking
+    session.log("Running TypeScript type checking...")
+    session.run("npm", "run", "typecheck", external=True)
+    
+    # Run ESLint
+    session.log("Running ESLint...")
+    session.run("npm", "run", "lint", external=True)
+
+
+@nox.session(venv_backend="venv")
+def typecheck_frontend(session: Session) -> None:
+    """Type check frontend TypeScript code."""
+    session.log("Running frontend type checking...")
+    session.chdir("jobmon_gui")
+    
+    # Check if node_modules exists, if not install dependencies
+    if not Path("node_modules").exists():
+        session.log("Installing frontend dependencies...")
+        session.run("npm", "install", external=True)
+    
+    # Run TypeScript type checking
+    session.run("npm", "run", "typecheck", external=True)
+
+
+@nox.session(venv_backend="venv")
+def format_frontend(session: Session) -> None:
+    """Format frontend TypeScript/React code."""
+    session.log("Running frontend formatting...")
+    session.chdir("jobmon_gui")
+    
+    # Check if node_modules exists, if not install dependencies
+    if not Path("node_modules").exists():
+        session.log("Installing frontend dependencies...")
+        session.run("npm", "install", external=True)
+    
+    # Run prettier
+    session.run("npm", "run", "format", external=True)
+
+
+@nox.session(venv_backend="venv")
+def lint_all(session: Session) -> None:
+    """Lint both backend and frontend code."""
+    session.log("Running linting for both backend and frontend...")
+    
+    # Run backend linting
+    session.log("=== Backend Linting ===")
+    session.notify("lint")
+    
+    # Run frontend linting
+    session.log("=== Frontend Linting ===")
+    session.notify("lint_frontend")
+
+
+@nox.session(venv_backend="venv")
+def typecheck_all(session: Session) -> None:
+    """Type check both backend and frontend code."""
+    session.log("Running type checking for both backend and frontend...")
+    
+    # Run backend type checking
+    session.log("=== Backend Type Checking ===")
+    session.notify("typecheck")
+    
+    # Run frontend type checking
+    session.log("=== Frontend Type Checking ===")
+    session.notify("typecheck_frontend")
+
+
+@nox.session(venv_backend="venv")
+def format_all(session: Session) -> None:
+    """Format both backend and frontend code."""
+    session.log("Running formatting for both backend and frontend...")
+    
+    # Run backend formatting
+    session.log("=== Backend Formatting ===")
+    session.notify("format")
+    
+    # Run frontend formatting
+    session.log("=== Frontend Formatting ===")
+    session.notify("format_frontend")

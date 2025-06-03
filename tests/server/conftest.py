@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy.orm import Session as SQLAlchemySession  # Alias to avoid conflict
 
 
 @pytest.fixture(scope="function")
@@ -69,3 +70,17 @@ def requester_in_memory(monkeypatch, web_server_in_memory, api_prefix):
     monkeypatch.setattr(requests, "post", post_in_mem)
     monkeypatch.setattr(requests, "put", put_in_mem)
     monkeypatch.setattr(requester, "get_content", get_test_content)
+
+
+@pytest.fixture
+def dbsession(db_engine):  # db_engine comes from your root conftest.py
+    """Provides a transactional SQLAlchemy Session for tests."""
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    session = SQLAlchemySession(bind=connection)
+    try:
+        yield session  # Provide the session to the test
+    finally:
+        session.close()
+        transaction.rollback()  # Roll back any changes made during the test
+        connection.close()
