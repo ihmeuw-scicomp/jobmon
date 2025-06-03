@@ -110,6 +110,9 @@ export default function PageNavigation({ children }: PropsWithChildren) {
     const [userMenuAnchorEl, setUserMenuAnchorEl] =
         useState<null | HTMLElement>(null);
 
+    // Check if auth is enabled
+    const authEnabled = import.meta.env.VITE_APP_AUTH_ENABLED !== 'false';
+
     const handleDrawerOpen = () => {
         setDrawerOpen(true);
     };
@@ -161,21 +164,37 @@ export default function PageNavigation({ children }: PropsWithChildren) {
                             Jobmon
                         </Typography>
                     </Box>
-                    <Box>
-                        <UserAvatarButton
-                            userFullName={
-                                user.given_name || user.family_name
-                                    ? `${user.given_name} ${user.family_name}`
-                                    : ''
-                            }
-                            onClickHandler={setUserMenuAnchorEl}
-                        />
-                        <UserMenu
-                            username={user.email || ''}
-                            anchorEl={userMenuAnchorEl}
-                            setAnchorEl={setUserMenuAnchorEl}
-                        />
-                    </Box>
+                    
+                    {/* Conditionally render user menu only if auth is enabled */}
+                    {authEnabled && user ? (
+                        <Box>
+                            <UserAvatarButton
+                                userFullName={
+                                    user.given_name || user.family_name
+                                        ? `${user.given_name} ${user.family_name}`
+                                        : ''
+                                }
+                                onClickHandler={setUserMenuAnchorEl}
+                            />
+                            <UserMenu
+                                username={user.email || ''}
+                                anchorEl={userMenuAnchorEl}
+                                setAnchorEl={setUserMenuAnchorEl}
+                            />
+                        </Box>
+                    ) : !authEnabled ? (
+                        /* Show indicator when auth is disabled */
+                        <Box sx={{ 
+                            color: 'white', 
+                            fontSize: '0.8rem',
+                            opacity: 0.8,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1
+                        }}>
+                            🔓 Authentication Disabled
+                        </Box>
+                    ) : null}
                 </Toolbar>
             </AppBar>
             <Drawer

@@ -117,6 +117,31 @@ To ensure code quality and consistency, set up pre-commit hooks:
 
 Once installed, pre-commit will automatically run the configured hooks (linting, formatting, type checking) on staged files before each commit.
 
+**Optional Authentication Configuration:**
+JobMon supports optional authentication for development and testing environments. When disabled, the system operates without user login requirements, using an anonymous user for all operations.
+
+To disable authentication:
+
+1.  **Server-side Configuration:**
+    Create or update your `.env` file in the repository root:
+    ```bash
+    JOBMON__AUTH__ENABLED=false
+    ```
+
+2.  **Client-side Configuration:**
+    Create or update your `.env` file in the `jobmon_gui/` directory:
+    ```bash
+    VITE_APP_AUTH_ENABLED=false
+    ```
+
+**When to use:**
+- Local development without OAuth setup
+- Testing environments
+- Simplified demonstrations
+- CI/CD pipelines where authentication isn't needed
+
+**Note:** Authentication is enabled by default. Both server and client configurations must be set to `false` to fully disable authentication. In production environments, authentication should remain enabled for security.
+
 <details>
 <summary><strong>Advanced: IHME Artifactory Configuration (Only needed for lock file generation)</strong></summary>
 

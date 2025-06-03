@@ -4,6 +4,9 @@ All notable changes to the Jobmon GUI will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- Complete refactor and enhancement of Task Template Resource Usage visualization (PR TBD). New usage tab features interactive KPI cards, enhanced scatter plots with statistical analysis, improved filtering capabilities, and comprehensive usage calculations with performance optimizations.
+- Added optional authentication support (PR TBD). GUI now supports running without authentication by setting `VITE_APP_AUTH_ENABLED=false`, providing anonymous user experience for development and testing environments.
+
 ### Changed
 ### Fixed
 ### Deprecated
