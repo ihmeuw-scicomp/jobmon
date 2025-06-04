@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import copy
+import fcntl
 import hashlib
 import itertools
 import logging
 import logging.config
 import os
 import sys
+import time
 import uuid
 from subprocess import PIPE, Popen, TimeoutExpired
 from types import TracebackType
@@ -55,6 +57,42 @@ class DistributorContext:
         self._workflow_run_id = workflow_run_id
         self._timeout = timeout
 
+    def wait_for_startup_signal(self, timeout: int = 180) -> bool:
+        """Wait for startup signal with non-blocking reads to handle timing issues."""
+        buffer = ""
+        start_time = time.time()
+
+        assert self.process.stderr is not None  # keep mypy happy
+
+        # Make stderr non-blocking to avoid hanging if signal already sent
+        fd = self.process.stderr.fileno()
+        fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+        while time.time() - start_time < timeout:
+            try:
+                chunk = self.process.stderr.read(100)
+                if chunk:
+                    buffer += chunk
+                    # Look for startup signal (handles package warnings naturally)
+                    if "ALIVE" in buffer:
+                        logger.info("Received startup signal")
+                        return True
+            except BlockingIOError:
+                # No data available, check if process died
+                if self.process.poll() is not None:
+                    logger.error(
+                        f"Distributor process exited with code: "
+                        f"{self.process.returncode}"
+                    )
+                    return False
+                time.sleep(0.1)
+            except Exception as e:
+                logger.warning(f"Error reading stderr: {e}")
+                time.sleep(0.1)
+
+        return False
+
     def __enter__(self) -> DistributorContext:
         """Starts the Distributor Process."""
         logger.info("Starting Distributor Process")
@@ -83,15 +121,17 @@ class DistributorContext:
             env=env,
         )
 
-        # check if stderr contains "ALIVE"
-        assert self.process.stderr is not None  # keep mypy happy on optional type
-        stderr_val = self.process.stderr.read(5)
-        if stderr_val != "ALIVE":
-            stderr_all = self.process.stderr.read()
+        # Use simple non-blocking startup detection
+        if not self.wait_for_startup_signal(self._timeout):
+            stderr_all = ""
+            try:
+                _, stderr_all = self.process.communicate(timeout=5)
+            except TimeoutExpired:
+                pass
             err = self._shutdown()
             raise DistributorStartupTimeout(
-                f"Distributor process did not start, stderr='{err}'\n\n"
-                f"Full stderr: {stderr_all}"
+                f"Distributor process did not start within {self._timeout}s, "
+                f"stderr='{err}'\n\nFull stderr: {stderr_all}"
             )
         return self
 
@@ -111,10 +151,16 @@ class DistributorContext:
         return self.process.returncode is None
 
     def _shutdown(self) -> str:
+        """Shutdown the distributor process."""
         self.process.terminate()
         try:
             _, err = self.process.communicate(timeout=self._timeout)
+            if "SHUTDOWN" in err:
+                logger.info("Received shutdown confirmation")
+            else:
+                logger.warning("No shutdown confirmation received")
         except TimeoutExpired:
+            logger.warning("Timeout waiting for graceful shutdown")
             err = ""
 
         if "SHUTDOWN" not in err:

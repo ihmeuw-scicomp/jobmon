@@ -8,6 +8,7 @@ All notable changes to Jobmon will be documented in this file.
 
 ### Changed
 ### Fixed
+- Fixed distributor startup communication to be resilient against stderr pollution from package warnings and other output. The startup detection now uses non-blocking I/O and pattern-based parsing instead of expecting exactly 5 bytes, preventing hangs when dependent packages emit warnings during process startup.
 ### Deprecated
 ### Removed
 

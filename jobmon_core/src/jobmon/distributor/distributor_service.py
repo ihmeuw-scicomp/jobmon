@@ -122,7 +122,8 @@ class DistributorService:
         return self._heartbeat_report_by_buffer * self._task_instance_heartbeat_interval
 
     def set_workflow_run(self, workflow_run_id: int) -> None:
-        workflow_run = DistributorWorkflowRun(workflow_run_id, self.requester)
+        """Set the workflow run for this distributor service."""
+        workflow_run = DistributorWorkflowRun(workflow_run_id, requester=self.requester)
         self.workflow_run = workflow_run
         self.workflow_run.transition_to_instantiated()
 
@@ -133,7 +134,7 @@ class DistributorService:
             self.cluster_interface.start()
             self.workflow_run.transition_to_launched()
 
-            # signal via pipe that we are alive
+            # Send simple startup signal
             sys.stderr.write("ALIVE")
             sys.stderr.flush()
 
@@ -201,7 +202,7 @@ class DistributorService:
             # stop distributor
             self.cluster_interface.stop()
 
-            # signal via pipe that we are shutdown
+            # Send simple shutdown signal
             sys.stderr.write("SHUTDOWN")
             sys.stderr.flush()
 
