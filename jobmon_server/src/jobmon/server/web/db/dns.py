@@ -204,11 +204,10 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
             logger.debug(f"Applied user_connect_args: {user_connect_args}")
         return module.connect(*cargs, **cparams)
 
-    # Prevent SQLAlchemy from doing its own DNS look-up.
-    placeholder = url.set(host="127.0.0.1", port=url.port or 1)
-
+    # No need for placeholder URL when using custom creator - just use the original URL
+    # This allows OpenTelemetry to properly read the real connection details
     engine = create_engine(
-        str(placeholder),
+        str(url),
         *engine_args,
         future=True,
         creator=creator,
@@ -224,7 +223,7 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
     ) -> None:  # type: ignore[func-returns-value]
         record.info["peer_ip"] = _cached_ip(host)[0]
 
-    @event.listens_for(engine, "checkout")
+    @event.listens_for(engine, "checkout", insert=True)
     def _ensure_ip_fresh(
         dbapi_conn: DBAPIConnection, record: _ConnectionRecord, proxy: Any
     ) -> None:  # type: ignore[func-returns-value]
