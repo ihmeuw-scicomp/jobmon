@@ -31,7 +31,18 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     """
     config = JobmonConfig()
 
-    # Configure logging
+    # CRITICAL: Initialize OTLP instrumentation FIRST before any database access
+    USE_OTEL = config.get_boolean("otlp", "web_enabled")
+    if USE_OTEL:
+        # Import OTel modules here to avoid unnecessary imports when OTel is disabled
+        from jobmon.core.otlp import OtlpAPI, add_span_details_processor
+
+        otlp_api = OtlpAPI()
+        # Instrument SQLAlchemy BEFORE any engine creation
+        otlp_api.instrument_sqlalchemy()
+        otlp_api.instrument_requests()
+
+    # Configure logging AFTER OTLP instrumentation is set up
     configure_logging()
 
     # Initialize the FastAPI app
@@ -45,17 +56,9 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     )
     app = add_hooks_and_handlers(app)
 
-    USE_OTEL = config.get_boolean("otlp", "web_enabled")
-    # OpenTelemetry instrumentation
+    # Configure remaining OTLP components
     if USE_OTEL:
-        # Import OTel modules here to avoid unnecessary imports when OTel is disabled
-        from jobmon.core.otlp import OtlpAPI, add_span_details_processor
-
-        otlp_api = OtlpAPI()
-        otlp_api.instrument_sqlalchemy()
-        otlp_api.instrument_requests()
         otlp_api.instrument_app(app)
-
         configure_structlog([add_span_details_processor])
     else:
         configure_structlog()
