@@ -137,7 +137,12 @@ class OtlpAPI:
         from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
         # --- Query spans (driver-independent) ----------------------------
-        SQLAlchemyInstrumentor().instrument(engine=engine)
+        # Configure SQLAlchemy instrumentation to capture exceptions and sanitize SQL
+        SQLAlchemyInstrumentor().instrument(
+            engine=engine,
+            enable_commenter=True,  # Add OpenTelemetry trace context to SQL queries
+            skip_dep_check=True,  # Skip dependency version checks
+        )
 
         # --- Connect spans (driver-specific but discovered at runtime) ---
         try:

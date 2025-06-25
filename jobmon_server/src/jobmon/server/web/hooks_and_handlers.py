@@ -1,4 +1,5 @@
 import json
+import traceback
 from typing import Any, AsyncGenerator, Callable, Optional
 
 import structlog
@@ -22,10 +23,48 @@ async def teardown_session() -> AsyncGenerator:
         get_sessionmaker().remove()  # type: ignore
 
 
+def _record_exception_in_span(error: Exception) -> None:
+    """Record exception details in the current OpenTelemetry span."""
+    try:
+        from opentelemetry import trace
+        from opentelemetry.trace import Status, StatusCode
+
+        span = trace.get_current_span()
+        if span and span.is_recording():
+            # Set span status to ERROR
+            span.set_status(Status(StatusCode.ERROR, str(error)))
+
+            # Record the exception as a span event
+            span.record_exception(error)
+
+            # Add exception details as span attributes
+            span.set_attribute("error.type", type(error).__name__)
+            span.set_attribute("error.message", str(error))
+
+            # Add exception module and stack trace
+            span.set_attribute("error.module", type(error).__module__)
+
+            # Add HTTP status code if available
+            if hasattr(error, "status_code"):
+                span.set_attribute("http.status_code", error.status_code)
+
+            # Add stack trace as a span event for more detailed debugging
+            stack_trace = traceback.format_exc()
+            if stack_trace and stack_trace != "NoneType: None\n":
+                span.add_event("exception.stacktrace", {"stacktrace": stack_trace})
+
+    except Exception:
+        # Don't let span recording errors break the main error handling
+        pass
+
+
 def _handle_error(
     request: Request, error: Exception, status_code: Optional[int] = None
 ) -> Any:
     """Handle all exceptions in a uniform manner."""
+    # Record the exception in the OpenTelemetry span
+    _record_exception_in_span(error)
+
     # Extract status code from the error
     status_code = status_code or getattr(error, "status_code", 500)
 
