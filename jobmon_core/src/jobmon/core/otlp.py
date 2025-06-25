@@ -122,6 +122,68 @@ class OtlpAPI:
         cls._sqlalchemy_instrumented = True
 
     @classmethod
+    def instrument_engine(cls: Type[OtlpAPI], engine: Any) -> None:
+        """Instrument a specific SQLAlchemy engine with both query and connection spans.
+
+        This provides dialect-agnostic instrumentation for both:
+        - Query spans (via SQLAlchemy instrumentation)
+        - Connection spans (via database driver instrumentation)
+
+        Args:
+            engine: SQLAlchemy Engine instance to instrument
+        """
+        from importlib import import_module
+
+        from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+
+        # --- Query spans (driver-independent) ----------------------------
+        SQLAlchemyInstrumentor().instrument(engine=engine)
+
+        # --- Connect spans (driver-specific but discovered at runtime) ---
+        try:
+            driver = engine.dialect.dbapi.__name__.split(".")[0]  # e.g. "psycopg2"
+            registry = {
+                "psycopg2": (
+                    "opentelemetry.instrumentation.psycopg2",
+                    "Psycopg2Instrumentor",
+                ),
+                "psycopg": (
+                    "opentelemetry.instrumentation.psycopg",
+                    "PsycopgInstrumentor",
+                ),
+                "pymysql": (
+                    "opentelemetry.instrumentation.pymysql",
+                    "PyMySQLInstrumentor",
+                ),
+                "mysql": ("opentelemetry.instrumentation.mysql", "MySQLInstrumentor"),
+                "sqlite3": (
+                    "opentelemetry.instrumentation.sqlite3",
+                    "SQLite3Instrumentor",
+                ),
+                "cx_Oracle": (
+                    "opentelemetry.instrumentation.cx_oracle",
+                    "CxOracleInstrumentor",
+                ),
+                "MySQLdb": ("opentelemetry.instrumentation.mysql", "MySQLInstrumentor"),
+            }
+
+            if driver in registry:  # silently skip unknown drivers
+                mod_path, cls_name = registry[driver]
+                try:
+                    instr_cls = getattr(import_module(mod_path), cls_name)
+                    instr_cls().instrument()
+                except (ImportError, AttributeError) as e:
+                    # Log but don't fail - the query instrumentation will still work
+                    import logging
+
+                    logging.getLogger(__name__).debug(
+                        f"Could not instrument {driver} driver: {e}."
+                    )
+        except AttributeError:
+            # Some engines might not have dbapi or __name__, that's OK
+            pass
+
+    @classmethod
     def instrument_app(cls: Type[OtlpAPI], app: Any) -> None:
         """Instrument FastAPI app."""
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor

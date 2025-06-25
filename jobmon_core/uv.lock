@@ -61,7 +61,6 @@ multidict==6.4.4
 opentelemetry-api==1.33.1
     # via
     #   jobmon-core (jobmon_core/pyproject.toml)
-    #   opentelemetry-distro
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-instrumentation
@@ -70,8 +69,6 @@ opentelemetry-api==1.33.1
     #   opentelemetry-instrumentation-requests
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
-opentelemetry-distro==0.54b1
-    # via jobmon-core (jobmon_core/pyproject.toml)
 opentelemetry-exporter-otlp==1.33.1
     # via jobmon-core (jobmon_core/pyproject.toml)
 opentelemetry-exporter-otlp-proto-common==1.33.1
@@ -85,7 +82,6 @@ opentelemetry-exporter-otlp-proto-http==1.33.1
 opentelemetry-instrumentation==0.54b1
     # via
     #   jobmon-core (jobmon_core/pyproject.toml)
-    #   opentelemetry-distro
     #   opentelemetry-instrumentation-asgi
     #   opentelemetry-instrumentation-fastapi
     #   opentelemetry-instrumentation-requests
@@ -103,7 +99,6 @@ opentelemetry-proto==1.33.1
 opentelemetry-sdk==1.33.1
     # via
     #   jobmon-core (jobmon_core/pyproject.toml)
-    #   opentelemetry-distro
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
 opentelemetry-semantic-conventions==0.54b1

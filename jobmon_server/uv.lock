@@ -148,7 +148,6 @@ opentelemetry-api==1.33.1
     # via
     #   jobmon-server (jobmon_server/pyproject.toml)
     #   jobmon-core
-    #   opentelemetry-distro
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-instrumentation
@@ -158,10 +157,6 @@ opentelemetry-api==1.33.1
     #   opentelemetry-instrumentation-sqlalchemy
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
-opentelemetry-distro==0.54b1
-    # via
-    #   jobmon-server (jobmon_server/pyproject.toml)
-    #   jobmon-core
 opentelemetry-exporter-otlp==1.33.1
     # via
     #   jobmon-server (jobmon_server/pyproject.toml)
@@ -177,7 +172,6 @@ opentelemetry-exporter-otlp-proto-http==1.33.1
 opentelemetry-instrumentation==0.54b1
     # via
     #   jobmon-core
-    #   opentelemetry-distro
     #   opentelemetry-instrumentation-asgi
     #   opentelemetry-instrumentation-fastapi
     #   opentelemetry-instrumentation-requests
@@ -201,7 +195,6 @@ opentelemetry-sdk==1.33.1
     # via
     #   jobmon-server (jobmon_server/pyproject.toml)
     #   jobmon-core
-    #   opentelemetry-distro
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
 opentelemetry-semantic-conventions==0.54b1

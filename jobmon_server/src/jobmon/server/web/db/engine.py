@@ -85,6 +85,19 @@ def get_engine() -> Engine:
         if connect_args
         else get_dns_engine(uri)
     )
+
+    # Instrument the engine with OpenTelemetry if enabled
+    try:
+        use_otel = cfg.get_boolean("otlp", "web_enabled")
+        if use_otel:
+            from jobmon.core.otlp import OtlpAPI
+
+            OtlpAPI.instrument_engine(_engine)
+            log.debug("Instrumented database engine with OpenTelemetry")
+    except Exception as e:
+        # Don't fail engine creation if instrumentation fails
+        log.warning("Failed to instrument database engine with OpenTelemetry: %s", e)
+
     return _engine
 
 

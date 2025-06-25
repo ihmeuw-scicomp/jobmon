@@ -31,21 +31,6 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     """
     config = JobmonConfig()
 
-    # CRITICAL: Initialize OTLP instrumentation FIRST before any database access
-    USE_OTEL = config.get_boolean("otlp", "web_enabled")
-    if USE_OTEL:
-        # Configure OTLP exporters via environment variables for auto-instrumentation
-        from jobmon.server.web.otlp import configure_otlp_exporters
-
-        configure_otlp_exporters(config)
-
-        # Auto-instrument all supported libraries (SQLAlchemy, requests, FastAPI, etc.)
-        from opentelemetry.instrumentation.auto_instrumentation import (
-            sitecustomize,
-        )
-
-        sitecustomize.initialize()
-
     # Configure logging AFTER OTLP instrumentation is set up
     configure_logging()
 
@@ -60,13 +45,21 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     )
     app = add_hooks_and_handlers(app)
 
-    # Configure structlog with or without OTLP
+    # Configure remaining OTLP components
+    USE_OTEL = config.get_boolean("otlp", "web_enabled")
     if USE_OTEL:
-        # Import span processor from web-specific OTLP module
-        from jobmon.server.web.otlp import add_span_details_processor
+        # Import OTel modules here to avoid unnecessary imports when OTel is disabled
+        from jobmon.core.otlp import OtlpAPI, add_span_details_processor
 
+        otlp_api = OtlpAPI()
+
+        # Instrument SQLAlchemy BEFORE any engine creation
+        otlp_api.instrument_sqlalchemy()
+        otlp_api.instrument_requests()
+
+        otlp_api.instrument_app(app)
         configure_structlog([add_span_details_processor])
-    else:
+    else:  # Configure structlog without OTLP
         configure_structlog()
 
     # Mount static files
