@@ -34,13 +34,12 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     # CRITICAL: Initialize OTLP instrumentation FIRST before any database access
     USE_OTEL = config.get_boolean("otlp", "web_enabled")
     if USE_OTEL:
-        # Import OTel modules here to avoid unnecessary imports when OTel is disabled
-        from jobmon.core.otlp import OtlpAPI, add_span_details_processor
+        # Auto-instrument all supported libraries (SQLAlchemy, requests, FastAPI, etc.)
+        from opentelemetry.instrumentation.auto_instrumentation import (
+            sitecustomize,
+        )
 
-        otlp_api = OtlpAPI()
-        # Instrument SQLAlchemy BEFORE any engine creation
-        otlp_api.instrument_sqlalchemy()
-        otlp_api.instrument_requests()
+        sitecustomize.initialize()
 
     # Configure logging AFTER OTLP instrumentation is set up
     configure_logging()
@@ -56,9 +55,11 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     )
     app = add_hooks_and_handlers(app)
 
-    # Configure remaining OTLP components
+    # Configure structlog with or without OTLP
     if USE_OTEL:
-        otlp_api.instrument_app(app)
+        # Import span processor only when OTLP is enabled
+        from jobmon.core.otlp import add_span_details_processor
+
         configure_structlog([add_span_details_processor])
     else:
         configure_structlog()

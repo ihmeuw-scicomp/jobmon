@@ -20,7 +20,7 @@ dependencies = [
     'requests',
     'tenacity>=8.1',
     'docstring-parser',
-    'grpcio<=1.64.1',
+    'grpcio',
     'docutils',
     'sphinx',
     'python-dotenv',
@@ -36,6 +36,7 @@ worker_node_entry_point = "jobmon.worker_node.cli:run"
 otlp = [
     'opentelemetry-api',
     'opentelemetry-sdk',
+    'opentelemetry-distro',
     'opentelemetry-instrumentation',
     'opentelemetry-instrumentation-fastapi',
     'opentelemetry-instrumentation-requests',

@@ -1470,6 +1470,7 @@ dependencies = [
 [package.optional-dependencies]
 otlp = [
     { name = "opentelemetry-api" },
+    { name = "opentelemetry-distro" },
     { name = "opentelemetry-exporter-otlp", version = "1.15.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "opentelemetry-exporter-otlp", version = "1.33.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
     { name = "opentelemetry-instrumentation" },
@@ -1483,8 +1484,9 @@ requires-dist = [
     { name = "aiohttp" },
     { name = "docstring-parser" },
     { name = "docutils" },
-    { name = "grpcio", specifier = "<=1.64.1" },
+    { name = "grpcio" },
     { name = "opentelemetry-api", marker = "extra == 'otlp'" },
+    { name = "opentelemetry-distro", marker = "extra == 'otlp'" },
     { name = "opentelemetry-exporter-otlp", marker = "extra == 'otlp'" },
     { name = "opentelemetry-instrumentation", marker = "extra == 'otlp'" },
     { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'otlp'" },
@@ -1532,6 +1534,7 @@ mysql = [
 otlp = [
     { name = "jobmon-core", extra = ["otlp"] },
     { name = "opentelemetry-api" },
+    { name = "opentelemetry-distro" },
     { name = "opentelemetry-exporter-otlp", version = "1.15.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "opentelemetry-exporter-otlp", version = "1.33.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
     { name = "opentelemetry-instrumentation-fastapi" },
@@ -1554,6 +1557,7 @@ requires-dist = [
     { name = "mysqlclient", marker = "extra == 'mysql'" },
     { name = "nltk" },
     { name = "opentelemetry-api", marker = "extra == 'otlp'" },
+    { name = "opentelemetry-distro", marker = "extra == 'otlp'" },
     { name = "opentelemetry-exporter-otlp", marker = "extra == 'otlp'" },
     { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'otlp'" },
     { name = "opentelemetry-instrumentation-sqlalchemy", marker = "extra == 'otlp'" },
@@ -1587,8 +1591,8 @@ dev = [
     { name = "flake8-docstrings" },
     { name = "isort" },
     { name = "jobmon-client" },
-    { name = "jobmon-core" },
-    { name = "jobmon-server" },
+    { name = "jobmon-core", extra = ["otlp"] },
+    { name = "jobmon-server", extra = ["otlp"] },
     { name = "mock" },
     { name = "mypy" },
     { name = "nox" },
@@ -1620,8 +1624,8 @@ requires-dist = [
     { name = "flake8-docstrings", marker = "extra == 'dev'" },
     { name = "isort", marker = "extra == 'dev'" },
     { name = "jobmon-client", marker = "extra == 'dev'", editable = "jobmon_client" },
-    { name = "jobmon-core", marker = "extra == 'dev'", editable = "jobmon_core" },
-    { name = "jobmon-server", marker = "extra == 'dev'", editable = "jobmon_server" },
+    { name = "jobmon-core", extras = ["otlp"], marker = "extra == 'dev'", editable = "jobmon_core" },
+    { name = "jobmon-server", extras = ["otlp"], marker = "extra == 'dev'", editable = "jobmon_server" },
     { name = "mock", marker = "extra == 'dev'" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "nox", marker = "extra == 'dev'" },
@@ -2111,6 +2115,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/9a/8d/1f5a45fbcb9a7d87809d460f09dc3399e3fbd31d7f3e14888345e9d29951/opentelemetry_api-1.33.1.tar.gz", hash = "sha256:1c6055fc0a2d3f23a50c7e17e16ef75ad489345fd3df1f8b8af7c0bbf8a109e8", size = 65002 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/05/44/4c45a34def3506122ae61ad684139f0bbc4e00c39555d4f7e20e0e001c8a/opentelemetry_api-1.33.1-py3-none-any.whl", hash = "sha256:4db83ebcf7ea93e64637ec6ee6fabee45c5cbe4abd9cf3da95c43828ddb50b83", size = 65771 },
+]
+
+[[package]]
+name = "opentelemetry-distro"
+version = "0.54b1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-sdk" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/dd/0b/0012cb5947c255d6755cb91e3b9fd9bb1876b7e14d5ab67131c030fd90b2/opentelemetry_distro-0.54b1.tar.gz", hash = "sha256:61d6b97bb7a245fddbb829345bb4ad18be39eb52f770fab89a127107fca3149f", size = 2593 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/12/b1/5f008a2909d59c02c7b88aa595502d438ca21c15e88edd7620c697a56ce8/opentelemetry_distro-0.54b1-py3-none-any.whl", hash = "sha256:009486513b32b703e275bb2f9ccaf5791676bbf5e2dcfdd90201ddc8f56f122b", size = 3348 },
 ]
 
 [[package]]
