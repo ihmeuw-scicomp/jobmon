@@ -53,9 +53,26 @@ def _record_exception_in_span(error: Exception) -> None:
             if stack_trace and stack_trace != "NoneType: None\n":
                 span.add_event("exception.stacktrace", {"stacktrace": stack_trace})
 
-    except Exception:
+            # Debug logging to verify span recording is working
+            logger.debug(
+                "Recorded exception in span",
+                span_id=format(span.get_span_context().span_id, "016x"),
+                trace_id=format(span.get_span_context().trace_id, "032x"),
+                error_type=type(error).__name__,
+                error_message=str(error),
+                span_recording=span.is_recording(),
+            )
+        else:
+            logger.warning(
+                "No active span to record exception",
+                span_exists=span is not None,
+                span_recording=span.is_recording() if span else False,
+                error_type=type(error).__name__,
+            )
+
+    except Exception as e:
         # Don't let span recording errors break the main error handling
-        pass
+        logger.warning("Failed to record exception in span", record_error=str(e))
 
 
 def _handle_error(
@@ -77,9 +94,17 @@ def _handle_error(
         "exception_message": str(error),
         "status_code": str(status_code),
     }
+
+    # Enhanced logging with exception details
     logger.exception(
-        "server encountered:", status_code=status_code, route=request.url.path
+        "server encountered:",
+        status_code=status_code,
+        route=request.url.path,
+        error_type=type(error).__name__,
+        error_message=str(error),
+        full_exception=str(error),  # Add full exception text
     )
+
     rd = {"error": response_data}
     response = JSONResponse(
         content=rd,  # type: ignore
