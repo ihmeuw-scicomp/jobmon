@@ -128,14 +128,14 @@ export default function TaskInstanceTable({taskId}: TaskInstanceTableProps) {
         {
             accessorKey: 'ti_submit_date',
             header: 'Submit Date',
-            Cell: ({cell, row}) => (
+            Cell: ({cell}) => (
                 formatJobmonDate(cell.getValue())
             ),
         },
         {
             accessorKey: 'ti_status_date',
             header: 'Status Date',
-            Cell: ({cell, row}) => (
+            Cell: ({cell}) => (
                 formatJobmonDate(cell.getValue())
             ),
         }
