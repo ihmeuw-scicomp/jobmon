@@ -11,6 +11,8 @@ export type TaskInstance = {
     ti_stdout: string | null;
     ti_stdout_log: string | null;
     ti_wallclock: string | number | null;
+    ti_submit_date: string | null;
+    ti_status_date: string | null;
 };
 
 export type TypeInstanceResponse = {

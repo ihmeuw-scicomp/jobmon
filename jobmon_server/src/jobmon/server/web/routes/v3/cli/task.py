@@ -1,5 +1,6 @@
 """Routes for Tasks."""
 
+from datetime import datetime
 import json
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
@@ -692,6 +693,8 @@ def get_task_details(task_id: int) -> Any:
                     TaskInstance.wallclock,
                     TaskInstance.maxrss,
                     TaskResources.requested_resources,
+                    TaskInstance.submitted_date,
+                    TaskInstance.status_date,
                 )
                 .outerjoin_from(
                     TaskInstance,
@@ -722,8 +725,19 @@ def get_task_details(task_id: int) -> Any:
             "ti_wallclock",
             "ti_maxrss",
             "ti_resources",
+            "ti_submit_date",
+            "ti_status_date",
         )
-        result = [dict(zip(column_names, row)) for row in rows]
+
+        def serialize_row(row):
+            row_dict = dict(zip(column_names, row))
+            for key in ("ti_submit_date", "ti_status_date"):
+                if isinstance(row_dict[key], datetime):
+                    row_dict[key] = row_dict[key].isoformat()
+            return row_dict
+
+        result = [serialize_row(row) for row in rows]
+
         resp = JSONResponse(
             content={"taskinstances": result}, status_code=StatusCodes.OK
         )
