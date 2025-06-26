@@ -35,6 +35,7 @@ export const getTaskInstanceDetailsQueryFn = async ({
                 ti_resources: data.ti_resources,
                 ti_submit_date: data.ti_submit_date,
                 ti_status_date: data.ti_status_date,
+                ti_queue_name: data.ti_queue_name,
             }));
         });
 };

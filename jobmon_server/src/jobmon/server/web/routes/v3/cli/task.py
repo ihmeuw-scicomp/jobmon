@@ -27,6 +27,7 @@ from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow import Workflow
+from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
@@ -695,6 +696,7 @@ def get_task_details(task_id: int) -> Any:
                     TaskResources.requested_resources,
                     TaskInstance.submitted_date,
                     TaskInstance.status_date,
+                    Queue.name,
                 )
                 .outerjoin_from(
                     TaskInstance,
@@ -704,6 +706,10 @@ def get_task_details(task_id: int) -> Any:
                 .join(
                     TaskResources,
                     TaskInstance.task_resources_id == TaskResources.id,
+                )
+                .join(
+                    Queue,
+                    TaskResources.queue_id == Queue.id,
                 )
                 .where(
                     TaskInstance.task_id == task_id,
@@ -727,6 +733,7 @@ def get_task_details(task_id: int) -> Any:
             "ti_resources",
             "ti_submit_date",
             "ti_status_date",
+            "ti_queue_name",
         )
 
         def serialize_row(row):

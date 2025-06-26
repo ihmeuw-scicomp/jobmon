@@ -58,6 +58,7 @@ export default function TaskInstanceTable({taskId}: TaskInstanceTableProps) {
         ti_resources: '',
         ti_submit_date: '',
         ti_status_date: '',
+        ti_queue_name: '',
     });
 
     const handleCellClick = (rowIndex, modalName) => {
@@ -301,6 +302,9 @@ export default function TaskInstanceTable({taskId}: TaskInstanceTableProps) {
                 title={'Resources'}
                 children={
                     <p>
+                        <b>Queue:</b> <br></br>
+                        {rowDetail.ti_queue_name || 'N/A'}
+                        <br></br><br></br>
                         <b>Requested Resources:</b> <br></br>
                         {rowDetail.ti_resources && (
                             <>
@@ -334,8 +338,7 @@ export default function TaskInstanceTable({taskId}: TaskInstanceTableProps) {
                                 <br/>
                             </>
                         )}
-                        <br></br>
-                        <b>Utilized Resources:</b> <br></br>
+                        <b>Utilized Resources:</b> <br/>
                         <i>memory</i>: {formatBytes(rowDetail.ti_maxrss)}
                         <br></br>
                         <i>runtime</i>:{' '}
