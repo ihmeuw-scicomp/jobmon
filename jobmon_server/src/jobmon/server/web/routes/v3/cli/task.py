@@ -736,7 +736,7 @@ def get_task_details(task_id: int) -> Any:
             "ti_queue_name",
         )
 
-        def serialize_row(row):
+        def serialize_row(row: Any) -> Dict[str, Any]:
             row_dict = dict(zip(column_names, row))
             for key in ("ti_submit_date", "ti_status_date"):
                 if isinstance(row_dict[key], datetime):
