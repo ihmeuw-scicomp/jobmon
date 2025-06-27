@@ -5,6 +5,8 @@ All notable changes to Jobmon will be documented in this file.
 ## [Unreleased]
 ### Added
 - Added optional authentication support for Jobmon server and GUI (PR TBD). Authentication can now be disabled via `JOBMON__AUTH__ENABLED=false` server-side and `VITE_APP_AUTH_ENABLED=false` client-side environment variables for development and testing environments.
+- Added submitted_date and status_date to TaskInstance table on the Task Details page in the Jobmon GUI.
+- Added the queue the TaskInstance ran on to the Requested Resources modal on the Task Details page in the Jobmon GUI.
 
 ### Changed
 ### Fixed
