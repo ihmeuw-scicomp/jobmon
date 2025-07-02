@@ -10,10 +10,9 @@ Key points:
 * Works with any **synchronous** SQLAlchemy dialect – no hard dependency on a
   particular DB-API.
 * Accepts the full argument surface of :pyfunc:`sqlalchemy.create_engine`.
-  The function injects its own `creator` and configurable connection pool
-  settings; supplying *your own* `creator` will raise a clear
-  `ValueError`, because a custom creator would defeat the point of DNS-aware
-  pooling.
+  The function injects its own `creator` for DNS-aware pooling; supplying
+  *your own* `creator` will raise a clear `ValueError`, because a custom
+  creator would defeat the point of DNS-aware pooling.
 * Opens **zero** extra database connections while building the engine.
 * Includes ``clear_dns_cache()`` for tests.
 
@@ -45,8 +44,6 @@ from sqlalchemy import create_engine, event, exc
 from sqlalchemy.engine import URL, Engine, make_url
 from sqlalchemy.engine.interfaces import DBAPIConnection, Dialect
 from sqlalchemy.pool import _ConnectionRecord
-
-from jobmon.server.web.config import get_jobmon_config
 
 __all__ = ["get_dns_engine", "clear_dns_cache", "get_ip_with_ttl"]
 
@@ -163,9 +160,6 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
         if user_connect_args:
             engine_kwargs["connect_args"] = user_connect_args
 
-        # Apply connection pool settings to prevent timeout errors
-        _apply_pool_settings(engine_kwargs)
-
         return create_engine(str(url), *engine_args, **engine_kwargs)
 
     # If we've reached here, it's a DNS-aware case, and host should not be None.
@@ -211,9 +205,6 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
 
     # No need for placeholder URL when using custom creator - just use the original URL
     # This allows OpenTelemetry to properly read the real connection details
-
-    # Apply connection pool settings to prevent timeout errors
-    _apply_pool_settings(engine_kwargs)
 
     engine = create_engine(
         str(url),
@@ -265,26 +256,3 @@ def _is_ip_address(host: str) -> bool:
         return True
     except ValueError:
         return False
-
-
-def _get_pool_settings() -> Dict[str, Any]:
-    """Get database connection pool settings from configuration."""
-    cfg = get_jobmon_config()
-    return {
-        "pool_recycle": cfg.get_int("db", "pool_recycle"),
-        "pool_pre_ping": cfg.get_boolean("db", "pool_pre_ping"),
-        "pool_timeout": cfg.get_int("db", "pool_timeout"),
-    }
-
-
-def _apply_pool_settings(engine_kwargs: Dict[str, Any]) -> None:
-    """Apply pool settings to engine kwargs if not already specified."""
-    pool_settings = _get_pool_settings()
-    applied_settings = {}
-    # Don't overwrite user-provided settings
-    for key, value in pool_settings.items():
-        if key not in engine_kwargs:
-            engine_kwargs[key] = value
-            applied_settings[key] = value
-    if applied_settings:
-        logger.info("Applied connection pool settings: %s", applied_settings)
