@@ -223,6 +223,9 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
     ) -> None:  # type: ignore[func-returns-value]
         record.info["peer_ip"] = _cached_ip(host)[0]
 
+    # This makes sure the DB connection's IP matches current DNS. If it has changed,
+    # drop the connection. The insert=True guarantees this listener is first so it
+    # runs before any others on checkout.
     @event.listens_for(engine, "checkout", insert=True)
     def _ensure_ip_fresh(
         dbapi_conn: DBAPIConnection, record: _ConnectionRecord, proxy: Any
