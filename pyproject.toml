@@ -15,8 +15,8 @@ requires-python = ">=3.8"
 dev = [
     "pytest",
     "jobmon_client",
-    "jobmon_core",
-    "jobmon_server",
+    "jobmon_core[otlp]",
+    "jobmon_server[otlp]",
     "pytest-xdist",
     "pytest-cov",
     "mock",

@@ -77,14 +77,35 @@ def get_engine() -> Engine:
 
     connect_args = _coerce(raw_ca) if raw_ca else None
 
+    # Get pool settings from configuration
+    pool_kwargs = {
+        "pool_recycle": cfg.get_int("db", "pool_recycle"),
+        "pool_pre_ping": cfg.get_boolean("db", "pool_pre_ping"),
+        "pool_timeout": cfg.get_int("db", "pool_timeout"),
+    }
+
     log.debug("DATABASE URI: %s", uri)
     log.debug("CONNECT ARGS: %s", connect_args)
+    log.debug("POOL SETTINGS: %s", pool_kwargs)
 
     _engine = (
-        get_dns_engine(uri, connect_args=connect_args)
+        get_dns_engine(uri, connect_args=connect_args, **pool_kwargs)
         if connect_args
-        else get_dns_engine(uri)
+        else get_dns_engine(uri, **pool_kwargs)
     )
+
+    # Instrument the engine with OpenTelemetry if enabled
+    try:
+        use_otel = cfg.get_boolean("otlp", "web_enabled")
+        if use_otel:
+            from jobmon.core.otlp import OtlpAPI
+
+            OtlpAPI.instrument_engine(_engine)
+            log.debug("Instrumented database engine with OpenTelemetry")
+    except Exception as e:
+        # Don't fail engine creation if instrumentation fails
+        log.warning("Failed to instrument database engine with OpenTelemetry: %s", e)
+
     return _engine
 
 
