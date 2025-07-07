@@ -301,7 +301,7 @@ def workflow_is_resumable(workflow_id: int) -> Any:
         except NoResultFound:
             raise HTTPException(
                 status_code=404,
-                detail=f"Workflow with ID {workflow_id} not found in database."
+                detail=f"Workflow with ID {workflow_id} not found in database.",
             )
 
         logger.info(f"Workflow is resumable: {workflow.is_resumable}")

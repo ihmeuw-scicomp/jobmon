@@ -1,8 +1,8 @@
 """Routes for Tasks."""
 
-from datetime import datetime
 import json
 from collections import defaultdict
+from datetime import datetime
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Optional, Set, Union, cast
 
@@ -19,6 +19,7 @@ from jobmon.core.serializers import SerializeTaskResourceUsage
 from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.models.node import Node
+from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
@@ -27,7 +28,6 @@ from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
