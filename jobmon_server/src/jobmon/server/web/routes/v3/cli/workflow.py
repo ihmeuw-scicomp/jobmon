@@ -415,12 +415,12 @@ def get_workflow_status_viz(workflow_ids: list[int] = Query(None)) -> Any:
     for wf_id in wf_ids:
         with SessionMaker() as session:
             with session.begin():
-                sql = select(
+                attempts_sql = select(
                     func.coalesce(func.min(Task.num_attempts), 0).label("min"),
                     func.coalesce(func.max(Task.num_attempts), 0).label("max"),
                     func.coalesce(func.avg(Task.num_attempts), 0.0).label("mean"),
                 ).where(Task.workflow_id == wf_id)
-                attempts = session.execute(sql).first()
+                attempts = session.execute(attempts_sql).first()
 
         return_dic[int(wf_id)] = {
             "id": int(wf_id),
@@ -441,10 +441,10 @@ def get_workflow_status_viz(workflow_ids: list[int] = Query(None)) -> Any:
                 Task.workflow_id.in_(wf_ids),
                 Task.workflow_id == Workflow.id,
             ]
-            sql = select(
+            status_sql: Select[Tuple[int, str, int]] = select(
                 Task.workflow_id, Task.status, Workflow.max_concurrently_running
             ).where(*query_filter)
-            rows = session.execute(sql).all()
+            rows = session.execute(status_sql).all()
 
     for row in rows:
         return_dic[row[0]]["tasks"] += 1
