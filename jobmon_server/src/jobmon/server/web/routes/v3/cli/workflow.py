@@ -416,9 +416,9 @@ def get_workflow_status_viz(workflow_ids: list[int] = Query(None)) -> Any:
         with SessionMaker() as session:
             with session.begin():
                 sql = select(
-                    func.min(Task.num_attempts).label("min"),
-                    func.max(Task.num_attempts).label("max"),
-                    func.avg(Task.num_attempts).label("mean"),
+                    func.coalesce(func.min(Task.num_attempts), 0).label("min"),
+                    func.coalesce(func.max(Task.num_attempts), 0).label("max"),
+                    func.coalesce(func.avg(Task.num_attempts), 0.0).label("mean"),
                 ).where(Task.workflow_id == wf_id)
                 attempts = session.execute(sql).first()
 
