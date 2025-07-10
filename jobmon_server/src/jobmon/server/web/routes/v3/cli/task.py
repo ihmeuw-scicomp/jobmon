@@ -28,6 +28,7 @@ from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow import Workflow
+from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
@@ -291,28 +292,55 @@ async def update_task_statuses(request: Request) -> Any:
             update_stmt = update(Task).where(
                 and_(Task.id.in_(task_ids), Task.status != new_status)
             )
+
             vals = {"status": new_status}
             session.execute(update_stmt.values(**vals))
             session.flush()
+
+            wfr = (
+                session.query(WorkflowRun)
+                .filter(WorkflowRun.workflow_id == workflow_id)
+                .order_by(WorkflowRun.id.desc())
+                .first()
+            )
+
+            active_statuses = [
+                constants.TaskInstanceStatus.SUBMITTED_TO_BATCH_DISTRIBUTOR,
+                constants.TaskInstanceStatus.INSTANTIATED,
+                constants.TaskInstanceStatus.LAUNCHED,
+                constants.TaskInstanceStatus.QUEUED,
+                constants.TaskInstanceStatus.RUNNING,
+                constants.TaskInstanceStatus.TRIAGING,
+                constants.TaskInstanceStatus.NO_HEARTBEAT,
+            ]
+
             # If job is supposed to be rerun, set task instances to "K"
             if new_status == constants.TaskStatus.REGISTERING:
-                task_instance_update_stmt = update(TaskInstance).where(
-                    TaskInstance.task_id.in_(task_ids),
-                    TaskInstance.status.notin_(
-                        [
-                            constants.TaskInstanceStatus.ERROR_FATAL,
-                            constants.TaskInstanceStatus.DONE,
-                            constants.TaskInstanceStatus.ERROR,
-                            constants.TaskInstanceStatus.UNKNOWN_ERROR,
-                            constants.TaskInstanceStatus.RESOURCE_ERROR,
-                            constants.TaskInstanceStatus.KILL_SELF,
-                            constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID,
-                        ]
-                    ),
-                )
-                vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
-                session.execute(task_instance_update_stmt.values(**vals))
-                session.flush()
+                # Process task_ids in batches to reduce lock duration
+                batch_size = 100
+
+                for i in range(0, len(task_ids), batch_size):
+                    batch_task_ids = task_ids[i : i + batch_size]
+
+                    # First, get the IDs of rows that need updating using a subquery
+                    subquery = (
+                        session.query(TaskInstance.id)
+                        .filter(
+                            TaskInstance.workflow_run_id == wfr.id,
+                            TaskInstance.task_id.in_(batch_task_ids),
+                            TaskInstance.status.in_(active_statuses),
+                        )
+                        .subquery()
+                    )
+
+                    # Update TIs to "K" status
+                    task_instance_update_stmt = update(TaskInstance).where(
+                        TaskInstance.id.in_(session.query(subquery.c.id))
+                    )
+                    vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
+                    session.execute(task_instance_update_stmt.values(**vals))
+                    session.flush()
+
                 # if workflow status is None, get workflow status from db
                 if workflow_status is None:
                     workflow_status = (
