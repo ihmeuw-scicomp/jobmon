@@ -316,16 +316,21 @@ def workflow_is_resumable(workflow_id: int) -> Any:
 async def get_max_concurrently_running(workflow_id: int, request: Request) -> Any:
     """Return the maximum concurrency of this workflow."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
-
     with SessionMaker() as session:
         with session.begin():
             select_stmt = select(Workflow).where(Workflow.id == workflow_id)
-            workflow = session.execute(select_stmt).scalars().one()
+            workflow = session.execute(select_stmt).scalars().one_or_none()
 
-        resp = JSONResponse(
-            content={"max_concurrently_running": workflow.max_concurrently_running},
-            status_code=StatusCodes.OK,
-        )
+            if workflow is None:
+                return JSONResponse(
+                    content={"error": f"Workflow with ID {workflow_id} not found in database."},
+                    status_code=StatusCodes.NOT_FOUND,
+                )
+
+            resp = JSONResponse(
+                content={"max_concurrently_running": workflow.max_concurrently_running},
+                status_code=StatusCodes.OK,
+            )
     return resp
 
 
