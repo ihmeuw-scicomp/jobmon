@@ -323,7 +323,9 @@ async def get_max_concurrently_running(workflow_id: int, request: Request) -> An
 
             if workflow is None:
                 return JSONResponse(
-                    content={"error": f"Workflow with ID {workflow_id} not found in database."},
+                    content={
+                        "error": f"Workflow with ID {workflow_id} not found in database."
+                    },
                     status_code=StatusCodes.NOT_FOUND,
                 )
 
