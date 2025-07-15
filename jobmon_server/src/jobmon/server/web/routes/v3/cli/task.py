@@ -220,10 +220,172 @@ async def get_task_subdag(request: Request) -> Any:
     return resp
 
 
+def parse_request_data(data: Dict) -> tuple[str, bool, Optional[str], Union[List[int], str], str]:
+    """Parse and validate request data."""
+    try:
+        workflow_id = data["workflow_id"]
+        recursive = data.get("recursive", False)
+        workflow_status = data.get("workflow_status", None)
+
+        task_ids = data["task_ids"]
+        if isinstance(task_ids, int):
+            task_ids = [task_ids]
+        if task_ids == "all":
+            recursive = False
+
+        new_status = data["new_status"]
+
+        return workflow_id, recursive, workflow_status, task_ids, new_status
+    except KeyError as e:
+        raise InvalidUsage(
+            f"problem with {str(e)} in request", status_code=400
+        ) from e
+
+
+def get_all_task_ids(workflow_id: str, session: Session) -> List[int]:
+    """Get all task IDs for a workflow."""
+    task_ids = (
+        session.query(Task.id)
+        .filter(Task.workflow_id == workflow_id)
+        .all()
+    )
+    return [task_id for task_id, in task_ids]
+
+
+async def get_recursive_task_ids(task_ids: List[int], new_status: str, session: Session) -> List[int]:
+    """Get task IDs including dependencies based on status direction."""
+    if new_status == constants.TaskStatus.DONE:
+        logger.info("recursive update including upstream tasks")
+        direction = constants.Direction.UP
+    elif new_status == constants.TaskStatus.REGISTERING:
+        logger.info("recursive update including downstream tasks")
+        direction = constants.Direction.DOWN
+    else:
+        raise InvalidUsage(
+            f"Invalid new_status {new_status} for recursive update",
+            status_code=400,
+        )
+
+    task_ids = await get_tasks_recursive(set(task_ids), direction, session)
+    logger.info(f"reset status to new_status: {new_status}")
+    return list(task_ids)  # Convert set to list
+
+
+def update_task_statuses_in_db(task_ids: List[int], new_status: str, session: Session) -> None:
+    """Update task statuses in the database."""
+    update_stmt = update(Task).where(
+        and_(Task.id.in_(task_ids), Task.status != new_status)
+    )
+    vals = {"status": new_status}
+    session.execute(update_stmt.values(**vals))
+    session.flush()
+
+
+def get_workflow_run(workflow_id: str, session: Session) -> WorkflowRun:
+    """Get the latest workflow run for a workflow."""
+    return (
+        session.query(WorkflowRun)
+        .filter(WorkflowRun.workflow_id == workflow_id)
+        .order_by(WorkflowRun.id.desc())
+        .first()
+    )
+
+
+def kill_active_task_instances(task_ids: List[int], workflow_run_id: int, session: Session) -> None:
+    """Kill active task instances for the given tasks."""
+    active_statuses = [
+        constants.TaskInstanceStatus.SUBMITTED_TO_BATCH_DISTRIBUTOR,
+        constants.TaskInstanceStatus.INSTANTIATED,
+        constants.TaskInstanceStatus.LAUNCHED,
+        constants.TaskInstanceStatus.QUEUED,
+        constants.TaskInstanceStatus.RUNNING,
+        constants.TaskInstanceStatus.TRIAGING,
+        constants.TaskInstanceStatus.NO_HEARTBEAT,
+    ]
+
+    # Process task_ids in batches to reduce lock duration
+    batch_size = 100
+    for i in range(0, len(task_ids), batch_size):
+        batch_task_ids = task_ids[i: i + batch_size]
+
+        # First, get the IDs of rows that need updating using a subquery
+        subquery = (
+            session.query(TaskInstance.id)
+            .filter(
+                TaskInstance.workflow_run_id == workflow_run_id,
+                TaskInstance.task_id.in_(batch_task_ids),
+                TaskInstance.status.in_(active_statuses),
+            )
+            .subquery()
+        )
+
+        # Update TIs to "K" status
+        task_instance_update_stmt = update(TaskInstance).where(
+            TaskInstance.id.in_(session.query(subquery.c.id))
+        )
+        vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
+        session.execute(task_instance_update_stmt.values(**vals))
+        session.flush()
+
+
+def handle_registering_status(
+        workflow_id: str,
+        task_ids: List[int],
+        workflow_status: Optional[str],
+        session: Session
+) -> None:
+    """Handle special logic for REGISTERING status."""
+    wfr = get_workflow_run(workflow_id, session)
+    kill_active_task_instances(task_ids, wfr.id, session)
+
+    # Get workflow status from db if not provided
+    if workflow_status is None:
+        workflow_status = (
+            session.query(Workflow.status)
+            .filter(Workflow.id == workflow_id)
+            .scalar()
+        )
+
+    # If workflow is done, need to set it to an error state before resuming
+    if workflow_status == constants.WorkflowStatus.DONE:
+        logger.info(f"reset workflow status for workflow_id: {workflow_id}")
+        workflow_update_stmt = update(Workflow).where(
+            Workflow.id == workflow_id
+        )
+        vals = {"status": constants.WorkflowStatus.FAILED}
+        session.execute(workflow_update_stmt.values(**vals))
+
+
+def handle_done_status(workflow_id: str, new_status: str, session: Session) -> None:
+    """Handle special logic for DONE status."""
+    tasks_done = (
+        session.query(Task.id)
+        .filter(Task.workflow_id == workflow_id, Task.status != new_status)
+        .all()
+    )
+
+    if not tasks_done:
+        logger.info(f"set workflow status to DONE for workflow_id: {workflow_id}")
+        workflow_update_stmt = update(Workflow).where(
+            Workflow.id == workflow_id
+        )
+        vals = {"status": constants.WorkflowStatus.DONE}
+        session.execute(workflow_update_stmt.values(**vals))
+
+
+def create_response(new_status: str) -> JSONResponse:
+    """Create the JSON response with CORS headers."""
+    message = f"updated to status {new_status}"
+    resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "PUT, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "*"
+    return resp
+
+
 @api_v3_router.put("/task/update_statuses")
 async def update_task_statuses(request: Request) -> Any:
     """Update the status of the tasks.
-
     Description:
         - When workflow_id='all', it updates all tasks in the workflow with
         recursive=False. This improves performance.
@@ -232,153 +394,34 @@ async def update_task_statuses(request: Request) -> Any:
         - When recursive=False, it updates only the tasks in the task_ids list.
         - When workflow_status is None, it gets the workflow status from the db.
         - After updating the tasks, it checks the workflow status and updates it.
-
     Notes:
-        This API is different from v2.
         It integrated the logic in update_task_status from status_commands.py.
-    TODO:
-    - Once CLI moves to v3, simplify update_task_status to avoid duplication.
     """
     data = cast(Dict, await request.json())
-    try:
-        # workflow_id is required; if not set, raise KeyError
-        workflow_id = data["workflow_id"]
-        # get the recursive flag, if not provided, default to False
-        recursive = data.get("recursive", False)
-        # get workflow_status, if not provided, get it from db
-        workflow_status = data.get("workflow_status", None)
-        # task_ids is required; if not set, raise KeyError;
-        # if it is an int, convert it to a list
-        # if it is "all", get all tasks from the workflow_id, and disable recursive
-        task_ids = data["task_ids"]
-        if isinstance(task_ids, int):
-            task_ids = [task_ids]
-        if task_ids == "all":
-            recursive = False
-        # new_status is required; if not set, raise KeyError
-        new_status = data["new_status"]
 
-    except KeyError as e:
-        raise InvalidUsage(
-            f"problem with {str(e)} in request to {request.url.path}", status_code=400
-        ) from e
+    # Parse and validate request data
+    workflow_id, recursive, workflow_status, task_ids, new_status = parse_request_data(data)
 
     with SessionMaker() as session:
         with session.begin():
-            # if task_ids is "all", get all tasks from the workflow_id
+            # Get all task IDs if task_ids is "all"
             if task_ids == "all":
-                task_ids = (
-                    session.query(Task.id).filter(Task.workflow_id == workflow_id).all()
-                )
-                task_ids = [task_id for task_id, in task_ids]
-            # If recursive is True, appends all dependent task_ids
-            # (upstream if new_status == 'D'; downstream if new_status == 'G').
+                task_ids = get_all_task_ids(workflow_id, session)
+
+            # Get recursive task IDs if needed
             if recursive:
-                if new_status == constants.TaskStatus.DONE:
-                    logger.info("recursive update including upstream tasks")
-                    direction = constants.Direction.UP
-                elif new_status == constants.TaskStatus.REGISTERING:
-                    logger.info("recursive update including downstream tasks")
-                    direction = constants.Direction.DOWN
-                else:
-                    raise InvalidUsage(
-                        f"Invalid new_status {new_status} for recursive update",
-                        status_code=400,
-                    )
-                task_ids = _get_tasks_recursive(set(task_ids), direction, session)
+                task_ids = await get_recursive_task_ids(task_ids, new_status, session)
 
-                logger.info(f"reset status to new_status: {new_status}")
+            # Update task statuses
+            update_task_statuses_in_db(task_ids, new_status, session)
 
-            update_stmt = update(Task).where(
-                and_(Task.id.in_(task_ids), Task.status != new_status)
-            )
-
-            vals = {"status": new_status}
-            session.execute(update_stmt.values(**vals))
-            session.flush()
-
-            wfr = (
-                session.query(WorkflowRun)
-                .filter(WorkflowRun.workflow_id == workflow_id)
-                .order_by(WorkflowRun.id.desc())
-                .first()
-            )
-
-            active_statuses = [
-                constants.TaskInstanceStatus.SUBMITTED_TO_BATCH_DISTRIBUTOR,
-                constants.TaskInstanceStatus.INSTANTIATED,
-                constants.TaskInstanceStatus.LAUNCHED,
-                constants.TaskInstanceStatus.QUEUED,
-                constants.TaskInstanceStatus.RUNNING,
-                constants.TaskInstanceStatus.TRIAGING,
-                constants.TaskInstanceStatus.NO_HEARTBEAT,
-            ]
-
-            # If job is supposed to be rerun, set task instances to "K"
+            # Handle special cases based on status
             if new_status == constants.TaskStatus.REGISTERING:
-                # Process task_ids in batches to reduce lock duration
-                batch_size = 100
+                handle_registering_status(workflow_id, task_ids, workflow_status, session)
+            elif new_status == constants.TaskStatus.DONE:
+                handle_done_status(workflow_id, new_status, session)
 
-                for i in range(0, len(task_ids), batch_size):
-                    batch_task_ids = task_ids[i : i + batch_size]
-
-                    # First, get the IDs of rows that need updating using a subquery
-                    subquery = (
-                        session.query(TaskInstance.id)
-                        .filter(
-                            TaskInstance.workflow_run_id == wfr.id,
-                            TaskInstance.task_id.in_(batch_task_ids),
-                            TaskInstance.status.in_(active_statuses),
-                        )
-                        .subquery()
-                    )
-
-                    # Update TIs to "K" status
-                    task_instance_update_stmt = update(TaskInstance).where(
-                        TaskInstance.id.in_(session.query(subquery.c.id))
-                    )
-                    vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
-                    session.execute(task_instance_update_stmt.values(**vals))
-                    session.flush()
-
-                # if workflow status is None, get workflow status from db
-                if workflow_status is None:
-                    workflow_status = (
-                        session.query(Workflow.status)
-                        .filter(Workflow.id == workflow_id)
-                        .scalar()
-                    )
-                # If workflow is done, need to set it to an error state before resuming
-                if workflow_status == constants.WorkflowStatus.DONE:
-                    logger.info(f"reset workflow status for workflow_id: {workflow_id}")
-                    workflow_update_stmt = update(Workflow).where(
-                        Workflow.id == workflow_id
-                    )
-                    vals = {"status": constants.WorkflowStatus.FAILED}
-                    session.execute(workflow_update_stmt.values(**vals))
-            # If new_status is "D", check if all the tasks in the wf are done, and set wf.
-            if new_status == constants.TaskStatus.DONE:
-                tasks_done = (
-                    session.query(Task.id)
-                    .filter(Task.workflow_id == workflow_id, Task.status != new_status)
-                    .all()
-                )
-                if not tasks_done:
-                    logger.info(
-                        f"set workflow status to DONE for workflow_id: {workflow_id}"
-                    )
-                    workflow_update_stmt = update(Workflow).where(
-                        Workflow.id == workflow_id
-                    )
-                    vals = {"status": constants.WorkflowStatus.DONE}
-                    session.execute(workflow_update_stmt.values(**vals))
-
-        message = f"updated to status {new_status}"
-        resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
-        resp.headers["Access-Control-Allow-Origin"] = "*"
-        resp.headers["Access-Control-Allow-Methods"] = "PUT, OPTIONS"
-        resp.headers["Access-Control-Allow-Headers"] = "*"
-    return resp
+    return create_response(new_status)
 
 
 @api_v3_router.get("/task_dependencies/{task_id}")
