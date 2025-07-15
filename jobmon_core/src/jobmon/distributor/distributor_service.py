@@ -23,12 +23,11 @@ from typing import (
 
 import aiohttp
 
-from jobmon.core import __version__
 from jobmon.core.cluster_protocol import ClusterDistributor
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus
-from jobmon.core.exceptions import DistributorInterruptedError, InvalidResponse
-from jobmon.core.requester import Requester, http_request_ok
+from jobmon.core.exceptions import DistributorInterruptedError
+from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeTaskInstanceBatch
 from jobmon.distributor.distributor_command import DistributorCommand
 from jobmon.distributor.distributor_task_instance import DistributorTaskInstance
@@ -464,7 +463,7 @@ class DistributorService:
 
     async def _log_heartbeats(self, task_instance_batches: List[List[int]]) -> None:
         """Create a task for each batch of task instances to send heartbeat."""
-        async with aiohttp.ClientSession(self.requester.base_url) as session:
+        async with aiohttp.ClientSession() as session:
             heartbeat_tasks = [
                 asyncio.create_task(self._log_heartbeat_by_batch(session, batch))
                 for batch in task_instance_batches
@@ -474,51 +473,21 @@ class DistributorService:
     async def _log_heartbeat_by_batch(
         self, session: aiohttp.ClientSession, task_instance_ids_to_heartbeat: List[int]
     ) -> None:
-        """Send heartbeat for a batch of task instances."""
+        """Send heartbeat for a batch of task instances using sophisticated retry logic."""
         message: Dict = {
             "next_report_increment": self._next_report_increment,
             "task_instance_ids": task_instance_ids_to_heartbeat,
         }
-        app_route = f"{self.requester.route_prefix}/task_instance/log_report_by/batch"
+        app_route = "/task_instance/log_report_by/batch"
 
-        # Super basic retrying logic, to avoid fussing with tenacity logic.
-        # TODO: Factor out into an asynchronous requester
-
-        max_attempts, wait_time = 10, 1.5
-
-        while max_attempts > 0:
-            async with session.post(
-                app_route,
-                json=message,
-                params={"client_jobmon_version": __version__},
-                headers={"Content-Type": "application/json"},
-            ) as response:
-                return_code = response.status
-                response_text = await response.text()
-
-            if 499 < return_code < 600:
-                logger.warning(
-                    f"Got HTTP status_code={return_code} from server. "
-                    f"app_route: {app_route}."
-                )
-            elif return_code == 423:
-                logger.info(
-                    f"Got HTTP status_code=423 from server. app_route: {app_route}. "
-                    f"Retrying as per design."
-                )
-            else:
-                break
-
-            max_attempts -= 1
-            await asyncio.sleep(wait_time)
-            wait_time *= wait_time
-
-        if not http_request_ok(return_code):
-            raise InvalidResponse(
-                f"Unexpected status code {return_code} from POST "
-                f"request through route {app_route}. Expected "
-                f"code 200. Response content: {response_text}"
-            )
+        # Use the sophisticated async requester with tenacity retry logic
+        await self.requester.send_request_async(
+            session=session,
+            app_route=app_route,
+            message=message,
+            request_type="post",
+            tenacious=True,
+        )
 
     def _initialize_signal_handlers(self) -> None:
         def handle_sighup(signal: int, frame: Any) -> None:
