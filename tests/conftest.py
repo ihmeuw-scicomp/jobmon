@@ -115,10 +115,9 @@ class WebServerProcess:
             specifically the database host, port, service account user, service account
             password, and database name
         """
-        if sys.platform == "darwin":
-            self.web_host = "127.0.0.1"
-        else:
-            self.web_host = socket.getfqdn()
+        # Always use localhost for test server to avoid DNS/network issues
+        # The test server runs locally regardless of platform
+        self.web_host = "127.0.0.1"
         self.web_port = str(10_000 + os.getpid() % 30_000)
         self.api_prefix = _api_prefix
 

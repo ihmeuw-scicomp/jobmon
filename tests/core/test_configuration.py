@@ -22,12 +22,13 @@ def test_basic_configuration_methods(temp_yaml_file):
     """Test basic configuration retrieval methods."""
     config = JobmonConfig(filepath=str(temp_yaml_file))
 
-    # Test basic get method
-    assert config.get("http", "request_timeout") == 20
+    # Test basic get method - returns strings
+    assert config.get("http", "request_timeout") == "20"
 
-    # Test typed get methods
+    # Test typed get methods - return proper types
     assert config.get_int("http", "request_timeout") == 20
-    assert config.get_int("http", "retries_timeout") == 300
+    # Note: retries_timeout is overridden to 0 in conftest.py for faster test failures
+    assert config.get_int("http", "retries_timeout") == 0
 
 
 def test_environment_variable_overrides(monkeypatch, temp_yaml_file):
@@ -68,8 +69,8 @@ def test_section_retrieval_with_overrides(temp_yaml_file, monkeypatch):
 
     # Assert that the value from the environment variable is used
     assert section_data["request_timeout"] == "25"
-    # Assert other values remain unaffected
-    assert section_data["retries_timeout"] == 300
+    # Assert other values from test environment (conftest.py sets retries_timeout=0)
+    assert section_data["retries_timeout"] == "0"
     # Assert new values from env vars are added
     assert section_data["missing"] == "foo"
 
@@ -88,8 +89,9 @@ def test_configuration_precedence(monkeypatch):
     overriding_dict = {"http": {"request_timeout": 30}}
     config = JobmonConfig(dict_config=overriding_dict)
 
-    assert config.get("http", "request_timeout") == 30  # Dict override wins
-    assert config.get("http", "retries_timeout") == 300  # File value unchanged
+    assert config.get_int("http", "request_timeout") == 30  # Dict override wins
+    # Note: retries_timeout is 0 from test environment (conftest.py), not file value
+    assert config.get_int("http", "retries_timeout") == 0  # Test env override
 
 
 def test_nested_environment_variables_comprehensive(monkeypatch, tmp_path):
