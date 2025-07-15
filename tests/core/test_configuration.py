@@ -21,10 +21,10 @@ def temp_yaml_file(tmp_path):
 def test_basic_configuration_methods(temp_yaml_file):
     """Test basic configuration retrieval methods."""
     config = JobmonConfig(filepath=str(temp_yaml_file))
-    
+
     # Test basic get method
     assert config.get("http", "request_timeout") == 20
-    
+
     # Test typed get methods
     assert config.get_int("http", "request_timeout") == 20
     assert config.get_int("http", "retries_timeout") == 300
@@ -34,18 +34,19 @@ def test_environment_variable_overrides(monkeypatch, temp_yaml_file):
     """Test environment variable overrides and interpolation."""
     # Clear any existing environment variables that might interfere
     import os
+
     for key in list(os.environ.keys()):
         if key.startswith("JOBMON__"):
             monkeypatch.delenv(key, raising=False)
-    
+
     # Test direct env var override
     monkeypatch.setenv("JOBMON__HTTP__REQUEST_TIMEOUT", "200")
     config = JobmonConfig()
     assert config.get_int("http", "request_timeout") == 200
-    
+
     # Clear env var for interpolation test
     monkeypatch.delenv("JOBMON__HTTP__REQUEST_TIMEOUT", raising=False)
-    
+
     # Test env var interpolation
     monkeypatch.setenv("TEST_VAR", "400")
     data_with_env = """
@@ -95,10 +96,11 @@ def test_nested_environment_variables_comprehensive(monkeypatch, tmp_path):
     """Comprehensive test for nested environment variable handling."""
     # Clear any existing JOBMON environment variables
     import os
+
     for key in list(os.environ.keys()):
         if key.startswith("JOBMON__"):
             monkeypatch.delenv(key, raising=False)
-    
+
     # Create config file with nested structure
     config_content = """
     integration:
@@ -118,28 +120,31 @@ def test_nested_environment_variables_comprehensive(monkeypatch, tmp_path):
     monkeypatch.setenv("JOBMON__DB__FLAT_KEY", "flat_value")
 
     config = JobmonConfig(filepath=str(config_file))
-    
+
     # Test integration section
     integration_section = config.get_section("integration")
     assert integration_section["outer_key"] == "file_value"  # From file
     assert integration_section["nested"]["inner_key"] == "env_inner_value"  # Overridden
     assert integration_section["nested"]["new_key"] == "new_value"  # Added by env
-    
+
     # Test db section with mixed flat and deep nesting
     db_section = config.get_section("db")
     assert db_section["simple_key"] == "simple_value"  # From file
     assert db_section["flat_key"] == "flat_value"  # From env var
-    assert db_section["deep"]["level1"]["level2"]["deep_key"] == "deep_value"  # Deep nesting
+    assert (
+        db_section["deep"]["level1"]["level2"]["deep_key"] == "deep_value"
+    )  # Deep nesting
 
 
 def test_db_pool_configuration_comprehensive(tmp_path, monkeypatch):
     """Comprehensive test for database pool configuration."""
     # Clear any existing JOBMON environment variables
     import os
+
     for key in list(os.environ.keys()):
         if key.startswith("JOBMON__"):
             monkeypatch.delenv(key, raising=False)
-    
+
     config_content = """
     db:
       sqlalchemy_database_uri: 'sqlite:///test.db'
@@ -158,12 +163,12 @@ def test_db_pool_configuration_comprehensive(tmp_path, monkeypatch):
     monkeypatch.setenv("JOBMON__DB__POOL__NEW_SETTING", "true")
 
     config = JobmonConfig(filepath=str(config_file))
-    
+
     # Test basic nested structure
     db_section = config.get_section("db")
     assert "pool" in db_section
     assert isinstance(db_section["pool"], dict)
-    
+
     # Test values and overrides
     assert db_section["pool"]["size"] == "15"  # Overridden by env var
     assert db_section["pool"]["max_overflow"] == 20  # From file
@@ -171,11 +176,11 @@ def test_db_pool_configuration_comprehensive(tmp_path, monkeypatch):
     assert db_section["pool"]["recycle"] == 300  # From file
     assert db_section["pool"]["pre_ping"] is True  # From file
     assert db_section["pool"]["new_setting"] == "true"  # Added by env var
-    
+
     # Test empty/missing pool sections in a separate scenario without env vars
     monkeypatch.delenv("JOBMON__DB__POOL__SIZE", raising=False)
     monkeypatch.delenv("JOBMON__DB__POOL__NEW_SETTING", raising=False)
-    
+
     empty_config = """
     db:
       sqlalchemy_database_uri: 'sqlite:///test.db'
@@ -212,24 +217,24 @@ def test_type_coercion_comprehensive(tmp_path):
     """
     config_file = tmp_path / "coerce_test.yaml"
     config_file.write_text(config_content)
-    
+
     config = JobmonConfig(filepath=str(config_file))
-    
+
     # Test individual typed methods
     assert config.get_boolean("test", "bool_true") is True
-    assert config.get_boolean("test", "bool_false") is False  
+    assert config.get_boolean("test", "bool_false") is False
     assert config.get_boolean("test", "bool_int_1") is True
     assert config.get_boolean("test", "bool_int_0") is False
-    
+
     assert config.get_int("test", "int_string") == 42
     assert config.get_int("test", "int_actual") == 100
     assert isinstance(config.get_int("test", "int_string"), int)
-    
+
     assert config.get_float("test", "float_string") == 3.14159
     assert config.get_float("test", "float_int") == 42.0  # int converted to float
     assert config.get_float("test", "float_actual") == 2.718
     assert isinstance(config.get_float("test", "float_int"), float)
-    
+
     # Test section-wide coercion
     test_section = config.get_section_coerced("test")
     assert test_section["bool_true"] is True  # String "true" → bool True
@@ -243,10 +248,11 @@ def test_type_coercion_with_environment_variables(monkeypatch, tmp_path):
     """Test that environment variable values are properly coerced."""
     # Clear any existing JOBMON environment variables
     import os
+
     for key in list(os.environ.keys()):
         if key.startswith("JOBMON__"):
             monkeypatch.delenv(key, raising=False)
-    
+
     config_content = """
     test:
       pool:
@@ -254,29 +260,32 @@ def test_type_coercion_with_environment_variables(monkeypatch, tmp_path):
     """
     config_file = tmp_path / "env_coerce_test.yaml"
     config_file.write_text(config_content)
-    
+
     # Set environment variables with string values that should be coerced
     monkeypatch.setenv("JOBMON__TEST__POOL__SIZE", "15")
     monkeypatch.setenv("JOBMON__TEST__POOL__ENABLED", "true")
     monkeypatch.setenv("JOBMON__TEST__POOL__TIMEOUT", "30.5")
-    
+
     config = JobmonConfig(filepath=str(config_file))
     test_section = config.get_section_coerced("test")
-    
+
     # Environment variables should override and be coerced to correct types
     assert test_section["pool"]["size"] == 15  # String "15" from env → int 15
     assert test_section["pool"]["enabled"] is True  # String "true" from env → bool True
-    assert test_section["pool"]["timeout"] == 30.5  # String "30.5" from env → float 30.5
+    assert (
+        test_section["pool"]["timeout"] == 30.5
+    )  # String "30.5" from env → float 30.5
 
 
 def test_engine_integration_with_coerced_configuration(tmp_path, monkeypatch):
     """Test the actual engine logic using coerced configuration."""
     # Clear any existing JOBMON environment variables
     import os
+
     for key in list(os.environ.keys()):
         if key.startswith("JOBMON__"):
             monkeypatch.delenv(key, raising=False)
-    
+
     config_content = """
     db:
       sqlalchemy_database_uri: 'sqlite:///test.db'
@@ -288,38 +297,39 @@ def test_engine_integration_with_coerced_configuration(tmp_path, monkeypatch):
     """
     config_file = tmp_path / "real_engine_test.yaml"
     config_file.write_text(config_content)
-    
+
     monkeypatch.setenv("JOBMON__CONFIG_FILE", str(config_file))
-    
-    from jobmon.server.web.config import get_jobmon_config
+
     import jobmon.server.web.config
+    from jobmon.server.web.config import get_jobmon_config
+
     jobmon.server.web.config._jobmon_config = None
-    
+
     cfg = get_jobmon_config()
-    
+
     # Use the actual consolidated engine logic
     try:
         db_config = cfg.get_section_coerced("db")
         pool_config = db_config.get("pool", {})
         pool_param_mapping = {
             "recycle": "pool_recycle",
-            "pre_ping": "pool_pre_ping", 
+            "pre_ping": "pool_pre_ping",
             "timeout": "pool_timeout",
             "size": "pool_size",
-            "max_overflow": "max_overflow"
+            "max_overflow": "max_overflow",
         }
-        
+
         pool_kwargs = {}
         for config_key, sqlalchemy_param in pool_param_mapping.items():
             if config_key in pool_config:
                 pool_kwargs[sqlalchemy_param] = pool_config[config_key]
-                
+
     except Exception:
         pool_kwargs = {}
-    
+
     # Verify types are correctly coerced
     assert pool_kwargs["pool_size"] == 8  # Should be int, not string
-    assert pool_kwargs["pool_pre_ping"] is True  # Should be bool, not string 
+    assert pool_kwargs["pool_pre_ping"] is True  # Should be bool, not string
     assert pool_kwargs["pool_timeout"] == 25  # Should be int, not string
     assert pool_kwargs["pool_recycle"] == 300  # Should be int, not string
     assert isinstance(pool_kwargs["pool_size"], int)
@@ -338,16 +348,16 @@ def test_error_handling(tmp_path):
     """
     config_file = tmp_path / "error_test.yaml"
     config_file.write_text(config_content)
-    
+
     config = JobmonConfig(filepath=str(config_file))
-    
+
     # Test error handling for invalid types
     with pytest.raises(ConfigError, match="Failed to convert value to bool"):
         config.get_boolean("test", "not_bool")
-    
+
     with pytest.raises(ConfigError, match="Failed to convert value to int"):
         config.get_int("test", "not_int")
-    
+
     with pytest.raises(ConfigError, match="Failed to convert value to float"):
         config.get_float("test", "not_float")
 
@@ -356,10 +366,11 @@ def test_empty_pool_configuration_engine_compatibility(tmp_path, monkeypatch):
     """Test that empty/null pool configurations don't break engine initialization."""
     # Clear any existing JOBMON environment variables
     import os
+
     for key in list(os.environ.keys()):
         if key.startswith("JOBMON__"):
             monkeypatch.delenv(key, raising=False)
-    
+
     # Test various empty pool configurations
     test_configs = [
         # Completely missing pool section
@@ -384,30 +395,32 @@ def test_empty_pool_configuration_engine_compatibility(tmp_path, monkeypatch):
         db:
           sqlalchemy_database_uri: 'sqlite:///test.db'
           pool: {}
-        """
+        """,
     ]
-    
+
     for i, config_content in enumerate(test_configs):
         config_file = tmp_path / f"empty_pool_test_{i}.yaml"
         config_file.write_text(config_content)
-        
+
         monkeypatch.setenv("JOBMON__CONFIG_FILE", str(config_file))
-        
+
         # Reset singleton to pick up new config
         import jobmon.server.web.config
+
         jobmon.server.web.config._jobmon_config = None
-        
+
         try:
             # This should not raise a TypeError about NoneType not being iterable
             from jobmon.server.web.db.engine import get_engine
+
             engine = get_engine()
-            
+
             # Verify we can create the engine successfully
             assert engine is not None
-            
+
         except Exception as e:
             pytest.fail(f"Empty pool config test case {i} failed: {e}")
-        
+
         finally:
             # Clean up
             monkeypatch.delenv("JOBMON__CONFIG_FILE", raising=False)

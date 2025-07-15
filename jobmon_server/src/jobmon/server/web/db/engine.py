@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
@@ -28,25 +29,25 @@ def get_engine() -> Engine:
     try:
         db_config = cfg.get_section_coerced("db")
         connect_args = db_config.get("sqlalchemy_connect_args")
-        
+
         # Get pool settings - ensure pool_config is always a dict
         pool_config = db_config.get("pool") or {}
         if not isinstance(pool_config, dict):
             pool_config = {}
-            
+
         pool_param_mapping = {
             "recycle": "pool_recycle",
-            "pre_ping": "pool_pre_ping", 
+            "pre_ping": "pool_pre_ping",
             "timeout": "pool_timeout",
             "size": "pool_size",
-            "max_overflow": "max_overflow"
+            "max_overflow": "max_overflow",
         }
-        
+
         pool_kwargs = {}
         for config_key, sqlalchemy_param in pool_param_mapping.items():
             if config_key in pool_config:
                 pool_kwargs[sqlalchemy_param] = pool_config[config_key]
-                
+
     except (ConfigError, ValueError):
         connect_args = None
         pool_kwargs = {}

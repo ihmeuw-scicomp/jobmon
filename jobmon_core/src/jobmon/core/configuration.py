@@ -84,9 +84,9 @@ class JobmonConfig:
 
     def _coerce_value(self, value: Any) -> Any:
         """Recursively coerce values to appropriate Python types.
-        
+
         • 'true', 'false', etc. → bool
-        • Numeric strings → int/float  
+        • Numeric strings → int/float
         • JSON / Python literals → parsed objects
         • Dict / list containers → recurse element-wise
         • Anything else → returned unchanged
@@ -94,7 +94,9 @@ class JobmonConfig:
         # Already a non-string, recurse if container
         if isinstance(value, Mapping):
             return {k: self._coerce_value(v) for k, v in value.items()}
-        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        if isinstance(value, Sequence) and not isinstance(
+            value, (str, bytes, bytearray)
+        ):
             return [self._coerce_value(v) for v in value]
 
         if not isinstance(value, str):
@@ -112,7 +114,7 @@ class JobmonConfig:
         # Try numeric conversion first
         try:
             # Try int first, then float
-            if '.' not in s_val:
+            if "." not in s_val:
                 return int(s_val)
             else:
                 return float(s_val)
@@ -217,7 +219,7 @@ class JobmonConfig:
 
     def get_section_coerced(self, section: str) -> Dict[str, Any]:
         """Returns a dictionary with all values coerced to appropriate Python types.
-        
+
         Same as get_section() but automatically converts:
         - String booleans to bool
         - Numeric strings to int/float
@@ -234,7 +236,7 @@ class JobmonConfig:
         """
         val = self.get(section, key)
         coerced_val = self._coerce_value(val)
-        
+
         if isinstance(coerced_val, bool):
             return coerced_val
         else:
@@ -251,7 +253,7 @@ class JobmonConfig:
         """
         val = self.get(section, key)
         coerced_val = self._coerce_value(val)
-        
+
         if isinstance(coerced_val, int):
             return coerced_val
         else:
@@ -265,7 +267,7 @@ class JobmonConfig:
         """Get the configuration value for the section/key as float. Raise if key not found."""
         val = self.get(section, key)
         coerced_val = self._coerce_value(val)
-        
+
         if isinstance(coerced_val, (int, float)):
             return float(coerced_val)
         else:

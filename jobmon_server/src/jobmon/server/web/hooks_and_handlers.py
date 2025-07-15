@@ -13,9 +13,6 @@ from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 logger = structlog.get_logger(__name__)
 
 
-
-
-
 def _record_exception_in_span(error: Exception) -> None:
     """Record exception details in the current OpenTelemetry span."""
     try:
@@ -181,7 +178,5 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
         # Step 4: Proceed with the request
         response = await call_next(request)
         return response
-
-
 
     return app
