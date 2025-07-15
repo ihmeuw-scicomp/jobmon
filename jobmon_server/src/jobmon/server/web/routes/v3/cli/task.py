@@ -220,7 +220,9 @@ async def get_task_subdag(request: Request) -> Any:
     return resp
 
 
-def parse_request_data(data: Dict) -> tuple[str, bool, Optional[str], Union[List[int], str], str]:
+def parse_request_data(
+    data: Dict,
+) -> tuple[str, bool, Optional[str], Union[List[int], str], str]:
     """Parse and validate request data."""
     try:
         workflow_id = data["workflow_id"]
@@ -237,22 +239,18 @@ def parse_request_data(data: Dict) -> tuple[str, bool, Optional[str], Union[List
 
         return workflow_id, recursive, workflow_status, task_ids, new_status
     except KeyError as e:
-        raise InvalidUsage(
-            f"problem with {str(e)} in request", status_code=400
-        ) from e
+        raise InvalidUsage(f"problem with {str(e)} in request", status_code=400) from e
 
 
 def get_all_task_ids(workflow_id: str, session: Session) -> List[int]:
     """Get all task IDs for a workflow."""
-    task_ids = (
-        session.query(Task.id)
-        .filter(Task.workflow_id == workflow_id)
-        .all()
-    )
+    task_ids = session.query(Task.id).filter(Task.workflow_id == workflow_id).all()
     return [task_id for task_id, in task_ids]
 
 
-async def get_recursive_task_ids(task_ids: List[int], new_status: str, session: Session) -> List[int]:
+async def get_recursive_task_ids(
+    task_ids: List[int], new_status: str, session: Session
+) -> List[int]:
     """Get task IDs including dependencies based on status direction."""
     if new_status == constants.TaskStatus.DONE:
         logger.info("recursive update including upstream tasks")
@@ -271,7 +269,9 @@ async def get_recursive_task_ids(task_ids: List[int], new_status: str, session: 
     return list(task_ids)  # Convert set to list
 
 
-def update_task_statuses_in_db(task_ids: List[int], new_status: str, session: Session) -> None:
+def update_task_statuses_in_db(
+    task_ids: List[int], new_status: str, session: Session
+) -> None:
     """Update task statuses in the database."""
     update_stmt = update(Task).where(
         and_(Task.id.in_(task_ids), Task.status != new_status)
@@ -291,7 +291,9 @@ def get_workflow_run(workflow_id: str, session: Session) -> WorkflowRun:
     )
 
 
-def kill_active_task_instances(task_ids: List[int], workflow_run_id: int, session: Session) -> None:
+def kill_active_task_instances(
+    task_ids: List[int], workflow_run_id: int, session: Session
+) -> None:
     """Kill active task instances for the given tasks."""
     active_statuses = [
         constants.TaskInstanceStatus.SUBMITTED_TO_BATCH_DISTRIBUTOR,
@@ -306,7 +308,7 @@ def kill_active_task_instances(task_ids: List[int], workflow_run_id: int, sessio
     # Process task_ids in batches to reduce lock duration
     batch_size = 100
     for i in range(0, len(task_ids), batch_size):
-        batch_task_ids = task_ids[i: i + batch_size]
+        batch_task_ids = task_ids[i : i + batch_size]
 
         # First, get the IDs of rows that need updating using a subquery
         subquery = (
@@ -329,10 +331,10 @@ def kill_active_task_instances(task_ids: List[int], workflow_run_id: int, sessio
 
 
 def handle_registering_status(
-        workflow_id: str,
-        task_ids: List[int],
-        workflow_status: Optional[str],
-        session: Session
+    workflow_id: str,
+    task_ids: List[int],
+    workflow_status: Optional[str],
+    session: Session,
 ) -> None:
     """Handle special logic for REGISTERING status."""
     wfr = get_workflow_run(workflow_id, session)
@@ -341,17 +343,13 @@ def handle_registering_status(
     # Get workflow status from db if not provided
     if workflow_status is None:
         workflow_status = (
-            session.query(Workflow.status)
-            .filter(Workflow.id == workflow_id)
-            .scalar()
+            session.query(Workflow.status).filter(Workflow.id == workflow_id).scalar()
         )
 
     # If workflow is done, need to set it to an error state before resuming
     if workflow_status == constants.WorkflowStatus.DONE:
         logger.info(f"reset workflow status for workflow_id: {workflow_id}")
-        workflow_update_stmt = update(Workflow).where(
-            Workflow.id == workflow_id
-        )
+        workflow_update_stmt = update(Workflow).where(Workflow.id == workflow_id)
         vals = {"status": constants.WorkflowStatus.FAILED}
         session.execute(workflow_update_stmt.values(**vals))
 
@@ -366,9 +364,7 @@ def handle_done_status(workflow_id: str, new_status: str, session: Session) -> N
 
     if not tasks_done:
         logger.info(f"set workflow status to DONE for workflow_id: {workflow_id}")
-        workflow_update_stmt = update(Workflow).where(
-            Workflow.id == workflow_id
-        )
+        workflow_update_stmt = update(Workflow).where(Workflow.id == workflow_id)
         vals = {"status": constants.WorkflowStatus.DONE}
         session.execute(workflow_update_stmt.values(**vals))
 
@@ -386,6 +382,7 @@ def create_response(new_status: str) -> JSONResponse:
 @api_v3_router.put("/task/update_statuses")
 async def update_task_statuses(request: Request) -> Any:
     """Update the status of the tasks.
+
     Description:
         - When workflow_id='all', it updates all tasks in the workflow with
         recursive=False. This improves performance.
@@ -394,13 +391,16 @@ async def update_task_statuses(request: Request) -> Any:
         - When recursive=False, it updates only the tasks in the task_ids list.
         - When workflow_status is None, it gets the workflow status from the db.
         - After updating the tasks, it checks the workflow status and updates it.
+
     Notes:
         It integrated the logic in update_task_status from status_commands.py.
     """
     data = cast(Dict, await request.json())
 
     # Parse and validate request data
-    workflow_id, recursive, workflow_status, task_ids, new_status = parse_request_data(data)
+    workflow_id, recursive, workflow_status, task_ids, new_status = parse_request_data(
+        data
+    )
 
     with SessionMaker() as session:
         with session.begin():
@@ -417,7 +417,9 @@ async def update_task_statuses(request: Request) -> Any:
 
             # Handle special cases based on status
             if new_status == constants.TaskStatus.REGISTERING:
-                handle_registering_status(workflow_id, task_ids, workflow_status, session)
+                handle_registering_status(
+                    workflow_id, task_ids, workflow_status, session
+                )
             elif new_status == constants.TaskStatus.DONE:
                 handle_done_status(workflow_id, new_status, session)
 
