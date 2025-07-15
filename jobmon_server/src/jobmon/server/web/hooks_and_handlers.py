@@ -6,6 +6,8 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.requests import ClientDisconnect
+from starlette.responses import Response
 from starlette.status import HTTP_404_NOT_FOUND
 
 from jobmon.server.web.db import get_sessionmaker
@@ -116,6 +118,11 @@ def _handle_error(
 
 def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
     """Add logging hooks and exception handlers."""
+
+    @app.exception_handler(ClientDisconnect)
+    async def handle_client_disconnect(request: Request, exc: ClientDisconnect) -> Response:
+        logger.info("Client disconnected during request", route=request.url.path)
+        return Response(status_code=499)
 
     @app.exception_handler(Exception)
     def handle_generic_exception(request: Request, error: Any) -> Any:
