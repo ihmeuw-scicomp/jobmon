@@ -120,7 +120,9 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
     """Add logging hooks and exception handlers."""
 
     @app.exception_handler(ClientDisconnect)
-    async def handle_client_disconnect(request: Request, exc: ClientDisconnect) -> Response:
+    async def handle_client_disconnect(
+        request: Request, exc: ClientDisconnect
+    ) -> Response:
         logger.info("Client disconnected during request", route=request.url.path)
         return Response(status_code=499)
 
