@@ -1,7 +1,10 @@
 """Parse configuration options and set them to be used throughout the Jobmon Architecture."""
 
 import argparse
+import ast
+import json
 import os
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -78,6 +81,52 @@ class JobmonConfig:
         if isinstance(value, str):
             return os.path.expandvars(value)
         return value
+
+    def _coerce_value(self, value: Any) -> Any:
+        """Recursively coerce values to appropriate Python types.
+        
+        • 'true', 'false', etc. → bool
+        • Numeric strings → int/float  
+        • JSON / Python literals → parsed objects
+        • Dict / list containers → recurse element-wise
+        • Anything else → returned unchanged
+        """
+        # Already a non-string, recurse if container
+        if isinstance(value, Mapping):
+            return {k: self._coerce_value(v) for k, v in value.items()}
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            return [self._coerce_value(v) for v in value]
+
+        if not isinstance(value, str):
+            return value
+
+        s_val = value.strip()
+        lower_s_val = s_val.lower()
+
+        # Boolean conversion (consistent with get_boolean)
+        if lower_s_val in ("t", "true", "1", "yes"):
+            return True
+        if lower_s_val in ("f", "false", "0", "no"):
+            return False
+
+        # Try numeric conversion first
+        try:
+            # Try int first, then float
+            if '.' not in s_val:
+                return int(s_val)
+            else:
+                return float(s_val)
+        except ValueError:
+            pass
+
+        # Try JSON, then Python literal, fall back to raw string
+        for parser in (json.loads, ast.literal_eval):
+            try:
+                return parser(s_val)
+            except Exception:  # noqa: BLE001
+                pass
+
+        return s_val
 
     def _get_yaml_variable(self, section: str, key: str) -> Optional[str]:
         return self._config.get(section, {}).get(key)
@@ -166,16 +215,28 @@ class JobmonConfig:
 
         return section_dict
 
+    def get_section_coerced(self, section: str) -> Dict[str, Any]:
+        """Returns a dictionary with all values coerced to appropriate Python types.
+        
+        Same as get_section() but automatically converts:
+        - String booleans to bool
+        - Numeric strings to int/float
+        - JSON/Python literals to their parsed values
+        - Nested structures recursively
+        """
+        section_dict = self.get_section(section)
+        return self._coerce_value(section_dict)
+
     def get_boolean(self, section: str, key: str) -> bool:
         """Get the configuration value for the section and key as bool.
 
         Raise if key not found.
         """
-        val = str(self.get(section, key)).lower().strip()
-        if val in ("t", "true", "1", "yes"):
-            return True
-        elif val in ("f", "false", "0", "no"):
-            return False
+        val = self.get(section, key)
+        coerced_val = self._coerce_value(val)
+        
+        if isinstance(coerced_val, bool):
+            return coerced_val
         else:
             raise ConfigError(
                 f'Failed to convert value to bool. Please check "{key}" key in "{section}" '
@@ -189,26 +250,30 @@ class JobmonConfig:
         Raise if key not found.
         """
         val = self.get(section, key)
-        try:
-            return int(val)
-        except ValueError as exc:
+        coerced_val = self._coerce_value(val)
+        
+        if isinstance(coerced_val, int):
+            return coerced_val
+        else:
             raise ConfigError(
                 f'Failed to convert value to int. Please check "{key}" key in "{section}" '
                 f'section or environment var "{self._get_env_var_name(section, key)}". '
                 f'Current value: "{val}".'
-            ) from exc
+            )
 
     def get_float(self, section: str, key: str) -> float:
         """Get the configuration value for the section/key as float. Raise if key not found."""
         val = self.get(section, key)
-        try:
-            return float(val)
-        except ValueError as exc:
+        coerced_val = self._coerce_value(val)
+        
+        if isinstance(coerced_val, (int, float)):
+            return float(coerced_val)
+        else:
             raise ConfigError(
                 f'Failed to convert value to float. Please check "{key}" key in "{section}" '
                 f'section or environment var "{self._get_env_var_name(section, key)}". '
                 f'Current value: "{val}".'
-            ) from exc
+            )
 
     def set(self, section: str, key: str, val: str) -> None:
         """Set the configuration value for the section/key."""

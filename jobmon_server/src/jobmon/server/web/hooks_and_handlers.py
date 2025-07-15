@@ -1,6 +1,6 @@
 import json
 import traceback
-from typing import Any, AsyncGenerator, Callable, Optional
+from typing import Any, Callable, Optional
 
 import structlog
 from fastapi import FastAPI, Request
@@ -8,19 +8,12 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_404_NOT_FOUND
 
-from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
 
 
-# Dependency for removing session after each request
-async def teardown_session() -> AsyncGenerator:
-    """Remove the session after each request."""
-    try:
-        yield
-    finally:
-        get_sessionmaker().remove()  # type: ignore
+
 
 
 def _record_exception_in_span(error: Exception) -> None:
@@ -189,11 +182,6 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
         response = await call_next(request)
         return response
 
-    # Include the teardown function globally, using FastAPI dependencies (for session cleanup)
-    @app.middleware("http")
-    async def session_middleware(request: Request, call_next: Callable) -> Any:
-        response = await call_next(request)
-        teardown_session()  # Call the session teardown after Request
-        return response
+
 
     return app
