@@ -429,7 +429,9 @@ class DistributorService:
         ERROR state allows for a retry, so that a new task instance can attempt to run.
         """
         task_instance.transition_to_error(
-            "Task instance never reported a heartbeat after scheduling. Will retry",
+            "Task instance never reported a heartbeat after scheduling. Will retry. "
+            "May be caused by distributor heartbeat failure or worker startup issue often due to cluster node problem. "
+            "If retry fails, resume with Slurm logs enabled.",
             TaskInstanceStatus.ERROR,
         )
 
