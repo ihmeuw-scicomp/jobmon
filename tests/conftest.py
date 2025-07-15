@@ -25,21 +25,57 @@ _api_prefix = "/api/v2"
 
 
 def pytest_sessionstart(session):
+    """Set up test environment - override any external config with test settings."""
     # Create a unique SQLite file in a temporary directory
     tmp_dir = tempfile.mkdtemp()
-    # Resolve the path to be absolute *before* creating the URI
     sqlite_file = pathlib.Path(tmp_dir, "tests.sqlite").resolve()
 
-    # Print information for debugging purposes
     print("Running code before test file import")
     print(f"SQLite file created at: {sqlite_file}")
 
-    # Use four slashes for an absolute path SQLite URI
-    os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{sqlite_file}"
-    os.environ["JOBMON__OTLP__WEB_ENABLED"] = "false"
-    os.environ["JOBMON__OTLP__SPAN_EXPORTER"] = ""
-    os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
-    os.environ["JOBMON__SESSION__SECRET_KEY"] = "test"
+    # Override all configuration via environment variables to bypass external config files
+    # This prevents interference from installer plugins or external configurations
+    test_env_vars = {
+        # Core test configuration
+        "JOBMON__CONFIG_FILE": "",  # Force use of env vars only
+        "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{sqlite_file}",
+        "JOBMON__SESSION__SECRET_KEY": "test",
+        
+        # HTTP configuration (matching defaults but optimized for tests)
+        "JOBMON__HTTP__REQUEST_TIMEOUT": "20",
+        "JOBMON__HTTP__RETRIES_ATTEMPTS": "10", 
+        "JOBMON__HTTP__RETRIES_TIMEOUT": "0",  # Fast failures in tests
+        "JOBMON__HTTP__ROUTE_PREFIX": _api_prefix,
+        "JOBMON__HTTP__SERVICE_URL": "",  # Set dynamically by client_env fixture
+        "JOBMON__HTTP__STOP_AFTER_DELAY": "0",  # No delays in tests
+        
+        # Distributor configuration (faster polling for tests)
+        "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
+        
+        # Heartbeat configuration (faster intervals for tests)
+        "JOBMON__HEARTBEAT__REPORT_BY_BUFFER": "3.1",
+        "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1", 
+        "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
+        
+        # OIDC configuration
+        "JOBMON__OIDC__NAME": "OIDC",
+        
+        # OTLP configuration (disabled for tests)
+        "JOBMON__OTLP__HTTP_ENABLED": "false",
+        "JOBMON__OTLP__WEB_ENABLED": "false",
+        "JOBMON__OTLP__DEPLOYMENT_ENVIRONMENT": "test",
+        "JOBMON__OTLP__SPAN_EXPORTER": "",
+        "JOBMON__OTLP__LOG_EXPORTER": "",
+        
+        # Reaper configuration
+        "JOBMON__REAPER__POLL_INTERVAL_MINUTES": "5",
+        
+        # Worker node configuration
+        "JOBMON__WORKER_NODE__COMMAND_INTERRUPT_TIMEOUT": "10",
+    }
+    
+    # Apply all test environment variables
+    os.environ.update(test_env_vars)
 
 
 @pytest.fixture(scope="session")
@@ -178,19 +214,12 @@ def web_server_process(db_engine):
 
 @pytest.fixture(scope="function")
 def client_env(web_server_process, monkeypatch):
-    monkeypatch.setenv(
-        "JOBMON__HTTP__SERVICE_URL",
-        f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}',
-    )
-    monkeypatch.setenv("JOBMON__HTTP__ROUTE_PREFIX", _api_prefix)
-    monkeypatch.setenv("JOBMON__HTTP__STOP_AFTER_DELAY", "0")
-    monkeypatch.setenv("JOBMON__HTTP__RETRIES_TIMEOUT", "0")
-    monkeypatch.setenv("JOBMON__DISTRIBUTOR__POLL_INTERVAL", "1")
-    monkeypatch.setenv("JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL", "1")
-    monkeypatch.setenv("JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL", "1")
-
-    # This instance is thrown away, hence monkey-patching the defaults via the
-    # environment variables
+    """Configure client to connect to the local test server."""
+    # Set the dynamic service URL to point to the local test server
+    service_url = f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}'
+    monkeypatch.setenv("JOBMON__HTTP__SERVICE_URL", service_url)
+    
+    # Create requester instance that will use the test configuration
     requester = Requester.from_defaults()
     yield requester.url
 
