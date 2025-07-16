@@ -18,6 +18,109 @@ def web_server_in_memory(db_engine):
     yield client, db_engine
 
 
+@pytest.fixture(scope="function")
+def json_log_file(tmp_path):
+    """Fixture that sets up JSON logging to a temporary file.
+
+    This fixture provides a flexible way to configure structured logging for tests
+    that need to capture and verify log output from specific loggers.
+
+    Args:
+        loggers: Dict of logger names to log levels (e.g., {"jobmon.server.web": "INFO"})
+        filename_suffix: String to use as part of the log filename (default: "test")
+
+    Returns:
+        A function that, when called, returns a Path object to the log file
+
+    Usage Examples:
+        # Basic usage - logs jobmon.server.web at INFO level
+        def test_basic_logging(json_log_file):
+            log_file_path = json_log_file()
+            # ... run code that logs ...
+
+        # Custom logger and level
+        def test_dns_logging(json_log_file):
+            log_file_path = json_log_file(
+                loggers={"jobmon.server.web.db.dns": "DEBUG"}
+            )
+
+        # Multiple loggers with different levels
+        def test_multiple_loggers(json_log_file):
+            log_file_path = json_log_file(
+                loggers={
+                    "jobmon.server.web": "INFO",
+                    "jobmon.server.web.db": "DEBUG",
+                    "sqlalchemy": "WARNING"
+                },
+                filename_suffix="multi_logger"
+            )
+
+        # Reading the log file
+        def test_log_content(json_log_file):
+            log_file_path = json_log_file(loggers={"my.logger": "INFO"})
+            # ... trigger logging ...
+
+            import json
+            with open(log_file_path, "r") as f:
+                for line in f:
+                    if line.strip():
+                        log_entry = json.loads(line.strip())
+                        assert "expected_message" in log_entry.get("event", "")
+    """
+    from jobmon.server.web import log_config
+
+    def _setup_logging(loggers=None, filename_suffix="test"):
+        if loggers is None:
+            loggers = {"jobmon.server.web": "INFO"}
+
+        log_file_path = tmp_path / f"{filename_suffix}.log"
+
+        # Build handlers dict
+        handlers = {
+            "test_file_handler": {
+                "class": "logging.FileHandler",
+                "formatter": "json",
+                "filename": str(log_file_path),
+                "level": "INFO",
+            }
+        }
+
+        # Build loggers dict with proper structure
+        logger_configs = {}
+        for logger_name, level in loggers.items():
+            logger_configs[logger_name] = {
+                "handlers": ["test_file_handler"],
+                "level": level,
+                "propagate": False,
+            }
+
+        dict_config = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": log_config.default_formatters.copy(),
+            "handlers": handlers,
+            "loggers": logger_configs,
+        }
+
+        # Apply the test logging configuration
+        original_config = log_config.configure_logging(dict_config=dict_config)
+        return log_file_path, original_config
+
+    setups = []
+
+    def setup_logging_wrapper(**kwargs):
+        log_file_path, original_config = _setup_logging(**kwargs)
+        setups.append((log_file_path, original_config))
+        return log_file_path
+
+    yield setup_logging_wrapper
+
+    # Cleanup: restore original logging configuration
+    from jobmon.server.web import log_config
+
+    log_config.configure_logging()
+
+
 def get_test_content(response):
     """The function called by the no_request_jsm_jqs to query the fake
     test_client for a response

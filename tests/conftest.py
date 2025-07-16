@@ -2,6 +2,7 @@ import logging
 import multiprocessing as mp
 import os
 import pathlib
+import platform
 import signal
 import sys
 import tempfile
@@ -113,46 +114,48 @@ class WebServerProcess:
         self.web_port = str(10_000 + os.getpid() % 30_000)
         self.api_prefix = _api_prefix
 
+    def _run_server_with_handler(self) -> None:
+        """Run the server with signal handlers - separate method for pickle compatibility."""
+
+        def sigterm_handler(_signo: int, _stack_frame: Any) -> None:
+            # catch SIGTERM and shut down with 0 so pycov finalizers are run
+            # Raises SystemExit(0):
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, sigterm_handler)
+
+        from jobmon.server.web import log_config
+        from jobmon.server.web.api import get_app
+
+        dict_config = {
+            "version": 1,
+            "disable_existing_loggers": True,
+            "formatters": log_config.default_formatters.copy(),
+            "handlers": log_config.default_handlers.copy(),
+            "loggers": {
+                "jobmon.server.web": {
+                    "handlers": ["console_text"],
+                    "level": "INFO",
+                },
+                # enable SQL debug
+                "sqlalchemy": {
+                    "handlers": ["console_text"],
+                    "level": "WARNING",
+                },
+            },
+        }
+        log_config.configure_logging(dict_config=dict_config)
+
+        app = get_app(versions=["v2"])
+        uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
+
     def __enter__(self) -> Any:
         """Starts the web service process."""
-        # jobmon_cli string
-
-        def run_server_with_handler() -> None:
-            def sigterm_handler(_signo: int, _stack_frame: Any) -> None:
-                # catch SIGTERM and shut down with 0 so pycov finalizers are run
-                # Raises SystemExit(0):
-                sys.exit(0)
-
-            signal.signal(signal.SIGTERM, sigterm_handler)
-
-            from jobmon.server.web import log_config
-            from jobmon.server.web.api import get_app
-
-            dict_config = {
-                "version": 1,
-                "disable_existing_loggers": True,
-                "formatters": log_config.default_formatters.copy(),
-                "handlers": log_config.default_handlers.copy(),
-                "loggers": {
-                    "jobmon.server.web": {
-                        "handlers": ["console_text"],
-                        "level": "INFO",
-                    },
-                    # enable SQL debug
-                    "sqlalchemy": {
-                        "handlers": ["console_text"],
-                        "level": "WARNING",
-                    },
-                },
-            }
-            log_config.configure_logging(dict_config=dict_config)
-
-            app = get_app(versions=["v2"])
-            uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
-
         # start server
-        ctx = mp.get_context("fork")
-        self.p1 = ctx.Process(target=run_server_with_handler)
+        # Use spawn on macOS to avoid fork warnings in multi-threaded environment
+        mp_method = "spawn" if platform.system() == "Darwin" else "fork"
+        ctx = mp.get_context(mp_method)
+        self.p1 = ctx.Process(target=self._run_server_with_handler)
         self.p1.start()
 
         # Wait for it to be up

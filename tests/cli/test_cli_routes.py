@@ -1,6 +1,7 @@
 import getpass
 import random
 import string
+from io import StringIO
 
 import pandas as pd
 import pytest
@@ -350,7 +351,7 @@ def test_get_workflow_tasks(db_engine, tool):
         request_type="get",
     )
     assert return_code == 200
-    result = pd.read_json(msg["workflow_tasks"])
+    result = pd.read_json(StringIO(msg["workflow_tasks"]))
     assert len(result) == 2
 
     app_route = f"/workflow/{wf.workflow_id}/workflow_tasks"
@@ -360,7 +361,7 @@ def test_get_workflow_tasks(db_engine, tool):
         request_type="get",
     )
     assert return_code == 200
-    result = pd.read_json(msg["workflow_tasks"])
+    result = pd.read_json(StringIO(msg["workflow_tasks"]))
     assert len(result) == 1
 
 
@@ -547,7 +548,7 @@ def test_get_workflow_status(db_engine, tool):
         request_type="get",
     )
     assert return_code == 200
-    result = pd.read_json(msg["workflows"])
+    result = pd.read_json(StringIO(msg["workflows"]))
     assert len(result) == 1
 
     # Create a second workflow, check that ordering returns second one correctly
@@ -563,7 +564,7 @@ def test_get_workflow_status(db_engine, tool):
         message={"user": getpass.getuser(), "limit": 1},
         request_type="get",
     )
-    result2 = pd.read_json(msg2["workflows"])
+    result2 = pd.read_json(StringIO(msg2["workflows"]))
     assert len(result2) == 1
     assert result2.WF_ID[0] == wf2.workflow_id
 
@@ -594,7 +595,7 @@ def test_get_task_status(db_engine, tool):
         request_type="get",
     )
     assert return_code == 200
-    result = pd.read_json(msg["task_instance_status"])
+    result = pd.read_json(StringIO(msg["task_instance_status"]))
     assert len(result) == 2
     assert result["task_status"][0] == result["task_status"][1] == "D"
     assert result["STATUS"][0] == result["STATUS"][1] == "DONE"
