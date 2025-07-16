@@ -11,9 +11,10 @@ version = "0.1.0"
 readme = "README.md"
 requires-python = ">=3.8"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest",
+    "pytest-asyncio>=1.0.0",
     "jobmon_client",
     "jobmon_core[otlp]",
     "jobmon_server[otlp]",
