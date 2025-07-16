@@ -13,7 +13,7 @@ def web_server_in_memory(db_engine):
 
     from jobmon.server.web.api import get_app
 
-    app = get_app(versions=["v2"])
+    app = get_app(versions=["v3"])
     client = TestClient(app)
     yield client, db_engine
 

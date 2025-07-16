@@ -21,10 +21,11 @@ from jobmon.core.requester import Requester
 
 logger = logging.getLogger(__name__)
 
-_api_prefix = "/api/v2"
+_api_prefix = "/api/v3"
 
 
 def pytest_sessionstart(session):
+    
     # Create a unique SQLite file in a temporary directory
     tmp_dir = tempfile.mkdtemp()
     # Resolve the path to be absolute *before* creating the URI
@@ -120,7 +121,7 @@ class WebServerProcess:
             }
             log_config.configure_logging(dict_config=dict_config)
 
-            app = get_app(versions=["v2"])
+            app = get_app(versions=["v3"])
             uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
 
         # start server
@@ -188,6 +189,7 @@ def client_env(web_server_process, monkeypatch):
     monkeypatch.setenv("JOBMON__DISTRIBUTOR__POLL_INTERVAL", "1")
     monkeypatch.setenv("JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL", "1")
     monkeypatch.setenv("JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL", "1")
+    monkeypatch.setenv("JOBMON__AUTH__ENABLED", "false")
 
     # This instance is thrown away, hence monkey-patching the defaults via the
     # environment variables

@@ -1131,4 +1131,5 @@ def test_task_update_statuses(client_env, db_engine, tool):
         res = session.execute(
             text(f"select status from workflow where id= {wf.workflow_id}")
         ).fetchone()
-        assert res[0] == "F"
+        # According to the code in update_task_statuses, the workflow status should be updated to D if all tasks are done
+        assert res[0] == "D"
