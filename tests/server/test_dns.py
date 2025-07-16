@@ -177,6 +177,11 @@ def test_grace_period_logging(monkeypatch, caplog):
     """Test that fallback logging works correctly"""
     import logging
 
+    # The DNS logger may have been disabled by configure_logging() calls from other modules
+    # (e.g., when server conftest.py imports get_app). Re-enable it for this test.
+    dns_logger = logging.getLogger("jobmon.server.web.db.dns")
+    dns_logger.disabled = False
+
     # Set log level for the specific DNS module logger
     caplog.set_level(logging.INFO, logger="jobmon.server.web.db.dns")
 
