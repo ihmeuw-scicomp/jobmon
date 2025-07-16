@@ -174,7 +174,8 @@ def test_cached_ip_variable_scope_bug_regression(monkeypatch):
 def test_grace_period_logging(monkeypatch, caplog):
     """Test that fallback logging works correctly"""
     import logging
-    caplog.set_level(logging.INFO)
+    # Set log level for the specific DNS module logger
+    caplog.set_level(logging.INFO, logger="jobmon.server.web.db.dns")
     
     host = "log-test.example.local"
     
