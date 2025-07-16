@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Set, Union, cast
 import pandas as pd
 import structlog
 from fastapi import Query, Request
-from sqlalchemy import and_, select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
@@ -28,7 +28,6 @@ from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow import Workflow
-from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.repositories.task_repository import TaskRepository
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
@@ -404,9 +403,6 @@ def get_task_resource_usage(task_id: int) -> Any:
             status_code=StatusCodes.OK,
         )
     return resp
-
-
-
 
 
 def _get_dag_and_wf_id(task_id: int, session: Session) -> tuple:

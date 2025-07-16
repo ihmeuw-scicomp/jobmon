@@ -1,7 +1,7 @@
 """Repository for Task operations."""
 
 import json
-from typing import Dict, List, Optional, Set, Union
+from typing import List, Optional, Set, Union
 
 import structlog
 from sqlalchemy import and_, select, update
@@ -47,6 +47,9 @@ class TaskRepository:
         if task_ids == "all":
             task_ids = self._get_all_task_ids(workflow_id)
 
+        if isinstance(task_ids, str):
+            raise InvalidUsage(f"Invalid task_ids value: {task_ids}")
+
         task_ids = list(task_ids)
 
         # Get recursive task IDs if needed
@@ -64,10 +67,14 @@ class TaskRepository:
 
     def _get_all_task_ids(self, workflow_id: str) -> List[int]:
         """Get all task IDs for a workflow."""
-        task_ids = self.session.query(Task.id).filter(Task.workflow_id == workflow_id).all()
+        task_ids = (
+            self.session.query(Task.id).filter(Task.workflow_id == workflow_id).all()
+        )
         return [task_id for task_id, in task_ids]
 
-    def _get_recursive_task_ids(self, task_ids: List[int], new_status: str) -> List[int]:
+    def _get_recursive_task_ids(
+        self, task_ids: List[int], new_status: str
+    ) -> List[int]:
         """Get task IDs including dependencies based on status direction."""
         if new_status == constants.TaskStatus.DONE:
             logger.info("recursive update including upstream tasks")
@@ -244,14 +251,20 @@ class TaskRepository:
             node_deps = self._get_node_dependencies(
                 {current_node},
                 dag_id,
-                Direction.DOWN if direction == constants.Direction.DOWN else Direction.UP,
+                (
+                    Direction.DOWN
+                    if direction == constants.Direction.DOWN
+                    else Direction.UP
+                ),
             )
             if node_deps:
                 # Add the node dependencies to the stack for further processing.
                 stack.extend(list(node_deps))
 
         # get task_ids from node_ids
-        tasks_recursive = self._get_tasks_from_nodes(workflow_id, list(nodes_recursive), [])
+        tasks_recursive = self._get_tasks_from_nodes(
+            workflow_id, list(nodes_recursive), []
+        )
         return set(tasks_recursive.keys())
 
     def _get_node_dependencies(
@@ -287,7 +300,9 @@ class TaskRepository:
                 if downstreams:
                     node_ids.update(downstreams)
             else:
-                raise ValueError(f"Invalid direction type. Expected one of: {Direction}")
+                raise ValueError(
+                    f"Invalid direction type. Expected one of: {Direction}"
+                )
         return node_ids
 
     def _get_tasks_from_nodes(
@@ -316,4 +331,4 @@ class TaskRepository:
             else:
                 if r[1] in task_status:
                     task_dict[r[0]] = [r[1], r[2]]
-        return task_dict 
+        return task_dict
