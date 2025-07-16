@@ -47,3 +47,12 @@ docsource/api
 # ignore .env
 .env
 node_modules/*
+
+# Ignore design documents and temporary files in root
+/PRD_*.md
+/TASK_*.md
+/RELEASE_*.md
+/*_design.md
+/bad_query.*
+/rebuild-*.sh
+/*.text
