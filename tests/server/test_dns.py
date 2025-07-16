@@ -104,18 +104,20 @@ def test_dns_failure_uses_fallback_and_short_ttl(monkeypatch):
 def test_dns_failure_without_cached_ip_raises_exception(monkeypatch):
     """Test that DNS failure without a cached IP raises the original exception"""
     host = "new.example.local"
-    
+
     # No pre-seeded cache - fresh lookup should fail
     t0 = 1_000_000.0
     monkeypatch.setattr(db.time, "time", lambda: t0)
-    
+
     # make resolver.resolve always blow up
     monkeypatch.setattr(
         db.resolver,
         "resolve",
-        lambda hostname, qtype, lifetime: (_ for _ in ()).throw(Exception("DNS totally broken")),
+        lambda hostname, qtype, lifetime: (_ for _ in ()).throw(
+            Exception("DNS totally broken")
+        ),
     )
-    
+
     # Should raise the original exception since there's no cached IP to fall back to
     with pytest.raises(Exception, match="DNS totally broken"):
         db.get_ip_with_ttl(host)
@@ -124,20 +126,20 @@ def test_dns_failure_without_cached_ip_raises_exception(monkeypatch):
 def test_dns_failure_with_nxdomain_fallback(monkeypatch):
     """Test specific NXDOMAIN handling that was causing production issues"""
     from dns.resolver import NXDOMAIN
-    
+
     host = "mock-azure-mysql.mysql.database.azure.com"
-    
+
     # pre-seed cache with valid IP (simulating previous successful resolution)
     t0 = 1_000_000.0
     monkeypatch.setattr(db.time, "time", lambda: t0)
     db._DNS_CACHE[host] = ("10.4.34.197", t0 - 5)  # expired 5 seconds ago
-    
+
     # simulate NXDOMAIN error (the specific error from production)
     def nxdomain_error(hostname, qtype, lifetime):
         raise NXDOMAIN(qnames=[hostname], responses={})
-    
+
     monkeypatch.setattr(db.resolver, "resolve", nxdomain_error)
-    
+
     # Should use cached IP with grace period, not crash
     ip, ttl = db.get_ip_with_ttl(host)
     assert ip == "10.4.34.197"
@@ -147,53 +149,59 @@ def test_dns_failure_with_nxdomain_fallback(monkeypatch):
 def test_cached_ip_variable_scope_bug_regression(monkeypatch):
     """Regression test for the variable scope bug where 'ip' vs 'cached_ip' was confused"""
     host = "scope-bug.example.local"
-    
+
     # Set up initial cache entry
     t0 = 1_000_000.0
     monkeypatch.setattr(db.time, "time", lambda: t0)
     db._DNS_CACHE[host] = ("192.168.1.100", t0 - 1)  # expired
-    
+
     # Track what variables are defined when exception handler runs
     scope_check = {}
-    
+
     def failing_resolve(hostname, qtype, lifetime):
         # This simulates the original bug where 'ip' would be undefined
         # when the exception is raised, but 'cached_ip' should still be available
-        scope_check['before_exception'] = True
+        scope_check["before_exception"] = True
         raise Exception("DNS failed")
-    
+
     monkeypatch.setattr(db.resolver, "resolve", failing_resolve)
-    
+
     # Should successfully use cached IP despite DNS failure
     ip, ttl = db.get_ip_with_ttl(host)
     assert ip == "192.168.1.100"
     assert ttl == 30
-    assert scope_check['before_exception']  # Verify the exception path was taken
+    assert scope_check["before_exception"]  # Verify the exception path was taken
 
 
 def test_grace_period_logging(monkeypatch, caplog):
     """Test that fallback logging works correctly"""
     import logging
+
     # Set log level for the specific DNS module logger
     caplog.set_level(logging.INFO, logger="jobmon.server.web.db.dns")
-    
+
     host = "log-test.example.local"
-    
+
     # pre-seed cache with expired IP
     t0 = 1_000_000.0
     monkeypatch.setattr(db.time, "time", lambda: t0)
     db._DNS_CACHE[host] = ("1.1.1.1", t0 - 10)  # expired
-    
+
     # make DNS fail
     monkeypatch.setattr(
         db.resolver,
         "resolve",
-        lambda hostname, qtype, lifetime: (_ for _ in ()).throw(Exception("Network error")),
+        lambda hostname, qtype, lifetime: (_ for _ in ()).throw(
+            Exception("Network error")
+        ),
     )
-    
+
     ip, ttl = db.get_ip_with_ttl(host)
     assert ip == "1.1.1.1"
     assert ttl == 30
-    
+
     # Check that informative log message was generated
-    assert "Using cached IP 1.1.1.1 for log-test.example.local with 30s grace period" in caplog.text
+    assert (
+        "Using cached IP 1.1.1.1 for log-test.example.local with 30s grace period"
+        in caplog.text
+    )

@@ -3,7 +3,6 @@ import multiprocessing as mp
 import os
 import pathlib
 import signal
-import socket
 import sys
 import tempfile
 from time import sleep
@@ -40,40 +39,33 @@ def pytest_sessionstart(session):
         "JOBMON__CONFIG_FILE": "",  # Force use of env vars only
         "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{sqlite_file}",
         "JOBMON__SESSION__SECRET_KEY": "test",
-        
         # HTTP configuration (matching defaults but optimized for tests)
         "JOBMON__HTTP__REQUEST_TIMEOUT": "20",
-        "JOBMON__HTTP__RETRIES_ATTEMPTS": "10", 
+        "JOBMON__HTTP__RETRIES_ATTEMPTS": "10",
         "JOBMON__HTTP__RETRIES_TIMEOUT": "0",  # Fast failures in tests
         "JOBMON__HTTP__ROUTE_PREFIX": _api_prefix,
         "JOBMON__HTTP__SERVICE_URL": "",  # Set dynamically by client_env fixture
         "JOBMON__HTTP__STOP_AFTER_DELAY": "0",  # No delays in tests
-        
         # Distributor configuration (faster polling for tests)
         "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
-        
         # Heartbeat configuration (faster intervals for tests)
         "JOBMON__HEARTBEAT__REPORT_BY_BUFFER": "3.1",
-        "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1", 
+        "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
         "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
-        
         # OIDC configuration
         "JOBMON__OIDC__NAME": "OIDC",
-        
         # OTLP configuration (disabled for tests)
         "JOBMON__OTLP__HTTP_ENABLED": "false",
         "JOBMON__OTLP__WEB_ENABLED": "false",
         "JOBMON__OTLP__DEPLOYMENT_ENVIRONMENT": "test",
         "JOBMON__OTLP__SPAN_EXPORTER": "",
         "JOBMON__OTLP__LOG_EXPORTER": "",
-        
         # Reaper configuration
         "JOBMON__REAPER__POLL_INTERVAL_MINUTES": "5",
-        
         # Worker node configuration
         "JOBMON__WORKER_NODE__COMMAND_INTERRUPT_TIMEOUT": "10",
     }
-    
+
     # Apply all test environment variables
     os.environ.update(test_env_vars)
 
@@ -217,7 +209,7 @@ def client_env(web_server_process, monkeypatch):
     # Set the dynamic service URL to point to the local test server
     service_url = f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}'
     monkeypatch.setenv("JOBMON__HTTP__SERVICE_URL", service_url)
-    
+
     # Create requester instance that will use the test configuration
     requester = Requester.from_defaults()
     yield requester.url
