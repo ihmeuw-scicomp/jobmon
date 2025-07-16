@@ -1,28 +1,29 @@
-import React, { useState } from 'react';
-import { HiInformationCircle } from 'react-icons/hi';
-import { formatBytes } from '@jobmon_gui/utils/formatters';
+import React, {useState} from 'react';
+import {HiInformationCircle} from 'react-icons/hi';
+import {formatBytes} from '@jobmon_gui/utils/formatters';
 import humanizeDuration from 'humanize-duration';
 import {
     MaterialReactTable,
     useMaterialReactTable,
 } from 'material-react-table';
-import { Box, Grid } from '@mui/material';
-import { useTaskInstanceTableStore } from '@jobmon_gui/stores/TaskInstanceTable.ts';
-import { useQuery } from '@tanstack/react-query';
+import {Box, Grid} from '@mui/material';
+import {useTaskInstanceTableStore} from '@jobmon_gui/stores/TaskInstanceTable.ts';
+import {useQuery} from '@tanstack/react-query';
 import Typography from '@mui/material/Typography';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import { JobmonModal } from '@jobmon_gui/components/JobmonModal.tsx';
-import { ScrollableCodeBlock } from '@jobmon_gui/components/ScrollableTextArea.tsx';
-import { getTaskInstanceDetailsQueryFn } from '@jobmon_gui/queries/GetTaskInstanceDetails.ts';
-import { TaskInstance } from '@jobmon_gui/types/TaskInstance.ts';
+import {JobmonModal} from '@jobmon_gui/components/JobmonModal.tsx';
+import {ScrollableCodeBlock} from '@jobmon_gui/components/ScrollableTextArea.tsx';
+import {getTaskInstanceDetailsQueryFn} from '@jobmon_gui/queries/GetTaskInstanceDetails.ts';
+import {TaskInstance} from '@jobmon_gui/types/TaskInstance.ts';
+import {formatJobmonDate,} from '@jobmon_gui/utils/DayTime.ts';
 
 type TaskInstanceTableProps = {
     taskId: number | string;
 };
-import { HtmlTooltip } from '@jobmon_gui/components/HtmlToolTip';
+import {HtmlTooltip} from '@jobmon_gui/components/HtmlToolTip';
 import IconButton from '@mui/material/IconButton';
 
-export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
+export default function TaskInstanceTable({taskId}: TaskInstanceTableProps) {
     const [modalVisibility, setModalVisibility] = useState({
         stdout: false,
         stderr: false,
@@ -37,9 +38,9 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
     });
 
     const showModal = modalName =>
-        setModalVisibility({ ...modalVisibility, [modalName]: true });
+        setModalVisibility({...modalVisibility, [modalName]: true});
     const hideModal = modalName =>
-        setModalVisibility({ ...modalVisibility, [modalName]: false });
+        setModalVisibility({...modalVisibility, [modalName]: false});
 
     // ti_stderr_log is pulled from task_instance.stderr_log, ti_error_log_description is pulled from task_instance_error_log.description
     const [rowDetail, setRowDetail] = useState<TaskInstance>({
@@ -55,6 +56,9 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
         ti_wallclock: 0,
         ti_maxrss: '',
         ti_resources: '',
+        ti_submit_date: '',
+        ti_status_date: '',
+        ti_queue_name: '',
     });
 
     const handleCellClick = (rowIndex, modalName) => {
@@ -74,30 +78,30 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
         {
             accessorKey: 'ti_stderr',
             header: 'Standard Error',
-            Cell: ({ cell, row }) => (
+            Cell: ({cell, row}) => (
                 <Box
                     onClick={() => handleCellClick(row.index, 'stderr')}
-                    sx={{ cursor: 'pointer' }}
+                    sx={{cursor: 'pointer'}}
                 >
                     {cell.getValue()?.length > 30
                         ? '...' + cell.getValue().trim().slice(-30)
                         : cell.getValue()}
-                    <OpenInNewIcon />
+                    <OpenInNewIcon/>
                 </Box>
             ),
         },
         {
             accessorKey: 'ti_stdout',
             header: 'Standard Out',
-            Cell: ({ cell, row }) => (
+            Cell: ({cell, row}) => (
                 <Box
                     onClick={() => handleCellClick(row.index, 'stdout')}
-                    sx={{ cursor: 'pointer' }}
+                    sx={{cursor: 'pointer'}}
                 >
                     {cell.getValue()?.length > 30
                         ? '...' + cell.getValue().trim().slice(-30)
                         : cell.getValue()}
-                    <OpenInNewIcon />
+                    <OpenInNewIcon/>
                 </Box>
             ),
         },
@@ -112,15 +116,29 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
         {
             accessorKey: 'ti_resources',
             header: 'Resources',
-            Cell: ({ cell, row }) => (
+            Cell: ({cell, row}) => (
                 <Box
                     onClick={() => handleCellClick(row.index, 'resources')}
-                    sx={{ cursor: 'pointer' }}
+                    sx={{cursor: 'pointer'}}
                 >
-                    {cell.getValue()} <OpenInNewIcon />
+                    {cell.getValue()} <OpenInNewIcon/>
                 </Box>
             ),
         },
+        {
+            accessorKey: 'ti_submit_date',
+            header: 'Submit Date',
+            Cell: ({cell}) => (
+                formatJobmonDate(cell.getValue())
+            ),
+        },
+        {
+            accessorKey: 'ti_status_date',
+            header: 'Status Date',
+            Cell: ({cell}) => (
+                formatJobmonDate(cell.getValue())
+            ),
+        }
     ];
 
     const table = useMaterialReactTable({
@@ -172,7 +190,7 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
 
     return (
         <div>
-            <div style={{ display: 'flex' }}>
+            <div style={{display: 'flex'}}>
                 <header className="header-1">
                     <p className="color-dark">
                         Task Instances&nbsp;
@@ -190,7 +208,7 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
                                     }}
                                 >
                                     <HiInformationCircle
-                                        style={{ cursor: 'pointer' }}
+                                        style={{cursor: 'pointer'}}
                                         onClick={() => showModal('status')}
                                     />
                                 </IconButton>
@@ -201,7 +219,7 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
             </div>
 
             <Box p={2} display="flex" justifyContent="center" width="100%">
-                <MaterialReactTable table={table} />
+                <MaterialReactTable table={table}/>
             </Box>
 
             <JobmonModal
@@ -226,7 +244,9 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
                         </Grid>
                         <Grid item xs={12}>
                             <ScrollableCodeBlock>
-                                {rowDetail.ti_stdout_log}
+                                <pre>
+                                    {rowDetail.ti_stdout_log}
+                                </pre>
                             </ScrollableCodeBlock>
                         </Grid>
                     </Grid>
@@ -257,7 +277,9 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
                         </Grid>
                         <Grid item xs={12}>
                             <ScrollableCodeBlock>
-                                {rowDetail.ti_stderr_log}
+                                <pre>
+                                    {rowDetail.ti_stderr_log}
+                                </pre>
                             </ScrollableCodeBlock>
                         </Grid>
                         <Grid item xs={12}>
@@ -280,6 +302,9 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
                 title={'Resources'}
                 children={
                     <p>
+                        <b>Queue:</b> <br></br>
+                        {rowDetail.ti_queue_name || 'N/A'}
+                        <br></br><br></br>
                         <b>Requested Resources:</b> <br></br>
                         {rowDetail.ti_resources && (
                             <>
@@ -310,18 +335,17 @@ export default function TaskInstanceTable({ taskId }: TaskInstanceTableProps) {
                                         );
                                     })}
                                 </ul>
-                                <br />
+                                <br/>
                             </>
                         )}
-                        <br></br>
-                        <b>Utilized Resources:</b> <br></br>
+                        <b>Utilized Resources:</b> <br/>
                         <i>memory</i>: {formatBytes(rowDetail.ti_maxrss)}
                         <br></br>
                         <i>runtime</i>:{' '}
                         {rowDetail.ti_wallclock
                             ? humanizeDuration(
                                 parseInt(rowDetail.ti_wallclock.toString()) *
-                                      1000
+                                1000
                             )
                             : ''}
                     </p>

@@ -211,44 +211,49 @@ async def log_error_worker_node(task_instance_id: int, request: Request) -> Any:
     logger.info(f"Log ERROR for TI:{task_instance_id}.")
 
     with SessionMaker() as session:
-        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
-        task_instance = session.execute(select_stmt).scalars().one()
-
-        optional_vals = [
-            "distributor_id",
-            "stdout_log",
-            "stderr_log",
-            "nodename",
-            "stdout",
-            "stderr",
-        ]
-        for optional_val in optional_vals:
-            val = data.get(optional_val, None)
-            if data is not None:
-                setattr(task_instance, optional_val, val)
-        session.commit()
-
-        # add error log
-        error_state = data["error_state"]
-        error_description = data["error_description"]
-        try:
-            session.execute(
-                select(Task).where(Task.id == task_instance.task_id).with_for_update()
-            ).scalar_one()
-            task_instance.transition(error_state)
-            session.commit()
-        except InvalidStateTransition as e:
-            if task_instance.status == error_state:
-                logger.warning(e)
-            else:
-                # Tried to move to an illegal state
-                logger.error(e)
-        else:
-            error = TaskInstanceErrorLog(
-                task_instance_id=task_instance.id, description=error_description
+        with session.begin():
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
             )
-            session.add(error)
-            session.commit()
+            task_instance = session.execute(select_stmt).scalars().one()
+
+            optional_vals = [
+                "distributor_id",
+                "stdout_log",
+                "stderr_log",
+                "nodename",
+                "stdout",
+                "stderr",
+            ]
+            for optional_val in optional_vals:
+                val = data.get(optional_val, None)
+                if data is not None:
+                    setattr(task_instance, optional_val, val)
+
+            # add error log
+            error_state = data["error_state"]
+            error_description = data["error_description"]
+            try:
+                session.execute(
+                    select(Task)
+                    .where(Task.id == task_instance.task_id)
+                    .with_for_update()
+                ).scalar_one()
+                task_instance.transition(error_state)
+
+                # Add error log only if transition was successful
+                error = TaskInstanceErrorLog(
+                    task_instance_id=task_instance.id, description=error_description
+                )
+                session.add(error)
+
+            except InvalidStateTransition as e:
+                if task_instance.status == error_state:
+                    logger.warning(e)
+                else:
+                    # Tried to move to an illegal state
+                    logger.error(e)
+                # Note: Transaction will rollback automatically on exception
 
         resp = JSONResponse(
             content={"status": task_instance.status}, status_code=StatusCodes.OK

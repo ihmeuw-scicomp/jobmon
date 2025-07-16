@@ -2,6 +2,7 @@
 
 import getpass
 import logging
+from io import StringIO
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
@@ -67,7 +68,7 @@ def workflow_status(
     if json:
         return res["workflows"]
     else:
-        df = pd.read_json(res["workflows"])
+        df = pd.read_json(StringIO(res["workflows"]))
         # Cast CREATED_DATE back to a date-like object, serialized as an int
         df["CREATED_DATE"] = pd.to_datetime(df["CREATED_DATE"], unit="ms")
         return df
@@ -109,7 +110,7 @@ def workflow_tasks(
     if json:
         return res["workflow_tasks"]
     else:
-        return pd.read_json(res["workflow_tasks"])
+        return pd.read_json(StringIO(res["workflow_tasks"]))
 
 
 def task_template_resources(
@@ -214,7 +215,7 @@ def task_status(
     if json:
         return res["task_instance_status"]
     else:
-        return pd.read_json(res["task_instance_status"], dtype=False)
+        return pd.read_json(StringIO(res["task_instance_status"]), dtype=False)
 
 
 def concurrency_limit(

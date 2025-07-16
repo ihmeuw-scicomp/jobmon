@@ -47,3 +47,6 @@ docsource/api
 # ignore .env
 .env
 node_modules/*
+
+# Ignore design documents folder
+/design/

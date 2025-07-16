@@ -29,6 +29,7 @@ class TaskInstanceStatus:
     QUEUED = "Q"
     RUNNING = "R"
     TRIAGING = "T"
+    SUBMITTED_TO_BATCH_DISTRIBUTOR = "B"
 
     UNKNOWN_ERROR = "U"
     NO_DISTRIBUTOR_ID = "W"

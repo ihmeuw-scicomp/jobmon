@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TaskTemplateResourceUsageRequest(BaseModel):
@@ -38,10 +38,7 @@ class TaskResourceDetailItem(BaseModel):
     #             return None
     #     return None
 
-    class Config:
-        """Pydantic configuration for TaskResourceDetailItem."""
-
-        populate_by_name = True  # Pydantic V2 equivalent
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class TaskResourceVizItem(BaseModel):
