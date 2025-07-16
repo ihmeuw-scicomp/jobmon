@@ -2,6 +2,7 @@
 
 import json
 from collections import defaultdict
+from datetime import datetime
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Optional, Set, Union, cast
 
@@ -18,6 +19,7 @@ from jobmon.core.serializers import SerializeTaskResourceUsage
 from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.models.node import Node
+from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
@@ -26,6 +28,7 @@ from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow import Workflow
+from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
@@ -289,28 +292,55 @@ async def update_task_statuses(request: Request) -> Any:
             update_stmt = update(Task).where(
                 and_(Task.id.in_(task_ids), Task.status != new_status)
             )
+
             vals = {"status": new_status}
             session.execute(update_stmt.values(**vals))
             session.flush()
+
+            wfr = (
+                session.query(WorkflowRun)
+                .filter(WorkflowRun.workflow_id == workflow_id)
+                .order_by(WorkflowRun.id.desc())
+                .first()
+            )
+
+            active_statuses = [
+                constants.TaskInstanceStatus.SUBMITTED_TO_BATCH_DISTRIBUTOR,
+                constants.TaskInstanceStatus.INSTANTIATED,
+                constants.TaskInstanceStatus.LAUNCHED,
+                constants.TaskInstanceStatus.QUEUED,
+                constants.TaskInstanceStatus.RUNNING,
+                constants.TaskInstanceStatus.TRIAGING,
+                constants.TaskInstanceStatus.NO_HEARTBEAT,
+            ]
+
             # If job is supposed to be rerun, set task instances to "K"
             if new_status == constants.TaskStatus.REGISTERING:
-                task_instance_update_stmt = update(TaskInstance).where(
-                    TaskInstance.task_id.in_(task_ids),
-                    TaskInstance.status.notin_(
-                        [
-                            constants.TaskInstanceStatus.ERROR_FATAL,
-                            constants.TaskInstanceStatus.DONE,
-                            constants.TaskInstanceStatus.ERROR,
-                            constants.TaskInstanceStatus.UNKNOWN_ERROR,
-                            constants.TaskInstanceStatus.RESOURCE_ERROR,
-                            constants.TaskInstanceStatus.KILL_SELF,
-                            constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID,
-                        ]
-                    ),
-                )
-                vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
-                session.execute(task_instance_update_stmt.values(**vals))
-                session.flush()
+                # Process task_ids in batches to reduce lock duration
+                batch_size = 100
+
+                for i in range(0, len(task_ids), batch_size):
+                    batch_task_ids = task_ids[i : i + batch_size]
+
+                    # First, get the IDs of rows that need updating using a subquery
+                    subquery = (
+                        session.query(TaskInstance.id)
+                        .filter(
+                            TaskInstance.workflow_run_id == wfr.id,
+                            TaskInstance.task_id.in_(batch_task_ids),
+                            TaskInstance.status.in_(active_statuses),
+                        )
+                        .subquery()
+                    )
+
+                    # Update TIs to "K" status
+                    task_instance_update_stmt = update(TaskInstance).where(
+                        TaskInstance.id.in_(session.query(subquery.c.id))
+                    )
+                    vals = {"status": constants.TaskInstanceStatus.KILL_SELF}
+                    session.execute(task_instance_update_stmt.values(**vals))
+                    session.flush()
+
                 # if workflow status is None, get workflow status from db
                 if workflow_status is None:
                     workflow_status = (
@@ -692,6 +722,9 @@ def get_task_details(task_id: int) -> Any:
                     TaskInstance.wallclock,
                     TaskInstance.maxrss,
                     TaskResources.requested_resources,
+                    TaskInstance.submitted_date,
+                    TaskInstance.status_date,
+                    Queue.name,
                 )
                 .outerjoin_from(
                     TaskInstance,
@@ -701,6 +734,10 @@ def get_task_details(task_id: int) -> Any:
                 .join(
                     TaskResources,
                     TaskInstance.task_resources_id == TaskResources.id,
+                )
+                .join(
+                    Queue,
+                    TaskResources.queue_id == Queue.id,
                 )
                 .where(
                     TaskInstance.task_id == task_id,
@@ -722,8 +759,20 @@ def get_task_details(task_id: int) -> Any:
             "ti_wallclock",
             "ti_maxrss",
             "ti_resources",
+            "ti_submit_date",
+            "ti_status_date",
+            "ti_queue_name",
         )
-        result = [dict(zip(column_names, row)) for row in rows]
+
+        def serialize_row(row: Any) -> Dict[str, Any]:
+            row_dict = dict(zip(column_names, row))
+            for key in ("ti_submit_date", "ti_status_date"):
+                if isinstance(row_dict[key], datetime):
+                    row_dict[key] = row_dict[key].isoformat()
+            return row_dict
+
+        result = [serialize_row(row) for row in rows]
+
         resp = JSONResponse(
             content={"taskinstances": result}, status_code=StatusCodes.OK
         )

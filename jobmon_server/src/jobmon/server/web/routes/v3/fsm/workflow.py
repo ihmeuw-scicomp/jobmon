@@ -11,6 +11,7 @@ from fastapi import HTTPException, Request
 from sqlalchemy import func, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
@@ -181,7 +182,7 @@ def _add_or_get_wf_attribute_type(name: str, session: Session) -> Optional[int]:
         with session.begin_nested():
             wf_attrib_type = WorkflowAttributeType(name=name)
             session.add(wf_attrib_type)
-    except sqlalchemy.exc.IntegrityError:
+    except IntegrityError:
         with session.begin_nested():
             select_stmt = select(WorkflowAttributeType).where(
                 WorkflowAttributeType.name == name
@@ -293,9 +294,15 @@ def workflow_is_resumable(workflow_id: int) -> Any:
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
 
     with SessionMaker() as session:
-        with session.begin():
-            select_stmt = select(Workflow).where(Workflow.id == workflow_id)
-            workflow = session.execute(select_stmt).scalars().one()
+        try:
+            with session.begin():
+                select_stmt = select(Workflow).where(Workflow.id == workflow_id)
+                workflow = session.execute(select_stmt).scalars().one()
+        except NoResultFound:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Workflow with ID {workflow_id} not found in database.",
+            )
 
         logger.info(f"Workflow is resumable: {workflow.is_resumable}")
         resp = JSONResponse(
@@ -309,16 +316,23 @@ def workflow_is_resumable(workflow_id: int) -> Any:
 async def get_max_concurrently_running(workflow_id: int, request: Request) -> Any:
     """Return the maximum concurrency of this workflow."""
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
-
     with SessionMaker() as session:
         with session.begin():
             select_stmt = select(Workflow).where(Workflow.id == workflow_id)
-            workflow = session.execute(select_stmt).scalars().one()
+            workflow = session.execute(select_stmt).scalars().one_or_none()
 
-        resp = JSONResponse(
-            content={"max_concurrently_running": workflow.max_concurrently_running},
-            status_code=StatusCodes.OK,
-        )
+            if workflow is None:
+                return JSONResponse(
+                    content={
+                        "error": f"Workflow with ID {workflow_id} not found in database."
+                    },
+                    status_code=StatusCodes.NOT_FOUND,
+                )
+
+            resp = JSONResponse(
+                content={"max_concurrently_running": workflow.max_concurrently_running},
+                status_code=StatusCodes.OK,
+            )
     return resp
 
 

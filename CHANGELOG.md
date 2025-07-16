@@ -2,9 +2,9 @@
 
 All notable changes to Jobmon will be documented in this file.
 
+
 ## [Unreleased]
 ### Added
-- Added optional authentication support for Jobmon server and GUI (PR TBD). Authentication can now be disabled via `JOBMON__AUTH__ENABLED=false` server-side and `VITE_APP_AUTH_ENABLED=false` client-side environment variables for development and testing environments.
 - Added async retry support to Requester and modernized DistributorService for improved error handling and performance.
 - Added UV for dependency and workflow management, replacing pip-tools for faster and more reliable dependency resolution.
 - Added configurable database connection pool settings to prevent timeout errors in high-load scenarios.
@@ -22,13 +22,32 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed transaction anti-patterns with multiple commits, ensuring proper atomicity and error handling.
 - Fixed DNS cache variable scope bug that was causing NXDOMAIN crashes in production environments.
 - Fixed DNS test logging issues in CI by implementing proper structlog capture mechanisms.
-- Fixed distributor startup communication to be resilient against stderr pollution from package warnings and other output. The startup detection now uses non-blocking I/O and pattern-based parsing instead of expecting exactly 5 bytes, preventing hangs when dependent packages emit warnings during process startup.
 - Fixed OpenTelemetry instrumentation order to initialize before database access, preventing instrumentation issues.
 - Fixed test suite warnings and failures including AsyncIO deprecation warnings, Pydantic configuration warnings, Pandas FutureWarnings, and multiprocessing fork warnings on macOS.
 - Fixed pre-existing test failures related to configuration type handling and swarm test infrastructure.
 
 ### Deprecated
 ### Removed
+
+## [3.4.24] - TBD
+### Changed
+- Updated Workflow.add_tasks() parameter type from Sequence[Task] to Iterable[Task] to accept a broader range of iterable types including generators and iterators. (PR 279)
+
+### Fixed
+- Fixed ClientDisconnect exceptions appearing as errors in APM by adding global exception handler. (PR 282)
+- Fixed get_max_concurrently_running endpoint to handle non-existent workflows gracefully by returning a 404 error with descriptive message instead of raising an exception. (PR 278)
+
+## [3.4.23] - 2025-07-10
+### Added
+- Added optional authentication support for Jobmon server and GUI (PR TBD). Authentication can now be disabled via `JOBMON__AUTH__ENABLED=false` server-side and `VITE_APP_AUTH_ENABLED=false` client-side environment variables for development and testing environments.
+- Added submitted_date and status_date to TaskInstance table on the Task Details page in the Jobmon GUI.
+- Added the queue the TaskInstance ran on to the Requested Resources modal on the Task Details page in the Jobmon GUI.
+
+### Fixed
+- Fixed distributor startup communication to be resilient against stderr pollution from package warnings and other output. The startup detection now uses non-blocking I/O and pattern-based parsing instead of expecting exactly 5 bytes, preventing hangs when dependent packages emit warnings during process startup.
+
+### Changed
+- Optimize SQL in `update_status` route to lessen chance of wait lock timeout on the database.
 
 ## [3.4.14] - 2025-05-05
 ### Added
