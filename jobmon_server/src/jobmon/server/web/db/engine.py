@@ -1,10 +1,7 @@
 # jobmon/server/db/engine.py
 from __future__ import annotations
 
-import ast
-import json
 import logging
-from collections.abc import Mapping, Sequence
 
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
@@ -19,47 +16,6 @@ _engine: Engine | None = None
 _SessionMaker: sessionmaker | None = None
 
 
-_TRUE = {"true", "t", "1", "yes"}
-_FALSE = {"false", "f", "0", "no"}
-
-
-def _coerce(val: object) -> object:
-    """Recursively coerce strings to Python types.
-
-    • 'true', 'false', etc. → bool
-    • JSON / Python literals → parsed objects
-    • Dict / list containers → recurse element-wise
-    • Anything else → returned unchanged
-    """
-    # Already a non-string, recurse if container
-    if isinstance(val, Mapping):
-        return {k: _coerce(v) for k, v in val.items()}
-    if isinstance(val, Sequence) and not isinstance(val, (str, bytes, bytearray)):
-        return [_coerce(v) for v in val]
-
-    if not isinstance(val, str):
-        return val
-
-    s_val = val.strip()
-    lower_s_val = s_val.lower()
-
-    # Cheap bool path first
-    if lower_s_val in _TRUE:
-        return True
-    if lower_s_val in _FALSE:
-        return False
-
-    # Try JSON, then Python literal, fall back to raw string
-    for parser in (json.loads, ast.literal_eval):
-        try:
-            parsed = parser(s_val)
-            return parsed
-        except Exception:  # noqa: BLE001
-            pass
-
-    return s_val
-
-
 def get_engine() -> Engine:
     """Return the lazily-initialised SQLAlchemy engine."""
     global _engine
@@ -69,20 +25,32 @@ def get_engine() -> Engine:
     cfg = get_jobmon_config()
     uri = cfg.get("db", "sqlalchemy_database_uri")
 
-    # Grab the raw value exactly once
+    # Get database configuration with automatic type coercion
     try:
-        raw_ca = cfg.get_section("db").get("sqlalchemy_connect_args")
-    except ConfigError:
-        raw_ca = None
+        db_config = cfg.get_section_coerced("db")
+        connect_args = db_config.get("sqlalchemy_connect_args")
 
-    connect_args = _coerce(raw_ca) if raw_ca else None
+        # Get pool settings - ensure pool_config is always a dict
+        pool_config = db_config.get("pool") or {}
+        if not isinstance(pool_config, dict):
+            pool_config = {}
 
-    # Get pool settings from configuration
-    pool_kwargs = {
-        "pool_recycle": cfg.get_int("db", "pool_recycle"),
-        "pool_pre_ping": cfg.get_boolean("db", "pool_pre_ping"),
-        "pool_timeout": cfg.get_int("db", "pool_timeout"),
-    }
+        pool_param_mapping = {
+            "recycle": "pool_recycle",
+            "pre_ping": "pool_pre_ping",
+            "timeout": "pool_timeout",
+            "size": "pool_size",
+            "max_overflow": "max_overflow",
+        }
+
+        pool_kwargs = {}
+        for config_key, sqlalchemy_param in pool_param_mapping.items():
+            if config_key in pool_config:
+                pool_kwargs[sqlalchemy_param] = pool_config[config_key]
+
+    except (ConfigError, ValueError):
+        connect_args = None
+        pool_kwargs = {}
 
     log.debug("DATABASE URI: %s", uri)
     log.debug("CONNECT ARGS: %s", connect_args)

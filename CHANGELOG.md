@@ -5,8 +5,27 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- Added async retry support to Requester and modernized DistributorService for improved error handling and performance.
+- Added UV for dependency and workflow management, replacing pip-tools for faster and more reliable dependency resolution.
+- Added configurable database connection pool settings to prevent timeout errors in high-load scenarios.
+- Added enhanced OpenTelemetry database instrumentation with error capture for better observability.
+- Added JUnit XML report generation for test dashboard integration.
+- Added consolidated JSON logging fixture for server tests to improve test maintainability.
+
 ### Changed
+- Overhauled frontend resource utilization page for better performance and user experience.
+- Migrated project dependency management from pip-tools to UV workspace configuration.
+- Consolidated database session management and configuration for improved consistency and performance.
+
 ### Fixed
+- Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.
+- Fixed transaction anti-patterns with multiple commits, ensuring proper atomicity and error handling.
+- Fixed DNS cache variable scope bug that was causing NXDOMAIN crashes in production environments.
+- Fixed DNS test logging issues in CI by implementing proper structlog capture mechanisms.
+- Fixed OpenTelemetry instrumentation order to initialize before database access, preventing instrumentation issues.
+- Fixed test suite warnings and failures including AsyncIO deprecation warnings, Pydantic configuration warnings, Pandas FutureWarnings, and multiprocessing fork warnings on macOS.
+- Fixed pre-existing test failures related to configuration type handling and swarm test infrastructure.
+
 ### Deprecated
 ### Removed
 

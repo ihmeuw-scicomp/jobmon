@@ -4,38 +4,21 @@ import pytest
 
 from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
-from jobmon.server.web import log_config, routes
+from jobmon.server.web import routes
 
 
 @pytest.fixture(scope="function")
-def log_file(web_server_in_memory, tmp_path):
+def log_file(web_server_in_memory, json_log_file):
+    """Legacy fixture that uses the consolidated json_log_file fixture"""
     app, _ = web_server_in_memory
     app.get("/")  # trigger logging setup
-    filepath = str(tmp_path) + ".log"
 
-    dict_config = {
-        "version": 1,
-        "disable_existing_loggers": True,
-        "formatters": log_config.default_formatters.copy(),
-        "handlers": {
-            "file_handler": {
-                "class": "logging.FileHandler",
-                "formatter": "json",
-                "filename": filepath,
-            }
-        },
-        "loggers": {
-            "jobmon.server.web": {
-                "handlers": ["file_handler"],
-                "level": "INFO",
-            },
-        },
-    }
+    # Use the consolidated logging fixture
+    filepath = json_log_file(
+        loggers={"jobmon.server.web": "INFO"}, filename_suffix="server_logging"
+    )
 
-    # override base config
-    log_config.configure_logging(dict_config=dict_config)
-    yield filepath
-    log_config.configure_logging()
+    yield str(filepath)
 
 
 def test_add_structlog_context(requester_in_memory, log_file, api_prefix):

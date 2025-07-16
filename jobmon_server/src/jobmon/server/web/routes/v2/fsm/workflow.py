@@ -363,19 +363,19 @@ async def task_status_updates(workflow_id: int, request: Request) -> Any:
     except KeyError:
         filter_criteria = (Task.workflow_id == workflow_id,)
 
-    # get time from db
+    # get time from db and execute query within the same session context
     with SessionMaker() as session:
         with session.begin():
             db_time = session.execute(select(func.now())).scalar()
             str_time = db_time.strftime("%Y-%m-%d %H:%M:%S") if db_time else None
 
-    # Prepare and execute your query without GROUP_CONCAT
-    tasks_by_status_query = select(Task.status, Task.id).where(*filter_criteria)
+            # Prepare and execute your query without GROUP_CONCAT
+            tasks_by_status_query = select(Task.status, Task.id).where(*filter_criteria)
 
-    # Fetch the rows
-    result_dict = defaultdict(list)
-    for row in session.execute(tasks_by_status_query):
-        result_dict[row.status].append(row.id)
+            # Fetch the rows
+            result_dict = defaultdict(list)
+            for row in session.execute(tasks_by_status_query):
+                result_dict[row.status].append(row.id)
 
     resp = JSONResponse(
         content={"tasks_by_status": result_dict, "time": str_time},

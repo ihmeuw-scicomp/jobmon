@@ -2,8 +2,8 @@ import logging
 import multiprocessing as mp
 import os
 import pathlib
+import platform
 import signal
-import socket
 import sys
 import tempfile
 from time import sleep
@@ -25,21 +25,50 @@ _api_prefix = "/api/v2"
 
 
 def pytest_sessionstart(session):
+    """Set up test environment - override any external config with test settings."""
     # Create a unique SQLite file in a temporary directory
     tmp_dir = tempfile.mkdtemp()
-    # Resolve the path to be absolute *before* creating the URI
     sqlite_file = pathlib.Path(tmp_dir, "tests.sqlite").resolve()
 
-    # Print information for debugging purposes
     print("Running code before test file import")
     print(f"SQLite file created at: {sqlite_file}")
 
-    # Use four slashes for an absolute path SQLite URI
-    os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{sqlite_file}"
-    os.environ["JOBMON__OTLP__WEB_ENABLED"] = "false"
-    os.environ["JOBMON__OTLP__SPAN_EXPORTER"] = ""
-    os.environ["JOBMON__OTLP__LOG_EXPORTER"] = ""
-    os.environ["JOBMON__SESSION__SECRET_KEY"] = "test"
+    # Override all configuration via environment variables to bypass external config files
+    # This prevents interference from installer plugins or external configurations
+    test_env_vars = {
+        # Core test configuration
+        "JOBMON__CONFIG_FILE": "",  # Force use of env vars only
+        "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{sqlite_file}",
+        "JOBMON__SESSION__SECRET_KEY": "test",
+        # HTTP configuration (matching defaults but optimized for tests)
+        "JOBMON__HTTP__REQUEST_TIMEOUT": "20",
+        "JOBMON__HTTP__RETRIES_ATTEMPTS": "10",
+        "JOBMON__HTTP__RETRIES_TIMEOUT": "0",  # Fast failures in tests
+        "JOBMON__HTTP__ROUTE_PREFIX": _api_prefix,
+        "JOBMON__HTTP__SERVICE_URL": "",  # Set dynamically by client_env fixture
+        "JOBMON__HTTP__STOP_AFTER_DELAY": "0",  # No delays in tests
+        # Distributor configuration (faster polling for tests)
+        "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
+        # Heartbeat configuration (faster intervals for tests)
+        "JOBMON__HEARTBEAT__REPORT_BY_BUFFER": "3.1",
+        "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
+        "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
+        # OIDC configuration
+        "JOBMON__OIDC__NAME": "OIDC",
+        # OTLP configuration (disabled for tests)
+        "JOBMON__OTLP__HTTP_ENABLED": "false",
+        "JOBMON__OTLP__WEB_ENABLED": "false",
+        "JOBMON__OTLP__DEPLOYMENT_ENVIRONMENT": "test",
+        "JOBMON__OTLP__SPAN_EXPORTER": "",
+        "JOBMON__OTLP__LOG_EXPORTER": "",
+        # Reaper configuration
+        "JOBMON__REAPER__POLL_INTERVAL_MINUTES": "5",
+        # Worker node configuration
+        "JOBMON__WORKER_NODE__COMMAND_INTERRUPT_TIMEOUT": "10",
+    }
+
+    # Apply all test environment variables
+    os.environ.update(test_env_vars)
 
 
 @pytest.fixture(scope="session")
@@ -79,53 +108,54 @@ class WebServerProcess:
             specifically the database host, port, service account user, service account
             password, and database name
         """
-        if sys.platform == "darwin":
-            self.web_host = "127.0.0.1"
-        else:
-            self.web_host = socket.getfqdn()
+        # Always use localhost for test server to avoid DNS/network issues
+        # The test server runs locally regardless of platform
+        self.web_host = "127.0.0.1"
         self.web_port = str(10_000 + os.getpid() % 30_000)
         self.api_prefix = _api_prefix
 
+    def _run_server_with_handler(self) -> None:
+        """Run the server with signal handlers - separate method for pickle compatibility."""
+
+        def sigterm_handler(_signo: int, _stack_frame: Any) -> None:
+            # catch SIGTERM and shut down with 0 so pycov finalizers are run
+            # Raises SystemExit(0):
+            sys.exit(0)
+
+        signal.signal(signal.SIGTERM, sigterm_handler)
+
+        from jobmon.server.web import log_config
+        from jobmon.server.web.api import get_app
+
+        dict_config = {
+            "version": 1,
+            "disable_existing_loggers": True,
+            "formatters": log_config.default_formatters.copy(),
+            "handlers": log_config.default_handlers.copy(),
+            "loggers": {
+                "jobmon.server.web": {
+                    "handlers": ["console_text"],
+                    "level": "INFO",
+                },
+                # enable SQL debug
+                "sqlalchemy": {
+                    "handlers": ["console_text"],
+                    "level": "WARNING",
+                },
+            },
+        }
+        log_config.configure_logging(dict_config=dict_config)
+
+        app = get_app(versions=["v2"])
+        uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
+
     def __enter__(self) -> Any:
         """Starts the web service process."""
-        # jobmon_cli string
-
-        def run_server_with_handler() -> None:
-            def sigterm_handler(_signo: int, _stack_frame: Any) -> None:
-                # catch SIGTERM and shut down with 0 so pycov finalizers are run
-                # Raises SystemExit(0):
-                sys.exit(0)
-
-            signal.signal(signal.SIGTERM, sigterm_handler)
-
-            from jobmon.server.web import log_config
-            from jobmon.server.web.api import get_app
-
-            dict_config = {
-                "version": 1,
-                "disable_existing_loggers": True,
-                "formatters": log_config.default_formatters.copy(),
-                "handlers": log_config.default_handlers.copy(),
-                "loggers": {
-                    "jobmon.server.web": {
-                        "handlers": ["console_text"],
-                        "level": "INFO",
-                    },
-                    # enable SQL debug
-                    "sqlalchemy": {
-                        "handlers": ["console_text"],
-                        "level": "WARNING",
-                    },
-                },
-            }
-            log_config.configure_logging(dict_config=dict_config)
-
-            app = get_app(versions=["v2"])
-            uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
-
         # start server
-        ctx = mp.get_context("fork")
-        self.p1 = ctx.Process(target=run_server_with_handler)
+        # Use spawn on macOS to avoid fork warnings in multi-threaded environment
+        mp_method = "spawn" if platform.system() == "Darwin" else "fork"
+        ctx = mp.get_context(mp_method)
+        self.p1 = ctx.Process(target=self._run_server_with_handler)
         self.p1.start()
 
         # Wait for it to be up
@@ -178,19 +208,12 @@ def web_server_process(db_engine):
 
 @pytest.fixture(scope="function")
 def client_env(web_server_process, monkeypatch):
-    monkeypatch.setenv(
-        "JOBMON__HTTP__SERVICE_URL",
-        f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}',
-    )
-    monkeypatch.setenv("JOBMON__HTTP__ROUTE_PREFIX", _api_prefix)
-    monkeypatch.setenv("JOBMON__HTTP__STOP_AFTER_DELAY", "0")
-    monkeypatch.setenv("JOBMON__HTTP__RETRIES_TIMEOUT", "0")
-    monkeypatch.setenv("JOBMON__DISTRIBUTOR__POLL_INTERVAL", "1")
-    monkeypatch.setenv("JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL", "1")
-    monkeypatch.setenv("JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL", "1")
+    """Configure client to connect to the local test server."""
+    # Set the dynamic service URL to point to the local test server
+    service_url = f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}'
+    monkeypatch.setenv("JOBMON__HTTP__SERVICE_URL", service_url)
 
-    # This instance is thrown away, hence monkey-patching the defaults via the
-    # environment variables
+    # Create requester instance that will use the test configuration
     requester = Requester.from_defaults()
     yield requester.url
 

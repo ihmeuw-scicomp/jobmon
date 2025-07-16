@@ -67,16 +67,19 @@ def _resolve(host: str) -> Tuple[str, int]:
 def _cached_ip(host: str) -> Tuple[str, int]:
     now = time.time()
     with _CACHE_LOCK:
-        ip, exp = _DNS_CACHE.get(host, (None, 0.0))
-        if ip and exp > now:
-            return ip, int(exp - now)
+        cached_ip, exp = _DNS_CACHE.get(host, (None, 0.0))
+        if cached_ip and exp > now:
+            return cached_ip, int(exp - now)
 
     try:
         ip, ttl = _resolve(host)
     except Exception as err:  # pragma: no cover
         logger.warning("DNS resolve failed for %s: %s", host, err, exc_info=err)
-        if ip:
-            return ip, 30  # grace period
+        if cached_ip:
+            logger.info(
+                "Using cached IP %s for %s with 30s grace period", cached_ip, host
+            )
+            return cached_ip, 30  # grace period with cached IP
         raise
 
     with _CACHE_LOCK:
