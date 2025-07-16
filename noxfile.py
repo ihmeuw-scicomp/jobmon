@@ -18,7 +18,7 @@ def tests(session: Session) -> None:
     """Run the test suite."""
     session.install("uv")
     # Install all dev dependencies, including pytest and workspace packages
-    session.run("uv", "sync", "--active", "--extra", "dev")
+    session.run("uv", "sync", "--active", "--group", "dev")
 
     args = session.posargs or test_locations
 
@@ -52,7 +52,7 @@ def lint(session: Session) -> None:
     session.install("uv")
     args = session.posargs or src_locations
     # Install all dev dependencies, including linters and workspace packages
-    session.run("uv", "sync", "--active", "--extra", "dev")
+    session.run("uv", "sync", "--active", "--group", "dev")
     session.run("flake8", *args)
 
 
@@ -61,7 +61,7 @@ def format(session):
     session.install("uv")
     args = session.posargs or src_locations + test_locations
     # Install all dev dependencies, including formatters and workspace packages
-    session.run("uv", "sync", "--active", "--extra", "dev")
+    session.run("uv", "sync", "--active", "--group", "dev")
     session.run(
         "autoflake",
         "--in-place",
@@ -79,7 +79,7 @@ def typecheck(session: Session) -> None:
     session.install("uv")
     args = session.posargs or src_locations
     # Install all dev dependencies, including mypy, types, and workspace packages
-    session.run("uv", "sync", "--active", "--extra", "dev")
+    session.run("uv", "sync", "--active", "--group", "dev")
     session.run("mypy", "--explicit-package-bases", *args)
 
 
@@ -124,7 +124,7 @@ def build(session: Session) -> None:
     session.install("uv")
     args = session.posargs or src_locations
     # Install build tool and ensure workspace packages are available
-    session.run("uv", "sync", "--active", "--extra", "dev")
+    session.run("uv", "sync", "--active", "--group", "dev")
 
     for src_dir in args:
         namespace_dir = str(Path(src_dir).parent)
@@ -202,7 +202,7 @@ def clean(session: Session) -> None:
 def build_gui_test_env(session: Session) -> None:
     session.install("uv")
     # Install dev dependencies which now include mysqlclient and workspace packages
-    session.run("uv", "sync", "--active", "--extra", "dev")
+    session.run("uv", "sync", "--active", "--group", "dev")
     if os.path.exists("/tmp/tests.sqlite"):
         os.remove("/tmp/tests.sqlite")
     # The workspace packages (jobmon_core, jobmon_client, jobmon_server)

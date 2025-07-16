@@ -14,7 +14,7 @@ import time
 import uuid
 from subprocess import PIPE, Popen, TimeoutExpired
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Dict, Iterator, List, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Union
 
 import psutil
 
@@ -432,7 +432,7 @@ class Workflow(object):
         self.arrays[template_name] = array
         array.workflow = self
 
-    def add_tasks(self, tasks: Sequence[Task]) -> None:
+    def add_tasks(self, tasks: Iterable[Task]) -> None:
         """Add a list of task to the workflow to be executed."""
         for task in tasks:
             # add the task

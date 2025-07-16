@@ -9,6 +9,7 @@ import logging
 import logging.config
 from typing import Any, Callable, Dict, Tuple, Type
 
+import aiohttp
 import requests
 import tenacity
 import urllib3
@@ -140,31 +141,34 @@ class Requester(object):
 
         return wrapper
 
+    def _should_retry_exception(self, exception: Any) -> bool:
+        """Determine if an exception should trigger a retry."""
+        logger.warning(f"Exception occurred: {exception}")
+
+        # Do not retry for certain client errors.
+        if isinstance(exception, InvalidRequest):
+            return False
+
+        # Retry for specific exceptions (sync and async compatible).
+        return isinstance(
+            exception,
+            (
+                InvalidResponse,
+                TimeoutError,
+                requests.ConnectionError,
+                requests.adapters.MaxRetryError,
+                requests.exceptions.ReadTimeout,
+                urllib3.exceptions.NewConnectionError,
+                urllib3.exceptions.MaxRetryError,
+                aiohttp.ClientError,
+                aiohttp.ServerTimeoutError,
+                aiohttp.ClientConnectorError,
+            ),
+        )
+
     def _maybe_retry(self, func: Callable, tenacious: bool) -> Any:
         if not tenacious:
             return func
-
-        def should_retry_exception(exception: Any) -> Any:
-            """Return True if we should retry on the given exception."""
-            logger.warning(f"Exception occurred: {exception}")
-
-            # Do not retry for certain client errors.
-            if isinstance(exception, InvalidRequest):
-                return False
-
-            # Retry for specific exceptions.
-            return isinstance(
-                exception,
-                (
-                    InvalidResponse,
-                    TimeoutError,
-                    requests.ConnectionError,
-                    requests.adapters.MaxRetryError,
-                    requests.exceptions.ReadTimeout,
-                    urllib3.exceptions.NewConnectionError,
-                    urllib3.exceptions.MaxRetryError,
-                ),
-            )
 
         def raise_if_exceed_retry(retry_state: tenacity.RetryCallState) -> Any:
             """If we trigger retry error, raise informative RuntimeError."""
@@ -182,7 +186,7 @@ class Requester(object):
                 | tenacity.stop_after_delay(self.retries_timeout)
             ),
             wait=tenacity.wait_exponential_jitter(initial=1, exp_base=2, jitter=1),
-            retry=tenacity.retry_if_exception(should_retry_exception),
+            retry=tenacity.retry_if_exception(self._should_retry_exception),
             retry_error_callback=raise_if_exceed_retry,
         )(func)
 
@@ -273,6 +277,180 @@ class Requester(object):
         res = send_with_trace(
             app_route=app_route, message=message, request_type=request_type
         )
+
+        return res
+
+    async def _send_request_async(
+        self,
+        session: aiohttp.ClientSession,
+        app_route: str,
+        message: dict,
+        request_type: str,
+    ) -> Tuple[int, Any]:
+        """Async version of _send_request using aiohttp."""
+        # Construct URL
+        route = self.url + app_route
+        logger.info(f"Route: {route}, message: {message}")
+
+        # Add version to query parameters
+        params = {"client_jobmon_version": __version__}
+        if request_type == "get":
+            params.update(message)
+
+        # Set headers, including the custom header for structlog context
+        headers = {
+            "Content-Type": "application/json",
+            "X-Server-Structlog-Context": json.dumps(self.server_structlog_context),
+        }
+
+        # Send the appropriate request
+        method_map = {
+            "post": session.post,
+            "get": session.get,
+            "put": session.put,
+        }
+
+        if request_type not in method_map:
+            raise ValueError(
+                f"request_type must be one of 'get', 'post', or 'put'. Got {request_type}"
+            )
+
+        method = method_map[request_type]
+
+        # Send the request with appropriate parameters
+        if request_type in ("post", "put"):
+            async with method(
+                route,
+                params=params,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=self.request_timeout),
+                json=message,
+            ) as response:
+                status_code, content = await self._get_content_async(response)
+        else:  # GET
+            async with method(
+                route,
+                params=params,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=self.request_timeout),
+            ) as response:
+                status_code, content = await self._get_content_async(response)
+
+        # Raise the InvalidResponse exception based on the logic from should_retry_result
+        if 499 < status_code < 600 or status_code == 423:
+            raise InvalidResponse(
+                f"Request failed due to status code {status_code} from {request_type.upper()} "
+                f"request through route {app_route}. Response content: {content}"
+            )
+
+        # Keep the logic for other status codes that might be encountered but
+        # aren't in the retry condition.
+        if 400 <= status_code < 500:
+            raise InvalidRequest(
+                f"Client error with status code {status_code} from {request_type.upper()} "
+                f"request through route {app_route}. Response content: {content}"
+            )
+
+        return status_code, content
+
+    async def _get_content_async(
+        self, response: aiohttp.ClientResponse
+    ) -> Tuple[int, Any]:
+        """Parse an aiohttp response, handling JSON and non-JSON content gracefully.
+
+        Args:
+            response: The aiohttp ClientResponse object to parse.
+
+        Returns:
+            Tuple of (status_code, content) where content is parsed JSON or raw text/bytes.
+        """
+        content_type = response.headers.get("Content-Type", "")
+        if "application/json" in content_type:
+            try:
+                content = await response.json()
+            except (json.decoder.JSONDecodeError, ValueError, aiohttp.ContentTypeError):
+                # For cases where the response body is empty or malformed JSON
+                content = await response.text()
+        else:
+            content = await response.read()
+        return response.status, content
+
+    def _maybe_retry_async(self, func: Callable, tenacious: bool) -> Any:
+        """Async version of _maybe_retry using tenacity async retry."""
+        if not tenacious:
+            return func
+
+        def raise_if_exceed_retry(retry_state: tenacity.RetryCallState) -> Any:
+            """If we trigger retry error, raise informative RuntimeError."""
+            # Check if the retry outcome is an exception
+            outcome = retry_state.outcome
+            if outcome and outcome.exception():
+                exception = outcome.exception()
+                raise RuntimeError(
+                    f"Exceeded HTTP request retry budget due to: {exception}"
+                ) from exception
+
+        retrying = tenacity.retry(
+            stop=(
+                tenacity.stop_after_attempt(self.retries_attempts)
+                | tenacity.stop_after_delay(self.retries_timeout)
+            ),
+            wait=tenacity.wait_exponential_jitter(initial=1, exp_base=2, jitter=1),
+            retry=tenacity.retry_if_exception(self._should_retry_exception),
+            retry_error_callback=raise_if_exceed_retry,
+        )(func)
+
+        return retrying
+
+    async def send_request_async(
+        self,
+        session: aiohttp.ClientSession,
+        app_route: str,
+        message: dict,
+        request_type: str,
+        tenacious: bool = True,
+    ) -> Tuple[int, Any]:
+        """Send an async request to the Jobmon server with sophisticated retry logic.
+
+        This method provides the same robust retry capabilities as the sync version,
+        using tenacity for exponential backoff with jitter, timeout protection,
+        and comprehensive exception handling.
+
+        Args:
+            session: An active aiohttp ClientSession for making requests.
+            app_route: The API route to request (will be appended to base URL).
+            message: Dictionary containing the request payload.
+            request_type: HTTP method - 'get', 'post', or 'put'.
+            tenacious: Whether to enable retry logic (default: True).
+
+        Returns:
+            Tuple of (status_code, response_content).
+
+        Raises:
+            InvalidRequest: For 4xx client errors (no retry).
+            InvalidResponse: For 5xx server errors after exhausting retries.
+            RuntimeError: If retry budget is exceeded.
+        """
+
+        async def send_fn(
+            session: aiohttp.ClientSession,
+            app_route: str,
+            message: dict,
+            request_type: str,
+        ) -> Tuple[int, Any]:
+            return await self._send_request_async(
+                session, app_route, message, request_type
+            )
+
+        send_method = self._maybe_retry_async(send_fn, tenacious)
+
+        with self.tracing_span(app_route, request_type):
+            res = await send_method(
+                session=session,
+                app_route=app_route,
+                message=message,
+                request_type=request_type,
+            )
 
         return res
 
