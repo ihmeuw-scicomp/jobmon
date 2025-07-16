@@ -264,9 +264,9 @@ async def get_recursive_task_ids(
             status_code=400,
         )
 
-    task_ids = await get_tasks_recursive(set(task_ids), direction, session)
+    task_ids = list(_get_tasks_recursive(set(task_ids), direction, session))
     logger.info(f"reset status to new_status: {new_status}")
-    return list(task_ids)  # Convert set to list
+    return task_ids
 
 
 def update_task_statuses_in_db(
@@ -281,7 +281,7 @@ def update_task_statuses_in_db(
     session.flush()
 
 
-def get_workflow_run(workflow_id: str, session: Session) -> WorkflowRun:
+def get_workflow_run(workflow_id: str, session: Session) -> WorkflowRun | None:
     """Get the latest workflow run for a workflow."""
     return (
         session.query(WorkflowRun)
@@ -338,6 +338,8 @@ def handle_registering_status(
 ) -> None:
     """Handle special logic for REGISTERING status."""
     wfr = get_workflow_run(workflow_id, session)
+    if wfr is None:
+        raise ValueError(f"No workflow run found for workflow_id: {workflow_id}")
     kill_active_task_instances(task_ids, wfr.id, session)
 
     # Get workflow status from db if not provided
@@ -407,6 +409,8 @@ async def update_task_statuses(request: Request) -> Any:
             # Get all task IDs if task_ids is "all"
             if task_ids == "all":
                 task_ids = get_all_task_ids(workflow_id, session)
+
+            task_ids = cast(list[int], task_ids)
 
             # Get recursive task IDs if needed
             if recursive:
