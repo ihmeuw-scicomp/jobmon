@@ -76,7 +76,9 @@ def _cached_ip(host: str) -> Tuple[str, int]:
     except Exception as err:  # pragma: no cover
         logger.warning("DNS resolve failed for %s: %s", host, err, exc_info=err)
         if cached_ip:
-            logger.info("Using cached IP %s for %s with 30s grace period", cached_ip, host)
+            logger.info(
+                "Using cached IP %s for %s with 30s grace period", cached_ip, host
+            )
             return cached_ip, 30  # grace period with cached IP
         raise
 
