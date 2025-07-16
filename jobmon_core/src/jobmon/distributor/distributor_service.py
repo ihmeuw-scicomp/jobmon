@@ -431,7 +431,8 @@ class DistributorService:
         task_instance.transition_to_error(
             "Task instance never reported a heartbeat after scheduling. Will retry. "
             "May be caused by distributor heartbeat failure or worker startup issue often due "
-            "to cluster node problem. If retry fails, resume with Slurm logs enabled.",
+            "to cluster node problem. If the retry fails, resume the task with Slurm logs enabled "
+            "by setting 'standard_error' and 'standard_output' in your compute resources dictionary.",
             TaskInstanceStatus.ERROR,
         )
 
