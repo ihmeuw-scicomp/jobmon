@@ -154,7 +154,7 @@ class WebServerProcess:
         """Starts the web service process."""
         # start server
         # Use spawn on macOS to avoid fork warnings in multi-threaded environment
-        mp_method = "spawn" if platform.system() == "Darwin" else "fork"
+        mp_method = "fork"
         ctx = mp.get_context(mp_method)
         self.p1 = ctx.Process(target=self._run_server_with_handler)
         self.p1.start()
