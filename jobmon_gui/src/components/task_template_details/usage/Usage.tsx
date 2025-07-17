@@ -65,12 +65,15 @@ export default function Usage({
         selectedAttempts,
         selectedStatuses,
         selectedResourceClusters,
+        selectedTaskNames,
         availableAttempts,
         availableStatuses,
         availableResourceClusters,
+        availableTaskNames,
         setSelectedAttempts,
         setSelectedStatuses,
         setSelectedResourceClusters,
+        setSelectedTaskNames,
         resetFilters,
         clearFilters,
     } = useUsageFilters({ rawTaskNodesFromApi });
@@ -90,7 +93,8 @@ export default function Usage({
                             String(d.status || 'UNKNOWN').toUpperCase()
                         ) &&
                         (clusterKey === null ||
-                            selectedResourceClusters.has(clusterKey))
+                            selectedResourceClusters.has(clusterKey)) &&
+                        (!d.task_name || selectedTaskNames.has(d.task_name))
                     );
                 })
                 .map(item => {
@@ -110,6 +114,7 @@ export default function Usage({
         selectedAttempts,
         selectedStatuses,
         selectedResourceClusters,
+        selectedTaskNames,
     ]);
 
     // State for plot interactions
@@ -246,7 +251,8 @@ export default function Usage({
                         String(d.status || 'UNKNOWN').toUpperCase()
                     ) &&
                     (clusterKey === null ||
-                        selectedResourceClusters.has(clusterKey))
+                        selectedResourceClusters.has(clusterKey)) &&
+                    (!d.task_name || selectedTaskNames.has(d.task_name))
                 );
             })
             .map((item): ScatterDataPoint | null => {
@@ -304,6 +310,7 @@ export default function Usage({
         selectedAttempts,
         selectedStatuses,
         selectedResourceClusters,
+        selectedTaskNames,
     ]);
 
     // Determine which data to use for KPI calculations: selected data if available, otherwise filtered data
@@ -537,13 +544,16 @@ export default function Usage({
                 availableAttempts={availableAttempts}
                 availableStatuses={availableStatuses}
                 availableResourceClusters={availableResourceClusters}
+                availableTaskNames={availableTaskNames}
                 selectedAttempts={selectedAttempts}
                 selectedStatuses={selectedStatuses}
                 selectedResourceClusters={selectedResourceClusters}
+                selectedTaskNames={selectedTaskNames}
                 showResourceZones={showResourceZones}
                 onSelectedAttemptsChange={setSelectedAttempts}
                 onSelectedStatusesChange={setSelectedStatuses}
                 onSelectedResourceClustersChange={setSelectedResourceClusters}
+                onSelectedTaskNamesChange={setSelectedTaskNames}
                 onShowResourceZonesChange={setShowResourceZones}
                 onClearFilters={clearFilters}
                 onResetFilters={resetFilters}
