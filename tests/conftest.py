@@ -55,6 +55,7 @@ def pytest_sessionstart(session):
         "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
         # OIDC configuration
         "JOBMON__OIDC__NAME": "OIDC",
+        "JOBMON__AUTH__ENABLED": "false",
         # OTLP configuration (disabled for tests)
         "JOBMON__OTLP__HTTP_ENABLED": "false",
         "JOBMON__OTLP__WEB_ENABLED": "false",
