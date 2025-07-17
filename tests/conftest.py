@@ -2,7 +2,6 @@ import logging
 import multiprocessing as mp
 import os
 import pathlib
-import platform
 import signal
 import sys
 import tempfile

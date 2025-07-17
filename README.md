@@ -96,13 +96,13 @@ Choose one of the following workflows:
             ```
         3.  Install all workspace projects with development dependencies:
             ```bash
-            uv sync --extra dev
+            uv sync --group dev
             ```
             This installs all workspace packages in editable mode along with their development dependencies. The workspace configuration in `pyproject.toml` ensures that local versions of workspace packages are used automatically.
 
 **Pre-commit Setup (Recommended):**
 To ensure code quality and consistency, set up pre-commit hooks:
-1.  **Install pre-commit** (if not already installed via `uv sync --extra dev`):
+1.  **Install pre-commit** (if not already installed via `uv sync --group dev`):
     ```bash
     uv pip install pre-commit
     ```
