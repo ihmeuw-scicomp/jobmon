@@ -11,6 +11,7 @@ All notable changes to Jobmon will be documented in this file.
 - Added enhanced OpenTelemetry database instrumentation with error capture for better observability.
 - Added JUnit XML report generation for test dashboard integration.
 - Added consolidated JSON logging fixture for server tests to improve test maintainability.
+- Added more information about stopping workflows and updating task statuses to the technical panel in the Jobmon GUI.
 
 ### Changed
 - Overhauled frontend resource utilization page for better performance and user experience.
