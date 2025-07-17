@@ -563,10 +563,14 @@ def workflows_by_user_form(
             )
             rows = session.execute(query, substitution_dict).all()
 
-        def serialize_datetime(obj: datetime) -> str:
-            """Serialize datetime objects into string format."""
+        def serialize_datetime(obj: Union[datetime, str]) -> str:
             if isinstance(obj, datetime):
                 return obj.isoformat()
+            elif isinstance(obj, str):
+                try:
+                    return datetime.fromisoformat(obj).isoformat()
+                except ValueError:
+                    raise TypeError(f"String '{obj}' is not a valid datetime format.")
             raise TypeError(f"Type {obj.__class__.__name__} not serializable")
 
         column_names = (
