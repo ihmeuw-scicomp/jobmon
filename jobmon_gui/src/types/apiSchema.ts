@@ -4151,6 +4151,8 @@ export interface components {
             node_id: number;
             /** Task Id */
             task_id: number;
+            /** Task Name */
+            task_name?: string | null;
             /** Requested Resources */
             requested_resources?: string | null;
             /** Attempt Number Of Instance */

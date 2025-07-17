@@ -138,6 +138,7 @@ export default function Usage({
 
     const filteredScatterData = useMemo(() => {
         if (!rawTaskNodesFromApi) return [];
+        
         return rawTaskNodesFromApi
             .filter(d => {
                 const clusterKey = getResourceClusterKey(d.requested_resources);
@@ -180,6 +181,8 @@ export default function Usage({
                     // Skip invalid JSON, leave as undefined
                 }
 
+                const taskName = item.task_name;
+
                 if (
                     runtime !== null &&
                     runtime > 0 &&
@@ -188,6 +191,7 @@ export default function Usage({
                 ) {
                     return {
                         task_id: item.task_id,
+                        task_name: taskName,
                         runtime: runtime,
                         memory: memoryGiB,
                         status: String(item.status || 'UNKNOWN').toUpperCase(),

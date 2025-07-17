@@ -61,6 +61,7 @@ class TaskTemplateRepository:
                 TaskInstance.maxrss,
                 Node.id.label("node_id_col"),
                 Task.id.label("task_id_col"),
+                Task.name.label("task_name_col"),
                 TaskInstance.id.label("task_instance_id_col"),
                 TaskResources.requested_resources.label("requested_resources_col"),
                 attempt_number_col,
@@ -85,9 +86,10 @@ class TaskTemplateRepository:
                     "m_orig": row[1],
                     "node_id": row[2],
                     "task_id": row[3],
-                    "requested_resources": row[5],
-                    "attempt_number_of_instance": row[6],
-                    "status_orig": row[7],
+                    "task_name": row[4],
+                    "requested_resources": row[6],
+                    "attempt_number_of_instance": row[7],
+                    "status_orig": row[8],
                 }
             )
 
@@ -148,6 +150,7 @@ class TaskTemplateRepository:
                         ),
                         node_id=task_item_dict["node_id"],
                         task_id=task_item_dict["task_id"],
+                        task_name=task_item_dict.get("task_name"),
                         requested_resources=task_item_dict["requested_resources"],
                         attempt_number_of_instance=task_item_dict.get(
                             "attempt_number_of_instance"
@@ -180,6 +183,7 @@ class TaskTemplateRepository:
                         ),
                         node_id=task_item_dict["node_id"],
                         task_id=task_item_dict["task_id"],
+                        task_name=task_item_dict.get("task_name"),
                         requested_resources=task_item_dict["requested_resources"],
                         attempt_number_of_instance=task_item_dict.get(
                             "attempt_number_of_instance"
@@ -217,6 +221,7 @@ class TaskTemplateRepository:
                         m=detail_item.m,
                         node_id=detail_item.node_id,
                         task_id=detail_item.task_id,
+                        task_name=detail_item.task_name,
                         requested_resources=detail_item.requested_resources,
                         attempt_number_of_instance=detail_item.attempt_number_of_instance,
                         status=detail_item.status,
