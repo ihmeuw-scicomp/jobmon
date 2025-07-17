@@ -26,6 +26,7 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed test suite warnings and failures including AsyncIO deprecation warnings, Pydantic configuration warnings, Pandas FutureWarnings, and multiprocessing fork warnings on macOS.
 - Fixed pre-existing test failures related to configuration type handling and swarm test infrastructure.
 - Fixed missing transition_to_killed route in v3.
+- Fixed the v3 /workflow_overview_viz datatime input formatting restriction.
 
 ### Deprecated
 ### Removed

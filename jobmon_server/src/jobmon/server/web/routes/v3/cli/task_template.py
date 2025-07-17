@@ -272,7 +272,7 @@ async def get_task_template_resource_usage(
         ) from e
 
     response_data = {}
-    if request_data.viz and viz_data is not None:
+    if viz_data is not None:
         response_data["result_viz"] = viz_data
 
     return TaskTemplateResourceUsageResponse(**response_data)

@@ -665,7 +665,9 @@ def test_get_task_template_resource_usage(db_engine, tool):
         request_type="post",
     )
     assert return_code == 200
-    assert msg[0] == 2
+    assert len(msg["result_viz"]) == 2
+    assert msg["result_viz"][0]["requested_resources"] == '{"num_cores": 2}'
+    assert msg["result_viz"][1]["requested_resources"] == '{"num_cores": 4}'
 
     # two rows
     app_route = f"/task_template_resource_usage"
@@ -678,7 +680,9 @@ def test_get_task_template_resource_usage(db_engine, tool):
         request_type="post",
     )
     assert return_code == 200
-    assert msg[0] == 2
+    assert len(msg["result_viz"]) == 2
+    assert msg["result_viz"][0]["requested_resources"] == '{"num_cores": 2}'
+    assert msg["result_viz"][1]["requested_resources"] == '{"num_cores": 4}'
 
     # two rows
     app_route = f"/task_template_resource_usage"
@@ -690,8 +694,9 @@ def test_get_task_template_resource_usage(db_engine, tool):
         },
         request_type="post",
     )
-    assert return_code == 200
-    assert msg[0] == 2
+    assert len(msg["result_viz"]) == 2
+    assert msg["result_viz"][0]["requested_resources"] == '{"num_cores": 2}'
+    assert msg["result_viz"][1]["requested_resources"] == '{"num_cores": 4}'
 
     # one row
     app_route = f"/task_template_resource_usage"
@@ -704,7 +709,8 @@ def test_get_task_template_resource_usage(db_engine, tool):
         request_type="post",
     )
     assert return_code == 200
-    assert msg[0] == 1
+    assert len(msg["result_viz"]) == 1
+    assert msg["result_viz"][0]["requested_resources"] == '{"num_cores": 2}'
 
     # 0 row
     app_route = f"/task_template_resource_usage"
@@ -717,7 +723,7 @@ def test_get_task_template_resource_usage(db_engine, tool):
         request_type="post",
     )
     assert return_code == 200
-    assert msg[0] is None
+    assert len(msg["result_viz"]) == 0
 
 
 def test_node_dependencies(client_env):

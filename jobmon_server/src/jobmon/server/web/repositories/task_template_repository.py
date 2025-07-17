@@ -206,21 +206,19 @@ class TaskTemplateRepository:
                 node_args=req.node_args,
             )
         )
-
         viz_data: Optional[List[TaskResourceVizItem]] = None
-        if req.viz:
-            viz_data = []
-            for detail_item in task_details_list:
-                viz_data.append(
-                    TaskResourceVizItem(
-                        r=detail_item.r,
-                        m=detail_item.m,
-                        node_id=detail_item.node_id,
-                        task_id=detail_item.task_id,
-                        requested_resources=detail_item.requested_resources,
-                        attempt_number_of_instance=detail_item.attempt_number_of_instance,
-                        status=detail_item.status,
-                    )
+        viz_data = []
+        for detail_item in task_details_list:
+            viz_data.append(
+                TaskResourceVizItem(
+                    r=detail_item.r,
+                    m=detail_item.m,
+                    node_id=detail_item.node_id,
+                    task_id=detail_item.task_id,
+                    requested_resources=detail_item.requested_resources,
+                    attempt_number_of_instance=detail_item.attempt_number_of_instance,
+                    status=detail_item.status,
                 )
+            )
 
         return viz_data
