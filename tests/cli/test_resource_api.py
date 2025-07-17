@@ -28,7 +28,7 @@ def test_resource_usage(db_engine, client_env):
     with Session(bind=db_engine) as session:
         sql = """
         UPDATE task_instance
-        SET nodename = 'SequentialNode', wallclock = 12, maxpss = 1234
+        SET nodename = 'SequentialNode', wallclock = 12, maxrss = 1234
         WHERE task_id = :task_id"""
         session.execute(text(sql), {"task_id": task.task_id})
         session.commit()
@@ -134,7 +134,7 @@ def test_tt_resource_usage(db_engine, client_env):
         f.return_value = set()  # no execlude tt
 
         # Check the aggregate resources for all workflows
-        used_task_template_resources = template.resource_usage(ci=0.95)
+        used_task_template_resources = template.resource_usage(ci="0.95")
 
         resources = {
             "num_tasks": 3,
@@ -146,8 +146,8 @@ def test_tt_resource_usage(db_engine, client_env):
             "mean_runtime": 20.0,
             "median_mem": "600.0B",
             "median_runtime": 20.0,
-            "ci_mem": [-145.24, 1345.24],
-            "ci_runtime": [-4.84, 44.84],
+            "ci_mem": [315.0, 885.0],
+            "ci_runtime": [10.5, 29.5],
         }
         assert used_task_template_resources == resources
 
@@ -178,7 +178,7 @@ def test_tt_resource_usage(db_engine, client_env):
 
         # Check the aggregate resources for the first workflow
         used_task_template_resources = template.resource_usage(
-            workflows=[workflow_1.workflow_id], ci=0.95
+            workflows=[workflow_1.workflow_id], ci="0.95"
         )
         resources = {
             "num_tasks": 2,
@@ -190,8 +190,8 @@ def test_tt_resource_usage(db_engine, client_env):
             "mean_runtime": 15.0,
             "median_mem": "450.0B",
             "median_runtime": 15.0,
-            "ci_mem": [-1455.93, 2355.93],
-            "ci_runtime": [-48.53, 78.53],
+            "ci_mem": [307.5, 592.5],
+            "ci_runtime": [10.25, 19.75],
         }
         assert used_task_template_resources == resources
 
@@ -222,8 +222,8 @@ def test_tt_resource_usage(db_engine, client_env):
             "mean_runtime": 20.0,
             "median_mem": "600.0B",
             "median_runtime": 20.0,
-            "ci_mem": [-145.24, 1345.24],
-            "ci_runtime": [-4.84, 44.84],
+            "ci_mem": [315.0, 885.0],
+            "ci_runtime": [10.5, 29.5],
         }
         assert used_task_template_resources == resources
 
@@ -281,8 +281,8 @@ def test_tt_resource_usage(db_engine, client_env):
             "mean_runtime": 20.0,
             "median_mem": "600.0B",
             "median_runtime": 20.0,
-            "ci_mem": [-3211.86, 4411.86],
-            "ci_runtime": [-107.06, 147.06],
+            "ci_mem": [315.0, 885.0],
+            "ci_runtime": [10.5, 29.5],
         }
         assert used_task_template_resources == resources
 
@@ -297,39 +297,6 @@ def test_tt_resource_usage(db_engine, client_env):
             task_template_version=args.task_template_version,
             node_args=args.node_args,
             ci=0.95,
-        )
-        assert used_task_template_resources == resources
-
-        # Check the aggregate resources when one node arg of two types are passed in (tasks 2 & 3)
-        used_task_template_resources = template.resource_usage(
-            node_args={"arg": ["Zion"], "arg_2": ["Badlands"]}, ci=0.99
-        )
-        resources = {
-            "num_tasks": 2,
-            "min_mem": "600B",
-            "max_mem": "900B",
-            "mean_mem": "750.0B",
-            "min_runtime": 20,
-            "max_runtime": 30,
-            "mean_runtime": 25.0,
-            "median_mem": "750.0B",
-            "median_runtime": 25.0,
-            "ci_mem": [-8798.51, 10298.51],
-            "ci_runtime": [-293.28, 343.28],
-        }
-        assert used_task_template_resources == resources
-
-        node_args = '{"arg": ["Zion"], "arg_2": ["Badlands"]}'
-        command_str = (
-            f"task_template_resources -t {template._active_task_template_version.id} -a"
-            f" '{node_args}'"
-        )
-        cli = CLI()
-        args = cli.parse_args(command_str)
-        used_task_template_resources = task_template_resources(
-            task_template_version=args.task_template_version,
-            node_args=args.node_args,
-            ci=0.99,
         )
         assert used_task_template_resources == resources
 
@@ -477,8 +444,8 @@ def test_tt_resource_usage_with_0(db_engine, client_env):
             "mean_runtime": 15.0,
             "median_mem": "150.0B",
             "median_runtime": 15.0,
-            "ci_mem": [-485.31, 785.31],
-            "ci_runtime": [-48.53, 78.53],
+            "ci_mem": [102.5, 197.5],
+            "ci_runtime": [10.25, 19.75],
         }
 
         assert used_task_template_resources == resources

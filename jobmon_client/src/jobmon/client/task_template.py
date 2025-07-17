@@ -26,10 +26,10 @@ from jobmon.client.task import Task, validate_task_resource_scales
 from jobmon.client.task_template_version import TaskTemplateVersion
 from jobmon.core.constants import ExecludeTTVs, MaxConcurrentlyRunning
 from jobmon.core.exceptions import InvalidResponse
+from jobmon.core.jobmon_utils import resource_usage_converter
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import (
     SerializeClientTaskTemplate,
-    SerializeTaskTemplateResourceUsage,
 )
 
 if TYPE_CHECKING:
@@ -754,27 +754,8 @@ class TaskTemplate:
                 f"200. Response content: {response}"
             )
 
-        def format_bytes(value: Any) -> Optional[str]:
-            if value is not None:
-                return str(value) + "B"
-            else:
-                return value
-
-        kwargs = SerializeTaskTemplateResourceUsage.kwargs_from_wire(response)
-        resources = {
-            "num_tasks": kwargs["num_tasks"],
-            "min_mem": format_bytes(kwargs["min_mem"]),
-            "max_mem": format_bytes(kwargs["max_mem"]),
-            "mean_mem": format_bytes(kwargs["mean_mem"]),
-            "min_runtime": kwargs["min_runtime"],
-            "max_runtime": kwargs["max_runtime"],
-            "mean_runtime": kwargs["mean_runtime"],
-            "median_mem": format_bytes(kwargs["median_mem"]),
-            "median_runtime": kwargs["median_runtime"],
-            "ci_mem": kwargs["ci_mem"],
-            "ci_runtime": kwargs["ci_runtime"],
-        }
-        return resources
+        resource_usage = resource_usage_converter(response["result_viz"], ci)
+        return resource_usage
 
     def __repr__(self) -> str:
         """A representation string for a TaskTemplate instance."""

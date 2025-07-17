@@ -7,7 +7,7 @@ class TaskTemplateResourceUsageRequest(BaseModel):
     task_template_version_id: int
     workflows: Optional[List[int]] = None
     node_args: Optional[Dict[str, List[str]]] = None
-    ci: Optional[str] = None
+    ci: Optional[str | float] = None
     viz: bool = False
 
 
