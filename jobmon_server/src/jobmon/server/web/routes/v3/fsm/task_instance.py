@@ -234,11 +234,19 @@ async def log_error_worker_node(task_instance_id: int, request: Request) -> Any:
             error_state = data["error_state"]
             error_description = data["error_description"]
             try:
+                session.execute(
+                    select(Task)
+                    .where(Task.id == task_instance.task_id)
+                    .with_for_update()
+                ).scalar_one()
                 task_instance.transition(error_state)
+
+                # Add error log only if transition was successful
                 error = TaskInstanceErrorLog(
                     task_instance_id=task_instance.id, description=error_description
                 )
                 session.add(error)
+
             except InvalidStateTransition as e:
                 if task_instance.status == error_state:
                     logger.warning(e)
