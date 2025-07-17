@@ -15,6 +15,7 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
+from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.db import get_dialect_name, get_sessionmaker
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.dag import Dag
@@ -256,7 +257,12 @@ async def set_resume(workflow_id: int, request: Request) -> Any:
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
     try:
         data = cast(Dict, await request.json())
-        user_name = get_request_username(request)
+
+        # Check if auth is enabled via config
+        config = JobmonConfig()
+        auth_enabled = config.get_boolean("auth", "enabled")
+        if auth_enabled:
+            user_name = get_request_username(request)
 
         logger.info("Set resume for workflow")
         reset_running_jobs = bool(data["reset_running_jobs"])
@@ -276,9 +282,13 @@ async def set_resume(workflow_id: int, request: Request) -> Any:
                 .limit(1)
             )
             workflow_run = session.execute(wf_run_select_stmt).scalars().one_or_none()
-            if workflow:
+
+            # Only check ownership if auth is enabled
+            if workflow and auth_enabled:
                 if workflow_run.user != user_name:
                     raise HTTPException(status_code=401, detail="Unauthorized.")
+
+            if workflow:
                 # trigger resume on active workflow run
                 workflow.resume(reset_running_jobs)
                 session.flush()
@@ -345,7 +355,12 @@ async def update_max_running(workflow_id: int, request: Request) -> Any:
 
     try:
         new_limit = data["max_tasks"]
-        user_name = get_request_username(request)
+
+        # Check if auth is enabled via config
+        config = JobmonConfig()
+        auth_enabled = config.get_boolean("auth", "enabled")
+        if auth_enabled:
+            user_name = get_request_username(request)
     except KeyError as e:
         raise InvalidUsage(
             f"{str(e)} in request to {request.url.path}", status_code=400
@@ -363,7 +378,8 @@ async def update_max_running(workflow_id: int, request: Request) -> Any:
             )
             workflow_run = session.execute(wf_run_select_stmt).scalars().one_or_none()
 
-            if workflow:
+            # Only check ownership if auth is enabled
+            if workflow and auth_enabled:
                 if workflow_run.user != user_name:
                     raise HTTPException(status_code=401, detail="Unauthorized.")
 
@@ -557,7 +573,12 @@ async def update_array_max_running(workflow_id: int, request: Request) -> Any:
     try:
         new_limit = int(data["max_tasks"])
         task_template_version_id = data["task_template_version_id"]
-        user_name = get_request_username(request)
+
+        # Check if auth is enabled via config
+        config = JobmonConfig()
+        auth_enabled = config.get_boolean("auth", "enabled")
+        if auth_enabled:
+            user_name = get_request_username(request)
     except KeyError as e:
         raise InvalidUsage(
             f"{str(e)} in request to {request.url.path}", status_code=400
@@ -575,7 +596,8 @@ async def update_array_max_running(workflow_id: int, request: Request) -> Any:
             )
             workflow_run = session.execute(wf_run_select_stmt).scalars().one_or_none()
 
-            if workflow:
+            # Only check ownership if auth is enabled
+            if workflow and auth_enabled:
                 if workflow_run.user != user_name:
                     raise HTTPException(status_code=401, detail="Unauthorized.")
 
