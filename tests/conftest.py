@@ -21,7 +21,7 @@ from jobmon.core.requester import Requester
 
 logger = logging.getLogger(__name__)
 
-_api_prefix = "/api/v2"
+_api_prefix = "/api/v3"
 
 
 def pytest_sessionstart(session):
@@ -146,7 +146,7 @@ class WebServerProcess:
         }
         log_config.configure_logging(dict_config=dict_config)
 
-        app = get_app(versions=["v2"])
+        app = get_app(versions=["v3"])
         uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
 
     def __enter__(self) -> Any:
@@ -212,6 +212,13 @@ def client_env(web_server_process, monkeypatch):
     # Set the dynamic service URL to point to the local test server
     service_url = f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}'
     monkeypatch.setenv("JOBMON__HTTP__SERVICE_URL", service_url)
+    monkeypatch.setenv("JOBMON__HTTP__ROUTE_PREFIX", _api_prefix)
+    monkeypatch.setenv("JOBMON__HTTP__STOP_AFTER_DELAY", "0")
+    monkeypatch.setenv("JOBMON__HTTP__RETRIES_TIMEOUT", "0")
+    monkeypatch.setenv("JOBMON__DISTRIBUTOR__POLL_INTERVAL", "1")
+    monkeypatch.setenv("JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL", "1")
+    monkeypatch.setenv("JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL", "1")
+    monkeypatch.setenv("JOBMON__AUTH__ENABLED", "false")
 
     # Create requester instance that will use the test configuration
     requester = Requester.from_defaults()
