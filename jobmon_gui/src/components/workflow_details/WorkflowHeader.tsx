@@ -480,7 +480,7 @@ export default function WorkflowHeader({
                                         wf_id={wf_id}
                                         disabled={disabled}
                                     />
-                                    <Tooltip>
+                                    <Tooltip title="" placement="top">
                                         <IconButton
                                             color="primary"
                                             onClick={() => setShowInfoModal(true)}
@@ -510,7 +510,7 @@ export default function WorkflowHeader({
                                                         <span>Update Task Status</span>
                                                     </Tooltip>
                                                 </Box>
-                                                <Tooltip title="Task Status Information" placement="top">
+                                                <Tooltip title="" placement="top">
                                                     <IconButton
                                                         size="small"
                                                         color="primary"
@@ -630,7 +630,7 @@ export default function WorkflowHeader({
                                                     </Tooltip>
                                                 )}
                                             </Box>
-                                            <Tooltip title="Task Status Information" placement="top">
+                                            <Tooltip title="" placement="top">
                                                 <IconButton
                                                     size="small"
                                                     color="primary"
