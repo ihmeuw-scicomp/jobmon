@@ -16,71 +16,58 @@ import sqlalchemy
 import uvicorn
 from sqlalchemy.engine import Engine
 
-
 # SET UP TEST ENVIRONMENT VARIABLES BEFORE ANY JOBMON IMPORTS
 # This must happen before jobmon modules are imported because load_dotenv()
 # runs at module level in jobmon.core.configuration
+
+# Simple, elegant subprocess detection using process ID
+_main_process_pid = os.getpid()
+
+
+def _is_main_test_process():
+    """Check if we're in the main test process (not a subprocess)."""
+    return os.getpid() == _main_process_pid
+
+
 def _setup_test_environment():
-    """Set up test environment - override any external config with test settings."""
-    # Create a unique SQLite file in a temporary directory
+    """Set up complete test environment in pytest_sessionstart."""
+    if not _is_main_test_process():
+        print("Subprocess detected: Using test environment from parent process")
+        return None
+
+    # We're in the main process - create new database
     tmp_dir = tempfile.mkdtemp()
     sqlite_file = pathlib.Path(tmp_dir, "tests.sqlite").resolve()
 
-    print("Setting up test environment before module imports")
+    print("Setting up complete test environment")
     print(f"SQLite file created at: {sqlite_file}")
 
-    # Clean slate: Remove ALL existing JOBMON environment variables to avoid conflicts
-    jobmon_env_vars = [key for key in os.environ.keys() if key.startswith("JOBMON__")]
-    removed_vars = {}
-    for key in jobmon_env_vars:
-        removed_vars[key] = os.environ.pop(key)
-    if removed_vars:
-        print(f"Removed {len(removed_vars)} existing JOBMON environment variables")
-
-    # Set up clean test environment variables
-    test_env_vars = {
-        # Core test configuration
-        "JOBMON__CONFIG_FILE": "",  # Force use of env vars only
+    # Set complete test environment variables
+    complete_test_vars = {
+        # Core database configuration
         "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{sqlite_file}",
-        "JOBMON__SESSION__SECRET_KEY": "test",
-        # HTTP configuration (matching defaults but optimized for tests)
-        "JOBMON__HTTP__REQUEST_TIMEOUT": "20",
-        "JOBMON__HTTP__RETRIES_ATTEMPTS": "10",
-        "JOBMON__HTTP__RETRIES_TIMEOUT": "0",  # Fast failures in tests
-        "JOBMON__HTTP__ROUTE_PREFIX": _api_prefix,
-        "JOBMON__HTTP__SERVICE_URL": "",  # Set dynamically by client_env fixture
-        "JOBMON__HTTP__STOP_AFTER_DELAY": "0",  # No delays in tests
-        # Distributor configuration (faster polling for tests)
-        "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
-        # Heartbeat configuration (faster intervals for tests)
-        "JOBMON__HEARTBEAT__REPORT_BY_BUFFER": "3.1",
-        "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
-        "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
-        # OIDC configuration
-        "JOBMON__OIDC__NAME": "OIDC",
+        "JOBMON__DB__SQLALCHEMY_CONNECT_ARGS": "{}",  # No SSL for SQLite
+        # Essential test settings
         "JOBMON__AUTH__ENABLED": "false",
-        # OTLP configuration (disabled for tests)
-        "JOBMON__OTLP__HTTP_ENABLED": "false",
-        "JOBMON__OTLP__WEB_ENABLED": "false",
-        "JOBMON__OTLP__DEPLOYMENT_ENVIRONMENT": "test",
-        "JOBMON__OTLP__SPAN_EXPORTER": "",
-        "JOBMON__OTLP__LOG_EXPORTER": "",
-        # Reaper configuration
-        "JOBMON__REAPER__POLL_INTERVAL_MINUTES": "5",
-        # Worker node configuration
-        "JOBMON__WORKER_NODE__COMMAND_INTERRUPT_TIMEOUT": "10",
+        "JOBMON__HTTP__ROUTE_PREFIX": "/api/v3",
+        "JOBMON__SESSION__SECRET_KEY": "test",
+        # Performance optimizations for faster tests
+        "JOBMON__HTTP__STOP_AFTER_DELAY": "0",
+        "JOBMON__HTTP__RETRIES_TIMEOUT": "0",
+        "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
+        "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
+        "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
     }
 
-    # Apply all test environment variables
-    os.environ.update(test_env_vars)
+    os.environ.update(complete_test_vars)
+    print(f"Set {len(complete_test_vars)} test environment variables")
     return sqlite_file
 
 
-# Set up test environment immediately - this must happen before any jobmon imports
+# Now safe to import jobmon modules - load_dotenv() is skipped during tests
 _api_prefix = "/api/v3"
-_test_sqlite_file = _setup_test_environment()
 
-# Now it's safe to import jobmon modules
+# Import jobmon modules
 from jobmon.client.api import Tool
 from jobmon.core.requester import Requester
 
@@ -88,9 +75,18 @@ logger = logging.getLogger(__name__)
 
 
 def pytest_sessionstart(session):
-    """This now just logs that setup was done earlier."""
-    print("Test environment was set up at module import time")
-    print(f"Using SQLite file: {_test_sqlite_file}")
+    """Set up complete test environment and reset singletons for clean test state."""
+    print("=== pytest_sessionstart: Setting up test environment ===")
+
+    # Complete the test environment setup
+    _setup_test_environment()
+
+    print("=== Test environment setup complete ===")
+
+    # Log current test configuration for debugging
+    db_uri = os.environ.get("JOBMON__DB__SQLALCHEMY_DATABASE_URI", "NOT_SET")
+    print(f"Using database: {db_uri}")
+    print(f"Auth enabled: {os.environ.get('JOBMON__AUTH__ENABLED', 'NOT_SET')}")
 
 
 @pytest.fixture(scope="session")
@@ -239,13 +235,6 @@ def client_env(web_server_process, monkeypatch):
     # Set the dynamic service URL to point to the local test server
     service_url = f'http://{web_server_process["JOBMON_HOST"]}:{web_server_process["JOBMON_PORT"]}'
     monkeypatch.setenv("JOBMON__HTTP__SERVICE_URL", service_url)
-    monkeypatch.setenv("JOBMON__HTTP__ROUTE_PREFIX", _api_prefix)
-    monkeypatch.setenv("JOBMON__HTTP__STOP_AFTER_DELAY", "0")
-    monkeypatch.setenv("JOBMON__HTTP__RETRIES_TIMEOUT", "0")
-    monkeypatch.setenv("JOBMON__DISTRIBUTOR__POLL_INTERVAL", "1")
-    monkeypatch.setenv("JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL", "1")
-    monkeypatch.setenv("JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL", "1")
-    monkeypatch.setenv("JOBMON__AUTH__ENABLED", "false")
 
     # Create requester instance that will use the test configuration
     requester = Requester.from_defaults()

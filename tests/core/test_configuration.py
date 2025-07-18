@@ -22,8 +22,10 @@ def test_basic_configuration_methods(temp_yaml_file):
     """Test basic configuration retrieval methods."""
     config = JobmonConfig(filepath=str(temp_yaml_file))
 
-    # Test basic get method - returns strings
-    assert config.get("http", "request_timeout") == "20"
+    # Test basic get method - returns YAML-parsed values (not forced to strings)
+    assert (
+        config.get("http", "request_timeout") == 20
+    )  # YAML parses numeric values as int
 
     # Test typed get methods - return proper types
     assert config.get_int("http", "request_timeout") == 20

@@ -273,7 +273,9 @@ async def get_task_template_resource_usage(
 
         # Calculate statistics using repository method
         stats = repo.calculate_resource_statistics(
-            task_details=task_details, confidence_interval=request_data.ci
+            task_details=task_details,
+            confidence_interval=request_data.ci,
+            task_template_version_id=request_data.task_template_version_id,
         )
 
         # Prepare viz data if requested

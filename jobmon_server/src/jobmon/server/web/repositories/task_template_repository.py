@@ -225,59 +225,125 @@ class TaskTemplateRepository:
         self,
         task_details: List[TaskResourceDetailItem],
         confidence_interval: Optional[str] = None,
+        task_template_version_id: Optional[int] = None,
     ) -> ResourceUsageStatistics:
         """Calculate statistics from task details using scipy.stats."""
         if not task_details:
-            return ResourceUsageStatistics()
+            # Distinguish between "no tasks exist" vs "no tasks match filter"
+            if task_template_version_id is not None:
+                # Check if this task template version has ANY tasks at all
+                has_any_tasks_query = (
+                    select(Task.id)
+                    .select_from(TaskTemplateVersion)
+                    .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+                    .join(Task, Node.id == Task.node_id)
+                    .where(TaskTemplateVersion.id == task_template_version_id)
+                    .limit(1)
+                )
+                has_any_tasks = (
+                    self.session.execute(has_any_tasks_query).first() is not None
+                )
 
-        # Extract numeric data
-        runtimes = [float(item.r) for item in task_details if item.r is not None]
-        memories = [float(item.m) for item in task_details if item.m is not None]
+                if has_any_tasks:
+                    # Task template has tasks, but none match the filter
+                    num_tasks_value = 0
+                else:
+                    # Task template has never been used
+                    num_tasks_value = None
+            else:
+                # Fallback to None if no task_template_version_id provided
+                num_tasks_value = None
 
-        if not runtimes or not memories:
-            return ResourceUsageStatistics(num_tasks=len(task_details))
+            return ResourceUsageStatistics(
+                num_tasks=num_tasks_value,
+                min_mem=None,
+                max_mem=None,
+                mean_mem=None,
+                min_runtime=None,
+                max_runtime=None,
+                mean_runtime=None,
+                median_mem=None,
+                median_runtime=None,
+                ci_mem=None,
+                ci_runtime=None,
+            )
 
-        # Calculate basic statistics
-        stats = ResourceUsageStatistics(
-            num_tasks=len(task_details),
-            min_mem=int(min(memories)),
-            max_mem=int(max(memories)),
-            mean_mem=float(np.mean(memories)),
-            min_runtime=int(min(runtimes)),
-            max_runtime=int(max(runtimes)),
-            mean_runtime=float(np.mean(runtimes)),
-            median_mem=float(np.median(memories)),
-            median_runtime=float(np.median(runtimes)),
-        )
+        # Extract numeric data with business logic to handle edge cases (matching V2 behavior)
+        runtimes = [
+            float(item.r) for item in task_details if item.r is not None and item.r != 0
+        ]
+
+        # Calculate statistics separately for each data type
+        stats = ResourceUsageStatistics(num_tasks=len(task_details))
+
+        # Handle memory data: distinguish between "no data" vs "invalid data"
+        has_any_memory_data = any(item.m is not None for item in task_details)
+        if has_any_memory_data:
+            # We have memory data - clamp negative values to 0, then filter zeros for stats
+            memories_raw = [
+                max(0.0, float(item.m)) for item in task_details if item.m is not None
+            ]
+            memories_for_stats = [
+                m for m in memories_raw if m != 0
+            ]  # Filter out zeros for statistical calculations
+
+            # Calculate memory statistics
+            if memories_for_stats:
+                stats.min_mem = int(min(memories_for_stats))
+                stats.max_mem = int(max(memories_for_stats))
+                stats.mean_mem = float(np.mean(memories_for_stats))
+                stats.median_mem = float(np.median(memories_for_stats))
+            else:
+                # Had memory data but all were <= 0 (clamped to 0)
+                stats.min_mem = 0
+                stats.max_mem = 0
+                stats.mean_mem = 0.0
+                stats.median_mem = 0.0
+        # else: No memory data at all - leave as None (default in ResourceUsageStatistics)
+
+        # Calculate runtime statistics (default to 0 if no data, matching V2 behavior)
+        if runtimes:
+            stats.min_runtime = int(min(runtimes))
+            stats.max_runtime = int(max(runtimes))
+            stats.mean_runtime = float(np.mean(runtimes))
+            stats.median_runtime = float(np.median(runtimes))
+        else:
+            # Default to 0 when no runtime data (matching V2 behavior)
+            stats.min_runtime = 0
+            stats.max_runtime = 0
+            stats.mean_runtime = 0.0
+            stats.median_runtime = 0.0
 
         # Calculate confidence intervals if requested
-        if confidence_interval and len(runtimes) > 1:
+        if confidence_interval:
             ci_value = float(confidence_interval)
 
-            # Memory confidence interval
-            mem_mean = np.mean(memories)
-            mem_std = np.std(memories, ddof=1)
-            mem_ci = st.t.interval(
-                ci_value,
-                len(memories) - 1,
-                loc=mem_mean,
-                scale=mem_std / np.sqrt(len(memories)),
-            )
-            stats.ci_mem = [round(float(mem_ci[0]), 2), round(float(mem_ci[1]), 2)]
+            # Memory confidence interval (only if we have enough memory data)
+            if has_any_memory_data and len(memories_for_stats) > 1:
+                mem_mean = np.mean(memories_for_stats)
+                mem_std = np.std(memories_for_stats, ddof=1)
+                mem_ci = st.t.interval(
+                    ci_value,
+                    len(memories_for_stats) - 1,
+                    loc=mem_mean,
+                    scale=mem_std / np.sqrt(len(memories_for_stats)),
+                )
+                stats.ci_mem = [round(float(mem_ci[0]), 2), round(float(mem_ci[1]), 2)]
 
-            # Runtime confidence interval
-            runtime_mean = np.mean(runtimes)
-            runtime_std = np.std(runtimes, ddof=1)
-            runtime_ci = st.t.interval(
-                ci_value,
-                len(runtimes) - 1,
-                loc=runtime_mean,
-                scale=runtime_std / np.sqrt(len(runtimes)),
-            )
-            stats.ci_runtime = [
-                round(float(runtime_ci[0]), 2),
-                round(float(runtime_ci[1]), 2),
-            ]
+            # Runtime confidence interval (only if we have enough runtime data)
+            if len(runtimes) > 1:
+                runtime_mean = np.mean(runtimes)
+                runtime_std = np.std(runtimes, ddof=1)
+                runtime_ci = st.t.interval(
+                    ci_value,
+                    len(runtimes) - 1,
+                    loc=runtime_mean,
+                    scale=runtime_std / np.sqrt(len(runtimes)),
+                )
+                stats.ci_runtime = [
+                    round(float(runtime_ci[0]), 2),
+                    round(float(runtime_ci[1]), 2),
+                ]
 
         return stats
 

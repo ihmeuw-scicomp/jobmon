@@ -552,7 +552,14 @@ def _get_yaml_data(
                 f"Server returns HTTP error code: {rc} "
                 f"for /task_template_resource_usage."
             )
-        usage = SerializeTaskTemplateResourceUsage.kwargs_from_wire(res)
+        # Handle both new dictionary format and legacy format
+        if isinstance(res, dict) and key_map_m[v_mem] in res:
+            # New API response format - direct dictionary access
+            usage = res
+        else:
+            # Legacy format - use serializer
+            usage = SerializeTaskTemplateResourceUsage.kwargs_from_wire(res)
+
         ttvis_dic[int(ttv)].append(int(usage[key_map_m[v_mem]]))
         ttvis_dic[int(ttv)].append(int(usage[key_map_r[v_runtime]]))
 

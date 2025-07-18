@@ -28,7 +28,7 @@ def test_resource_usage(db_engine, client_env):
     with Session(bind=db_engine) as session:
         sql = """
         UPDATE task_instance
-        SET nodename = 'SequentialNode', wallclock = 12, maxpss = 1234
+        SET nodename = 'SequentialNode', wallclock = 12, maxrss = 1234
         WHERE task_id = :task_id"""
         session.execute(text(sql), {"task_id": task.task_id})
         session.commit()
@@ -519,7 +519,7 @@ def test_max_mem(db_engine, client_env):
         session.execute(text(query_1))
         session.commit()
     resources = template.resource_usage()
-    assert resources["max_mem"] == "0B"
+    assert resources["max_mem"] is None
 
     # return the other when 1 is null
     with Session(bind=db_engine) as session:
@@ -530,7 +530,7 @@ def test_max_mem(db_engine, client_env):
         session.execute(text(query_1))
         session.commit()
     resources = template.resource_usage()
-    assert resources["max_mem"] == "0B"
+    assert resources["max_mem"] is None
 
     with Session(bind=db_engine) as session:
         query_1 = f"""

@@ -665,7 +665,7 @@ def test_get_task_template_resource_usage(db_engine, tool):
         request_type="post",
     )
     assert return_code == 200
-    assert msg[0] == 2
+    assert msg["num_tasks"] == 2
 
     # two rows
     app_route = f"/task_template_resource_usage"
@@ -678,7 +678,7 @@ def test_get_task_template_resource_usage(db_engine, tool):
         request_type="post",
     )
     assert return_code == 200
-    assert msg[0] == 2
+    assert msg["num_tasks"] == 2
 
     # two rows
     app_route = f"/task_template_resource_usage"
@@ -691,7 +691,7 @@ def test_get_task_template_resource_usage(db_engine, tool):
         request_type="post",
     )
     assert return_code == 200
-    assert msg[0] == 2
+    assert msg["num_tasks"] == 2
 
     # one row
     app_route = f"/task_template_resource_usage"
@@ -704,7 +704,7 @@ def test_get_task_template_resource_usage(db_engine, tool):
         request_type="post",
     )
     assert return_code == 200
-    assert msg[0] == 1
+    assert msg["num_tasks"] == 1
 
     # 0 row
     app_route = f"/task_template_resource_usage"
@@ -717,7 +717,7 @@ def test_get_task_template_resource_usage(db_engine, tool):
         request_type="post",
     )
     assert return_code == 200
-    assert msg[0] is None
+    assert msg["num_tasks"] == 0
 
 
 def test_node_dependencies(client_env):

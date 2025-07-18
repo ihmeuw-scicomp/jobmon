@@ -70,13 +70,15 @@ class TaskTemplateResourceUsageResponse(BaseModel):
         """Provide formatted statistics similar to legacy client format."""
         return {
             "num_tasks": self.num_tasks,
-            "min_mem": f"{self.min_mem}B" if self.min_mem else None,
-            "max_mem": f"{self.max_mem}B" if self.max_mem else None,
-            "mean_mem": f"{self.mean_mem}B" if self.mean_mem else None,
+            "min_mem": f"{self.min_mem}B" if self.min_mem is not None else None,
+            "max_mem": f"{self.max_mem}B" if self.max_mem is not None else None,
+            "mean_mem": f"{self.mean_mem}B" if self.mean_mem is not None else None,
             "min_runtime": self.min_runtime,
             "max_runtime": self.max_runtime,
             "mean_runtime": self.mean_runtime,
-            "median_mem": f"{self.median_mem}B" if self.median_mem else None,
+            "median_mem": (
+                f"{self.median_mem}B" if self.median_mem is not None else None
+            ),
             "median_runtime": self.median_runtime,
             "ci_mem": self.ci_mem,
             "ci_runtime": self.ci_runtime,
