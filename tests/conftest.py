@@ -2,6 +2,7 @@ import logging
 import multiprocessing as mp
 import os
 import pathlib
+import platform
 import signal
 import sys
 import tempfile
@@ -153,7 +154,7 @@ class WebServerProcess:
         """Starts the web service process."""
         # start server
         # Use spawn on macOS to avoid fork warnings in multi-threaded environment
-        mp_method = "fork"
+        mp_method = "spawn" if platform.system() == "Darwin" else "fork"
         ctx = mp.get_context(mp_method)
         self.p1 = ctx.Process(target=self._run_server_with_handler)
         self.p1.start()

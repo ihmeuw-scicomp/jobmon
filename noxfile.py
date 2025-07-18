@@ -24,12 +24,7 @@ def tests(session: Session) -> None:
 
     # Set up environment variables
     test_env = {"SQLALCHEMY_WARN_20": "1"}
-    if sys.platform == "darwin":
-        # This is a workaround for a fork safety issue on macOS
-        test_env["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
-        
-    session.log(f"DEBUG: OBJC_DISABLE_INITIALIZE_FORK_SAFETY set to: {test_env['OBJC_DISABLE_INITIALIZE_FORK_SAFETY']}")
-
+   
     session.run(
         "coverage",
         "run",
