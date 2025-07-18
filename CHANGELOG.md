@@ -27,6 +27,8 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed pre-existing test failures related to configuration type handling and swarm test infrastructure.
 - Fixed missing transition_to_killed route in v3.
 - Fixed the v3 /workflow_overview_viz datatime input formatting restriction.
+- Modified the resource calculation for consistency across CLI and GUI
+- Fixed the CI calculation.
 
 ### Deprecated
 ### Removed
