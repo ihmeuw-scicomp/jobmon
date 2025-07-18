@@ -1,5 +1,8 @@
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
+import scipy.stats as st  # type: ignore
 import structlog
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -19,6 +22,24 @@ from jobmon.server.web.schemas.task_template import (
 )
 
 logger = structlog.get_logger(__name__)
+
+
+@dataclass
+class ResourceUsageStatistics:
+    """Clean data class for resource usage statistics."""
+
+    num_tasks: Optional[int] = None
+    min_mem: Optional[int] = None
+    max_mem: Optional[int] = None
+    mean_mem: Optional[float] = None
+    min_runtime: Optional[int] = None
+    max_runtime: Optional[int] = None
+    mean_runtime: Optional[float] = None
+    median_mem: Optional[float] = None
+    median_runtime: Optional[float] = None
+    ci_mem: Optional[List[Union[float, None]]] = None
+    ci_runtime: Optional[List[Union[float, None]]] = None
+    viz_data: Optional[List[TaskResourceVizItem]] = None
 
 
 class TaskTemplateRepository:
@@ -112,6 +133,7 @@ class TaskTemplateRepository:
                     node_args_on_db[name].append(str(val_db))
 
                 include_task_item = True
+                # Use AND logic - task matches only if ALL filter conditions match
                 for filter_arg_name, filter_arg_values_any in node_args.items():
                     filter_arg_values = [str(v) for v in filter_arg_values_any]
 
@@ -131,6 +153,8 @@ class TaskTemplateRepository:
 
                 if include_task_item:
                     node_args_filtered_tasks_intermediate.append(task_dict)
+                else:
+                    continue
 
             # Convert to Pydantic models after filtering
             for task_item_dict in node_args_filtered_tasks_intermediate:
@@ -162,6 +186,7 @@ class TaskTemplateRepository:
                         f"Data: {task_item_dict}"
                     )
                     continue
+
             return fetched_tasks_data
         else:
             # Convert to Pydantic models if no node_args filtering
@@ -195,6 +220,66 @@ class TaskTemplateRepository:
                     )
                     continue
             return fetched_tasks_data
+
+    def calculate_resource_statistics(
+        self,
+        task_details: List[TaskResourceDetailItem],
+        confidence_interval: Optional[str] = None,
+    ) -> ResourceUsageStatistics:
+        """Calculate statistics from task details using scipy.stats."""
+        if not task_details:
+            return ResourceUsageStatistics()
+
+        # Extract numeric data
+        runtimes = [float(item.r) for item in task_details if item.r is not None]
+        memories = [float(item.m) for item in task_details if item.m is not None]
+
+        if not runtimes or not memories:
+            return ResourceUsageStatistics(num_tasks=len(task_details))
+
+        # Calculate basic statistics
+        stats = ResourceUsageStatistics(
+            num_tasks=len(task_details),
+            min_mem=int(min(memories)),
+            max_mem=int(max(memories)),
+            mean_mem=float(np.mean(memories)),
+            min_runtime=int(min(runtimes)),
+            max_runtime=int(max(runtimes)),
+            mean_runtime=float(np.mean(runtimes)),
+            median_mem=float(np.median(memories)),
+            median_runtime=float(np.median(runtimes)),
+        )
+
+        # Calculate confidence intervals if requested
+        if confidence_interval and len(runtimes) > 1:
+            ci_value = float(confidence_interval)
+
+            # Memory confidence interval
+            mem_mean = np.mean(memories)
+            mem_std = np.std(memories, ddof=1)
+            mem_ci = st.t.interval(
+                ci_value,
+                len(memories) - 1,
+                loc=mem_mean,
+                scale=mem_std / np.sqrt(len(memories)),
+            )
+            stats.ci_mem = [round(float(mem_ci[0]), 2), round(float(mem_ci[1]), 2)]
+
+            # Runtime confidence interval
+            runtime_mean = np.mean(runtimes)
+            runtime_std = np.std(runtimes, ddof=1)
+            runtime_ci = st.t.interval(
+                ci_value,
+                len(runtimes) - 1,
+                loc=runtime_mean,
+                scale=runtime_std / np.sqrt(len(runtimes)),
+            )
+            stats.ci_runtime = [
+                round(float(runtime_ci[0]), 2),
+                round(float(runtime_ci[1]), 2),
+            ]
+
+        return stats
 
     def get_task_template_resource_usage(
         self, req: TaskTemplateResourceUsageRequest

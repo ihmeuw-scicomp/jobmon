@@ -11,11 +11,13 @@ All notable changes to Jobmon will be documented in this file.
 - Added enhanced OpenTelemetry database instrumentation with error capture for better observability.
 - Added JUnit XML report generation for test dashboard integration.
 - Added consolidated JSON logging fixture for server tests to improve test maintainability.
+- Added unified V3 API endpoint for task template resource usage statistics with comprehensive metrics including min, max, mean, and percentile calculations.
 
 ### Changed
 - Overhauled frontend resource utilization page for better performance and user experience.
 - Migrated project dependency management from pip-tools to UV workspace configuration.
 - Consolidated database session management and configuration for improved consistency and performance.
+- Enhanced Python client to handle string confidence interval parameters and new unified resource usage response format.
 
 ### Fixed
 - Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.
@@ -25,6 +27,8 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed OpenTelemetry instrumentation order to initialize before database access, preventing instrumentation issues.
 - Fixed test suite warnings and failures including AsyncIO deprecation warnings, Pydantic configuration warnings, Pandas FutureWarnings, and multiprocessing fork warnings on macOS.
 - Fixed pre-existing test failures related to configuration type handling and swarm test infrastructure.
+- Fixed configuration system to properly handle conflicts between primitive and nested environment variable assignments, preventing "TypeError: 'str' object does not support item assignment" during test environment setup.
+- Fixed test environment configuration by ensuring proper cleanup of existing JOBMON environment variables before setting test-specific SQLite database settings.
 
 ### Deprecated
 ### Removed

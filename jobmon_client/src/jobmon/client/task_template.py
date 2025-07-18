@@ -742,7 +742,7 @@ class TaskTemplate:
         if node_args:
             message["node_args"] = node_args
         if ci:
-            message["ci"] = ci
+            message["ci"] = str(ci)  # Convert to string for V3 API
         app_route = "/task_template_resource_usage"
         return_code, response = self.requester.send_request(
             app_route=app_route, message=message, request_type="post"
@@ -760,6 +760,28 @@ class TaskTemplate:
             else:
                 return value
 
+        # Handle the new Pydantic response format
+        if isinstance(response, dict):
+            # Use the formatted_stats property if available, otherwise format manually
+            if "formatted_stats" in response:
+                return response["formatted_stats"]
+            else:
+                # Manually format the response to match legacy format
+                return {
+                    "num_tasks": response.get("num_tasks"),
+                    "min_mem": format_bytes(response.get("min_mem")),
+                    "max_mem": format_bytes(response.get("max_mem")),
+                    "mean_mem": format_bytes(response.get("mean_mem")),
+                    "min_runtime": response.get("min_runtime"),
+                    "max_runtime": response.get("max_runtime"),
+                    "mean_runtime": response.get("mean_runtime"),
+                    "median_mem": format_bytes(response.get("median_mem")),
+                    "median_runtime": response.get("median_runtime"),
+                    "ci_mem": response.get("ci_mem"),
+                    "ci_runtime": response.get("ci_runtime"),
+                }
+
+        # Fallback to legacy serialization if response is not a dict
         kwargs = SerializeTaskTemplateResourceUsage.kwargs_from_wire(response)
         resources = {
             "num_tasks": kwargs["num_tasks"],

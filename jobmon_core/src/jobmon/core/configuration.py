@@ -195,7 +195,15 @@ class JobmonConfig:
                 if idx == len(path) - 1:  # last segment – assign
                     cur[seg_lower] = value
                 else:
-                    cur = cur.setdefault(seg_lower, {})
+                    # Handle case where target exists but is not a dict (e.g., primitive value)
+                    if seg_lower not in cur:
+                        cur[seg_lower] = {}
+                    elif not isinstance(cur[seg_lower], dict):
+                        # Convert primitive value to dict to allow nested assignment
+                        # This handles conflicts where parent key was set to a primitive value
+                        # but child keys also exist in environment variables
+                        cur[seg_lower] = {}
+                    cur = cur[seg_lower]
 
         for env_key, env_val in os.environ.items():
             if not env_key.startswith(prefix):

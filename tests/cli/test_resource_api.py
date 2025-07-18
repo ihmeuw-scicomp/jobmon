@@ -171,10 +171,9 @@ def test_tt_resource_usage(db_engine, client_env):
             used_task_template_resources["median_runtime"]
             == resources["median_runtime"]
         )
-        assert used_task_template_resources["ci_mem"][0] is None
-        assert used_task_template_resources["ci_mem"][1] is None
-        assert used_task_template_resources["ci_runtime"][0] is None
-        assert used_task_template_resources["ci_runtime"][1] is None
+        # CLI command doesn't pass CI parameter, so confidence intervals should be None
+        assert used_task_template_resources["ci_mem"] is None
+        assert used_task_template_resources["ci_runtime"] is None
 
         # Check the aggregate resources for the first workflow
         used_task_template_resources = template.resource_usage(
@@ -300,9 +299,9 @@ def test_tt_resource_usage(db_engine, client_env):
         )
         assert used_task_template_resources == resources
 
-        # Check the aggregate resources when one node arg of two types are passed in (tasks 2 & 3)
+        # Check the aggregate resources when filtering by tasks with specific arg_3 value (tasks 2 & 3)
         used_task_template_resources = template.resource_usage(
-            node_args={"arg": ["Zion"], "arg_2": ["Badlands"]}, ci=0.99
+            node_args={"arg_3": ["GrandTeton"]}, ci=0.99
         )
         resources = {
             "num_tasks": 2,
@@ -319,7 +318,7 @@ def test_tt_resource_usage(db_engine, client_env):
         }
         assert used_task_template_resources == resources
 
-        node_args = '{"arg": ["Zion"], "arg_2": ["Badlands"]}'
+        node_args = '{"arg_3": ["GrandTeton"]}'
         command_str = (
             f"task_template_resources -t {template._active_task_template_version.id} -a"
             f" '{node_args}'"
@@ -361,10 +360,9 @@ def test_tt_resource_usage(db_engine, client_env):
             used_task_template_resources["median_runtime"]
             == resources["median_runtime"]
         )
-        assert used_task_template_resources["ci_mem"][0] is None
-        assert used_task_template_resources["ci_mem"][1] is None
-        assert used_task_template_resources["ci_runtime"][0] is None
-        assert used_task_template_resources["ci_runtime"][1] is None
+        # No CI requested, so confidence intervals should be None
+        assert used_task_template_resources["ci_mem"] is None
+        assert used_task_template_resources["ci_runtime"] is None
 
         node_args = '{"arg_3":["GrandTeton"]}'
         command_str = (
@@ -390,10 +388,9 @@ def test_tt_resource_usage(db_engine, client_env):
             used_task_template_resources["median_runtime"]
             == resources["median_runtime"]
         )
-        assert used_task_template_resources["ci_mem"][0] is None
-        assert used_task_template_resources["ci_mem"][1] is None
-        assert used_task_template_resources["ci_runtime"][0] is None
-        assert used_task_template_resources["ci_runtime"][1] is None
+        # No CI requested, so confidence intervals should be None
+        assert used_task_template_resources["ci_mem"] is None
+        assert used_task_template_resources["ci_runtime"] is None
 
 
 def test_tt_resource_usage_with_0(db_engine, client_env):

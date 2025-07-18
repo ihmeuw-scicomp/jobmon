@@ -16,25 +16,28 @@ import sqlalchemy
 import uvicorn
 from sqlalchemy.engine import Engine
 
-from jobmon.client.api import Tool
-from jobmon.core.requester import Requester
 
-logger = logging.getLogger(__name__)
-
-_api_prefix = "/api/v3"
-
-
-def pytest_sessionstart(session):
+# SET UP TEST ENVIRONMENT VARIABLES BEFORE ANY JOBMON IMPORTS
+# This must happen before jobmon modules are imported because load_dotenv()
+# runs at module level in jobmon.core.configuration
+def _setup_test_environment():
     """Set up test environment - override any external config with test settings."""
     # Create a unique SQLite file in a temporary directory
     tmp_dir = tempfile.mkdtemp()
     sqlite_file = pathlib.Path(tmp_dir, "tests.sqlite").resolve()
 
-    print("Running code before test file import")
+    print("Setting up test environment before module imports")
     print(f"SQLite file created at: {sqlite_file}")
 
-    # Override all configuration via environment variables to bypass external config files
-    # This prevents interference from installer plugins or external configurations
+    # Clean slate: Remove ALL existing JOBMON environment variables to avoid conflicts
+    jobmon_env_vars = [key for key in os.environ.keys() if key.startswith("JOBMON__")]
+    removed_vars = {}
+    for key in jobmon_env_vars:
+        removed_vars[key] = os.environ.pop(key)
+    if removed_vars:
+        print(f"Removed {len(removed_vars)} existing JOBMON environment variables")
+
+    # Set up clean test environment variables
     test_env_vars = {
         # Core test configuration
         "JOBMON__CONFIG_FILE": "",  # Force use of env vars only
@@ -70,6 +73,24 @@ def pytest_sessionstart(session):
 
     # Apply all test environment variables
     os.environ.update(test_env_vars)
+    return sqlite_file
+
+
+# Set up test environment immediately - this must happen before any jobmon imports
+_api_prefix = "/api/v3"
+_test_sqlite_file = _setup_test_environment()
+
+# Now it's safe to import jobmon modules
+from jobmon.client.api import Tool
+from jobmon.core.requester import Requester
+
+logger = logging.getLogger(__name__)
+
+
+def pytest_sessionstart(session):
+    """This now just logs that setup was done earlier."""
+    print("Test environment was set up at module import time")
+    print(f"Using SQLite file: {_test_sqlite_file}")
 
 
 @pytest.fixture(scope="session")
@@ -84,10 +105,15 @@ def db_engine() -> Engine:
     config = get_jobmon_config()
     from jobmon.server.web.db import init_db
 
+    # Verify that our test environment setup worked
+    db_uri = config.get("db", "sqlalchemy_database_uri")
+    print(f"Database URI from config: {db_uri}")
+    assert "sqlite" in db_uri, f"Expected SQLite URI but got: {db_uri}"
+
     init_db()  # Then initialize DB (runs migrations + metadata load)
 
     # verify db created
-    eng = sqlalchemy.create_engine(config.get("db", "sqlalchemy_database_uri"))
+    eng = sqlalchemy.create_engine(db_uri)
     from sqlalchemy.orm import Session
 
     with Session(eng) as session:

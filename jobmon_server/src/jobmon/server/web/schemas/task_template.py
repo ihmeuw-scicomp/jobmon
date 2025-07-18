@@ -1,6 +1,6 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class TaskTemplateResourceUsageRequest(BaseModel):
@@ -28,16 +28,6 @@ class TaskResourceDetailItem(BaseModel):
     attempt_number_of_instance: Optional[int] = None  # Added field
     status: Optional[str] = None  # Added field: Will hold 'D', 'F', etc.
 
-    # Example for parsing if you choose to send requested_resources_obj
-    # @validator('requested_resources_obj', pre=True, always=True)
-    # def parse_requested_resources(cls, v, values):
-    #     if values.get('requested_resources'):
-    #         try:
-    #             return RequestedResourcesModel(**json.loads(values['requested_resources']))
-    #         except json.JSONDecodeError:
-    #             return None
-    #     return None
-
     model_config = ConfigDict(populate_by_name=True)
 
 
@@ -52,5 +42,42 @@ class TaskResourceVizItem(BaseModel):
 
 
 class TaskTemplateResourceUsageResponse(BaseModel):
-    # This field will only be present if viz=True in the request
+    """Unified response model for task template resource usage."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    # Core statistics (what both GUI and client need)
+    num_tasks: Optional[int] = None
+    min_mem: Optional[int] = None  # bytes
+    max_mem: Optional[int] = None  # bytes
+    mean_mem: Optional[float] = None  # bytes
+    min_runtime: Optional[int] = None  # seconds
+    max_runtime: Optional[int] = None  # seconds
+    mean_runtime: Optional[float] = None  # seconds
+    median_mem: Optional[float] = None  # bytes
+    median_runtime: Optional[float] = None  # seconds
+
+    # Confidence intervals (can be null for small datasets)
+    ci_mem: Optional[List[Union[float, None]]] = None
+    ci_runtime: Optional[List[Union[float, None]]] = None
+
+    # Visualization data (optional, only when viz=True)
     result_viz: Optional[List[TaskResourceVizItem]] = None
+
+    # Computed properties for client convenience
+    @computed_field
+    def formatted_stats(self) -> Dict[str, Any]:
+        """Provide formatted statistics similar to legacy client format."""
+        return {
+            "num_tasks": self.num_tasks,
+            "min_mem": f"{self.min_mem}B" if self.min_mem else None,
+            "max_mem": f"{self.max_mem}B" if self.max_mem else None,
+            "mean_mem": f"{self.mean_mem}B" if self.mean_mem else None,
+            "min_runtime": self.min_runtime,
+            "max_runtime": self.max_runtime,
+            "mean_runtime": self.mean_runtime,
+            "median_mem": f"{self.median_mem}B" if self.median_mem else None,
+            "median_runtime": self.median_runtime,
+            "ci_mem": self.ci_mem,
+            "ci_runtime": self.ci_runtime,
+        }
