@@ -623,6 +623,10 @@ class WorkflowRun:
 
     def get_swarm_commands(self) -> Generator[SwarmCommand, None, None]:
         """Generator to get next chunk of work to be done. Must be idempotent."""
+        # Sync concurrency limits from server before starting
+        self._synchronize_max_concurrently_running()
+        self._synchronize_array_max_concurrently_running()
+
         # compute capacities. max - active
         active_tasks: Set[SwarmTask] = set()
         for task_status in self._active_states:

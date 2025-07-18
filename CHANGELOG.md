@@ -25,6 +25,7 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed OpenTelemetry instrumentation order to initialize before database access, preventing instrumentation issues.
 - Fixed test suite warnings and failures including AsyncIO deprecation warnings, Pydantic configuration warnings, Pandas FutureWarnings, and multiprocessing fork warnings on macOS.
 - Fixed pre-existing test failures related to configuration type handling and swarm test infrastructure.
+- Sync concurrency limit before creating swam commands.
 
 ### Deprecated
 ### Removed
