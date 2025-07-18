@@ -512,7 +512,11 @@ def _get_yaml_data(
                 f"for /task_template_resource_usage."
             )
         usage = resource_usage_converter(res["result_viz"])
-        ttvis_dic[int(ttv)].append(int(usage[key_map_m[v_mem]]))
+        # remove the B from the memory value
+        mem_val = usage[key_map_m[v_mem]]
+        if str(mem_val).endswith("B"):
+            mem_val = str(mem_val)[:-1]
+        ttvis_dic[int(ttv)].append(int(float(mem_val)))
         ttvis_dic[int(ttv)].append(int(usage[key_map_r[v_runtime]]))
 
     # get queue
