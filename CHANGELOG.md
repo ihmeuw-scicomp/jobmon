@@ -11,6 +11,7 @@ All notable changes to Jobmon will be documented in this file.
 - Added enhanced OpenTelemetry database instrumentation with error capture for better observability.
 - Added JUnit XML report generation for test dashboard integration.
 - Added consolidated JSON logging fixture for server tests to improve test maintainability.
+- Added more information about stopping workflows and updating task statuses to the technical panel in the Jobmon GUI.
 - Added `Task Name` to the tooltip in the resource usage scatter plot.
 - Enabled filtering by `Task Name` in the resource usage scatter plot.
 - Added a `Download CSV button` to the resource usage page, allowing users to export all plot data regardless of filters.
