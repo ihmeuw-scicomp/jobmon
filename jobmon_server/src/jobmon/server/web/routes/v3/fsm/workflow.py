@@ -5,6 +5,7 @@ from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pandas as pd
+import psutil
 import sqlalchemy
 import structlog
 from fastapi import HTTPException, Request
@@ -612,7 +613,6 @@ async def task_template_dag(workflow_id: str) -> Any:
             query = (
                 session.query(
                     Edge.node_id,
-                    Edge.upstream_node_ids,
                     Edge.downstream_node_ids,
                     TaskTemplate.name,
                 )
@@ -628,50 +628,53 @@ async def task_template_dag(workflow_id: str) -> Any:
                 .filter(Edge.dag_id == dag_id)
             )
 
-            res = session.execute(query).fetchall()
+            rows = session.execute(query).fetchall()
 
-            results_list = [
-                {
-                    "node_id": row.node_id,
-                    "upstream_node_ids": row.upstream_node_ids,
-                    "downstream_node_ids": row.downstream_node_ids,
-                    "name": row.name,
-                }
-                for row in res
-            ]
+    node_to_name = {row.node_id: row.name for row in rows}
+    tt_dag_dict = {}
 
-    df = pd.DataFrame(results_list)
-    task_template_lookup = df[["node_id", "name"]]
-    df["downstream_node_ids"] = (
-        df["downstream_node_ids"]
-        .fillna("[]")
-        .str.rstrip('"]')
-        .str.lstrip('["')
-        .str.split(",")
-    )
+    for row in rows:
+        task_name = row.name
 
-    # Handle edge case where the is only one node
-    df = df.explode("downstream_node_ids")[["node_id", "downstream_node_ids"]]
-    df = df.loc[df["downstream_node_ids"] != ""].astype(int)
-    df = df.merge(task_template_lookup, on="node_id", how="left")
-    df = df.merge(
-        task_template_lookup.rename(
-            columns={
-                "name": "downstream_task_template_id",
-                "node_id": "downstream_node_ids",
-            }
-        ),
-        how="left",
-        on="downstream_node_ids",
-    )
+        if task_name not in tt_dag_dict:
+            tt_dag_dict[task_name] = set()
 
-    task_template_names_without_edges = task_template_lookup[["name"]]
-    task_template_names_without_edges["downstream_task_template_id"] = None
+        if row.downstream_node_ids:
+            downstream_str = str(row.downstream_node_ids).strip('[]"')
+            if downstream_str:
+                try:
+                    downstream_ids = [int(id_str.strip(' "')) for id_str in downstream_str.split(',') if
+                                      id_str.strip(' "')]
 
-    df = df[["name", "downstream_task_template_id"]]
-    df = pd.concat([df, task_template_names_without_edges]).drop_duplicates()
-    resp_content = {"tt_dag": df.to_dict(orient="records")}
+                    # Add downstream task names
+                    for downstream_id in downstream_ids:
+                        downstream_name = node_to_name.get(downstream_id)
+                        if downstream_name:
+                            tt_dag_dict[task_name].add(downstream_name)
+                except (ValueError, TypeError):
+                    # Handle malformed downstream_node_ids
+                    logger.warning(f"Malformed downstream_node_ids for node {row.node_id}: {row.downstream_node_ids}")
 
+    tt_dag = []
+    for name, downstream_names in tt_dag_dict.items():
+        if downstream_names:
+            for downstream_name in downstream_names:
+                tt_dag.append({
+                    "name": name,
+                    "downstream_task_template_id": downstream_name
+                })
+        else:
+            tt_dag.append({
+                "name": name,
+                "downstream_task_template_id": None
+            })
+
+    # Clean up intermediate data structures
+    del node_to_name
+    del tt_dag_dict
+    del rows
+
+    resp_content = {"tt_dag": tt_dag}
     resp = JSONResponse(
         content=resp_content,
         status_code=StatusCodes.OK,
