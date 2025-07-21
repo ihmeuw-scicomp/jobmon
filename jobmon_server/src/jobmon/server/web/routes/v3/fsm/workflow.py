@@ -4,8 +4,6 @@ from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Optional, Tuple, cast
 
-import pandas as pd
-import psutil
 import sqlalchemy
 import structlog
 from fastapi import HTTPException, Request
@@ -631,7 +629,7 @@ async def task_template_dag(workflow_id: str) -> Any:
             rows = session.execute(query).fetchall()
 
     node_to_name = {row.node_id: row.name for row in rows}
-    tt_dag_dict = {}
+    tt_dag_dict: dict[str, set[str]] = {}
 
     for row in rows:
         task_name = row.name
@@ -643,8 +641,11 @@ async def task_template_dag(workflow_id: str) -> Any:
             downstream_str = str(row.downstream_node_ids).strip('[]"')
             if downstream_str:
                 try:
-                    downstream_ids = [int(id_str.strip(' "')) for id_str in downstream_str.split(',') if
-                                      id_str.strip(' "')]
+                    downstream_ids = [
+                        int(id_str.strip(' "'))
+                        for id_str in downstream_str.split(",")
+                        if id_str.strip(' "')
+                    ]
 
                     # Add downstream task names
                     for downstream_id in downstream_ids:
@@ -653,21 +654,20 @@ async def task_template_dag(workflow_id: str) -> Any:
                             tt_dag_dict[task_name].add(downstream_name)
                 except (ValueError, TypeError):
                     # Handle malformed downstream_node_ids
-                    logger.warning(f"Malformed downstream_node_ids for node {row.node_id}: {row.downstream_node_ids}")
+                    logger.warning(
+                        f"Malformed downstream_node_ids for node "
+                        f"{row.node_id}: {row.downstream_node_ids}"
+                    )
 
-    tt_dag = []
+    tt_dag: list[dict[str, str | None]] = []
     for name, downstream_names in tt_dag_dict.items():
         if downstream_names:
             for downstream_name in downstream_names:
-                tt_dag.append({
-                    "name": name,
-                    "downstream_task_template_id": downstream_name
-                })
+                tt_dag.append(
+                    {"name": name, "downstream_task_template_id": downstream_name}
+                )
         else:
-            tt_dag.append({
-                "name": name,
-                "downstream_task_template_id": None
-            })
+            tt_dag.append({"name": name, "downstream_task_template_id": None})
 
     # Clean up intermediate data structures
     del node_to_name
