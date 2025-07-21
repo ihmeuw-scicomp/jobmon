@@ -30,13 +30,16 @@ interface UsageFiltersProps {
     availableAttempts: string[];
     availableStatuses: string[];
     availableResourceClusters: ResourceCluster[];
+    availableTaskNames: string[];
     selectedAttempts: Set<string>;
     selectedStatuses: Set<string>;
     selectedResourceClusters: Set<string>;
+    selectedTaskNames: Set<string>;
     showResourceZones: boolean;
     onSelectedAttemptsChange: (attempts: Set<string>) => void;
     onSelectedStatusesChange: (statuses: Set<string>) => void;
     onSelectedResourceClustersChange: (clusters: Set<string>) => void;
+    onSelectedTaskNamesChange: (taskNames: Set<string>) => void;
     onShowResourceZonesChange: (show: boolean) => void;
     onClearFilters: () => void;
     onResetFilters: () => void;
@@ -46,13 +49,16 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
     availableAttempts,
     availableStatuses,
     availableResourceClusters,
+    availableTaskNames,
     selectedAttempts,
     selectedStatuses,
     selectedResourceClusters,
+    selectedTaskNames,
     showResourceZones,
     onSelectedAttemptsChange,
     onSelectedStatusesChange,
     onSelectedResourceClustersChange,
+    onSelectedTaskNamesChange,
     onShowResourceZonesChange,
     onClearFilters,
     onResetFilters,
@@ -349,6 +355,80 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
                                         />
                                         <ListItemText
                                             primary={cluster.label}
+                                            primaryTypographyProps={{
+                                                fontSize: '0.875rem',
+                                            }}
+                                        />
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+
+                        <FormControl size="small" sx={{ minWidth: 250 }}>
+                            <InputLabel id="task-name-filter-label">
+                                Task Names
+                            </InputLabel>
+                            <Select
+                                labelId="task-name-filter-label"
+                                multiple
+                                value={Array.from(selectedTaskNames)}
+                                onChange={event => {
+                                    const {
+                                        target: { value },
+                                    } = event;
+                                    onSelectedTaskNamesChange(
+                                        new Set(
+                                            typeof value === 'string'
+                                                ? value.split(',')
+                                                : (value as string[])
+                                        )
+                                    );
+                                }}
+                                input={<OutlinedInput label="Task Names" />}
+                                renderValue={selected => (
+                                    <Box
+                                        display="flex"
+                                        flexWrap="wrap"
+                                        gap={0.5}
+                                    >
+                                        {selected.slice(0, 1).map(value => (
+                                            <Chip
+                                                key={value}
+                                                label={
+                                                    value.length > 20
+                                                        ? `${value.substring(0, 20)}...`
+                                                        : value
+                                                }
+                                                size="small"
+                                                color="secondary"
+                                                variant="outlined"
+                                            />
+                                        ))}
+                                        {selected.length > 1 && (
+                                            <Chip
+                                                label={`+${selected.length - 1}`}
+                                                size="small"
+                                                variant="outlined"
+                                            />
+                                        )}
+                                    </Box>
+                                )}
+                                MenuProps={{
+                                    PaperProps: { style: { maxHeight: 300 } },
+                                }}
+                            >
+                                {availableTaskNames.map(taskName => (
+                                    <MenuItem
+                                        key={taskName}
+                                        value={taskName}
+                                        dense
+                                    >
+                                        <Checkbox
+                                            checked={selectedTaskNames.has(taskName)}
+                                            size="small"
+                                        />
+                                        <ListItemText
+                                            primary={taskName}
                                             primaryTypographyProps={{
                                                 fontSize: '0.875rem',
                                             }}

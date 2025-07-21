@@ -12,11 +12,17 @@ All notable changes to Jobmon will be documented in this file.
 - Added JUnit XML report generation for test dashboard integration.
 - Added consolidated JSON logging fixture for server tests to improve test maintainability.
 - Added more information about stopping workflows and updating task statuses to the technical panel in the Jobmon GUI.
+- Added `Task Name` to the tooltip in the resource usage scatter plot.
+- Enabled filtering by `Task Name` in the resource usage scatter plot.
+- Added a `Download CSV button` to the resource usage page, allowing users to export all plot data regardless of filters.
 
 ### Changed
 - Overhauled frontend resource utilization page for better performance and user experience.
 - Migrated project dependency management from pip-tools to UV workspace configuration.
 - Consolidated database session management and configuration for improved consistency and performance.
+- Updated Workflow.add_tasks() parameter type from Sequence[Task] to Iterable[Task] to accept a broader range of iterable types including generators and iterators. (PR 279)
+- Expanded error message when a TaskInstance doesn't report a heartbeat.
+- Refactored task status update endpoint into smaller functions for better maintainability.
 
 ### Fixed
 - Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.
@@ -26,18 +32,11 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed OpenTelemetry instrumentation order to initialize before database access, preventing instrumentation issues.
 - Fixed test suite warnings and failures including AsyncIO deprecation warnings, Pydantic configuration warnings, Pandas FutureWarnings, and multiprocessing fork warnings on macOS.
 - Fixed pre-existing test failures related to configuration type handling and swarm test infrastructure.
-
-### Deprecated
-### Removed
-
-## [3.4.24] - TBD
-### Changed
-- Updated Workflow.add_tasks() parameter type from Sequence[Task] to Iterable[Task] to accept a broader range of iterable types including generators and iterators. (PR 279)
-
-### Fixed
 - Fixed ClientDisconnect exceptions appearing as errors in APM by adding global exception handler. (PR 282)
 - Fixed get_max_concurrently_running endpoint to handle non-existent workflows gracefully by returning a 404 error with descriptive message instead of raising an exception. (PR 278)
+- Fixed 'Set' object is not subscriptable in CLI error in `/update_statuses` route.
 
+### Fixed
 ## [3.4.23] - 2025-07-10
 ### Added
 - Added optional authentication support for Jobmon server and GUI (PR TBD). Authentication can now be disabled via `JOBMON__AUTH__ENABLED=false` server-side and `VITE_APP_AUTH_ENABLED=false` client-side environment variables for development and testing environments.
