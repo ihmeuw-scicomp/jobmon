@@ -65,48 +65,21 @@ def get_task_template_details_for_workflow(
 
 @api_v3_router.get("/get_task_template_version")
 def get_task_template_version_for_tasks(
-    task_id: Optional[int] = None, workflow_id: Optional[int] = None
+    task_id: Optional[int] = None, 
+    workflow_id: Optional[int] = None,
+    db: Session = Depends(get_db)
 ) -> Any:
-    """Get the task_template_version_ids."""
-    # parse args
-    t_id = task_id
-    wf_id = workflow_id
-    # This route only accept one task id or one wf id;
-    # If provided both, ignor wf id
-    with SessionMaker() as session:
-        with session.begin():
-            if t_id:
-                query_filter = [
-                    Task.id == t_id,
-                    Task.node_id == Node.id,
-                    Node.task_template_version_id == TaskTemplateVersion.id,
-                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
-                ]
-                sql = select(
-                    TaskTemplateVersion.id,
-                    TaskTemplate.name,
-                ).where(*query_filter)
-
-            else:
-                query_filter = [
-                    Task.workflow_id == wf_id,
-                    Task.node_id == Node.id,
-                    Node.task_template_version_id == TaskTemplateVersion.id,
-                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
-                ]
-                sql = (
-                    select(
-                        TaskTemplateVersion.id,
-                        TaskTemplate.name,
-                    ).where(*query_filter)
-                ).distinct()
-            rows = session.execute(sql).all()
-        column_names = ("id", "name")
-        ttvis = [dict(zip(column_names, ti)) for ti in rows]
-        resp = JSONResponse(
-            content={"task_template_version_ids": ttvis}, status_code=StatusCodes.OK
+    """Get the task_template_version_ids using repository pattern."""
+    tt_repo = TaskTemplateRepository(db)
+    result = tt_repo.get_task_template_versions(task_id=task_id, workflow_id=workflow_id)
+    
+    if result is None:
+        return JSONResponse(
+            content={"task_template_version_ids": []}, 
+            status_code=StatusCodes.OK
         )
-    return resp
+    
+    return result  # FastAPI will automatically serialize the Pydantic model
 
 
 @api_v3_router.get("/get_requested_cores")

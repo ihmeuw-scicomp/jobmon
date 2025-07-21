@@ -21,6 +21,8 @@ from jobmon.server.web.schemas.task_template import (
     TaskResourceVizItem,
     TaskTemplateResourceUsageRequest,
     TaskTemplateDetailsResponse,
+    TaskTemplateVersionItem,
+    TaskTemplateVersionResponse,
 )
 
 logger = structlog.get_logger(__name__)
@@ -418,4 +420,68 @@ class TaskTemplateRepository:
 
         return tt_details_data
 
+    def get_task_template_versions(self, 
+            task_id: Optional[int] = None, 
+            workflow_id: Optional[int] = None) -> Optional[TaskTemplateVersionResponse]:
+        """Get task template version IDs and names for a task or workflow.
+        
+        Args:
+            task_id: Optional task ID to get task template version for
+            workflow_id: Optional workflow ID to get all task template versions for
+            
+        Returns:
+            TaskTemplateVersionResponse with list of task template versions,
+            or None if no data found.
+            
+        Note:
+            If both task_id and workflow_id are provided, task_id takes precedence.
+        """
+        if task_id:
+            # Get task template version for specific task
+            query_filter = [
+                Task.id == task_id,
+                Task.node_id == Node.id,
+                Node.task_template_version_id == TaskTemplateVersion.id,
+                TaskTemplateVersion.task_template_id == TaskTemplate.id,
+            ]
+            sql = select(
+                TaskTemplateVersion.id,
+                TaskTemplate.name,
+            ).where(*query_filter)
+        elif workflow_id:
+            # Get all task template versions for workflow
+            query_filter = [
+                Task.workflow_id == workflow_id,
+                Task.node_id == Node.id,
+                Node.task_template_version_id == TaskTemplateVersion.id,
+                TaskTemplateVersion.task_template_id == TaskTemplate.id,
+            ]
+            sql = (
+                select(
+                    TaskTemplateVersion.id,
+                    TaskTemplate.name,
+                ).where(*query_filter)
+            ).distinct()
+        else:
+            # Neither task_id nor workflow_id provided
+            return None
+
+        rows = self.session.execute(sql).all()
+        
+        if not rows:
+            return None
+
+        # Convert rows to Pydantic models
+        task_template_versions = []
+        for row in rows:
+            task_template_versions.append(
+                TaskTemplateVersionItem(
+                    id=row.id,
+                    name=row.name
+                )
+            )
+
+        return TaskTemplateVersionResponse(
+            task_template_version_ids=task_template_versions
+        )
     

@@ -90,3 +90,14 @@ class TaskTemplateDetailsResponse(BaseModel):
     task_template_id: int
     task_template_name: str
     task_template_version_id: int
+
+
+class TaskTemplateVersionItem(BaseModel):
+    """Individual task template version item."""
+    id: int
+    name: str
+
+
+class TaskTemplateVersionResponse(BaseModel):
+    """Response model for task template version queries."""
+    task_template_version_ids: List[TaskTemplateVersionItem]
