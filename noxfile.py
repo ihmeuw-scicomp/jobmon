@@ -226,7 +226,7 @@ def update_locks(session: Session) -> None:
         # Optionally, you could make this an error: session.error("UV_EXTRA_INDEX_URL is required")
         # Or proceed, and let uv fail if the index is truly needed and not found in global pip.conf
 
-    python_target_version = "3.12" # Align with production Dockerfile Python version
+    python_target_version = "3.13" # Align with production Dockerfile Python version
     compile_args = [
         "--all-extras",
         f"--python={python_target_version}"
