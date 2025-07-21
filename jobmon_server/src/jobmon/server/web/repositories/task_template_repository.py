@@ -14,11 +14,13 @@ from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.task_resources import TaskResources
+from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.schemas.task_template import (
     TaskResourceDetailItem,
     TaskResourceVizItem,
     TaskTemplateResourceUsageRequest,
+    TaskTemplateDetailsResponse,
 )
 
 logger = structlog.get_logger(__name__)
@@ -380,3 +382,40 @@ class TaskTemplateRepository:
                 )
 
         return viz_data
+
+    def get_task_template_details(self, 
+            workflow_id: int, 
+            task_template_id: int) -> Optional[TaskTemplateDetailsResponse]:
+        """Get task template details."""
+        query_filter = [
+            Task.workflow_id == workflow_id,
+            Task.node_id == Node.id,
+            Node.task_template_version_id == TaskTemplateVersion.id,
+            TaskTemplateVersion.task_template_id == task_template_id,
+            TaskTemplateVersion.task_template_id == TaskTemplate.id,
+        ]
+
+        sql = (
+            select(
+                TaskTemplate.id,
+                TaskTemplate.name,
+                TaskTemplateVersion.id.label("task_template_version_id"),
+            )
+            .where(*query_filter)
+            .distinct()
+        )
+
+        row = self.session.execute(sql).one_or_none()
+
+        if row is None:
+            return None
+
+        tt_details_data = TaskTemplateDetailsResponse(
+            task_template_id=row.id,
+            task_template_name=row.name,
+            task_template_version_id=row.task_template_version_id,
+        )
+
+        return tt_details_data
+
+    

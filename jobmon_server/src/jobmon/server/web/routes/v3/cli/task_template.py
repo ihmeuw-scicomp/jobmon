@@ -48,43 +48,19 @@ DIALECT = get_dialect_name()
 def get_task_template_details_for_workflow(
     workflow_id: int = Query(..., ge=1),
     task_template_id: int = Query(..., ge=1),
+    db: Session = Depends(get_db)
 ) -> Any:
     """Fetch Task Template details (ID, Name, and Version) for a given Workflow."""
-    with SessionMaker() as session:
-        with session.begin():
-            query_filter = [
-                Task.workflow_id == workflow_id,
-                Task.node_id == Node.id,
-                Node.task_template_version_id == TaskTemplateVersion.id,
-                TaskTemplateVersion.task_template_id == task_template_id,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
-            ]
+    tt_repo = TaskTemplateRepository(db)
+    tt_details_data = tt_repo.get_task_template_details(workflow_id, task_template_id)
 
-            sql = (
-                select(
-                    TaskTemplate.id,
-                    TaskTemplate.name,
-                    TaskTemplateVersion.id.label("task_template_version_id"),
-                )
-                .where(*query_filter)
-                .distinct()
-            )
+    if tt_details_data is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Task Template not found for the given workflow.",
+        )
 
-            row = session.execute(sql).one_or_none()
-
-        if row is None:
-            raise HTTPException(
-                status_code=404,
-                detail="Task Template not found for the given workflow.",
-            )
-
-        tt_details_data = {
-            "task_template_id": row.id,
-            "task_template_name": row.name,
-            "task_template_version_id": row.task_template_version_id,
-        }
-
-        return JSONResponse(content=tt_details_data, status_code=StatusCodes.OK)
+    return tt_details_data
 
 
 @api_v3_router.get("/get_task_template_version")

@@ -84,3 +84,9 @@ class TaskTemplateResourceUsageResponse(BaseModel):
             "ci_mem": self.ci_mem,
             "ci_runtime": self.ci_runtime,
         }
+
+
+class TaskTemplateDetailsResponse(BaseModel):
+    task_template_id: int
+    task_template_name: str
+    task_template_version_id: int
