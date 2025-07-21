@@ -65,12 +65,15 @@ export default function Usage({
         selectedAttempts,
         selectedStatuses,
         selectedResourceClusters,
+        selectedTaskNames,
         availableAttempts,
         availableStatuses,
         availableResourceClusters,
+        availableTaskNames,
         setSelectedAttempts,
         setSelectedStatuses,
         setSelectedResourceClusters,
+        setSelectedTaskNames,
         resetFilters,
         clearFilters,
     } = useUsageFilters({ rawTaskNodesFromApi });
@@ -90,7 +93,8 @@ export default function Usage({
                             String(d.status || 'UNKNOWN').toUpperCase()
                         ) &&
                         (clusterKey === null ||
-                            selectedResourceClusters.has(clusterKey))
+                            selectedResourceClusters.has(clusterKey)) &&
+                        (!d.task_name || selectedTaskNames.has(d.task_name))
                     );
                 })
                 .map(item => {
@@ -110,6 +114,7 @@ export default function Usage({
         selectedAttempts,
         selectedStatuses,
         selectedResourceClusters,
+        selectedTaskNames,
     ]);
 
     // State for plot interactions
@@ -117,6 +122,102 @@ export default function Usage({
 
     // Add new state for resource zones toggle
     const [showResourceZones, setShowResourceZones] = useState(false);
+
+    // CSV download function
+    const downloadCSV = () => {
+        if (!rawTaskNodesFromApi || rawTaskNodesFromApi.length === 0) {
+            return;
+        }
+
+        // Process all raw data (not filtered)
+        const csvData = rawTaskNodesFromApi.map(item => {
+            const runtime = typeof item.r === 'number' ? item.r : null;
+            const memoryBytes = typeof item.m === 'number' ? item.m : null;
+            const memoryGiB = memoryBytes !== null ? bytes_to_gib(memoryBytes) : null;
+
+            // Extract requested resources
+            let requestedRuntime: number | undefined;
+            let requestedMemory: number | undefined;
+            try {
+                const reqRes = item.requested_resources
+                    ? JSON.parse(item.requested_resources)
+                    : {};
+                const reqRuntimeVal = Number(reqRes.runtime);
+                const reqMemoryVal = Number(reqRes.memory);
+                requestedRuntime =
+                    !isNaN(reqRuntimeVal) && reqRuntimeVal > 0
+                        ? reqRuntimeVal
+                        : undefined;
+                requestedMemory =
+                    !isNaN(reqMemoryVal) && reqMemoryVal > 0
+                        ? reqMemoryVal
+                        : undefined;
+            } catch {
+                // Skip invalid JSON, leave as undefined
+            }
+
+            return {
+                task_id: item.task_id,
+                task_name: item.task_name || '',
+                runtime_seconds: runtime,
+                memory_gib: memoryGiB,
+                memory_bytes: memoryBytes,
+                status: item.status || 'UNKNOWN',
+                attempt_number: item.attempt_number_of_instance || 1,
+                requested_runtime_seconds: requestedRuntime,
+                requested_memory_gib: requestedMemory,
+                node_id: item.node_id,
+                requested_resources_json: item.requested_resources || ''
+            };
+        });
+
+        // Create CSV content
+        const headers = [
+            'task_id',
+            'task_name',
+            'runtime_seconds',
+            'memory_gib',
+            'memory_bytes',
+            'status',
+            'attempt_number',
+            'requested_runtime_seconds',
+            'requested_memory_gib',
+            'node_id',
+            'requested_resources_json'
+        ];
+
+        const csvContent = [
+            headers.join(','),
+            ...csvData.map(row => 
+                headers.map(header => {
+                    const value = row[header as keyof typeof row];
+                    // Escape values that contain commas or quotes
+                    if (value === null || value === undefined) {
+                        return '';
+                    }
+                    const stringValue = String(value);
+                    if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+                        return `"${stringValue.replace(/"/g, '""')}"`;
+                    }
+                    return stringValue;
+                }).join(',')
+            )
+        ].join('\n');
+
+        // Create and download file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${taskTemplateName}_usage_data.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+    };
 
     // Calculate median requested resources from FILTERED nodes (dynamic based on current filters)
     const filteredRequestedRuntimes = useMemo(() => {
@@ -138,6 +239,7 @@ export default function Usage({
 
     const filteredScatterData = useMemo(() => {
         if (!rawTaskNodesFromApi) return [];
+        
         return rawTaskNodesFromApi
             .filter(d => {
                 const clusterKey = getResourceClusterKey(d.requested_resources);
@@ -149,7 +251,8 @@ export default function Usage({
                         String(d.status || 'UNKNOWN').toUpperCase()
                     ) &&
                     (clusterKey === null ||
-                        selectedResourceClusters.has(clusterKey))
+                        selectedResourceClusters.has(clusterKey)) &&
+                    (!d.task_name || selectedTaskNames.has(d.task_name))
                 );
             })
             .map((item): ScatterDataPoint | null => {
@@ -180,6 +283,8 @@ export default function Usage({
                     // Skip invalid JSON, leave as undefined
                 }
 
+                const taskName = item.task_name;
+
                 if (
                     runtime !== null &&
                     runtime > 0 &&
@@ -188,6 +293,7 @@ export default function Usage({
                 ) {
                     return {
                         task_id: item.task_id,
+                        task_name: taskName,
                         runtime: runtime,
                         memory: memoryGiB,
                         status: String(item.status || 'UNKNOWN').toUpperCase(),
@@ -204,6 +310,7 @@ export default function Usage({
         selectedAttempts,
         selectedStatuses,
         selectedResourceClusters,
+        selectedTaskNames,
     ]);
 
     // Determine which data to use for KPI calculations: selected data if available, otherwise filtered data
@@ -437,13 +544,16 @@ export default function Usage({
                 availableAttempts={availableAttempts}
                 availableStatuses={availableStatuses}
                 availableResourceClusters={availableResourceClusters}
+                availableTaskNames={availableTaskNames}
                 selectedAttempts={selectedAttempts}
                 selectedStatuses={selectedStatuses}
                 selectedResourceClusters={selectedResourceClusters}
+                selectedTaskNames={selectedTaskNames}
                 showResourceZones={showResourceZones}
                 onSelectedAttemptsChange={setSelectedAttempts}
                 onSelectedStatusesChange={setSelectedStatuses}
                 onSelectedResourceClustersChange={setSelectedResourceClusters}
+                onSelectedTaskNamesChange={setSelectedTaskNames}
                 onShowResourceZonesChange={setShowResourceZones}
                 onClearFilters={clearFilters}
                 onResetFilters={resetFilters}
@@ -459,6 +569,8 @@ export default function Usage({
                 showResourceZones={showResourceZones}
                 onTaskClick={handleScatterTaskClick}
                 onSelected={handleDataSelection}
+                onDownloadCSV={downloadCSV}
+                hasData={rawTaskNodesFromApi && rawTaskNodesFromApi.length > 0}
             />
         </Box>
     );

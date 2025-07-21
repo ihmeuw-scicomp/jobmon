@@ -17,12 +17,15 @@ interface UseUsageFiltersReturn {
     selectedAttempts: Set<string>;
     selectedStatuses: Set<string>;
     selectedResourceClusters: Set<string>;
+    selectedTaskNames: Set<string>;
     availableAttempts: string[];
     availableStatuses: string[];
     availableResourceClusters: ResourceCluster[];
+    availableTaskNames: string[];
     setSelectedAttempts: (attempts: Set<string>) => void;
     setSelectedStatuses: (statuses: Set<string>) => void;
     setSelectedResourceClusters: (clusters: Set<string>) => void;
+    setSelectedTaskNames: (taskNames: Set<string>) => void;
     resetFilters: () => void;
     clearFilters: () => void;
 }
@@ -40,6 +43,9 @@ export const useUsageFilters = ({
     const [selectedResourceClusters, setSelectedResourceClusters] = useState<
         Set<string>
     >(new Set());
+    const [selectedTaskNames, setSelectedTaskNames] = useState<Set<string>>(
+        new Set()
+    );
 
     // Calculate available filter options
     const availableAttempts = useMemo(() => {
@@ -66,6 +72,17 @@ export const useUsageFilters = ({
         return extractResourceClusters(rawTaskNodesFromApi);
     }, [rawTaskNodesFromApi]);
 
+    const availableTaskNames = useMemo(() => {
+        if (!rawTaskNodesFromApi) return [];
+        const taskNames = new Set<string>();
+        rawTaskNodesFromApi.forEach(d => {
+            if (d.task_name && d.task_name.trim()) {
+                taskNames.add(d.task_name);
+            }
+        });
+        return Array.from(taskNames).sort();
+    }, [rawTaskNodesFromApi]);
+
     // Initialize filters when data changes
     useEffect(() => {
         setSelectedAttempts(new Set(availableAttempts));
@@ -81,6 +98,10 @@ export const useUsageFilters = ({
         );
     }, [availableResourceClusters]);
 
+    useEffect(() => {
+        setSelectedTaskNames(new Set(availableTaskNames));
+    }, [availableTaskNames]);
+
     // Reset to defaults
     const resetFilters = () => {
         setSelectedAttempts(new Set(availableAttempts));
@@ -88,6 +109,7 @@ export const useUsageFilters = ({
         setSelectedResourceClusters(
             new Set(availableResourceClusters.map(cluster => cluster.id))
         );
+        setSelectedTaskNames(new Set(availableTaskNames));
     };
 
     // Clear all filters
@@ -97,18 +119,22 @@ export const useUsageFilters = ({
         setSelectedResourceClusters(
             new Set(availableResourceClusters.map(cluster => cluster.id))
         );
+        setSelectedTaskNames(new Set(availableTaskNames));
     };
 
     return {
         selectedAttempts,
         selectedStatuses,
         selectedResourceClusters,
+        selectedTaskNames,
         availableAttempts,
         availableStatuses,
         availableResourceClusters,
+        availableTaskNames,
         setSelectedAttempts,
         setSelectedStatuses,
         setSelectedResourceClusters,
+        setSelectedTaskNames,
         resetFilters,
         clearFilters,
     };

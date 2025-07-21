@@ -139,7 +139,12 @@ const RuntimeMemoryScatterPlot: React.FC<RuntimeMemoryScatterPlotProps> = ({
                         taskStatusMeta.UNKNOWN;
 
                     // Generate simplified tooltip with actual requested resources
-                    let tooltip = `<b>Task ${d.task_id}</b> (${pointStatusMeta.label})<br>`;
+                    let tooltip = `<b>Task ID: ${d.task_id}</b> (${pointStatusMeta.label})<br>`;
+                    
+                    // Add task name if available
+                    if (d.task_name) {
+                        tooltip += `<b>Task Name:</b> ${d.task_name}<br>`;
+                    }
 
                     // Runtime information
                     if (d.requestedRuntime) {
