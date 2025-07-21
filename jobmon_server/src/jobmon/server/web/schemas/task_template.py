@@ -94,10 +94,81 @@ class TaskTemplateDetailsResponse(BaseModel):
 
 class TaskTemplateVersionItem(BaseModel):
     """Individual task template version item."""
+
     id: int
     name: str
 
 
 class TaskTemplateVersionResponse(BaseModel):
     """Response model for task template version queries."""
+
     task_template_version_ids: List[TaskTemplateVersionItem]
+
+
+class CoreInfoItem(BaseModel):
+    """Individual core info item."""
+
+    id: int
+    min: int
+    max: int
+    avg: int
+
+
+class RequestedCoresResponse(BaseModel):
+    """Response model for requested cores queries."""
+
+    core_info: List[CoreInfoItem]
+
+
+class QueueInfoItem(BaseModel):
+    """Individual queue info item."""
+
+    id: int
+    queue: str
+    queue_id: int
+
+
+class MostPopularQueueResponse(BaseModel):
+    """Response model for most popular queue queries."""
+
+    queue_info: List[QueueInfoItem]
+
+
+class WorkflowTaskTemplateStatusItem(BaseModel):
+    """Individual workflow task template status item."""
+
+    id: int
+    name: str
+    tasks: int
+    PENDING: int
+    SCHEDULED: int
+    RUNNING: int
+    DONE: int
+    FATAL: int
+    MAXC: Union[int, str]  # Can be int or "NA"
+    num_attempts_min: Optional[float]
+    num_attempts_max: Optional[float]
+    num_attempts_avg: Optional[float]
+    task_template_version_id: int
+
+
+class ErrorLogItem(BaseModel):
+    """Individual error log item."""
+
+    task_id: int
+    task_instance_id: int
+    task_instance_err_id: int
+    error_time: str
+    error: str
+    task_instance_stderr_log: str
+    workflow_run_id: int
+    workflow_id: int
+
+
+class ErrorLogResponse(BaseModel):
+    """Response model for error log queries."""
+
+    error_logs: List[ErrorLogItem]
+    total_count: int
+    page: int
+    page_size: int
