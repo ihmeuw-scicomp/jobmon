@@ -1,6 +1,5 @@
 """Routes for Tasks."""
 
-import json
 from collections import defaultdict
 from datetime import datetime
 from http import HTTPStatus as StatusCodes

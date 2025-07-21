@@ -1,6 +1,5 @@
 """Repository for Task operations."""
 
-import json
 from typing import List, Optional, Set, Union
 
 import structlog
