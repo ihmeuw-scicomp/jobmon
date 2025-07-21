@@ -29,7 +29,6 @@ from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import (
     SerializeClientTaskTemplate,
-    SerializeTaskTemplateResourceUsage,
 )
 
 if TYPE_CHECKING:
@@ -754,49 +753,8 @@ class TaskTemplate:
                 f"200. Response content: {response}"
             )
 
-        def format_bytes(value: Any) -> Optional[str]:
-            if value is not None:
-                return str(value) + "B"
-            else:
-                return value
-
-        # Handle the new Pydantic response format
-        if isinstance(response, dict):
-            # Use the formatted_stats property if available, otherwise format manually
-            if "formatted_stats" in response:
-                return response["formatted_stats"]
-            else:
-                # Manually format the response to match legacy format
-                return {
-                    "num_tasks": response.get("num_tasks"),
-                    "min_mem": format_bytes(response.get("min_mem")),
-                    "max_mem": format_bytes(response.get("max_mem")),
-                    "mean_mem": format_bytes(response.get("mean_mem")),
-                    "min_runtime": response.get("min_runtime"),
-                    "max_runtime": response.get("max_runtime"),
-                    "mean_runtime": response.get("mean_runtime"),
-                    "median_mem": format_bytes(response.get("median_mem")),
-                    "median_runtime": response.get("median_runtime"),
-                    "ci_mem": response.get("ci_mem"),
-                    "ci_runtime": response.get("ci_runtime"),
-                }
-
-        # Fallback to legacy serialization if response is not a dict
-        kwargs = SerializeTaskTemplateResourceUsage.kwargs_from_wire(response)
-        resources = {
-            "num_tasks": kwargs["num_tasks"],
-            "min_mem": format_bytes(kwargs["min_mem"]),
-            "max_mem": format_bytes(kwargs["max_mem"]),
-            "mean_mem": format_bytes(kwargs["mean_mem"]),
-            "min_runtime": kwargs["min_runtime"],
-            "max_runtime": kwargs["max_runtime"],
-            "mean_runtime": kwargs["mean_runtime"],
-            "median_mem": format_bytes(kwargs["median_mem"]),
-            "median_runtime": kwargs["median_runtime"],
-            "ci_mem": kwargs["ci_mem"],
-            "ci_runtime": kwargs["ci_runtime"],
-        }
-        return resources
+        # Handle the V3 Pydantic response format
+        return response["formatted_stats"]
 
     def __repr__(self) -> str:
         """A representation string for a TaskTemplate instance."""
