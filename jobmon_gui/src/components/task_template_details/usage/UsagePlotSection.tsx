@@ -1,8 +1,8 @@
 // Plot section component for Usage analysis
 
 import React from 'react';
-import { Box, Paper, Skeleton, Typography } from '@mui/material';
-import { Info as InfoIcon } from '@mui/icons-material';
+import { Box, Paper, Skeleton, Typography, Button } from '@mui/material';
+import { Info as InfoIcon, Download as DownloadIcon } from '@mui/icons-material';
 import RuntimeMemoryScatterPlot from './RuntimeMemoryScatterPlot';
 import { ScatterDataPoint } from '@jobmon_gui/types/Usage';
 
@@ -15,6 +15,8 @@ interface UsagePlotSectionProps {
     showResourceZones: boolean;
     onTaskClick: (taskId: number | string) => void;
     onSelected: (selectedPoints: ScatterDataPoint[]) => void;
+    onDownloadCSV?: () => void;
+    hasData?: boolean;
 }
 
 const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
@@ -26,6 +28,8 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
     showResourceZones,
     onTaskClick,
     onSelected,
+    onDownloadCSV,
+    hasData = false,
 }) => {
     return (
         <Paper
@@ -39,14 +43,39 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
             }}
         >
             <Box sx={{ p: 3, pb: 1 }}>
-                <Typography
-                    variant="h6"
-                    fontWeight="bold"
-                    color="primary.main"
-                    sx={{ mb: 0.5 }}
-                >
-                    Interactive Scatter Plot
-                </Typography>
+                <Box sx={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    mb: 0.5 
+                }}>
+                    <Typography
+                        variant="h6"
+                        fontWeight="bold"
+                        color="primary.main"
+                    >
+                        Interactive Scatter Plot
+                    </Typography>
+                    {onDownloadCSV && (
+                        <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<DownloadIcon />}
+                            onClick={onDownloadCSV}
+                            disabled={!hasData}
+                            sx={{
+                                color: 'primary.main',
+                                borderColor: 'primary.main',
+                                '&:hover': {
+                                    borderColor: 'primary.dark',
+                                    backgroundColor: 'primary.light',
+                                },
+                            }}
+                        >
+                            Download CSV
+                        </Button>
+                    )}
+                </Box>
                 <Typography
                     variant="body2"
                     color="text.secondary"

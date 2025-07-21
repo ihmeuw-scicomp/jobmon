@@ -22,7 +22,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./jobmon_gui/src:/app/src:ro
+      - ./jobmon_gui/src:/app/src
     env_file:
       - .env  # Load environment variables from the .env file
 

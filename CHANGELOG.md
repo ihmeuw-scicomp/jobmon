@@ -13,12 +13,18 @@ All notable changes to Jobmon will be documented in this file.
 - Added consolidated JSON logging fixture for server tests to improve test maintainability.
 - Added unified V3 API endpoint for task template resource usage statistics with comprehensive metrics including min, max, mean, and percentile calculations.
 - Added missing `/array/{array_id}/transition_to_killed` endpoint to V3 API for proper KILL_SELF task status processing, completing V3 API feature parity with V2.
+- Added `Task Name` to the tooltip in the resource usage scatter plot.
+- Enabled filtering by `Task Name` in the resource usage scatter plot.
+- Added a `Download CSV button` to the resource usage page, allowing users to export all plot data regardless of filters.
 
 ### Changed
 - Overhauled frontend resource utilization page for better performance and user experience.
 - Migrated project dependency management from pip-tools to UV workspace configuration.
 - Consolidated database session management and configuration for improved consistency and performance.
 - Enhanced Python client to handle string confidence interval parameters and new unified resource usage response format.
+- Updated Workflow.add_tasks() parameter type from Sequence[Task] to Iterable[Task] to accept a broader range of iterable types including generators and iterators. (PR 279)
+- Expanded error message when a TaskInstance doesn't report a heartbeat.
+- Refactored task status update endpoint into smaller functions for better maintainability.
 
 ### Fixed
 - Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.
@@ -43,7 +49,9 @@ All notable changes to Jobmon will be documented in this file.
 ### Fixed
 - Fixed ClientDisconnect exceptions appearing as errors in APM by adding global exception handler. (PR 282)
 - Fixed get_max_concurrently_running endpoint to handle non-existent workflows gracefully by returning a 404 error with descriptive message instead of raising an exception. (PR 278)
+- Fixed 'Set' object is not subscriptable in CLI error in `/update_statuses` route.
 
+### Fixed
 ## [3.4.23] - 2025-07-10
 ### Added
 - Added optional authentication support for Jobmon server and GUI (PR TBD). Authentication can now be disabled via `JOBMON__AUTH__ENABLED=false` server-side and `VITE_APP_AUTH_ENABLED=false` client-side environment variables for development and testing environments.

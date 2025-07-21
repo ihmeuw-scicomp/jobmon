@@ -2,6 +2,7 @@
 
 export interface ScatterDataPoint {
     task_id: number | string;
+    task_name?: string;
     runtime: number;
     memory: number;
     status: string;
