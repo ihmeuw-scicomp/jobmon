@@ -5,12 +5,17 @@ services:
       dockerfile: ./jobmon_server/Dockerfile.local
       args:
         EDITABLE: "${EDITABLE:-true}"  # Default to true for local dev
-        EXTRAS: "${EXTRAS:-mysql}" # Default to common dev extras (adjust as needed)
+        EXTRAS: "${EXTRAS:-mysql,otlp}" # Include otlp for template system compatibility
     ports:
       - "8070:80"
     volumes:
       - ./jobmon_core:/app/jobmon_core:ro
       - ./jobmon_server:/app/jobmon_server:ro
+      - ./config:/app/config:ro  # Mount local config directory
+    environment:
+      # Jobmon Configuration
+      - JOBMON_CONFIG_PATH=/app/config/jobmonconfig.local.yaml
+
     env_file:
       - .env
     command: >
