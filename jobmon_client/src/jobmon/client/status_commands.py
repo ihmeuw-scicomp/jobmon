@@ -295,7 +295,6 @@ def update_task_status(
     user = getpass.getuser()
 
     validate_username(workflow_id, user, requester)
-    workflow_status = validate_workflow(task_ids, requester)
 
     # Validate the allowed statuses. For now, only "D" and "G" allowed.
     allowed_statuses = [TaskStatus.REGISTERING, TaskStatus.DONE]
@@ -331,7 +330,6 @@ def update_task_status(
         message={
             "task_ids": task_ids,
             "new_status": new_status,
-            "workflow_status": workflow_status,
             "workflow_id": workflow_id,
         },
         request_type="put",

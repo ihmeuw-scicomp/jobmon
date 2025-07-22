@@ -28,6 +28,7 @@ from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow import Workflow
+from jobmon.server.web.models.workflow_status import WorkflowStatus
 from jobmon.server.web.repositories.task_repository import TaskRepository
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
@@ -222,12 +223,11 @@ async def get_task_subdag(request: Request) -> Any:
 
 def parse_request_data(
     data: Dict,
-) -> tuple[str, bool, Optional[str], Union[List[int], str], str]:
+) -> tuple[str, bool, Union[List[int], str], str]:
     """Parse and validate request data."""
     try:
         workflow_id = data["workflow_id"]
         recursive = data.get("recursive", False)
-        workflow_status = data.get("workflow_status", None)
 
         task_ids = data["task_ids"]
         if isinstance(task_ids, int):
@@ -237,9 +237,53 @@ def parse_request_data(
 
         new_status = data["new_status"]
 
-        return workflow_id, recursive, workflow_status, task_ids, new_status
+        return workflow_id, recursive, task_ids, new_status
     except KeyError as e:
         raise InvalidUsage(f"problem with {str(e)} in request", status_code=400) from e
+
+
+def validate_workflow_for_update(task_ids: List[int], session: Session) -> str:
+    """Validate workflow status for task updates.
+    
+    Validates that:
+    - All tasks belong to the same workflow
+    - The workflow status allows updates (FAILED, DONE, ABORTED, HALTED)
+    
+    Returns:
+        The workflow status if validation passes
+        
+    Raises:
+        InvalidUsage if validation fails
+    """
+    # If the given list is empty, skip validation
+    if len(task_ids) == 0:
+        return ""
+
+    # Execute query to get workflow status
+    query_filter = [Task.workflow_id == Workflow.id, Task.id.in_(task_ids)]
+    sql = (
+        select(Task.workflow_id, Workflow.status).where(*query_filter)
+    ).distinct()
+    rows = session.execute(sql).all()
+    
+    workflow_statuses = [row[1] for row in rows]
+    
+    # Validate if all tasks are in the same workflow and the workflow status allows updates
+    if len(workflow_statuses) == 1 and workflow_statuses[0] in (
+        WorkflowStatus.FAILED,
+        WorkflowStatus.DONE,
+        WorkflowStatus.ABORTED,
+        WorkflowStatus.HALTED,
+    ):
+        return workflow_statuses[0]
+    else:
+        raise InvalidUsage(
+            "The workflow status of the given task ids are out of "
+            "scope of the following required statuses "
+            "(FAILED, DONE, ABORTED, HALTED) or multiple workflow statuses "
+            "were found.",
+            status_code=400
+        )
 
 
 def create_response(new_status: str) -> JSONResponse:
@@ -262,7 +306,7 @@ async def update_task_statuses(request: Request) -> Any:
         - When recursive=True, it updates the tasks and it's dependencies all
         the way up or down the DAG.
         - When recursive=False, it updates only the tasks in the task_ids list.
-        - When workflow_status is None, it gets the workflow status from the db.
+        - Validates workflow status before proceeding with updates.
         - After updating the tasks, it checks the workflow status and updates it.
 
     Notes:
@@ -271,12 +315,22 @@ async def update_task_statuses(request: Request) -> Any:
     data = cast(Dict, await request.json())
 
     # Parse and validate request data
-    workflow_id, recursive, workflow_status, task_ids, new_status = parse_request_data(
-        data
-    )
+    workflow_id, recursive, task_ids, new_status = parse_request_data(data)
 
     with SessionMaker() as session:
         with session.begin():
+            # Convert task_ids to list if not already for validation
+            task_ids_for_validation = task_ids
+            if isinstance(task_ids, str) and task_ids != "all":
+                raise InvalidUsage(f"Invalid task_ids value: {task_ids}", status_code=400)
+            elif task_ids == "all":
+                # Get all task IDs for validation
+                all_task_ids = session.query(Task.id).filter(Task.workflow_id == workflow_id).all()
+                task_ids_for_validation = [task_id for task_id, in all_task_ids]
+                
+            # Validate workflow status
+            workflow_status = validate_workflow_for_update(task_ids_for_validation, session)
+            
             task_repository = TaskRepository(session=session)
             task_repository.update_task_statuses(
                 workflow_id, recursive, workflow_status, task_ids, new_status
