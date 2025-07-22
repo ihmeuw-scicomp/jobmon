@@ -41,7 +41,7 @@ class TaskSubdagResponse(BaseModel):
     """Response model for task subdag."""
 
     workflow_id: Optional[int]
-    sub_task: Optional[Dict[str, Any]]
+    sub_task: Optional[Dict[int, Any]]  # Changed from str to int - keys are task IDs
 
 
 class TaskDependencyItem(BaseModel):

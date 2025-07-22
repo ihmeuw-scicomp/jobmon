@@ -4,10 +4,10 @@ from pydantic import BaseModel
 
 
 class ArrayTaskInstance(BaseModel):
-    task_id: int
-    task_name: str
-    array_name: str
-    task_instance_id: int
+    TASK_ID: int
+    TASK_NAME: str
+    ARRAY_NAME: str
+    TASK_INSTANCE_ID: int
     OUTPUT_PATH: str
     ERROR_PATH: str
 

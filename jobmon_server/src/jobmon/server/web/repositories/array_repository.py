@@ -55,10 +55,10 @@ class ArrayRepository:
 
         array_tasks = [
             ArrayTaskInstance(
-                task_id=row.task_id,
-                task_name=row.task_name,
-                array_name=row.array_name,
-                task_instance_id=row.task_instance_id,
+                TASK_ID=row.task_id,
+                TASK_NAME=row.task_name,
+                ARRAY_NAME=row.array_name,
+                TASK_INSTANCE_ID=row.task_instance_id,
                 OUTPUT_PATH=row.OUTPUT_PATH or "",
                 ERROR_PATH=row.ERROR_PATH or "",
             )

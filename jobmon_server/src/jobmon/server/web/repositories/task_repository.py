@@ -511,9 +511,20 @@ class TaskRepository:
         return TaskSubdagResponse(workflow_id=workflow_id, sub_task=sub_task_tree)
 
     def _get_subdag(self, node_ids: List[int], dag_id: int) -> List[int]:
-        """Get subdag nodes."""
-        # This is a simplified version - you may need to implement more complex logic
-        return node_ids
+        """Get all descendants of given nodes.
+
+        Args:
+            node_ids (list): list of node IDs
+            dag_id (int): ID of DAG
+        """
+        node_set = set(node_ids)
+        node_descendants = node_set
+        while len(node_descendants) > 0:
+            node_descendants = self._get_node_dependencies(
+                node_descendants, dag_id, Direction.DOWN
+            )
+            node_set = node_set.union(node_descendants)
+        return list(node_set)
 
     def get_task_dependencies(self, task_id: int) -> TaskDependenciesResponse:
         """Get task's downstream and upstream tasks and their status."""
