@@ -338,31 +338,53 @@ async def update_task_statuses(request: Request) -> Any:
     Notes:
         It integrated the logic in update_task_status from status_commands.py.
     """
-    data = cast(Dict, await request.json())
+    try:
+        data = cast(Dict, await request.json())
 
-    # Parse and validate request data
-    workflow_id, recursive, task_ids, new_status = parse_request_data(data)
+        # Parse and validate request data
+        workflow_id, recursive, task_ids, new_status = parse_request_data(data)
 
-    with SessionMaker() as session:
-        with session.begin():
-            # Convert task_ids to list if not already for validation
-            task_ids_for_validation = task_ids
-            if isinstance(task_ids, str) and task_ids != "all":
-                raise InvalidUsage(f"Invalid task_ids value: {task_ids}", status_code=400)
-            elif task_ids == "all":
-                # Get all task IDs for validation
-                all_task_ids = session.query(Task.id).filter(Task.workflow_id == workflow_id).all()
-                task_ids_for_validation = [task_id for task_id, in all_task_ids]
+        with SessionMaker() as session:
+            with session.begin():
+                # Convert task_ids to list if not already for validation
+                task_ids_for_validation = task_ids
+                if isinstance(task_ids, str) and task_ids != "all":
+                    raise InvalidUsage(f"Invalid task_ids value: {task_ids}", status_code=400)
+                elif task_ids == "all":
+                    # Get all task IDs for validation
+                    all_task_ids = session.query(Task.id).filter(Task.workflow_id == workflow_id).all()
+                    task_ids_for_validation = [task_id for task_id, in all_task_ids]
+                    
+                # Validate workflow status
+                workflow_status = validate_workflow_for_update(task_ids_for_validation, session)
                 
-            # Validate workflow status
-            workflow_status = validate_workflow_for_update(task_ids_for_validation, session)
+                task_repository = TaskRepository(session=session)
+                task_repository.update_task_statuses(
+                    workflow_id, recursive, workflow_status, task_ids, new_status
+                )
+                
+        # Success response with CORS headers
+        response = create_response(new_status)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "PUT, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+        
+    except Exception as error:
+        # Error response with CORS headers
+        status_code = getattr(error, "status_code", 500)
+        
+        # Use detail format for InvalidUsage errors, otherwise use generic format
+        if isinstance(error, InvalidUsage):
+            content = {"detail": str(error)}
+        else:
+            content = {"error": {"exception_message": str(error)}}
             
-            task_repository = TaskRepository(session=session)
-            task_repository.update_task_statuses(
-                workflow_id, recursive, workflow_status, task_ids, new_status
-            )
-            
-    return create_response(new_status)
+        response = JSONResponse(content=content, status_code=status_code)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "PUT, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
 
 
 @api_v3_router.get("/task_dependencies/{task_id}")

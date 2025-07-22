@@ -67,24 +67,6 @@ def _record_exception_in_span(error: Exception) -> None:
         logger.warning("Failed to record exception in span", record_error=str(e))
 
 
-def _get_error_content(error: Exception) -> dict:
-    """Extract appropriate error content format based on error type."""
-    error_class_name = error.__class__.__name__
-    
-    # For InvalidUsage and ServerError, return simplified format for frontend consumption
-    if error_class_name in ("InvalidUsage", "ServerError"):
-        return {"detail": str(error)}
-    
-    # For other errors, return detailed format
-    return {
-        "error": {
-            "type": str(type(error)),
-            "exception_message": str(error),
-            "status_code": str(getattr(error, "status_code", 500)),
-        }
-    }
-
-
 def _handle_error(
     request: Request, error: Exception, status_code: Optional[int] = None
 ) -> Any:
@@ -99,6 +81,12 @@ def _handle_error(
     if "deadlock found" in str(error).lower():
         status_code = 423
 
+    response_data = {
+        "type": str(type(error)),
+        "exception_message": str(error),
+        "status_code": str(status_code),
+    }
+
     # Enhanced logging with exception details
     logger.exception(
         "server encountered:",
@@ -109,21 +97,12 @@ def _handle_error(
         full_exception=str(error),
     )
 
-    content = _get_error_content(error)
+    rd = {"error": response_data}
     response = JSONResponse(
-        content=content,
-        media_type="application/json",
+        content=rd,
+        media_type="application/custom+json",
         status_code=status_code,
     )
-    
-    # Add CORS headers to error responses
-    origin = request.headers.get("origin", "")
-    if origin in ["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"]:
-        response.headers["Access-Control-Allow-Origin"] = origin
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
-    
     return response
 
 
