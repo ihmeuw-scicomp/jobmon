@@ -3,16 +3,15 @@
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, cast
 
-import sqlalchemy
 import structlog
-from fastapi import Request
+from fastapi import Depends, Request
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
 from jobmon.core import constants
-from jobmon.server.web.db import get_sessionmaker
+from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.arg import Arg
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
@@ -21,11 +20,10 @@ from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 logger = structlog.get_logger(__name__)
-SessionMaker = get_sessionmaker()
 
 
 @api_v3_router.post("/task_template")
-async def get_task_template(request: Request) -> Any:
+async def get_task_template(request: Request, db: Session = Depends(get_db)) -> Any:
     """Add a task template for a given tool to the database."""
     # check input variable
     data = cast(Dict, await request.json())
@@ -42,40 +40,37 @@ async def get_task_template(request: Request) -> Any:
 
     # add to DB
     try:
-        with SessionMaker() as session:
-            with session.begin():
-                task_template = TaskTemplate(tool_version_id=tool_version_id, name=name)
-                session.add(task_template)
-                session.flush()
-                session.refresh(task_template)
-                ttid = task_template.id
-    except sqlalchemy.exc.IntegrityError:
-        with SessionMaker() as session:
-            with session.begin():
-                select_stmt = select(TaskTemplate).where(
-                    TaskTemplate.tool_version_id == tool_version_id,
-                    TaskTemplate.name == name,
-                )
-                task_template = session.execute(select_stmt).scalars().one()
-                ttid = task_template.id
+        task_template = TaskTemplate(tool_version_id=tool_version_id, name=name)
+        db.add(task_template)
+        db.flush()
+        db.refresh(task_template)
+        ttid = task_template.id
+    except IntegrityError:
+        db.rollback()
+        select_stmt = select(TaskTemplate).where(
+            TaskTemplate.tool_version_id == tool_version_id,
+            TaskTemplate.name == name,
+        )
+        task_template = db.execute(select_stmt).scalars().one()
+        ttid = task_template.id
     resp = JSONResponse(content={"task_template_id": ttid}, status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.get("/task_template/{task_template_id}/versions")
-def get_task_template_versions(task_template_id: int) -> Any:
+def get_task_template_versions(
+    task_template_id: int, db: Session = Depends(get_db)
+) -> Any:
     """Get the task_template_version."""
     # get task template version object
     structlog.contextvars.bind_contextvars(task_template_id=task_template_id)
     logger.info(f"Getting task template version for task template: {task_template_id}")
 
-    with SessionMaker() as session:
-        with session.begin():
-            select_stmt = select(TaskTemplateVersion).where(
-                TaskTemplateVersion.task_template_id == task_template_id
-            )
-            ttvs = session.execute(select_stmt).scalars().all()
-            wire_obj = [ttv.to_wire_as_client_task_template_version() for ttv in ttvs]
+    select_stmt = select(TaskTemplateVersion).where(
+        TaskTemplateVersion.task_template_id == task_template_id
+    )
+    ttvs = db.execute(select_stmt).scalars().all()
+    wire_obj = [ttv.to_wire_as_client_task_template_version() for ttv in ttvs]
 
     resp = JSONResponse(
         content={"task_template_versions": wire_obj}, status_code=StatusCodes.OK
@@ -83,23 +78,23 @@ def get_task_template_versions(task_template_id: int) -> Any:
     return resp
 
 
-def _add_or_get_arg(name: str, session: Session) -> Arg:
+def _add_or_get_arg(name: str, db: Session) -> Arg:
     retries = 0
     while retries <= 5:
         try:
-            with session.begin():
-                arg = Arg(name=name)
-                session.add(arg)
-                session.flush()
-                break  # Successfully added, break the loop
+            arg = Arg(name=name)
+            db.add(arg)
+            db.flush()
+            break  # Successfully added, break the loop
         except IntegrityError:
-            with session.begin():
-                select_stmt = select(Arg).where(Arg.name == name)
-                arg = session.execute(select_stmt).scalars().one()
-                break  # Successfully retrieved, break the loop
+            db.rollback()
+            select_stmt = select(Arg).where(Arg.name == name)
+            arg = db.execute(select_stmt).scalars().one()
+            break  # Successfully retrieved, break the loop
         except OperationalError as e:
             if "Deadlock" in str(e):
                 retries += 1
+                db.rollback()
                 continue  # Deadlock detected, retrying
             else:
                 raise  # For other OperationalErrors, propagate the exception
@@ -107,7 +102,9 @@ def _add_or_get_arg(name: str, session: Session) -> Arg:
 
 
 @api_v3_router.post("/task_template/{task_template_id}/add_version")
-async def add_task_template_version(task_template_id: int, request: Request) -> Any:
+async def add_task_template_version(
+    task_template_id: int, request: Request, db: Session = Depends(get_db)
+) -> Any:
     """Add a tool to the database."""
     # check input variables
     structlog.contextvars.bind_contextvars(task_template_id=task_template_id)
@@ -130,56 +127,53 @@ async def add_task_template_version(task_template_id: int, request: Request) -> 
         constants.ArgType.TASK_ARG: [],
         constants.ArgType.OP_ARG: [],
     }
-    with SessionMaker() as session:
-        for arg_name in node_args:
-            arg_mapping_dct[constants.ArgType.NODE_ARG].append(
-                _add_or_get_arg(arg_name, session)
-            )
-        for arg_name in task_args:
-            arg_mapping_dct[constants.ArgType.TASK_ARG].append(
-                _add_or_get_arg(arg_name, session)
-            )
-        for arg_name in op_args:
-            arg_mapping_dct[constants.ArgType.OP_ARG].append(
-                _add_or_get_arg(arg_name, session)
-            )
 
-        try:
-            with session.begin():
-                ttv = TaskTemplateVersion(
-                    task_template_id=task_template_id,
-                    command_template=command_template,
-                    arg_mapping_hash=arg_mapping_hash,
+    for arg_name in node_args:
+        arg_mapping_dct[constants.ArgType.NODE_ARG].append(
+            _add_or_get_arg(arg_name, db)
+        )
+    for arg_name in task_args:
+        arg_mapping_dct[constants.ArgType.TASK_ARG].append(
+            _add_or_get_arg(arg_name, db)
+        )
+    for arg_name in op_args:
+        arg_mapping_dct[constants.ArgType.OP_ARG].append(_add_or_get_arg(arg_name, db))
+
+    try:
+        ttv = TaskTemplateVersion(
+            task_template_id=task_template_id,
+            command_template=command_template,
+            arg_mapping_hash=arg_mapping_hash,
+        )
+        db.add(ttv)
+        db.flush()
+
+        # get a lock
+        db.refresh(ttv, with_for_update=True)
+        for arg_type_id in arg_mapping_dct.keys():
+            for arg in arg_mapping_dct[arg_type_id]:
+                ctatm = TemplateArgMap(
+                    task_template_version_id=ttv.id,
+                    arg_id=arg.id,
+                    arg_type_id=arg_type_id,
                 )
-                session.add(ttv)
-                session.flush()
+                db.add(ctatm)
+        db.flush()
 
-                # get a lock
-                session.refresh(ttv, with_for_update=True)
-                for arg_type_id in arg_mapping_dct.keys():
-                    for arg in arg_mapping_dct[arg_type_id]:
-                        ctatm = TemplateArgMap(
-                            task_template_version_id=ttv.id,
-                            arg_id=arg.id,
-                            arg_type_id=arg_type_id,
-                        )
-                        session.add(ctatm)
-                session.flush()
+        task_template_version = ttv.to_wire_as_client_task_template_version()
 
-                task_template_version = ttv.to_wire_as_client_task_template_version()
+    except IntegrityError:
+        db.rollback()
+        # if another process is adding this task_template_version then this query
+        # should block until the template_arg_map has been populated and committed
+        select_stmt = select(TaskTemplateVersion).where(
+            TaskTemplateVersion.task_template_id == task_template_id,
+            TaskTemplateVersion.command_template == command_template,
+            TaskTemplateVersion.arg_mapping_hash == arg_mapping_hash,
+        )
+        ttv = db.execute(select_stmt).scalars().one()
 
-        except sqlalchemy.exc.IntegrityError:
-            with session.begin():
-                # if another process is adding this task_template_version then this query
-                # should block until the template_arg_map has been populated and committed
-                select_stmt = select(TaskTemplateVersion).where(
-                    TaskTemplateVersion.task_template_id == task_template_id,
-                    TaskTemplateVersion.command_template == command_template,
-                    TaskTemplateVersion.arg_mapping_hash == arg_mapping_hash,
-                )
-                ttv = session.execute(select_stmt).scalars().one()
-
-                task_template_version = ttv.to_wire_as_client_task_template_version()
+        task_template_version = ttv.to_wire_as_client_task_template_version()
     resp = JSONResponse(
         content={"task_template_version": task_template_version},
         status_code=StatusCodes.OK,
@@ -190,6 +184,7 @@ async def add_task_template_version(task_template_id: int, request: Request) -> 
 @api_v3_router.get("/task_template/id/{task_template_version_id}")
 def get_task_template_id_for_task_template_version(
     task_template_version_id: int,
+    db: Session = Depends(get_db),
 ) -> int:
     """Get the task_template_id for a given task_template_version_id."""
     structlog.contextvars.bind_contextvars(
@@ -199,12 +194,10 @@ def get_task_template_id_for_task_template_version(
         f"Getting task template id for task template version: {task_template_version_id}"
     )
 
-    with SessionMaker() as session:
-        with session.begin():
-            select_stmt = select(TaskTemplateVersion).where(
-                TaskTemplateVersion.id == task_template_version_id
-            )
-            ttv = session.execute(select_stmt).scalars().one()
-            ttid = ttv.task_template_id
+    select_stmt = select(TaskTemplateVersion).where(
+        TaskTemplateVersion.id == task_template_version_id
+    )
+    ttv = db.execute(select_stmt).scalars().one()
+    ttid = ttv.task_template_id
 
-    return ttid
+    return int(ttid)  # type: ignore
