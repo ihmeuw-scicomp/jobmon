@@ -157,6 +157,7 @@ async def add_task_template_version(
                     arg_id=arg.id,
                     arg_type_id=arg_type_id,
                 )
+                ctatm.argument = arg  # Explicitly set the relationship
                 db.add(ctatm)
         db.flush()
 
