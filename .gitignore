@@ -50,3 +50,4 @@ node_modules/*
 
 # Ignore design documents folder
 /design/
+/config/*
