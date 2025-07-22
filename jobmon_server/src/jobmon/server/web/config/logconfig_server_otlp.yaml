@@ -1,0 +1,75 @@
+# Server-specific logconfig for jobmon WITH OTLP ENABLED
+# This uses shared templates from core and enables OTLP logging for all server logs
+
+version: 1
+disable_existing_loggers: false
+
+# Import shared formatters from core templates
+formatters: !template formatters
+
+# Server handlers
+handlers:
+  # Shared console handler patterns
+  console_default:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: console_default
+
+  console_structlog:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: structlog_text
+
+  console_json:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: structlog_json
+
+  # OTLP handler for server libraries (ENABLED) - uses shared exporter config
+  otlp_server:
+    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+    level: INFO
+    formatter: otlp_default
+    exporter: !template otlp_grpc_exporter
+
+  # OTLP handler with structlog for server jobmon logs (ENABLED)
+  otlp_structlog:
+    class: jobmon.server.web.otlp.ServerOTLPStructlogHandler
+    level: INFO
+    formatter: structlog_json
+    exporter: !template otlp_grpc_exporter
+
+# Server logger configurations WITH OTLP ENABLED
+loggers:
+  # Server jobmon logging with structlog (console + OTLP enabled)
+  jobmon:
+    handlers: [console_structlog, otlp_structlog]  # OTLP ENABLED
+    level: INFO
+    propagate: false
+
+  # Server web module (console + OTLP enabled)
+  jobmon.server.web:
+    handlers: [console_structlog, otlp_structlog]  # OTLP ENABLED
+    level: INFO
+    propagate: false
+
+  # Standard server library loggers (console + OTLP enabled)
+  sqlalchemy:
+    handlers: [console_default, otlp_server]  # OTLP ENABLED
+    level: WARN
+    propagate: false
+
+  uvicorn.access:
+    handlers: [console_default, otlp_server]  # OTLP ENABLED
+    level: INFO
+    propagate: false
+
+  uvicorn.error:
+    handlers: [console_default, otlp_server]  # OTLP ENABLED
+    level: INFO
+    propagate: false
+
+# Root logger fallback (console only)
+root:
+  handlers: [console_default]
+  level: WARNING 

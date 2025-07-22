@@ -1,0 +1,42 @@
+# Requester-specific logconfig for jobmon core WITH OTLP ENABLED
+# This focuses solely on the requester component for HTTP tracing and logging
+
+version: 1
+disable_existing_loggers: false
+
+# Import shared formatters from templates
+formatters: !template formatters
+
+# Requester handlers
+handlers:
+  # Console handler for requester development (always enabled)
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: console_default
+
+  # OTLP handler for requester (ENABLED) - captures HTTP requests and responses
+  otlp_requester:
+    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+    level: INFO
+    formatter: otlp_default
+    exporter: !template otlp_grpc_exporter
+
+# Requester logger configurations WITH OTLP ENABLED
+loggers:
+  # Core requester logging (console + OTLP enabled) - the primary target
+  jobmon.core.requester:
+    handlers: [console, otlp_requester]  # OTLP ENABLED for HTTP tracing
+    level: INFO
+    propagate: false
+
+  # General core logging (console only - not traced)
+  jobmon.core:
+    handlers: [console]
+    level: INFO
+    propagate: false
+
+# Root logger fallback (console only)
+root:
+  handlers: [console]
+  level: WARNING 

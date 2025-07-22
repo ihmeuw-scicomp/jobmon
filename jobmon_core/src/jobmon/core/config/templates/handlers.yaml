@@ -1,0 +1,35 @@
+# Shared handler templates for jobmon logging
+# These reference shared formatters and can be customized in specific configs
+
+handlers:
+  # Console handler template for general logging
+  console_template: &console_template
+    class: logging.StreamHandler
+    level: INFO
+    formatter: console_default
+
+  # Console handler template for structlog (server-specific)
+  console_structlog_template: &console_structlog_template
+    class: logging.StreamHandler
+    level: INFO
+    formatter: structlog_text
+
+  # Console handler template for JSON output (production)
+  console_json_template: &console_json_template
+    class: logging.StreamHandler
+    level: INFO
+    formatter: structlog_json
+
+  # Base OTLP handler template (without exporter - to be added in configs)
+  otlp_base_template: &otlp_base_template
+    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+    level: INFO
+    formatter: otlp_default
+    # exporter config to be added by importing configs
+
+  # Server OTLP structlog handler template (without exporter)
+  otlp_structlog_template: &otlp_structlog_template
+    class: jobmon.server.web.otlp.ServerOTLPStructlogHandler
+    level: INFO
+    formatter: structlog_json
+    # exporter config to be added by importing configs 

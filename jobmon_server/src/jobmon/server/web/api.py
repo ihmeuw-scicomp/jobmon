@@ -49,15 +49,17 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     USE_OTEL = config.get_boolean("otlp", "web_enabled")
     if USE_OTEL:
         # Import OTel modules here to avoid unnecessary imports when OTel is disabled
-        from jobmon.core.otlp import OtlpAPI, add_span_details_processor
+        from jobmon.core.otlp import add_span_details_processor
+        from jobmon.server.web.otlp import get_server_otlp_manager
 
-        otlp_api = OtlpAPI()
+        # Initialize server OTLP manager
+        server_otlp = get_server_otlp_manager()
 
         # Instrument SQLAlchemy BEFORE any engine creation
-        otlp_api.instrument_sqlalchemy()
-        otlp_api.instrument_requests()
+        server_otlp.instrument_sqlalchemy()
+        server_otlp.instrument_requests()
 
-        otlp_api.instrument_app(app)
+        server_otlp.instrument_app(app)
         configure_structlog([add_span_details_processor])
     else:  # Configure structlog without OTLP
         configure_structlog()

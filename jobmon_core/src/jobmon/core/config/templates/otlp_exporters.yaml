@@ -1,0 +1,39 @@
+# Shared OTLP exporter templates for jobmon logging
+# These contain common exporter configurations used by both client and server
+
+# Base OTLP exporter configuration
+base_otlp_exporter: &base_otlp_exporter
+  module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+  class: OTLPLogExporter
+  endpoint: http://localhost:4317  # Default localhost endpoint
+  options:
+    - ["grpc.max_send_message_length", 16777216]    # 16MB
+    - ["grpc.max_receive_message_length", 16777216] # 16MB
+
+# Base batch processor settings
+base_batch_settings: &base_batch_settings
+  max_export_batch_size: 8
+  export_timeout_millis: 5000
+  schedule_delay_millis: 1000
+  max_queue_size: 256
+
+# Standard OTLP exporter (combines base + batch settings)
+otlp_grpc_exporter: &otlp_grpc_exporter
+  <<: *base_otlp_exporter
+  <<: *base_batch_settings
+
+# Development exporter (smaller batches, faster exports)  
+otlp_dev_exporter: &otlp_dev_exporter
+  <<: *base_otlp_exporter
+  max_export_batch_size: 4
+  export_timeout_millis: 2000
+  schedule_delay_millis: 500
+  max_queue_size: 128
+
+# Production exporter (larger batches, optimized for throughput)
+otlp_prod_exporter: &otlp_prod_exporter  
+  <<: *base_otlp_exporter
+  max_export_batch_size: 16
+  export_timeout_millis: 10000
+  schedule_delay_millis: 2000
+  max_queue_size: 512 

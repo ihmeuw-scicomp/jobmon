@@ -1,0 +1,25 @@
+# Shared formatter templates for jobmon logging
+# These can be referenced using !template formatter_name
+
+formatters:
+  # Simple console formatter for general use
+  console_default: &console_default_formatter
+    format: "%(levelname)s [%(name)s] %(message)s"
+
+  # OTLP formatter with span details for tracing integration
+  otlp_default: &otlp_default_formatter
+    "()": jobmon.core.otlp.JobmonOTLPFormatter
+    format: "%(asctime)s [%(levelname)s] [trace_id=%(trace_id)s, span_id=%(span_id)s, parent_span_id=%(parent_span_id)s] - %(message)s"
+
+  # Structlog text formatter for development (requires structlog)
+  structlog_text: &structlog_text_formatter
+    "()": structlog.stdlib.ProcessorFormatter
+    processor: structlog.dev.ConsoleRenderer
+    keep_exc_info: true
+    keep_stack_info: true
+
+  # Structlog JSON formatter for production (requires structlog)
+  structlog_json: &structlog_json_formatter
+    "()": structlog.stdlib.ProcessorFormatter
+    processor: structlog.processors.JSONRenderer
+    foreign_pre_chain: [] 

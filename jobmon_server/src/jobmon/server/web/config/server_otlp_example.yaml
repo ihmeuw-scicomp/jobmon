@@ -1,0 +1,27 @@
+# Example server configuration for enabling OTLP
+# This file shows how to enable server OTLP and optionally override the default endpoint
+
+# Database configuration
+db:
+  host: localhost
+  port: 3306
+  database: jobmon
+
+# Enable OTLP for server
+otlp:
+  http_enabled: false  # Not used by server
+  web_enabled: true    # Enable server OTLP
+  deployment_environment: prod
+  # Optional: Override the default endpoint from logconfig_server_otlp.yaml
+  # If not specified, will use http://localhost:4317 from the logconfig file
+  endpoint: http://your-otel-collector:4317
+
+# Note: The complete server logging configuration is in logconfig_server_otlp.yaml
+# When web_enabled is true, the server automatically uses that file and optionally
+# overrides the endpoint with the value above.
+# 
+# Server OTLP includes:
+# - FastAPI instrumentation
+# - SQLAlchemy instrumentation  
+# - Structured logging with OTLP export
+# - Console + OTLP for all server logs 

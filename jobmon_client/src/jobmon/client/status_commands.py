@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 
-from jobmon.client.logging import JobmonLoggerConfig
+from jobmon.client.logging import configure_client_logging
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow import DistributorContext
 from jobmon.client.workflow_run import WorkflowRunFactory
@@ -598,9 +598,7 @@ def resume_workflow_from_id(
     Raise an error if the workflow is not completed successfully on resume.
     """
     if log:
-        JobmonLoggerConfig.attach_default_handler(
-            logger_name="jobmon", log_level=logging.INFO
-        )
+        configure_client_logging()
 
     factory = WorkflowRunFactory(workflow_id=workflow_id)
 

@@ -1,4 +1,4 @@
-"""Requester object to make HTTP requests to the Jobmon Flask services."""
+"""Requester object to make HTTP requests to the Jobmon FastAPI services."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import functools
 import json
 import logging
 import logging.config
+import os
 from typing import Any, Callable, Dict, Tuple, Type
 
 import aiohttp
@@ -20,99 +21,134 @@ from jobmon.core.exceptions import InvalidRequest, InvalidResponse
 
 logger = logging.getLogger(__name__)
 
-_OTEL_LOGGING_CONFIG = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "otel": {
-            "()": "jobmon.core.otlp.OpenTelemetryLogFormatter",
-            "format": "%(asctime)s [%(levelname)s] [trace_id=%(trace_id)s,"
-            " span_id=%(span_id)s, parent_span_id=%(parent_span_id)s]"
-            " - %(message)s",
-        },
-    },
-    "handlers": {
-        "otel_text": {
-            "level": "INFO",
-            "class": "opentelemetry.sdk._logs.LoggingHandler",
-            "formatter": "otel",
-        },
-    },
-    "loggers": {
-        "jobmon.core.requester": {
-            "handlers": ["otel_text"],
-            "level": "INFO",
-            "propagate": False,
-        },
-    },
-}
-
 
 def http_request_ok(status_code: int) -> bool:
     """Return True if HTTP return codes that are deemed ok."""
     return status_code in (200, 302, 307)
 
 
-class Requester(object):
-    """Requester object to make HTTP requests to the Jobmon FastApi services."""
+class Requester:
+    """Handles HTTP requests to the jobmon server with configurable OTLP integration."""
 
-    # Class-level attribute to store the OtlpAPI instance
-    _otlp_api = None
+    # Class-level attribute to store the OtlpManager instance
+    _otlp_manager = None
 
     def __init__(
         self,
-        url: str,
-        route_prefix: str = "",
-        request_timeout: int = 20,
+        service_url: str,
         retries_timeout: int = 300,
         retries_attempts: int = 10,
+        request_timeout: int = 20,
         use_otlp: bool = False,
     ) -> None:
-        """Initialize the Requester object with the url to make requests to."""
-        self.base_url = url
-        self.route_prefix = route_prefix
-        self.request_timeout = request_timeout
+        """Initialize requester with optional OTLP support.
+
+        Args:
+            service_url: The jobmon server URL
+            retries_timeout: Total timeout for retries in seconds
+            retries_attempts: Number of retry attempts
+            request_timeout: Individual request timeout in seconds
+            use_otlp: Whether to enable OTLP instrumentation
+        """
+        self.service_url = service_url
         self.retries_timeout = retries_timeout
         self.retries_attempts = retries_attempts
-        if use_otlp and Requester._otlp_api is None:
+        self.request_timeout = request_timeout
+
+        if use_otlp and Requester._otlp_manager is None:
             self._init_otlp()
+
         self.server_structlog_context: Dict[str, str] = {}
 
     @classmethod
     def _init_otlp(cls: Type[Requester]) -> None:
-        from jobmon.core.otlp import OtlpAPI
+        """Initialize OTLP by loading the appropriate logconfig file with templates."""
+        try:
+            from jobmon.core.configuration import JobmonConfig
+            from jobmon.core.otlp import (
+                OTLP_AVAILABLE,
+                JobmonOTLPManager,
+                initialize_jobmon_otlp,
+            )
 
-        # setup connections to backend
-        otlp_instance = OtlpAPI()
-        otlp_instance.instrument_requests()
+            if not OTLP_AVAILABLE:
+                return
 
-        logging.config.dictConfig(_OTEL_LOGGING_CONFIG)
-        # setup tracer for Requester to use
-        cls._otlp_api = otlp_instance
+            # Initialize minimal OTLP manager for traces
+            cls._otlp_manager = initialize_jobmon_otlp()
+
+            # Instrument requests library for HTTP tracing
+            JobmonOTLPManager.instrument_requests()
+
+            # Load requester-specific OTLP logconfig with user override support
+            config = JobmonConfig()
+            current_dir = os.path.dirname(__file__)
+            default_template_path = os.path.join(
+                current_dir, "config/logconfig_requester_otlp.yaml"
+            )
+
+            # Load with override support
+            from jobmon.core.config.logconfig_utils import load_logconfig_with_overrides
+
+            logconfig_data = load_logconfig_with_overrides(
+                default_template_path=default_template_path,
+                config_section="requester",
+                config=config,
+            )
+
+            # Legacy: Override endpoint only if explicitly configured
+            try:
+                override_endpoint = config.get("otlp", "endpoint")
+                if override_endpoint and logconfig_data:
+                    handlers = logconfig_data.get("handlers", {})
+                    if (
+                        "otlp_requester" in handlers
+                        and "exporter" in handlers["otlp_requester"]
+                    ):
+                        handlers["otlp_requester"]["exporter"][
+                            "endpoint"
+                        ] = override_endpoint
+            except Exception:
+                pass  # Use default endpoint from logconfig
+
+            # Apply the logconfig directly
+            logging.config.dictConfig(logconfig_data)
+
+        except ImportError:
+            # OTLP dependencies not available, continue without OTLP
+            pass
 
     @classmethod
     def from_defaults(cls: Type[Requester]) -> Requester:
         """Instantiate a requester from default config values."""
         config = JobmonConfig()
+
         service_url = config.get("http", "service_url")
         route_prefix = config.get("http", "route_prefix")
-        request_timeout = config.get_int("http", "request_timeout")
+        if route_prefix:
+            service_url = f"{service_url.rstrip('/')}/{route_prefix.strip('/')}"
+
         retries_timeout = config.get_int("http", "retries_timeout")
         retries_attempts = config.get_int("http", "retries_attempts")
-        use_otlp = config.get_boolean("otlp", "http_enabled")
+        request_timeout = config.get_int("http", "request_timeout")
+
+        try:
+            use_otlp = config.get_boolean("otlp", "http_enabled")
+        except Exception:
+            use_otlp = False
+
         return cls(
-            service_url,
-            route_prefix,
-            request_timeout,
-            retries_timeout,
-            retries_attempts,
-            use_otlp,
+            service_url=service_url,
+            retries_timeout=retries_timeout,
+            retries_attempts=retries_attempts,
+            request_timeout=request_timeout,
+            use_otlp=use_otlp,
         )
 
     @property
     def url(self) -> str:
-        """Return the base url for the requester."""
-        return self.base_url + self.route_prefix
+        """Legacy property for backward compatibility."""
+        return self.service_url
 
     def add_server_structlog_context(self, **kwargs: Any) -> None:
         """Add the structlogging context if it has been provided."""
@@ -121,14 +157,17 @@ class Requester(object):
 
     @contextlib.contextmanager
     def tracing_span(self, app_route: str, request_type: str) -> Any:
-        if self._otlp_api:
-            tracer = self._otlp_api.get_tracer("requester")
-            with tracer.start_as_current_span("send_request") as span:
-                span.set_attribute("http.method", request_type.upper())
-                span.set_attribute("http.url", self.url + app_route)
-                yield span
-        else:
-            yield None
+        if self._otlp_manager and hasattr(self._otlp_manager, "get_tracer"):
+            tracer = self._otlp_manager.get_tracer("requester")
+            if tracer:
+                with tracer.start_as_current_span("send_request") as span:
+                    span.set_attribute("http.method", request_type.upper())
+                    span.set_attribute("http.url", self.service_url + app_route)
+                    yield
+                    return
+
+        # If no OTLP or tracer not available, just yield without tracing
+        yield
 
     def _maybe_trace(self, func: Callable) -> Callable:
         @functools.wraps(func)
@@ -199,7 +238,7 @@ class Requester(object):
         request_type: str,
     ) -> Tuple[int, Any]:
         # Construct URL
-        route = self.url + app_route
+        route = self.service_url + app_route
         logger.info(f"Route: {route}, message: {message}")
 
         # Add version to query parameters
@@ -289,7 +328,7 @@ class Requester(object):
     ) -> Tuple[int, Any]:
         """Async version of _send_request using aiohttp."""
         # Construct URL
-        route = self.url + app_route
+        route = self.service_url + app_route
         logger.info(f"Route: {route}, message: {message}")
 
         # Add version to query parameters

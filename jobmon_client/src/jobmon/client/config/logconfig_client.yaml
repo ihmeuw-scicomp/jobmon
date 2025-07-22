@@ -1,0 +1,60 @@
+# Client-specific logconfig for jobmon (OTLP disabled)
+# This uses shared templates for formatters and focuses on client package loggers
+
+version: 1
+disable_existing_loggers: false
+
+# Import shared formatters from templates
+formatters: !template formatters
+
+# Client handlers
+handlers:
+  # Console handler for client development (always enabled)
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: console_default
+
+  # OTLP handler template for client (ready to enable)
+  otlp_client:
+    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+    level: INFO
+    formatter: otlp_default
+    exporter: !template otlp_grpc_exporter
+
+# Client logger configurations (console only by default)
+loggers:
+  # Client package logging (workflow, task, tool, etc.)
+  jobmon.client:
+    handlers: [console]
+    level: INFO
+    propagate: false
+
+  # Client workflow logging
+  jobmon.client.workflow:
+    handlers: [console]
+    level: INFO
+    propagate: false
+
+  # Client task logging  
+  jobmon.client.task:
+    handlers: [console]
+    level: INFO
+    propagate: false
+
+  # Client tool logging
+  jobmon.client.tool:
+    handlers: [console]
+    level: INFO
+    propagate: false
+
+  # General jobmon logging (includes core components)
+  jobmon:
+    handlers: [console]
+    level: INFO
+    propagate: false
+
+# Root logger fallback (console only)
+root:
+  handlers: [console]
+  level: WARNING 

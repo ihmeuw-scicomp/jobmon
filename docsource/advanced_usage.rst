@@ -881,12 +881,51 @@ Error Logs
 
 Python Logging
 ##############
-To attach Jobmon's simple formatted logger use the following code.
+Jobmon provides a flexible logging configuration system with template-based configurations
+and user override capabilities.
 
-For example::
+**Basic Usage:**
 
-    from jobmon.client.client_logging import ClientLogging
+To configure Jobmon's client logging with default settings::
 
-    ClientLogging().attach()
+    from jobmon.client.logging import configure_client_logging
+    
+    configure_client_logging()
+
+This automatically configures all Jobmon client loggers (workflow, task, tool, etc.) with 
+console output and INFO level logging.
+
+**Advanced Configuration:**
+
+You can customize logging behavior using configuration overrides in your ``~/.jobmon.yaml`` file:
+
+.. code-block:: yaml
+
+    logging:
+      client:
+        # Add file logging
+        formatters:
+          file_formatter:
+            format: "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+            datefmt: "%Y-%m-%d %H:%M:%S"
+        handlers:
+          file:
+            class: logging.FileHandler
+            filename: "/var/log/jobmon_client.log"
+            formatter: file_formatter
+            level: INFO
+        loggers:
+          jobmon.client.workflow:
+            handlers: [console, file]
+            level: DEBUG
+
+You can also specify a completely custom logging configuration file::
+
+.. code-block:: yaml
+
+    logging:
+      client_logconfig_file: "/path/to/custom_client_logging.yaml"
+
+For more details on logging configuration options, see the configuration documentation.
 
 
