@@ -247,7 +247,8 @@ def validate_workflow_for_update(task_ids: List[int], session: Session) -> str:
     
     Validates that:
     - All tasks belong to the same workflow
-    - The workflow status allows updates (FAILED, DONE, ABORTED, HALTED)
+    - The workflow status allows updates (FAILED, DONE, ABORTED, HALTED) OR
+    - All downstream tasks are in valid states (G, I, Q) for non-terminal workflows
     
     Args:
         task_ids: List of task IDs to validate
@@ -267,7 +268,7 @@ def validate_workflow_for_update(task_ids: List[int], session: Session) -> str:
 
     # Query workflow status for all tasks
     query = (
-        select(Task.workflow_id, Workflow.status)
+        select(Task.workflow_id, Workflow.status, Workflow.dag_id)
         .where(Task.workflow_id == Workflow.id, Task.id.in_(task_ids))
         .distinct()
     )
@@ -290,16 +291,83 @@ def validate_workflow_for_update(task_ids: List[int], session: Session) -> str:
         WorkflowStatus.HALTED,
     }
     
-    if current_status not in allowed_statuses:
-        error_msg = (
-            f"Task status cannot be updated because the workflow is currently in '{current_status}' status. "
-            "Task status updates are only allowed when the workflow is in FAILED, DONE, ABORTED, or HALTED status."
-        )
-        logger.warning(f"Validation failed: {error_msg}")
-        raise InvalidUsage(error_msg, status_code=400)
+    if current_status in allowed_statuses:
+        # Workflow is in terminal state, allow update
+        logger.info(f"Validation passed, workflow status: {current_status}")
+        return current_status
+    else:
+        # Workflow is not in terminal state, check downstream tasks
+        workflow_id = rows[0].workflow_id
+        dag_id = rows[0].dag_id
+        
+        if _check_downstream_tasks_status_for_update(session, task_ids, workflow_id, dag_id):
+            logger.info(f"Validation passed via downstream task check, workflow status: {current_status}")
+            return current_status
+        else:
+            error_msg = (
+                f"Task status cannot be updated because the workflow is in '{current_status}' status "
+                "and not all downstream tasks are in valid states (G, I, Q). "
+                "Task status updates are only allowed when the workflow is in FAILED, DONE, ABORTED, or HALTED status, "
+                "or when all downstream tasks are in registered, instantiating, or queued states."
+            )
+            logger.warning(f"Validation failed: {error_msg}")
+            raise InvalidUsage(error_msg, status_code=400)
+
+
+def _check_downstream_tasks_status_for_update(session: Session, task_ids: List[int], workflow_id: int, dag_id: int) -> bool:
+    """Check if all downstream tasks are in valid states (G, I, Q) for task updates.
     
-    logger.info(f"Validation passed, workflow status: {current_status}")
-    return current_status
+    Args:
+        session: Database session
+        task_ids: List of task IDs to check downstream tasks for
+        workflow_id: Workflow ID
+        dag_id: DAG ID
+        
+    Returns:
+        True if all downstream tasks are in valid states, False otherwise
+    """
+    # Valid downstream task states
+    valid_states = {"G", "I", "Q"}  # REGISTERING, INSTANTIATING, QUEUED
+    
+    # Get downstream node_ids for each task using the same pattern as get_downstream_tasks
+    tasks_and_edges = session.execute(
+        select(Task.id, Task.node_id, Edge.downstream_node_ids).where(
+            Task.id.in_(task_ids),
+            Task.node_id == Edge.node_id,
+            Edge.dag_id == dag_id,
+        )
+    ).all()
+    
+    # Collect all downstream node_ids
+    downstream_node_ids = set()
+    for row in tasks_and_edges:
+        if row.downstream_node_ids is not None:
+            # Parse JSON list of downstream node IDs
+            downstreams = (
+                json.loads(row.downstream_node_ids)
+                if isinstance(row.downstream_node_ids, str)
+                else row.downstream_node_ids
+            )
+            if downstreams:
+                downstream_node_ids.update(downstreams)
+    
+    if not downstream_node_ids:
+        return True  # No downstream tasks, consider valid
+    
+    # Get task statuses for downstream nodes
+    downstream_status_rows = session.execute(
+        select(Task.status).where(
+            Task.workflow_id == workflow_id,
+            Task.node_id.in_(list(downstream_node_ids))
+        )
+    ).all()
+    
+    # Check if all downstream tasks are in valid states
+    for status_row in downstream_status_rows:
+        if status_row[0] not in valid_states:
+            return False  # Found a downstream task not in valid state
+    
+    return True  # All downstream tasks are in valid states
 
 
 def _get_validation_error_message(workflow_statuses: List[str]) -> str:
