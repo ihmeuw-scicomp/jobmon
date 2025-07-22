@@ -249,50 +249,76 @@ def validate_workflow_for_update(task_ids: List[int], session: Session) -> str:
     - All tasks belong to the same workflow
     - The workflow status allows updates (FAILED, DONE, ABORTED, HALTED)
     
+    Args:
+        task_ids: List of task IDs to validate
+        session: Database session
+        
     Returns:
         The workflow status if validation passes
         
     Raises:
-        InvalidUsage if validation fails
+        InvalidUsage: If validation fails with detailed error message
     """
-    # If the given list is empty, skip validation
-    if len(task_ids) == 0:
+    logger.info(f"Validating workflow for task_ids: {task_ids}")
+    
+    # Skip validation for empty task list
+    if not task_ids:
         return ""
 
-    # Execute query to get workflow status
-    query_filter = [Task.workflow_id == Workflow.id, Task.id.in_(task_ids)]
-    sql = (
-        select(Task.workflow_id, Workflow.status).where(*query_filter)
-    ).distinct()
-    rows = session.execute(sql).all()
+    # Query workflow status for all tasks
+    query = (
+        select(Task.workflow_id, Workflow.status)
+        .where(Task.workflow_id == Workflow.id, Task.id.in_(task_ids))
+        .distinct()
+    )
+    rows = session.execute(query).all()
+    workflow_statuses = [row.status for row in rows]
     
-    workflow_statuses = [row[1] for row in rows]
+    logger.info(f"Found workflow statuses: {workflow_statuses}")
     
-    # Validate if all tasks are in the same workflow and the workflow status allows updates
-    if len(workflow_statuses) == 1 and workflow_statuses[0] in (
+    # Validate results
+    if len(workflow_statuses) != 1:
+        error_msg = _get_validation_error_message(workflow_statuses)
+        logger.warning(f"Validation failed: {error_msg}")
+        raise InvalidUsage(error_msg, status_code=400)
+    
+    current_status = workflow_statuses[0]
+    allowed_statuses = {
         WorkflowStatus.FAILED,
         WorkflowStatus.DONE,
         WorkflowStatus.ABORTED,
         WorkflowStatus.HALTED,
-    ):
-        return workflow_statuses[0]
-    else:
-        raise InvalidUsage(
-            "The workflow status of the given task ids are out of "
-            "scope of the following required statuses "
-            "(FAILED, DONE, ABORTED, HALTED) or multiple workflow statuses "
-            "were found.",
-            status_code=400
+    }
+    
+    if current_status not in allowed_statuses:
+        error_msg = (
+            f"Task status cannot be updated because the workflow is currently in '{current_status}' status. "
+            "Task status updates are only allowed when the workflow is in FAILED, DONE, ABORTED, or HALTED status."
         )
+        logger.warning(f"Validation failed: {error_msg}")
+        raise InvalidUsage(error_msg, status_code=400)
+    
+    logger.info(f"Validation passed, workflow status: {current_status}")
+    return current_status
+
+
+def _get_validation_error_message(workflow_statuses: List[str]) -> str:
+    """Get appropriate error message based on workflow status validation results."""
+    if len(workflow_statuses) > 1:
+        return (
+            "Task status cannot be updated because the tasks belong to multiple workflows. "
+            "All tasks must belong to the same workflow."
+        )
+    elif len(workflow_statuses) == 0:
+        return "Task status cannot be updated because no valid workflow was found for the given tasks."
+    else:
+        # This shouldn't happen given the calling context, but handle it gracefully
+        return "Task status cannot be updated due to workflow validation issues."
 
 
 def create_response(new_status: str) -> JSONResponse:
-    """Create the JSON response with CORS headers."""
     message = f"updated to status {new_status}"
     resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Methods"] = "PUT, OPTIONS"
-    resp.headers["Access-Control-Allow-Headers"] = "*"
     return resp
 
 
@@ -335,7 +361,7 @@ async def update_task_statuses(request: Request) -> Any:
             task_repository.update_task_statuses(
                 workflow_id, recursive, workflow_status, task_ids, new_status
             )
-
+            
     return create_response(new_status)
 
 
