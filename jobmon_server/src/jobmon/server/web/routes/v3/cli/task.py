@@ -303,9 +303,9 @@ def validate_workflow_for_update(task_ids: List[int], session: Session) -> str:
             return current_status
         else:
             error_msg = (
-                f"Task status updates are only allowed when the workflow is in "
-                f"FAILED, DONE, ABORTED, or HALTED status, or when all downstream "
-                f"tasks are in registered, instantiating, or queued states."
+                "Task status updates are only allowed when the workflow is in "
+                "FAILED, DONE, ABORTED, or HALTED status, or when all downstream "
+                "tasks are in registered, instantiating, or queued states."
             )
             logger.warning(f"Validation failed: {error_msg}")
             raise InvalidUsage(error_msg, status_code=400)
@@ -355,6 +355,7 @@ async def update_task_statuses(request: Request) -> Any:
         - Validates workflow status before proceeding with updates.
         - After updating the tasks, it checks the workflow status and updates it.
     """
+
     def add_cors_headers(response: JSONResponse) -> JSONResponse:
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "PUT, OPTIONS"
@@ -368,16 +369,21 @@ async def update_task_statuses(request: Request) -> Any:
         with SessionMaker() as session, session.begin():
             if isinstance(task_ids, str):
                 if task_ids != "all":
-                    raise InvalidUsage(f"Invalid task_ids value: {task_ids}", status_code=400)
+                    raise InvalidUsage(
+                        f"Invalid task_ids value: {task_ids}", status_code=400
+                    )
                 task_ids_for_validation = [
-                    task_id for task_id, in session.query(Task.id)
+                    task_id
+                    for task_id, in session.query(Task.id)
                     .filter(Task.workflow_id == workflow_id)
                     .all()
                 ]
             else:
                 task_ids_for_validation = task_ids
 
-            workflow_status = validate_workflow_for_update(task_ids_for_validation, session)
+            workflow_status = validate_workflow_for_update(
+                task_ids_for_validation, session
+            )
 
             TaskRepository(session).update_task_statuses(
                 workflow_id, recursive, workflow_status, task_ids, new_status
