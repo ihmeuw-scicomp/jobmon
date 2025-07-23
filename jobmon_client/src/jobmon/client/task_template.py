@@ -29,7 +29,6 @@ from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import (
     SerializeClientTaskTemplate,
-    SerializeTaskTemplateResourceUsage,
 )
 
 if TYPE_CHECKING:
@@ -742,7 +741,7 @@ class TaskTemplate:
         if node_args:
             message["node_args"] = node_args
         if ci:
-            message["ci"] = ci
+            message["ci"] = str(ci)  # Convert to string for V3 API
         app_route = "/task_template_resource_usage"
         return_code, response = self.requester.send_request(
             app_route=app_route, message=message, request_type="post"
@@ -754,27 +753,8 @@ class TaskTemplate:
                 f"200. Response content: {response}"
             )
 
-        def format_bytes(value: Any) -> Optional[str]:
-            if value is not None:
-                return str(value) + "B"
-            else:
-                return value
-
-        kwargs = SerializeTaskTemplateResourceUsage.kwargs_from_wire(response)
-        resources = {
-            "num_tasks": kwargs["num_tasks"],
-            "min_mem": format_bytes(kwargs["min_mem"]),
-            "max_mem": format_bytes(kwargs["max_mem"]),
-            "mean_mem": format_bytes(kwargs["mean_mem"]),
-            "min_runtime": kwargs["min_runtime"],
-            "max_runtime": kwargs["max_runtime"],
-            "mean_runtime": kwargs["mean_runtime"],
-            "median_mem": format_bytes(kwargs["median_mem"]),
-            "median_runtime": kwargs["median_runtime"],
-            "ci_mem": kwargs["ci_mem"],
-            "ci_runtime": kwargs["ci_runtime"],
-        }
-        return resources
+        # Handle the V3 Pydantic response format
+        return response["formatted_stats"]
 
     def __repr__(self) -> str:
         """A representation string for a TaskTemplate instance."""

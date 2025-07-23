@@ -19,7 +19,6 @@ from jobmon.core.constants import (
 )
 from jobmon.core.exceptions import WorkflowRunStateError
 from jobmon.core.requester import Requester
-from jobmon.core.serializers import SerializeTaskTemplateResourceUsage
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +148,7 @@ def task_template_resources(
     if node_args:
         message["node_args"] = node_args
     if ci:
-        message["ci"] = ci
+        message["ci"] = str(ci)  # Convert to string for V3 API
 
     if requester is None:
         requester = Requester.from_defaults()
@@ -159,28 +158,8 @@ def task_template_resources(
         app_route=app_route, message=message, request_type="post"
     )
 
-    def format_bytes(value: Any) -> Optional[str]:
-        if value is not None:
-            return str(value) + "B"
-        else:
-            return value
-
-    kwargs = SerializeTaskTemplateResourceUsage.kwargs_from_wire(response)
-    resources = {
-        "num_tasks": kwargs["num_tasks"],
-        "min_mem": format_bytes(kwargs["min_mem"]),
-        "max_mem": format_bytes(kwargs["max_mem"]),
-        "mean_mem": format_bytes(kwargs["mean_mem"]),
-        "min_runtime": kwargs["min_runtime"],
-        "max_runtime": kwargs["max_runtime"],
-        "mean_runtime": kwargs["mean_runtime"],
-        "median_mem": format_bytes(kwargs["median_mem"]),
-        "median_runtime": kwargs["median_runtime"],
-        "ci_mem": kwargs["ci_mem"],
-        "ci_runtime": kwargs["ci_runtime"],
-    }
-
-    return resources
+    # Handle the V3 Pydantic response format
+    return response["formatted_stats"]
 
 
 def task_status(
@@ -528,7 +507,9 @@ def _get_yaml_data(
                 f"Server returns HTTP error code: {rc} "
                 f"for /task_template_resource_usage."
             )
-        usage = SerializeTaskTemplateResourceUsage.kwargs_from_wire(res)
+        # Handle V3 API response format
+        usage = res
+
         ttvis_dic[int(ttv)].append(int(usage[key_map_m[v_mem]]))
         ttvis_dic[int(ttv)].append(int(usage[key_map_r[v_runtime]]))
 
