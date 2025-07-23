@@ -245,24 +245,24 @@ def parse_request_data(
 
 def validate_workflow_for_update(task_ids: List[int], session: Session) -> str:
     """Validate workflow status for task updates.
-    
+
     Validates that:
     - All tasks belong to the same workflow
     - The workflow status allows updates (FAILED, DONE, ABORTED, HALTED) OR
     - All downstream tasks are in valid states (G, I, Q) for non-terminal workflows
-    
+
     Args:
         task_ids: List of task IDs to validate
         session: Database session
-        
+
     Returns:
         The workflow status if validation passes
-        
+
     Raises:
         InvalidUsage: If validation fails with detailed error message
     """
     logger.info(f"Validating workflow for task_ids: {task_ids}")
-    
+
     # Skip validation for empty task list
     if not task_ids:
         return ""
@@ -275,15 +275,13 @@ def validate_workflow_for_update(task_ids: List[int], session: Session) -> str:
     )
     rows = session.execute(query).all()
     workflow_statuses = [row.status for row in rows]
-    
-    logger.info(f"Found workflow statuses: {workflow_statuses}")
-    
+
     # Validate results
     if len(workflow_statuses) != 1:
         error_msg = _get_validation_error_message(workflow_statuses)
         logger.warning(f"Validation failed: {error_msg}")
         raise InvalidUsage(error_msg, status_code=400)
-    
+
     current_status = workflow_statuses[0]
     allowed_statuses = {
         WorkflowStatus.FAILED,
@@ -291,7 +289,7 @@ def validate_workflow_for_update(task_ids: List[int], session: Session) -> str:
         WorkflowStatus.ABORTED,
         WorkflowStatus.HALTED,
     }
-    
+
     if current_status in allowed_statuses:
         # Workflow is in terminal state, allow update
         logger.info(f"Validation passed, workflow status: {current_status}")
@@ -300,16 +298,14 @@ def validate_workflow_for_update(task_ids: List[int], session: Session) -> str:
         # Workflow is not in terminal state, check downstream tasks
         workflow_id = rows[0].workflow_id
         dag_id = rows[0].dag_id
-        
+
         if _check_downstream_tasks_status(session, task_ids, workflow_id, dag_id):
-            logger.info(f"Validation passed via downstream task check, workflow status: {current_status}")
             return current_status
         else:
             error_msg = (
-                f"Task status cannot be updated because the workflow is in '{current_status}' status "
-                "and not all downstream tasks are in valid states (G, I, Q). "
-                "Task status updates are only allowed when the workflow is in FAILED, DONE, ABORTED, or HALTED status, "
-                "or when all downstream tasks are in registered, instantiating, or queued states."
+                f"Task status updates are only allowed when the workflow is in "
+                f"FAILED, DONE, ABORTED, or HALTED status, or when all downstream "
+                f"tasks are in registered, instantiating, or queued states."
             )
             logger.warning(f"Validation failed: {error_msg}")
             raise InvalidUsage(error_msg, status_code=400)
@@ -319,17 +315,28 @@ def _get_validation_error_message(workflow_statuses: List[str]) -> str:
     """Get appropriate error message based on workflow status validation results."""
     if len(workflow_statuses) > 1:
         return (
-            "Task status cannot be updated because the tasks belong to multiple workflows. "
-            "All tasks must belong to the same workflow."
+            "Task status cannot be updated because the tasks belong to "
+            "multiple workflows. All tasks must belong to the same workflow."
         )
     elif len(workflow_statuses) == 0:
-        return "Task status cannot be updated because no valid workflow was found for the given tasks."
+        return (
+            "Task status cannot be updated because no valid workflow "
+            "was found for the given tasks."
+        )
     else:
         # This shouldn't happen given the calling context, but handle it gracefully
         return "Task status cannot be updated due to workflow validation issues."
 
 
 def create_response(new_status: str) -> JSONResponse:
+    """Create a JSON HTTP response indicating a successful status update.
+
+    Args:
+        new_status (str): The new status that was applied.
+
+    Returns:
+        JSONResponse: A FastAPI JSONResponse object with a success message.
+    """
     message = f"updated to status {new_status}"
     resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
     return resp
@@ -342,62 +349,46 @@ async def update_task_statuses(request: Request) -> Any:
     Description:
         - When workflow_id='all', it updates all tasks in the workflow with
         recursive=False. This improves performance.
-        - When recursive=True, it updates the tasks and it's dependencies all
+        - When recursive=True, it updates the tasks and its dependencies all
         the way up or down the DAG.
         - When recursive=False, it updates only the tasks in the task_ids list.
         - Validates workflow status before proceeding with updates.
         - After updating the tasks, it checks the workflow status and updates it.
-
-    Notes:
-        It integrated the logic in update_task_status from status_commands.py.
     """
+    def add_cors_headers(response: JSONResponse) -> JSONResponse:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "PUT, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+
     try:
         data = cast(Dict, await request.json())
-
-        # Parse and validate request data
         workflow_id, recursive, task_ids, new_status = parse_request_data(data)
 
-        with SessionMaker() as session:
-            with session.begin():
-                # Convert task_ids to list if not already for validation
-                task_ids_for_validation = task_ids
-                if isinstance(task_ids, str) and task_ids != "all":
+        with SessionMaker() as session, session.begin():
+            if isinstance(task_ids, str):
+                if task_ids != "all":
                     raise InvalidUsage(f"Invalid task_ids value: {task_ids}", status_code=400)
-                elif task_ids == "all":
-                    # Get all task IDs for validation
-                    all_task_ids = session.query(Task.id).filter(Task.workflow_id == workflow_id).all()
-                    task_ids_for_validation = [task_id for task_id, in all_task_ids]
-                    
-                # Validate workflow status
-                workflow_status = validate_workflow_for_update(task_ids_for_validation, session)
-                
-                task_repository = TaskRepository(session=session)
-                task_repository.update_task_statuses(
-                    workflow_id, recursive, workflow_status, task_ids, new_status
-                )
-                
-        # Success response with CORS headers
-        response = create_response(new_status)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "PUT, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-        return response
-        
+                task_ids_for_validation = [
+                    task_id for task_id, in session.query(Task.id)
+                    .filter(Task.workflow_id == workflow_id)
+                    .all()
+                ]
+            else:
+                task_ids_for_validation = task_ids
+
+            workflow_status = validate_workflow_for_update(task_ids_for_validation, session)
+
+            TaskRepository(session).update_task_statuses(
+                workflow_id, recursive, workflow_status, task_ids, new_status
+            )
+
+        return add_cors_headers(create_response(new_status))
+
     except Exception as error:
-        # Error response with CORS headers
         status_code = getattr(error, "status_code", 500)
-        
-        # Use detail format for InvalidUsage errors, otherwise use generic format
-        if isinstance(error, InvalidUsage):
-            content = {"detail": str(error)}
-        else:
-            content = {"error": {"exception_message": str(error)}}
-            
-        response = JSONResponse(content=content, status_code=status_code)
-        response.headers["Access-Control-Allow-Origin"] = "*"
-        response.headers["Access-Control-Allow-Methods"] = "PUT, OPTIONS"
-        response.headers["Access-Control-Allow-Headers"] = "*"
-        return response
+        content = {"detail": str(error)}
+        return add_cors_headers(JSONResponse(content=content, status_code=status_code))
 
 
 @api_v3_router.get("/task_dependencies/{task_id}")

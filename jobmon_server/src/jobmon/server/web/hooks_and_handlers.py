@@ -99,9 +99,9 @@ def _handle_error(
 
     rd = {"error": response_data}
     response = JSONResponse(
-        content=rd,
-        media_type="application/custom+json",
-        status_code=status_code,
+        content=rd,  # type: ignore
+        media_type="application/custom+json",  # type: ignore
+        status_code=status_code,  # type: ignore
     )
     return response
 
