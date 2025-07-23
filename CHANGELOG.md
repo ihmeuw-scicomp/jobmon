@@ -11,6 +11,8 @@ All notable changes to Jobmon will be documented in this file.
 - Added enhanced OpenTelemetry database instrumentation with error capture for better observability.
 - Added JUnit XML report generation for test dashboard integration.
 - Added consolidated JSON logging fixture for server tests to improve test maintainability.
+- Added unified V3 API endpoint for task template resource usage statistics with comprehensive metrics including min, max, mean, and percentile calculations.
+- Added missing `/array/{array_id}/transition_to_killed` endpoint to V3 API for proper KILL_SELF task status processing, completing V3 API feature parity with V2.
 - Added more information about stopping workflows and updating task statuses to the technical panel in the Jobmon GUI.
 - Added `Task Name` to the tooltip in the resource usage scatter plot.
 - Enabled filtering by `Task Name` in the resource usage scatter plot.
@@ -20,6 +22,7 @@ All notable changes to Jobmon will be documented in this file.
 - Overhauled frontend resource utilization page for better performance and user experience.
 - Migrated project dependency management from pip-tools to UV workspace configuration.
 - Consolidated database session management and configuration for improved consistency and performance.
+- Enhanced Python client to handle string confidence interval parameters and new unified resource usage response format.
 - Updated Workflow.add_tasks() parameter type from Sequence[Task] to Iterable[Task] to accept a broader range of iterable types including generators and iterators. (PR 279)
 - Expanded error message when a TaskInstance doesn't report a heartbeat.
 - Refactored task status update endpoint into smaller functions for better maintainability.
@@ -32,6 +35,19 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed OpenTelemetry instrumentation order to initialize before database access, preventing instrumentation issues.
 - Fixed test suite warnings and failures including AsyncIO deprecation warnings, Pydantic configuration warnings, Pandas FutureWarnings, and multiprocessing fork warnings on macOS.
 - Fixed pre-existing test failures related to configuration type handling and swarm test infrastructure.
+- Fixed configuration system to properly handle environment variable conflicts between primitive and nested assignments, with improved YAML parsing that preserves natural data types (integers remain integers) and proper merging logic that prevents "TypeError: 'str' object does not support item assignment" errors.
+- Fixed test environment isolation by preventing .env file loading during pytest runs and implementing proper subprocess environment inheritance, eliminating SSL configuration conflicts and ensuring consistent database connections between test processes.
+- Fixed V3 API task template resource usage statistics with unified response format, proper handling of memory values (distinguishing None/0B/invalid), correct task count semantics, and backward-compatible CLI support for both V3 dictionary and legacy array formats.
+- Fixed datetime serialization in workflow overview API to handle both datetime objects and string formats for cross-database compatibility (PostgreSQL vs SQLite).
+
+### Deprecated
+### Removed
+
+## [3.4.24] - TBD
+### Changed
+- Updated Workflow.add_tasks() parameter type from Sequence[Task] to Iterable[Task] to accept a broader range of iterable types including generators and iterators. (PR 279)
+
+### Fixed
 - Fixed ClientDisconnect exceptions appearing as errors in APM by adding global exception handler. (PR 282)
 - Fixed get_max_concurrently_running endpoint to handle non-existent workflows gracefully by returning a 404 error with descriptive message instead of raising an exception. (PR 278)
 - Fixed 'Set' object is not subscriptable in CLI error in `/update_statuses` route.

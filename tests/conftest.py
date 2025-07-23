@@ -16,59 +16,77 @@ import sqlalchemy
 import uvicorn
 from sqlalchemy.engine import Engine
 
+# SET UP TEST ENVIRONMENT VARIABLES BEFORE ANY JOBMON IMPORTS
+# This must happen before jobmon modules are imported because load_dotenv()
+# runs at module level in jobmon.core.configuration
+
+# Simple, elegant subprocess detection using process ID
+_main_process_pid = os.getpid()
+
+
+def _is_main_test_process():
+    """Check if we're in the main test process (not a subprocess)."""
+    return os.getpid() == _main_process_pid
+
+
+def _setup_test_environment():
+    """Set up complete test environment in pytest_sessionstart."""
+    if not _is_main_test_process():
+        print("Subprocess detected: Using test environment from parent process")
+        return None
+
+    # We're in the main process - create new database
+    tmp_dir = tempfile.mkdtemp()
+    sqlite_file = pathlib.Path(tmp_dir, "tests.sqlite").resolve()
+
+    print("Setting up complete test environment")
+    print(f"SQLite file created at: {sqlite_file}")
+
+    # Set complete test environment variables
+    complete_test_vars = {
+        # Core database configuration
+        "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{sqlite_file}",
+        "JOBMON__DB__SQLALCHEMY_CONNECT_ARGS": "{}",  # No SSL for SQLite
+        # Essential test settings
+        "JOBMON__AUTH__ENABLED": "false",
+        "JOBMON__HTTP__ROUTE_PREFIX": "/api/v3",
+        "JOBMON__SESSION__SECRET_KEY": "test",
+        # Performance optimizations for faster tests
+        "JOBMON__HTTP__STOP_AFTER_DELAY": "0",
+        "JOBMON__HTTP__RETRIES_TIMEOUT": "0",
+        "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
+        "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
+        "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
+    }
+
+    os.environ.update(complete_test_vars)
+    print(f"Set {len(complete_test_vars)} test environment variables")
+    return sqlite_file
+
+
+# Now safe to import jobmon modules - load_dotenv() is skipped during tests
+_api_prefix = "/api/v3"
+
+# Import jobmon modules
 from jobmon.client.api import Tool
 from jobmon.core.requester import Requester
 
 logger = logging.getLogger(__name__)
 
-_api_prefix = "/api/v2"
-
 
 def pytest_sessionstart(session):
-    """Set up test environment - override any external config with test settings."""
-    # Create a unique SQLite file in a temporary directory
-    tmp_dir = tempfile.mkdtemp()
-    sqlite_file = pathlib.Path(tmp_dir, "tests.sqlite").resolve()
+    """Set up complete test environment and reset singletons for clean test state."""
+    print("=== pytest_sessionstart: Setting up test environment ===")
 
-    print("Running code before test file import")
-    print(f"SQLite file created at: {sqlite_file}")
+    # Complete the test environment setup
+    _setup_test_environment()
 
-    # Override all configuration via environment variables to bypass external config files
-    # This prevents interference from installer plugins or external configurations
-    test_env_vars = {
-        # Core test configuration
-        "JOBMON__CONFIG_FILE": "",  # Force use of env vars only
-        "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{sqlite_file}",
-        "JOBMON__SESSION__SECRET_KEY": "test",
-        # HTTP configuration (matching defaults but optimized for tests)
-        "JOBMON__HTTP__REQUEST_TIMEOUT": "20",
-        "JOBMON__HTTP__RETRIES_ATTEMPTS": "10",
-        "JOBMON__HTTP__RETRIES_TIMEOUT": "0",  # Fast failures in tests
-        "JOBMON__HTTP__ROUTE_PREFIX": _api_prefix,
-        "JOBMON__HTTP__SERVICE_URL": "",  # Set dynamically by client_env fixture
-        "JOBMON__HTTP__STOP_AFTER_DELAY": "0",  # No delays in tests
-        # Distributor configuration (faster polling for tests)
-        "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
-        # Heartbeat configuration (faster intervals for tests)
-        "JOBMON__HEARTBEAT__REPORT_BY_BUFFER": "3.1",
-        "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
-        "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
-        # OIDC configuration
-        "JOBMON__OIDC__NAME": "OIDC",
-        # OTLP configuration (disabled for tests)
-        "JOBMON__OTLP__HTTP_ENABLED": "false",
-        "JOBMON__OTLP__WEB_ENABLED": "false",
-        "JOBMON__OTLP__DEPLOYMENT_ENVIRONMENT": "test",
-        "JOBMON__OTLP__SPAN_EXPORTER": "",
-        "JOBMON__OTLP__LOG_EXPORTER": "",
-        # Reaper configuration
-        "JOBMON__REAPER__POLL_INTERVAL_MINUTES": "5",
-        # Worker node configuration
-        "JOBMON__WORKER_NODE__COMMAND_INTERRUPT_TIMEOUT": "10",
-    }
+    print("=== Test environment setup complete ===")
 
-    # Apply all test environment variables
-    os.environ.update(test_env_vars)
+    # Log current test configuration for debugging
+    db_uri = os.environ.get("JOBMON__DB__SQLALCHEMY_DATABASE_URI", "NOT_SET")
+    print(f"Using database: {db_uri}")
+    print(f"Auth enabled: {os.environ.get('JOBMON__AUTH__ENABLED', 'NOT_SET')}")
 
 
 @pytest.fixture(scope="session")
@@ -83,10 +101,15 @@ def db_engine() -> Engine:
     config = get_jobmon_config()
     from jobmon.server.web.db import init_db
 
+    # Verify that our test environment setup worked
+    db_uri = config.get("db", "sqlalchemy_database_uri")
+    print(f"Database URI from config: {db_uri}")
+    assert "sqlite" in db_uri, f"Expected SQLite URI but got: {db_uri}"
+
     init_db()  # Then initialize DB (runs migrations + metadata load)
 
     # verify db created
-    eng = sqlalchemy.create_engine(config.get("db", "sqlalchemy_database_uri"))
+    eng = sqlalchemy.create_engine(db_uri)
     from sqlalchemy.orm import Session
 
     with Session(eng) as session:
@@ -146,7 +169,7 @@ class WebServerProcess:
         }
         log_config.configure_logging(dict_config=dict_config)
 
-        app = get_app(versions=["v2"])
+        app = get_app(versions=["v3"])
         uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))
 
     def __enter__(self) -> Any:

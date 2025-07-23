@@ -15,7 +15,11 @@ from jobmon.core import CONFIG_FILE_FROM_INSTALLER_PLUGIN
 from jobmon.core.cli import CLI
 from jobmon.core.exceptions import ConfigError
 
-load_dotenv()
+# Load .env file for development convenience, but skip for pytest to ensure test isolation
+# This ensures tests have complete control over configuration while developers get
+# .env convenience
+if not os.environ.get("PYTEST_CURRENT_TEST"):
+    load_dotenv()
 
 DEFAULTS_FILE_NAME = "defaults.yaml"
 DEFAULTS_FILE = Path(__file__).parent / DEFAULTS_FILE_NAME
@@ -195,7 +199,16 @@ class JobmonConfig:
                 if idx == len(path) - 1:  # last segment – assign
                     cur[seg_lower] = value
                 else:
-                    cur = cur.setdefault(seg_lower, {})
+                    # Check if parent key exists as primitive value
+                    # Convert it to dict to accommodate nested children
+                    if seg_lower in cur and not isinstance(cur[seg_lower], dict):
+                        # Parent key exists as primitive - convert to dict to allow children
+                        cur[seg_lower] = {}
+
+                    # Create nested dict structure if needed
+                    if seg_lower not in cur:
+                        cur[seg_lower] = {}
+                    cur = cur[seg_lower]
 
         for env_key, env_val in os.environ.items():
             if not env_key.startswith(prefix):

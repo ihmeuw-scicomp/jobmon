@@ -33,6 +33,7 @@ from jobmon.server.web.repositories.task_template_repository import (
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.routes.v3.cli.workflow import _cli_label_mapping
 from jobmon.server.web.schemas.task_template import (
+    TaskResourceVizItem,
     TaskTemplateResourceUsageRequest,
     TaskTemplateResourceUsageResponse,
 )
@@ -255,27 +256,67 @@ def get_most_popular_queue(
 async def get_task_template_resource_usage(
     request_data: TaskTemplateResourceUsageRequest, db: Session = Depends(get_db)
 ) -> TaskTemplateResourceUsageResponse:
-    """Return the aggregate resource usage for a give TaskTemplate.
+    """Unified endpoint for task template resource usage.
 
-    Need to use cross_origin decorator when using the GUI to call a post route.
-    This enables Cross Origin Resource Sharing (CORS) on the route. Default is
-    most permissive settings.
+    Returns modern Pydantic models suitable for both GUI frontend
+    and Python client consumption with full type safety.
     """
     repo = TaskTemplateRepository(db)
+
     try:
-        viz_data = repo.get_task_template_resource_usage(request_data)
+        # Get task details using the repository
+        task_details = repo.get_task_resource_details(
+            task_template_version_id=request_data.task_template_version_id,
+            workflows=request_data.workflows,
+            node_args=request_data.node_args,
+        )
+
+        # Calculate statistics using repository method
+        stats = repo.calculate_resource_statistics(
+            task_details=task_details,
+            confidence_interval=request_data.ci,
+            task_template_version_id=request_data.task_template_version_id,
+        )
+
+        # Prepare viz data if requested
+        viz_data = None
+        if request_data.viz and task_details:
+            viz_data = []
+            for detail_item in task_details:
+                viz_data.append(
+                    TaskResourceVizItem(
+                        r=detail_item.r,
+                        m=detail_item.m,
+                        node_id=detail_item.node_id,
+                        task_id=detail_item.task_id,
+                        requested_resources=detail_item.requested_resources,
+                        attempt_number_of_instance=detail_item.attempt_number_of_instance,
+                        status=detail_item.status,
+                    )
+                )
+
+        # Return unified Pydantic response
+        return TaskTemplateResourceUsageResponse(
+            num_tasks=stats.num_tasks,
+            min_mem=stats.min_mem,
+            max_mem=stats.max_mem,
+            mean_mem=stats.mean_mem,
+            min_runtime=stats.min_runtime,
+            max_runtime=stats.max_runtime,
+            mean_runtime=stats.mean_runtime,
+            median_mem=stats.median_mem,
+            median_runtime=stats.median_runtime,
+            ci_mem=stats.ci_mem,
+            ci_runtime=stats.ci_runtime,
+            result_viz=viz_data,
+        )
+
     except Exception as e:
         logger.error(f"Error fetching resource usage: {e}")
         raise HTTPException(
             status_code=StatusCodes.INTERNAL_SERVER_ERROR,
             detail="Error processing resource usage data.",
         ) from e
-
-    response_data = {}
-    if request_data.viz and viz_data is not None:
-        response_data["result_viz"] = viz_data
-
-    return TaskTemplateResourceUsageResponse(**response_data)
 
 
 @api_v3_router.get("/workflow_tt_status_viz/{workflow_id}")

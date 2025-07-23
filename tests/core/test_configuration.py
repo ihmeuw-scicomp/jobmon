@@ -22,8 +22,10 @@ def test_basic_configuration_methods(temp_yaml_file):
     """Test basic configuration retrieval methods."""
     config = JobmonConfig(filepath=str(temp_yaml_file))
 
-    # Test basic get method - returns strings
-    assert config.get("http", "request_timeout") == "20"
+    # Test basic get method - returns YAML-parsed values (not forced to strings)
+    assert (
+        config.get("http", "request_timeout") == 20
+    )  # YAML parses numeric values as int
 
     # Test typed get methods - return proper types
     assert config.get_int("http", "request_timeout") == 20
@@ -426,3 +428,67 @@ def test_empty_pool_configuration_engine_compatibility(tmp_path, monkeypatch):
         finally:
             # Clean up
             monkeypatch.delenv("JOBMON__CONFIG_FILE", raising=False)
+
+
+def test_conflicting_environment_variables_primitive_vs_nested(monkeypatch, tmp_path):
+    """Test that conflicting env vars (primitive parent vs nested children) are handled gracefully.
+
+    This tests the fix for the issue where setting a parent key to a primitive value
+    and having nested child keys in environment variables would cause:
+    TypeError: 'str' object does not support item assignment
+    """
+    # Clear any existing JOBMON environment variables
+    import os
+
+    for key in list(os.environ.keys()):
+        if key.startswith("JOBMON__"):
+            monkeypatch.delenv(key, raising=False)
+
+    config_content = """
+    db:
+      sqlalchemy_database_uri: 'sqlite:///test.db'
+    """
+    config_file = tmp_path / "conflict_test.yaml"
+    config_file.write_text(config_content)
+
+    # Simulate the exact scenario that was failing:
+    # 1. Parent key set to a primitive value (empty string, JSON, etc.)
+    # 2. Child keys also exist in environment variables
+    monkeypatch.setenv("JOBMON__DB__SQLALCHEMY_CONNECT_ARGS", "")  # Parent primitive
+    monkeypatch.setenv(
+        "JOBMON__DB__SQLALCHEMY_CONNECT_ARGS__SSL_MODE", "REQUIRED"
+    )  # Child nested
+    monkeypatch.setenv(
+        "JOBMON__DB__SQLALCHEMY_CONNECT_ARGS__SSL_CERT", "/path/to/cert"
+    )  # Another child
+
+    # This should not raise TypeError: 'str' object does not support item assignment
+    config = JobmonConfig(filepath=str(config_file))
+
+    # The configuration should handle the conflict gracefully
+    db_section = config.get_section("db")
+
+    # The parent key should be converted to a dict to accommodate children
+    assert isinstance(db_section["sqlalchemy_connect_args"], dict)
+    assert db_section["sqlalchemy_connect_args"]["ssl_mode"] == "REQUIRED"
+    assert db_section["sqlalchemy_connect_args"]["ssl_cert"] == "/path/to/cert"
+
+    # Test with JSON primitive value that also has conflicts
+    monkeypatch.setenv("JOBMON__DB__SQLALCHEMY_CONNECT_ARGS", "{}")  # JSON primitive
+    config = JobmonConfig(filepath=str(config_file))
+    db_section = config.get_section("db")
+
+    # Should still handle the conflict and merge children
+    assert isinstance(db_section["sqlalchemy_connect_args"], dict)
+    assert db_section["sqlalchemy_connect_args"]["ssl_mode"] == "REQUIRED"
+    assert db_section["sqlalchemy_connect_args"]["ssl_cert"] == "/path/to/cert"
+
+    # Test with null value that has conflicts
+    monkeypatch.setenv("JOBMON__DB__SQLALCHEMY_CONNECT_ARGS", "null")  # null primitive
+    config = JobmonConfig(filepath=str(config_file))
+    db_section = config.get_section("db")
+
+    # Should still handle the conflict and merge children
+    assert isinstance(db_section["sqlalchemy_connect_args"], dict)
+    assert db_section["sqlalchemy_connect_args"]["ssl_mode"] == "REQUIRED"
+    assert db_section["sqlalchemy_connect_args"]["ssl_cert"] == "/path/to/cert"

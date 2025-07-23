@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import shutil
 import tempfile
+import sys
 
 import nox
 from nox.sessions import Session
@@ -21,6 +22,12 @@ def tests(session: Session) -> None:
 
     args = session.posargs or test_locations
 
+    # Set up environment variables
+    test_env = {"SQLALCHEMY_WARN_20": "1"}
+    if sys.platform == "darwin":
+        # This is a workaround for a fork safety issue on macOS
+        test_env["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
+
     session.run(
         "coverage",
         "run",
@@ -28,7 +35,7 @@ def tests(session: Session) -> None:
         "pytest",
         "--junitxml=.test_report.xml",
         *args,
-        env={"SQLALCHEMY_WARN_20": "1"}
+        env=test_env
     )
 
 
@@ -219,7 +226,7 @@ def update_locks(session: Session) -> None:
         # Optionally, you could make this an error: session.error("UV_EXTRA_INDEX_URL is required")
         # Or proceed, and let uv fail if the index is truly needed and not found in global pip.conf
 
-    python_target_version = "3.12" # Align with production Dockerfile Python version
+    python_target_version = "3.13" # Align with production Dockerfile Python version
     compile_args = [
         "--all-extras",
         f"--python={python_target_version}"
