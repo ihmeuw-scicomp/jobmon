@@ -47,7 +47,9 @@ class ProcessResourceDetector(ResourceDetector):
 
             # Get deployment environment with fallback
             try:
-                deployment_environment = config.get("otlp", "deployment_environment")
+                deployment_environment = config.get(
+                    "telemetry", "deployment_environment"
+                )
             except Exception:
                 deployment_environment = "unknown"
 
@@ -75,7 +77,9 @@ class JobmonServiceResourceDetector(ResourceDetector):
 
             # Get deployment environment with fallback
             try:
-                deployment_environment = config.get("otlp", "deployment_environment")
+                deployment_environment = config.get(
+                    "telemetry", "deployment_environment"
+                )
             except Exception:
                 deployment_environment = "unknown"
 
@@ -102,7 +106,9 @@ class HostResourceDetector(ResourceDetector):
 
             # Get deployment environment with fallback
             try:
-                deployment_environment = config.get("otlp", "deployment_environment")
+                deployment_environment = config.get(
+                    "telemetry", "deployment_environment"
+                )
             except Exception:
                 deployment_environment = "unknown"
 

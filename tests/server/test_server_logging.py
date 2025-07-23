@@ -98,9 +98,9 @@ class TestServerLoggingConfiguration:
             mock_config = Mock()
             mock_config.get.return_value = ""
             mock_config.get_section.return_value = {}
-            mock_config.get_boolean.side_effect = lambda section, key: {
-                ("otlp", "web_enabled"): True,
-            }.get((section, key), False)
+            mock_config.get_section_coerced.return_value = {
+                "tracing": {"server_enabled": True}
+            }
             mock_config_class.return_value = mock_config
 
             # Mock template loading to avoid actual file I/O
@@ -261,9 +261,9 @@ class TestServerOTLPIntegration:
             mock_config = Mock()
             mock_config.get.return_value = ""
             mock_config.get_section.return_value = {}
-            mock_config.get_boolean.side_effect = lambda section, key: {
-                ("otlp", "web_enabled"): True,
-            }.get((section, key), False)
+            mock_config.get_section_coerced.return_value = {
+                "tracing": {"server_enabled": True}
+            }
             mock_config_class.return_value = mock_config
 
             with patch(
@@ -278,54 +278,71 @@ class TestServerOTLPIntegration:
                 args, kwargs = mock_load.call_args
                 assert "logconfig_server_otlp.yaml" in kwargs["default_template_path"]
 
-    def test_server_otlp_endpoint_override(self):
-        """Test that server OTLP endpoint can be overridden."""
+    def test_server_custom_logconfig_file(self):
+        """Test that server can use custom logconfig files for OTLP endpoint configuration."""
+        import tempfile
+
         from jobmon.server.web.log_config import configure_logging
 
-        with patch("jobmon.server.web.log_config.JobmonConfig") as mock_config_class:
-            mock_config = Mock()
-            mock_config.get.side_effect = lambda section, key: {
-                ("otlp", "endpoint"): "http://custom-otlp:4317",
-                ("logging", "server_logconfig_file"): "",
-            }.get((section, key), "")
-            mock_config.get_section.return_value = {}
-            mock_config.get_boolean.side_effect = lambda section, key: {
-                ("otlp", "web_enabled"): True,
-            }.get((section, key), False)
-            mock_config_class.return_value = mock_config
-
-            # Mock the loaded configuration with OTLP handlers
-            mock_otlp_config = {
-                "version": 1,
-                "handlers": {
-                    "otlp_server": {
-                        "class": "jobmon.core.otlp.JobmonOTLPLoggingHandler",
-                        "exporter": {"endpoint": "http://localhost:4317"},
-                    },
-                    "otlp_structlog": {
-                        "class": "jobmon.server.web.otlp.ServerOTLPStructlogHandler",
-                        "exporter": {"endpoint": "http://localhost:4317"},
+        # Create a custom logconfig with different endpoint
+        custom_logconfig = {
+            "version": 1,
+            "formatters": {
+                "console_default": {"format": "%(levelname)s [%(name)s] %(message)s"}
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "console_default",
+                },
+                "otlp_server": {
+                    "class": "jobmon.core.otlp.JobmonOTLPLoggingHandler",
+                    "formatter": "console_default",
+                    "exporter": {
+                        "module": "opentelemetry.exporter.otlp.proto.grpc._log_exporter",
+                        "class": "OTLPLogExporter",
+                        "endpoint": "http://custom-otlp:4317",  # Custom endpoint
                     },
                 },
-            }
+            },
+            "loggers": {"jobmon": {"handlers": ["console", "otlp_server"]}},
+        }
 
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            import yaml
+
+            yaml.dump(custom_logconfig, f)
+            custom_file_path = f.name
+
+        try:
             with patch(
-                "jobmon.core.config.logconfig_utils.load_logconfig_with_overrides"
-            ) as mock_load:
-                mock_load.return_value = mock_otlp_config
+                "jobmon.server.web.log_config.JobmonConfig"
+            ) as mock_config_class:
+                mock_config = Mock()
+                mock_config.get.side_effect = lambda section, key: {
+                    ("logging", "server_logconfig_file"): custom_file_path,
+                }.get((section, key), "")
+                mock_config.get_section.return_value = {}
+                mock_config.get_boolean.return_value = True  # OTLP enabled
+                mock_config_class.return_value = mock_config
 
-                configure_logging()
+                with patch("logging.config.dictConfig") as mock_dict_config:
+                    configure_logging()
 
-                # Should have overridden endpoints
-                loaded_config = mock_load.return_value
-                assert (
-                    loaded_config["handlers"]["otlp_server"]["exporter"]["endpoint"]
-                    == "http://custom-otlp:4317"
-                )
-                assert (
-                    loaded_config["handlers"]["otlp_structlog"]["exporter"]["endpoint"]
-                    == "http://custom-otlp:4317"
-                )
+                    # Should have called dictConfig with our custom config
+                    mock_dict_config.assert_called_once()
+                    loaded_config = mock_dict_config.call_args[0][0]
+
+                    # Verify our custom endpoint is used
+                    assert (
+                        loaded_config["handlers"]["otlp_server"]["exporter"]["endpoint"]
+                        == "http://custom-otlp:4317"
+                    )
+
+        finally:
+            import os
+
+            os.unlink(custom_file_path)
 
 
 class TestServerLoggingOutput:

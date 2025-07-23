@@ -32,4 +32,65 @@ handlers:
     class: jobmon.server.web.otlp.ServerOTLPStructlogHandler
     level: INFO
     formatter: structlog_json
-    # exporter config to be added by importing configs 
+    # exporter config to be added by importing configs
+
+  # Complete OTLP handlers with exporter included (no merge needed)
+  otlp_complete_template: &otlp_complete_template
+    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+    level: INFO
+    formatter: otlp_default
+    exporter:
+      module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+      class: OTLPLogExporter
+      endpoint: http://localhost:4317
+      options:
+        - ["grpc.max_send_message_length", 16777216]
+        - ["grpc.max_receive_message_length", 16777216]
+      max_export_batch_size: 8
+      export_timeout_millis: 5000
+      schedule_delay_millis: 1000
+      max_queue_size: 256
+
+  # Complete server OTLP structlog handler
+  otlp_structlog_complete_template: &otlp_structlog_complete_template
+    class: jobmon.server.web.otlp.ServerOTLPStructlogHandler
+    level: INFO
+    formatter: structlog_json
+    exporter:
+      module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+      class: OTLPLogExporter
+      endpoint: http://localhost:4317
+      options:
+        - ["grpc.max_send_message_length", 16777216]
+        - ["grpc.max_receive_message_length", 16777216]
+      max_export_batch_size: 8
+      export_timeout_millis: 5000
+      schedule_delay_millis: 1000
+      max_queue_size: 256
+
+# Common handler patterns that can be used directly
+common_handlers:
+  # Console handlers for different environments
+  console_dev:
+    <<: *console_template
+    level: DEBUG
+  
+  console_prod:
+    <<: *console_template
+    level: INFO
+    
+  console_structlog_dev:
+    <<: *console_structlog_template
+    level: DEBUG
+    
+  console_structlog_prod:
+    <<: *console_structlog_template
+    level: INFO
+    
+  console_json_dev:
+    <<: *console_json_template
+    level: DEBUG
+    
+  console_json_prod:
+    <<: *console_json_template
+    level: INFO 

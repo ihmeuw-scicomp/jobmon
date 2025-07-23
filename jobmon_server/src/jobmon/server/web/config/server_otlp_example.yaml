@@ -1,5 +1,5 @@
 # Example server configuration for enabling OTLP
-# This file shows how to enable server OTLP and optionally override the default endpoint
+# This file shows how to enable server OTLP with custom logging configuration
 
 # Database configuration
 db:
@@ -11,14 +11,19 @@ db:
 otlp:
   http_enabled: false  # Not used by server
   web_enabled: true    # Enable server OTLP
-  deployment_environment: prod
-  # Optional: Override the default endpoint from logconfig_server_otlp.yaml
-  # If not specified, will use http://localhost:4317 from the logconfig file
-  endpoint: http://your-otel-collector:4317
+  deployment_environment: dev
 
-# Note: The complete server logging configuration is in logconfig_server_otlp.yaml
-# When web_enabled is true, the server automatically uses that file and optionally
-# overrides the endpoint with the value above.
+# Optional: Custom logging configuration file
+# If you need to customize OTLP endpoints, formatters, or handlers,
+# create a custom logconfig file and specify its path here
+logging:
+  server_logconfig_file: "/path/to/your/custom_server_logconfig.yaml"
+
+# Note: When web_enabled is true, the server automatically uses logconfig_server_otlp.yaml
+# To customize OTLP endpoints or other logging settings:
+# 1. Copy logconfig_server_otlp.yaml to your custom location
+# 2. Modify the endpoint in handlers -> otlp_server -> exporter -> endpoint
+# 3. Set logging.server_logconfig_file to point to your custom file
 # 
 # Server OTLP includes:
 # - FastAPI instrumentation

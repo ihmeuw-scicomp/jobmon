@@ -7,7 +7,6 @@ import functools
 import json
 import logging
 import logging.config
-import os
 from typing import Any, Callable, Dict, Tuple, Type
 
 import aiohttp
@@ -62,9 +61,8 @@ class Requester:
 
     @classmethod
     def _init_otlp(cls: Type[Requester]) -> None:
-        """Initialize OTLP by loading the appropriate logconfig file with templates."""
+        """Initialize OTLP tracing only - logging handled by client configuration."""
         try:
-            from jobmon.core.configuration import JobmonConfig
             from jobmon.core.otlp import (
                 OTLP_AVAILABLE,
                 JobmonOTLPManager,
@@ -74,45 +72,14 @@ class Requester:
             if not OTLP_AVAILABLE:
                 return
 
-            # Initialize minimal OTLP manager for traces
+            # Initialize minimal OTLP manager for traces only
             cls._otlp_manager = initialize_jobmon_otlp()
 
             # Instrument requests library for HTTP tracing
             JobmonOTLPManager.instrument_requests()
 
-            # Load requester-specific OTLP logconfig with user override support
-            config = JobmonConfig()
-            current_dir = os.path.dirname(__file__)
-            default_template_path = os.path.join(
-                current_dir, "config/logconfig_requester_otlp.yaml"
-            )
-
-            # Load with override support
-            from jobmon.core.config.logconfig_utils import load_logconfig_with_overrides
-
-            logconfig_data = load_logconfig_with_overrides(
-                default_template_path=default_template_path,
-                config_section="requester",
-                config=config,
-            )
-
-            # Legacy: Override endpoint only if explicitly configured
-            try:
-                override_endpoint = config.get("otlp", "endpoint")
-                if override_endpoint and logconfig_data:
-                    handlers = logconfig_data.get("handlers", {})
-                    if (
-                        "otlp_requester" in handlers
-                        and "exporter" in handlers["otlp_requester"]
-                    ):
-                        handlers["otlp_requester"]["exporter"][
-                            "endpoint"
-                        ] = override_endpoint
-            except Exception:
-                pass  # Use default endpoint from logconfig
-
-            # Apply the logconfig directly
-            logging.config.dictConfig(logconfig_data)
+            # Note: Logging configuration is handled by the client's configure_client_logging()
+            # No requester-specific logconfig needed
 
         except ImportError:
             # OTLP dependencies not available, continue without OTLP
@@ -133,7 +100,9 @@ class Requester:
         request_timeout = config.get_int("http", "request_timeout")
 
         try:
-            use_otlp = config.get_boolean("otlp", "http_enabled")
+            telemetry_section = config.get_section_coerced("telemetry")
+            tracing_config = telemetry_section.get("tracing", {})
+            use_otlp = tracing_config.get("requester_enabled", False)
         except Exception:
             use_otlp = False
 

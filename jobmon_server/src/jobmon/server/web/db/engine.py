@@ -64,7 +64,9 @@ def get_engine() -> Engine:
 
     # Instrument the engine with OpenTelemetry if enabled
     try:
-        use_otel = cfg.get_boolean("otlp", "web_enabled")
+        telemetry_section = cfg.get_section_coerced("telemetry")
+        tracing_config = telemetry_section.get("tracing", {})
+        use_otel = tracing_config.get("server_enabled", False)
         if use_otel:
             from jobmon.server.web.otlp import ServerOTLPManager
 

@@ -425,39 +425,51 @@ class TestOTLPConfigurationOverrides:
     """Test OTLP integration with configuration override system."""
 
     def test_requester_otlp_with_config_overrides(self):
-        """Test requester OTLP integration with configuration overrides."""
+        """Test requester OTLP integration with custom logconfig file."""
+        import tempfile
+
+        import yaml
+
         from jobmon.core.requester import Requester
 
-        with patch("jobmon.core.otlp.OTLP_AVAILABLE", True):
-            with patch("jobmon.core.configuration.JobmonConfig") as mock_config_class:
-                mock_config = Mock()
-                mock_config.get.side_effect = lambda section, key: {
-                    ("otlp", "endpoint"): "http://custom-requester:4317",
-                }.get((section, key), "")
-                mock_config.get_section_coerced.return_value = {}
-                mock_config_class.return_value = mock_config
-
-                # Mock the template loading to return a config with OTLP handler
-                mock_otlp_config = {
-                    "version": 1,
-                    "handlers": {
-                        "otlp_requester": {
-                            "class": "jobmon.core.otlp.JobmonOTLPLoggingHandler",
-                            "exporter": {"endpoint": "http://localhost:4317"},
-                        }
-                    },
-                    "loggers": {
-                        "jobmon.core.requester": {
-                            "handlers": ["otlp_requester"],
-                            "level": "INFO",
-                        }
+        # Create a custom logconfig with different endpoint
+        custom_logconfig = {
+            "version": 1,
+            "formatters": {"simple": {"format": "%(levelname)s: %(message)s"}},
+            "handlers": {
+                "otlp_requester": {
+                    "class": "jobmon.core.otlp.JobmonOTLPLoggingHandler",
+                    "formatter": "simple",
+                    "exporter": {
+                        "module": "opentelemetry.exporter.otlp.proto.grpc._log_exporter",
+                        "class": "OTLPLogExporter",
+                        "endpoint": "http://custom-requester:4317",  # Custom endpoint
                     },
                 }
+            },
+            "loggers": {
+                "jobmon.core.requester": {
+                    "handlers": ["otlp_requester"],
+                    "level": "INFO",
+                }
+            },
+        }
 
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(custom_logconfig, f)
+            custom_file_path = f.name
+
+        try:
+            with patch("jobmon.core.otlp.OTLP_AVAILABLE", True):
                 with patch(
-                    "jobmon.core.config.logconfig_utils.load_logconfig_with_overrides"
-                ) as mock_load:
-                    mock_load.return_value = mock_otlp_config
+                    "jobmon.core.configuration.JobmonConfig"
+                ) as mock_config_class:
+                    mock_config = Mock()
+                    mock_config.get.side_effect = lambda section, key: {
+                        ("logging", "requester_logconfig_file"): custom_file_path,
+                    }.get((section, key), "")
+                    mock_config.get_section_coerced.return_value = {}
+                    mock_config_class.return_value = mock_config
 
                     with patch("jobmon.core.otlp.JobmonOTLPManager"), patch(
                         "logging.config.dictConfig"
@@ -466,7 +478,7 @@ class TestOTLPConfigurationOverrides:
                         # Initialize requester OTLP
                         Requester._init_otlp()
 
-                        # Should have called dictConfig with modified endpoint
+                        # Should have called dictConfig with our custom config
                         mock_dict_config.assert_called_once()
                         config_used = mock_dict_config.call_args[0][0]
                         assert (
@@ -475,6 +487,11 @@ class TestOTLPConfigurationOverrides:
                             ]
                             == "http://custom-requester:4317"
                         )
+
+        finally:
+            import os
+
+            os.unlink(custom_file_path)
 
     def test_create_log_exporter_factory(self):
         """Test the log exporter factory function."""

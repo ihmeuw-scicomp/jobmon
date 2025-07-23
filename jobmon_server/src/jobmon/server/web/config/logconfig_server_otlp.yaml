@@ -4,40 +4,19 @@
 version: 1
 disable_existing_loggers: false
 
-# Import shared formatters from core templates
+# Import shared formatters and handlers from core templates
 formatters: !template formatters
 
-# Server handlers
+# Server handlers using shared templates  
 handlers:
-  # Shared console handler patterns
-  console_default:
-    class: logging.StreamHandler
-    level: INFO
-    formatter: console_default
+  # Use shared console handler patterns
+  console_default: !template handlers.console_template
+  console_structlog: !template handlers.console_structlog_template
+  console_json: !template handlers.console_json_template
 
-  console_structlog:
-    class: logging.StreamHandler
-    level: INFO
-    formatter: structlog_text
-
-  console_json:
-    class: logging.StreamHandler
-    level: INFO
-    formatter: structlog_json
-
-  # OTLP handler for server libraries (ENABLED) - uses shared exporter config
-  otlp_server:
-    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
-    level: INFO
-    formatter: otlp_default
-    exporter: !template otlp_grpc_exporter
-
-  # OTLP handler with structlog for server jobmon logs (ENABLED)
-  otlp_structlog:
-    class: jobmon.server.web.otlp.ServerOTLPStructlogHandler
-    level: INFO
-    formatter: structlog_json
-    exporter: !template otlp_grpc_exporter
+  # OTLP handlers using complete templates (no merge needed)
+  otlp_server: !template handlers.otlp_complete_template
+  otlp_structlog: !template handlers.otlp_structlog_complete_template
 
 # Server logger configurations WITH OTLP ENABLED
 loggers:

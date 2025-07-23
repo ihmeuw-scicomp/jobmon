@@ -72,21 +72,8 @@ class TestCrossComponentConsistency:
         except (ImportError, FileNotFoundError):
             pass  # Config may not exist in test environment
 
-        # Test requester config loading
-        try:
-            import jobmon.core.config
-
-            core_config_dir = os.path.dirname(jobmon.core.config.__file__)
-            requester_config_path = os.path.join(
-                core_config_dir, "logconfig_requester_otlp.yaml"
-            )
-
-            if os.path.exists(requester_config_path):
-                requester_config = load_logconfig_with_templates(requester_config_path)
-                assert "version" in requester_config
-                assert requester_config["version"] == 1
-        except (ImportError, FileNotFoundError):
-            pass  # Config may not exist in test environment
+        # Note: Requester logging is now handled by client configuration
+        # No separate requester config file needed
 
     def test_otlp_exporter_consistency(self):
         """Test that OTLP exporters use consistent settings across components."""
@@ -150,9 +137,9 @@ class TestEndToEndLoggingScenarios:
                 mock_config = Mock()
                 mock_config.get.return_value = ""
                 mock_config.get_section.return_value = {}
-                mock_config.get_boolean.side_effect = lambda section, key: {
-                    ("otlp", "web_enabled"): True,
-                }.get((section, key), False)
+                mock_config.get_section_coerced.return_value = {
+                    "tracing": {"server_enabled": True}
+                }
                 mock_config_class.return_value = mock_config
 
                 # Mock OTLP managers
@@ -404,9 +391,9 @@ class TestProductionScenarios:
                 mock_config = Mock()
                 mock_config.get.return_value = ""
                 mock_config.get_section.return_value = {}
-                mock_config.get_boolean.side_effect = lambda section, key: {
-                    ("otlp", "web_enabled"): True,
-                }.get((section, key), False)
+                mock_config.get_section_coerced.return_value = {
+                    "tracing": {"server_enabled": True}
+                }
                 mock_config_class.return_value = mock_config
 
                 # Mock OTLP manager to simulate connection failure

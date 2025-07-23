@@ -159,16 +159,16 @@ configure_logging()  # Automatically applies user overrides and OTLP selection
 
 ### Requester Logging
 
-**Default Template**: `jobmon_core/src/jobmon/core/config/logconfig_requester_otlp.yaml`
+**Configuration**: Handled by general client logging configuration
 
-**Purpose**: HTTP request/response tracing with OTLP
+**Purpose**: HTTP request/response tracing integrated with client logging
 
 **Features**:
-- Focused on `jobmon.core.requester` logger
-- Automatic OTLP configuration when enabled
-- Integration with request instrumentation
+- `jobmon.core.requester` logger follows client logging configuration
+- OTLP integration available through client logconfig files
+- HTTP request tracing controlled by `telemetry.tracing.requester_enabled`
 
-**Usage**: Automatically configured when `Requester` is instantiated with OTLP enabled.
+**Usage**: Logging is configured by `configure_client_logging()`. Tracing is enabled when `telemetry.tracing.requester_enabled` is true.
 
 ## Examples
 

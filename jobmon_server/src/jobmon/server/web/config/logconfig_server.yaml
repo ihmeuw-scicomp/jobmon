@@ -4,28 +4,15 @@
 version: 1
 disable_existing_loggers: false
 
-# Import shared formatters from core templates
+# Import shared formatters and handlers from core templates
 formatters: !template formatters
 
-# Server handlers
+# Server handlers using shared templates
 handlers:
-  # Shared console handler pattern
-  console_default:
-    class: logging.StreamHandler
-    level: INFO
-    formatter: console_default
-
-  # Shared structlog console handler pattern
-  console_structlog:
-    class: logging.StreamHandler
-    level: INFO
-    formatter: structlog_text
-
-  # JSON console handler for production
-  console_json:
-    class: logging.StreamHandler
-    level: INFO
-    formatter: structlog_json
+  # Use shared console handler patterns
+  console_default: !template handlers.console_template
+  console_structlog: !template handlers.console_structlog_template
+  console_json: !template handlers.console_json_template
 
 # Server logger configurations (console only by default)
 loggers:

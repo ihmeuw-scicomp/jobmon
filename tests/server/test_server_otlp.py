@@ -461,9 +461,9 @@ class TestServerLoggingConfigIntegration:
             mock_config = Mock()
             mock_config.get.return_value = ""  # No file override
             mock_config.get_section_coerced.return_value = {}
-            mock_config.get_boolean.side_effect = lambda section, key: {
-                ("otlp", "web_enabled"): True,
-            }.get((section, key), False)
+            mock_config.get_section_coerced.return_value = {
+                "tracing": {"server_enabled": True}
+            }
             mock_config_class.return_value = mock_config
 
             with patch(

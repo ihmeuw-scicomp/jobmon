@@ -14,12 +14,23 @@ services:
       - ./config:/app/config:ro  # Mount local config directory
     environment:
       # Jobmon Configuration
-      - JOBMON_CONFIG_PATH=/app/config/jobmonconfig.local.yaml
-
+      - JOBMON_CONFIG_FILE=/app/config/jobmonconfig.local.yaml
+      - JOBMON__AUTH__ENABLED=false
+      # OTLP Debugging
+      - OTEL_PYTHON_LOG_CORRELATION=true
+      - OTEL_PYTHON_LOG_LEVEL=DEBUG
+      - OTEL_LOG_LEVEL=DEBUG
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_METRICS_EXPORTER=none
+      - OTEL_TRACES_EXPORTER=otlp
+      # Logging debugging
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
     env_file:
       - .env
     command: >
       /bin/sh -c "fastapi run /app/main.py --port 80 --reload"
+
   jobmon_frontend:
     build: 
       context: ./jobmon_gui
@@ -27,20 +38,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./jobmon_gui/src:/app/src
-    env_file:
-      - .env  # Load environment variables from the .env file
+      - ./jobmon_gui/src:/app/src:ro
+    environment:
+      - REACT_APP_API_URL=http://localhost:8070/api/v3
 
-  # jobmon_server_dev:
-  #   build:
-  #     context: ./
-  #     dockerfile: ./Dockerfile.server.dev
-  #   ports:
-  #     - "8070:8070"
-  #   volumes:
-  #     - ./jobmon_core:/app/jobmon_core:ro
-  #     - ./jobmon_server:/app/jobmon_server:ro
-  #     - ./jobmon_client:/app/jobmon_client:ro
-  #   env_file:
-  #     - .env
-  #   command: bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ./.nox/build_gui_test_env && python jobmon_gui/local_testing/main.py"

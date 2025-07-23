@@ -4,23 +4,16 @@
 version: 1
 disable_existing_loggers: false
 
-# Import shared formatters from templates
+# Import shared formatters and handlers from core templates
 formatters: !template formatters
 
-# Client handlers
+# Client handlers using shared templates
 handlers:
-  # Console handler for client development (always enabled)
-  console:
-    class: logging.StreamHandler
-    level: INFO
-    formatter: console_default
+  # Console handler for client development (shared template)
+  console: !template handlers.console_template
 
-  # OTLP handler template for client (ready to enable)
-  otlp_client:
-    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
-    level: INFO
-    formatter: otlp_default
-    exporter: !template otlp_grpc_exporter
+  # OTLP handler for client (ready to enable) - complete template
+  otlp_client: !template handlers.otlp_complete_template
 
 # Client logger configurations (console only by default)
 loggers:

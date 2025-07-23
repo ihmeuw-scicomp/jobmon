@@ -61,15 +61,14 @@ def merge_logging_configs(base_config: Dict, new_config: Dict) -> None:
 def configure_logging(
     dict_config: Optional[Dict] = None, file_config: str = ""
 ) -> None:
-    """Setup logging with automatic logconfig selection and user override support.
+    """Configure logging for the server web application.
 
     This function supports:
     1. Explicit dict_config or file_config (highest precedence)
     2. User file overrides via logging.server_logconfig_file
     3. User section overrides via logging.server.*
     4. Automatic OTLP selection based on otlp.web_enabled
-    5. Legacy OTLP endpoint override via otlp.endpoint
-    6. Fallback to default templates and legacy config
+    5. Fallback to default templates and legacy config
 
     Args:
         dict_config: Explicit logging configuration dictionary
@@ -119,7 +118,9 @@ def configure_logging(
 
                 # Check if OTLP is enabled for server
                 try:
-                    otlp_enabled = config.get_boolean("otlp", "web_enabled")
+                    telemetry_section = config.get_section_coerced("telemetry")
+                    tracing_config = telemetry_section.get("tracing", {})
+                    otlp_enabled = tracing_config.get("server_enabled", False)
                 except ConfigError:
                     otlp_enabled = False
 
@@ -140,23 +141,6 @@ def configure_logging(
                     config_section="server",
                     config=config,
                 )
-
-                # Legacy: Override endpoint in OTLP handlers if configured
-                if otlp_enabled:
-                    try:
-                        override_endpoint = config.get("otlp", "endpoint")
-                        if override_endpoint and logging_config:
-                            handlers = logging_config.get("handlers", {})
-                            for handler_name in ["otlp_server", "otlp_structlog"]:
-                                if (
-                                    handler_name in handlers
-                                    and "exporter" in handlers[handler_name]
-                                ):
-                                    handlers[handler_name]["exporter"][
-                                        "endpoint"
-                                    ] = override_endpoint
-                    except ConfigError:
-                        pass  # Use default endpoint from logconfig
 
         except Exception:
             # Fallback to legacy defaults if everything fails

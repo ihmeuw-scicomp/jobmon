@@ -46,7 +46,12 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     app = add_hooks_and_handlers(app)
 
     # Configure remaining OTLP components
-    USE_OTEL = config.get_boolean("otlp", "web_enabled")
+    try:
+        telemetry_section = config.get_section_coerced("telemetry")
+        tracing_config = telemetry_section.get("tracing", {})
+        USE_OTEL = tracing_config.get("server_enabled", False)
+    except Exception:
+        USE_OTEL = False
     if USE_OTEL:
         # Import OTel modules here to avoid unnecessary imports when OTel is disabled
         from jobmon.core.otlp import add_span_details_processor

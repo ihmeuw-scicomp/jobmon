@@ -53,27 +53,10 @@ def load_all_templates(config_root: str) -> Dict[str, Any]:
     """Load all template files from the templates directory."""
     templates = {}
 
-    # Find templates directory - try multiple locations with package-aware resolution
-    templates_dirs = [
-        # First try: templates in same directory (for core configs)
-        os.path.join(config_root, "templates"),
-        # Second try: relative path from server to core (for server configs)
-        os.path.join(config_root, "../../../../core/config/templates"),
-        # Third try: relative path from client to core (for client configs)
-        os.path.join(config_root, "../../../core/config/templates"),
-        # Fourth try: package-based resolution using this module's location
-        os.path.join(os.path.dirname(__file__), "templates"),
-        # Fifth try: absolute package path resolution
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "templates"),
-    ]
+    # Use package-based resolution - reliable in all environments
+    templates_dir = get_core_templates_path()
 
-    templates_dir = None
-    for candidate in templates_dirs:
-        if os.path.exists(candidate):
-            templates_dir = os.path.abspath(candidate)
-            break
-
-    if not templates_dir:
+    if not os.path.exists(templates_dir):
         return {}
 
     # Load all template files
@@ -126,3 +109,16 @@ def load_logconfig_with_templates(config_path: str) -> Dict[str, Any]:
 def load_yaml_with_templates(file_path: str) -> Dict[str, Any]:
     """Convenience function to load any YAML file with template support."""
     return load_logconfig_with_templates(file_path)
+
+
+def get_core_templates_path() -> str:
+    """Get the absolute path to core templates using package resources."""
+    try:
+        import jobmon.core.config.templates
+
+        return os.path.dirname(jobmon.core.config.templates.__file__)
+    except ImportError as e:
+        raise ImportError(
+            f"Failed to import jobmon.core.config.templates module. "
+            f"This suggests a broken jobmon installation: {e}"
+        )

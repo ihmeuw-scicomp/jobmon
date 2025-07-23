@@ -243,39 +243,5 @@ class TestTemplateIntegration:
         except ImportError:
             pytest.skip("Server config not available")
 
-    def test_requester_otlp_config_loads_templates(self):
-        """Test that requester OTLP config successfully loads templates."""
-        from jobmon.core.config.template_loader import load_logconfig_with_templates
-
-        # Find requester OTLP config file
-        try:
-            import jobmon.core.config
-
-            core_config_dir = os.path.dirname(jobmon.core.config.__file__)
-            requester_config_path = os.path.join(
-                core_config_dir, "logconfig_requester_otlp.yaml"
-            )
-
-            if os.path.exists(requester_config_path):
-                # Load requester config with templates
-                config = load_logconfig_with_templates(requester_config_path)
-
-                # Should have basic logging config structure
-                assert "version" in config
-                assert config["version"] == 1
-
-                # Should have OTLP-specific elements
-                if "handlers" in config:
-                    handlers = config["handlers"]
-                    # Look for OTLP handlers
-                    otlp_handlers = [
-                        name for name in handlers.keys() if "otlp" in name.lower()
-                    ]
-                    if otlp_handlers:
-                        # Check that OTLP handler has exporter config
-                        otlp_handler = handlers[otlp_handlers[0]]
-                        if "exporter" in otlp_handler:
-                            assert "endpoint" in otlp_handler["exporter"]
-
-        except ImportError:
-            pytest.skip("Core config not available")
+    # Note: Requester OTLP config test removed as requester logging
+    # is now handled by the general client configuration

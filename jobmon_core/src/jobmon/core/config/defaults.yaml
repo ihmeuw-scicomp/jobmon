@@ -29,8 +29,7 @@ logging:
   # File-based overrides (highest precedence)
   # Specify custom logconfig files to completely replace default templates
   client_logconfig_file: ""      # Path to custom client logconfig YAML file
-  server_logconfig_file: ""      # Path to custom server logconfig YAML file  
-  requester_logconfig_file: ""   # Path to custom requester logconfig YAML file
+  server_logconfig_file: ""      # Path to custom server logconfig YAML file
   
   # Section-based overrides (applied to default templates)
   # Override specific formatters, handlers, or loggers while keeping templates
@@ -43,11 +42,6 @@ logging:
     formatters: {}               # Override/add server formatters
     handlers: {}                 # Override/add server handlers
     loggers: {}                  # Override/add server loggers
-    
-  requester:
-    formatters: {}               # Override/add requester formatters
-    handlers: {}                 # Override/add requester handlers
-    loggers: {}                  # Override/add requester loggers
 
 # Examples of environment variable overrides:
 # JOBMON__LOGGING__CLIENT_LOGCONFIG_FILE=/path/to/custom.yaml
@@ -57,11 +51,31 @@ logging:
 oidc:
   name: OIDC
 
-# OpenTelemetry (OTLP) configuration
-otlp:
-  http_enabled: false  # Client OTLP (requester logging)
-  web_enabled: false   # Server OTLP (web app logging)
+# Telemetry configuration (replaces otlp section)
+telemetry:
+  # Shared resource identification (used by both logs and traces)
   deployment_environment: prod
+  
+  # Distributed tracing configuration (spans only - logs handled via logconfig)
+  tracing:
+    requester_enabled: false     # Enable HTTP request tracing (replaces otlp.http_enabled)
+    server_enabled: false        # Enable server tracing (replaces otlp.web_enabled)
+    span_exporter: "grpc_span"   # Which exporter to use for trace spans
+    
+    exporters:
+      # Production GRPC span exporter
+      grpc_span:
+        endpoint: "otelcol.aks.scicomp.ihme.washington.edu:443"
+        module: "opentelemetry.exporter.otlp.proto.grpc.trace_exporter"
+        class: "OTLPSpanExporter"
+        timeout: 30
+        headers: {}
+        compression: "gzip"
+        
+      # Local development console exporter
+      console_span:
+        module: "opentelemetry.exporter.console.trace_exporter"
+        class: "ConsoleSpanExporter"
 
 reaper:
   poll_interval_minutes: 5
