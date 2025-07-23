@@ -5,7 +5,7 @@ from http import HTTPStatus as StatusCodes
 from typing import Any, DefaultDict, Dict, Optional, cast
 
 import structlog
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy import and_, select, update
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
@@ -31,55 +31,52 @@ logger = structlog.get_logger(__name__)
 async def log_running(
     task_instance_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
-    """Log a task_instance as running.
-
-    Args:
-        task_instance_id: id of the task_instance to log as running
-        request: fastapi request object
-        db: The database session.
-    """
+    """Log a task_instance as running."""
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
-    # Acquire an exclusive lock on the task instance to prevent concurrent modifications
-    select_stmt = (
-        select(TaskInstance)
-        .where(TaskInstance.id == task_instance_id)
-        .with_for_update()
-    )
-    task_instance = db.execute(select_stmt).scalars().one()
-
-    # Update attributes first
-    if data.get("distributor_id", None) is not None:
-        task_instance.distributor_id = data["distributor_id"]
-    if data.get("nodename", None) is not None:
-        task_instance.nodename = data["nodename"]
-    task_instance.process_group_id = data["process_group_id"]
-
-    # Handle state transitions with proper error handling
     try:
-        task_instance.transition(constants.TaskInstanceStatus.RUNNING)
-        task_instance.report_by_date = add_time(data["next_report_increment"])
-    except InvalidStateTransition as e:
-        if task_instance.status == constants.TaskInstanceStatus.RUNNING:
-            logger.warning(e)
-        elif task_instance.status == constants.TaskInstanceStatus.KILL_SELF:
-            task_instance.transition(constants.TaskInstanceStatus.ERROR_FATAL)
-        elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
-            task_instance.transition(constants.TaskInstanceStatus.ERROR)
-        else:
-            # Tried to move to an illegal state
-            logger.error(e)
+        db.begin()
 
-    # Flush changes within the locked context
-    db.flush()
+        # Lock and load task_instance
+        select_stmt = (
+            select(TaskInstance)
+            .where(TaskInstance.id == task_instance_id)
+            .with_for_update()
+        )
+        task_instance = db.execute(select_stmt).scalars().one()
 
-    wire_format = task_instance.to_wire_as_worker_node_task_instance()
+        # Update attributes
+        if data.get("distributor_id") is not None:
+            task_instance.distributor_id = data["distributor_id"]
+        if data.get("nodename") is not None:
+            task_instance.nodename = data["nodename"]
+        task_instance.process_group_id = data["process_group_id"]
 
-    resp = JSONResponse(
-        content={"task_instance": wire_format}, status_code=StatusCodes.OK
-    )
-    return resp
+        # Handle state transition
+        try:
+            task_instance.transition(constants.TaskInstanceStatus.RUNNING)
+            task_instance.report_by_date = add_time(data["next_report_increment"])
+        except InvalidStateTransition as e:
+            if task_instance.status == constants.TaskInstanceStatus.RUNNING:
+                logger.warning(e)
+            elif task_instance.status == constants.TaskInstanceStatus.KILL_SELF:
+                task_instance.transition(constants.TaskInstanceStatus.ERROR_FATAL)
+            elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
+                task_instance.transition(constants.TaskInstanceStatus.ERROR)
+            else:
+                logger.error(e)
+
+        db.commit()
+
+        wire_format = task_instance.to_wire_as_worker_node_task_instance()
+        return JSONResponse(
+            content={"task_instance": wire_format}, status_code=StatusCodes.OK
+        )
+
+    except Exception as e:
+        db.rollback()
+        raise e
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_report_by")
@@ -138,26 +135,22 @@ async def log_ti_report_by(
 async def log_ti_report_by_batch(
     request: Request, db: Session = Depends(get_db)
 ) -> Any:
-    """Log task_instances as being responsive with a new report_by_date.
-
-    This is done at the worker node heartbeat_interval rate, so it may not happen at the same
-    rate that the reconciler updates batch submitted report_by_dates (also because it causes
-    a lot of traffic if all workers are logging report by_dates often compared to if the
-    reconciler runs often).
-
-    Args:
-        request: fastapi request object
-        db: The database session.
-    """
+    """Log a batch of task_instances as being responsive with a new report_by_date."""
     data = cast(Dict, await request.json())
-    tis = data.get("task_instance_ids", None)
-
+    tis = data.get("task_instance_ids")
     next_report_increment = float(data["next_report_increment"])
 
+    if not tis or not isinstance(tis, list):
+        raise HTTPException(
+            status_code=400, detail="task_instance_ids must be a non-empty list"
+        )
+
     logger.debug(f"Log report_by for TI {tis}.")
-    if tis:
-        # Use bulk update with explicit locking for better performance and reduced contention
-        # First acquire locks on the task instances we're about to update
+
+    try:
+        db.begin()
+
+        # Optional: lock first if worried about race conditions
         lock_stmt = (
             select(TaskInstance.id)
             .where(
@@ -169,7 +162,7 @@ async def log_ti_report_by_batch(
         )
         db.execute(lock_stmt)
 
-        # Then perform the bulk update
+        # Bulk update
         update_stmt = (
             update(TaskInstance)
             .where(
@@ -181,112 +174,132 @@ async def log_ti_report_by_batch(
         )
         db.execute(update_stmt)
 
-    resp = JSONResponse(content={}, status_code=StatusCodes.OK)
-    return resp
+        db.commit()
+        return JSONResponse(content={}, status_code=StatusCodes.OK)
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update report_by_date for TIs {tis}: {e}")
+        raise e
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_done")
 async def log_done(
     task_instance_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
-    """Log a task_instance as done.
-
-    Args:
-        task_instance_id: id of the task_instance to log done
-        request: fastapi request object
-        db: The database session.
-    """
+    """Log a task_instance as done."""
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
-    # Acquire exclusive lock to prevent concurrent modifications
-    select_stmt = (
-        select(TaskInstance)
-        .where(TaskInstance.id == task_instance_id)
-        .with_for_update()
-    )
-    task_instance = db.execute(select_stmt).scalars().one()
-
-    optional_vals = [
-        "distributor_id",
-        "stdout_log",
-        "stderr_log",
-        "nodename",
-        "stdout",
-        "stderr",
-    ]
-    for optional_val in optional_vals:
-        val = data.get(optional_val, None)
-        if val is not None:
-            setattr(task_instance, optional_val, val)
-
     try:
-        task_instance.transition(constants.TaskInstanceStatus.DONE)
-    except InvalidStateTransition as e:
-        if task_instance.status == constants.TaskInstanceStatus.DONE:
-            logger.warning(e)
-        else:
-            # Tried to move to an illegal state
-            logger.error(e)
-    db.flush()
-    resp = JSONResponse(
-        content={"status": task_instance.status}, status_code=StatusCodes.OK
-    )
-    return resp
+        db.begin()
+
+        # Lock the row
+        select_stmt = (
+            select(TaskInstance)
+            .where(TaskInstance.id == task_instance_id)
+            .with_for_update()
+        )
+        task_instance = db.execute(select_stmt).scalars().one()
+
+        # Update fields if present
+        optional_vals = [
+            "distributor_id",
+            "stdout_log",
+            "stderr_log",
+            "nodename",
+            "stdout",
+            "stderr",
+        ]
+        for field in optional_vals:
+            val = data.get(field)
+            if val is not None:
+                setattr(task_instance, field, val)
+
+        # Attempt transition
+        try:
+            task_instance.transition(constants.TaskInstanceStatus.DONE)
+        except InvalidStateTransition as e:
+            if task_instance.status == constants.TaskInstanceStatus.DONE:
+                logger.warning(e)
+            else:
+                logger.error(e)
+
+        db.commit()
+
+        return JSONResponse(
+            content={"status": task_instance.status},
+            status_code=StatusCodes.OK,
+        )
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to mark task_instance {task_instance_id} as done: {e}")
+        raise e
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_error_worker_node")
 async def log_error_worker_node(
     task_instance_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
-    """Log a task_instance as errored.
-
-    Args:
-        task_instance_id (str): id of the task_instance to log done
-        request (Request): fastapi request object
-        db: The database session.
-    """
+    """Log an error for a task instance."""
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
     logger.info(f"Log ERROR for TI:{task_instance_id}.")
 
-    select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
-    task_instance = db.execute(select_stmt).scalars().one()
-
-    optional_vals = [
-        "distributor_id",
-        "stdout_log",
-        "stderr_log",
-        "nodename",
-        "stdout",
-        "stderr",
-    ]
-    for optional_val in optional_vals:
-        val = data.get(optional_val, None)
-        if data is not None:
-            setattr(task_instance, optional_val, val)
-
-    # add error log
-    error_state = data["error_state"]
-    error_description = data["error_description"]
     try:
-        task_instance.transition(error_state)
+        db.begin()
+
+        # Lock the task instance
+        select_stmt = (
+            select(TaskInstance)
+            .where(TaskInstance.id == task_instance_id)
+            .with_for_update()
+        )
+        task_instance = db.execute(select_stmt).scalars().one()
+
+        # Optional updates
+        optional_vals = [
+            "distributor_id",
+            "stdout_log",
+            "stderr_log",
+            "nodename",
+            "stdout",
+            "stderr",
+        ]
+        for field in optional_vals:
+            val = data.get(field)
+            if val is not None:
+                setattr(task_instance, field, val)
+
+        # Error handling
+        error_state = data["error_state"]
+        error_description = data["error_description"]
+
+        try:
+            task_instance.transition(error_state)
+        except InvalidStateTransition as e:
+            if task_instance.status == error_state:
+                logger.warning(e)
+            else:
+                logger.error(e)
+        # Create error log entry
         error = TaskInstanceErrorLog(
-            task_instance_id=task_instance.id, description=error_description
+            task_instance_id=task_instance.id,
+            description=error_description,
         )
         db.add(error)
-        db.flush()
-    except InvalidStateTransition as e:
-        if task_instance.status == error_state:
-            logger.warning(e)
-        else:
-            # Tried to move to an illegal state
-            logger.error(e)
+        db.commit()
 
-    resp = JSONResponse(
-        content={"status": task_instance.status}, status_code=StatusCodes.OK
-    )
-    return resp
+        return JSONResponse(
+            content={"status": task_instance.status},
+            status_code=StatusCodes.OK,
+        )
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to log error for TI {task_instance_id}: {e}")
+        raise e
 
 
 @api_v3_router.get("/task_instance/{task_instance_id}/task_instance_error_log")
@@ -412,10 +425,11 @@ async def log_known_error(
     nodename = data.get("nodename", None)
     logger.info(f"Log ERROR for TI:{task_instance_id}.")
 
-    select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
-    task_instance = db.execute(select_stmt).scalars().one()
-
     try:
+        db.begin()
+        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+        task_instance = db.execute(select_stmt).scalars().one()
+
         resp = _log_error(
             db,
             task_instance,
@@ -437,6 +451,8 @@ async def log_known_error(
             nodename,
             request,
         )
+    finally:
+        db.commit()
     return resp
 
 
@@ -461,37 +477,43 @@ async def log_unknown_error(
 
     # make sure the task hasn't logged a new heartbeat since we began
     # reconciliation
-    select_stmt = select(TaskInstance).where(
-        TaskInstance.id == task_instance_id,
-        TaskInstance.report_by_date <= func.now(),
-    )
-    task_instance = db.execute(select_stmt).scalars().one_or_none()
-    db.flush()
+    try:
+        db.begin()
+        select_stmt = select(TaskInstance).where(
+            TaskInstance.id == task_instance_id,
+            TaskInstance.report_by_date <= func.now(),
+        )
+        task_instance = db.execute(select_stmt).scalars().one_or_none()
+        db.flush()
 
-    if task_instance is not None:
-        try:
-            resp = _log_error(
-                db,
-                task_instance,
-                error_state,
-                error_message,
-                distributor_id,
-                nodename,
-                request,
-            )
-        except OperationalError:
-            # modify the error message and retry
-            new_msg = error_message.encode("latin1", "replace").decode("utf-8")
-            resp = _log_error(
-                db,
-                task_instance,
-                error_state,
-                new_msg,
-                distributor_id,
-                nodename,
-                request,
-            )
-    return resp
+        if task_instance is not None:
+            try:
+                resp = _log_error(
+                    db,
+                    task_instance,
+                    error_state,
+                    error_message,
+                    distributor_id,
+                    nodename,
+                    request,
+                )
+            except OperationalError:
+                # modify the error message and retry
+                new_msg = error_message.encode("latin1", "replace").decode("utf-8")
+                resp = _log_error(
+                    db,
+                    task_instance,
+                    error_state,
+                    new_msg,
+                    distributor_id,
+                    nodename,
+                    request,
+                )
+        db.commit()
+        return resp
+    except Exception as e:
+        db.rollback()
+        raise e
 
 
 @api_v3_router.post("/task_instance/instantiate_task_instances")

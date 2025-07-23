@@ -6,7 +6,7 @@ from typing import Any, Dict, cast
 import structlog
 from fastapi import Depends, Request
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
@@ -78,39 +78,39 @@ def get_task_template_versions(
     return resp
 
 
-def _add_or_get_arg(name: str, db: Session) -> Arg:
-    retries = 0
-    while retries <= 5:
-        try:
-            arg = Arg(name=name)
-            db.add(arg)
-            db.flush()
-            break  # Successfully added, break the loop
-        except IntegrityError:
-            db.rollback()
-            select_stmt = select(Arg).where(Arg.name == name)
-            arg = db.execute(select_stmt).scalars().one()
-            break  # Successfully retrieved, break the loop
-        except OperationalError as e:
-            if "Deadlock" in str(e):
-                retries += 1
-                db.rollback()
-                continue  # Deadlock detected, retrying
-            else:
-                raise  # For other OperationalErrors, propagate the exception
-    return arg
-
-
 @api_v3_router.post("/task_template/{task_template_id}/add_version")
 async def add_task_template_version(
-    task_template_id: int, request: Request, db: Session = Depends(get_db)
+    task_template_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
 ) -> Any:
-    """Add a tool to the database."""
-    # check input variables
+    """Add a task_template_version safely using injected DB session."""
     structlog.contextvars.bind_contextvars(task_template_id=task_template_id)
-    data = cast(Dict, await request.json())
+
+    def _add_or_get_arg(name: str, session: Session) -> Arg:
+        try:
+            # First try to get existing
+            select_stmt = select(Arg).where(Arg.name == name)
+            arg = session.execute(select_stmt).scalars().one_or_none()
+            if arg:
+                return arg
+
+            # If not found, create new
+            arg = Arg(name=name)
+            session.add(arg)
+            session.flush()
+            return arg
+
+        except IntegrityError:
+            # Race condition: another process created it
+            session.rollback()  # Clear the failed state
+            select_stmt = select(Arg).where(Arg.name == name)
+            arg = session.execute(select_stmt).scalars().one()
+            return arg
+
+    # Parse and validate request
     try:
-        task_template_id = int(task_template_id)
+        data = cast(Dict, await request.json())
         node_args = data["node_args"]
         task_args = data["task_args"]
         op_args = data["op_args"]
@@ -121,25 +121,21 @@ async def add_task_template_version(
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    # populate the argument table
-    arg_mapping_dct: dict = {
-        constants.ArgType.NODE_ARG: [],
-        constants.ArgType.TASK_ARG: [],
-        constants.ArgType.OP_ARG: [],
-    }
-
-    for arg_name in node_args:
-        arg_mapping_dct[constants.ArgType.NODE_ARG].append(
-            _add_or_get_arg(arg_name, db)
-        )
-    for arg_name in task_args:
-        arg_mapping_dct[constants.ArgType.TASK_ARG].append(
-            _add_or_get_arg(arg_name, db)
-        )
-    for arg_name in op_args:
-        arg_mapping_dct[constants.ArgType.OP_ARG].append(_add_or_get_arg(arg_name, db))
-
     try:
+        # Resolve args in same session
+        arg_mapping_dct = {
+            constants.ArgType.NODE_ARG: [
+                arg for arg in [_add_or_get_arg(arg, db) for arg in node_args] if arg
+            ],
+            constants.ArgType.TASK_ARG: [
+                arg for arg in [_add_or_get_arg(arg, db) for arg in task_args] if arg
+            ],
+            constants.ArgType.OP_ARG: [
+                arg for arg in [_add_or_get_arg(arg, db) for arg in op_args] if arg
+            ],
+        }
+
+        # Main transaction block
         ttv = TaskTemplateVersion(
             task_template_id=task_template_id,
             command_template=command_template,
@@ -148,38 +144,47 @@ async def add_task_template_version(
         db.add(ttv)
         db.flush()
 
-        # get a lock
+        # Lock to ensure exclusive write
         db.refresh(ttv, with_for_update=True)
-        for arg_type_id in arg_mapping_dct.keys():
-            for arg in arg_mapping_dct[arg_type_id]:
+
+        for arg_type_id, args in arg_mapping_dct.items():
+            for arg in args:
                 ctatm = TemplateArgMap(
                     task_template_version_id=ttv.id,
                     arg_id=arg.id,
                     arg_type_id=arg_type_id,
                 )
-                ctatm.argument = arg  # Explicitly set the relationship
                 db.add(ctatm)
         db.flush()
-
+        db.commit()
         task_template_version = ttv.to_wire_as_client_task_template_version()
+        return JSONResponse(
+            content={"task_template_version": task_template_version},
+            status_code=StatusCodes.OK,
+        )
 
-    except IntegrityError:
+    except IntegrityError as e:
+        logger.error(f"IntegrityError: {e}")
+        # Session is in corrupted state - rollback first
         db.rollback()
-        # if another process is adding this task_template_version then this query
-        # should block until the template_arg_map has been populated and committed
+        # Race condition: another process may have inserted this TTV
         select_stmt = select(TaskTemplateVersion).where(
             TaskTemplateVersion.task_template_id == task_template_id,
             TaskTemplateVersion.command_template == command_template,
             TaskTemplateVersion.arg_mapping_hash == arg_mapping_hash,
         )
-        ttv = db.execute(select_stmt).scalars().one()
-
-        task_template_version = ttv.to_wire_as_client_task_template_version()
-    resp = JSONResponse(
-        content={"task_template_version": task_template_version},
-        status_code=StatusCodes.OK,
-    )
-    return resp
+        existing_ttv = db.execute(select_stmt).scalars().one_or_none()
+        if existing_ttv is None:
+            # Still not found - let the IntegrityError bubble up
+            raise e
+        else:
+            task_template_version = (
+                existing_ttv.to_wire_as_client_task_template_version()
+            )
+            return JSONResponse(
+                content={"task_template_version": task_template_version},
+                status_code=StatusCodes.OK,
+            )
 
 
 @api_v3_router.get("/task_template/id/{task_template_version_id}")
