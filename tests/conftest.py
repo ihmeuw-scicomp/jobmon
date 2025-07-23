@@ -12,7 +12,6 @@ from typing import Any, Optional
 
 import pytest
 import requests
-import sqlalchemy
 import uvicorn
 from sqlalchemy.engine import Engine
 
@@ -109,7 +108,9 @@ def db_engine() -> Engine:
     init_db()  # Then initialize DB (runs migrations + metadata load)
 
     # verify db created
-    eng = sqlalchemy.create_engine(db_uri)
+    from jobmon.server.web.db import get_engine
+
+    eng = get_engine()  # Use the configured engine with WAL mode
     from sqlalchemy.orm import Session
 
     with Session(eng) as session:

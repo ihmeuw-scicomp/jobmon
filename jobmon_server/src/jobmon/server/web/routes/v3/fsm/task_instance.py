@@ -4,10 +4,10 @@ from collections import defaultdict
 from http import HTTPStatus as StatusCodes
 from typing import Any, DefaultDict, Dict, Optional, cast
 
-import sqlalchemy
 import structlog
 from fastapi import Depends, Request
 from sqlalchemy import and_, select, update
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
@@ -41,14 +41,22 @@ async def log_running(
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
-    select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+    # Acquire an exclusive lock on the task instance to prevent concurrent modifications
+    select_stmt = (
+        select(TaskInstance)
+        .where(TaskInstance.id == task_instance_id)
+        .with_for_update()
+    )
     task_instance = db.execute(select_stmt).scalars().one()
 
+    # Update attributes first
     if data.get("distributor_id", None) is not None:
         task_instance.distributor_id = data["distributor_id"]
     if data.get("nodename", None) is not None:
         task_instance.nodename = data["nodename"]
     task_instance.process_group_id = data["process_group_id"]
+
+    # Handle state transitions with proper error handling
     try:
         task_instance.transition(constants.TaskInstanceStatus.RUNNING)
         task_instance.report_by_date = add_time(data["next_report_increment"])
@@ -62,6 +70,8 @@ async def log_running(
         else:
             # Tried to move to an illegal state
             logger.error(e)
+
+    # Flush changes within the locked context
     db.flush()
 
     wire_format = task_instance.to_wire_as_worker_node_task_instance()
@@ -91,25 +101,37 @@ async def log_ti_report_by(
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
-    vals = {"report_by_date": add_time(data["next_report_increment"])}
-    for optional_val in ["distributor_id", "stderr", "stdout"]:
-        val = data.get(optional_val, None)
-        if data is not None:
-            vals[optional_val] = val
+    try:
+        db.begin()
+        vals = {"report_by_date": add_time(data["next_report_increment"])}
+        for optional_val in ["distributor_id", "stderr", "stdout"]:
+            val = data.get(optional_val, None)
+            if data is not None:
+                vals[optional_val] = val
 
-    update_stmt = update(TaskInstance).where(TaskInstance.id == task_instance_id)
-    db.execute(update_stmt.values(**vals))
-    db.flush()
+        select_stmt = (
+            select(TaskInstance)
+            .where(TaskInstance.id == task_instance_id)
+            .with_for_update()
+        )
+        task_instance = db.execute(select_stmt).scalars().one()
+        # Apply value updates directly to ORM object
+        for key, value in vals.items():
+            setattr(task_instance, key, value)
 
-    select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
-    task_instance = db.execute(select_stmt).scalars().one()
-    if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
-        task_instance.transition(constants.TaskInstanceStatus.RUNNING)
+        # Handle possible state transition
+        if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
+            task_instance.transition(constants.TaskInstanceStatus.RUNNING)
 
-    resp = JSONResponse(
-        content={"status": task_instance.status}, status_code=StatusCodes.OK
-    )
-    return resp
+        db.commit()
+
+        resp = JSONResponse(
+            content={"status": task_instance.status}, status_code=StatusCodes.OK
+        )
+        return resp
+    except OperationalError as e:
+        db.rollback()
+        raise e
 
 
 @api_v3_router.post("/task_instance/log_report_by/batch")
@@ -124,7 +146,6 @@ async def log_ti_report_by_batch(
     reconciler runs often).
 
     Args:
-        task_instance_id: id of the task_instance to log
         request: fastapi request object
         db: The database session.
     """
@@ -135,6 +156,20 @@ async def log_ti_report_by_batch(
 
     logger.debug(f"Log report_by for TI {tis}.")
     if tis:
+        # Use bulk update with explicit locking for better performance and reduced contention
+        # First acquire locks on the task instances we're about to update
+        lock_stmt = (
+            select(TaskInstance.id)
+            .where(
+                TaskInstance.id.in_(tis),
+                TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
+            )
+            .with_for_update()
+            .execution_options(synchronize_session=False)
+        )
+        db.execute(lock_stmt)
+
+        # Then perform the bulk update
         update_stmt = (
             update(TaskInstance)
             .where(
@@ -142,10 +177,10 @@ async def log_ti_report_by_batch(
                 TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
             )
             .values(report_by_date=add_time(next_report_increment))
+            .execution_options(synchronize_session=False)
         )
-
         db.execute(update_stmt)
-        db.flush()
+
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 
@@ -164,7 +199,12 @@ async def log_done(
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
-    select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+    # Acquire exclusive lock to prevent concurrent modifications
+    select_stmt = (
+        select(TaskInstance)
+        .where(TaskInstance.id == task_instance_id)
+        .with_for_update()
+    )
     task_instance = db.execute(select_stmt).scalars().one()
 
     optional_vals = [
@@ -385,7 +425,7 @@ async def log_known_error(
             nodename,
             request,
         )
-    except sqlalchemy.exc.OperationalError:
+    except OperationalError:
         # modify the error message and retry
         new_msg = error_message.encode("latin1", "replace").decode("utf-8")
         resp = _log_error(
@@ -439,7 +479,7 @@ async def log_unknown_error(
                 nodename,
                 request,
             )
-        except sqlalchemy.exc.OperationalError:
+        except OperationalError:
             # modify the error message and retry
             new_msg = error_message.encode("latin1", "replace").decode("utf-8")
             resp = _log_error(
