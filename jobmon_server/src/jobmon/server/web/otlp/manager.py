@@ -38,7 +38,7 @@ class ServerOTLPManager:
             self._core_manager.initialize()
 
             # Note: OTLP logging handlers are configured via dictConfig/logconfig
-            # using JobmonOTLPLoggingHandler and ServerOTLPStructlogHandler
+            # using JobmonOTLPLoggingHandler and JobmonOTLPStructlogHandler
 
             self._initialized = True
 

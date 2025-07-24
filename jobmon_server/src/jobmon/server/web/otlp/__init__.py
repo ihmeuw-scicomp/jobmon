@@ -16,8 +16,6 @@ Architecture:
 
 from __future__ import annotations
 
-from .handlers import ServerOTLPStructlogHandler
-
 # Core server OTLP exports
 from .manager import (
     OTLP_AVAILABLE,
@@ -30,6 +28,5 @@ __all__ = [
     "ServerOTLPManager",
     "get_server_otlp_manager",
     "initialize_server_otlp",
-    "ServerOTLPStructlogHandler",
     "OTLP_AVAILABLE",
 ]

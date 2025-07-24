@@ -27,9 +27,9 @@ handlers:
     formatter: otlp_default
     # exporter config to be added by importing configs
 
-  # Server OTLP structlog handler template (without exporter)
+  # OTLP structlog handler template (without exporter)
   otlp_structlog_template: &otlp_structlog_template
-    class: jobmon.server.web.otlp.ServerOTLPStructlogHandler
+    class: jobmon.core.otlp.JobmonOTLPStructlogHandler
     level: INFO
     formatter: structlog_json
     # exporter config to be added by importing configs
@@ -51,9 +51,9 @@ handlers:
       schedule_delay_millis: 1000
       max_queue_size: 256
 
-  # Complete server OTLP structlog handler
+  # Complete OTLP structlog handler
   otlp_structlog_complete_template: &otlp_structlog_complete_template
-    class: jobmon.server.web.otlp.ServerOTLPStructlogHandler
+    class: jobmon.core.otlp.JobmonOTLPStructlogHandler
     level: INFO
     formatter: structlog_json
     exporter:

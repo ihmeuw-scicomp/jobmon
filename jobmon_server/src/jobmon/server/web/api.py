@@ -59,6 +59,7 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
 
         # Initialize server OTLP manager
         server_otlp = get_server_otlp_manager()
+        server_otlp.initialize()  # Actually initialize the manager!
 
         # Instrument SQLAlchemy BEFORE any engine creation
         server_otlp.instrument_sqlalchemy()

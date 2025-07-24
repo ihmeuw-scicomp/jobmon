@@ -147,14 +147,21 @@ class WebServerProcess:
 
         signal.signal(signal.SIGTERM, sigterm_handler)
 
+        from jobmon.core.config.template_loader import (
+            get_core_templates_path,
+            load_all_templates,
+        )
         from jobmon.server.web import log_config
         from jobmon.server.web.api import get_app
+
+        # Load templates from the config directory
+        templates = load_all_templates(get_core_templates_path())
 
         dict_config = {
             "version": 1,
             "disable_existing_loggers": True,
-            "formatters": log_config.default_formatters.copy(),
-            "handlers": log_config.default_handlers.copy(),
+            "formatters": templates["formatters"],
+            "handlers": {"console_text": templates["common_handlers"]["console_dev"]},
             "loggers": {
                 "jobmon.server.web": {
                     "handlers": ["console_text"],

@@ -31,14 +31,30 @@ def test_add_structlog_context(requester_in_memory, log_file, api_prefix):
     added_context = {"foo": "bar", "baz": "qux"}
     requester.add_server_structlog_context(**added_context)
     requester._send_request(f"{api_prefix}/health", {}, "get")
+
+    # Look for the health endpoint log entry that should contain the context
+    found_health_log = False
     with open(log_file, "r") as server_log_file:
         for line in server_log_file:
             stripped_line = line.strip()
-            log_dict = json.loads(stripped_line)
-            for key in added_context.keys():
-                assert key in log_dict.keys()
-            for val in added_context.values():
-                assert val in log_dict.values()
+            if stripped_line:
+                log_dict = json.loads(stripped_line)
+                # Only check logs from the health endpoint (contains our message and path)
+                if (
+                    log_dict.get("event") == "Health check completed successfully"
+                    and log_dict.get("path") == f"{api_prefix}/health"
+                ):
+                    found_health_log = True
+                    for key in added_context.keys():
+                        assert (
+                            key in log_dict.keys()
+                        ), f"Key '{key}' not found in health log: {log_dict}"
+                    for val in added_context.values():
+                        assert (
+                            val in log_dict.values()
+                        ), f"Value '{val}' not found in health log: {log_dict}"
+
+    assert found_health_log, "Health endpoint log with context not found"
 
 
 @pytest.mark.skip(reason="This test is not working")

@@ -959,7 +959,7 @@ def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
 
 def test_fhs_serializers(client_env) -> None:
     """Test the serializers for the FHS task generator."""
-    from tests.worker_node.task_generator_fhs import (
+    from tests.pytest.worker_node.task_generator_fhs import (
         FHSDirSpec,
         FHSFileSpec,
         Quantiles,
@@ -1037,7 +1037,7 @@ def test_fhs_deserizalizers(client_env, monkeypatch) -> None:
 
     tool = Tool("test_tool")
 
-    from tests.worker_node.task_generator_fhs import (
+    from tests.pytest.worker_node.task_generator_fhs import (
         FHSDirSpec,
         FHSFileSpec,
         Quantiles,
@@ -1094,7 +1094,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
         "_find_executable_path",
         Mock(return_value=task_generator.TASK_RUNNER_NAME),
     )
-    from tests.worker_node.task_generator_fhs import (
+    from tests.pytest.worker_node.task_generator_fhs import (
         FHSDirSpec,
         FHSFileSpec,
         Quantiles,

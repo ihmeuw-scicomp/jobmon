@@ -42,3 +42,29 @@ services:
     environment:
       - REACT_APP_API_URL=http://localhost:8070/api/v3
 
+  jobmon_client:
+    build:
+      context: ./
+      dockerfile: ./jobmon_client/Dockerfile.local
+      args:
+        EDITABLE: "${EDITABLE:-true}"  # Default to true for local dev
+        EXTRAS: "${CLIENT_EXTRAS:-otlp}"  # Default extras for client
+    volumes:
+      - ./jobmon_core:/app/jobmon_core:ro
+      - ./jobmon_client:/app/jobmon_client:ro
+      - ./config:/app/config:ro  # Mount local config directory
+      - ./tests/workflows:/app/test_scripts  # Volume for test workflow scripts
+      - ./tests/_scripts:/app/example_scripts:ro  # Mount existing test scripts as examples
+      - ./docsource/quickstart_tasks:/app/quickstart_examples:ro  # Mount quickstart examples
+    environment:
+      # Jobmon Configuration
+      - JOBMON_CONFIG_FILE=/app/config/jobmonconfig.local.yaml
+      - JOBMON__AUTH__ENABLED=false
+      # Logging debugging
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+    env_file:
+      - .env
+    stdin_open: true  # Keep STDIN open for interactive use
+    tty: true         # Allocate a pseudo-TTY for interactive use
+

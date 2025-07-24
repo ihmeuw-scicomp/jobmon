@@ -67,6 +67,10 @@ def json_log_file(tmp_path):
                         log_entry = json.loads(line.strip())
                         assert "expected_message" in log_entry.get("event", "")
     """
+    from jobmon.core.config.template_loader import (
+        get_core_templates_path,
+        load_all_templates,
+    )
     from jobmon.server.web import log_config
 
     def _setup_logging(loggers=None, filename_suffix="test"):
@@ -75,11 +79,14 @@ def json_log_file(tmp_path):
 
         log_file_path = tmp_path / f"{filename_suffix}.log"
 
+        # Load templates from the config directory
+        templates = load_all_templates(get_core_templates_path())
+
         # Build handlers dict
         handlers = {
             "test_file_handler": {
                 "class": "logging.FileHandler",
-                "formatter": "json",
+                "formatter": "structlog_json",
                 "filename": str(log_file_path),
                 "level": "INFO",
             }
@@ -97,7 +104,7 @@ def json_log_file(tmp_path):
         dict_config = {
             "version": 1,
             "disable_existing_loggers": False,
-            "formatters": log_config.default_formatters.copy(),
+            "formatters": templates["formatters"],
             "handlers": handlers,
             "loggers": logger_configs,
         }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict, Optional, Union
 
 from . import OTLP_AVAILABLE
@@ -43,23 +44,41 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         super().__init__(level)
         self._exporter_config = exporter
         self._otlp_handler: Optional[logging.Handler] = None
+
+        # Simple debug mode for troubleshooting
+        self._debug_mode = os.environ.get("JOBMON_OTLP_DEBUG", "").lower() in (
+            "true",
+            "1",
+            "yes",
+        )
+
         self.setFormatter(JobmonOTLPFormatter())
 
     def emit(self, record: logging.LogRecord) -> None:
         """Emit a log record to OTLP."""
+        # Create handler on first use
         if not self._otlp_handler and self._exporter_config and OTLP_AVAILABLE:
             try:
                 self._otlp_handler = self._create_handler()
-            except Exception:
-                # Fail silently if handler creation fails to avoid breaking application logging
-                pass
+                if self._debug_mode and self._otlp_handler:
+                    logging.getLogger("jobmon.otlp.debug").info(
+                        "OTLP handler initialized successfully"
+                    )
+            except Exception as e:
+                if self._debug_mode:
+                    logging.getLogger("jobmon.otlp.debug").error(
+                        f"OTLP handler initialization failed: {e}", exc_info=True
+                    )
 
+        # Emit to OTLP if handler is available
         if self._otlp_handler:
             try:
                 self._otlp_handler.emit(record)
-            except Exception:
-                # Fail silently to avoid breaking application logging
-                pass
+            except Exception as e:
+                if self._debug_mode:
+                    logging.getLogger("jobmon.otlp.debug").error(
+                        f"OTLP emit failed: {e}"
+                    )
 
     def _create_handler(self) -> Optional[logging.Handler]:
         """Create OTLP handler by processing the exporter configuration."""
@@ -74,7 +93,10 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             logger_provider = LoggerProvider(resource=resource_group)
 
             # Determine if we have a dict config or pre-configured exporter
-            if isinstance(self._exporter_config, dict):
+            # Handle both dict and ConvertingDict (from logging config)
+            if hasattr(self._exporter_config, "get") and hasattr(
+                self._exporter_config, "keys"
+            ):
                 # Handle inline dict configuration (server pattern)
                 exporter = self._create_exporter_from_dict(self._exporter_config)
                 processor = self._create_processor_from_dict(
@@ -100,8 +122,8 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         except Exception:
             return None
 
-    def _create_exporter_from_dict(self, config: Dict) -> Optional[Any]:
-        """Create an OTLP exporter from dictionary configuration."""
+    def _create_exporter_from_dict(self, config: Any) -> Optional[Any]:
+        """Create an OTLP exporter from dictionary configuration (handles ConvertingDict)."""
         try:
             # Extract exporter configuration
             module_name = config.get("module")
@@ -123,24 +145,27 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             if "endpoint" in config:
                 exporter_args["endpoint"] = config["endpoint"]
             if "headers" in config:
-                exporter_args["headers"] = config["headers"]
+                exporter_args["headers"] = dict(
+                    config["headers"]
+                )  # Convert ConvertingDict to dict
             if "timeout" in config:
                 exporter_args["timeout"] = config["timeout"]
             if "compression" in config:
                 exporter_args["compression"] = config["compression"]
+            if "insecure" in config:
+                exporter_args["insecure"] = config["insecure"]
             if "options" in config:
                 # Convert list of [key, value] pairs to list of tuples
-                exporter_args["options"] = [
-                    tuple(option) for option in config["options"]
-                ]
+                options_list = config["options"]
+                exporter_args["options"] = [tuple(option) for option in options_list]
 
             return exporter_class(**exporter_args)
 
         except Exception:
             return None
 
-    def _create_processor_from_dict(self, exporter: Any, config: Dict) -> Any:
-        """Create a batch processor with configuration from dict."""
+    def _create_processor_from_dict(self, exporter: Any, config: Any) -> Any:
+        """Create a batch processor with configuration from dict (handles ConvertingDict)."""
         try:
             from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 

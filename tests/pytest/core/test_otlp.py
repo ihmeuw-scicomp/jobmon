@@ -424,74 +424,49 @@ class TestOTLPLogconfigIntegration:
 class TestOTLPConfigurationOverrides:
     """Test OTLP integration with configuration override system."""
 
-    def test_requester_otlp_with_config_overrides(self):
-        """Test requester OTLP integration with custom logconfig file."""
-        import tempfile
+    def test_requester_otlp_tracing_only(self):
+        """Test that requester OTLP initialization only sets up tracing, not logging.
 
-        import yaml
-
+        In the current architecture, requester logging is handled by client configuration,
+        while requester only manages tracing setup.
+        """
         from jobmon.core.requester import Requester
 
-        # Create a custom logconfig with different endpoint
-        custom_logconfig = {
-            "version": 1,
-            "formatters": {"simple": {"format": "%(levelname)s: %(message)s"}},
-            "handlers": {
-                "otlp_requester": {
-                    "class": "jobmon.core.otlp.JobmonOTLPLoggingHandler",
-                    "formatter": "simple",
-                    "exporter": {
-                        "module": "opentelemetry.exporter.otlp.proto.grpc._log_exporter",
-                        "class": "OTLPLogExporter",
-                        "endpoint": "http://custom-requester:4317",  # Custom endpoint
-                    },
-                }
-            },
-            "loggers": {
-                "jobmon.core.requester": {
-                    "handlers": ["otlp_requester"],
-                    "level": "INFO",
-                }
-            },
-        }
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml.dump(custom_logconfig, f)
-            custom_file_path = f.name
+        # Reset class state to avoid side effects
+        original_manager = Requester._otlp_manager
+        Requester._otlp_manager = None
 
         try:
             with patch("jobmon.core.otlp.OTLP_AVAILABLE", True):
                 with patch(
-                    "jobmon.core.configuration.JobmonConfig"
-                ) as mock_config_class:
-                    mock_config = Mock()
-                    mock_config.get.side_effect = lambda section, key: {
-                        ("logging", "requester_logconfig_file"): custom_file_path,
-                    }.get((section, key), "")
-                    mock_config.get_section_coerced.return_value = {}
-                    mock_config_class.return_value = mock_config
+                    "jobmon.core.otlp.JobmonOTLPManager"
+                ) as mock_manager_class, patch(
+                    "jobmon.core.otlp.initialize_jobmon_otlp"
+                ) as mock_init_otlp, patch(
+                    "logging.config.dictConfig"
+                ) as mock_dict_config:
 
-                    with patch("jobmon.core.otlp.JobmonOTLPManager"), patch(
-                        "logging.config.dictConfig"
-                    ) as mock_dict_config:
+                    mock_manager = Mock()
+                    mock_init_otlp.return_value = mock_manager
 
-                        # Initialize requester OTLP
-                        Requester._init_otlp()
+                    # Initialize requester OTLP
+                    Requester._init_otlp()
 
-                        # Should have called dictConfig with our custom config
-                        mock_dict_config.assert_called_once()
-                        config_used = mock_dict_config.call_args[0][0]
-                        assert (
-                            config_used["handlers"]["otlp_requester"]["exporter"][
-                                "endpoint"
-                            ]
-                            == "http://custom-requester:4317"
-                        )
+                    # Should initialize OTLP manager for tracing
+                    mock_init_otlp.assert_called_once()
+
+                    # Should instrument requests for HTTP tracing
+                    mock_manager_class.instrument_requests.assert_called_once()
+
+                    # Should NOT configure logging (that's handled by client config)
+                    mock_dict_config.assert_not_called()
+
+                    # Should store the manager instance
+                    assert Requester._otlp_manager is mock_manager
 
         finally:
-            import os
-
-            os.unlink(custom_file_path)
+            # Restore original state
+            Requester._otlp_manager = original_manager
 
     def test_create_log_exporter_factory(self):
         """Test the log exporter factory function."""

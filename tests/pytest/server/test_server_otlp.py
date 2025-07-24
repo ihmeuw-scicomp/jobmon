@@ -189,37 +189,38 @@ class TestServerOTLPManager:
         assert result._initialized  # Should be initialized after the call
 
 
-class TestServerOTLPStructlogHandler:
-    """Test the server-specific OTLP structlog handler."""
+class TestOTLPStructlogHandler:
+    """Test the OTLP structlog handler (now using core implementation)."""
 
     def test_handler_initialization(self):
-        """Test ServerOTLPStructlogHandler initialization."""
-        from jobmon.server.web.otlp import ServerOTLPStructlogHandler
+        """Test JobmonOTLPStructlogHandler initialization."""
+        from jobmon.core.otlp.handlers import JobmonOTLPStructlogHandler
 
         with patch("structlog.stdlib.ProcessorFormatter") as mock_formatter:
-            handler = ServerOTLPStructlogHandler(level=logging.INFO)
+            handler = JobmonOTLPStructlogHandler(level=logging.INFO)
 
             # Should have attempted to create ProcessorFormatter for structlog
             mock_formatter.assert_called_once()
-            assert handler._exporter is None  # No exporter yet
+            assert handler._exporter_config is None  # No exporter config yet
+            assert handler._otlp_handler is None  # Handler not created yet
 
     def test_handler_with_exporter_config(self):
         """Test handler with pre-configured exporter."""
-        from jobmon.server.web.otlp import ServerOTLPStructlogHandler
+        from jobmon.core.otlp.handlers import JobmonOTLPStructlogHandler
 
         mock_exporter = Mock()
-        handler = ServerOTLPStructlogHandler(exporter=mock_exporter)
+        handler = JobmonOTLPStructlogHandler(exporter=mock_exporter)
 
-        assert handler._exporter is mock_exporter
+        assert handler._exporter_config is mock_exporter
         assert handler._otlp_handler is None  # Lazy initialization
 
     def test_handler_lazy_initialization(self):
         """Test that handler initializes lazily on first emit."""
-        from jobmon.server.web.otlp import ServerOTLPStructlogHandler
+        from jobmon.core.otlp.handlers import JobmonOTLPStructlogHandler
 
         # Create handler with a mock exporter so it will try to create internal handler
         mock_exporter = Mock()
-        handler = ServerOTLPStructlogHandler(exporter=mock_exporter)
+        handler = JobmonOTLPStructlogHandler(exporter=mock_exporter)
 
         # Should not have created internal handler yet
         assert handler._otlp_handler is None
@@ -247,20 +248,20 @@ class TestServerOTLPStructlogHandler:
 
     def test_handler_without_structlog(self):
         """Test handler fallback when structlog not available."""
-        from jobmon.server.web.otlp import ServerOTLPStructlogHandler
+        from jobmon.core.otlp.handlers import JobmonOTLPStructlogHandler
 
         with patch("structlog.stdlib.ProcessorFormatter", side_effect=ImportError):
-            handler = ServerOTLPStructlogHandler()
+            handler = JobmonOTLPStructlogHandler()
 
             # Should have fallen back to default formatter
             assert isinstance(handler.formatter, logging.Formatter)
 
     def test_handler_without_otlp_available(self):
         """Test handler gracefully handles OTLP not being available."""
-        from jobmon.server.web.otlp import ServerOTLPStructlogHandler
+        from jobmon.core.otlp.handlers import JobmonOTLPStructlogHandler
 
-        with patch("jobmon.server.web.otlp.manager.OTLP_AVAILABLE", False):
-            handler = ServerOTLPStructlogHandler()
+        with patch("jobmon.core.otlp.handlers.OTLP_AVAILABLE", False):
+            handler = JobmonOTLPStructlogHandler()
 
             record = logging.LogRecord(
                 name="test",
@@ -301,7 +302,7 @@ class TestServerOTLPIntegration:
                         "level": "INFO",
                     },
                     "otlp_structlog": {
-                        "class": "jobmon.server.web.otlp.ServerOTLPStructlogHandler",
+                        "class": "jobmon.core.otlp.JobmonOTLPStructlogHandler",
                         "level": "INFO",
                     },
                 },
@@ -473,7 +474,7 @@ class TestServerLoggingConfigIntegration:
                     "version": 1,
                     "handlers": {
                         "otlp_structlog": {
-                            "class": "jobmon.server.web.otlp.ServerOTLPStructlogHandler"
+                            "class": "jobmon.core.otlp.JobmonOTLPStructlogHandler"
                         }
                     },
                 }
@@ -509,7 +510,7 @@ class TestServerLoggingConfigIntegration:
                     "level": "INFO",
                 },
                 "otlp_structlog": {
-                    "class": "jobmon.server.web.otlp.ServerOTLPStructlogHandler",
+                    "class": "jobmon.core.otlp.JobmonOTLPStructlogHandler",
                     "level": "INFO",
                     "formatter": "structlog_json",
                     "exporter": {
@@ -538,7 +539,7 @@ class TestServerLoggingConfigIntegration:
         # Find the OTLP handler
         otlp_handler = None
         for handler in server_logger.handlers:
-            if "ServerOTLPStructlogHandler" in str(type(handler)):
+            if "JobmonOTLPStructlogHandler" in str(type(handler)):
                 otlp_handler = handler
                 break
 
@@ -589,9 +590,9 @@ class TestErrorHandlingAndResilience:
 
     def test_custom_handler_resilience(self):
         """Test that custom handlers are resilient to OTLP failures."""
-        from jobmon.server.web.otlp import ServerOTLPStructlogHandler
+        from jobmon.core.otlp.handlers import JobmonOTLPStructlogHandler
 
-        handler = ServerOTLPStructlogHandler()
+        handler = JobmonOTLPStructlogHandler()
 
         with patch.object(
             handler, "_create_handler", side_effect=Exception("Handler creation failed")

@@ -1,0 +1,41 @@
+# jobmon_client/Dockerfile.local
+FROM python:3.13
+
+ENV APP_HOME=/app
+WORKDIR $APP_HOME
+
+# Install uv
+RUN python -m pip install --upgrade pip --no-cache-dir && \
+    pip install --no-cache-dir uv
+
+# Configure Artifactory for UV
+ENV UV_EXTRA_INDEX_URL=https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple
+
+# Set build-time arguments for extras, defaulting for local development
+ARG EXTRAS="otlp"      # Default extras for local dev
+ARG EDITABLE=true      # Default to editable install for local dev
+
+# Define valid extras for client
+ENV VALID_CORE_EXTRAS="otlp"
+ENV VALID_CLIENT_EXTRAS="server"  # client can optionally install server extras
+
+# Copy source code
+COPY . ${APP_HOME}/
+
+# Install dependencies using the client-specific script
+# Pass Docker ARGs as ENV VARs to the script
+RUN EXTRAS_ARG="${EXTRAS}" \
+    EDITABLE_ARG="${EDITABLE}" \
+    APP_HOME="${APP_HOME}" \
+    VALID_CORE_EXTRAS="${VALID_CORE_EXTRAS}" \
+    VALID_CLIENT_EXTRAS="${VALID_CLIENT_EXTRAS}" \
+    bash $APP_HOME/jobmon_client/docker_install_deps.sh
+
+# Create directory for test scripts
+RUN mkdir -p /app/test_scripts
+
+# Set the default working directory for running scripts
+WORKDIR /app/test_scripts
+
+# CMD to keep container running for interactive use
+CMD ["tail", "-f", "/dev/null"] 
