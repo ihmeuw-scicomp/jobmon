@@ -7,7 +7,7 @@ from typing import Any, DefaultDict, Dict, Optional, cast
 import structlog
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import and_, select, update
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
@@ -27,6 +27,18 @@ from jobmon.server.web.server_side_exception import ServerError
 logger = structlog.get_logger(__name__)
 
 
+def verify_transit_status(task_instance: TaskInstance, new_state: str) -> bool:
+    """Get the valid status to transit to. Otherwise, retrun None."""
+    if task_instance._is_timely_transition(new_state):
+        current_status = task_instance.status
+        if (current_status, new_state) in task_instance.valid_transitions:
+            return True
+        else:
+            return False
+    else:
+        return False
+
+
 @api_v3_router.post("/task_instance/{task_instance_id}/log_running")
 async def log_running(
     task_instance_id: int, request: Request, db: Session = Depends(get_db)
@@ -36,8 +48,6 @@ async def log_running(
     data = cast(Dict, await request.json())
 
     try:
-        db.begin()
-
         # Lock and load task_instance
         select_stmt = (
             select(TaskInstance)
@@ -54,28 +64,40 @@ async def log_running(
         task_instance.process_group_id = data["process_group_id"]
 
         # Handle state transition
-        try:
+        if verify_transit_status(task_instance, constants.TaskInstanceStatus.RUNNING):
             task_instance.transition(constants.TaskInstanceStatus.RUNNING)
             task_instance.report_by_date = add_time(data["next_report_increment"])
-        except InvalidStateTransition as e:
+        else:
             if task_instance.status == constants.TaskInstanceStatus.RUNNING:
-                logger.warning(e)
+                logger.warning(
+                    f"Unable to transition to running from {task_instance.status}"
+                )
             elif task_instance.status == constants.TaskInstanceStatus.KILL_SELF:
                 task_instance.transition(constants.TaskInstanceStatus.ERROR_FATAL)
             elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
                 task_instance.transition(constants.TaskInstanceStatus.ERROR)
             else:
-                logger.error(e)
+                logger.error(
+                    f"Unable to transition to running from {task_instance.status}"
+                )
 
-        db.commit()
+        db.flush()
 
         wire_format = task_instance.to_wire_as_worker_node_task_instance()
         return JSONResponse(
             content={"task_instance": wire_format}, status_code=StatusCodes.OK
         )
 
-    except Exception as e:
-        db.rollback()
+    except OperationalError as e:
+        if "database is locked" in str(e):
+            logger.warning(
+                f"Database lock detected for task_instance {task_instance_id}, retrying..."
+            )
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable, please retry"
+            )
+        raise e
+    except IntegrityError as e:
         raise e
 
 
@@ -99,7 +121,6 @@ async def log_ti_report_by(
     data = cast(Dict, await request.json())
 
     try:
-        db.begin()
         vals = {"report_by_date": add_time(data["next_report_increment"])}
         for optional_val in ["distributor_id", "stderr", "stdout"]:
             val = data.get(optional_val, None)
@@ -120,14 +141,18 @@ async def log_ti_report_by(
         if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
             task_instance.transition(constants.TaskInstanceStatus.RUNNING)
 
-        db.commit()
-
         resp = JSONResponse(
             content={"status": task_instance.status}, status_code=StatusCodes.OK
         )
         return resp
     except OperationalError as e:
-        db.rollback()
+        if "database is locked" in str(e):
+            logger.warning(
+                f"Database lock detected for task_instance {task_instance_id}, retrying..."
+            )
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable, please retry"
+            )
         raise e
 
 
@@ -148,9 +173,7 @@ async def log_ti_report_by_batch(
     logger.debug(f"Log report_by for TI {tis}.")
 
     try:
-        db.begin()
-
-        # Optional: lock first if worried about race conditions
+        # Lock first to prevent race conditions
         lock_stmt = (
             select(TaskInstance.id)
             .where(
@@ -174,11 +197,17 @@ async def log_ti_report_by_batch(
         )
         db.execute(update_stmt)
 
-        db.commit()
         return JSONResponse(content={}, status_code=StatusCodes.OK)
 
+    except OperationalError as e:
+        if "database is locked" in str(e):
+            logger.warning(f"Database lock detected for TIs {tis}, retrying...")
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable, please retry"
+            )
+        logger.error(f"Failed to update report_by_date for TIs {tis}: {e}")
+        raise e
     except Exception as e:
-        db.rollback()
         logger.error(f"Failed to update report_by_date for TIs {tis}: {e}")
         raise e
 
@@ -192,8 +221,6 @@ async def log_done(
     data = cast(Dict, await request.json())
 
     try:
-        db.begin()
-
         # Lock the row
         select_stmt = (
             select(TaskInstance)
@@ -217,23 +244,34 @@ async def log_done(
                 setattr(task_instance, field, val)
 
         # Attempt transition
-        try:
+        if verify_transit_status(task_instance, constants.TaskInstanceStatus.DONE):
             task_instance.transition(constants.TaskInstanceStatus.DONE)
-        except InvalidStateTransition as e:
+        else:
             if task_instance.status == constants.TaskInstanceStatus.DONE:
-                logger.warning(e)
+                logger.warning(
+                    f"Unable to transition to done from {task_instance.status}"
+                )
             else:
-                logger.error(e)
-
-        db.commit()
+                logger.error(
+                    f"Unable to transition to done from {task_instance.status}"
+                )
 
         return JSONResponse(
             content={"status": task_instance.status},
             status_code=StatusCodes.OK,
         )
 
+    except OperationalError as e:
+        if "database is locked" in str(e):
+            logger.warning(
+                f"Database lock detected for task_instance {task_instance_id}, retrying..."
+            )
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable, please retry"
+            )
+        logger.error(f"Failed to mark task_instance {task_instance_id} as done: {e}")
+        raise e
     except Exception as e:
-        db.rollback()
         logger.error(f"Failed to mark task_instance {task_instance_id} as done: {e}")
         raise e
 
@@ -248,8 +286,6 @@ async def log_error_worker_node(
     logger.info(f"Log ERROR for TI:{task_instance_id}.")
 
     try:
-        db.begin()
-
         # Lock the task instance
         select_stmt = (
             select(TaskInstance)
@@ -276,28 +312,40 @@ async def log_error_worker_node(
         error_state = data["error_state"]
         error_description = data["error_description"]
 
-        try:
+        if verify_transit_status(task_instance, error_state):
             task_instance.transition(error_state)
-        except InvalidStateTransition as e:
+        else:
             if task_instance.status == error_state:
-                logger.warning(e)
+                logger.warning(
+                    f"Unable to transition to {error_state} from {task_instance.status}"
+                )
             else:
-                logger.error(e)
+                logger.error(
+                    f"Unable to transition to {error_state} from {task_instance.status}"
+                )
         # Create error log entry
         error = TaskInstanceErrorLog(
             task_instance_id=task_instance.id,
             description=error_description,
         )
         db.add(error)
-        db.commit()
 
         return JSONResponse(
             content={"status": task_instance.status},
             status_code=StatusCodes.OK,
         )
 
+    except OperationalError as e:
+        if "database is locked" in str(e):
+            logger.warning(
+                f"Database lock detected for task_instance {task_instance_id}, retrying..."
+            )
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable, please retry"
+            )
+        logger.error(f"Failed to log error for TI {task_instance_id}: {e}")
+        raise e
     except Exception as e:
-        db.rollback()
         logger.error(f"Failed to log error for TI {task_instance_id}: {e}")
         raise e
 
@@ -426,7 +474,6 @@ async def log_known_error(
     logger.info(f"Log ERROR for TI:{task_instance_id}.")
 
     try:
-        db.begin()
         select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
         task_instance = db.execute(select_stmt).scalars().one()
 
@@ -439,7 +486,14 @@ async def log_known_error(
             nodename,
             request,
         )
-    except OperationalError:
+    except OperationalError as e:
+        if "database is locked" in str(e):
+            logger.warning(
+                f"Database lock detected for task_instance {task_instance_id}, retrying..."
+            )
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable, please retry"
+            )
         # modify the error message and retry
         new_msg = error_message.encode("latin1", "replace").decode("utf-8")
         resp = _log_error(
@@ -451,8 +505,6 @@ async def log_known_error(
             nodename,
             request,
         )
-    finally:
-        db.commit()
     return resp
 
 
@@ -478,13 +530,11 @@ async def log_unknown_error(
     # make sure the task hasn't logged a new heartbeat since we began
     # reconciliation
     try:
-        db.begin()
         select_stmt = select(TaskInstance).where(
             TaskInstance.id == task_instance_id,
             TaskInstance.report_by_date <= func.now(),
         )
         task_instance = db.execute(select_stmt).scalars().one_or_none()
-        db.flush()
 
         if task_instance is not None:
             try:
@@ -497,7 +547,15 @@ async def log_unknown_error(
                     nodename,
                     request,
                 )
-            except OperationalError:
+            except OperationalError as e:
+                if "database is locked" in str(e):
+                    logger.warning(
+                        f"Database lock detected for ti {task_instance_id}, retrying..."
+                    )
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Database temporarily unavailable, please retry",
+                    )
                 # modify the error message and retry
                 new_msg = error_message.encode("latin1", "replace").decode("utf-8")
                 resp = _log_error(
@@ -509,10 +567,8 @@ async def log_unknown_error(
                     nodename,
                     request,
                 )
-        db.commit()
         return resp
     except Exception as e:
-        db.rollback()
         raise e
 
 
@@ -686,12 +742,11 @@ def _log_error(
         session.flush()
         resp = JSONResponse(content={"message": msg}, status_code=StatusCodes.OK)
     except Exception as e:
-        session.rollback()
-        if request is not None:
-            raise ServerError(
-                f"Unexpected Jobmon Server Error in {request.url.path}", status_code=500
-            ) from e
-        else:
-            raise ServerError("Unexpected Jobmon Server Error", status_code=500) from e
+        # Always complete the request successfully to avoid infinite retries
+        logger.error(f"Failed to log error for task_instance {ti.id}: {e}")
+        resp = JSONResponse(
+            content={"message": "Error logged with warnings"},
+            status_code=StatusCodes.OK,
+        )
 
     return resp
