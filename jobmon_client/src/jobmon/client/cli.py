@@ -639,7 +639,7 @@ class ClientCLI(CLI):
         )
         update_config_parser.add_argument(
             "value",
-            help="New value to set (will be automatically type-coerced)",
+            help="New value to set",
             type=str,
         )
         update_config_parser.add_argument(

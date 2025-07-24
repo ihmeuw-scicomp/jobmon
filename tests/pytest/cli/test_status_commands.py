@@ -18,7 +18,6 @@ from sqlalchemy.orm import Session
 from jobmon.client.api import Tool
 from jobmon.client.cli import ClientCLI as CLI
 from jobmon.client.status_commands import (
-    _coerce_config_value,
     _create_yaml,
     get_filepaths,
     get_sub_task_tree,
@@ -1002,41 +1001,6 @@ def test_resume_workflow_from_cli(tool, task_template, db_engine, cli):
         assert res == WorkflowStatus.DONE
         session.commit()
 
-
-def test_coerce_config_value():
-    """Test the standalone type coercion function."""
-    # Test boolean coercion
-    assert _coerce_config_value("true") is True
-    assert _coerce_config_value("True") is True
-    assert _coerce_config_value("t") is True
-    assert _coerce_config_value("1") == 1  # Numbers take precedence over booleans
-    assert _coerce_config_value("yes") is True
-
-    assert _coerce_config_value("false") is False
-    assert _coerce_config_value("False") is False
-    assert _coerce_config_value("f") is False
-    assert _coerce_config_value("0") == 0  # Numbers take precedence over booleans
-    assert _coerce_config_value("no") is False
-
-    # Test integer coercion
-    assert _coerce_config_value("42") == 42
-    assert _coerce_config_value("-123") == -123
-
-    # Test float coercion
-    assert _coerce_config_value("3.14") == 3.14
-    assert _coerce_config_value("-2.5") == -2.5
-
-    # Test string fallback
-    assert _coerce_config_value("hello") == "hello"
-    assert _coerce_config_value("http://localhost:8080") == "http://localhost:8080"
-
-    # Test JSON/literal evaluation
-    assert _coerce_config_value('{"key": "value"}') == {"key": "value"}
-    assert _coerce_config_value("[1, 2, 3]") == [1, 2, 3]
-
-    # Test whitespace handling
-    assert _coerce_config_value("  true  ") is True
-    assert _coerce_config_value("  42  ") == 42
 
 
 def test_update_config_value_success():

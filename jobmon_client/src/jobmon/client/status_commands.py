@@ -23,64 +23,6 @@ from jobmon.core.requester import Requester
 logger = logging.getLogger(__name__)
 
 
-def _coerce_config_value(value: str) -> Any:
-    """Coerce a string value to appropriate Python type.
-
-    This is a standalone implementation that replicates JobmonConfig._coerce_value
-    to avoid version compatibility issues with installed packages.
-
-    Args:
-        value: String value to coerce
-
-    Returns:
-        Value coerced to appropriate type (bool, int, float, or str)
-    """
-    import ast
-    import json
-    from collections.abc import Mapping, Sequence
-
-    def _coerce_recursive(val: Any) -> Any:
-        """Recursively coerce values."""
-        # Handle containers
-        if isinstance(val, Mapping):
-            return {k: _coerce_recursive(v) for k, v in val.items()}
-        if isinstance(val, Sequence) and not isinstance(val, (str, bytes, bytearray)):
-            return [_coerce_recursive(v) for v in val]
-
-        if not isinstance(val, str):
-            return val
-
-        s_val = val.strip()
-        lower_s_val = s_val.lower()
-
-        # Boolean conversion
-        if lower_s_val in ("t", "true", "1", "yes"):
-            return True
-        if lower_s_val in ("f", "false", "0", "no"):
-            return False
-
-        # Try numeric conversion first
-        try:
-            # Try int first, then float
-            if "." not in s_val:
-                return int(s_val)
-            else:
-                return float(s_val)
-        except ValueError:
-            pass
-
-        # Try JSON, then Python literal, fall back to raw string
-        for parser in (json.loads, ast.literal_eval):
-            try:
-                return parser(s_val)
-            except Exception:
-                pass
-
-        return s_val
-
-    return _coerce_recursive(value)
-
-
 def update_config_value(
     key: str,
     value: str,
@@ -152,12 +94,12 @@ def update_config_value(
             f"Available keys: {available_keys}"
         )
 
-    # Store the old value for the return message
+        # Store the old value for the return message
     old_value = current_dict[final_key]
-
-    # Coerce the new value to the appropriate type using our standalone function
-    coerced_value = _coerce_config_value(value)
-
+    
+    # Coerce the new value to the appropriate type using JobmonConfig's method
+    coerced_value = config._coerce_value(value)
+    
     # Update the value in the config
     current_dict[final_key] = coerced_value
 
