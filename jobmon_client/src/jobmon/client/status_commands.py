@@ -23,6 +23,149 @@ from jobmon.core.requester import Requester
 logger = logging.getLogger(__name__)
 
 
+def _coerce_config_value(value: str) -> Any:
+    """Coerce a string value to appropriate Python type.
+    
+    This is a standalone implementation that replicates JobmonConfig._coerce_value
+    to avoid version compatibility issues with installed packages.
+    
+    Args:
+        value: String value to coerce
+        
+    Returns:
+        Value coerced to appropriate type (bool, int, float, or str)
+    """
+    import ast
+    import json
+    from collections.abc import Mapping, Sequence
+    
+    def _coerce_recursive(val: Any) -> Any:
+        """Recursively coerce values."""
+        # Handle containers
+        if isinstance(val, Mapping):
+            return {k: _coerce_recursive(v) for k, v in val.items()}
+        if isinstance(val, Sequence) and not isinstance(val, (str, bytes, bytearray)):
+            return [_coerce_recursive(v) for v in val]
+        
+        if not isinstance(val, str):
+            return val
+        
+        s_val = val.strip()
+        lower_s_val = s_val.lower()
+        
+        # Boolean conversion
+        if lower_s_val in ("t", "true", "1", "yes"):
+            return True
+        if lower_s_val in ("f", "false", "0", "no"):
+            return False
+        
+        # Try numeric conversion first
+        try:
+            # Try int first, then float
+            if "." not in s_val:
+                return int(s_val)
+            else:
+                return float(s_val)
+        except ValueError:
+            pass
+        
+        # Try JSON, then Python literal, fall back to raw string
+        for parser in (json.loads, ast.literal_eval):
+            try:
+                return parser(s_val)
+            except Exception:
+                pass
+        
+        return s_val
+    
+    return _coerce_recursive(value)
+
+
+def update_config_value(
+    key: str,
+    value: str,
+    config_file: Optional[str] = None,
+) -> str:
+    """Update a configuration value in the defaults.yaml file using dot notation.
+    
+    Args:
+        key: Dot-notated key (e.g., 'http.retries_attempts', 'distributor.poll_interval')
+        value: New value to set (will be automatically type-coerced)
+        config_file: Optional path to specific config file to update
+        
+    Returns:
+        Success message indicating what was updated
+        
+    Raises:
+        ValueError: If the key doesn't exist in the current configuration
+    """
+    from jobmon.core.configuration import JobmonConfig
+    
+    # Load current config
+    config = JobmonConfig(filepath=config_file or "")
+    
+    # Split the dot-notated key into parts
+    key_parts = key.split('.')
+    if len(key_parts) < 2:
+        raise ValueError(
+            f"Key '{key}' must be in dot notation format (e.g., 'section.key'). "
+            f"Valid sections are: {list(config._config.keys())}"
+        )
+    
+    section = key_parts[0]
+    nested_keys = key_parts[1:]
+    
+    # Validate that the section exists
+    if section not in config._config:
+        available_sections = list(config._config.keys())
+        raise ValueError(
+            f"Section '{section}' not found in configuration. "
+            f"Available sections: {available_sections}"
+        )
+    
+    # Navigate to the nested key and validate it exists
+    current_dict = config._config[section]
+    navigation_path = [section]
+    
+    for i, nested_key in enumerate(nested_keys[:-1]):  # All but the last key
+        if not isinstance(current_dict, dict) or nested_key not in current_dict:
+            available_keys = list(current_dict.keys()) if isinstance(current_dict, dict) else []
+            full_path = '.'.join(navigation_path)
+            raise ValueError(
+                f"Key '{nested_key}' not found in '{full_path}'. "
+                f"Available keys: {available_keys}"
+            )
+        current_dict = current_dict[nested_key]
+        navigation_path.append(nested_key)
+    
+    # Validate the final key exists
+    final_key = nested_keys[-1]
+    if not isinstance(current_dict, dict) or final_key not in current_dict:
+        available_keys = list(current_dict.keys()) if isinstance(current_dict, dict) else []
+        full_path = '.'.join(navigation_path)
+        raise ValueError(
+            f"Key '{final_key}' not found in '{full_path}'. "
+            f"Available keys: {available_keys}"
+        )
+    
+    # Store the old value for the return message
+    old_value = current_dict[final_key]
+    
+    # Coerce the new value to the appropriate type using our standalone function
+    coerced_value = _coerce_config_value(value)
+    
+    # Update the value in the config
+    current_dict[final_key] = coerced_value
+    
+    # Write the updated config back to file
+    config.write()
+    
+    return (
+        f"Successfully updated '{key}' from '{old_value}' to '{coerced_value}' "
+        f"in {config._filepath}"
+    )
+
+
 def workflow_status(
     workflow_id: Optional[List[int]] = None,
     user: Optional[List[str]] = None,
