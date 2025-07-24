@@ -47,6 +47,8 @@ async def get_task_template(request: Request, db: Session = Depends(get_db)) -> 
         ttid = task_template.id
     except IntegrityError:
         # Race condition: another process created it
+        # Must rollback to clear the corrupted session state after IntegrityError
+        db.rollback()
         select_stmt = select(TaskTemplate).where(
             TaskTemplate.tool_version_id == tool_version_id,
             TaskTemplate.name == name,
@@ -103,6 +105,8 @@ async def add_task_template_version(
 
         except IntegrityError:
             # Race condition: another process created it
+            # Must rollback to clear the corrupted session state after IntegrityError
+            session.rollback()
             select_stmt = select(Arg).where(Arg.name == name)
             arg = session.execute(select_stmt).scalars().one()
             return arg
@@ -164,7 +168,8 @@ async def add_task_template_version(
     except IntegrityError as e:
         logger.error(f"IntegrityError: {e}")
         # Race condition: another process may have inserted this TTV
-        # Note: With Depends(get_db), session will auto-rollback on exception
+        # Must rollback to clear the corrupted session state after IntegrityError
+        db.rollback()
         select_stmt = select(TaskTemplateVersion).where(
             TaskTemplateVersion.task_template_id == task_template_id,
             TaskTemplateVersion.command_template == command_template,

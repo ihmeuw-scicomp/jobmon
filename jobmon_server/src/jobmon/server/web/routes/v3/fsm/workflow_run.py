@@ -7,6 +7,7 @@ from typing import Any, Dict, List, cast
 import structlog
 from fastapi import Depends, Request
 from sqlalchemy import and_, case, func, insert, select, update
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
@@ -315,32 +316,51 @@ async def set_status_for_triaging(
             constants.TaskInstanceStatus.RUNNING,
         ]
     )
+
     condition3 = TaskInstance.report_by_date <= func.now()
     common_condition = and_(condition1, condition2, condition3)
 
-    # pre-selecting rows to update using with_for_update
-    # prevents deadlocks by setting intent locks
-    select_rows_to_update = (
-        select(TaskInstance).where(common_condition).with_for_update()
-    )
+    # Get task instance IDs to update (without locks)
+    select_ids = select(TaskInstance.id).where(common_condition)
 
-    db.execute(select_rows_to_update).fetchall()
+    rows = db.execute(select_ids).fetchall()
+    task_instance_ids = [row[0] for row in rows]
 
-    update_stmt = (
-        update(TaskInstance)
-        .where(common_condition)
-        .values(
-            status=case(
-                (
-                    TaskInstance.status == constants.TaskInstanceStatus.RUNNING,
-                    constants.TaskInstanceStatus.TRIAGING,
-                ),
-                else_=constants.TaskInstanceStatus.NO_HEARTBEAT,
+    # now update row by row with immediate commit;
+    # do not lock all the rows at the same time to avoid deadlocks
+    # ignor rows with locks as it should be picked up by the next triaging
+    for task_instance_id in task_instance_ids:
+        try:
+            update_stmt = (
+                update(TaskInstance)
+                .where(TaskInstance.id == task_instance_id)
+                .values(
+                    status=case(
+                        (
+                            TaskInstance.status == constants.TaskInstanceStatus.RUNNING,
+                            constants.TaskInstanceStatus.TRIAGING,
+                        ),
+                        else_=constants.TaskInstanceStatus.NO_HEARTBEAT,
+                    )
+                )
             )
-        )
-        .execution_options(synchronize_session=False)
-    )
-    db.execute(update_stmt)
-    db.flush()
+            db.execute(update_stmt)
+            db.commit()
+        except OperationalError as e:
+            if "database is locked" in str(e):
+                logger.warning(
+                    f"Database lock detected, discarding row {task_instance_id} for triaging."
+                    f"It should be picked up by the next triaging."
+                )
+            else:
+                logger.warning(
+                    f"Error in triaging task instance {task_instance_id}: {e}"
+                    f"Discarding row for triaging."
+                    f"It should be picked up by the next triaging."
+                    f"The error is: {e}"
+                )
+            db.rollback()
+        except Exception as e:
+            raise e
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp

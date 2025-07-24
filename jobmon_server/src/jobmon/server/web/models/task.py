@@ -108,6 +108,9 @@ class Task(Base):
 
     def transition(self, new_state: str) -> None:
         """Transition the Task to a new state."""
+        if self.status == new_state:
+            # do nothing if the task is already in the new state
+            return
         # bind_to_logger(workflow_id=self.workflow_id, task_id=self.id)
         logger.info(f"Transitioning task from {self.status} to {new_state}")
         self._validate_transition(new_state)

@@ -2,18 +2,18 @@
 
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
+from time import sleep
 from typing import Any, DefaultDict, Dict, Optional, cast
 
 import structlog
 from fastapi import Depends, HTTPException, Request
 from sqlalchemy import and_, select, update
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 
 from jobmon.core import constants
-from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.core.serializers import SerializeTaskInstanceBatch
 from jobmon.server.web._compat import add_time
 from jobmon.server.web.db.deps import get_db
@@ -21,22 +21,137 @@ from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
+from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
+from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import ServerError
 
 logger = structlog.get_logger(__name__)
 
 
-def verify_transit_status(task_instance: TaskInstance, new_state: str) -> bool:
-    """Get the valid status to transit to. Otherwise, retrun None."""
+def get_new_task_status(task_instance: TaskInstance, new_state: str) -> str:
+    """Get the valid status to transit to. (TaskInstanceStatus, TaskStatus)."""
+    current_task_status = task_instance.task.status
+    if new_state == TaskInstanceStatus.QUEUED:
+        return TaskStatus.QUEUED
+    if new_state == TaskInstanceStatus.INSTANTIATED:
+        return TaskStatus.INSTANTIATING
+    if new_state == TaskInstanceStatus.LAUNCHED:
+        return TaskStatus.LAUNCHED
+    if new_state == TaskInstanceStatus.RUNNING:
+        return TaskStatus.RUNNING
+    elif new_state == TaskInstanceStatus.DONE:
+        return TaskStatus.DONE
+    elif new_state in task_instance.error_states:
+        if task_instance.task.num_attempts >= task_instance.task.max_attempts:
+            logger.info("Giving up task after max attempts.")
+            return TaskStatus.ERROR_FATAL
+        else:
+            if new_state == TaskInstanceStatus.RESOURCE_ERROR:
+                logger.debug("Adjust resource for task.")
+                return TaskStatus.ADJUSTING_RESOURCES
+            else:
+                logger.debug("Retrying Task.")
+                return TaskStatus.REGISTERING
+    elif new_state == TaskInstanceStatus.ERROR_FATAL:
+        return TaskStatus.ERROR_FATAL
+    else:
+        return current_task_status
+
+
+def get_transit_status(task_instance: TaskInstance, new_state: str) -> tuple:
+    """Get the valid status to transit to. (TaskInstanceStatus, TaskStatus)."""
     if task_instance._is_timely_transition(new_state):
         current_status = task_instance.status
         if (current_status, new_state) in task_instance.valid_transitions:
-            return True
+            new_task_status = get_new_task_status(task_instance, new_state)
+            if new_task_status is not None:
+                if (
+                    task_instance.task.status,
+                    new_task_status,
+                ) in task_instance.task.valid_transitions:
+                    return new_state, new_task_status
+                else:
+                    return None, None
+            else:
+                return None, None
         else:
-            return False
+            return None, None
     else:
-        return False
+        return None, None
+
+
+def transit_ti_and_t(
+    task_instance: TaskInstance,
+    new_status_ti: str,
+    new_status_t: str,
+    db: Session,
+    report_by_date: Optional[float] = None,
+) -> None:
+    """Transit the task_instance and task to the new status."""
+    task = task_instance.task
+    # retry 3 times for db lock, wait a small amount of time between retries
+    for i in range(3):
+        try:
+            # Lock TaskInstance first (by ID - deterministic order)
+            # please do not lock the two tables at the same time to avoid deadlock
+            ti_lock_stmt = (
+                select(TaskInstance.id, TaskInstance.task_id)
+                .where(TaskInstance.id == task_instance.id)
+                .with_for_update()
+            )
+            ti_result = db.execute(ti_lock_stmt).one()
+            task_id = ti_result.task_id
+
+            # only lock Task if it needs update
+            if task.status != new_status_t:
+                # Then lock Task (by ID - deterministic order)
+                task_lock_stmt = (
+                    select(Task.id).where(Task.id == task_id).with_for_update()
+                )
+                db.execute(task_lock_stmt).one()
+
+            # Update TaskInstance with status and optional report_by_date
+            ti_values = {
+                "status": new_status_ti,
+                "status_date": func.now(),
+            }
+            if report_by_date is not None:
+                ti_values["report_by_date"] = add_time(report_by_date)
+
+            update_stmt = (
+                update(TaskInstance)
+                .where(TaskInstance.id == task_instance.id)
+                .values(ti_values)
+            )
+            db.execute(update_stmt)
+
+            if task.status != new_status_t:
+                # Update Task status
+                update_stmt = (
+                    update(Task)
+                    .where(Task.id == task_id)
+                    .values(status=new_status_t, status_date=func.now())
+                )
+                db.execute(update_stmt)
+            # release locks immediately; please do not use flush() here
+            db.commit()
+            return
+        except OperationalError as e:
+            if "database is locked" in str(e):
+                logger.warning(f"Database lock detected, retrying attempt {i+1}/3...")
+                db.rollback()  # Clear the corrupted session state
+                sleep(0.001 * (i + 1))  # Much faster: 1ms, 2ms, 3ms
+            else:
+                db.rollback()
+                raise e
+        except Exception as e:
+            logger.error(f"Failed to transit task_instance: {e}")
+            db.rollback()  # Clear the corrupted session state
+            raise e
+    raise HTTPException(
+        status_code=503, detail="Database temporarily unavailable, please retry"
+    )
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_running")
@@ -48,12 +163,8 @@ async def log_running(
     data = cast(Dict, await request.json())
 
     try:
-        # Lock and load task_instance
-        select_stmt = (
-            select(TaskInstance)
-            .where(TaskInstance.id == task_instance_id)
-            .with_for_update()
-        )
+        # load task_instance; do not lock
+        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
         task_instance = db.execute(select_stmt).scalars().one()
 
         # Update attributes
@@ -64,40 +175,57 @@ async def log_running(
         task_instance.process_group_id = data["process_group_id"]
 
         # Handle state transition
-        if verify_transit_status(task_instance, constants.TaskInstanceStatus.RUNNING):
-            task_instance.transition(constants.TaskInstanceStatus.RUNNING)
-            task_instance.report_by_date = add_time(data["next_report_increment"])
+        new_status_ti, new_status_t = get_transit_status(
+            task_instance, constants.TaskInstanceStatus.RUNNING
+        )
+        if new_status_ti is not None and new_status_t is not None:
+            transit_ti_and_t(
+                task_instance,
+                new_status_ti,
+                new_status_t,
+                db,
+                data["next_report_increment"],
+            )
         else:
             if task_instance.status == constants.TaskInstanceStatus.RUNNING:
                 logger.warning(
                     f"Unable to transition to running from {task_instance.status}"
                 )
             elif task_instance.status == constants.TaskInstanceStatus.KILL_SELF:
-                task_instance.transition(constants.TaskInstanceStatus.ERROR_FATAL)
+                new_status_ti, new_status_t = get_transit_status(
+                    task_instance, constants.TaskInstanceStatus.ERROR_FATAL
+                )
+                if new_status_ti is not None and new_status_t is not None:
+                    transit_ti_and_t(
+                        task_instance,
+                        new_status_ti,
+                        new_status_t,
+                        db,
+                        data["next_report_increment"],
+                    )
             elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
-                task_instance.transition(constants.TaskInstanceStatus.ERROR)
+                new_status_ti, new_status_t = get_transit_status(
+                    task_instance, constants.TaskInstanceStatus.ERROR
+                )
+                if new_status_ti is not None and new_status_t is not None:
+                    transit_ti_and_t(
+                        task_instance,
+                        new_status_ti,
+                        new_status_t,
+                        db,
+                        data["next_report_increment"],
+                    )
             else:
                 logger.error(
                     f"Unable to transition to running from {task_instance.status}"
                 )
-
-        db.flush()
 
         wire_format = task_instance.to_wire_as_worker_node_task_instance()
         return JSONResponse(
             content={"task_instance": wire_format}, status_code=StatusCodes.OK
         )
 
-    except OperationalError as e:
-        if "database is locked" in str(e):
-            logger.warning(
-                f"Database lock detected for task_instance {task_instance_id}, retrying..."
-            )
-            raise HTTPException(
-                status_code=503, detail="Database temporarily unavailable, please retry"
-            )
-        raise e
-    except IntegrityError as e:
+    except Exception as e:
         raise e
 
 
@@ -127,11 +255,8 @@ async def log_ti_report_by(
             if data is not None:
                 vals[optional_val] = val
 
-        select_stmt = (
-            select(TaskInstance)
-            .where(TaskInstance.id == task_instance_id)
-            .with_for_update()
-        )
+        # do not lock TaskInstance
+        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
         task_instance = db.execute(select_stmt).scalars().one()
         # Apply value updates directly to ORM object
         for key, value in vals.items():
@@ -139,20 +264,27 @@ async def log_ti_report_by(
 
         # Handle possible state transition
         if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
-            task_instance.transition(constants.TaskInstanceStatus.RUNNING)
+            new_status_ti, new_status_t = get_transit_status(
+                task_instance, constants.TaskInstanceStatus.RUNNING
+            )
+            if new_status_ti is not None and new_status_t is not None:
+                transit_ti_and_t(
+                    task_instance,
+                    new_status_ti,
+                    new_status_t,
+                    db,
+                    data["next_report_increment"],
+                )
+            else:
+                logger.error(
+                    f"Unable to transition to running from {task_instance.status}"
+                )
 
         resp = JSONResponse(
             content={"status": task_instance.status}, status_code=StatusCodes.OK
         )
         return resp
-    except OperationalError as e:
-        if "database is locked" in str(e):
-            logger.warning(
-                f"Database lock detected for task_instance {task_instance_id}, retrying..."
-            )
-            raise HTTPException(
-                status_code=503, detail="Database temporarily unavailable, please retry"
-            )
+    except Exception as e:
         raise e
 
 
@@ -221,12 +353,8 @@ async def log_done(
     data = cast(Dict, await request.json())
 
     try:
-        # Lock the row
-        select_stmt = (
-            select(TaskInstance)
-            .where(TaskInstance.id == task_instance_id)
-            .with_for_update()
-        )
+        # Do not lock TaskInstance
+        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
         task_instance = db.execute(select_stmt).scalars().one()
 
         # Update fields if present
@@ -244,8 +372,12 @@ async def log_done(
                 setattr(task_instance, field, val)
 
         # Attempt transition
-        if verify_transit_status(task_instance, constants.TaskInstanceStatus.DONE):
-            task_instance.transition(constants.TaskInstanceStatus.DONE)
+        new_status_ti, new_status_t = get_transit_status(
+            task_instance, constants.TaskInstanceStatus.DONE
+        )
+        if new_status_ti is not None and new_status_t is not None:
+            # log_done doesn't provide next_report_increment
+            transit_ti_and_t(task_instance, new_status_ti, new_status_t, db)
         else:
             if task_instance.status == constants.TaskInstanceStatus.DONE:
                 logger.warning(
@@ -261,16 +393,6 @@ async def log_done(
             status_code=StatusCodes.OK,
         )
 
-    except OperationalError as e:
-        if "database is locked" in str(e):
-            logger.warning(
-                f"Database lock detected for task_instance {task_instance_id}, retrying..."
-            )
-            raise HTTPException(
-                status_code=503, detail="Database temporarily unavailable, please retry"
-            )
-        logger.error(f"Failed to mark task_instance {task_instance_id} as done: {e}")
-        raise e
     except Exception as e:
         logger.error(f"Failed to mark task_instance {task_instance_id} as done: {e}")
         raise e
@@ -286,12 +408,8 @@ async def log_error_worker_node(
     logger.info(f"Log ERROR for TI:{task_instance_id}.")
 
     try:
-        # Lock the task instance
-        select_stmt = (
-            select(TaskInstance)
-            .where(TaskInstance.id == task_instance_id)
-            .with_for_update()
-        )
+        # do not lock TaskInstance
+        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
         task_instance = db.execute(select_stmt).scalars().one()
 
         # Optional updates
@@ -312,8 +430,10 @@ async def log_error_worker_node(
         error_state = data["error_state"]
         error_description = data["error_description"]
 
-        if verify_transit_status(task_instance, error_state):
-            task_instance.transition(error_state)
+        new_status_ti, new_status_t = get_transit_status(task_instance, error_state)
+        if new_status_ti is not None and new_status_t is not None:
+            # Error transitions don't need next_report_increment
+            transit_ti_and_t(task_instance, new_status_ti, new_status_t, db)
         else:
             if task_instance.status == error_state:
                 logger.warning(
@@ -329,22 +449,13 @@ async def log_error_worker_node(
             description=error_description,
         )
         db.add(error)
+        db.flush()
 
         return JSONResponse(
             content={"status": task_instance.status},
             status_code=StatusCodes.OK,
         )
 
-    except OperationalError as e:
-        if "database is locked" in str(e):
-            logger.warning(
-                f"Database lock detected for task_instance {task_instance_id}, retrying..."
-            )
-            raise HTTPException(
-                status_code=503, detail="Database temporarily unavailable, please retry"
-            )
-        logger.error(f"Failed to log error for TI {task_instance_id}: {e}")
-        raise e
     except Exception as e:
         logger.error(f"Failed to log error for TI {task_instance_id}: {e}")
         raise e
@@ -419,7 +530,7 @@ async def log_no_distributor_id(
     select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
     task_instance = db.execute(select_stmt).scalars().one()
     msg = _update_task_instance_state(
-        task_instance, constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID, request
+        task_instance, constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID, request, db
     )
     error = TaskInstanceErrorLog(task_instance_id=task_instance.id, description=err_msg)
     db.add(error)
@@ -444,8 +555,16 @@ async def log_distributor_id(
 
     select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
     task_instance = db.execute(select_stmt).scalars().one()
+    new_status_ti, new_status_t = get_transit_status(
+        task_instance, constants.TaskInstanceStatus.LAUNCHED
+    )
+    if new_status_ti is not None and new_status_t is not None:
+        # log_distributor_id doesn't need next_report_increment
+        transit_ti_and_t(task_instance, new_status_ti, new_status_t, db)
+    else:
+        logger.error(f"Unable to transition to launched from {task_instance.status}")
     msg = _update_task_instance_state(
-        task_instance, constants.TaskInstanceStatus.LAUNCHED, request
+        task_instance, constants.TaskInstanceStatus.LAUNCHED, request, db
     )
     task_instance.distributor_id = data["distributor_id"]
     task_instance.report_by_date = add_time(data["next_report_increment"])
@@ -677,7 +796,7 @@ async def instantiate_task_instances(
 
 # ############################ HELPER FUNCTIONS ###############################
 def _update_task_instance_state(
-    task_instance: TaskInstance, status_id: str, request: Request
+    task_instance: TaskInstance, status_id: str, request: Request, db: Session
 ) -> Any:
     """Advance the states of task_instance and it's associated Task.
 
@@ -687,30 +806,32 @@ def _update_task_instance_state(
         task_instance (TaskInstance): object of time models.TaskInstance
         status_id (int): id of the status to which to transition
         request (Request): fastapi request object
+        db (Session): database session
     """
     response = ""
+
     try:
-        task_instance.transition(status_id)
-    except InvalidStateTransition:
+        # if the ti is already in the new state, just log it
         if task_instance.status == status_id:
-            # It was already in that state, just log it
             msg = (
                 f"Attempting to transition to existing state."
                 f"Not transitioning task, tid= "
                 f"{task_instance.id} from {task_instance.status} to "
                 f"{status_id}"
             )
-            logger.warning(msg)
             response += msg
         else:
-            # Tried to move to an illegal state
-            msg = (
-                f"Illegal state transition. Not transitioning task, "
-                f"tid={task_instance.id}, from {task_instance.status} to "
-                f"{status_id}"
-            )
-            logger.error(msg)
-            response += msg
+            new_status_ti, new_status_t = get_transit_status(task_instance, status_id)
+            if new_status_ti is not None and new_status_t is not None:
+                transit_ti_and_t(task_instance, new_status_ti, new_status_t, db)
+            else:
+                msg = (
+                    f"Illegal state transition. Not transitioning task, "
+                    f"tid={task_instance.id}, from {task_instance.status} to "
+                    f"{status_id}"
+                )
+                logger.error(msg)
+                response += msg
     except Exception as e:
         raise ServerError(
             f"General exception in _update_task_instance_state, jid "
@@ -738,7 +859,7 @@ def _log_error(
     try:
         error = TaskInstanceErrorLog(task_instance_id=ti.id, description=error_msg)
         session.add(error)
-        msg = _update_task_instance_state(ti, error_state, request)  # type: ignore
+        msg = _update_task_instance_state(ti, error_state, request, session)  # type: ignore
         session.flush()
         resp = JSONResponse(content={"message": msg}, status_code=StatusCodes.OK)
     except Exception as e:
