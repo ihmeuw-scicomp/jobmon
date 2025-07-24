@@ -3,23 +3,23 @@ import ast
 import datetime
 import getpass
 import logging
+import os
+import tempfile
 from contextlib import redirect_stdout
 from io import StringIO
 from unittest.mock import PropertyMock, patch
-import tempfile
-import yaml
-import os
 
 import pandas as pd
 import pytest
+import yaml
 from sqlalchemy import select, text, update
 from sqlalchemy.orm import Session
 
 from jobmon.client.api import Tool
 from jobmon.client.cli import ClientCLI as CLI
 from jobmon.client.status_commands import (
-    _create_yaml,
     _coerce_config_value,
+    _create_yaml,
     get_filepaths,
     get_sub_task_tree,
     resume_workflow_from_id,
@@ -1011,29 +1011,29 @@ def test_coerce_config_value():
     assert _coerce_config_value("t") is True
     assert _coerce_config_value("1") == 1  # Numbers take precedence over booleans
     assert _coerce_config_value("yes") is True
-    
+
     assert _coerce_config_value("false") is False
     assert _coerce_config_value("False") is False
     assert _coerce_config_value("f") is False
     assert _coerce_config_value("0") == 0  # Numbers take precedence over booleans
     assert _coerce_config_value("no") is False
-    
+
     # Test integer coercion
     assert _coerce_config_value("42") == 42
     assert _coerce_config_value("-123") == -123
-    
+
     # Test float coercion
     assert _coerce_config_value("3.14") == 3.14
     assert _coerce_config_value("-2.5") == -2.5
-    
+
     # Test string fallback
     assert _coerce_config_value("hello") == "hello"
     assert _coerce_config_value("http://localhost:8080") == "http://localhost:8080"
-    
+
     # Test JSON/literal evaluation
     assert _coerce_config_value('{"key": "value"}') == {"key": "value"}
-    assert _coerce_config_value('[1, 2, 3]') == [1, 2, 3]
-    
+    assert _coerce_config_value("[1, 2, 3]") == [1, 2, 3]
+
     # Test whitespace handling
     assert _coerce_config_value("  true  ") is True
     assert _coerce_config_value("  42  ") == 42
@@ -1043,71 +1043,72 @@ def test_update_config_value_success():
     """Test successful config updates with various data types."""
     # Create a temporary config file for testing
     test_config_data = {
-        'db': {
-            'sqlalchemy_database_uri': 'original_uri',
-            'pool': {
-                'size': 5,
-                'max_overflow': 10,
-                'timeout': 30,
-                'pre_ping': False
-            }
+        "db": {
+            "sqlalchemy_database_uri": "original_uri",
+            "pool": {"size": 5, "max_overflow": 10, "timeout": 30, "pre_ping": False},
         },
-        'distributor': {
-            'poll_interval': 10
+        "distributor": {"poll_interval": 10},
+        "http": {
+            "request_timeout": 20,
+            "retries_attempts": 10,
+            "retries_timeout": 300,
+            "service_url": "http://original.com",
         },
-        'http': {
-            'request_timeout': 20,
-            'retries_attempts': 10,
-            'retries_timeout': 300,
-            'service_url': 'http://original.com'
-        },
-        'heartbeat': {
-            'report_by_buffer': 3.1,
-            'task_instance_interval': 90
-        }
+        "heartbeat": {"report_by_buffer": 3.1, "task_instance_interval": 90},
     }
-    
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.safe_dump(test_config_data, f)
         temp_config_path = f.name
-    
+
     try:
         # Test simple key update
         result = update_config_value("http.retries_attempts", "15", temp_config_path)
-        assert "Successfully updated 'http.retries_attempts' from '10' to '15'" in result
-        
+        assert (
+            "Successfully updated 'http.retries_attempts' from '10' to '15'" in result
+        )
+
         # Verify the update
-        with open(temp_config_path, 'r') as f:
+        with open(temp_config_path, "r") as f:
             updated_config = yaml.safe_load(f)
-        assert updated_config['http']['retries_attempts'] == 15
-        
+        assert updated_config["http"]["retries_attempts"] == 15
+
         # Test nested key update
         result = update_config_value("db.pool.size", "8", temp_config_path)
         assert "Successfully updated 'db.pool.size' from '5' to '8'" in result
-        
+
         # Test boolean update
         result = update_config_value("db.pool.pre_ping", "true", temp_config_path)
-        assert "Successfully updated 'db.pool.pre_ping' from 'False' to 'True'" in result
-        
+        assert (
+            "Successfully updated 'db.pool.pre_ping' from 'False' to 'True'" in result
+        )
+
         # Test float update
-        result = update_config_value("heartbeat.report_by_buffer", "2.5", temp_config_path)
-        assert "Successfully updated 'heartbeat.report_by_buffer' from '3.1' to '2.5'" in result
-        
+        result = update_config_value(
+            "heartbeat.report_by_buffer", "2.5", temp_config_path
+        )
+        assert (
+            "Successfully updated 'heartbeat.report_by_buffer' from '3.1' to '2.5'"
+            in result
+        )
+
         # Test string update
-        result = update_config_value("http.service_url", "http://new.example.com", temp_config_path)
+        result = update_config_value(
+            "http.service_url", "http://new.example.com", temp_config_path
+        )
         assert "Successfully updated 'http.service_url'" in result
         assert "http://new.example.com" in result
-        
+
         # Verify all updates were applied
-        with open(temp_config_path, 'r') as f:
+        with open(temp_config_path, "r") as f:
             final_config = yaml.safe_load(f)
-        
-        assert final_config['http']['retries_attempts'] == 15
-        assert final_config['db']['pool']['size'] == 8
-        assert final_config['db']['pool']['pre_ping'] is True
-        assert final_config['heartbeat']['report_by_buffer'] == 2.5
-        assert final_config['http']['service_url'] == "http://new.example.com"
-        
+
+        assert final_config["http"]["retries_attempts"] == 15
+        assert final_config["db"]["pool"]["size"] == 8
+        assert final_config["db"]["pool"]["pre_ping"] is True
+        assert final_config["heartbeat"]["report_by_buffer"] == 2.5
+        assert final_config["http"]["service_url"] == "http://new.example.com"
+
     finally:
         os.unlink(temp_config_path)
 
@@ -1115,49 +1116,46 @@ def test_update_config_value_success():
 def test_update_config_value_validation_errors():
     """Test validation errors for invalid keys and sections."""
     test_config_data = {
-        'db': {
-            'sqlalchemy_database_uri': '',
-            'pool': {
-                'size': 5
-            }
-        },
-        'http': {
-            'request_timeout': 20
-        }
+        "db": {"sqlalchemy_database_uri": "", "pool": {"size": 5}},
+        "http": {"request_timeout": 20},
     }
-    
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.safe_dump(test_config_data, f)
         temp_config_path = f.name
-    
+
     try:
         # Test invalid section
         with pytest.raises(ValueError) as exc_info:
             update_config_value("invalid_section.key", "value", temp_config_path)
-        assert "Section 'invalid_section' not found in configuration" in str(exc_info.value)
+        assert "Section 'invalid_section' not found in configuration" in str(
+            exc_info.value
+        )
         assert "Available sections: ['db', 'http']" in str(exc_info.value)
-        
+
         # Test invalid key in valid section
         with pytest.raises(ValueError) as exc_info:
             update_config_value("http.invalid_key", "value", temp_config_path)
         assert "Key 'invalid_key' not found in 'http'" in str(exc_info.value)
         assert "Available keys:" in str(exc_info.value)
-        
+
         # Test invalid nested key
         with pytest.raises(ValueError) as exc_info:
             update_config_value("db.pool.invalid_nested_key", "value", temp_config_path)
         assert "Key 'invalid_nested_key' not found in 'db.pool'" in str(exc_info.value)
-        
+
         # Test invalid format (no dot notation)
         with pytest.raises(ValueError) as exc_info:
             update_config_value("invalid_format", "value", temp_config_path)
-        assert "Key 'invalid_format' must be in dot notation format" in str(exc_info.value)
-        
+        assert "Key 'invalid_format' must be in dot notation format" in str(
+            exc_info.value
+        )
+
         # Test single level key (needs at least section.key)
         with pytest.raises(ValueError) as exc_info:
             update_config_value("db", "value", temp_config_path)
         assert "must be in dot notation format" in str(exc_info.value)
-        
+
     finally:
         os.unlink(temp_config_path)
 
@@ -1166,43 +1164,44 @@ def test_update_config_cli_integration(cli):
     """Test the CLI integration for config updates."""
     # Create a temporary config file
     test_config_data = {
-        'http': {
-            'retries_attempts': 10,
-            'request_timeout': 20
-        },
-        'distributor': {
-            'poll_interval': 15
-        }
+        "http": {"retries_attempts": 10, "request_timeout": 20},
+        "distributor": {"poll_interval": 15},
     }
-    
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.safe_dump(test_config_data, f)
         temp_config_path = f.name
-    
+
     try:
         # Test successful CLI command parsing
-        command_str = f"update_config http.retries_attempts 25 --config-file {temp_config_path}"
+        command_str = (
+            f"update_config http.retries_attempts 25 --config-file {temp_config_path}"
+        )
         args = cli.parse_args(command_str)
-        
+
         assert args.key == "http.retries_attempts"
         assert args.value == "25"
         assert args.config_file == temp_config_path
-        
+
         # Test the CLI execution captures stdout
         output = capture_stdout(cli.update_config, args)
         assert "Successfully updated 'http.retries_attempts'" in output
         assert "from '10' to '25'" in output
-        
+
         # Test error handling in CLI
-        error_command_str = f"update_config invalid.key value --config-file {temp_config_path}"
+        error_command_str = (
+            f"update_config invalid.key value --config-file {temp_config_path}"
+        )
         error_args = cli.parse_args(error_command_str)
-        
+
         # The CLI should catch ValueError and exit with code 1
         # We can't easily test sys.exit(1) in pytest, but we can test that it would call the function
         # and that the function raises ValueError
         with pytest.raises(ValueError):
-            update_config_value(error_args.key, error_args.value, error_args.config_file)
-        
+            update_config_value(
+                error_args.key, error_args.value, error_args.config_file
+            )
+
     finally:
         os.unlink(temp_config_path)
 
@@ -1211,48 +1210,39 @@ def test_update_config_preserves_yaml_structure():
     """Test that config updates preserve YAML structure and comments are not lost."""
     # Create a config with specific structure
     test_config_data = {
-        'db': {
-            'sqlalchemy_database_uri': '',
-            'pool': {
-                'size': 5,
-                'max_overflow': 10
-            }
-        },
-        'http': {
-            'retries_attempts': 10,
-            'service_url': 'http://original.com'
-        }
+        "db": {"sqlalchemy_database_uri": "", "pool": {"size": 5, "max_overflow": 10}},
+        "http": {"retries_attempts": 10, "service_url": "http://original.com"},
     }
-    
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         yaml.safe_dump(test_config_data, f)
         temp_config_path = f.name
-    
+
     try:
         # Make multiple updates
         update_config_value("db.pool.size", "20", temp_config_path)
         update_config_value("http.service_url", "http://updated.com", temp_config_path)
-        
+
         # Load the updated config and verify structure is preserved
-        with open(temp_config_path, 'r') as f:
+        with open(temp_config_path, "r") as f:
             updated_config = yaml.safe_load(f)
-        
+
         # Check that all original keys are still present
-        assert 'db' in updated_config
-        assert 'http' in updated_config
-        assert 'pool' in updated_config['db']
-        assert 'sqlalchemy_database_uri' in updated_config['db']
-        assert 'max_overflow' in updated_config['db']['pool']
-        assert 'retries_attempts' in updated_config['http']
-        
+        assert "db" in updated_config
+        assert "http" in updated_config
+        assert "pool" in updated_config["db"]
+        assert "sqlalchemy_database_uri" in updated_config["db"]
+        assert "max_overflow" in updated_config["db"]["pool"]
+        assert "retries_attempts" in updated_config["http"]
+
         # Check that updates were applied
-        assert updated_config['db']['pool']['size'] == 20
-        assert updated_config['http']['service_url'] == "http://updated.com"
-        
+        assert updated_config["db"]["pool"]["size"] == 20
+        assert updated_config["http"]["service_url"] == "http://updated.com"
+
         # Check that unmodified values remain the same
-        assert updated_config['db']['sqlalchemy_database_uri'] == ''
-        assert updated_config['db']['pool']['max_overflow'] == 10
-        assert updated_config['http']['retries_attempts'] == 10
-        
+        assert updated_config["db"]["sqlalchemy_database_uri"] == ""
+        assert updated_config["db"]["pool"]["max_overflow"] == 10
+        assert updated_config["http"]["retries_attempts"] == 10
+
     finally:
         os.unlink(temp_config_path)

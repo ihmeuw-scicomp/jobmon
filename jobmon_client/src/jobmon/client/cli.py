@@ -628,12 +628,13 @@ class ClientCLI(CLI):
     def _add_update_config_subparser(self) -> None:
         update_config_parser = self._subparsers.add_parser(
             "update_config",
-            help="Update configuration values in defaults.yaml using dot notation"
+            help="Update configuration values in defaults.yaml using dot notation",
         )
         update_config_parser.set_defaults(func=self.update_config)
         update_config_parser.add_argument(
             "key",
-            help="Configuration key in dot notation (e.g., 'http.retries_attempts', 'distributor.poll_interval')",
+            help="Configuration key in dot notation "
+            "(e.g., 'http.retries_attempts', 'distributor.poll_interval')",
             type=str,
         )
         update_config_parser.add_argument(
