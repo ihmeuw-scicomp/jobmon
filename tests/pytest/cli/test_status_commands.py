@@ -1002,7 +1002,6 @@ def test_resume_workflow_from_cli(tool, task_template, db_engine, cli):
         session.commit()
 
 
-
 def test_update_config_value_success():
     """Test successful config updates with various data types."""
     # Create a temporary config file for testing

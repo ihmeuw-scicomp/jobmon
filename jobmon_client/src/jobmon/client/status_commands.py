@@ -32,7 +32,7 @@ def update_config_value(
 
     Args:
         key: Dot-notated key (e.g., 'http.retries_attempts', 'distributor.poll_interval')
-        value: New value to set (will be automatically type-coerced)
+        value: New value to set
         config_file: Optional path to specific config file to update
 
     Returns:
@@ -96,10 +96,10 @@ def update_config_value(
 
         # Store the old value for the return message
     old_value = current_dict[final_key]
-    
+
     # Coerce the new value to the appropriate type using JobmonConfig's method
     coerced_value = config._coerce_value(value)
-    
+
     # Update the value in the config
     current_dict[final_key] = coerced_value
 
