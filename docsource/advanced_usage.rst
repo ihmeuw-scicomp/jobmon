@@ -827,6 +827,30 @@ TaskTemplate Resource Prediction to YAML
               max_runtime_seconds: 20
               queue: "long.q"
 
+update_config
+*************
+    The ``jobmon update_config`` command allows users to update configuration values in their 
+    local defaults.yaml file using dot notation. This is useful for modifying configuration 
+    settings without manually editing YAML files.
+
+    **Usage:**
+        ``jobmon update_config <key> <value> [--config-file <path>]``
+
+    **Arguments:**
+        * ``key`` - Configuration key in dot notation (e.g., 'http.retries_attempts', 'distributor.poll_interval')
+        * ``value`` - New value to set
+        * ``--config-file`` - Optional path to specific config file to update (defaults to system config)
+
+    **Examples:**
+        * ``jobmon update_config http.retries_attempts 15`` - Update HTTP retry attempts to 15
+        * ``jobmon update_config distributor.poll_interval 5`` - Set distributor polling interval to 5 seconds
+        * ``jobmon update_config telemetry.tracing.requester_enabled true`` - Enable OTLP tracing for requests
+        * ``jobmon update_config db.pool.size 20`` - Update database connection pool size to 20
+        * ``jobmon update_config http.service_url "http://new-server.com" --config-file /path/to/config.yaml`` - Update service URL in specific config file
+
+    .. note::
+        * Only keys that already exist in the configuration can be updated
+
 Resource Usage
 ##############
 Task Resource Usage
