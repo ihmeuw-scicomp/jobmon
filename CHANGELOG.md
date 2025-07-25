@@ -15,6 +15,19 @@ All notable changes to Jobmon will be documented in this file.
   - Auto-instrumentation of HTTP requests with OTLP when enabled
   - Environment variable support for all configuration overrides (e.g., `JOBMON__LOGGING__CLIENT__LOGGERS__LEVEL`)
   - Comprehensive logging configuration documentation and migration guide
+  - Simplified structlog formatters by removing conditional logic (structlog is now a guaranteed dependency)
+- **Enhanced Docker Development Environment**: Complete containerized development setup for improved workflow testing:
+  - New `jobmon_client` Docker container with local development support and editable installs
+  - Live code editing with volume mounts for `jobmon_core` and `jobmon_client` source code
+  - Interactive shell support (stdin/tty) for workflow development and testing
+  - Comprehensive dependency management with automated installation scripts
+  - Enhanced `docker-compose.yml` with proper OTLP configuration mounting
+- **Test Structure Reorganization**: Improved test organization for better maintainability:
+  - `tests/pytest/` - All automated pytest tests (moved from root tests/)
+  - `tests/workflows/` - Development and manual testing workflows
+  - `tests/_scripts/` - Utility scripts (unchanged)
+  - Updated pytest configuration for new test paths with proper test discovery
+  - Added sample workflow examples and comprehensive testing documentation
 - Added async retry support to Requester and modernized DistributorService for improved error handling and performance.
 - Added UV for dependency and workflow management, replacing pip-tools for faster and more reliable dependency resolution.
 - Added configurable database connection pool settings to prevent timeout errors in high-load scenarios.
@@ -35,6 +48,12 @@ All notable changes to Jobmon will be documented in this file.
   - All logging configurations now support user customization via `JobmonConfig` overrides
   - OTLP configurations moved from monolithic files to focused packages (`jobmon.core.otlp`, `jobmon.server.web.otlp`)
   - Default logging configurations moved to template-based system with shared patterns
+- **BREAKING: Telemetry Configuration Structure**: Replaced `otlp` section with new `telemetry` configuration structure:
+  - `otlp.http_enabled` → `telemetry.tracing.requester_enabled`
+  - `otlp.web_enabled` → `telemetry.tracing.server_enabled`
+  - `otlp.deployment_environment` → `telemetry.deployment_environment`
+  - Nested tracing configuration under `telemetry.tracing` with configurable span exporters
+  - Clear separation: logging via logconfig files, tracing via telemetry config
 - Overhauled frontend resource utilization page for better performance and user experience.
 - Migrated project dependency management from pip-tools to UV workspace configuration.
 - Consolidated database session management and configuration for improved consistency and performance.
