@@ -414,9 +414,6 @@ async def log_error_worker_node(
     """Log an error for a task instance."""
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
-    logger.info(
-        f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Log ERROR for TI:{task_instance_id}."
-    )
 
     try:
         # do not lock TaskInstance

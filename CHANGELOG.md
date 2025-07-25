@@ -25,6 +25,11 @@ All notable changes to Jobmon will be documented in this file.
 - Updated Workflow.add_tasks() parameter type from Sequence[Task] to Iterable[Task] to accept a broader range of iterable types including generators and iterators. (PR 279)
 - Expanded error message when a TaskInstance doesn't report a heartbeat.
 - Refactored task status update endpoint into smaller functions for better maintainability.
+- Replaced SessionMaker with FastAPI DB injection.
+- Locked corresponding rows in both Task and TaskInstance tables when transition states.
+- Reduced conditional selection from twice to once in set_status_for_triaging to shorten locking time, but still aggressively locked all corresponding rows in the TaskInstance table.
+- Added race condition protection in /log_error_worker_node to move task instance in T to R first.
+- Siwched to one session logic for /task_template/{task_template_id}/add_version with manual rollback to avoid dead lock.
 
 ### Fixed
 - Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.
