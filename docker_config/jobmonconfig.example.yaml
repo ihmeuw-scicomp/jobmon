@@ -37,9 +37,8 @@ cors:
   allowed_origins: "http://localhost:3000"  # Local frontend
 
 db:
-  sqlalchemy_database_uri: "mysql+mysqldb://service_user:NDJKWKixfPhFcNK6@scicomp-mysql-mysql-p01.mysql.database.azure.com:3306/docker"
-  sqlalchemy_connect_args:
-    ssl_mode: "REQUIRED"
+  sqlalchemy_database_uri: "sqlite:///jobmon_server/jobmon.db"
+  sqlalchemy_connect_args: {}
   pool:
     recycle: 300
     pre_ping: true

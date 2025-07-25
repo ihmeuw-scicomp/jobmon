@@ -4,7 +4,18 @@ This directory contains workflow scripts for testing and developing with jobmon_
 
 ## Getting Started
 
-### 1. Start the Services
+### 1. Initialize the Database (SQLite)
+
+```bash
+# Initialize the SQLite database (only needed once)
+source .venv/bin/activate
+jobmon_server init_db --sqlalchemy_database_uri sqlite:///jobmon_server/jobmon.db
+
+# Or use the config file approach
+JOBMON__CONFIG_FILE=docker_config/jobmonconfig.local.yaml jobmon_server init_db
+```
+
+### 2. Start the Services
 
 ```bash
 # Start all services (backend, frontend, and client)
@@ -14,17 +25,17 @@ docker compose up -d
 docker compose up -d jobmon_backend jobmon_client
 ```
 
-### 2. Access the Client Container
+### 3. Access the Client Container
 
 ```bash
 # Open an interactive shell in the client container
 docker compose exec jobmon_client bash
 
 # Or run a script directly
-docker compose exec jobmon_client python six_job_test.py 
+docker compose exec jobmon_client python six_job_test.py sequential
 ```
 
-### 3. Available Directories in the Container
+### 4. Available Directories in the Container
 
 - `/app/test_scripts/` - Your development workflows (this directory: `tests/workflows/`)
 - `/app/jobmon_core/` - Jobmon core source code

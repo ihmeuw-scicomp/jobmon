@@ -10,7 +10,7 @@ services:
       - "8070:80"
     volumes:
       - ./jobmon_core:/app/jobmon_core:ro
-      - ./jobmon_server:/app/jobmon_server:ro
+      - ./jobmon_server:/app/jobmon_server  # Remove :ro to allow database creation
       - ./docker_config:/app/config:ro  # Mount local config directory
     environment:
       # Jobmon Configuration
