@@ -23,6 +23,7 @@ All notable changes to Jobmon will be documented in this file.
 - Added consolidated JSON logging fixture for server tests to improve test maintainability.
 - Added unified V3 API endpoint for task template resource usage statistics with comprehensive metrics including min, max, mean, and percentile calculations.
 - Added missing `/array/{array_id}/transition_to_killed` endpoint to V3 API for proper KILL_SELF task status processing, completing V3 API feature parity with V2.
+- Added more information about stopping workflows and updating task statuses to the technical panel in the Jobmon GUI.
 - Added `Task Name` to the tooltip in the resource usage scatter plot.
 - Enabled filtering by `Task Name` in the resource usage scatter plot.
 - Added a `Download CSV button` to the resource usage page, allowing users to export all plot data regardless of filters.
