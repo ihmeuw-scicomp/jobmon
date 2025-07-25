@@ -618,7 +618,9 @@ async def update_array_max_running(workflow_id: int, request: Request) -> Any:
                 f"task_template_version_id {task_template_version_id}."
             )
         else:
-            message = f"Successfully updated array max_concurrently_running to {new_limit}."
+            message = (
+                f"Successfully updated array max_concurrently_running to {new_limit}."
+            )
 
         resp = JSONResponse(content={"message": message}, status_code=StatusCodes.OK)
     return resp
