@@ -37,4 +37,4 @@ RUN python -m nltk.downloader popular punkt_tab
 
 # CMD for local development
 COPY jobmon_server/main.py $APP_HOME/main.py
-CMD ["python", "$APP_HOME/main.py"] 
+CMD ["fastapi", "run", "$APP_HOME/main.py", "--host", "0.0.0.0", "--port", "8000"] 
