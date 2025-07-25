@@ -1,13 +1,13 @@
 """Routes for WorkflowRuns."""
 
 from collections import defaultdict
+from datetime import timedelta
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, cast
 
 import structlog
 from fastapi import Depends, Request
 from sqlalchemy import and_, case, func, insert, select, update
-from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
@@ -17,6 +17,7 @@ from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
+from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
@@ -309,6 +310,12 @@ async def set_status_for_triaging(
         ) from e
     logger.info(f"Set to triaging those overdue tis for wfr {workflow_run_id}")
 
+    # let's log all the task instance in the workflow run
+    select_stmt = select(TaskInstance).where(TaskInstance.workflow_run_id == workflow_run_id)
+    rows = db.execute(select_stmt).scalars().all()
+    for row in rows:
+        logger.info(f"********************Task instance {row.id} in workflow run {workflow_run_id} has status {row.status} report_by_date {row.report_by_date}")
+
     condition1 = TaskInstance.workflow_run_id == workflow_run_id
     condition2 = TaskInstance.status.in_(
         [
@@ -316,51 +323,34 @@ async def set_status_for_triaging(
             constants.TaskInstanceStatus.RUNNING,
         ]
     )
-
-    condition3 = TaskInstance.report_by_date <= func.now()
+    # Give RUNNING tasks 10 extra seconds before triaging them
+    time_now = func.now()  # for debugging
+    logger.info(f"*************************time_now: {time_now}")
+    condition3 = TaskInstance.report_by_date <= time_now
     common_condition = and_(condition1, condition2, condition3)
 
-    # Get task instance IDs to update (without locks)
-    select_ids = select(TaskInstance.id).where(common_condition)
+    # lock rows to avoid deadlocks
+    rows_to_update_stmt = select(TaskInstance.id).where(common_condition).with_for_update()
+    rows_to_update = db.execute(rows_to_update_stmt).scalars().all()
 
-    rows = db.execute(select_ids).fetchall()
-    task_instance_ids = [row[0] for row in rows]
-
-    # now update row by row with immediate commit;
-    # do not lock all the rows at the same time to avoid deadlocks
-    # ignor rows with locks as it should be picked up by the next triaging
-    for task_instance_id in task_instance_ids:
-        try:
-            update_stmt = (
-                update(TaskInstance)
-                .where(TaskInstance.id == task_instance_id)
-                .values(
-                    status=case(
-                        (
-                            TaskInstance.status == constants.TaskInstanceStatus.RUNNING,
-                            constants.TaskInstanceStatus.TRIAGING,
-                        ),
-                        else_=constants.TaskInstanceStatus.NO_HEARTBEAT,
-                    )
+    if rows_to_update:
+        #Update those rows using their IDs only
+        update_stmt = (
+            update(TaskInstance)
+            .where(TaskInstance.id.in_(rows_to_update))
+            .values(
+                status=case(
+                    (
+                        TaskInstance.status == constants.TaskInstanceStatus.RUNNING,
+                        constants.TaskInstanceStatus.TRIAGING,
+                    ),
+                    else_=constants.TaskInstanceStatus.NO_HEARTBEAT,
                 )
             )
-            db.execute(update_stmt)
-            db.commit()
-        except OperationalError as e:
-            if "database is locked" in str(e):
-                logger.warning(
-                    f"Database lock detected, discarding row {task_instance_id} for triaging."
-                    f"It should be picked up by the next triaging."
-                )
-            else:
-                logger.warning(
-                    f"Error in triaging task instance {task_instance_id}: {e}"
-                    f"Discarding row for triaging."
-                    f"It should be picked up by the next triaging."
-                    f"The error is: {e}"
-                )
-            db.rollback()
-        except Exception as e:
-            raise e
+            .execution_options(synchronize_session=False)
+        )
+        db.execute(update_stmt)
+        # release locks immediately
+        db.commit()
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp

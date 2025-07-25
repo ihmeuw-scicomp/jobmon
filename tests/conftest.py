@@ -53,8 +53,8 @@ def _setup_test_environment():
         # Performance optimizations for faster tests
         "JOBMON__HTTP__STOP_AFTER_DELAY": "0",
         "JOBMON__HTTP__RETRIES_TIMEOUT": "0",
-        "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
-        "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
+        "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "5",
+        "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "5",
         "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
     }
 
