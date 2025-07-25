@@ -75,6 +75,22 @@ def configure_client_logging() -> None:
             fallback_config=default_config,
         )
 
-    except (ImportError, FileNotFoundError):
-        # Fall back to basic configuration if template system not available
-        logging.config.dictConfig(default_config)
+    except Exception:
+        # Fall back to basic configuration for any error:
+        # - ImportError: core module not available
+        # - FileNotFoundError: template file missing
+        # - yaml.YAMLError: malformed YAML
+        # - ValueError: template resolution errors
+        # - PermissionError: file access issues
+        # - OSError: other I/O errors
+        # - logging configuration errors
+        try:
+            logging.config.dictConfig(default_config)
+        except Exception:
+            # If even the fallback config fails, set up minimal logging
+            logging.basicConfig(
+                level=logging.INFO,
+                format=_DEFAULT_LOG_FORMAT,
+                datefmt="%Y-%m-%d %H:%M:%S",
+                stream=sys.stdout,
+            )
