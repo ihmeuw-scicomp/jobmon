@@ -142,12 +142,11 @@ configure_client_logging()  # Automatically applies user overrides
 
 ### Server Logging
 
-**Default Templates**: 
-- `jobmon_server/src/jobmon/server/web/config/logconfig_server.yaml` (OTLP disabled)
-- `jobmon_server/src/jobmon/server/web/config/logconfig_server_otlp.yaml` (OTLP enabled)
+**Default Template**: 
+- `jobmon_server/src/jobmon/server/web/config/logconfig_server.yaml`
 
 **Features**:
-- Automatic OTLP selection based on `otlp.web_enabled`
+- OTLP configuration via file overrides (`server_logconfig_file`)
 - Structlog integration for server components
 - Support for both console and JSON output
 

@@ -74,7 +74,7 @@ def get_task_template_fail_num(tool, template_name="task_template_fail_num"):
 
 this_file = os.path.dirname(__file__)
 remote_sleep_and_write = os.path.abspath(
-    os.path.expanduser(f"{this_file}/../_scripts/remote_sleep_and_write.py")
+    os.path.expanduser(f"{this_file}/../../_scripts/remote_sleep_and_write.py")
 )
 
 

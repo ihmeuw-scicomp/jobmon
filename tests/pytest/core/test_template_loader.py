@@ -38,25 +38,6 @@ class TestTemplateLoader:
         assert "format" in console_formatter
         assert "levelname" in console_formatter["format"]
 
-    def test_load_shared_otlp_exporters(self):
-        """Test loading shared OTLP exporter templates."""
-        from jobmon.core.config import template_loader
-        from jobmon.core.config.template_loader import load_all_templates
-
-        config_root = os.path.dirname(template_loader.__file__)
-        templates = load_all_templates(config_root)
-
-        # Should have loaded OTLP exporters
-        assert "otlp_grpc_exporter" in templates
-        exporter = templates["otlp_grpc_exporter"]
-
-        # Check expected exporter structure
-        assert "module" in exporter
-        assert "class" in exporter
-        assert "endpoint" in exporter
-        assert "options" in exporter
-        assert exporter["class"] == "OTLPLogExporter"
-
     def test_load_shared_handlers(self):
         """Test loading shared handler templates."""
         import jobmon.core.config.template_loader as template_loader
@@ -70,19 +51,29 @@ class TestTemplateLoader:
         handlers = templates["handlers"]
 
         # Should have loaded expected handlers
-        expected_handlers = ["console_template", "otlp_base_template"]
+        expected_handlers = [
+            "otlp_complete_template",
+            "otlp_structlog_complete_template",
+        ]
         for handler_name in expected_handlers:
             assert handler_name in handlers
 
-        # Check console_template structure
-        console_handler = handlers["console_template"]
-        assert "class" in console_handler
-        assert console_handler["class"] == "logging.StreamHandler"
-
-        # Check otlp_base_template structure
-        otlp_handler = handlers["otlp_base_template"]
+        # Check otlp_complete_template structure
+        otlp_handler = handlers["otlp_complete_template"]
         assert "class" in otlp_handler
         assert otlp_handler["class"] == "jobmon.core.otlp.JobmonOTLPLoggingHandler"
+        assert "exporter" in otlp_handler
+        assert "formatter" in otlp_handler
+
+        # Check otlp_structlog_complete_template structure
+        otlp_structlog_handler = handlers["otlp_structlog_complete_template"]
+        assert "class" in otlp_structlog_handler
+        assert (
+            otlp_structlog_handler["class"]
+            == "jobmon.core.otlp.JobmonOTLPStructlogHandler"
+        )
+        assert "exporter" in otlp_structlog_handler
+        assert "formatter" in otlp_structlog_handler
 
     def test_template_directive_resolution(self):
         """Test that !template directives resolve correctly."""

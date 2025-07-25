@@ -161,7 +161,13 @@ class WebServerProcess:
             "version": 1,
             "disable_existing_loggers": True,
             "formatters": templates["formatters"],
-            "handlers": {"console_text": templates["common_handlers"]["console_dev"]},
+            "handlers": {
+                "console_text": {
+                    "class": "logging.StreamHandler",
+                    "level": "DEBUG",
+                    "formatter": "console_default",
+                }
+            },
             "loggers": {
                 "jobmon.server.web": {
                     "handlers": ["console_text"],

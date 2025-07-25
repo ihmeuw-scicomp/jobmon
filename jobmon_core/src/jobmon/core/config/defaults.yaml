@@ -56,16 +56,19 @@ telemetry:
   # Shared resource identification (used by both logs and traces)
   deployment_environment: prod
   
+  # Debug mode for OTLP/telemetry troubleshooting
+  debug: false
+  
   # Distributed tracing configuration (spans only - logs handled via logconfig)
   tracing:
     requester_enabled: false     # Enable HTTP request tracing (replaces otlp.http_enabled)
     server_enabled: false        # Enable server tracing (replaces otlp.web_enabled)
-    span_exporter: "grpc_span"   # Which exporter to use for trace spans
+    span_exporter: "console_span"   # Which exporter to use for trace spans
     
     exporters:
       # Production GRPC span exporter
       grpc_span:
-        endpoint: "otelcol.aks.scicomp.ihme.washington.edu:443"
+        endpoint: "http://localhost:4317"
         module: "opentelemetry.exporter.otlp.proto.grpc.trace_exporter"
         class: "OTLPSpanExporter"
         timeout: 30

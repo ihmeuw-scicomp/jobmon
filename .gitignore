@@ -47,7 +47,8 @@ docsource/api
 # ignore .env
 .env
 node_modules/*
+docker_config/jobmonconfig.local.yaml
+docker_config/logconfig.otlp.yaml
 
 # Ignore design documents folder
 /design/
-/config/*

@@ -1,11 +1,11 @@
 import '@jobmon_gui/styles/jobmon_gui.css';
-import { BiRun } from 'react-icons/bi';
-import { IoMdCloseCircle, IoMdCloseCircleOutline } from 'react-icons/io';
-import { AiFillSchedule, AiFillCheckCircle } from 'react-icons/ai';
-import { TbHandStop } from 'react-icons/tb';
-import { HiRocketLaunch } from 'react-icons/hi2';
-import React, { useState, useEffect } from 'react';
-import { JobmonModal } from '@jobmon_gui/components/JobmonModal.tsx';
+import {BiRun} from 'react-icons/bi';
+import {IoMdCloseCircle, IoMdCloseCircleOutline} from 'react-icons/io';
+import {AiFillSchedule, AiFillCheckCircle} from 'react-icons/ai';
+import {TbHandStop} from 'react-icons/tb';
+import {HiRocketLaunch} from 'react-icons/hi2';
+import React, {useState, useEffect} from 'react';
+import {JobmonModal} from '@jobmon_gui/components/JobmonModal.tsx';
 import {
     Grid,
     TextField,
@@ -21,12 +21,12 @@ import {
     FormControl,
     CircularProgress,
 } from '@mui/material';
-import { Box } from '@mui/system';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import {Box} from '@mui/system';
+import {useMutation, useQuery} from '@tanstack/react-query';
 import Typography from '@mui/material/Typography';
 import humanizeDuration from 'humanize-duration';
-import { formatJobmonDate } from '@jobmon_gui/utils/DayTime.ts';
-import { compare } from 'compare-versions';
+import {formatJobmonDate} from '@jobmon_gui/utils/DayTime.ts';
+import {compare} from 'compare-versions';
 import AllInclusiveIcon from '@mui/icons-material/AllInclusive';
 import {
     update_task_status_url,
@@ -48,11 +48,11 @@ interface TaskTemplateData {
 }
 
 import IconButton from '@mui/material/IconButton';
-import { HtmlTooltip } from '@jobmon_gui/components/HtmlToolTip';
+import {HtmlTooltip} from '@jobmon_gui/components/HtmlToolTip';
 import InfoIcon from '@mui/icons-material/Info';
 import StopWorkflowButton from '@jobmon_gui/components/StopWorkflow.tsx';
 import BuildIcon from '@mui/icons-material/Build';
-import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
+import {getWorkflowDetailsQueryFn} from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import axios from 'axios';
 import {
     get_task_template_concurrency_url,
@@ -60,7 +60,7 @@ import {
     set_task_template_concurrency_url,
     set_wf_concurrency_url,
 } from '@jobmon_gui/configs/ApiUrls.ts';
-import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
+import {jobmonAxiosConfig} from '@jobmon_gui/configs/Axios.ts';
 
 interface WorkflowResponse {
     tasks: { task_id: string | number }[]; // Replace `any` with the correct type of tasks
@@ -68,10 +68,10 @@ interface WorkflowResponse {
 }
 
 export default function WorkflowHeader({
-    wf_id,
-    task_template_info,
-    onTechnicalPanelClose,
-}: WorkflowHeaderProps) {
+                                           wf_id,
+                                           task_template_info,
+                                           onTechnicalPanelClose,
+                                       }: WorkflowHeaderProps) {
     const [recursive, setRecursive] = React.useState(true);
     const [wfFieldValues, setWfFieldValues] = useState(null);
     const wfDetails = useQuery({
@@ -95,6 +95,8 @@ export default function WorkflowHeader({
 
     const [showWFInfo, setShowWFInfo] = useState(false);
     const [showTechnicalPanel, setShowTechnicalPanel] = useState(false);
+    const [showInfoModal, setShowInfoModal] = useState(false);
+    const [showTaskStatusInfoModal, setShowTaskStatusInfoModal] = useState(false);
 
     const [fieldValues, setFieldValues] = useState(
         task_template_info.reduce((acc, template) => {
@@ -105,9 +107,9 @@ export default function WorkflowHeader({
 
     const updateTaskTemplateConcurrency = useMutation({
         mutationFn: async ({
-            task_template_version_id,
-            max_tasks,
-        }: {
+                               task_template_version_id,
+                               max_tasks,
+                           }: {
             task_template_version_id: string;
             max_tasks: string;
         }) => {
@@ -143,7 +145,7 @@ export default function WorkflowHeader({
         const url = task_table_url + wf_id;
         axios
             .get(url, {
-                params: { tt_name: tt_name },
+                params: {tt_name: tt_name},
                 ...jobmonAxiosConfig,
             })
             .then(response => {
@@ -184,7 +186,7 @@ export default function WorkflowHeader({
                 if (
                     response &&
                     statusUpdateMsgDict[template.tt_version_id] !==
-                        'Updating...'
+                    'Updating...'
                 ) {
                     setStatusUpdateMsgDict(prevValues => ({
                         ...prevValues,
@@ -196,7 +198,7 @@ export default function WorkflowHeader({
                 setStatusUpdateMsgDict(prevValues => ({
                     ...prevValues,
                     [template.tt_version_id]:
-                        'Error: ' + (error.message || error.toString()),
+                    'Error: ' + (error.message || error.toString()),
                 }));
             });
     };
@@ -238,7 +240,7 @@ export default function WorkflowHeader({
                     setFieldValues(prevValues => ({
                         ...prevValues,
                         [template.tt_version_id]:
-                            r.data.max_concurrently_running,
+                        r.data.max_concurrently_running,
                     }));
                     setStatusUpdateMsgDict(prevValues => ({
                         ...prevValues,
@@ -253,7 +255,7 @@ export default function WorkflowHeader({
     }, [task_template_info]);
 
     const updateWfConcurrency = useMutation({
-        mutationFn: async ({ max_tasks }: { max_tasks: string }) => {
+        mutationFn: async ({max_tasks}: { max_tasks: string }) => {
             return axios.put(
                 set_wf_concurrency_url(wf_id),
                 {
@@ -268,7 +270,7 @@ export default function WorkflowHeader({
         (id: string | number) =>
             (event: React.ChangeEvent<HTMLInputElement>) => {
                 const value =
-                event.target.value === '' ? '' : Number(event.target.value);
+                    event.target.value === '' ? '' : Number(event.target.value);
                 if (value === '' || (value >= 0 && value <= 2147483647)) {
                     setFieldValues(prevValues => ({
                         ...prevValues,
@@ -294,21 +296,21 @@ export default function WorkflowHeader({
         };
 
     const statusIcons = {
-        A: { icon: <IoMdCloseCircleOutline />, className: 'icon-aa' },
-        D: { icon: <AiFillCheckCircle />, className: 'icon-dd' },
-        F: { icon: <IoMdCloseCircle />, className: 'icon-ff' },
-        G: { icon: <AiFillSchedule />, className: 'icon-pp' },
-        H: { icon: <TbHandStop />, className: 'icon-aa' },
-        I: { icon: <AiFillSchedule />, className: 'icon-pp' },
-        O: { icon: <HiRocketLaunch />, className: 'icon-ss' },
-        Q: { icon: <AiFillSchedule />, className: 'icon-pp' },
-        R: { icon: <BiRun />, className: 'icon-rr' },
+        A: {icon: <IoMdCloseCircleOutline/>, className: 'icon-aa'},
+        D: {icon: <AiFillCheckCircle/>, className: 'icon-dd'},
+        F: {icon: <IoMdCloseCircle/>, className: 'icon-ff'},
+        G: {icon: <AiFillSchedule/>, className: 'icon-pp'},
+        H: {icon: <TbHandStop/>, className: 'icon-aa'},
+        I: {icon: <AiFillSchedule/>, className: 'icon-pp'},
+        O: {icon: <HiRocketLaunch/>, className: 'icon-ss'},
+        Q: {icon: <AiFillSchedule/>, className: 'icon-pp'},
+        R: {icon: <BiRun/>, className: 'icon-rr'},
     };
 
-    const gridHeaderStyles = { fontWeight: 'bold' };
+    const gridHeaderStyles = {fontWeight: 'bold'};
 
     if (wfDetails.isLoading) {
-        return <CircularProgress />;
+        return <CircularProgress/>;
     }
     if (wfDetails.isError) {
         return (
@@ -330,7 +332,7 @@ export default function WorkflowHeader({
     );
     const wf_elapsed_time = humanizeDuration(
         new Date(wfDetails?.data?.wfr_heartbeat_date).getTime() -
-            new Date(wfDetails?.data?.wf_created_date).getTime()
+        new Date(wfDetails?.data?.wf_created_date).getTime()
     );
     const jobmon_version = wfDetails?.data?.wfr_jobmon_version;
     const wfr_user = wfDetails?.data?.wfr_user;
@@ -344,7 +346,7 @@ export default function WorkflowHeader({
     const normalizedVersion = normalizeVersion(jobmon_version);
     const disabled = !compare(normalizedVersion, '3.3', '>');
 
-    const { icon, className } = statusIcons[wf_status] || {};
+    const {icon, className} = statusIcons[wf_status] || {};
 
     const handleClose = () => {
         setShowTechnicalPanel(false);
@@ -355,10 +357,10 @@ export default function WorkflowHeader({
 
     return (
         <Box className="App-header">
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box sx={{display: 'flex', alignItems: 'center'}}>
                 <span>
                     {icon && <span className={className}>{icon}</span>}
-                    <Typography variant="h5" component="span" sx={{ pl: 1 }}>
+                    <Typography variant="h5" component="span" sx={{pl: 1}}>
                         {wf_id} {wf_name ? `- ${wf_name}` : ''}
                     </Typography>
                 </span>
@@ -372,13 +374,13 @@ export default function WorkflowHeader({
                         title="Workflow Information"
                         arrow={true}
                         placement={'bottom'}
-                        sx={{ pl: 1 }}
+                        sx={{pl: 1}}
                     >
                         <IconButton
                             color="inherit"
                             onClick={() => setShowWFInfo(true)}
                         >
-                            <InfoIcon fontSize={'large'} />
+                            <InfoIcon fontSize={'large'}/>
                         </IconButton>
                     </HtmlTooltip>
                     <HtmlTooltip
@@ -390,7 +392,7 @@ export default function WorkflowHeader({
                             color="inherit"
                             onClick={() => setShowTechnicalPanel(true)}
                         >
-                            <BuildIcon />
+                            <BuildIcon/>
                         </IconButton>
                     </HtmlTooltip>
                 </span>
@@ -473,10 +475,20 @@ export default function WorkflowHeader({
                     children={
                         <Grid container spacing={2}>
                             <Grid item xs={10}>
-                                <StopWorkflowButton
-                                    wf_id={wf_id}
-                                    disabled={disabled}
-                                />
+                                <Box sx={{display: 'flex', alignItems: 'center', gap: 1}}>
+                                    <StopWorkflowButton
+                                        wf_id={wf_id}
+                                        disabled={disabled}
+                                    />
+                                    <Tooltip title="" placement="top">
+                                        <IconButton
+                                            color="primary"
+                                            onClick={() => setShowInfoModal(true)}
+                                        >
+                                            <InfoIcon/>
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
                             </Grid>
                             <Grid item xs={10}>
                                 <Typography variant="h5">Workflow</Typography>
@@ -488,13 +500,26 @@ export default function WorkflowHeader({
                                             Update Concurrency Limit
                                         </TableCell>
                                         <TableCell align="center">
-                                            <Tooltip
-                                                title={
-                                                    'Update the status of all tasks in the workflow'
-                                                }
-                                            >
-                                                <span>Update Task Status</span>
-                                            </Tooltip>
+                                            <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1}}>
+                                                <Box>
+                                                    <Tooltip
+                                                        title={
+                                                            'Update the status of all tasks in the workflow'
+                                                        }
+                                                    >
+                                                        <span>Update Task Status</span>
+                                                    </Tooltip>
+                                                </Box>
+                                                <Tooltip title="" placement="top">
+                                                    <IconButton
+                                                        size="small"
+                                                        color="primary"
+                                                        onClick={() => setShowTaskStatusInfoModal(true)}
+                                                    >
+                                                        <InfoIcon fontSize="small"/>
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Box>
                                         </TableCell>
                                     </TableRow>
                                     <TableRow>
@@ -533,36 +558,37 @@ export default function WorkflowHeader({
                                                                 .value as string
                                                         )
                                                     }
-                                                    style={{ minWidth: 80 }}
+                                                    style={{minWidth: 80}}
                                                 >
                                                     <MenuItem value="D">
-                                                        D
+                                                        Done (D)
                                                     </MenuItem>
                                                     <MenuItem value="G">
-                                                        G
+                                                        Registered (G)
                                                     </MenuItem>
                                                 </Select>
                                                 {wfTaskStatusUpdateMsg !==
                                                     '' && (
-                                                    <Typography
-                                                        variant="caption"
-                                                        color="error"
-                                                    >
-                                                        {wfTaskStatusUpdateMsg}
-                                                    </Typography>
-                                                )}
+                                                        <Typography
+                                                            variant="caption"
+                                                            color="error"
+                                                        >
+                                                            {wfTaskStatusUpdateMsg}
+                                                        </Typography>
+                                                    )}
                                             </FormControl>
                                         </TableCell>
                                     </TableRow>
                                 </Table>
                             </Grid>
-                            <br />
+                            <br/>
                             <Grid item xs={10}>
                                 <Typography variant="h5">
                                     Task Templates
                                 </Typography>
                                 <Typography>
-                                    <Tooltip title="If recursive update is enabled, all related task statuses will be modified; if disabled, only the tasks in the selected template will be updated. For large workflows, it's recommended to disable recursion for better performance.">
+                                    <Tooltip
+                                        title="If recursive update is enabled, all related task statuses will be modified; if disabled, only the tasks in the selected template will be updated. For large workflows, it's recommended to disable recursion for better performance.">
                                         <FormControlLabel
                                             control={
                                                 <Checkbox
@@ -589,18 +615,31 @@ export default function WorkflowHeader({
                                         Update Concurrency Limit
                                     </TableCell>
                                     <TableCell align="center">
-                                        {recursive ? (
-                                            <Tooltip title="Update all tasks in the template recursively">
-                                                <span>
-                                                    Update Task Status &nbsp;{' '}
-                                                    <AllInclusiveIcon />
-                                                </span>
+                                        <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1}}>
+                                            <Box>
+                                                {recursive ? (
+                                                    <Tooltip title="Update all tasks in the template recursively">
+                                                        <span>
+                                                            Update Task Status &nbsp;{' '}
+                                                            <AllInclusiveIcon/>
+                                                        </span>
+                                                    </Tooltip>
+                                                ) : (
+                                                    <Tooltip title="Update only the tasks in the selected template">
+                                                        <span>Update Task Status</span>
+                                                    </Tooltip>
+                                                )}
+                                            </Box>
+                                            <Tooltip title="" placement="top">
+                                                <IconButton
+                                                    size="small"
+                                                    color="primary"
+                                                    onClick={() => setShowTaskStatusInfoModal(true)}
+                                                >
+                                                    <InfoIcon fontSize="small"/>
+                                                </IconButton>
                                             </Tooltip>
-                                        ) : (
-                                            <Tooltip title="Update only the tasks in the selected template">
-                                                <span>Update Task Status</span>
-                                            </Tooltip>
-                                        )}
+                                        </Box>
                                     </TableCell>
                                     <TableCell align="center"></TableCell>
                                 </TableRow>
@@ -616,7 +655,7 @@ export default function WorkflowHeader({
                                                 value={
                                                     fieldValues[
                                                         template.tt_version_id
-                                                    ]
+                                                        ]
                                                 }
                                                 onChange={handleInputChange(
                                                     template.tt_version_id
@@ -649,7 +688,7 @@ export default function WorkflowHeader({
                                                         statusSelectionDict[
                                                             template
                                                                 .tt_version_id
-                                                        ] || ''
+                                                            ] || ''
                                                     }
                                                     onChange={e =>
                                                         handleUpdateStatus(
@@ -658,18 +697,18 @@ export default function WorkflowHeader({
                                                             template
                                                         )
                                                     }
-                                                    style={{ minWidth: 80 }}
+                                                    style={{minWidth: 80}}
                                                 >
                                                     <MenuItem value="D">
-                                                        D
+                                                        Done (D)
                                                     </MenuItem>
                                                     <MenuItem value="G">
-                                                        G
+                                                        Registered (G)
                                                     </MenuItem>
                                                 </Select>
                                                 {statusUpdateMsgDict[
                                                     template.tt_version_id
-                                                ] !== '' && (
+                                                    ] !== '' && (
                                                     <Typography
                                                         variant="caption"
                                                         color="error"
@@ -678,7 +717,7 @@ export default function WorkflowHeader({
                                                             statusUpdateMsgDict[
                                                                 template
                                                                     .tt_version_id
-                                                            ]
+                                                                ]
                                                         }
                                                     </Typography>
                                                 )}
@@ -694,6 +733,42 @@ export default function WorkflowHeader({
                     width="80%"
                 />
             </Box>
+
+            <JobmonModal
+                title="Stop Workflow"
+                open={showInfoModal}
+                onClose={() => setShowInfoModal(false)}
+                width="600px"
+                children={
+                    <Typography>
+                        Clicking the "Stop Workflow" button will:
+                        <ul>
+                            <li>- Transition the Workflow to the Halted state ("H")</li>
+                            <li>- Transition the WorkflowRun to the Terminated state ("T")</li>
+                            <li>- Transition running Tasks to the Failed state ("F")</li>
+                            <li>- Transition running TaskInstances to the Error Fatal state ("F")</li>
+                        </ul>
+                    </Typography>
+                }
+            />
+
+            {/* Task Status Info Modal */}
+            <JobmonModal
+                title="Task Status Information"
+                open={showTaskStatusInfoModal}
+                onClose={() => setShowTaskStatusInfoModal(false)}
+                width="600px"
+                children={
+                    <Typography>
+                        Setting a Task to the Done state will only affect that specific Task. In contrast,
+                        setting a Task to the Registered state will also update all downstream Tasks to
+                        Registered and set their associated TaskInstances to Kill Self.
+                        <br/><br/>
+                        Users typically use the Registered state to re-run Tasks, and the Done state to
+                        bypass failures they want to ignore.
+                    </Typography>
+                }
+            />
         </Box>
     );
 }

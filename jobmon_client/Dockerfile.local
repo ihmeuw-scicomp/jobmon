@@ -12,12 +12,15 @@ RUN python -m pip install --upgrade pip --no-cache-dir && \
 ENV UV_EXTRA_INDEX_URL=https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple
 
 # Set build-time arguments for extras, defaulting for local development
-ARG EXTRAS="otlp"      # Default extras for local dev
-ARG EDITABLE=true      # Default to editable install for local dev
+# Default extras for local dev
+ARG EXTRAS="otlp"
+# Default to editable install for local dev
+ARG EDITABLE=true
 
 # Define valid extras for client
 ENV VALID_CORE_EXTRAS="otlp"
-ENV VALID_CLIENT_EXTRAS="server"  # client can optionally install server extras
+# client can optionally install server extras
+ENV VALID_CLIENT_EXTRAS="server"
 
 # Copy source code
 COPY . ${APP_HOME}/
