@@ -1,14 +1,13 @@
 """Shared logging configuration templates for jobmon.
 
 This package contains YAML template files that define reusable patterns
-for formatters, handlers, and OTLP exporters. These templates are used
+for formatters and complex handlers. These templates are used
 by both client and server configurations via !template directives.
 
 Templates:
 - formatters.yaml: Console, OTLP, and structlog formatters
-- otlp_exporters.yaml: OTLP/gRPC exporter configurations
-- handlers.yaml: Logging handler patterns
+- handlers.yaml: Complex OTLP handlers (simple handlers are inlined)
 
-The template system ensures consistency across all logging configurations
-while eliminating duplication.
+The template system focuses on high-value templates while keeping
+simple configurations inline for clarity.
 """

@@ -454,17 +454,14 @@ class TestServerOTLPConfiguration:
 class TestServerLoggingConfigIntegration:
     """Test integration with our elegant logging configuration system."""
 
-    def test_server_auto_otlp_selection(self):
-        """Test that server automatically selects OTLP config when enabled."""
+    def test_server_default_config_selection(self):
+        """Test that server uses basic config by default (OTLP via overrides)."""
         from jobmon.server.web.log_config import configure_logging
 
         with patch("jobmon.server.web.log_config.JobmonConfig") as mock_config_class:
             mock_config = Mock()
             mock_config.get.return_value = ""  # No file override
             mock_config.get_section_coerced.return_value = {}
-            mock_config.get_section_coerced.return_value = {
-                "tracing": {"server_enabled": True}
-            }
             mock_config_class.return_value = mock_config
 
             with patch(
@@ -473,19 +470,17 @@ class TestServerLoggingConfigIntegration:
                 mock_load.return_value = {
                     "version": 1,
                     "handlers": {
-                        "otlp_structlog": {
-                            "class": "jobmon.core.otlp.JobmonOTLPStructlogHandler"
-                        }
+                        "console_structlog": {"class": "logging.StreamHandler"}
                     },
                 }
 
-                # Should configure with OTLP
+                # Should configure with basic config
                 configure_logging()
 
-                # Should have loaded OTLP-enabled config
+                # Should have loaded basic server config
                 mock_load.assert_called_once()
                 args, kwargs = mock_load.call_args
-                assert "logconfig_server_otlp.yaml" in kwargs["default_template_path"]
+                assert "logconfig_server.yaml" in kwargs["default_template_path"]
 
     def test_server_template_integration_with_otlp(self):
         """Test that server OTLP handlers work with template system."""

@@ -24,7 +24,7 @@ class TestCrossComponentConsistency:
 
         # Test that core shared templates are available
         assert "formatters" in templates
-        assert "otlp_grpc_exporter" in templates
+        assert "handlers" in templates
 
         # Test template consistency - formatters should have same structure
         formatters = templates["formatters"]
@@ -35,6 +35,20 @@ class TestCrossComponentConsistency:
                 # Format strings should be valid
                 assert isinstance(formatter_config["format"], str)
                 assert "%(message)s" in formatter_config["format"]
+
+        # Test that OTLP handler templates exist and have consistent structure
+        handlers = templates["handlers"]
+        otlp_handlers = [name for name in handlers if "otlp" in name.lower()]
+        assert len(otlp_handlers) > 0, "Should have at least one OTLP handler template"
+
+        # Check that OTLP handlers have consistent exporter configuration
+        for handler_name in otlp_handlers:
+            handler_config = handlers[handler_name]
+            if "exporter" in handler_config:
+                exporter = handler_config["exporter"]
+                assert "class" in exporter
+                assert exporter["class"] == "OTLPLogExporter"
+                assert "endpoint" in exporter
 
     def test_component_configs_load_successfully(self):
         """Test that all component configurations load without errors."""
@@ -83,19 +97,25 @@ class TestCrossComponentConsistency:
         config_root = os.path.dirname(template_loader.__file__)
         templates = load_all_templates(config_root)
 
-        if "otlp_grpc_exporter" in templates:
-            exporter = templates["otlp_grpc_exporter"]
+        if "handlers" in templates:
+            handlers = templates["handlers"]
+            otlp_handlers = [name for name in handlers if "otlp" in name.lower()]
 
-            # Should have consistent OTLP structure
-            assert "module" in exporter
-            assert "class" in exporter
-            assert "endpoint" in exporter
-            assert exporter["class"] == "OTLPLogExporter"
+            for handler_name in otlp_handlers:
+                handler_config = handlers[handler_name]
+                if "exporter" in handler_config:
+                    exporter = handler_config["exporter"]
 
-            # Should have reasonable batch settings
-            if "max_export_batch_size" in exporter:
-                assert isinstance(exporter["max_export_batch_size"], int)
-                assert exporter["max_export_batch_size"] > 0
+                    # Should have consistent OTLP structure
+                    assert "module" in exporter
+                    assert "class" in exporter
+                    assert "endpoint" in exporter
+                    assert exporter["class"] == "OTLPLogExporter"
+
+                    # Should have reasonable batch settings
+                    if "max_export_batch_size" in exporter:
+                        assert isinstance(exporter["max_export_batch_size"], int)
+                        assert exporter["max_export_batch_size"] > 0
 
 
 class TestEndToEndLoggingScenarios:

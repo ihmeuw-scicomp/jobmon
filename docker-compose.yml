@@ -11,21 +11,10 @@ services:
     volumes:
       - ./jobmon_core:/app/jobmon_core:ro
       - ./jobmon_server:/app/jobmon_server:ro
-      - ./config:/app/config:ro  # Mount local config directory
+      - ./docker_config:/app/config:ro  # Mount local config directory
     environment:
       # Jobmon Configuration
-      - JOBMON_CONFIG_FILE=/app/config/jobmonconfig.local.yaml
-      - JOBMON__AUTH__ENABLED=false
-      # OTLP Debugging
-      - OTEL_PYTHON_LOG_CORRELATION=true
-      - OTEL_PYTHON_LOG_LEVEL=DEBUG
-      - OTEL_LOG_LEVEL=DEBUG
-      - OTEL_LOGS_EXPORTER=otlp
-      - OTEL_METRICS_EXPORTER=none
-      - OTEL_TRACES_EXPORTER=otlp
-      # Logging debugging
-      - LOG_LEVEL=DEBUG
-      - PYTHONPATH=/app
+      - JOBMON__CONFIG_FILE=/app/config/jobmonconfig.local.yaml
     env_file:
       - .env
     command: >
@@ -52,19 +41,12 @@ services:
     volumes:
       - ./jobmon_core:/app/jobmon_core:ro
       - ./jobmon_client:/app/jobmon_client:ro
-      - ./config:/app/config:ro  # Mount local config directory
+      - ./docker_config:/app/config:ro  # Mount local config directory
       - ./tests/workflows:/app/test_scripts  # Volume for test workflow scripts
-      - ./tests/_scripts:/app/example_scripts:ro  # Mount existing test scripts as examples
-      - ./docsource/quickstart_tasks:/app/quickstart_examples:ro  # Mount quickstart examples
     environment:
       # Jobmon Configuration
-      - JOBMON_CONFIG_FILE=/app/config/jobmonconfig.local.yaml
-      - JOBMON__AUTH__ENABLED=false
-      # Logging debugging
-      - LOG_LEVEL=DEBUG
-      - PYTHONPATH=/app
+      - JOBMON__CONFIG_FILE=/app/config/jobmonconfig.local.yaml
     env_file:
       - .env
     stdin_open: true  # Keep STDIN open for interactive use
     tty: true         # Allocate a pseudo-TTY for interactive use
-

@@ -1,41 +1,48 @@
-# Server-specific logconfig for jobmon (OTLP disabled)
-# This uses shared templates from core and provides structlog console logging
+# Local development logconfig for jobmon (OTLP DISABLED)
+# For basic local development without OTLP
 
 version: 1
 disable_existing_loggers: false
 
-# Import shared formatters and handlers from core templates
+# Use shared formatters from core templates (consistent with other configs)
 formatters: !template formatters
 
-# Server handlers (simple handlers inline, complex ones templated)  
+# Basic handlers for local development  
 handlers:
-  # Simple console handlers (inlined - no templates needed)
   console_default:
     class: logging.StreamHandler
     level: INFO
     formatter: console_default
-    
+
   console_structlog:
     class: logging.StreamHandler
     level: INFO
     formatter: structlog_text
 
-# Server logger configurations (console only by default)
+# Logger configurations
 loggers:
-  # Server web module
-  jobmon.server.web:
-    handlers: [console_structlog] 
+  jobmon.client:
+    handlers: [console_default]
     level: INFO
     propagate: true
 
-  # Standard server library loggers using shared console pattern
+  jobmon.core:
+    handlers: [console_default]
+    level: INFO
+    propagate: true
+
+  jobmon.server.web:
+    handlers: [console_structlog]
+    level: INFO
+    propagate: true
+
   sqlalchemy:
     handlers: [console_default]
     level: WARN
     propagate: false
 
   uvicorn.access:
-    handlers: [console_default]
+    handlers: [console_default] 
     level: INFO
     propagate: false
 
@@ -44,7 +51,7 @@ loggers:
     level: INFO
     propagate: false
 
-# Root logger fallback (console only)
+# Root logger
 root:
   handlers: [console_default]
-  level: WARNING 
+  level: INFO 

@@ -60,7 +60,7 @@ def load_all_templates(config_root: str) -> Dict[str, Any]:
         return {}
 
     # Load all template files
-    template_files = ["formatters.yaml", "otlp_exporters.yaml", "handlers.yaml"]
+    template_files = ["formatters.yaml", "handlers.yaml"]
 
     for template_file in template_files:
         template_path = os.path.join(templates_dir, template_file)

@@ -106,17 +106,15 @@ class TestServerLoggingConfiguration:
             server_logger = logging.getLogger("jobmon.server.web")
             assert server_logger is not None
 
-    def test_server_configure_logging_with_otlp_enabled(self):
-        """Test server logging auto-selects OTLP config when OTLP enabled."""
+    def test_server_configure_logging_with_default_config(self):
+        """Test server logging uses basic config by default (OTLP via overrides)."""
         from jobmon.server.web.log_config import configure_logging
 
         with patch("jobmon.server.web.log_config.JobmonConfig") as mock_config_class:
             mock_config = Mock()
             mock_config.get.return_value = ""
             mock_config.get_section.return_value = {}
-            mock_config.get_section_coerced.return_value = {
-                "tracing": {"server_enabled": True}
-            }
+            mock_config.get_section_coerced.return_value = {}
             mock_config_class.return_value = mock_config
 
             # Mock template loading to avoid actual file I/O
@@ -125,26 +123,22 @@ class TestServerLoggingConfiguration:
             ) as mock_load:
                 mock_load.return_value = {
                     "version": 1,
-                    "handlers": {
-                        "otlp_server": {
-                            "class": "jobmon.core.otlp.JobmonOTLPLoggingHandler"
-                        }
-                    },
+                    "handlers": {"console_default": {"class": "logging.StreamHandler"}},
                     "loggers": {
                         "jobmon.server.web": {
-                            "handlers": ["otlp_server"],
+                            "handlers": ["console_default"],
                             "level": "INFO",
                         }
                     },
                 }
 
-                # Should configure with OTLP
+                # Should configure with basic config
                 configure_logging()
 
-                # Should have called load with OTLP config
+                # Should have called load with basic server config
                 mock_load.assert_called_once()
                 args, kwargs = mock_load.call_args
-                assert "logconfig_server_otlp.yaml" in kwargs["default_template_path"]
+                assert "logconfig_server.yaml" in kwargs["default_template_path"]
 
     def test_server_configure_logging_with_file_override(self):
         """Test server logging with custom file override."""
@@ -269,17 +263,15 @@ class TestServerLoggingConfiguration:
 class TestServerOTLPIntegration:
     """Test server OTLP integration with new configuration system."""
 
-    def test_server_otlp_auto_selection(self):
-        """Test that server automatically selects OTLP config when enabled."""
+    def test_server_file_override_precedence(self):
+        """Test that server respects file overrides for OTLP configuration."""
         from jobmon.server.web.log_config import configure_logging
 
         with patch("jobmon.server.web.log_config.JobmonConfig") as mock_config_class:
             mock_config = Mock()
-            mock_config.get.return_value = ""
+            mock_config.get.return_value = ""  # No file override
             mock_config.get_section.return_value = {}
-            mock_config.get_section_coerced.return_value = {
-                "tracing": {"server_enabled": True}
-            }
+            mock_config.get_section_coerced.return_value = {}
             mock_config_class.return_value = mock_config
 
             with patch(
@@ -289,10 +281,10 @@ class TestServerOTLPIntegration:
 
                 configure_logging()
 
-                # Should have selected OTLP config file
+                # Should use default server config (OTLP configured via overrides)
                 mock_load.assert_called_once()
                 args, kwargs = mock_load.call_args
-                assert "logconfig_server_otlp.yaml" in kwargs["default_template_path"]
+                assert "logconfig_server.yaml" in kwargs["default_template_path"]
 
     def test_server_custom_logconfig_file(self):
         """Test that server can use custom logconfig files for OTLP endpoint configuration."""

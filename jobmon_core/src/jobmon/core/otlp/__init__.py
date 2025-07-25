@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 try:
+    # Actually test if the required OpenTelemetry modules are available
     OTLP_AVAILABLE = True
 except ImportError:
     OTLP_AVAILABLE = False

@@ -83,15 +83,9 @@ def configure_logging(
         except (ConfigError, AttributeError, KeyError):
             pass  # Fall through to auto-select
 
-        # Auto-select template based on telemetry configuration (fallback)
-        otlp_enabled = _is_otlp_enabled(config)
-
-        # Select appropriate template
+        # Use basic server config (users can override via logging.server_logconfig_file)
         current_dir = os.path.dirname(__file__)
-        template_name = (
-            "logconfig_server_otlp.yaml" if otlp_enabled else "logconfig_server.yaml"
-        )
-        template_path = os.path.join(current_dir, "config", template_name)
+        template_path = os.path.join(current_dir, "config", "logconfig_server.yaml")
 
         # Load with full template system support (handles user overrides, fallbacks, etc.)
         from jobmon.core.config.logconfig_utils import load_logconfig_with_overrides
@@ -103,7 +97,7 @@ def configure_logging(
         )
 
         _apply_logging_config(
-            logging_config, f"auto-selected template: {template_name}"
+            logging_config, f"auto-selected template: {template_path}"
         )
 
     except Exception as e:
@@ -136,10 +130,9 @@ def _apply_logging_config(logging_config: Dict, source_description: str) -> None
         logger.info(f"Logging configured successfully from {source_description}")
 
         # Enable OTLP debug logging if requested
-        if os.environ.get("JOBMON_OTLP_DEBUG", "").lower() in ("true", "1", "yes"):
-            logger.info(
-                "OTLP debug logging enabled via JOBMON_OTLP_DEBUG environment variable"
-            )
+        config = JobmonConfig()
+        if config.get_boolean("telemetry", "debug"):
+            logger.info("OTLP debug logging enabled via telemetry.debug configuration")
 
     except Exception as e:
         # Fall back to basic logging if configuration fails
@@ -184,13 +177,3 @@ def _validate_otlp_configuration(logging_config: Dict, source_description: str) 
         # Don't fail configuration loading due to validation errors
         logger = logging.getLogger(__name__)
         logger.warning(f"Failed to validate OTLP configuration: {e}")
-
-
-def _is_otlp_enabled(config: JobmonConfig) -> bool:
-    """Check if OTLP is enabled for server logging."""
-    try:
-        telemetry_section = config.get_section_coerced("telemetry")
-        tracing_config = telemetry_section.get("tracing", {})
-        return tracing_config.get("server_enabled", False)
-    except (ConfigError, AttributeError, KeyError):
-        return False

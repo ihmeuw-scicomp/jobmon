@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any, Dict, Optional, Union
+
+from jobmon.core.configuration import JobmonConfig
 
 from . import OTLP_AVAILABLE
 from .formatters import JobmonOTLPFormatter
@@ -46,11 +47,8 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         self._otlp_handler: Optional[logging.Handler] = None
 
         # Simple debug mode for troubleshooting
-        self._debug_mode = os.environ.get("JOBMON_OTLP_DEBUG", "").lower() in (
-            "true",
-            "1",
-            "yes",
-        )
+        config = JobmonConfig()
+        self._debug_mode = config.get_boolean("telemetry", "debug")
 
         self.setFormatter(JobmonOTLPFormatter())
 

@@ -4,9 +4,8 @@ This package contains server-specific logging configurations that
 use shared templates from jobmon.core.config.templates.
 
 Server configs:
-- logconfig_server.yaml: Server logging with structlog (OTLP disabled)
-- logconfig_server_otlp.yaml: Server logging with OTLP enabled
-- server_otlp_example.yaml: Example server OTLP configuration
+  - logconfig_server.yaml: Server logging with structlog (OTLP disabled)
+  - server_otlp_example.yaml: Example server OTLP configuration
 
 These configurations are automatically selected by the server's
 configure_logging() function based on the otlp.web_enabled setting.

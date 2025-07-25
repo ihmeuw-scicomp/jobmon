@@ -76,8 +76,10 @@ class JobmonOTLPManager:
             telemetry_config = config.get_section_coerced("telemetry")
             tracing_config = telemetry_config.get("tracing", {})
 
-            # Check if server tracing is enabled
-            if not tracing_config.get("server_enabled", False):
+            # Check if either server or requester tracing is enabled
+            server_enabled = tracing_config.get("server_enabled", False)
+            requester_enabled = tracing_config.get("requester_enabled", False)
+            if not (server_enabled or requester_enabled):
                 return
 
             # Get the configured span exporter

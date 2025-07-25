@@ -8,33 +8,31 @@ This directory contains workflow scripts for testing and developing with jobmon_
 
 ```bash
 # Start all services (backend, frontend, and client)
-docker-compose up -d
+docker compose up -d
 
 # Or start just the client and backend
-docker-compose up -d jobmon_backend jobmon_client
+docker compose up -d jobmon_backend jobmon_client
 ```
 
 ### 2. Access the Client Container
 
 ```bash
 # Open an interactive shell in the client container
-docker-compose exec jobmon_client bash
+docker compose exec jobmon_client bash
 
 # Or run a script directly
-docker-compose exec jobmon_client python sample_workflow.py
+docker compose exec jobmon_client python six_job_test.py 
 ```
 
 ### 3. Available Directories in the Container
 
 - `/app/test_scripts/` - Your development workflows (this directory: `tests/workflows/`)
-- `/app/example_scripts/` - Example scripts from `tests/_scripts/`
-- `/app/quickstart_examples/` - Quickstart examples from documentation
 - `/app/jobmon_core/` - Jobmon core source code
 - `/app/jobmon_client/` - Jobmon client source code
 
 ## Sample Scripts
 
-### sample_workflow.py
+### six_job_test.py
 A basic example showing how to create a simple workflow with task dependencies. Modify this script to test different workflow scenarios.
 
 ## Creating Your Own Test Scripts
@@ -56,20 +54,9 @@ The client container is configured with:
 - Debug logging enabled
 - Interactive shell support (stdin/tty)
 
-## Examples to Try
-
-```bash
-# Inside the container, try these examples:
-cd /app/example_scripts
-python memory_usage_array.py
-
-cd /app/quickstart_examples  
-python data_prep.py
-```
-
 ## Configuration
 
 The container uses the same configuration as the backend:
 - Config file: `/app/config/jobmonconfig.local.yaml`
 - Auth disabled for local development
-- Logs to stdout with DEBUG level 
+- Logs to stdout with INFO level 

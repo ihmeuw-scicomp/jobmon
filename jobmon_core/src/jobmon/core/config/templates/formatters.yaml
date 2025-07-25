@@ -11,19 +11,14 @@ formatters:
     '()': jobmon.core.otlp.JobmonOTLPFormatter
     format: "%(asctime)s [%(levelname)s] [trace_id=%(trace_id)s, span_id=%(span_id)s, parent_span_id=%(parent_span_id)s] %(name)s: %(message)s"
 
-  # Structlog formatter for console output (instantiated processor - multiprocessing safe)
+  # Structlog formatter for console output (custom class to avoid dictConfig issues)
   structlog_text:
-    '()': jobmon.core.config.StructlogFormatterFactory
-    renderer_type: console
+    '()': jobmon.core.config.formatters.JobmonStructlogConsoleFormatter
 
-  # Structlog formatter for JSON output (instantiated processor - multiprocessing safe)
+  # Structlog formatter for JSON output (custom class to avoid dictConfig issues)  
   structlog_json:
-    '()': jobmon.core.config.StructlogFormatterFactory  
-    renderer_type: json
+    '()': jobmon.core.config.formatters.JobmonStructlogJSONFormatter
 
-  # Fallback simple formatters
-  simple_text:
-    format: "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-    
+  # Basic JSON formatter (simple, no dependencies)
   simple_json:
     format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}' 

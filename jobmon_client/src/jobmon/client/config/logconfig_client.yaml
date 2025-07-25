@@ -7,13 +7,13 @@ disable_existing_loggers: false
 # Import shared formatters and handlers from core templates
 formatters: !template formatters
 
-# Client handlers using shared templates
+# Client handlers (simple console inline, complex OTLP templated)
 handlers:
-  # Console handler for client development (shared template)
-  console: !template handlers.console_template
-
-  # OTLP handler for client (ready to enable) - complete template
-  otlp_client: !template handlers.otlp_complete_template
+  # Simple console handler (inlined - no template needed)
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: console_default
 
 # Client logger configurations (console only by default)
 loggers:
@@ -21,33 +21,4 @@ loggers:
   jobmon.client:
     handlers: [console]
     level: INFO
-    propagate: false
-
-  # Client workflow logging
-  jobmon.client.workflow:
-    handlers: [console]
-    level: INFO
-    propagate: false
-
-  # Client task logging  
-  jobmon.client.task:
-    handlers: [console]
-    level: INFO
-    propagate: false
-
-  # Client tool logging
-  jobmon.client.tool:
-    handlers: [console]
-    level: INFO
-    propagate: false
-
-  # General jobmon logging (includes core components)
-  jobmon:
-    handlers: [console]
-    level: INFO
-    propagate: false
-
-# Root logger fallback (console only)
-root:
-  handlers: [console]
-  level: WARNING 
+    propagate: true
