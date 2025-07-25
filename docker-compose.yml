@@ -27,7 +27,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./jobmon_gui/src:/app/src:ro
+      - ./jobmon_gui/src:/app/src
     environment:
       - REACT_APP_API_URL=http://localhost:8070/api/v3
 
