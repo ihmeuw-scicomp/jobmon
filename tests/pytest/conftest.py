@@ -16,77 +16,72 @@ import sqlalchemy
 import uvicorn
 from sqlalchemy.engine import Engine
 
-# SET UP TEST ENVIRONMENT VARIABLES BEFORE ANY JOBMON IMPORTS
-# This must happen before jobmon modules are imported because load_dotenv()
-# runs at module level in jobmon.core.configuration
-
-# Simple, elegant subprocess detection using process ID
-_main_process_pid = os.getpid()
-
-
-def _is_main_test_process():
-    """Check if we're in the main test process (not a subprocess)."""
-    return os.getpid() == _main_process_pid
-
-
-def _setup_test_environment():
-    """Set up complete test environment in pytest_sessionstart."""
-    if not _is_main_test_process():
-        print("Subprocess detected: Using test environment from parent process")
-        return None
-
-    # We're in the main process - create new database
-    tmp_dir = tempfile.mkdtemp()
-    sqlite_file = pathlib.Path(tmp_dir, "tests.sqlite").resolve()
-
-    print("Setting up complete test environment")
-    print(f"SQLite file created at: {sqlite_file}")
-
-    # Set complete test environment variables
-    complete_test_vars = {
-        # Core database configuration
-        "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{sqlite_file}",
-        "JOBMON__DB__SQLALCHEMY_CONNECT_ARGS": "{}",  # No SSL for SQLite
-        # Essential test settings
-        "JOBMON__AUTH__ENABLED": "false",
-        "JOBMON__HTTP__ROUTE_PREFIX": "/api/v3",
-        "JOBMON__SESSION__SECRET_KEY": "test",
-        # Performance optimizations for faster tests
-        "JOBMON__HTTP__STOP_AFTER_DELAY": "0",
-        "JOBMON__HTTP__RETRIES_TIMEOUT": "0",
-        "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
-        "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
-        "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
-    }
-
-    os.environ.update(complete_test_vars)
-    print(f"Set {len(complete_test_vars)} test environment variables")
-    return sqlite_file
-
-
-# Now safe to import jobmon modules - load_dotenv() is skipped during tests
-_api_prefix = "/api/v3"
-
 # Import jobmon modules
 from jobmon.client.api import Tool
 from jobmon.core.requester import Requester
 
 logger = logging.getLogger(__name__)
 
+# Global API prefix
+_api_prefix = "/api/v3"
 
-def pytest_sessionstart(session):
-    """Set up complete test environment and reset singletons for clean test state."""
-    print("=== pytest_sessionstart: Setting up test environment ===")
 
-    # Complete the test environment setup
-    _setup_test_environment()
+def pytest_configure(config):
+    """Configure pytest - set up environment variables before any imports happen."""
+    # Only set up database config during test collection/execution
+    # This ensures environment variables are available when modules are imported
+    if not os.environ.get("JOBMON__DB__SQLALCHEMY_DATABASE_URI"):
+        # Get worker ID from xdist (None if not using xdist)
+        worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
 
-    print("=== Test environment setup complete ===")
+        # Create unique database per worker
+        tmp_dir = tempfile.mkdtemp()
+        sqlite_file = pathlib.Path(tmp_dir, f"tests_{worker_id}.sqlite").resolve()
 
-    # Log current test configuration for debugging
-    db_uri = os.environ.get("JOBMON__DB__SQLALCHEMY_DATABASE_URI", "NOT_SET")
-    print(f"Using database: {db_uri}")
-    print(f"Auth enabled: {os.environ.get('JOBMON__AUTH__ENABLED', 'NOT_SET')}")
+        # Set minimal environment variables needed for module imports
+        test_vars = {
+            # Core database configuration - unique per worker
+            "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{sqlite_file}",
+            "JOBMON__DB__SQLALCHEMY_CONNECT_ARGS": "{}",  # No SSL for SQLite
+            # Essential test settings
+            "JOBMON__AUTH__ENABLED": "false",
+            "JOBMON__HTTP__ROUTE_PREFIX": "/api/v3",
+            "JOBMON__SESSION__SECRET_KEY": "test",
+            # Performance optimizations for faster tests
+            "JOBMON__HTTP__STOP_AFTER_DELAY": "0",
+            "JOBMON__HTTP__RETRIES_TIMEOUT": "0",
+            "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
+            "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
+            "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
+        }
+
+        os.environ.update(test_vars)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_environment():
+    """Set up test environment with per-worker databases - runs automatically."""
+    # Get worker ID and database path (both guaranteed to be set by pytest_configure)
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    db_uri = os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"]
+    sqlite_file = pathlib.Path(db_uri[11:])  # Remove 'sqlite:////' prefix
+
+    print(f"Worker {worker_id}: Setting up test environment")
+    print(f"Worker {worker_id}: SQLite file at {sqlite_file}")
+
+    # Reset singletons for clean test state
+    import jobmon.server.web.config as config_module
+
+    config_module._jobmon_config = None
+
+    import jobmon.server.web.db.engine as engine_module
+
+    engine_module._engine = None
+    engine_module._SessionMaker = None
+
+    print(f"Worker {worker_id}: Environment setup complete")
+    yield sqlite_file  # This becomes the fixture value
+    print(f"Worker {worker_id}: Environment teardown")
 
 
 @pytest.fixture(scope="session")
@@ -95,28 +90,35 @@ def api_prefix():
 
 
 @pytest.fixture(scope="session")
-def db_engine() -> Engine:
+def db_engine(setup_test_environment) -> Engine:
     from jobmon.server.web.config import get_jobmon_config
-
-    config = get_jobmon_config()
     from jobmon.server.web.db import init_db
 
-    # Verify that our test environment setup worked
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    config = get_jobmon_config()
+
+    # Verify configuration
     db_uri = config.get("db", "sqlalchemy_database_uri")
-    print(f"Database URI from config: {db_uri}")
+    print(f"Worker {worker_id}: Database URI from config: {db_uri}")
     assert "sqlite" in db_uri, f"Expected SQLite URI but got: {db_uri}"
 
-    init_db()  # Then initialize DB (runs migrations + metadata load)
+    # Initialize database - each worker has its own, so no race conditions
+    print(f"Worker {worker_id}: Initializing database")
+    init_db()
 
-    # verify db created
+    # Create and return engine
     eng = sqlalchemy.create_engine(db_uri)
+
+    # Verify database has expected tables
     from sqlalchemy.orm import Session
 
     with Session(eng) as session:
         from sqlalchemy import text
 
         res = session.execute(text("SELECT * from workflow_status")).fetchall()
-        assert len(res) > 0
+        assert len(res) > 0, f"Worker {worker_id}: Database not properly initialized"
+
+    print(f"Worker {worker_id}: Database ready with {len(res)} workflow statuses")
     return eng
 
 

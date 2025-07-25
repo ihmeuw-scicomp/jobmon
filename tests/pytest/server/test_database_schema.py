@@ -1,9 +1,5 @@
-import unittest
-
 from sqlalchemy import inspect, text
 from sqlalchemy.orm import Session
-
-from jobmon.server.web.db import get_engine
 
 
 def test_arg_name_collation(web_server_in_memory):
@@ -26,10 +22,10 @@ def test_arg_name_collation(web_server_in_memory):
         assert result.rowcount == 4
 
 
-class TestDatabase(unittest.TestCase):
-    def test_database_tables(self):
-        # get a connection to the database
-        engine = get_engine()
+class TestDatabase:
+    def test_database_tables(self, db_engine):
+        # use the provided engine from the fixture
+        engine = db_engine
 
         # validate a few tables we know should exist
         inspector = inspect(engine)
@@ -38,7 +34,7 @@ class TestDatabase(unittest.TestCase):
         assert "task" in tables
         assert "task_instance" in tables
 
-    def test_supported_dialect(self):
+    def test_supported_dialect(self, db_engine):
         """Test that the dialect detection returns a supported dialect."""
         from jobmon.server.web.db import get_dialect_name
 
