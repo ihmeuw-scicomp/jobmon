@@ -6,7 +6,7 @@ import getpass
 import os
 import socket
 import sys
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
@@ -24,7 +24,7 @@ def create_jobmon_resources() -> Optional[Any]:
         return None
 
     try:
-        detectors = [
+        detectors: list[ResourceDetector] = [
             ProcessResourceDetector(),
             HostResourceDetector(),
             JobmonServiceResourceDetector(),
@@ -34,88 +34,75 @@ def create_jobmon_resources() -> Optional[Any]:
         return None
 
 
-class ProcessResourceDetector(ResourceDetector):
+class BaseJobmonResourceDetector(ResourceDetector):
+    """Base class for jobmon resource detectors that handles common logic."""
+
+    def detect(self) -> Optional[Any]:  # type: ignore[override]
+        """Detect resource attributes using common jobmon logic."""
+        if not OTLP_AVAILABLE:
+            return None
+
+        try:
+            config = JobmonConfig()
+
+            # Get deployment environment with fallback
+            try:
+                deployment_environment = config.get(
+                    "telemetry", "deployment_environment"
+                )
+            except Exception:
+                deployment_environment = "unknown"
+
+            # Get detector-specific attributes
+            attrs = self._get_attributes(config, deployment_environment)
+            return resources.Resource(attrs)  # type: ignore[arg-type]
+        except ImportError:
+            return None
+
+    def _get_attributes(
+        self, config: JobmonConfig, deployment_environment: str
+    ) -> Dict[str, Any]:
+        """Get detector-specific attributes. Must be implemented by subclasses."""
+        raise NotImplementedError
+
+
+class ProcessResourceDetector(BaseJobmonResourceDetector):
     """Detects process-related resource attributes."""
 
-    def detect(self) -> Optional[Any]:  # type: ignore[override]
-        """Detect process resource attributes."""
-        if not OTLP_AVAILABLE:
-            return None
-
-        try:
-            config = JobmonConfig()
-
-            # Get deployment environment with fallback
-            try:
-                deployment_environment = config.get(
-                    "telemetry", "deployment_environment"
-                )
-            except Exception:
-                deployment_environment = "unknown"
-
-            attrs = {
-                str(resources.PROCESS_PID): int(os.getpid()),
-                str(resources.PROCESS_RUNTIME_NAME): str(sys.implementation.name),
-                str(resources.PROCESS_OWNER): str(getpass.getuser()),
-                str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
-            }
-            return resources.Resource(attrs)  # type: ignore[arg-type]
-        except ImportError:
-            return None
+    def _get_attributes(
+        self, config: JobmonConfig, deployment_environment: str
+    ) -> Dict[str, Any]:
+        """Get process-specific attributes."""
+        return {
+            str(resources.PROCESS_PID): int(os.getpid()),
+            str(resources.PROCESS_RUNTIME_NAME): str(sys.implementation.name),
+            str(resources.PROCESS_OWNER): str(getpass.getuser()),
+            str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
+        }
 
 
-class JobmonServiceResourceDetector(ResourceDetector):
+class JobmonServiceResourceDetector(BaseJobmonResourceDetector):
     """Detects jobmon service-related resource attributes."""
 
-    def detect(self) -> Optional[Any]:  # type: ignore[override]
-        """Detect jobmon service resource attributes."""
-        if not OTLP_AVAILABLE:
-            return None
-
-        try:
-            config = JobmonConfig()
-
-            # Get deployment environment with fallback
-            try:
-                deployment_environment = config.get(
-                    "telemetry", "deployment_environment"
-                )
-            except Exception:
-                deployment_environment = "unknown"
-
-            attrs = {
-                resources.SERVICE_NAME: "jobmon",
-                resources.SERVICE_VERSION: __version__,
-                str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
-            }
-            return resources.Resource(attrs)  # type: ignore[arg-type]
-        except ImportError:
-            return None
+    def _get_attributes(
+        self, config: JobmonConfig, deployment_environment: str
+    ) -> Dict[str, Any]:
+        """Get jobmon service-specific attributes."""
+        return {
+            resources.SERVICE_NAME: "jobmon",
+            resources.SERVICE_VERSION: __version__,
+            str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
+        }
 
 
-class HostResourceDetector(ResourceDetector):
+class HostResourceDetector(BaseJobmonResourceDetector):
     """Detects host-related resource attributes."""
 
-    def detect(self) -> Optional[Any]:  # type: ignore[override]
-        """Detect host resource attributes."""
-        if not OTLP_AVAILABLE:
-            return None
-
-        try:
-            config = JobmonConfig()
-
-            # Get deployment environment with fallback
-            try:
-                deployment_environment = config.get(
-                    "telemetry", "deployment_environment"
-                )
-            except Exception:
-                deployment_environment = "unknown"
-
-            attrs = {
-                resources.HOST_NAME: socket.gethostname(),
-                str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
-            }
-            return resources.Resource(attrs)  # type: ignore[arg-type]
-        except ImportError:
-            return None
+    def _get_attributes(
+        self, config: JobmonConfig, deployment_environment: str
+    ) -> Dict[str, Any]:
+        """Get host-specific attributes."""
+        return {
+            resources.HOST_NAME: socket.gethostname(),
+            str(resources.DEPLOYMENT_ENVIRONMENT): deployment_environment,
+        }
