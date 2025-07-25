@@ -45,58 +45,61 @@ def get_new_task_status(task_instance: TaskInstance, new_state: str) -> tuple[st
     elif new_state in task_instance.error_states:
         if task_instance.task.num_attempts >= task_instance.task.max_attempts:
             logger.info("Giving up task after max attempts.")
-            return TaskStatus.ERROR_FATAL, TaskStatus.ERROR_FATAL
+            return TaskStatus.ERROR_RECOVERABLE, TaskStatus.ERROR_FATAL
         else:
             if new_state == TaskInstanceStatus.RESOURCE_ERROR:
                 logger.debug("Adjust resource for task.")
-                return TaskStatus.ADJUSTING_RESOURCES, TaskStatus.ADJUSTING_RESOURCES
+                return TaskStatus.ERROR_RECOVERABLE, TaskStatus.ADJUSTING_RESOURCES
             else:
                 logger.debug("Retrying Task.")
-                return TaskStatus.REGISTERING, TaskStatus.REGISTERING
+                return TaskStatus.ERROR_RECOVERABLE, TaskStatus.REGISTERING
     elif new_state == TaskInstanceStatus.ERROR_FATAL:
         return TaskStatus.ERROR_RECOVERABLE, TaskStatus.ERROR_FATAL
     else:
         return current_task_status, current_task_status
 
 
-def get_transit_status(task_instance: 
-        TaskInstance, new_state: str) -> tuple[str, tuple[str, str]] | None:
+def get_transit_status(task_instance: TaskInstance, new_ti_status: str) -> dict | None:
     """Get the valid status to transit to. (TaskInstanceStatus, TaskStatus)."""
-    if task_instance._is_timely_transition(new_state):
-        current_status = task_instance.status
-        if (current_status, new_state) in task_instance.valid_transitions:
-            new_task_status, final_task_status = get_new_task_status(task_instance, new_state)
-            if new_task_status is not None:
-                if (
-                    task_instance.task.status,
-                    new_task_status,
-                ) in task_instance.task.valid_transitions:
-                    logger.info(f"$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ask status {task_instance.task.status} is valid for transition to {new_task_status}")
-                    return new_state, (new_task_status, final_task_status)
-                else:
-                    logger.info(f"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@task status {task_instance.task.status} is not valid for transition to {new_task_status}")
-                    return None
-            else:
-                logger.info(f"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@task status {task_instance.status} is not valid for transition to {new_state}")
-                return None
-        else:
-            return None
-    else:
-        logger.info(f"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@Not a timely transition from {task_instance.status} to {new_state}")
+    if not task_instance._is_timely_transition(new_ti_status):
         return None
+
+    if (task_instance.status, new_ti_status) not in task_instance.valid_transitions:
+        return None
+
+    new_task_status, final_task_status = get_new_task_status(
+        task_instance, new_ti_status
+    )
+    if new_task_status is None:
+        return None
+
+    if (
+        task_instance.task.status,
+        new_task_status,
+    ) not in task_instance.task.valid_transitions:
+        return None
+
+    return {
+        "new_ti_status": new_ti_status,
+        "new_t_status": new_task_status,
+        "final_t_status": final_task_status,
+    }
 
 
 def transit_ti_and_t(
     task_instance: TaskInstance,
-    new_status_ti: str,
-    new_status_t: str,
-    final_task_status: str,
+    status_dict: dict,
     db: Session,
     report_by_date: Optional[float] = None,
 ) -> None:
     """Transit the task_instance and task to the new status.
-    Update both tables in a single transation or none to avoid inconsistent state.
+
+    Update task_instance and task in a single transation or to avoid inconsistent state.
+    If unable to obtain logs for both, update none.
     """
+    new_ti_status = status_dict["new_ti_status"]
+    new_t_status = status_dict["new_t_status"]
+    final_t_status = status_dict["final_t_status"]
     task = task_instance.task
     # retry 3 times for lock because we need to lock two tables in a single transaction
     for i in range(3):
@@ -111,17 +114,13 @@ def transit_ti_and_t(
             ti_result = db.execute(ti_lock_stmt).one()
             task_id = ti_result.task_id
 
-            # only lock Task if it needs update
-            if task.status != new_status_t or new_status_t != final_task_status:
-                # Then lock Task (by ID - deterministic order)
-                task_lock_stmt = (
-                    select(Task.id).where(Task.id == task_id).with_for_update()
-                )
-                db.execute(task_lock_stmt).one()
+            # Then lock Task (by ID - deterministic order)
+            task_lock_stmt = select(Task.id).where(Task.id == task_id).with_for_update()
+            db.execute(task_lock_stmt).one()
 
             # Update TaskInstance with status and optional report_by_date
             ti_values = {
-                "status": new_status_ti,
+                "status": new_ti_status,
                 "status_date": func.now(),
             }
             if report_by_date is not None:
@@ -134,21 +133,21 @@ def transit_ti_and_t(
             )
             db.execute(update_stmt)
 
-            if task.status != new_status_t or new_status_t != final_task_status:
+            if task.status != new_t_status or new_t_status != final_t_status:
                 # Update Task status
                 update_stmt = (
                     update(Task)
                     .where(Task.id == task_id)
-                    .values(status=new_status_t, status_date=func.now())
+                    .values(status=new_t_status, status_date=func.now())
                 )
                 db.execute(update_stmt)
                 db.flush()
                 # update to the final task status
-                if new_status_t != final_task_status:
+                if new_t_status != final_t_status:
                     update_stmt = (
                         update(Task)
                         .where(Task.id == task_id)
-                        .values(status=final_task_status, status_date=func.now())
+                        .values(status=final_t_status, status_date=func.now())
                     )
                     db.execute(update_stmt)
             # release locks immediately; please do not use flush() here
@@ -192,15 +191,11 @@ async def log_running(
         task_instance.process_group_id = data["process_group_id"]
 
         # Handle state transition
-        status = get_transit_status(
-            task_instance, constants.TaskInstanceStatus.RUNNING
-        )
+        status = get_transit_status(task_instance, constants.TaskInstanceStatus.RUNNING)
         if status is not None:
             transit_ti_and_t(
                 task_instance,
-                status[0],
-                status[1][0],
-                status[1][1],
+                status,
                 db,
                 data["next_report_increment"],
             )
@@ -216,9 +211,7 @@ async def log_running(
                 if status is not None:
                     transit_ti_and_t(
                         task_instance,
-                        status[0],
-                        status[1][0],
-                        status[1][1],
+                        status,
                         db,
                         data["next_report_increment"],
                     )
@@ -229,9 +222,7 @@ async def log_running(
                 if status is not None:
                     transit_ti_and_t(
                         task_instance,
-                        status[0],
-                        status[1][0],
-                        status[1][1],
+                        status,
                         db,
                         data["next_report_increment"],
                     )
@@ -267,7 +258,7 @@ async def log_ti_report_by(
     """
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
-    logger.info(f'!!!!!!!!!!!!!!!!!!!!!!Log report_by for TI {task_instance_id}')
+    logger.debug(f"Log report_by for TI {task_instance_id}")
 
     try:
         vals = {"report_by_date": add_time(data["next_report_increment"])}
@@ -291,9 +282,7 @@ async def log_ti_report_by(
             if status is not None:
                 transit_ti_and_t(
                     task_instance,
-                    status[0],
-                    status[1][0],
-                    status[1][1],
+                    status,
                     db,
                     data["next_report_increment"],
                 )
@@ -394,12 +383,10 @@ async def log_done(
                 setattr(task_instance, field, val)
 
         # Attempt transition
-        status = get_transit_status(
-            task_instance, constants.TaskInstanceStatus.DONE
-        )
+        status = get_transit_status(task_instance, constants.TaskInstanceStatus.DONE)
         if status is not None:
             # log_done doesn't provide next_report_increment
-            transit_ti_and_t(task_instance, status[0], status[1][0], status[1][1], db)
+            transit_ti_and_t(task_instance, status, db)
         else:
             if task_instance.status == constants.TaskInstanceStatus.DONE:
                 logger.warning(
@@ -427,12 +414,27 @@ async def log_error_worker_node(
     """Log an error for a task instance."""
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
-    logger.info(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Log ERROR for TI:{task_instance_id}.")
+    logger.info(
+        f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Log ERROR for TI:{task_instance_id}."
+    )
 
     try:
         # do not lock TaskInstance
         select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
         task_instance = db.execute(select_stmt).scalars().one()
+
+        # ti that tries to log error should not in T unles there was a race condition
+        # we need to transition to R first
+        if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
+            all_status = get_transit_status(
+                task_instance, constants.TaskInstanceStatus.RUNNING
+            )
+            if all_status is not None:
+                transit_ti_and_t(task_instance, all_status, db)
+            else:
+                logger.error(
+                    f"Unable to transition to running from {task_instance.status}"
+                )
 
         # Optional updates
         optional_vals = [
@@ -455,7 +457,7 @@ async def log_error_worker_node(
         status = get_transit_status(task_instance, error_state)
         if status is not None:
             # Error transitions don't need next_report_increment
-            transit_ti_and_t(task_instance, status[0], status[1][0], status[1][1], db)
+            transit_ti_and_t(task_instance, status, db)
         else:
             if task_instance.status == error_state:
                 logger.warning(
@@ -577,12 +579,10 @@ async def log_distributor_id(
 
     select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
     task_instance = db.execute(select_stmt).scalars().one()
-    status = get_transit_status(
-        task_instance, constants.TaskInstanceStatus.LAUNCHED
-    )
+    status = get_transit_status(task_instance, constants.TaskInstanceStatus.LAUNCHED)
     if status is not None:
         # log_distributor_id doesn't need next_report_increment
-        transit_ti_and_t(task_instance, status[0], status[1][0], status[1][1], db)
+        transit_ti_and_t(task_instance, status, db)
     else:
         logger.error(f"Unable to transition to launched from {task_instance.status}")
     msg = _update_task_instance_state(
@@ -845,7 +845,7 @@ def _update_task_instance_state(
         else:
             status = get_transit_status(task_instance, status_id)
             if status is not None:
-                transit_ti_and_t(task_instance, status[0], status[1][0], status[1][1], db)
+                transit_ti_and_t(task_instance, status, db)
             else:
                 msg = (
                     f"Illegal state transition. Not transitioning task, "
