@@ -303,56 +303,48 @@ async def log_ti_report_by(
 async def log_ti_report_by_batch(
     request: Request, db: Session = Depends(get_db)
 ) -> Any:
-    """Log a batch of task_instances as being responsive with a new report_by_date."""
+    """Log task_instances as being responsive with a new report_by_date.
+
+    This is done at the worker node heartbeat_interval rate, so it may not happen at the same
+    rate that the reconciler updates batch submitted report_by_dates (also because it causes
+    a lot of traffic if all workers are logging report by_dates often compared to if the
+    reconciler runs often).
+
+    Args:
+        task_instance_id: id of the task_instance to log
+        request: fastapi request object
+        db: The database session.
+    """
     data = cast(Dict, await request.json())
-    tis = data.get("task_instance_ids")
+    tis = data.get("task_instance_ids", None)
+
     next_report_increment = float(data["next_report_increment"])
 
-    if not tis or not isinstance(tis, list):
-        raise HTTPException(
-            status_code=400, detail="task_instance_ids must be a non-empty list"
-        )
-
     logger.debug(f"Log report_by for TI {tis}.")
-
-    try:
-        # Lock first to prevent race conditions
-        lock_stmt = (
-            select(TaskInstance.id)
-            .where(
-                TaskInstance.id.in_(tis),
-                TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
+    if tis:
+        # rows are not locked, hit or miss
+        try:
+            update_stmt = (
+                update(TaskInstance)
+                .where(
+                    TaskInstance.id.in_(tis),
+                    TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
+                )
+                .values(report_by_date=add_time(next_report_increment))
             )
-            .with_for_update()
-            .execution_options(synchronize_session=False)
-        )
-        db.execute(lock_stmt)
 
-        # Bulk update
-        update_stmt = (
-            update(TaskInstance)
-            .where(
-                TaskInstance.id.in_(tis),
-                TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
-            )
-            .values(report_by_date=add_time(next_report_increment))
-            .execution_options(synchronize_session=False)
-        )
-        db.execute(update_stmt)
-
-        return JSONResponse(content={}, status_code=StatusCodes.OK)
-
-    except OperationalError as e:
-        if "database is locked" in str(e):
-            logger.warning(f"Database lock detected for TIs {tis}, retrying...")
-            raise HTTPException(
-                status_code=503, detail="Database temporarily unavailable, please retry"
-            )
-        logger.error(f"Failed to update report_by_date for TIs {tis}: {e}")
-        raise e
-    except Exception as e:
-        logger.error(f"Failed to update report_by_date for TIs {tis}: {e}")
-        raise e
+            db.execute(update_stmt)
+            # immediately release the lock
+            db.commit()
+            resp = JSONResponse(content={}, status_code=StatusCodes.OK)
+            return resp
+        except Exception as e:
+            # The bulk update may fail if any row is locked by another transaction.
+            # Log this error for investigation.
+            # If this happens a lot, consider update rows one by one.
+            # The locked rows may being updated by worker node; thus, just discard.
+            logger.warning(f"Failed to batch log report_by for TI {tis}: {e}")
+            raise e
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_done")

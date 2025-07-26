@@ -343,7 +343,7 @@ async def set_status_for_triaging(
             .execution_options(synchronize_session=False)
         )
         db.execute(update_stmt)
-        # release locks immediately
-        db.commit()
+    # release locks immediately
+    db.commit()
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp

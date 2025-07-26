@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
-from jobmon.server.web.db import get_dialect_name, get_sessionmaker
+from jobmon.server.web.db import get_dialect_name
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.repositories.task_template_repository import (
     TaskTemplateRepository,
@@ -22,7 +22,6 @@ from jobmon.server.web.schemas.task_template import (
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
-SessionMaker = get_sessionmaker()
 DIALECT = get_dialect_name()
 
 
