@@ -5,6 +5,7 @@ from __future__ import annotations
 try:
     # Actually test if the required OpenTelemetry modules are available
     import opentelemetry.trace  # noqa: F401
+
     OTLP_AVAILABLE = True
 except ImportError:
     OTLP_AVAILABLE = False

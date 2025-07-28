@@ -8,6 +8,7 @@ from typing import Any, Optional, Type
 # Check if OpenTelemetry is available
 try:
     import opentelemetry.trace  # noqa: F401
+
     OTLP_AVAILABLE = True
 except ImportError:
     OTLP_AVAILABLE = False
