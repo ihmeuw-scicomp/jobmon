@@ -53,8 +53,15 @@ def load_all_templates(config_root: str) -> Dict[str, Any]:
     """Load all template files from the templates directory."""
     templates = {}
 
-    # Use package-based resolution - reliable in all environments
-    templates_dir = get_core_templates_path()
+    # Try to load templates from config_root first, fall back to core templates
+    if config_root:
+        templates_dir = os.path.join(config_root, "templates")
+    else:
+        templates_dir = None
+
+    # If config_root templates directory doesn't exist, fall back to core templates
+    if not templates_dir or not os.path.exists(templates_dir):
+        templates_dir = get_core_templates_path()
 
     if not os.path.exists(templates_dir):
         return {}
