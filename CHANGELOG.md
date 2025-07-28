@@ -62,6 +62,7 @@ All notable changes to Jobmon will be documented in this file.
 - Updated Workflow.add_tasks() parameter type from Sequence[Task] to Iterable[Task] to accept a broader range of iterable types including generators and iterators. (PR 279)
 - Expanded error message when a TaskInstance doesn't report a heartbeat.
 - Refactored task status update endpoint into smaller functions for better maintainability.
+- Optimized `/task_template_dag` route to use less memory.
 
 ### Fixed
 - Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.
@@ -94,6 +95,9 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed ClientDisconnect exceptions appearing as errors in APM by adding global exception handler. (PR 282)
 - Fixed get_max_concurrently_running endpoint to handle non-existent workflows gracefully by returning a 404 error with descriptive message instead of raising an exception. (PR 278)
 - Fixed 'Set' object is not subscriptable in CLI error in `/update_statuses` route.
+
+### Removed
+- Removed jobmon_gui/CHANGELOG.md
 
 ### Fixed
 ## [3.4.23] - 2025-07-10
