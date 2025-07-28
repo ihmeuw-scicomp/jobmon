@@ -94,7 +94,7 @@ def update_config_value(
             f"Available keys: {available_keys}"
         )
 
-        # Store the old value for the return message
+    # Store the old value for the return message
     old_value = current_dict[final_key]
 
     # Coerce the new value to the appropriate type using JobmonConfig's method
