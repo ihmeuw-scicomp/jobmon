@@ -277,7 +277,7 @@ users need to add a resume parameter to the run() function to resume their Workf
 That's it. If you don't set "resume=True", Jobmon will raise an error saying that the user is
 trying to create a Workflow that already exists.
 
-For more examples, take a look at the `resume tests <https://github.com/ihmeuw-scicomp/jobmon/blob/release/3.2/tests/end_to_end/test_workflow_resume.py>`_.
+For more examples, take a look at the `resume tests <https://github.com/ihmeuw-scicomp/jobmon/blob/release/3.2/tests/pytest/end_to_end/test_workflow_resume.py>`_.
 
 .. note::
 
@@ -827,6 +827,30 @@ TaskTemplate Resource Prediction to YAML
               max_runtime_seconds: 20
               queue: "long.q"
 
+update_config
+*************
+    The ``jobmon update_config`` command allows users to update configuration values in their 
+    local defaults.yaml file using dot notation. This is useful for modifying configuration 
+    settings without manually editing YAML files.
+
+    **Usage:**
+        ``jobmon update_config <key> <value> [--config-file <path>]``
+
+    **Arguments:**
+        * ``key`` - Configuration key in dot notation (e.g., 'http.retries_attempts', 'distributor.poll_interval')
+        * ``value`` - New value to set
+        * ``--config-file`` - Optional path to specific config file to update (defaults to system config)
+
+    **Examples:**
+        * ``jobmon update_config http.retries_attempts 15`` - Update HTTP retry attempts to 15
+        * ``jobmon update_config distributor.poll_interval 5`` - Set distributor polling interval to 5 seconds
+        * ``jobmon update_config telemetry.tracing.requester_enabled true`` - Enable OTLP tracing for requests
+        * ``jobmon update_config db.pool.size 20`` - Update database connection pool size to 20
+        * ``jobmon update_config http.service_url "http://new-server.com" --config-file /path/to/config.yaml`` - Update service URL in specific config file
+
+    .. note::
+        * Only keys that already exist in the configuration can be updated
+
 Resource Usage
 ##############
 Task Resource Usage
@@ -881,12 +905,51 @@ Error Logs
 
 Python Logging
 ##############
-To attach Jobmon's simple formatted logger use the following code.
+Jobmon provides a flexible logging configuration system with template-based configurations
+and user override capabilities.
 
-For example::
+**Basic Usage:**
 
-    from jobmon.client.client_logging import ClientLogging
+To configure Jobmon's client logging with default settings::
 
-    ClientLogging().attach()
+    from jobmon.client.logging import configure_client_logging
+    
+    configure_client_logging()
+
+This automatically configures all Jobmon client loggers (workflow, task, tool, etc.) with 
+console output and INFO level logging.
+
+**Advanced Configuration:**
+
+You can customize logging behavior using configuration overrides in your ``~/.jobmon.yaml`` file:
+
+.. code-block:: yaml
+
+    logging:
+      client:
+        # Add file logging
+        formatters:
+          file_formatter:
+            format: "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
+            datefmt: "%Y-%m-%d %H:%M:%S"
+        handlers:
+          file:
+            class: logging.FileHandler
+            filename: "/var/log/jobmon_client.log"
+            formatter: file_formatter
+            level: INFO
+        loggers:
+          jobmon.client.workflow:
+            handlers: [console, file]
+            level: DEBUG
+
+You can also specify a completely custom logging configuration file::
+
+.. code-block:: yaml
+
+    logging:
+      client_logconfig_file: "/path/to/custom_client_logging.yaml"
+
+For more details on logging configuration options, see the configuration documentation.
 
 

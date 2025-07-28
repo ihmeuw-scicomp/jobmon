@@ -20,7 +20,7 @@ import psutil
 
 from jobmon.client.array import Array
 from jobmon.client.dag import Dag
-from jobmon.client.logging import JobmonLoggerConfig
+from jobmon.client.logging import configure_client_logging
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.task import Task
 from jobmon.client.task_resources import TaskResources
@@ -544,9 +544,7 @@ class Workflow(object):
             str of WorkflowRunStatus
         """
         if configure_logging is True:
-            JobmonLoggerConfig.attach_default_handler(
-                logger_name="jobmon.client", log_level=logging.INFO
-            )
+            configure_client_logging()
 
         # bind to database
         logger.info("Adding Workflow metadata to database")
