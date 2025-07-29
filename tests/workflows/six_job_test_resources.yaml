@@ -1,0 +1,19 @@
+tool_resources:
+  slurm:
+    memory: 1
+    cores: 1
+    runtime: 60
+    project: 'proj_scicomp'
+    queue: 'all.q'
+    stderr: '/ihme/scratch/svcscicompci/six_job_test_stdout'
+    stdout: '/ihme/scratch/svcscicompci/six_job_test_stderr'
+  sequential:
+    queue: "null.q"
+task_template_resources:
+  phase_1:
+    buster:
+      queue: 'long.q'
+      runtime: 90_000
+    slurm:
+      queue: 'long.q'
+      runtime: 90_000

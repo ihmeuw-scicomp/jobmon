@@ -61,6 +61,7 @@ class ClientCLI(CLI):
         self._add_create_resource_yaml_subparser()
         self._add_get_filepaths_subparser()
         self._add_resume_workflow_parser()
+        self._add_update_config_subparser()
 
     @staticmethod
     def limit_checker(limit: Any) -> int:
@@ -247,6 +248,22 @@ class ClientCLI(CLI):
             print(df)
         else:
             print(tabulate(df, headers="keys", tablefmt="psql", showindex=False))
+
+    @staticmethod
+    def update_config(args: argparse.Namespace) -> None:
+        """Update a configuration value in the defaults.yaml file."""
+        from jobmon.client.status_commands import update_config_value
+
+        try:
+            result = update_config_value(
+                key=args.key,
+                value=args.value,
+                config_file=args.config_file,
+            )
+            print(result)
+        except ValueError as e:
+            print(f"Error: {e}")
+            exit(1)
 
     def _add_version_subparser(self) -> None:
         version_parser = self._subparsers.add_parser("version")
@@ -606,6 +623,30 @@ class ClientCLI(CLI):
             required=False,
             default=180,
             type=int,
+        )
+
+    def _add_update_config_subparser(self) -> None:
+        update_config_parser = self._subparsers.add_parser(
+            "update_config",
+            help="Update configuration values in defaults.yaml using dot notation",
+        )
+        update_config_parser.set_defaults(func=self.update_config)
+        update_config_parser.add_argument(
+            "key",
+            help="Configuration key in dot notation "
+            "(e.g., 'http.retries_attempts', 'distributor.poll_interval')",
+            type=str,
+        )
+        update_config_parser.add_argument(
+            "value",
+            help="New value to set",
+            type=str,
+        )
+        update_config_parser.add_argument(
+            "--config-file",
+            help="Optional path to specific config file to update (defaults to system config)",
+            required=False,
+            type=str,
         )
 
 

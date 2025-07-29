@@ -20,6 +20,7 @@ dist
 .coverage.*
 .test_report.xml
 jobmon.db
+jobmon_server/jobmon.db
 
 # ignore cache directories
 *__pycache__*
@@ -47,6 +48,8 @@ docsource/api
 # ignore .env
 .env
 node_modules/*
+docker_config/jobmonconfig.local.yaml
+docker_config/logconfig.otlp.yaml
 
 # Ignore design documents folder
 /design/

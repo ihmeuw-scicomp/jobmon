@@ -1,6 +1,5 @@
 """Repository for Task operations."""
 
-import json
 from typing import List, Optional, Set, Union
 
 import structlog
@@ -15,6 +14,7 @@ from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.server_side_exception import InvalidUsage
+from jobmon.server.web.utils.json_utils import parse_node_ids
 
 logger = structlog.get_logger(__name__)
 
@@ -284,19 +284,11 @@ class TaskRepository:
         for row in self.session.execute(select_stmt).all():
             edges = row[0]
             if direction == Direction.UP:
-                upstreams = (
-                    json.loads(edges.upstream_node_ids)
-                    if isinstance(edges.upstream_node_ids, str)
-                    else edges.upstream_node_ids
-                )
+                upstreams = parse_node_ids(edges.upstream_node_ids)
                 if upstreams:
                     node_ids.update(upstreams)
             elif direction == Direction.DOWN:
-                downstreams = (
-                    json.loads(edges.downstream_node_ids)
-                    if isinstance(edges.downstream_node_ids, str)
-                    else edges.downstream_node_ids
-                )
+                downstreams = parse_node_ids(edges.downstream_node_ids)
                 if downstreams:
                     node_ids.update(downstreams)
             else:

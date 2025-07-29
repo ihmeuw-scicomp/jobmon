@@ -1,0 +1,60 @@
+# Local development configuration for docker-compose
+# Fixed: Using proper GRPC endpoints with TLS for both logs and traces
+
+# Authentication disabled for local development
+auth:
+  enabled: false
+
+# Telemetry configuration (replaces otlp section)
+telemetry:
+  # Environment identifier for telemetry resources
+  deployment_environment: dev
+  debug: true
+
+  # Distributed tracing configuration
+  tracing:
+    requester_enabled: false    # Client-side HTTP request tracing  
+    server_enabled: false        # Server-side tracing enabled for local dev
+    span_exporter: "console_span"  # Use GRPC exporter for real OTLP export
+    
+    exporters:
+      # Production GRPC span exporter with proper TLS
+      grpc_span:
+        module: "opentelemetry.exporter.otlp.proto.grpc.trace_exporter"
+        class: "OTLPSpanExporter"
+        endpoint: "https://localhost:4317"  # Add https://
+        timeout: 30
+        insecure: false  # Secure connection
+        headers: {}
+        compression: "gzip"
+        
+      # Console exporter for debugging (not available for logs)
+      console_span:
+        module: "opentelemetry.exporter.console.trace_exporter"
+        class: "ConsoleSpanExporter"
+
+cors:
+  allowed_origins: "http://localhost:3000"  # Local frontend
+
+db:
+  sqlalchemy_database_uri: "sqlite:///jobmon_server/jobmon.db"
+  sqlalchemy_connect_args: {}
+  pool:
+    recycle: 300
+    pre_ping: true
+    timeout: 20
+
+reaper:
+  slack_api_url: ""  # Disabled for local dev
+  slack_channel_default: ""
+  poll_interval_minutes: 5
+
+http:
+  request_timeout: 20
+  retries_timeout: 300
+  retries_attempts: 10
+  route_prefix: /api/v3
+
+# Override default logconfig location to use mounted file
+logging:
+  server_logconfig_file: /app/config/logconfig.example.yaml

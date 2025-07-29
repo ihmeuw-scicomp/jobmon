@@ -5,6 +5,30 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- Added `jobmon update_config` command to allow users to update configuration values in their defaults.yaml file using dot notation (e.g., `jobmon update_config http.retries_attempts 15`).
+- **Major Logging Architecture Refactor**: Completely redesigned Jobmon's logging system for maximum elegance and production readiness:
+  - Template-based logging configurations with DRY shared patterns (formatters, handlers, exporters)
+  - Comprehensive user override system supporting both file-based and section-based customization
+  - Clean separation of concerns: client, server, and requester logging packages with distinct responsibilities
+  - Production-ready OpenTelemetry (OTLP) integration with structured logging support
+  - Custom YAML template loader supporting `!template` and `!include` directives for configuration reuse
+  - Flexible configuration precedence: explicit params > file overrides > section overrides > default templates > fallback
+  - Auto-instrumentation of HTTP requests with OTLP when enabled
+  - Environment variable support for all configuration overrides (e.g., `JOBMON__LOGGING__CLIENT__LOGGERS__LEVEL`)
+  - Comprehensive logging configuration documentation and migration guide
+  - Simplified structlog formatters by removing conditional logic (structlog is now a guaranteed dependency)
+- **Enhanced Docker Development Environment**: Complete containerized development setup for improved workflow testing:
+  - New `jobmon_client` Docker container with local development support and editable installs
+  - Live code editing with volume mounts for `jobmon_core` and `jobmon_client` source code
+  - Interactive shell support (stdin/tty) for workflow development and testing
+  - Comprehensive dependency management with automated installation scripts
+  - Enhanced `docker-compose.yml` with proper OTLP configuration mounting
+- **Test Structure Reorganization**: Improved test organization for better maintainability:
+  - `tests/pytest/` - All automated pytest tests (moved from root tests/)
+  - `tests/workflows/` - Development and manual testing workflows
+  - `tests/_scripts/` - Utility scripts (unchanged)
+  - Updated pytest configuration for new test paths with proper test discovery
+  - Added sample workflow examples and comprehensive testing documentation
 - Added async retry support to Requester and modernized DistributorService for improved error handling and performance.
 - Added UV for dependency and workflow management, replacing pip-tools for faster and more reliable dependency resolution.
 - Added configurable database connection pool settings to prevent timeout errors in high-load scenarios.
@@ -19,6 +43,18 @@ All notable changes to Jobmon will be documented in this file.
 - Added a `Download CSV button` to the resource usage page, allowing users to export all plot data regardless of filters.
 
 ### Changed
+- **BREAKING: Logging System Migration**: Completely replaced legacy logging system with new elegant architecture:
+  - Client logging now uses `configure_client_logging()` instead of deprecated `JobmonLoggerConfig.attach_default_handler()`
+  - Server logging automatically selects OTLP configuration based on `otlp.web_enabled` setting
+  - All logging configurations now support user customization via `JobmonConfig` overrides
+  - OTLP configurations moved from monolithic files to focused packages (`jobmon.core.otlp`, `jobmon.server.web.otlp`)
+  - Default logging configurations moved to template-based system with shared patterns
+- **BREAKING: Telemetry Configuration Structure**: Replaced `otlp` section with new `telemetry` configuration structure:
+  - `otlp.http_enabled` → `telemetry.tracing.requester_enabled`
+  - `otlp.web_enabled` → `telemetry.tracing.server_enabled`
+  - `otlp.deployment_environment` → `telemetry.deployment_environment`
+  - Nested tracing configuration under `telemetry.tracing` with configurable span exporters
+  - Clear separation: logging via logconfig files, tracing via telemetry config
 - Overhauled frontend resource utilization page for better performance and user experience.
 - Migrated project dependency management from pip-tools to UV workspace configuration.
 - Consolidated database session management and configuration for improved consistency and performance.
@@ -27,6 +63,7 @@ All notable changes to Jobmon will be documented in this file.
 - Expanded error message when a TaskInstance doesn't report a heartbeat.
 - Refactored task status update endpoint into smaller functions for better maintainability.
 - Optimized `/get_task_template_details` and `/task_template_resource_usage` routes.
+- Optimized `/task_template_dag` route to use less memory.
 
 ### Fixed
 - Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.
@@ -42,7 +79,14 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed datetime serialization in workflow overview API to handle both datetime objects and string formats for cross-database compatibility (PostgreSQL vs SQLite).
 
 ### Deprecated
+- Legacy logging classes `JobmonLoggerConfig` and `ClientLogging` are deprecated in favor of new `configure_client_logging()` function
+- Direct import of OTLP classes from `jobmon.core.otlp` and `jobmon.server.web.otlp` module roots (use specific submodules)
+
 ### Removed
+- Removed legacy `JobmonLoggerConfig.attach_default_handler()` method and `ClientLogging().attach()` pattern
+- Removed monolithic OTLP configuration files in favor of modular package structure
+- Removed hardcoded logging configurations in favor of template-based system with user override support
+- Removed duplicate logging setup code across client, server, and requester components
 
 ## [3.4.24] - TBD
 ### Changed
@@ -52,6 +96,9 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed ClientDisconnect exceptions appearing as errors in APM by adding global exception handler. (PR 282)
 - Fixed get_max_concurrently_running endpoint to handle non-existent workflows gracefully by returning a 404 error with descriptive message instead of raising an exception. (PR 278)
 - Fixed 'Set' object is not subscriptable in CLI error in `/update_statuses` route.
+
+### Removed
+- Removed jobmon_gui/CHANGELOG.md
 
 ### Fixed
 ## [3.4.23] - 2025-07-10

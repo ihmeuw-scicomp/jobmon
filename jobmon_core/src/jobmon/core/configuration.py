@@ -22,7 +22,7 @@ if not os.environ.get("PYTEST_CURRENT_TEST"):
     load_dotenv()
 
 DEFAULTS_FILE_NAME = "defaults.yaml"
-DEFAULTS_FILE = Path(__file__).parent / DEFAULTS_FILE_NAME
+DEFAULTS_FILE = Path(__file__).parent / "config" / DEFAULTS_FILE_NAME
 ENV_VAR_PREFIX = "JOBMON__"
 
 
