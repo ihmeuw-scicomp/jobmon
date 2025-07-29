@@ -1,6 +1,6 @@
 -- This script converts the json string to json object for the edge table
 -- Run with:
--- mysql -h <jobmondb_host> -P 3306 -u <service_user> -p <jobmondb> < convert_jsonstr_json.sql
+-- mysql -h <jobmondb host> -P 3306 -u <service_user> -p <jobmondb> < convert_jsonstr_json.sql
 
 DELIMITER //
 
