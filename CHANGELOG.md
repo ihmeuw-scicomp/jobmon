@@ -26,6 +26,7 @@ All notable changes to Jobmon will be documented in this file.
 - Updated Workflow.add_tasks() parameter type from Sequence[Task] to Iterable[Task] to accept a broader range of iterable types including generators and iterators. (PR 279)
 - Expanded error message when a TaskInstance doesn't report a heartbeat.
 - Refactored task status update endpoint into smaller functions for better maintainability.
+- Optimized `/get_task_template_details` and `/task_template_resource_usage` routes.
 
 ### Fixed
 - Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.

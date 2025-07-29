@@ -1,7 +1,6 @@
 """Routes for TaskTemplate."""
 
 import json
-import time
 from decimal import Decimal
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -10,7 +9,7 @@ import numpy as np
 import pandas as pd  # type:ignore
 import structlog
 from fastapi import Depends, HTTPException, Query
-from sqlalchemy import and_, join, Row, Select, select
+from sqlalchemy import Row, Select, and_, join, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
@@ -63,16 +62,15 @@ def get_task_template_details_for_workflow(
                     join(
                         join(Task, Node, Task.node_id == Node.id),
                         TaskTemplateVersion,
-                        Node.task_template_version_id == TaskTemplateVersion.id
+                        Node.task_template_version_id == TaskTemplateVersion.id,
                     ),
                     TaskTemplate,
-                    TaskTemplateVersion.task_template_id == TaskTemplate.id
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
                 )
             )
             .where(
                 and_(
-                    Task.workflow_id == workflow_id,
-                    TaskTemplate.id == task_template_id
+                    Task.workflow_id == workflow_id, TaskTemplate.id == task_template_id
                 )
             )
             .distinct()
