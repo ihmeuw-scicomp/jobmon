@@ -28,34 +28,32 @@ _api_prefix = "/api/v3"
 
 def pytest_configure(config):
     """Configure pytest - set up environment variables before any imports happen."""
-    # Only set up database config during test collection/execution
-    # This ensures environment variables are available when modules are imported
-    if not os.environ.get("JOBMON__DB__SQLALCHEMY_DATABASE_URI"):
-        # Get worker ID from xdist (None if not using xdist)
-        worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    # Always set up test environment variables for consistent test behavior
+    # Get worker ID from xdist (None if not using xdist)
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
 
-        # Create unique database per worker
-        tmp_dir = tempfile.mkdtemp()
-        sqlite_file = pathlib.Path(tmp_dir, f"tests_{worker_id}.sqlite").resolve()
+    # Create unique database per worker
+    tmp_dir = tempfile.mkdtemp()
+    sqlite_file = pathlib.Path(tmp_dir, f"tests_{worker_id}.sqlite").resolve()
 
-        # Set minimal environment variables needed for module imports
-        test_vars = {
-            # Core database configuration - unique per worker
-            "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{sqlite_file}",
-            "JOBMON__DB__SQLALCHEMY_CONNECT_ARGS": "{}",  # No SSL for SQLite
-            # Essential test settings
-            "JOBMON__AUTH__ENABLED": "false",
-            "JOBMON__HTTP__ROUTE_PREFIX": "/api/v3",
-            "JOBMON__SESSION__SECRET_KEY": "test",
-            # Performance optimizations for faster tests
-            "JOBMON__HTTP__STOP_AFTER_DELAY": "0",
-            "JOBMON__HTTP__RETRIES_TIMEOUT": "0",
-            "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
-            "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
-            "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
-        }
+    # Set minimal environment variables needed for module imports
+    test_vars = {
+        # Core database configuration - unique per worker
+        "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:///{sqlite_file}",
+        "JOBMON__DB__SQLALCHEMY_CONNECT_ARGS": "{}",  # No SSL for SQLite
+        # Essential test settings
+        "JOBMON__AUTH__ENABLED": "false",
+        "JOBMON__HTTP__ROUTE_PREFIX": "/api/v3",
+        "JOBMON__SESSION__SECRET_KEY": "test",
+        # Performance optimizations for faster tests
+        "JOBMON__HTTP__STOP_AFTER_DELAY": "0",
+        "JOBMON__HTTP__RETRIES_TIMEOUT": "0",
+        "JOBMON__DISTRIBUTOR__POLL_INTERVAL": "1",
+        "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
+        "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
+    }
 
-        os.environ.update(test_vars)
+    os.environ.update(test_vars)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -64,7 +62,7 @@ def setup_test_environment():
     # Get worker ID and database path (both guaranteed to be set by pytest_configure)
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
     db_uri = os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"]
-    sqlite_file = pathlib.Path(db_uri[11:])  # Remove 'sqlite:////' prefix
+    sqlite_file = pathlib.Path(db_uri[10:])  # Remove 'sqlite:///' prefix
 
     print(f"Worker {worker_id}: Setting up test environment")
     print(f"Worker {worker_id}: SQLite file at {sqlite_file}")

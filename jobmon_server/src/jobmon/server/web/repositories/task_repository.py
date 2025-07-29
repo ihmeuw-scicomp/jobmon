@@ -14,7 +14,6 @@ from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.server_side_exception import InvalidUsage
-from jobmon.server.web.utils.json_utils import parse_node_ids
 
 logger = structlog.get_logger(__name__)
 
@@ -284,11 +283,11 @@ class TaskRepository:
         for row in self.session.execute(select_stmt).all():
             edges = row[0]
             if direction == Direction.UP:
-                upstreams = parse_node_ids(edges.upstream_node_ids)
+                upstreams = edges.upstream_node_ids
                 if upstreams:
                     node_ids.update(upstreams)
             elif direction == Direction.DOWN:
-                downstreams = parse_node_ids(edges.downstream_node_ids)
+                downstreams = edges.downstream_node_ids
                 if downstreams:
                     node_ids.update(downstreams)
             else:
