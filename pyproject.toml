@@ -58,4 +58,5 @@ python_functions = ["test_*"]
 
 [tool.isort]
 profile = "black"
-line_length = 88 # Usually black's default, but good to be explicit 
+line_length = 88 # Usually black's default, but good to be explicit
+known_first_party = ["jobmon"] 

@@ -32,6 +32,7 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     config = JobmonConfig()
 
     # Configure logging AFTER OTLP instrumentation is set up
+    # Server uses existing sophisticated logging system with OTLP safety
     configure_logging()
 
     # Initialize the FastAPI app
@@ -115,8 +116,6 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
             CORSMiddleware,
             allow_origins=["*"],
             allow_credentials=False,
-            allow_methods=["*"],
-            allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
         )
 
     app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
@@ -139,6 +138,11 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
                 dependencies = [Depends(get_user)]
             else:
                 dependencies = [Depends(get_user_or_anonymous)]
+
+            # Include health router separately without authentication
+            health_router = getattr(mod, f"api_{version}_health_router")
+            app.include_router(health_router, prefix=url_prefix)
+
         app.include_router(api_router, prefix=url_prefix, dependencies=dependencies)
 
     # Custom documentation endpoints

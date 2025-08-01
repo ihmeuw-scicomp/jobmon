@@ -16,10 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 class WorkerNodeCLI(CLI):
-    """Command line interface for WorkderNode."""
+    """Command line interface for Worker Node with automatic logging."""
 
     def __init__(self) -> None:
-        """Initialization of the worker node CLI."""
+        """Initialization of the worker node CLI with automatic component logging."""
+        # Enable automatic logging for worker component
+        super().__init__(component_name="worker")
+
         self.parser = argparse.ArgumentParser("jobmon worker_node CLI")
         self._subparsers = self.parser.add_subparsers(
             dest="sub_command", parser_class=argparse.ArgumentParser

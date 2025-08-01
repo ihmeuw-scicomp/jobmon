@@ -397,24 +397,24 @@ def test_downstream_task(client_env, tool, db_engine):
             )
         ).fetchall()
         assert len(res) == 1
-        two_id_patten = r"^\"\[\s*-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?\s*\]\"$"  # '"[1, 2]"'
-        assert re.match(two_id_patten, res[0][0])
+        two_id_patten = r"^\[\s*-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?\s*\]$"  # '[1, 2]'
+        assert re.match(two_id_patten, str(res[0][0]))
 
-        one_id_pattern = r"^\"\[\s*-?\d+(\.\d+)?\s*\]\"$"  # '"[1]"'
+        one_id_pattern = r"^\[\s*-?\d+(\.\d+)?\s*\]$"  # '[1]'
         res = session.execute(
             text(
                 f"select upstream_node_ids from task, edge where task.id={task2.task_id} and task.node_id=edge.node_id"
             )
         ).fetchall()
         assert len(res) == 1
-        assert re.match(one_id_pattern, res[0][0])
+        assert re.match(one_id_pattern, str(res[0][0]))
         res = session.execute(
             text(
                 f"select upstream_node_ids from task, edge where task.id={task3.task_id} and task.node_id=edge.node_id"
             )
         ).fetchall()
         assert len(res) == 1
-        assert re.match(one_id_pattern, res[0][0])
+        assert re.match(one_id_pattern, str(res[0][0]))
 
 
 def test_node_args_hash(client_env, tool, db_engine):

@@ -31,18 +31,17 @@ def pytest_configure(config):
     # Only set up database config during test collection/execution
     # This ensures environment variables are available when modules are imported
     if not os.environ.get("JOBMON__DB__SQLALCHEMY_DATABASE_URI"):
-        # Get worker ID from xdist (None if not using xdist)
-        worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
-
-        # Create unique database per worker
+        # Set a temporary database URI for test collection/imports
+        # This will be updated later in setup_test_environment with proper worker isolation
         tmp_dir = tempfile.mkdtemp()
-        sqlite_file = pathlib.Path(tmp_dir, f"tests_{worker_id}.sqlite").resolve()
+        temp_sqlite_file = pathlib.Path(tmp_dir, "temp_collection.sqlite").resolve()
 
         # Set minimal environment variables needed for module imports
         test_vars = {
-            # Core database configuration - unique per worker
-            "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{sqlite_file}",
+            # Temporary database URI for collection - will be updated in session fixture
+            "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{temp_sqlite_file}",
             "JOBMON__DB__SQLALCHEMY_CONNECT_ARGS": "{}",  # No SSL for SQLite
+            "JOBMON__DB__NEEDS_WORKER_SETUP": "true",  # Flag to update URI in session fixture
             # Essential test settings
             "JOBMON__AUTH__ENABLED": "false",
             "JOBMON__HTTP__ROUTE_PREFIX": "/api/v3",
@@ -61,15 +60,29 @@ def pytest_configure(config):
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():
     """Set up test environment with per-worker databases - runs automatically."""
-    # Get worker ID and database path (both guaranteed to be set by pytest_configure)
+    # Now worker ID should be properly set by pytest-xdist
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
-    db_uri = os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"]
-    sqlite_file = pathlib.Path(db_uri[11:])  # Remove 'sqlite:////' prefix
+
+    # Set up unique database for this worker if needed
+    if os.environ.get("JOBMON__DB__NEEDS_WORKER_SETUP"):
+        # Create unique database per worker (different from temp collection DB)
+        tmp_dir = tempfile.mkdtemp()
+        sqlite_file = pathlib.Path(tmp_dir, f"tests_{worker_id}.sqlite").resolve()
+
+        # Update the database URI now that we have the correct worker ID
+        os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{sqlite_file}"
+
+        # Clean up the setup flag
+        del os.environ["JOBMON__DB__NEEDS_WORKER_SETUP"]
+    else:
+        # Database URI was already set (non-xdist run or already configured)
+        db_uri = os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"]
+        sqlite_file = pathlib.Path(db_uri[11:])  # Remove 'sqlite:////' prefix
 
     print(f"Worker {worker_id}: Setting up test environment")
     print(f"Worker {worker_id}: SQLite file at {sqlite_file}")
 
-    # Reset singletons for clean test state
+    # Reset singletons for clean test state - important after URI change
     import jobmon.server.web.config as config_module
 
     config_module._jobmon_config = None

@@ -1,7 +1,7 @@
 from importlib import import_module
 
 from fastapi import APIRouter
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.status import HTTP_200_OK
 
 from jobmon.server.web import routes
@@ -9,6 +9,19 @@ from jobmon.server.web import routes
 version = "v3"
 # Create a router for version 3 of the API
 api_v3_router = APIRouter(tags=[version], prefix=f"/{version}")
+
+# Create a separate health router without authentication
+api_v3_health_router = APIRouter(tags=[f"{version}-health"], prefix=f"/{version}")
+
+
+# Add explicit CORS preflight handler
+@api_v3_router.options("/{full_path:path}")
+async def options_handler(full_path: str) -> Response:
+    """Handle CORS preflight requests for all v3 endpoints."""
+    response = Response()
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
+
 
 for r in ["fsm", "cli", "reaper"]:
     mod = import_module(f"jobmon.server.web.routes.{version}.{r}")
@@ -29,9 +42,9 @@ def get_pst_now() -> JSONResponse:
     return routes.get_pst_now()
 
 
-@api_v3_router.get("/health")
+@api_v3_health_router.get("/health")
 def health() -> JSONResponse:
-    """Test connectivity to the app."""
+    """Test connectivity to the app. Always unauthenticated for health checks."""
     return routes.health()
 
 

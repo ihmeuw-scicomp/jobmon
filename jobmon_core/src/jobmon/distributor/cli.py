@@ -9,10 +9,13 @@ from jobmon.distributor.api import DistributorService
 
 
 class DistributorCLI(CLI):
-    """Command line interface for Distributor."""
+    """Command line interface for Distributor with automatic logging."""
 
     def __init__(self) -> None:
-        """Initialization of distributor CLI."""
+        """Initialization of distributor CLI with automatic component logging."""
+        # Enable automatic logging for distributor component
+        super().__init__(component_name="distributor")
+
         self.parser = argparse.ArgumentParser()
         self._subparsers = self.parser.add_subparsers(
             dest="sub_command", parser_class=argparse.ArgumentParser

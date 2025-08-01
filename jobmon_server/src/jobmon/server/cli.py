@@ -11,10 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 class ServerCLI(CLI):
-    """CLI for Server only."""
+    """CLI for Server with automatic logging support."""
 
     def __init__(self) -> None:
-        """Initialize ServerCLI with subcommands."""
+        """Initialize ServerCLI for administrative operations."""
+        # ServerCLI uses component logging for admin commands (workflow-reaper, init-db, etc.)
+        super().__init__(component_name="server")
+
         self.parser = argparse.ArgumentParser("jobmon server")
         self._subparsers = self.parser.add_subparsers(dest="sub_command")
 
