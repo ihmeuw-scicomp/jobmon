@@ -6,26 +6,13 @@ All notable changes to Jobmon will be documented in this file.
 ## [Unreleased]
 ### Added
 - Added `jobmon update_config` command to allow users to update configuration values in their defaults.yaml file using dot notation (e.g., `jobmon update_config http.retries_attempts 15`).
-- **Automatic Component Logging**: Implemented automatic logging configuration for all Jobmon CLI components:
-  - Auto-configures logging for distributor, worker node, server, and client CLI commands on startup
-  - Local package-based logging templates with component-specific configurations
-  - Console logging by default with OTLP support via configuration overrides (opt-in)
-  - Library-safe logging: no root logger configuration, uses propagation for application control
+- **Enhanced Logging System**: Redesigned Jobmon's logging architecture with automatic component configuration and production-ready features:
+  - Automatic logging configuration for all CLI components (distributor, worker, server, client) with console logging by default
+  - Template-based logging configurations with user override support (file-based and section-based customization)
+  - Production-ready OpenTelemetry (OTLP) integration (opt-in via configuration)
+  - Library-safe logging with proper propagation and no root logger configuration
   - Integration with `workflow.run()` via optional `configure_logging` parameter
-  - Comprehensive test coverage with pytest-xdist parallel execution support
-  - Database isolation fixes for reliable parallel testing
-  - Consolidated documentation in `docsource/configuration.rst` with configuration examples
-- **Major Logging Architecture Refactor**: Completely redesigned Jobmon's logging system for maximum elegance and production readiness:
-  - Template-based logging configurations with DRY shared patterns (formatters, handlers, exporters)
-  - Comprehensive user override system supporting both file-based and section-based customization
-  - Clean separation of concerns: client, server, and requester logging packages with distinct responsibilities
-  - Production-ready OpenTelemetry (OTLP) integration with structured logging support
-  - Custom YAML template loader supporting `!template` and `!include` directives for configuration reuse
-  - Flexible configuration precedence: explicit params > file overrides > section overrides > default templates > fallback
-  - Auto-instrumentation of HTTP requests with OTLP when enabled
-  - Environment variable support for all configuration overrides (e.g., `JOBMON__LOGGING__CLIENT__LOGGERS__LEVEL`)
-  - Comprehensive logging configuration documentation and migration guide
-  - Simplified structlog formatters by removing conditional logic (structlog is now a guaranteed dependency)
+  - Comprehensive test coverage with parallel execution support and database isolation fixes
 - **Enhanced Docker Development Environment**: Complete containerized development setup for improved workflow testing:
   - New `jobmon_client` Docker container with local development support and editable installs
   - Live code editing with volume mounts for `jobmon_core` and `jobmon_client` source code
