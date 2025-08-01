@@ -6,6 +6,15 @@ All notable changes to Jobmon will be documented in this file.
 ## [Unreleased]
 ### Added
 - Added `jobmon update_config` command to allow users to update configuration values in their defaults.yaml file using dot notation (e.g., `jobmon update_config http.retries_attempts 15`).
+- **Automatic Component Logging**: Implemented automatic logging configuration for all Jobmon CLI components:
+  - Auto-configures logging for distributor, worker node, server, and client CLI commands on startup
+  - Local package-based logging templates with component-specific configurations
+  - Console logging by default with OTLP support via configuration overrides (opt-in)
+  - Library-safe logging: no root logger configuration, uses propagation for application control
+  - Integration with `workflow.run()` via optional `configure_logging` parameter
+  - Comprehensive test coverage with pytest-xdist parallel execution support
+  - Database isolation fixes for reliable parallel testing
+  - Consolidated documentation in `docsource/configuration.rst` with configuration examples
 - **Major Logging Architecture Refactor**: Completely redesigned Jobmon's logging system for maximum elegance and production readiness:
   - Template-based logging configurations with DRY shared patterns (formatters, handlers, exporters)
   - Comprehensive user override system supporting both file-based and section-based customization
@@ -63,6 +72,7 @@ All notable changes to Jobmon will be documented in this file.
 - Expanded error message when a TaskInstance doesn't report a heartbeat.
 - Refactored task status update endpoint into smaller functions for better maintainability.
 - Optimized `/task_template_dag` route to use less memory.
+- Improved isort configuration to correctly identify `jobmon` as first-party package, ensuring proper PEP 8 import order (stdlib → third-party → local).
 
 ### Fixed
 - Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.
