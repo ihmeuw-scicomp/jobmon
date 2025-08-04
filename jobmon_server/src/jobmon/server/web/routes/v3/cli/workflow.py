@@ -1,5 +1,6 @@
 """Routes for Workflow."""
 
+import json
 from datetime import datetime
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -8,10 +9,12 @@ import pandas as pd
 import structlog
 from fastapi import Query, Request
 from sqlalchemy import Select, func, select, text, update
+from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
 from jobmon.core.constants import WorkflowStatus as Statuses
 from jobmon.server.web.db import get_sessionmaker
+from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_template import TaskTemplate
@@ -64,29 +67,106 @@ async def get_workflow_validation_status(request: Request) -> Any:
 
     with SessionMaker() as session:
         with session.begin():
-            # execute query
+            # execute query to get workflow status
             query_filter = [Task.workflow_id == Workflow.id, Task.id.in_(task_ids)]
             sql = (
-                select(Task.workflow_id, Workflow.status).where(*query_filter)
+                select(Task.workflow_id, Workflow.status, Workflow.dag_id).where(
+                    *query_filter
+                )
             ).distinct()
             rows = session.execute(sql).all()
-        res = [ti[1] for ti in rows]
-        # Validate if all tasks are in the same workflow and the workflow status is dead
-        if len(res) == 1 and res[0] in (
+
+        if len(rows) == 0:
+            resp = JSONResponse(
+                content={"validation": False, "workflow_status": None},
+                status_code=StatusCodes.OK,
+            )
+            return resp
+
+        workflow_statuses = [row[1] for row in rows]
+
+        # Validate if all tasks are in the same workflow and the workflow status is terminal
+        if len(workflow_statuses) == 1 and workflow_statuses[0] in (
             Statuses.FAILED,
             Statuses.DONE,
             Statuses.ABORTED,
             Statuses.HALTED,
         ):
             validation = True
+        elif len(workflow_statuses) == 1:
+            # Workflow is not in terminal state, check downstream tasks
+            workflow_id = rows[0][0]
+            dag_id = rows[0][2]
+            validation = _check_downstream_tasks_status(
+                session, task_ids, workflow_id, dag_id
+            )
         else:
+            # Multiple workflow statuses found or other validation issues
             validation = False
 
         resp = JSONResponse(
-            content={"validation": validation, "workflow_status": res[0]},
+            content={
+                "validation": validation,
+                "workflow_status": workflow_statuses[0] if workflow_statuses else None,
+            },
             status_code=StatusCodes.OK,
         )
     return resp
+
+
+def _check_downstream_tasks_status(
+    session: Session, task_ids: List[int], workflow_id: int, dag_id: int
+) -> bool:
+    """Check if all downstream tasks are in valid states (G, I, Q).
+
+    Args:
+        session: Database session
+        task_ids: List of task IDs to check downstream tasks for
+        workflow_id: Workflow ID
+        dag_id: DAG ID
+
+    Returns:
+        True if all downstream tasks are in valid states, False otherwise
+    """
+    # Valid downstream task states
+    valid_states = {"G", "I", "Q"}
+
+    # Get downstream node_ids for each task using the same pattern as get_downstream_tasks
+    tasks_and_edges = session.execute(
+        select(Task.id, Task.node_id, Edge.downstream_node_ids).where(
+            Task.id.in_(task_ids),
+            Task.node_id == Edge.node_id,
+            Edge.dag_id == dag_id,
+        )
+    ).all()
+
+    # Collect all downstream node_ids
+    downstream_node_ids = set()
+    for row in tasks_and_edges:
+        if row.downstream_node_ids is not None:
+            downstreams = (
+                json.loads(row.downstream_node_ids)
+                if isinstance(row.downstream_node_ids, str)
+                else row.downstream_node_ids
+            )
+            if downstreams:
+                downstream_node_ids.update(downstreams)
+
+    if not downstream_node_ids:
+        return True  # No downstream tasks, consider valid
+
+    # Get task statuses for downstream nodes
+    downstream_status_rows = session.execute(
+        select(Task.status).where(
+            Task.workflow_id == workflow_id, Task.node_id.in_(list(downstream_node_ids))
+        )
+    ).all()
+
+    for status_row in downstream_status_rows:
+        if status_row[0] not in valid_states:
+            return False  # Found a downstream task not in valid state
+
+    return True
 
 
 @api_v3_router.get("/workflow/{workflow_id}/workflow_tasks")
