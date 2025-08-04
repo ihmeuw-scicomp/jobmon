@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd  # type:ignore
 import structlog
 from fastapi import Depends, HTTPException, Query
-from sqlalchemy import Row, Select, select
+from sqlalchemy import Row, Select, and_, join, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
@@ -51,26 +51,33 @@ def get_task_template_details_for_workflow(
 ) -> Any:
     """Fetch Task Template details (ID, Name, and Version) for a given Workflow."""
     with SessionMaker() as session:
-        with session.begin():
-            query_filter = [
-                Task.workflow_id == workflow_id,
-                Task.node_id == Node.id,
-                Node.task_template_version_id == TaskTemplateVersion.id,
-                TaskTemplateVersion.task_template_id == task_template_id,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
-            ]
-
-            sql = (
-                select(
-                    TaskTemplate.id,
-                    TaskTemplate.name,
-                    TaskTemplateVersion.id.label("task_template_version_id"),
-                )
-                .where(*query_filter)
-                .distinct()
+        sql = (
+            select(
+                TaskTemplate.id,
+                TaskTemplate.name,
+                TaskTemplateVersion.id.label("task_template_version_id"),
             )
+            .select_from(
+                join(
+                    join(
+                        join(Task, Node, Task.node_id == Node.id),
+                        TaskTemplateVersion,
+                        Node.task_template_version_id == TaskTemplateVersion.id,
+                    ),
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+            )
+            .where(
+                and_(
+                    Task.workflow_id == workflow_id, TaskTemplate.id == task_template_id
+                )
+            )
+            .distinct()
+            .limit(1)
+        )
 
-            row = session.execute(sql).one_or_none()
+        row = session.execute(sql).one_or_none()
 
         if row is None:
             raise HTTPException(
