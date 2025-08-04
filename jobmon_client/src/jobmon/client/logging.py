@@ -1,12 +1,22 @@
-"""Configuration setting for client-side only."""
+"""Logging configuration for jobmon client applications.
+
+This module provides the standard logging configuration used by
+workflow.run(configure_logging=True).
+
+The module supports both legacy dict-based configs and new template-based
+configurations. Requester logs are automatically captured by OTLP when
+enabled (handled by the Requester class itself).
+"""
 
 from __future__ import annotations
 
 import logging
 import logging.config
+import os
 import sys
-from typing import Dict, Optional, Type
+from typing import Dict
 
+# Legacy default configuration - used as fallback only
 _DEFAULT_LOG_FORMAT = (
     "%(asctime)s [%(name)-12s] %(module)s %(levelname)-8s: %(message)s"
 )
@@ -28,52 +38,59 @@ default_config: Dict = {
 }
 
 
-class JobmonLoggerConfig:
-    """A class to automatically format and attach handlers to client logging modules."""
+# Legacy configuration - kept for backward compatibility if needed
+# The primary interface is now configure_client_logging()
 
-    dict_config = default_config
 
-    @classmethod
-    def set_default_config(
-        cls: Type[JobmonLoggerConfig], dict_config: Optional[Dict] = None
-    ) -> None:
-        """Set the default logging configuration for this factory.
+def configure_client_logging() -> None:
+    """Configure client logging with template and user override support.
 
-        Args:
-            dict_config: A logging dict config to utilize when adding new loggers. each logger
-                added via add_logger method expects to find a handler called "default"
-        """
-        if dict_config is None:
-            dict_config = default_config
+    This is the primary interface for configuring client logging. It supports:
+    1. Default template-based configuration
+    2. User file overrides via logging.client_logconfig_file
+    3. User section overrides via logging.client.*
+    4. Environment variable overrides
 
-        if not isinstance(dict_config, dict):
-            raise ValueError(
-                f"dict_config param must be a dict or None. Got {type(dict_config)}"
+    Configuration precedence:
+    1. Custom file (logging.client_logconfig_file)
+    2. Section overrides (logging.client.formatters/handlers/loggers)
+    3. Default template (logconfig_client.yaml)
+    4. Basic fallback configuration
+
+    Note: Requester OTLP is handled separately by the Requester class.
+    """
+    try:
+        from jobmon.core.config.logconfig_utils import configure_logging_with_overrides
+
+        # Get default template path
+        current_dir = os.path.dirname(__file__)
+        default_template_path = os.path.join(
+            current_dir, "config/logconfig_client.yaml"
+        )
+
+        # Configure with override support
+        configure_logging_with_overrides(
+            default_template_path=default_template_path,
+            config_section="client",
+            fallback_config=default_config,
+        )
+
+    except Exception:
+        # Fall back to basic configuration for any error:
+        # - ImportError: core module not available
+        # - FileNotFoundError: template file missing
+        # - yaml.YAMLError: malformed YAML
+        # - ValueError: template resolution errors
+        # - PermissionError: file access issues
+        # - OSError: other I/O errors
+        # - logging configuration errors
+        try:
+            logging.config.dictConfig(default_config)
+        except Exception:
+            # If even the fallback config fails, set up minimal logging
+            logging.basicConfig(
+                level=logging.INFO,
+                format=_DEFAULT_LOG_FORMAT,
+                datefmt="%Y-%m-%d %H:%M:%S",
+                stream=sys.stdout,
             )
-        else:
-            cls.dict_config = dict_config
-            logging.config.dictConfig(cls.dict_config)
-
-    @classmethod
-    def attach_default_handler(
-        cls: Type[JobmonLoggerConfig], logger_name: str, log_level: int = logging.INFO
-    ) -> None:
-        """A method to setup the default logging config for a specific logger_name.
-
-        Args:
-            logger_name: The logger to setup
-            log_level: the log severity of the handler.
-
-        Returns: None
-        """
-        logger_config = {
-            "loggers": {
-                logger_name: {
-                    "handlers": ["default"],
-                    "level": log_level,
-                    "propagate": False,
-                },
-            }
-        }
-        cls.dict_config.update(logger_config)
-        logging.config.dictConfig(cls.dict_config)

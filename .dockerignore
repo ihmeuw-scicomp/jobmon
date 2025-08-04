@@ -2,3 +2,4 @@
 ./.venv
 ./node_modules
 ./jobmon_gui/node_modules
+./config/*

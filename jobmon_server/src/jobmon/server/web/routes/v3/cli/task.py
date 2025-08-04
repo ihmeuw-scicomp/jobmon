@@ -1,6 +1,5 @@
 """Routes for Tasks."""
 
-import json
 from collections import defaultdict
 from datetime import datetime
 from http import HTTPStatus as StatusCodes
@@ -33,6 +32,7 @@ from jobmon.server.web.repositories.task_repository import TaskRepository
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.routes.v3.cli.workflow import _check_downstream_tasks_status
 from jobmon.server.web.server_side_exception import InvalidUsage
+from jobmon.server.web.utils.json_utils import parse_node_ids
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
@@ -552,19 +552,11 @@ def _get_node_dependencies(
     for row in session.execute(select_stmt).all():
         edges = row[0]
         if direction == Direction.UP:
-            upstreams = (
-                json.loads(edges.upstream_node_ids)
-                if isinstance(edges.upstream_node_ids, str)
-                else edges.upstream_node_ids
-            )
+            upstreams = parse_node_ids(edges.upstream_node_ids)
             if upstreams:
                 node_ids.update(upstreams)
         elif direction == Direction.DOWN:
-            downstreams = (
-                json.loads(edges.downstream_node_ids)
-                if isinstance(edges.downstream_node_ids, str)
-                else edges.downstream_node_ids
-            )
+            downstreams = parse_node_ids(edges.downstream_node_ids)
             if downstreams:
                 node_ids.update(downstreams)
         else:
@@ -639,7 +631,7 @@ async def get_downstream_tasks(request: Request) -> Any:
                 )
             ).all()
             result = {
-                row.id: [row.node_id, row.downstream_node_ids]
+                row.id: [row.node_id, parse_node_ids(row.downstream_node_ids)]
                 for row in tasks_and_edges
             }
 

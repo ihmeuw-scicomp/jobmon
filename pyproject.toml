@@ -50,6 +50,12 @@ jobmon_client = { workspace = true }
 jobmon_core = { workspace = true }
 jobmon_server = { workspace = true }
 
+[tool.pytest.ini_options]
+testpaths = ["tests/pytest"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
 [tool.isort]
 profile = "black"
 line_length = 88 # Usually black's default, but good to be explicit 
