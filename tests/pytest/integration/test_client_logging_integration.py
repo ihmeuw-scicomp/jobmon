@@ -219,7 +219,7 @@ root:
 
                 # Check that CLI structure is consistent
                 assert cli.component_name == "client"
-                assert hasattr(cli, "_configure_component_logging")
+                assert hasattr(cli, "configure_component_logging")
 
                 # Client CLI follows same inheritance pattern as other CLIs
                 from jobmon.core.cli import CLI

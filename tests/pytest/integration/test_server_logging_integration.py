@@ -143,8 +143,10 @@ loggers:
         # Mock JobmonConfig to return section override
         with patch("jobmon.core.configuration.JobmonConfig") as mock_config_class:
             mock_config = MagicMock()
-            # No file override
-            mock_config.get.side_effect = Exception("No file override")
+            # No file override - use ConfigError which gets caught properly
+            from jobmon.core.exceptions import ConfigError
+
+            mock_config.get.side_effect = ConfigError("No file override")
             # Section override
             mock_config.get_section_coerced.return_value = {
                 "server": {"loggers": {"jobmon.server.web": {"level": "DEBUG"}}}
@@ -241,7 +243,7 @@ loggers:
             cli = ServerCLI()
 
             # Trigger logging configuration manually
-            cli._configure_component_logging()
+            cli.configure_component_logging()
 
             end_time = time.time()
             startup_time = end_time - start_time
@@ -271,7 +273,7 @@ loggers:
 
                 # Check that CLI structure is consistent
                 assert cli.component_name == "server"
-                assert hasattr(cli, "_configure_component_logging")
+                assert hasattr(cli, "configure_component_logging")
 
                 # Server CLI follows same inheritance pattern as other CLIs
                 from jobmon.core.cli import CLI

@@ -59,12 +59,24 @@ loggers:
         template_file = tmp_path / "logconfig_distributor.yaml"
         template_file.write_text(template_content)
 
-        # Mock the component template path resolution to point to our temp template
+        # Mock JobmonConfig to avoid configuration file dependencies
         with patch(
-            "jobmon.core.config.logconfig_utils._get_component_template_path",
-            return_value=str(template_file),
-        ):
-            with patch("os.path.dirname", return_value=str(tmp_path)):
+            "jobmon.core.config.logconfig_utils.JobmonConfig"
+        ) as mock_config_class:
+            mock_config = MagicMock()
+            # No file override - use ConfigError which gets caught properly
+            from jobmon.core.exceptions import ConfigError
+
+            mock_config.get.side_effect = ConfigError("No file override")
+            # No section override
+            mock_config.get_section_coerced.return_value = {}
+            mock_config_class.return_value = mock_config
+
+            # Mock the component template path resolution to point to our temp template
+            with patch(
+                "jobmon.core.config.logconfig_utils._get_component_template_path",
+                return_value=str(template_file),
+            ):
                 # Clear any existing handlers
                 distributor_logger = logging.getLogger("jobmon.distributor")
                 distributor_logger.handlers.clear()
