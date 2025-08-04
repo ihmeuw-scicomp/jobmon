@@ -29,7 +29,7 @@ loggers:
     handlers: [console]
     level: WARNING
     propagate: true
-
+    
 # OTLP can be enabled via configuration overrides:
 # 
 # Example file-based override (logging.worker_logconfig_file):

@@ -129,6 +129,8 @@ class DummyDistributor(ClusterDistributor):
         os.environ["JOB_ID"] = str(distributor_id)
 
         cli = WorkerNodeCLI()
+        # Configure component logging since we bypass main()
+        cli.configure_component_logging()
         args = cli.parse_args(command)
 
         worker_node_factory = WorkerNodeFactory(cluster_name=args.cluster_name)

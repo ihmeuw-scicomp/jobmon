@@ -50,7 +50,6 @@ class WorkerNodeCLI(CLI):
         worker_node_task_instance = worker_node_factory.get_job_task_instance(
             task_instance_id=args.task_instance_id
         )
-        worker_node_task_instance.configure_logging()
         try:
             worker_node_task_instance.run()
         except Exception as e:
@@ -78,7 +77,6 @@ class WorkerNodeCLI(CLI):
             array_id=args.array_id,
             batch_number=args.batch_number,
         )
-        worker_node_task_instance.configure_logging()
 
         try:
             worker_node_task_instance.run()

@@ -22,12 +22,16 @@ class CLI:
 
         # Configure component logging if enabled
         if self.component_name:
-            self._configure_component_logging()
+            self.configure_component_logging()
 
         return args.func(args)
 
-    def _configure_component_logging(self) -> None:
-        """Configure logging for this component using existing infrastructure."""
+    def configure_component_logging(self) -> None:
+        """Configure logging for this component using existing infrastructure.
+
+        This method can be called directly when needed (e.g., by plugins that
+        bypass the normal main() flow).
+        """
         if not self.component_name:
             return
 

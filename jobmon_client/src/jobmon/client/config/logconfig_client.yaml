@@ -32,6 +32,12 @@ loggers:
     level: INFO
     propagate: true
 
+  # Cluster interface operations (important for distributor)
+  jobmon.core:
+    handlers: [console]
+    level: WARNING
+    propagate: true
+    
 # OTLP can be enabled via configuration overrides:
 # 
 # Example file-based override (logging.client_logconfig_file):
