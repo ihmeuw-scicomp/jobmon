@@ -542,7 +542,17 @@ class Workflow(object):
         Returns:
             str of WorkflowRunStatus
         """
+        # Set gRPC fork support environment variables BEFORE any gRPC initialization
+        # This must happen before configure_logging as OTLP handlers create gRPC connections
         if configure_logging is True:
+            # Only set gRPC fork support if OTLP is available
+            from jobmon.core.otlp import OTLP_AVAILABLE
+
+            if OTLP_AVAILABLE:
+                import os
+
+                os.environ["GRPC_ENABLE_FORK_SUPPORT"] = "true"
+                os.environ["GRPC_POLL_STRATEGY"] = "poll"
             self._configure_component_logging()
 
         # bind to database
