@@ -496,8 +496,14 @@ def test_task_reset_wf_validation(db_engine, client_env, tool, cli):
     args = cli.parse_args(command_str)
 
     # Validation with a task not in the workflow raises an error
-    with pytest.raises(AssertionError):
+    with pytest.raises(InvalidRequest) as exc_info:
         update_task_status([t1.task_id, t2.task_id], args.workflow_id, args.new_status)
+
+    # Verify the error message contains the expected text
+    assert (
+        "Task status cannot be updated because the tasks belong to multiple workflows"
+        in str(exc_info.value)
+    )
 
     # Test that the number of resets requested doesn't break HTTP
     with pytest.raises(AssertionError):

@@ -94,7 +94,7 @@ def _handle_error(
         route=request.url.path,
         error_type=type(error).__name__,
         error_message=str(error),
-        full_exception=str(error),  # Add full exception text
+        full_exception=str(error),
     )
 
     rd = {"error": response_data}

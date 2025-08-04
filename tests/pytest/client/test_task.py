@@ -398,7 +398,7 @@ def test_downstream_task(client_env, tool, db_engine):
         ).fetchall()
         assert len(res) == 1
         two_id_patten = r"^\[\s*-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?\s*\]$"  # '[1, 2]'
-        assert re.match(two_id_patten, str(res[0][0]))
+        assert re.match(two_id_patten, res[0][0])
 
         one_id_pattern = r"^\[\s*-?\d+(\.\d+)?\s*\]$"  # '[1]'
         res = session.execute(
