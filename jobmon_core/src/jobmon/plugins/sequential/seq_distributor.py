@@ -134,6 +134,8 @@ class SequentialDistributor(ClusterDistributor):
         try:
             # run command
             cli = WorkerNodeCLI()
+            # Configure component logging since we bypass main()
+            cli.configure_component_logging()
             args = cli.parse_args(command)
             exit_code = cli.run_task_instance_job(args)
 

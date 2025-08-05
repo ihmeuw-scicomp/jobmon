@@ -41,6 +41,9 @@ class ClientCLI(CLI):
 
     def __init__(self) -> None:
         """Initialization of client CLI."""
+        # Enable automatic component logging for client CLI
+        super().__init__(component_name="client")
+
         self.parser = argparse.ArgumentParser("Jobmon Client CLI", add_help=False)
         self.parser.add_argument(
             "--help", action=_HelpAction, help="Help if you need Help"

@@ -129,10 +129,17 @@ def _apply_logging_config(logging_config: Dict, source_description: str) -> None
         logger = logging.getLogger(__name__)
         logger.info(f"Logging configured successfully from {source_description}")
 
-        # Enable OTLP debug logging if requested
-        config = JobmonConfig()
-        if config.get_boolean("telemetry", "debug"):
-            logger.info("OTLP debug logging enabled via telemetry.debug configuration")
+        # Enable OTLP debug logging if requested (optional - don't fail if config unavailable)
+        try:
+            config = JobmonConfig()
+            if config.get_boolean("telemetry", "debug"):
+                logger.info(
+                    "OTLP debug logging enabled via telemetry.debug configuration"
+                )
+        except Exception:
+            # JobmonConfig may not be available (e.g., in tests or minimal setups)
+            # This is optional functionality, so don't fail the logging configuration
+            pass
 
     except Exception as e:
         # Fall back to basic logging if configuration fails

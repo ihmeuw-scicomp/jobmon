@@ -1,37 +1,29 @@
-# Client Component Logging Configuration
-# Interactive client commands and workflow operations
+# Distributor-specific logconfig for jobmon components
 # Console logging by default, OTLP can be enabled via configuration overrides
 
 version: 1
 disable_existing_loggers: false
 
-# Import shared templates from core
+# Use existing shared formatters
 formatters: !template formatters
 
-# Client-specific handlers
+# Distributor handlers (console by default, OTLP via overrides)
 handlers:
-  # Console handler for interactive use
+  # Console handler for distributor subprocess
   console:
     class: logging.StreamHandler
     level: INFO
     formatter: console_default
     stream: ext://sys.stdout
-  
-  # Optional OTLP handler (can be enabled via config overrides)
-  # Disabled by default since client operations are usually interactive
-  otlp:
-    class: opentelemetry.sdk._logs.LoggingHandler
-    level: INFO
-    formatter: json_default
 
-# Client logger configuration
+# Distributor logger configurations (console by default, OTLP via config overrides)
 loggers:
-  # Main client package
-  jobmon.client:
+  # Primary distributor operations
+  jobmon.distributor:
     handlers: [console]
     level: INFO
     propagate: true
-
+    
   # Cluster interface operations (important for distributor)
   jobmon.core:
     handlers: [console]
@@ -40,9 +32,9 @@ loggers:
     
 # OTLP can be enabled via configuration overrides:
 # 
-# Example file-based override (logging.client_logconfig_file):
+# Example file-based override (logging.distributor_logconfig_file):
 # handlers:
-#   otlp_client:
+#   otlp_distributor:
 #     class: jobmon.core.otlp.JobmonOTLPLoggingHandler
 #     level: INFO
 #     formatter: otlp_default
@@ -52,16 +44,20 @@ loggers:
 #       endpoint: http://localhost:4317
 #       timeout: 30
 #       insecure: true
+#       # Long-running process batching settings
+#       max_export_batch_size: 8
+#       export_timeout_millis: 3000
+#       schedule_delay_millis: 1000
+#       max_queue_size: 2048
 # loggers:
-#   jobmon.client:
-#     handlers: [console, otlp_client]
+#   jobmon.distributor:
+#     handlers: [console, otlp_distributor]
 #
-# Example section-based override (logging.client.*):
+# Example section-based override (logging.distributor.*):
 # logging:
-#   client:
+#   distributor:
 #     handlers:
-#       otlp_client: { ... }
+#       otlp_distributor: { ... }
 #     loggers:
-#       jobmon.client:
-#         handlers: [console, otlp_client]
-  
+#       jobmon.distributor:
+#         handlers: [console, otlp_distributor]

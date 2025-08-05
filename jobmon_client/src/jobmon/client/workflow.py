@@ -20,7 +20,6 @@ import psutil
 
 from jobmon.client.array import Array
 from jobmon.client.dag import Dag
-from jobmon.client.logging import configure_client_logging
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.task import Task
 from jobmon.client.task_resources import TaskResources
@@ -537,14 +536,24 @@ class Workflow(object):
             distributor_startup_timeout: amount of time to wait for the distributor process to
                 start up
             resume_timeout: seconds to wait for a workflow to become resumable before giving up
-            configure_logging: setup jobmon logging. If False, no logging will be configured.
-                If True, default logging will be configured.
+            configure_logging: setup jobmon client logging. If False, no logging will be
+                configured. If True, automatic component logging will be configured.
 
         Returns:
             str of WorkflowRunStatus
         """
+        # Set gRPC fork support environment variables BEFORE any gRPC initialization
+        # This must happen before configure_logging as OTLP handlers create gRPC connections
         if configure_logging is True:
-            configure_client_logging()
+            # Only set gRPC fork support if OTLP is available
+            from jobmon.core.otlp import OTLP_AVAILABLE
+
+            if OTLP_AVAILABLE:
+                import os
+
+                os.environ["GRPC_ENABLE_FORK_SUPPORT"] = "true"
+                os.environ["GRPC_POLL_STRATEGY"] = "poll"
+            self._configure_component_logging()
 
         # bind to database
         logger.info("Adding Workflow metadata to database")
@@ -640,6 +649,12 @@ class Workflow(object):
         self.last_workflow_run_id = wfr.workflow_run_id
 
         return swarm.status
+
+    def _configure_component_logging(self) -> None:
+        """Configure component logging for client workflow operations."""
+        from jobmon.core.config.logconfig_utils import configure_component_logging
+
+        configure_component_logging("client")
 
     def set_task_template_max_concurrency_limit(
         self, task_template_name: str, limit: int
