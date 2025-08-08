@@ -57,14 +57,30 @@ _CACHE_LOCK = threading.RLock()
 _DEFAULT_MAX_TTL = 300  # seconds
 
 
-def _resolve(host: str) -> Tuple[str, int]:
-    """Return ``(ip, ttl_seconds)`` – fail fast (2 s timeout)."""
-    ans = resolver.resolve(host, "A", lifetime=2)
+def _resolve(
+    host: str, timeout_seconds: int, nameservers: list[str] | None
+) -> Tuple[str, int]:
+    """Resolve host to (ip, ttl_seconds) with configurable timeout and nameservers.
+
+    Uses a single total lifetime budget; dnspython will iterate configured
+    nameservers within that lifetime. Search domains are disabled.
+    """
+    r = resolver.Resolver()  # honors /etc/resolv.conf by default
+    if nameservers:
+        # Override nameservers if explicitly provided
+        r.nameservers = list(nameservers)
+
+    ans = r.resolve(host, "A", lifetime=timeout_seconds, search=False)
     ttl = getattr(ans.rrset, "ttl", None) or _DEFAULT_MAX_TTL
     return ans[0].address, int(ttl)
 
 
-def _cached_ip(host: str) -> Tuple[str, int]:
+def _cached_ip(
+    host: str,
+    dns_timeout: int = 12,
+    dns_nameservers: list[str] | None = None,
+    dns_grace_ttl: int = 30,
+) -> Tuple[str, int]:
     now = time.time()
     with _CACHE_LOCK:
         cached_ip, exp = _DNS_CACHE.get(host, (None, 0.0))
@@ -72,14 +88,19 @@ def _cached_ip(host: str) -> Tuple[str, int]:
             return cached_ip, int(exp - now)
 
     try:
-        ip, ttl = _resolve(host)
+        ip, ttl = _resolve(
+            host, timeout_seconds=dns_timeout, nameservers=dns_nameservers
+        )
     except Exception as err:  # pragma: no cover
         logger.warning("DNS resolve failed for %s: %s", host, err, exc_info=err)
         if cached_ip:
             logger.info(
-                "Using cached IP %s for %s with 30s grace period", cached_ip, host
+                "Using cached IP %s for %s with %ss grace period",
+                cached_ip,
+                host,
+                dns_grace_ttl,
             )
-            return cached_ip, 30  # grace period with cached IP
+            return cached_ip, int(dns_grace_ttl)  # grace period with cached IP
         raise
 
     with _CACHE_LOCK:
@@ -120,7 +141,15 @@ def _import_explicit_driver(drivername: str) -> ModuleType | None:
 # ---------------------------------------------------------------------------
 # Engine factory
 # ---------------------------------------------------------------------------
-def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> Engine:
+def get_dns_engine(
+    uri: str | URL,
+    *engine_args: Any,
+    dns_timeout: int = 12,
+    dns_nameservers: list[str] | None = None,
+    dns_grace_ttl: int = 30,
+    dns_fallback: bool = True,
+    **engine_kwargs: Any,
+) -> Engine:
     """Create a DNS-powered engine from a SQLAlchemy URL.
 
     With a normal SQLAlchemy engine, the hostname in the URL is looked up
@@ -131,7 +160,13 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
     This function fixes the problem by intercepting the connection factory
     to resolve DNS on each reconnect.
     """
-    logger.debug("get_dns_engine: uri=%s engine_kwargs=%s", uri, engine_kwargs)
+    logger.debug(
+        "get_dns_engine: uri=%s engine_kwargs=%s dns_timeout=%s dns_fallback=%s",
+        uri,
+        engine_kwargs,
+        dns_timeout,
+        dns_fallback,
+    )
 
     # Extract and save user connect_args
     user_connect_args = engine_kwargs.pop("connect_args", {})
@@ -185,8 +220,24 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
     # Get the connection factory method from the dialect.
     def creator() -> DBAPIConnection:
         """Return a connection to the currently resolved IP address."""
-        ip_now, _ = _cached_ip(host)
-        connect_url = url.set(host=ip_now)
+        try:
+            ip_now, _ = _cached_ip(
+                host,
+                dns_timeout=dns_timeout,
+                dns_nameservers=dns_nameservers,
+                dns_grace_ttl=dns_grace_ttl,
+            )
+            connect_url = url.set(host=ip_now)
+        except Exception:
+            if dns_fallback:
+                # Fall back to original hostname
+                connect_url = url
+                logger.warning(
+                    "DNS resolution failed; falling back to original hostname for %s",
+                    host,
+                )
+            else:
+                raise
         cargs, cparams = minimal_dialect.create_connect_args(connect_url)
 
         # Merge user-supplied connect_args into the parameters
@@ -224,7 +275,16 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
     def _store_peer_ip(
         dbapi_conn: DBAPIConnection, record: _ConnectionRecord
     ) -> None:  # type: ignore[func-returns-value]
-        record.info["peer_ip"] = _cached_ip(host)[0]
+        try:
+            record.info["peer_ip"] = _cached_ip(
+                host,
+                dns_timeout=dns_timeout,
+                dns_nameservers=dns_nameservers,
+                dns_grace_ttl=dns_grace_ttl,
+            )[0]
+        except Exception:
+            # If DNS fails here, keep existing info or store hostname marker
+            record.info["peer_ip"] = record.info.get("peer_ip", host)
 
     # This makes sure the DB connection's IP matches current DNS. If it has changed,
     # drop the connection. The insert=True guarantees this listener is first so it
@@ -233,7 +293,16 @@ def get_dns_engine(uri: str | URL, *engine_args: Any, **engine_kwargs: Any) -> E
     def _ensure_ip_fresh(
         dbapi_conn: DBAPIConnection, record: _ConnectionRecord, proxy: Any
     ) -> None:  # type: ignore[func-returns-value]
-        current_ip = _cached_ip(host)[0]
+        try:
+            current_ip = _cached_ip(
+                host,
+                dns_timeout=dns_timeout,
+                dns_nameservers=dns_nameservers,
+                dns_grace_ttl=dns_grace_ttl,
+            )[0]
+        except Exception:
+            # If DNS refresh fails during checkout, keep the connection
+            return
         if record.info.get("peer_ip") != current_ip:
             record.invalidate()
             raise exc.DisconnectionError(
