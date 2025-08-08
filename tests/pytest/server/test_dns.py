@@ -28,7 +28,12 @@ def test_initial_resolution_and_caching(monkeypatch):
     host = "db.example.local"
     # stub resolver.resolve → one record, TTL=120
     fake = FakeAnswers([SimpleNamespace(address="1.2.3.4")], ttl=120)
-    monkeypatch.setattr(db.resolver, "resolve", lambda hostname, qtype, lifetime: fake)
+
+    # Patch Resolver.resolve (instance method) to return our fake answers
+    def fake_resolve(self, hostname, qtype, lifetime=None, search=True, **kwargs):
+        return fake
+
+    monkeypatch.setattr(db.resolver.Resolver, "resolve", fake_resolve)
     # stub time to a fixed point
     t0 = 1_000_000.0
     monkeypatch.setattr(db.time, "time", lambda: t0)
@@ -59,11 +64,11 @@ def test_cache_expiry_triggers_new_dns(monkeypatch):
     # count how many times resolver.resolve is called
     calls = {"n": 0}
 
-    def fake_resolve(hostname, qtype, lifetime):
+    def fake_resolve(self, hostname, qtype, lifetime=None, search=True, **kwargs):
         calls["n"] += 1
         return ans1 if calls["n"] == 1 else ans2
 
-    monkeypatch.setattr(db.resolver, "resolve", fake_resolve)
+    monkeypatch.setattr(db.resolver.Resolver, "resolve", fake_resolve)
     t0 = 2_000_000.0
     monkeypatch.setattr(db.time, "time", lambda: t0)
 
@@ -90,9 +95,11 @@ def test_dns_failure_uses_fallback_and_short_ttl(monkeypatch):
 
     # make resolver.resolve always blow up
     monkeypatch.setattr(
-        db.resolver,
+        db.resolver.Resolver,
         "resolve",
-        lambda hostname, qtype, lifetime: (_ for _ in ()).throw(Exception("boom")),
+        lambda self, hostname, qtype, lifetime=None, search=True, **kwargs: (
+            _ for _ in ()
+        ).throw(Exception("boom")),
     )
 
     ip, ttl = db.get_ip_with_ttl(host)
@@ -111,11 +118,11 @@ def test_dns_failure_without_cached_ip_raises_exception(monkeypatch):
 
     # make resolver.resolve always blow up
     monkeypatch.setattr(
-        db.resolver,
+        db.resolver.Resolver,
         "resolve",
-        lambda hostname, qtype, lifetime: (_ for _ in ()).throw(
-            Exception("DNS totally broken")
-        ),
+        lambda self, hostname, qtype, lifetime=None, search=True, **kwargs: (
+            _ for _ in ()
+        ).throw(Exception("DNS totally broken")),
     )
 
     # Should raise the original exception since there's no cached IP to fall back to
@@ -135,10 +142,10 @@ def test_dns_failure_with_nxdomain_fallback(monkeypatch):
     db._DNS_CACHE[host] = ("10.4.34.197", t0 - 5)  # expired 5 seconds ago
 
     # simulate NXDOMAIN error (the specific error from production)
-    def nxdomain_error(hostname, qtype, lifetime):
+    def nxdomain_error(self, hostname, qtype, lifetime=None, search=True, **kwargs):
         raise NXDOMAIN(qnames=[hostname], responses={})
 
-    monkeypatch.setattr(db.resolver, "resolve", nxdomain_error)
+    monkeypatch.setattr(db.resolver.Resolver, "resolve", nxdomain_error)
 
     # Should use cached IP with grace period, not crash
     ip, ttl = db.get_ip_with_ttl(host)
@@ -158,13 +165,13 @@ def test_cached_ip_variable_scope_bug_regression(monkeypatch):
     # Track what variables are defined when exception handler runs
     scope_check = {}
 
-    def failing_resolve(hostname, qtype, lifetime):
+    def failing_resolve(self, hostname, qtype, lifetime=None, search=True, **kwargs):
         # This simulates the original bug where 'ip' would be undefined
         # when the exception is raised, but 'cached_ip' should still be available
         scope_check["before_exception"] = True
         raise Exception("DNS failed")
 
-    monkeypatch.setattr(db.resolver, "resolve", failing_resolve)
+    monkeypatch.setattr(db.resolver.Resolver, "resolve", failing_resolve)
 
     # Should successfully use cached IP despite DNS failure
     ip, ttl = db.get_ip_with_ttl(host)
@@ -191,11 +198,11 @@ def test_grace_period_logging(monkeypatch, json_log_file):
 
     # make DNS fail
     monkeypatch.setattr(
-        db.resolver,
+        db.resolver.Resolver,
         "resolve",
-        lambda hostname, qtype, lifetime: (_ for _ in ()).throw(
-            Exception("Network error")
-        ),
+        lambda self, hostname, qtype, lifetime=None, search=True, **kwargs: (
+            _ for _ in ()
+        ).throw(Exception("Network error")),
     )
 
     ip, ttl = db.get_ip_with_ttl(host)
@@ -223,3 +230,24 @@ def test_grace_period_logging(monkeypatch, json_log_file):
     assert (
         found_message
     ), f"Expected message '{expected_message}' not found in log file. File contents: {log_file_path.read_text() if log_file_path.exists() else 'File not found'}"
+
+
+def test_resolver_called_with_disabled_search_and_default_timeout(monkeypatch):
+    host = "db.search.test"
+
+    captured = {"search": None, "lifetime": None}
+
+    def fake_resolve(self, hostname, qtype, lifetime=None, search=True, **kwargs):
+        captured["search"] = search
+        captured["lifetime"] = lifetime
+        # Return a valid answer with TTL
+        return FakeAnswers([SimpleNamespace(address="8.8.8.8")], ttl=120)
+
+    monkeypatch.setattr(db.resolver.Resolver, "resolve", fake_resolve)
+
+    ip, ttl = db.get_ip_with_ttl(host)
+    assert ip == "8.8.8.8"
+    assert ttl == 120
+    # Ensure search domains are disabled and default timeout is passed through
+    assert captured["search"] is False
+    assert captured["lifetime"] == 12
