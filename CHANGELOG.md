@@ -5,6 +5,7 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- Added `jobmon update_config` command to allow users to update configuration values in their defaults.yaml file using dot notation (e.g., `jobmon update_config http.retries_attempts 15`).
 - **Enhanced Logging System**: Redesigned Jobmon's logging architecture with automatic component configuration and production-ready features:
   - Automatic logging configuration for all CLI components (distributor, worker, server, client) with console logging by default
   - Template-based logging configurations with user override support (file-based and section-based customization)
