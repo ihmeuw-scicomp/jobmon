@@ -5,7 +5,6 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
-- Added `jobmon update_config` command to allow users to update configuration values in their defaults.yaml file using dot notation (e.g., `jobmon update_config http.retries_attempts 15`).
 - **Enhanced Logging System**: Redesigned Jobmon's logging architecture with automatic component configuration and production-ready features:
   - Automatic logging configuration for all CLI components (distributor, worker, server, client) with console logging by default
   - Template-based logging configurations with user override support (file-based and section-based customization)
@@ -78,6 +77,7 @@ All notable changes to Jobmon will be documented in this file.
 ### Deprecated
 - Legacy logging classes `JobmonLoggerConfig` and `ClientLogging` are deprecated in favor of new `configure_client_logging()` function
 - Direct import of OTLP classes from `jobmon.core.otlp` and `jobmon.server.web.otlp` module roots (use specific submodules)
+- Removed jobmon update_config CLI command
 
 ### Removed
 - Removed legacy `JobmonLoggerConfig.attach_default_handler()` method and `ClientLogging().attach()` pattern

@@ -307,41 +307,13 @@ class JobmonConfig:
 
 
 class ConfigCLI(CLI):
-    """Client command line interface for update the config."""
+    """CLI for `jobmon_config."""
 
     def __init__(self) -> None:
         """Initialization of client CLI."""
         super().__init__()
         self._subparsers = self.parser.add_subparsers(
             dest="sub_command", parser_class=argparse.ArgumentParser
-        )
-        self._add_update_config_subparser()
-
-    @staticmethod
-    def update_config(args: argparse.Namespace) -> None:
-        """Update .jobmon.ini.
-
-        Args:
-            args: only --web_service_fqdn --web_service_port are expected.
-        """
-        config = JobmonConfig()
-        config.set(
-            "http",
-            "service_url",
-            f"http://{args.web_service_fqdn}:{args.web_service_port}",
-        )
-        config.write()
-
-    def _add_update_config_subparser(self) -> None:
-        update_config_parser = self._subparsers.add_parser("update")
-        update_config_parser.set_defaults(func=self.update_config)
-        update_config_parser.add_argument(
-            "--web_service_fqdn", type=str, help="The fqdn of the web service."
-        )
-        update_config_parser.add_argument(
-            "--web_service_port",
-            type=str,
-            help="The port for the web service..",
         )
 
 
