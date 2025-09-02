@@ -38,7 +38,7 @@ import random
 import threading
 import time
 from types import ModuleType
-from typing import Any, Dict, Tuple, Type, Optional
+from typing import Any, Dict, Optional, Tuple, Type
 
 from dns import resolver
 from sqlalchemy import create_engine, event, exc
@@ -53,25 +53,31 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # DNS-resolution helpers
 # ---------------------------------------------------------------------------
-_DNS_CACHE: Dict[str, Tuple[str, float, int]] = {}  # host -> (ip, expiry, failure_count)
+_DNS_CACHE: Dict[str, Tuple[str, float, int]] = (
+    {}
+)  # host -> (ip, expiry, failure_count)
 _CACHE_LOCK = threading.RLock()
 _RESOLVER_POOL = threading.local()  # Thread-local resolver instances
 _DEFAULT_MAX_TTL = 300  # seconds
 
 
-def _get_thread_local_resolver(nameservers: Optional[list[str]] = None) -> resolver.Resolver:
+def _get_thread_local_resolver(
+    nameservers: Optional[list[str]] = None,
+) -> resolver.Resolver:
     """Get a thread-local DNS resolver instance to avoid recreation overhead.
-    
+
     This reduces the overhead of creating new resolver instances for every DNS query
     and provides more consistent behavior under high concurrency.
     """
-    if not hasattr(_RESOLVER_POOL, 'resolver') or not hasattr(_RESOLVER_POOL, 'nameservers'):
+    if not hasattr(_RESOLVER_POOL, "resolver") or not hasattr(
+        _RESOLVER_POOL, "nameservers"
+    ):
         r = resolver.Resolver()  # honors /etc/resolv.conf by default
         if nameservers:
             r.nameservers = list(nameservers)
         # Configure for better performance under load
         r.timeout = 3  # Per-server timeout (reduced from default)
-        r.lifetime = 12  # Total query timeout 
+        r.lifetime = 12  # Total query timeout
         _RESOLVER_POOL.resolver = r
         _RESOLVER_POOL.nameservers = nameservers
     elif _RESOLVER_POOL.nameservers != nameservers:
@@ -82,48 +88,54 @@ def _get_thread_local_resolver(nameservers: Optional[list[str]] = None) -> resol
             # Reset to system defaults
             _RESOLVER_POOL.resolver = resolver.Resolver()
         _RESOLVER_POOL.nameservers = nameservers
-    
+
     return _RESOLVER_POOL.resolver
 
 
 def _resolve_with_retry(
-    host: str, 
-    timeout_seconds: int, 
+    host: str,
+    timeout_seconds: int,
     nameservers: Optional[list[str]] = None,
-    max_retries: int = 3
+    max_retries: int = 3,
 ) -> Tuple[str, int]:
     """Resolve host with exponential backoff retry logic.
-    
+
     This addresses transient DNS failures by implementing:
     - Exponential backoff with jitter
     - Thread-local resolver instances
     - Configurable retry attempts
     """
     r = _get_thread_local_resolver(nameservers)
-    
+
     last_exception = None
     for attempt in range(max_retries):
         try:
             ans = r.resolve(host, "A", lifetime=timeout_seconds, search=False)
             ttl = getattr(ans.rrset, "ttl", None) or _DEFAULT_MAX_TTL
             if attempt > 0:
-                logger.info(f"DNS resolution succeeded for {host} on retry {attempt + 1}/{max_retries}")
+                logger.info(
+                    f"DNS resolution succeeded for {host} on retry {attempt + 1}/{max_retries}"
+                )
             return ans[0].address, int(ttl)
         except Exception as e:
             last_exception = e
             if attempt < max_retries - 1:
                 # Exponential backoff with jitter to avoid thundering herd
-                delay = (2 ** attempt) * 0.1 + random.uniform(0, 0.1)
+                delay = (2**attempt) * 0.1 + random.uniform(0, 0.1)
                 logger.debug(
-                    f"DNS retry {attempt + 1}/{max_retries} for {host} after {delay:.2f}s (error: {e})"
+                    f"DNS retry {attempt + 1}/{max_retries} for {host} "
+                    f"after {delay:.2f}s (error: {e})"
                 )
                 time.sleep(delay)
             else:
                 logger.warning(
                     f"DNS resolution failed for {host} after {max_retries} attempts: {e}"
                 )
-    
-    raise last_exception
+
+    if last_exception is not None:
+        raise last_exception
+    else:
+        raise RuntimeError("DNS resolution failed for unknown reason")
 
 
 def _resolve(
@@ -133,7 +145,7 @@ def _resolve(
 
     Uses a single total lifetime budget; dnspython will iterate configured
     nameservers within that lifetime. Search domains are disabled.
-    
+
     This function now uses the enhanced retry logic by default.
     """
     return _resolve_with_retry(host, timeout_seconds, nameservers, max_retries=3)
@@ -148,45 +160,48 @@ def _cached_ip(
     dns_extend_grace: bool = True,
 ) -> Tuple[str, int]:
     """Enhanced DNS resolution with improved caching and retry logic.
-    
+
     New features:
     - Retry with exponential backoff
-    - Extended grace period on repeated failures  
+    - Extended grace period on repeated failures
     - Thread-local resolver instances
     - Failure count tracking
     """
     now = time.time()
-    
+
     # Check cache first
     with _CACHE_LOCK:
         cache_entry = _DNS_CACHE.get(host, (None, 0.0, 0))
         cached_ip, exp, failure_count = cache_entry
-        
+
         if cached_ip and exp > now:
             return cached_ip, int(exp - now)
 
     # Attempt DNS resolution with retry
     try:
         ip, ttl = _resolve_with_retry(
-            host, 
-            timeout_seconds=dns_timeout, 
+            host,
+            timeout_seconds=dns_timeout,
             nameservers=dns_nameservers,
-            max_retries=dns_max_retries
+            max_retries=dns_max_retries,
         )
-        
+
         # Success - reset failure count and cache the result
         with _CACHE_LOCK:
             _DNS_CACHE[host] = (ip, now + min(ttl, _DEFAULT_MAX_TTL), 0)
-        
+
         if failure_count > 0:
-            logger.info(f"DNS resolution recovered for {host} -> {ip} (TTL: {ttl}s) after {failure_count} failures")
+            logger.info(
+                f"DNS resolution recovered for {host} -> {ip} (TTL: {ttl}s) "
+                f"after {failure_count} failures"
+            )
         else:
             logger.debug(f"DNS resolved {host} -> {ip} (TTL: {ttl}s)")
         return ip, ttl
-        
+
     except Exception as err:
         logger.warning(f"DNS resolve failed for {host}: {err}", exc_info=True)
-        
+
         # Enhanced fallback logic
         if cached_ip:
             # Calculate extended grace period based on failure history
@@ -204,13 +219,13 @@ def _cached_ip(
                 logger.info(
                     f"Using cached IP {cached_ip} for {host} with {grace_period}s grace period"
                 )
-            
+
             # Update failure count in cache
             with _CACHE_LOCK:
                 _DNS_CACHE[host] = (cached_ip, now + grace_period, failure_count + 1)
-            
+
             return cached_ip, int(grace_period)
-        
+
         # No cached IP available
         raise
 
@@ -220,10 +235,10 @@ def clear_dns_cache() -> None:
     with _CACHE_LOCK:
         _DNS_CACHE.clear()
     # Also clear thread-local resolver instances
-    if hasattr(_RESOLVER_POOL, 'resolver'):
-        delattr(_RESOLVER_POOL, 'resolver')
-    if hasattr(_RESOLVER_POOL, 'nameservers'):
-        delattr(_RESOLVER_POOL, 'nameservers')
+    if hasattr(_RESOLVER_POOL, "resolver"):
+        delattr(_RESOLVER_POOL, "resolver")
+    if hasattr(_RESOLVER_POOL, "nameservers"):
+        delattr(_RESOLVER_POOL, "nameservers")
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +290,10 @@ def get_dns_engine(
     to resolve DNS on each reconnect.
     """
     logger.debug(
-        "get_dns_engine: uri=%s engine_kwargs=%s dns_timeout=%s dns_fallback=%s dns_max_retries=%s dns_extend_grace=%s",
+        "get_dns_engine: "
+        "uri=%s engine_kwargs=%s dns_timeout=%s "
+        "dns_fallback=%s dns_max_retries=%s "
+        "dns_extend_grace=%s",
         uri,
         engine_kwargs,
         dns_timeout,

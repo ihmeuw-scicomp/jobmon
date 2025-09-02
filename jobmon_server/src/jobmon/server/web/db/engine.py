@@ -106,7 +106,8 @@ def get_engine() -> Engine:
             )
         )
         log.info(
-            "Using DNS-aware database engine (timeout=%ss, fallback=%s, retries=%s, extend_grace=%s)",
+            "Using DNS-aware database engine (timeout=%ss, "
+            "fallback=%s, retries=%s, extend_grace=%s)",
             dns_timeout,
             dns_fallback,
             dns_max_retries,
