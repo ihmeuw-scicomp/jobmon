@@ -63,6 +63,8 @@ def get_engine() -> Engine:
     dns_nameservers = None
     dns_grace_ttl = 30
     dns_fallback = True
+    dns_max_retries = 3
+    dns_extend_grace = True
 
     try:
         use_dns_engine = bool(db_config.get("use_dns_engine", True))
@@ -72,6 +74,8 @@ def get_engine() -> Engine:
             dns_nameservers = None
         dns_grace_ttl = int(db_config.get("dns_grace_ttl", 30))
         dns_fallback = bool(db_config.get("dns_fallback", True))
+        dns_max_retries = int(db_config.get("dns_max_retries", 3))
+        dns_extend_grace = bool(db_config.get("dns_extend_grace", True))
     except Exception:
         # Keep defaults on any config parsing issue
         pass
@@ -85,6 +89,8 @@ def get_engine() -> Engine:
                 dns_nameservers=dns_nameservers,
                 dns_grace_ttl=dns_grace_ttl,
                 dns_fallback=dns_fallback,
+                dns_max_retries=dns_max_retries,
+                dns_extend_grace=dns_extend_grace,
                 **pool_kwargs,
             )
             if connect_args
@@ -94,13 +100,18 @@ def get_engine() -> Engine:
                 dns_nameservers=dns_nameservers,
                 dns_grace_ttl=dns_grace_ttl,
                 dns_fallback=dns_fallback,
+                dns_max_retries=dns_max_retries,
+                dns_extend_grace=dns_extend_grace,
                 **pool_kwargs,
             )
         )
         log.info(
-            "Using DNS-aware database engine (timeout=%ss, fallback=%s)",
+            "Using DNS-aware database engine (timeout=%ss, "
+            "fallback=%s, retries=%s, extend_grace=%s)",
             dns_timeout,
             dns_fallback,
+            dns_max_retries,
+            dns_extend_grace,
         )
     else:
         _engine = (
