@@ -144,11 +144,7 @@ def _check_downstream_tasks_status(
     downstream_node_ids = set()
     for row in tasks_and_edges:
         if row.downstream_node_ids is not None:
-            downstreams = (
-                json.loads(row.downstream_node_ids)
-                if isinstance(row.downstream_node_ids, str)
-                else row.downstream_node_ids
-            )
+            downstreams = parse_node_ids(row.downstream_node_ids)
             if downstreams:
                 downstream_node_ids.update(downstreams)
 
