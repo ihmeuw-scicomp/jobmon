@@ -285,7 +285,7 @@ class TaskTemplateRepository:
                 ci_runtime=None,
             )
 
-        # Extract numeric data with business logic to handle edge cases (matching V2 behavior)
+        # Extract numeric data with business logic to handle edge cases
         runtimes = [
             float(item.r) for item in task_details if item.r is not None and item.r != 0
         ]
@@ -318,14 +318,14 @@ class TaskTemplateRepository:
                 stats.median_mem = 0.0
         # else: No memory data at all - leave as None (default in ResourceUsageStatistics)
 
-        # Calculate runtime statistics (default to 0 if no data, matching V2 behavior)
+        # Calculate runtime statistics (default to 0 if no data)
         if runtimes:
             stats.min_runtime = int(min(runtimes))
             stats.max_runtime = int(max(runtimes))
             stats.mean_runtime = float(np.mean(runtimes))
             stats.median_runtime = float(np.median(runtimes))
         else:
-            # Default to 0 when no runtime data (matching V2 behavior)
+            # Default to 0 when no runtime data
             stats.min_runtime = 0
             stats.max_runtime = 0
             stats.mean_runtime = 0.0
