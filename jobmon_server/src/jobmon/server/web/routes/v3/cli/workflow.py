@@ -1,6 +1,5 @@
 """Routes for Workflow."""
 
-import json
 from datetime import datetime
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -25,6 +24,7 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_status import WorkflowStatus
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
+from jobmon.server.web.utils.json_utils import parse_node_ids
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
@@ -144,11 +144,7 @@ def _check_downstream_tasks_status(
     downstream_node_ids = set()
     for row in tasks_and_edges:
         if row.downstream_node_ids is not None:
-            downstreams = (
-                json.loads(row.downstream_node_ids)
-                if isinstance(row.downstream_node_ids, str)
-                else row.downstream_node_ids
-            )
+            downstreams = parse_node_ids(row.downstream_node_ids)
             if downstreams:
                 downstream_node_ids.update(downstreams)
 
