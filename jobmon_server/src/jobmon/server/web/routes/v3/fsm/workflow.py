@@ -34,7 +34,6 @@ from jobmon.server.web.models.workflow_status import WorkflowStatus
 from jobmon.server.web.routes.utils import get_request_username
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
-from jobmon.server.web.utils.json_utils import parse_node_ids
 
 logger = structlog.get_logger(__name__)
 SessionMaker = get_sessionmaker()
@@ -667,7 +666,7 @@ async def task_template_dag(workflow_id: str) -> Any:
             tt_dag_dict[task_name] = set()
 
         if row.downstream_node_ids:
-            downstream_ids = parse_node_ids(row.downstream_node_ids)
+            downstream_ids = row.downstream_node_ids
             if downstream_ids:
                 try:
                     # Add downstream task names
