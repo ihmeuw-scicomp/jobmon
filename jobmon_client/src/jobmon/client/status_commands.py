@@ -679,6 +679,7 @@ def resume_workflow_from_id(
     reset_if_running: bool = True,
     log: bool = True,
     timeout: int = 180,
+    seconds_until_timeout: int = 36000,
 ) -> None:
     """Given a workflow ID, resume the workflow.
 
@@ -708,7 +709,10 @@ def resume_workflow_from_id(
         cluster_name=cluster_name,
         timeout=timeout,
     ) as distributor:
-        swarm.run(distributor_alive_callable=distributor.alive)
+        swarm.run(
+            distributor_alive_callable=distributor.alive,
+            seconds_until_timeout=seconds_until_timeout,
+        )
 
     # Check on the swarm status - raise an error if != "D"
     if swarm.status == WorkflowRunStatus.DONE:
