@@ -483,139 +483,174 @@ def get_tt_error_log_viz(
 
     with SessionMaker() as session:
         with session.begin():
-            query_filter = [
+            # Base filter conditions
+            base_filter = [
                 TaskTemplateVersion.task_template_id == tt_id,
                 Task.workflow_id == wf_id,
             ]
 
-            where_conditions = query_filter[:]
-            if recent_errors:
-                where_conditions.extend(
-                    [
-                        (
-                            TaskInstance.id
-                            == select(func.max(TaskInstance.id))
-                            .where(TaskInstance.task_id == Task.id)
-                            .correlate(Task)
-                            .scalar_subquery()
-                        ),
-                        (
-                            TaskInstance.workflow_run_id
-                            == select(func.max(WorkflowRun.id))
-                            .where(WorkflowRun.workflow_id == Task.workflow_id)
-                            .correlate(Task)
-                            .scalar_subquery()
-                        ),
-                    ]
-                )
+            # Handle task instance ID filter
             if ti_id:
-                where_conditions.extend(
-                    [
-                        (TaskInstance.id == ti_id),
-                    ]
+                base_filter.append(TaskInstance.id == ti_id)
+
+            # Create CTE for latest task instances and workflow runs if recent_errors is True
+            if recent_errors:
+                # CTE to get the latest task instance for each task
+                latest_task_instances = (
+                    select(
+                        TaskInstance.task_id,
+                        func.max(TaskInstance.id).label("latest_task_instance_id"),
+                    )
+                    .group_by(TaskInstance.task_id)
+                    .cte("latest_task_instances")
                 )
 
-            total_count_query = (
-                select(func.count(TaskInstanceErrorLog.id))
-                .join_from(
-                    TaskInstanceErrorLog,
-                    TaskInstance,
-                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                # CTE to get the latest workflow run for each workflow
+                latest_workflow_runs = (
+                    select(
+                        WorkflowRun.workflow_id,
+                        func.max(WorkflowRun.id).label("latest_workflow_run_id"),
+                    )
+                    .group_by(WorkflowRun.workflow_id)
+                    .cte("latest_workflow_runs")
                 )
-                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
-                .join_from(
-                    TaskInstance,
-                    WorkflowRun,
-                    TaskInstance.workflow_run_id == WorkflowRun.id,
-                )
-                .join_from(Task, Node, Task.node_id == Node.id)
-                .join_from(
-                    Node,
-                    TaskTemplateVersion,
-                    Node.task_template_version_id == TaskTemplateVersion.id,
-                )
-                .join_from(
-                    TaskTemplateVersion,
-                    TaskTemplate,
-                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
-                )
-                .where(*where_conditions)
-            )
-            total_count = session.execute(total_count_query).scalar()
 
-            sql = (
-                select(
-                    Task.id,
-                    TaskInstance.id,
-                    TaskInstanceErrorLog.id,
-                    TaskInstanceErrorLog.error_time,
-                    TaskInstanceErrorLog.description,
-                    TaskInstance.stderr_log,
-                    TaskInstance.workflow_run_id,
-                    Task.workflow_id,
+                # Main query with CTEs and window function for count
+                main_query = (
+                    select(
+                        Task.id,
+                        TaskInstance.id,
+                        TaskInstanceErrorLog.id,
+                        TaskInstanceErrorLog.error_time,
+                        TaskInstanceErrorLog.description,
+                        TaskInstance.stderr_log,
+                        TaskInstance.workflow_run_id,
+                        Task.workflow_id,
+                        func.count(TaskInstanceErrorLog.id).over().label("total_count"),
+                    )
+                    .join_from(
+                        TaskInstanceErrorLog,
+                        TaskInstance,
+                        TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                    )
+                    .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                    .join_from(
+                        TaskInstance,
+                        WorkflowRun,
+                        TaskInstance.workflow_run_id == WorkflowRun.id,
+                    )
+                    .join_from(Task, Node, Task.node_id == Node.id)
+                    .join_from(
+                        Node,
+                        TaskTemplateVersion,
+                        Node.task_template_version_id == TaskTemplateVersion.id,
+                    )
+                    .join_from(
+                        TaskTemplateVersion,
+                        TaskTemplate,
+                        TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                    )
+                    .join_from(
+                        Task,
+                        latest_task_instances,
+                        and_(
+                            Task.id == latest_task_instances.c.task_id,
+                            TaskInstance.id
+                            == latest_task_instances.c.latest_task_instance_id,
+                        ),
+                    )
+                    .join_from(
+                        Task,
+                        latest_workflow_runs,
+                        and_(
+                            Task.workflow_id == latest_workflow_runs.c.workflow_id,
+                            TaskInstance.workflow_run_id
+                            == latest_workflow_runs.c.latest_workflow_run_id,
+                        ),
+                    )
+                    .where(*base_filter)
+                    .order_by(TaskInstanceErrorLog.id.desc())
+                    .offset(offset)
+                    .limit(page_size)
                 )
-                .join_from(
-                    TaskInstanceErrorLog,
-                    TaskInstance,
-                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+            else:
+                # Main query without recent_errors filtering, using window function for count
+                main_query = (
+                    select(
+                        Task.id,
+                        TaskInstance.id,
+                        TaskInstanceErrorLog.id,
+                        TaskInstanceErrorLog.error_time,
+                        TaskInstanceErrorLog.description,
+                        TaskInstance.stderr_log,
+                        TaskInstance.workflow_run_id,
+                        Task.workflow_id,
+                        func.count(TaskInstanceErrorLog.id).over().label("total_count"),
+                    )
+                    .join_from(
+                        TaskInstanceErrorLog,
+                        TaskInstance,
+                        TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                    )
+                    .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                    .join_from(
+                        TaskInstance,
+                        WorkflowRun,
+                        TaskInstance.workflow_run_id == WorkflowRun.id,
+                    )
+                    .join_from(Task, Node, Task.node_id == Node.id)
+                    .join_from(
+                        Node,
+                        TaskTemplateVersion,
+                        Node.task_template_version_id == TaskTemplateVersion.id,
+                    )
+                    .join_from(
+                        TaskTemplateVersion,
+                        TaskTemplate,
+                        TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                    )
+                    .where(*base_filter)
+                    .order_by(TaskInstanceErrorLog.id.desc())
+                    .offset(offset)
+                    .limit(page_size)
                 )
-                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
-                .join_from(
-                    TaskInstance,
-                    WorkflowRun,
-                    TaskInstance.workflow_run_id == WorkflowRun.id,
-                )
-                .join_from(Task, Node, Task.node_id == Node.id)
-                .join_from(
-                    Node,
-                    TaskTemplateVersion,
-                    Node.task_template_version_id == TaskTemplateVersion.id,
-                )
-                .join_from(
-                    TaskTemplateVersion,
-                    TaskTemplate,
-                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
-                )
-                .where(*where_conditions)
-                .order_by(TaskInstanceErrorLog.id.desc())
-                .offset(offset)
-                .limit(page_size)
-            )
 
-            rows = session.execute(sql).all()
-            session.commit()
+            rows = session.execute(main_query).all()
 
-        for r in rows:
-            return_list.append(
-                {
-                    "task_id": r[0],
-                    "task_instance_id": r[1],
-                    "task_instance_err_id": r[2],
-                    "error_time": str(r[3]),
-                    "error": str(r[4]),
-                    "task_instance_stderr_log": str(r[5]),
-                    "workflow_run_id": r[6],
-                    "workflow_id": r[7],
+            # Extract total count from the first row (all rows will have the same total_count)
+            total_count = rows[0].total_count if rows else 0
+
+            for r in rows:
+                return_list.append(
+                    {
+                        "task_id": r[0],
+                        "task_instance_id": r[1],
+                        "task_instance_err_id": r[2],
+                        "error_time": str(r[3]),
+                        "error": str(r[4]),
+                        "task_instance_stderr_log": str(r[5]),
+                        "workflow_run_id": r[6],
+                        "workflow_id": r[7],
+                    }
+                )
+            errors_df = pd.DataFrame(return_list)
+
+            if output_clustered_errors:
+                if errors_df.shape[0] > 0:
+                    errors_df = cluster_error_logs(errors_df)
+                total_count = errors_df.shape[0]
+                return_dict = {
+                    "error_logs": errors_df.to_dict(orient="records"),
+                    "total_count": total_count,
+                    "page": page,
+                    "page_size": page_size,
                 }
-            )
-        errors_df = pd.DataFrame(return_list)
-
-        if output_clustered_errors:
-            if errors_df.shape[0] > 0:
-                errors_df = cluster_error_logs(errors_df)
-            total_count = errors_df.shape[0]
-            return_dict = {
-                "error_logs": errors_df.to_dict(orient="records"),
-                "total_count": total_count,
-                "page": page,
-                "page_size": page_size,
-            }
-        else:
-            return_dict = {
-                "error_logs": errors_df.to_dict(orient="records"),
-                "total_count": total_count,
-                "page": page,
-                "page_size": page_size,
-            }
-        resp = JSONResponse(content=return_dict, status_code=StatusCodes.OK)
+            else:
+                return_dict = {
+                    "error_logs": errors_df.to_dict(orient="records"),
+                    "total_count": total_count,
+                    "page": page,
+                    "page_size": page_size,
+                }
+            resp = JSONResponse(content=return_dict, status_code=StatusCodes.OK)
     return resp

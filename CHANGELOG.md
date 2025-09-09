@@ -37,6 +37,7 @@ All notable changes to Jobmon will be documented in this file.
 - Added `Task Name` to the tooltip in the resource usage scatter plot.
 - Enabled filtering by `Task Name` in the resource usage scatter plot.
 - Added a `Download CSV button` to the resource usage page, allowing users to export all plot data regardless of filters.
+- **Performance Optimization**: Improved query performance for task template error log visualization by replacing correlated subqueries with CTEs and combining queries using window functions.
 
 ### Changed
 - **BREAKING: Logging System Migration**: Completely replaced legacy logging system with new elegant architecture:
