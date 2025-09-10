@@ -25,6 +25,10 @@ from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.routes.v2.cli import cli_router as api_v2_router
 from jobmon.server.web.server_side_exception import InvalidUsage
+from jobmon.server.web.utils.json_compat import (
+    normalize_node_ids,
+    normalize_node_ids_for_client,
+)
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
@@ -496,11 +500,11 @@ def _get_node_dependencies(
     node_ids: Set[int] = set()
     for (edges,) in session.execute(select_stmt).all():
         if direction == Direction.UP:
-            upstreams = edges.upstream_node_ids
+            upstreams = normalize_node_ids(edges.upstream_node_ids)
             if upstreams:
                 node_ids = node_ids.union(set(upstreams))
         elif direction == Direction.DOWN:
-            downstreams = edges.downstream_node_ids
+            downstreams = normalize_node_ids(edges.downstream_node_ids)
             if downstreams:
                 node_ids = node_ids.union(set(downstreams))
         else:
@@ -562,6 +566,9 @@ def _get_tasks_from_nodes(
 @api_v2_router.post("/task/get_downstream_tasks")
 async def get_downstream_tasks(request: Request) -> Any:
     """Get only the direct downstreams of a task."""
+    # Get client version from query parameters
+    client_version = request.query_params.get("client_jobmon_version")
+
     data = cast(Dict, await request.json())
 
     task_ids = data["task_ids"]
@@ -575,10 +582,13 @@ async def get_downstream_tasks(request: Request) -> Any:
                     Edge.dag_id == dag_id,
                 )
             ).all()
-            result = {
-                row.id: [row.node_id, row.downstream_node_ids]
-                for row in tasks_and_edges
-            }
+            result = {}
+            for row in tasks_and_edges:
+                # Normalize the downstream_node_ids based on client version
+                normalized_downstream = normalize_node_ids_for_client(
+                    row.downstream_node_ids, client_version
+                )
+                result[row.id] = [row.node_id, normalized_downstream]
 
         resp = JSONResponse(
             content={"downstream_tasks": result}, status_code=StatusCodes.OK
