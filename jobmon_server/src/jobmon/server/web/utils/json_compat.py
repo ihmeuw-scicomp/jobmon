@@ -6,7 +6,7 @@ from typing import Any, List, Optional
 # Version cutoff for JSON compatibility
 # Clients <= this version expect quoted JSON strings (old format)
 # Clients > this version expect unquoted JSON arrays (new format)
-JSON_COMPAT_CUTOFF_VERSION = "3.4.24"
+JSON_COMPAT_CUTOFF_VERSION = "3.4.23"
 
 
 def normalize_node_ids(node_ids: Any) -> Optional[List[int]]:

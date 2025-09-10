@@ -465,7 +465,7 @@ def test_downstream_task(client_env, tool, db_engine, web_server_process):
         # Test with old client version (3.4.23) - should return quoted JSON string
         response_old = requests.post(
             f"{service_url}/api/v3/task/get_downstream_tasks",
-            params={"client_jobmon_version": "3.4.24"},
+            params={"client_jobmon_version": "3.4.23"},
             json={"task_ids": [task1.task_id], "dag_id": dag_id},
         )
         assert response_old.status_code == 200
