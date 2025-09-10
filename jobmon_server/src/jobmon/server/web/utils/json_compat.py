@@ -132,13 +132,21 @@ def get_client_compatibility_mode(client_version: Optional[str]) -> str:
     """Determine the compatibility mode based on client version.
 
     Args:
-        client_version: The client version string (e.g., "3.4.10")
+        client_version: The client version string (e.g., "3.4.10", "3.4.24.dev1",
+            "3.4.24.stage1")
 
     Returns:
         Compatibility mode: "old", "new", or "unknown"
+        - "new" for versions with "dev" or "stage" in them
+        - "old" for versions <= JSON_COMPAT_CUTOFF_VERSION
+        - "new" for versions > JSON_COMPAT_CUTOFF_VERSION
     """
     if not client_version:
         return "unknown"
+
+    # If version contains "dev" or "stage", treat as new version
+    if "dev" in client_version.lower() or "stage" in client_version.lower():
+        return "new"
 
     try:
         # Compare versions using the cutoff constant
