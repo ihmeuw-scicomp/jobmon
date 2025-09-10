@@ -1,4 +1,7 @@
+import json
+
 import pytest
+import requests
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
@@ -363,7 +366,7 @@ def test_default_max_attemps(db_engine, client_env, tool):
     assert wf5.default_max_attempts == tool.default_max_attempts is not None
 
 
-def test_downstream_task(client_env, tool, db_engine):
+def test_downstream_task(client_env, tool, db_engine, web_server_process):
     """Test case to verify the downstream and the upstream tasks."""
     wf = tool.create_workflow()
     tt = tool.get_task_template(
@@ -415,6 +418,92 @@ def test_downstream_task(client_env, tool, db_engine):
         ).fetchall()
         assert len(res) == 1
         assert re.match(one_id_pattern, str(res[0][0]))
+
+        # Test HTTP requests to verify client version compatibility
+        # Get the server URL from the web server process
+        service_url = f"http://{web_server_process['JOBMON_HOST']}:{web_server_process['JOBMON_PORT']}"
+
+        # Get the dag_id for the task from the edge table
+        dag_result = session.execute(
+            text(
+                f"select dag_id from task, edge where task.id={task1.task_id} and task.node_id=edge.node_id"
+            )
+        ).fetchone()
+        assert dag_result is not None, "Could not find dag_id for task"
+        dag_id = dag_result[0]
+
+        # First test a simpler endpoint to see if routing works
+        response_test = requests.get(
+            f"{service_url}/api/v3/task_status", params={"task_ids": task1.task_id}
+        )
+        print(f"Test endpoint status: {response_test.status_code}")
+        print(f"Test endpoint text: {response_test.text}")
+
+        # Test with new client version (3.4.25) - should return unquoted JSON array
+        response_new = requests.post(
+            f"{service_url}/api/v3/task/get_downstream_tasks",
+            params={"client_jobmon_version": "3.4.25"},
+            json={"task_ids": [task1.task_id], "dag_id": dag_id},
+        )
+        print(f"Response status: {response_new.status_code}")
+        print(f"Response text: {response_new.text}")
+        assert response_new.status_code == 200
+        data_new = response_new.json()
+
+        # For new client, downstream_node_ids should be a list (unquoted JSON array)
+        downstream_tasks = data_new.get("downstream_tasks", {})
+        if downstream_tasks and str(task1.task_id) in downstream_tasks:
+            task_data = downstream_tasks[str(task1.task_id)]
+            downstream_ids = task_data[1]  # Second element is downstream_node_ids
+            assert isinstance(
+                downstream_ids, list
+            ), f"Expected list for new client, got {type(downstream_ids)}: {downstream_ids}"
+            assert (
+                len(downstream_ids) == 2
+            ), f"Expected 2 downstream nodes, got {len(downstream_ids)}"
+
+        # Test with old client version (3.4.23) - should return quoted JSON string
+        response_old = requests.post(
+            f"{service_url}/api/v3/task/get_downstream_tasks",
+            params={"client_jobmon_version": "3.4.23"},
+            json={"task_ids": [task1.task_id], "dag_id": dag_id},
+        )
+        assert response_old.status_code == 200
+        data_old = response_old.json()
+
+        # For old client, downstream_node_ids should be a quoted JSON string
+        downstream_tasks = data_old.get("downstream_tasks", {})
+        if downstream_tasks and str(task1.task_id) in downstream_tasks:
+            task_data = downstream_tasks[str(task1.task_id)]
+            downstream_ids = task_data[1]  # Second element is downstream_node_ids
+            assert isinstance(
+                downstream_ids, str
+            ), f"Expected string for old client, got {type(downstream_ids)}: {downstream_ids}"
+            # Verify it's a valid JSON string that can be parsed
+            parsed_ids = json.loads(downstream_ids)
+            assert isinstance(
+                parsed_ids, list
+            ), f"Expected parsed JSON to be list, got {type(parsed_ids)}"
+            assert (
+                len(parsed_ids) == 2
+            ), f"Expected 2 downstream nodes after parsing, got {len(parsed_ids)}"
+
+        # Test with no client version specified - should default to old client behavior
+        response_default = requests.post(
+            f"{service_url}/api/v3/task/get_downstream_tasks",
+            json={"task_ids": [task1.task_id], "dag_id": dag_id},
+        )
+        assert response_default.status_code == 200
+        data_default = response_default.json()
+
+        # For default (no version), should behave like old client
+        downstream_tasks = data_default.get("downstream_tasks", {})
+        if downstream_tasks and str(task1.task_id) in downstream_tasks:
+            task_data = downstream_tasks[str(task1.task_id)]
+            downstream_ids = task_data[1]  # Second element is downstream_node_ids
+            assert isinstance(
+                downstream_ids, str
+            ), f"Expected string for default (no version), got {type(downstream_ids)}: {downstream_ids}"
 
 
 def test_node_args_hash(client_env, tool, db_engine):
