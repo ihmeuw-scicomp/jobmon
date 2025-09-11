@@ -78,17 +78,10 @@ async def add_edges(
         ) from e
 
     # add dag and cast types
-    for edges in edges_to_add:
-        edges["dag_id"] = dag_id
-        if len(edges["upstream_node_ids"]) == 0:
-            edges["upstream_node_ids"] = None
-        else:
-            edges["upstream_node_ids"] = str(edges["upstream_node_ids"])
-
-        if len(edges["downstream_node_ids"]) == 0:
-            edges["downstream_node_ids"] = None
-        else:
-            edges["downstream_node_ids"] = str(edges["downstream_node_ids"])
+    for edge in edges_to_add:
+        edge["dag_id"] = dag_id
+        edge["upstream_node_ids"] = edge["upstream_node_ids"] or None
+        edge["downstream_node_ids"] = edge["downstream_node_ids"] or None
 
     # Bulk insert the nodes and node args with raw SQL, for performance. Ignore duplicate
     # keys

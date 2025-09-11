@@ -2,11 +2,9 @@
 
 import asyncio
 import logging
-import logging.config
 import os
 import signal
 import socket
-import sys
 from time import time
 from typing import Dict, Optional, TextIO
 
@@ -185,38 +183,6 @@ class WorkerNodeTaskInstance:
                 "Cannot access command_stderr until run() has been called"
             )
         return self._proc_stderr
-
-    def configure_logging(self) -> None:
-        """Setup logging for the worker node. INFO level goes to standard out."""
-        _DEFAULT_LOG_FORMAT = (
-            "%(asctime)s [%(name)-12s] %(module)s %(levelname)-8s: %(message)s"
-        )
-        logging_config: Dict = {
-            "version": 1,
-            "disable_existing_loggers": True,
-            "formatters": {
-                "default": {
-                    "format": _DEFAULT_LOG_FORMAT,
-                    "datefmt": "%Y-%m-%d %H:%M:%S",
-                }
-            },
-            "handlers": {
-                "default": {
-                    "level": "INFO",
-                    "class": "logging.StreamHandler",
-                    "formatter": "default",
-                    "stream": sys.stdout,
-                },
-            },
-            "loggers": {
-                "jobmon.worker_node": {
-                    "handlers": ["default"],
-                    "propagate": False,
-                    "level": "INFO",
-                },
-            },
-        }
-        logging.config.dictConfig(logging_config)
 
     def log_done(self) -> None:
         """Tell the JobStateManager that this task_instance is done."""

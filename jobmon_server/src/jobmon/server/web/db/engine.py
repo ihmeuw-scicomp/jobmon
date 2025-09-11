@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 
+from sqlalchemy import create_engine as sqlalchemy_create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
@@ -56,19 +57,79 @@ def get_engine() -> Engine:
     log.debug("CONNECT ARGS: %s", connect_args)
     log.debug("POOL SETTINGS: %s", pool_kwargs)
 
-    _engine = (
-        get_dns_engine(uri, connect_args=connect_args, **pool_kwargs)
-        if connect_args
-        else get_dns_engine(uri, **pool_kwargs)
-    )
+    # DNS-aware engine controls
+    use_dns_engine = True
+    dns_timeout = 12
+    dns_nameservers = None
+    dns_grace_ttl = 30
+    dns_fallback = True
+    dns_max_retries = 3
+    dns_extend_grace = True
+
+    try:
+        use_dns_engine = bool(db_config.get("use_dns_engine", True))
+        dns_timeout = int(db_config.get("dns_timeout", 12))
+        dns_nameservers = db_config.get("dns_nameservers")
+        if dns_nameservers is not None and not isinstance(dns_nameservers, list):
+            dns_nameservers = None
+        dns_grace_ttl = int(db_config.get("dns_grace_ttl", 30))
+        dns_fallback = bool(db_config.get("dns_fallback", True))
+        dns_max_retries = int(db_config.get("dns_max_retries", 3))
+        dns_extend_grace = bool(db_config.get("dns_extend_grace", True))
+    except Exception:
+        # Keep defaults on any config parsing issue
+        pass
+
+    if use_dns_engine:
+        _engine = (
+            get_dns_engine(
+                uri,
+                connect_args=connect_args,
+                dns_timeout=dns_timeout,
+                dns_nameservers=dns_nameservers,
+                dns_grace_ttl=dns_grace_ttl,
+                dns_fallback=dns_fallback,
+                dns_max_retries=dns_max_retries,
+                dns_extend_grace=dns_extend_grace,
+                **pool_kwargs,
+            )
+            if connect_args
+            else get_dns_engine(
+                uri,
+                dns_timeout=dns_timeout,
+                dns_nameservers=dns_nameservers,
+                dns_grace_ttl=dns_grace_ttl,
+                dns_fallback=dns_fallback,
+                dns_max_retries=dns_max_retries,
+                dns_extend_grace=dns_extend_grace,
+                **pool_kwargs,
+            )
+        )
+        log.info(
+            "Using DNS-aware database engine (timeout=%ss, "
+            "fallback=%s, retries=%s, extend_grace=%s)",
+            dns_timeout,
+            dns_fallback,
+            dns_max_retries,
+            dns_extend_grace,
+        )
+    else:
+        _engine = (
+            sqlalchemy_create_engine(uri, connect_args=connect_args, **pool_kwargs)
+            if connect_args
+            else sqlalchemy_create_engine(uri, **pool_kwargs)
+        )
+        log.info("Using standard SQLAlchemy database engine (DNS resolution disabled)")
 
     # Instrument the engine with OpenTelemetry if enabled
     try:
-        use_otel = cfg.get_boolean("otlp", "web_enabled")
+        telemetry_section = cfg.get_section_coerced("telemetry")
+        tracing_config = telemetry_section.get("tracing", {})
+        use_otel = tracing_config.get("server_enabled", False)
         if use_otel:
-            from jobmon.core.otlp import OtlpAPI
+            from jobmon.server.web.otlp import ServerOTLPManager
 
-            OtlpAPI.instrument_engine(_engine)
+            ServerOTLPManager.instrument_engine(_engine)
             log.debug("Instrumented database engine with OpenTelemetry")
     except Exception as e:
         # Don't fail engine creation if instrumentation fails

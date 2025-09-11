@@ -16,10 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 class WorkerNodeCLI(CLI):
-    """Command line interface for WorkderNode."""
+    """Command line interface for Worker Node with automatic logging."""
 
     def __init__(self) -> None:
-        """Initialization of the worker node CLI."""
+        """Initialization of the worker node CLI with automatic component logging."""
+        # Enable automatic logging for worker component
+        super().__init__(component_name="worker")
+
         self.parser = argparse.ArgumentParser("jobmon worker_node CLI")
         self._subparsers = self.parser.add_subparsers(
             dest="sub_command", parser_class=argparse.ArgumentParser
@@ -47,7 +50,6 @@ class WorkerNodeCLI(CLI):
         worker_node_task_instance = worker_node_factory.get_job_task_instance(
             task_instance_id=args.task_instance_id
         )
-        worker_node_task_instance.configure_logging()
         try:
             worker_node_task_instance.run()
         except Exception as e:
@@ -75,7 +77,6 @@ class WorkerNodeCLI(CLI):
             array_id=args.array_id,
             batch_number=args.batch_number,
         )
-        worker_node_task_instance.configure_logging()
 
         try:
             worker_node_task_instance.run()

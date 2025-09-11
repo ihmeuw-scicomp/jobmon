@@ -44,7 +44,7 @@ def parse_arguments():
 
 def create_simple_wf():
     """Use the task_generator_wf.py script to create a simple workflow."""
-    wf_script_path = Path(__file__).parent.parent.parent / "tests/worker_node/task_generator_wf.py"
+    wf_script_path = Path(__file__).parent.parent.parent / "tests/pytest/worker_node/task_generator_wf.py"
     # Run the command and wait for it to finish
     result = subprocess.check_output(["python", str(wf_script_path), "1"])
     # This line will only run after the command above finishes

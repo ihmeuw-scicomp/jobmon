@@ -124,6 +124,17 @@ export default function WorkflowHeader({
         },
     });
 
+    // Helper function to extract detailed error messages from axios responses
+    const extractErrorMessage = (error: any): string => {
+        if (error.response?.data?.detail) {
+            return error.response.data.detail;
+        }
+        if (error.response?.data?.error?.exception_message) {
+            return error.response.data.error.exception_message;
+        }
+        return error.message || error.toString();
+    };
+
     const handleUpdateStatus = (
         status: string,
         template: { tt_version_id: string | number; name: string }
@@ -197,8 +208,7 @@ export default function WorkflowHeader({
             .catch(error => {
                 setStatusUpdateMsgDict(prevValues => ({
                     ...prevValues,
-                    [template.tt_version_id]:
-                    'Error: ' + (error.message || error.toString()),
+                    [template.tt_version_id]: `Error: ${extractErrorMessage(error)}`,
                 }));
             });
     };
@@ -220,9 +230,7 @@ export default function WorkflowHeader({
                 setWfTaskStatusUpdateMsg('Success');
             })
             .catch(error => {
-                setWfTaskStatusUpdateMsg(
-                    'Error: ' + (error.message || error.toString())
-                );
+                setWfTaskStatusUpdateMsg(`Error: ${extractErrorMessage(error)}`);
             });
     };
 

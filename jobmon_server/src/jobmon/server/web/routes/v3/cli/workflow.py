@@ -5,10 +5,13 @@ from typing import Any, List, Optional, Union
 
 import structlog
 from fastapi import Depends, Query, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
 from jobmon.server.web.db.deps import get_db
+from jobmon.server.web.models.edge import Edge
+from jobmon.server.web.models.task import Task
 from jobmon.server.web.repositories.workflow_repository import WorkflowRepository
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.schemas.workflow import (
@@ -36,6 +39,57 @@ async def get_workflow_validation_status(
 
     workflow_repo = WorkflowRepository(db)
     return workflow_repo.get_workflow_validation_status(task_ids)
+
+
+def _check_downstream_tasks_status(
+    session: Session, task_ids: List[int], workflow_id: int, dag_id: int
+) -> bool:
+    """Check if all downstream tasks are in valid states (G, I, Q).
+
+    Args:
+        session: Database session
+        task_ids: List of task IDs to check downstream tasks for
+        workflow_id: Workflow ID
+        dag_id: DAG ID
+
+    Returns:
+        True if all downstream tasks are in valid states, False otherwise
+    """
+    # Valid downstream task states
+    valid_states = {"G", "I", "Q"}
+
+    # Get downstream node_ids for each task using the same pattern as get_downstream_tasks
+    tasks_and_edges = session.execute(
+        select(Task.id, Task.node_id, Edge.downstream_node_ids).where(
+            Task.id.in_(task_ids),
+            Task.node_id == Edge.node_id,
+            Edge.dag_id == dag_id,
+        )
+    ).all()
+
+    # Collect all downstream node_ids
+    downstream_node_ids = set()
+    for row in tasks_and_edges:
+        if row.downstream_node_ids is not None:
+            downstreams = row.downstream_node_ids
+            if downstreams:
+                downstream_node_ids.update(downstreams)
+
+    if not downstream_node_ids:
+        return True  # No downstream tasks, consider valid
+
+    # Get task statuses for downstream nodes
+    downstream_status_rows = session.execute(
+        select(Task.status).where(
+            Task.workflow_id == workflow_id, Task.node_id.in_(list(downstream_node_ids))
+        )
+    ).all()
+
+    for status_row in downstream_status_rows:
+        if status_row[0] not in valid_states:
+            return False  # Found a downstream task not in valid state
+
+    return True
 
 
 @api_v3_router.get("/workflow/{workflow_id}/workflow_tasks")

@@ -6,7 +6,6 @@ import os
 from typing import Dict, List, Optional
 
 import structlog
-import yaml
 
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.exceptions import ConfigError
@@ -36,92 +35,152 @@ def configure_structlog(extra_processors: Optional[List] = None) -> None:
     )
 
 
-def load_logging_config_from_file(filepath: str) -> Dict:
-    """Load logging configuration from a YAML file."""
-    if os.path.exists(filepath):
-        with open(filepath, "r") as f:
-            return yaml.safe_load(f)
-    else:
-        return {}
-
-
-def merge_logging_configs(base_config: Dict, new_config: Dict) -> None:
-    """Recursively merge new_config into base_config."""
-    for key, value in new_config.items():
-        if (
-            key in base_config
-            and isinstance(base_config[key], dict)
-            and isinstance(value, dict)
-        ):
-            merge_logging_configs(base_config[key], value)
-        else:
-            base_config[key] = value
-
-
 def configure_logging(
     dict_config: Optional[Dict] = None, file_config: str = ""
 ) -> None:
-    """Setup logging with default handlers and OpenTelemetry if enabled."""
-    logging_config = dict_config
-    if logging_config is None and file_config:
-        logging_config = load_logging_config_from_file(file_config)
+    """Configure logging for the server.
 
-    if logging_config is None:
+    Args:
+        dict_config: Logging configuration as a dictionary (highest precedence)
+        file_config: Path to logging configuration file (second precedence)
+
+    The configuration is selected in the following order:
+    1. dict_config parameter (if provided)
+    2. file_config parameter (if provided and file exists)
+    3. JobmonConfig logging.server_logconfig_file setting
+    4. Auto-selected template based on telemetry configuration
+    """
+    # Explicit dict config takes highest precedence
+    if dict_config:
+        _apply_logging_config(dict_config, "explicit dict config")
+        return
+
+    # Explicit file config takes second precedence
+    if file_config and os.path.exists(file_config):
+        from jobmon.core.config.template_loader import load_logconfig_with_templates
+
+        logging_config = load_logconfig_with_templates(file_config)
+        _apply_logging_config(logging_config, f"explicit file config: {file_config}")
+        return
+
+    # Check for JobmonConfig logging.server_logconfig_file setting (third precedence)
+    try:
         config = JobmonConfig()
+
+        # Check if user specified a custom logconfig file
         try:
-            log_config_file = config.get("logging", "log_config_file")
-            logging_config = load_logging_config_from_file(log_config_file)
-        except ConfigError:
-            logging_config = {
-                "version": 1,
-                "disable_existing_loggers": True,
-                "formatters": default_formatters.copy(),
-                "handlers": default_handlers.copy(),
-                "loggers": default_loggers.copy(),
-            }
+            custom_logconfig_file = config.get("logging", "server_logconfig_file")
+            if custom_logconfig_file:
+                from jobmon.core.config.template_loader import (
+                    load_logconfig_with_templates,
+                )
 
-    # Apply the logging configuration
-    logging.config.dictConfig(logging_config)
+                logging_config = load_logconfig_with_templates(custom_logconfig_file)
+                _apply_logging_config(
+                    logging_config, f"JobmonConfig setting: {custom_logconfig_file}"
+                )
+                return
+        except (ConfigError, AttributeError, KeyError):
+            pass  # Fall through to auto-select
+
+        # Use basic server config (users can override via logging.server_logconfig_file)
+        current_dir = os.path.dirname(__file__)
+        template_path = os.path.join(current_dir, "config", "logconfig_server.yaml")
+
+        # Load with full template system support (handles user overrides, fallbacks, etc.)
+        from jobmon.core.config.logconfig_utils import load_logconfig_with_overrides
+
+        logging_config = load_logconfig_with_overrides(
+            default_template_path=template_path,
+            config_section="server",
+            config=config,
+        )
+
+        _apply_logging_config(
+            logging_config, f"auto-selected template: {template_path}"
+        )
+
+    except Exception as e:
+        # Simple fallback - let the application fail gracefully if logging can't be configured
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        )
+        logging.getLogger(__name__).warning(
+            f"Failed to configure advanced logging, using basic config: {e}"
+        )
 
 
-# Default formatters
-default_formatters: Dict = {
-    "text": {
-        "()": structlog.stdlib.ProcessorFormatter,
-        "processor": structlog.dev.ConsoleRenderer(),
-        "keep_exc_info": True,
-        "keep_stack_info": True,
-    },
-    "json": {
-        "()": structlog.stdlib.ProcessorFormatter,
-        "processor": structlog.processors.JSONRenderer(),
-    },
-}
+def _apply_logging_config(logging_config: Dict, source_description: str) -> None:
+    """Apply logging configuration with validation and error reporting.
 
-# Default handlers
-default_handlers: Dict = {
-    "console_text": {
-        "level": "INFO",
-        "class": "logging.StreamHandler",
-        "formatter": "text",
-    },
-    "console_json": {
-        "level": "INFO",
-        "class": "logging.StreamHandler",
-        "formatter": "json",
-    },
-}
+    Args:
+        logging_config: The logging configuration dictionary
+        source_description: Description of where the config came from for error reporting
+    """
+    # Validate OTLP configuration if enabled
+    _validate_otlp_configuration(logging_config, source_description)
 
-# Default loggers
-default_loggers: Dict = {
-    "jobmon.server.web": {
-        "handlers": ["console_json"],
-        "level": "INFO",
-        "propagate": False,
-    },
-    "sqlalchemy": {
-        "handlers": ["console_json"],
-        "level": "WARN",
-        "propagate": False,
-    },
-}
+    # Apply the configuration
+    try:
+        logging.config.dictConfig(logging_config)
+
+        # Log successful configuration
+        logger = logging.getLogger(__name__)
+        logger.info(f"Logging configured successfully from {source_description}")
+
+        # Enable OTLP debug logging if requested (optional - don't fail if config unavailable)
+        try:
+            config = JobmonConfig()
+            if config.get_boolean("telemetry", "debug"):
+                logger.info(
+                    "OTLP debug logging enabled via telemetry.debug configuration"
+                )
+        except Exception:
+            # JobmonConfig may not be available (e.g., in tests or minimal setups)
+            # This is optional functionality, so don't fail the logging configuration
+            pass
+
+    except Exception as e:
+        # Fall back to basic logging if configuration fails
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        )
+        logger = logging.getLogger(__name__)
+        logger.error(
+            f"Failed to apply logging configuration from {source_description}: {e}"
+        )
+        raise
+
+
+def _validate_otlp_configuration(logging_config: Dict, source_description: str) -> None:
+    """Validate OTLP configuration and log any issues found.
+
+    Args:
+        logging_config: The logging configuration dictionary
+        source_description: Description of where the config came from
+    """
+    try:
+        from jobmon.core.otlp.validation import validate_and_log_otlp_config
+
+        # Create a temporary logger for validation messages
+        # (use basic config since main logging isn't configured yet)
+        validation_logger = logging.getLogger("jobmon.otlp.validation")
+
+        # Validate the configuration
+        is_valid = validate_and_log_otlp_config(logging_config, validation_logger)
+
+        if not is_valid:
+            validation_logger.warning(
+                f"OTLP configuration issues found in {source_description}. "
+                "Review the validation errors above. OTLP logging may not work correctly."
+            )
+
+    except ImportError:
+        # Validation module not available - continue without validation
+        pass
+    except Exception as e:
+        # Don't fail configuration loading due to validation errors
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Failed to validate OTLP configuration: {e}")

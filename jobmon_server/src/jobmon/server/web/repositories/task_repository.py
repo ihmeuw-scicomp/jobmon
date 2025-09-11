@@ -1,6 +1,5 @@
 """Repository for Task operations."""
 
-import json
 from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Union
@@ -327,19 +326,11 @@ class TaskRepository:
         for row in self.session.execute(select_stmt).all():
             edges = row[0]
             if direction == Direction.UP:
-                upstreams = (
-                    json.loads(edges.upstream_node_ids)
-                    if isinstance(edges.upstream_node_ids, str)
-                    else edges.upstream_node_ids
-                )
+                upstreams = edges.upstream_node_ids
                 if upstreams:
                     node_ids.update(upstreams)
             elif direction == Direction.DOWN:
-                downstreams = (
-                    json.loads(edges.downstream_node_ids)
-                    if isinstance(edges.downstream_node_ids, str)
-                    else edges.downstream_node_ids
-                )
+                downstreams = edges.downstream_node_ids
                 if downstreams:
                     node_ids.update(downstreams)
             else:
@@ -619,9 +610,11 @@ class TaskRepository:
         return TaskResourceUsageResponse(resource_usage=list(resource_usage))
 
     def get_downstream_tasks(
-        self, task_ids: List[int], dag_id: int
+        self, task_ids: List[int], dag_id: int, client_version: Optional[str] = None
     ) -> DownstreamTasksResponse:
         """Get only the direct downstreams of a task."""
+        from jobmon.server.web.utils.json_compat import normalize_node_ids_for_client
+
         tasks_and_edges = self.session.execute(
             select(Task.id, Task.node_id, Edge.downstream_node_ids).where(
                 Task.id.in_(task_ids),
@@ -629,9 +622,14 @@ class TaskRepository:
                 Edge.dag_id == dag_id,
             )
         ).all()
-        result = {
-            row.id: [row.node_id, row.downstream_node_ids] for row in tasks_and_edges
-        }
+
+        result = {}
+        for row in tasks_and_edges:
+            # Format downstream_node_ids based on client version
+            formatted_downstream_ids = normalize_node_ids_for_client(
+                row.downstream_node_ids, client_version
+            )
+            result[row.id] = [row.node_id, formatted_downstream_ids]
 
         return DownstreamTasksResponse(downstream_tasks=result)
 

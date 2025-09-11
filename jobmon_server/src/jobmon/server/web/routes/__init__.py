@@ -48,6 +48,7 @@ def health() -> Any:
     be checked individually.
     """
     _get_time()
+    logger.info("Health check completed successfully")
     resp = JSONResponse(content={"status": "OK"}, status_code=StatusCodes.OK)
     return resp
 

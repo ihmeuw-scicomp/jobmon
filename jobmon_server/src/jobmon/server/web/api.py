@@ -32,6 +32,7 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     config = JobmonConfig()
 
     # Configure logging AFTER OTLP instrumentation is set up
+    # Server uses existing sophisticated logging system with OTLP safety
     configure_logging()
 
     # Initialize the FastAPI app
@@ -46,18 +47,26 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     app = add_hooks_and_handlers(app)
 
     # Configure remaining OTLP components
-    USE_OTEL = config.get_boolean("otlp", "web_enabled")
+    try:
+        telemetry_section = config.get_section_coerced("telemetry")
+        tracing_config = telemetry_section.get("tracing", {})
+        USE_OTEL = tracing_config.get("server_enabled", False)
+    except Exception:
+        USE_OTEL = False
     if USE_OTEL:
         # Import OTel modules here to avoid unnecessary imports when OTel is disabled
-        from jobmon.core.otlp import OtlpAPI, add_span_details_processor
+        from jobmon.core.otlp import add_span_details_processor
+        from jobmon.server.web.otlp import get_server_otlp_manager
 
-        otlp_api = OtlpAPI()
+        # Initialize server OTLP manager
+        server_otlp = get_server_otlp_manager()
+        server_otlp.initialize()  # Actually initialize the manager!
 
         # Instrument SQLAlchemy BEFORE any engine creation
-        otlp_api.instrument_sqlalchemy()
-        otlp_api.instrument_requests()
+        server_otlp.instrument_sqlalchemy()
+        server_otlp.instrument_requests()
 
-        otlp_api.instrument_app(app)
+        server_otlp.instrument_app(app)
         configure_structlog([add_span_details_processor])
     else:  # Configure structlog without OTLP
         configure_structlog()
@@ -107,8 +116,6 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
             CORSMiddleware,
             allow_origins=["*"],
             allow_credentials=False,
-            allow_methods=["*"],
-            allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
         )
 
     app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
@@ -131,6 +138,11 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
                 dependencies = [Depends(get_user)]
             else:
                 dependencies = [Depends(get_user_or_anonymous)]
+
+            # Include health router separately without authentication
+            health_router = getattr(mod, f"api_{version}_health_router")
+            app.include_router(health_router, prefix=url_prefix)
+
         app.include_router(api_router, prefix=url_prefix, dependencies=dependencies)
 
     # Custom documentation endpoints

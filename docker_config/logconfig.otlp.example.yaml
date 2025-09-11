@@ -1,0 +1,93 @@
+# Local development logconfig for jobmon with OTLP ENABLED
+# Fixed: Using proper template system and inline exporter config
+# Sends to production OTLP collector
+
+version: 1
+disable_existing_loggers: false
+
+# Use shared formatters from core templates
+formatters: !template formatters
+
+# Local development handlers with working OTLP configuration
+handlers:
+  # Simple console handlers (inlined - no templates needed)
+  console_default:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: console_default
+    
+  console_structlog:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: structlog_text
+
+  # OTLP handler with inline configuration for JobmonOTLPLoggingHandler
+  # Fixed: More aggressive flushing for client processes
+  otlp:
+    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+    level: INFO
+    formatter: otlp_default
+    exporter:
+      module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+      class: OTLPLogExporter
+      endpoint: http://localhost:4317
+      timeout: 30
+      insecure: true
+      # More aggressive batching for client processes
+      max_export_batch_size: 4  # Reduced from 8 for faster flushing
+      export_timeout_millis: 2000  # Reduced from 5000
+      schedule_delay_millis: 500   # Reduced from 1000 for faster batching
+      max_queue_size: 1024  # Reduced from 2048
+
+  # OTLP handler with structlog formatting
+  # Fixed: More aggressive flushing for client processes
+  otlp_structlog:
+    class: jobmon.core.otlp.JobmonOTLPStructlogHandler
+    level: INFO
+    exporter:
+      module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+      class: OTLPLogExporter
+      endpoint: http://localhost:4317
+      timeout: 30
+      insecure: true
+      # More aggressive batching for client processes
+      max_export_batch_size: 4  # Reduced from 8 for faster flushing
+      export_timeout_millis: 2000  # Reduced from 5000
+      schedule_delay_millis: 500   # Reduced from 1000 for faster batching
+      max_queue_size: 1024  # Reduced from 2048
+
+# Local development logger configurations WITH OTLP ENABLED
+loggers:
+  # Primary jobmon logging (console + OTLP enabled, basic formatters)
+  jobmon.client:
+    handlers: [console_default, otlp]  # OTLP ENABLED - uses basic formatters
+    level: INFO
+    propagate: true  # ALLOW CHILD LOGGERS TO INHERIT OTLP HANDLER
+
+  # General jobmon logging (catch-all for any jobmon logs not caught by specific loggers)
+  jobmon.core:
+    handlers: [otlp]  # OTLP ENABLED - uses basic formatters
+    level: INFO
+    propagate: true
+
+  # Server web module (console + OTLP enabled with structlog)
+  jobmon.server.web:
+    handlers: [console_structlog, otlp_structlog]  # OTLP ENABLED - uses structlog formatters
+    level: INFO
+    propagate: true
+
+  # Standard server library loggers (console + OTLP enabled)
+  sqlalchemy:
+    handlers: [console_default, otlp]  # OTLP ENABLED
+    level: WARN
+    propagate: false
+
+  uvicorn.access:
+    handlers: [console_default, otlp]  # OTLP ENABLED
+    level: INFO
+    propagate: false
+
+  uvicorn.error:
+    handlers: [console_default, otlp]  # OTLP ENABLED
+    level: INFO
+    propagate: false

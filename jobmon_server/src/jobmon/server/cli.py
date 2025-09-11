@@ -11,10 +11,13 @@ logger = logging.getLogger(__name__)
 
 
 class ServerCLI(CLI):
-    """CLI for Server only."""
+    """CLI for Server with automatic logging support."""
 
     def __init__(self) -> None:
-        """Initialize ServerCLI with subcommands."""
+        """Initialize ServerCLI for administrative operations."""
+        # ServerCLI uses component logging for admin commands (workflow-reaper, init-db, etc.)
+        super().__init__(component_name="server")
+
         self.parser = argparse.ArgumentParser("jobmon server")
         self._subparsers = self.parser.add_subparsers(dest="sub_command")
 
@@ -44,32 +47,61 @@ class ServerCLI(CLI):
 
     def init_db(self, args: argparse.Namespace) -> None:
         """Entrypoint to initialize new Jobmon database."""
+        from jobmon.core.configuration import JobmonConfig
+        from jobmon.server.web.config import get_jobmon_config
         from jobmon.server.web.db import init_db
 
-        # Adjust the package path to where alembic.ini is located within your package
-        init_db()
+        sqlalchemy_database_uri = args.sqlalchemy_database_uri
+        if not sqlalchemy_database_uri:
+            config = JobmonConfig()
+            sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")
+        else:
+            # Override the config singleton with CLI-provided database URI
+            config = JobmonConfig(
+                dict_config={"db": {"sqlalchemy_database_uri": sqlalchemy_database_uri}}
+            )
+            # Set the singleton to use our overridden config
+            get_jobmon_config(config)
+
+        init_db(sqlalchemy_database_uri)
 
     def terminate_db(self, args: argparse.Namespace) -> None:
         """Entrypoint to terminate a Jobmon database."""
         from jobmon.core.configuration import JobmonConfig
+        from jobmon.server.web.config import get_jobmon_config
         from jobmon.server.web.db import terminate_db
 
         sqlalchemy_database_uri = args.sqlalchemy_database_uri
         if not sqlalchemy_database_uri:
             config = JobmonConfig()
             sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")
+        else:
+            # Override the config singleton with CLI-provided database URI
+            config = JobmonConfig(
+                dict_config={"db": {"sqlalchemy_database_uri": sqlalchemy_database_uri}}
+            )
+            # Set the singleton to use our overridden config
+            get_jobmon_config(config)
 
         terminate_db(sqlalchemy_database_uri)
 
     def upgrade_db(self, args: argparse.Namespace) -> None:
         """Entrypoint to upgrade a Jobmon database."""
         from jobmon.core.configuration import JobmonConfig
+        from jobmon.server.web.config import get_jobmon_config
         from jobmon.server.web.db import apply_migrations
 
         sqlalchemy_database_uri = args.sqlalchemy_database_uri
         if not sqlalchemy_database_uri:
             config = JobmonConfig()
             sqlalchemy_database_uri = config.get("db", "sqlalchemy_database_uri")
+        else:
+            # Override the config singleton with CLI-provided database URI
+            config = JobmonConfig(
+                dict_config={"db": {"sqlalchemy_database_uri": sqlalchemy_database_uri}}
+            )
+            # Set the singleton to use our overridden config
+            get_jobmon_config(config)
 
         apply_migrations(sqlalchemy_database_uri, args.revision)
 

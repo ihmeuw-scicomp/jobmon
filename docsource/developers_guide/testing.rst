@@ -26,12 +26,12 @@ To run the whole test suite in parallel::
 To run a single file in the test suite::
 
     nox -r --session tests -- <file path>
-    e.g. nox -r --session tests -- tests/cli/test_status_commands.py
+    e.g. nox -r --session tests -- tests/pytest/cli/test_status_commands.py
 
 To run a single test in the test suite::
 
     nox -r --session tests -- <file path>::<test_name>
-    e.g. nox -r --session tests -- tests/cli/test_status_commands.py::test_workflow_status
+    e.g. nox -r --session tests -- tests/pytest/cli/test_status_commands.py::test_workflow_status
 
 Ephemera
 ********
@@ -51,17 +51,17 @@ through till workflow.run(). Client unit tests should only go until workflow.bin
 
 Unit tests are in the following folders:
 
-* jobmon/tests/cli
-* jobmon/tests/client
-* jobmon/tests/distributor
-* jobmon/tests/server
-* jobmon/tests/swarm
-* jobmon/tests/worker_node
-* jobmon/tests/workflow_reaper
+* jobmon/tests/pytest/cli
+* jobmon/tests/pytest/client
+* jobmon/tests/pytest/distributor
+* jobmon/tests/pytest/server
+* jobmon/tests/pytest/swarm
+* jobmon/tests/pytest/worker_node
+* jobmon/tests/pytest/workflow_reaper
 
 Integration tests are in:
 
-* jobmon/tests/end_to_end
+* jobmon/tests/pytest/end_to_end
 
 .. note::
     The Jobmon PR Jenkins pipeline runs the whole Jobmon test suite. A developer is not allowed

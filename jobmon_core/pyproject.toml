@@ -24,6 +24,7 @@ dependencies = [
     'docutils',
     'sphinx',
     'python-dotenv',
+    'structlog',  # For structured logging (used by templates)
 ]
 dynamic = ["version"]
 

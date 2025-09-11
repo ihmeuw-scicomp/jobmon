@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-import json
 import logging
 import numbers
 import time
@@ -419,13 +418,12 @@ class WorkflowRun:
                 request_type="post",
             )
             downstream_tasks = edge_resp["downstream_tasks"]
-            # Format is {task_id: (node_id, '[downstream_node_ids]')}
+            # Format is {task_id: (node_id, downstream_node_ids)} where
+            # downstream_node_ids is a list
             for task_id, values in downstream_tasks.items():
                 node_id, downstream_node_ids = values
                 # Convert to Python datatypes
                 task_id = int(task_id)
-                if downstream_node_ids:
-                    downstream_node_ids = json.loads(downstream_node_ids)
 
                 # Assumption: every single node in the downstream edge is not in "D" state
                 # Shouldn't be possible to have a downstream node of a task not in "D" state

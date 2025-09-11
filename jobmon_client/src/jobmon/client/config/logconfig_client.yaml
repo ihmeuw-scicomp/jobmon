@@ -1,0 +1,67 @@
+# Client Component Logging Configuration
+# Interactive client commands and workflow operations
+# Console logging by default, OTLP can be enabled via configuration overrides
+
+version: 1
+disable_existing_loggers: false
+
+# Import shared templates from core
+formatters: !template formatters
+
+# Client-specific handlers
+handlers:
+  # Console handler for interactive use
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: console_default
+    stream: ext://sys.stdout
+  
+  # Optional OTLP handler (can be enabled via config overrides)
+  # Disabled by default since client operations are usually interactive
+  otlp:
+    class: opentelemetry.sdk._logs.LoggingHandler
+    level: INFO
+    formatter: json_default
+
+# Client logger configuration
+loggers:
+  # Main client package
+  jobmon.client:
+    handlers: [console]
+    level: INFO
+    propagate: true
+
+  # Cluster interface operations (important for distributor)
+  jobmon.core:
+    handlers: [console]
+    level: WARNING
+    propagate: true
+    
+# OTLP can be enabled via configuration overrides:
+# 
+# Example file-based override (logging.client_logconfig_file):
+# handlers:
+#   otlp_client:
+#     class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+#     level: INFO
+#     formatter: otlp_default
+#     exporter:
+#       module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+#       class: OTLPLogExporter
+#       endpoint: http://localhost:4317
+#       timeout: 30
+#       insecure: true
+# loggers:
+#   jobmon.client:
+#     handlers: [console, otlp_client]
+#
+# Example section-based override (logging.client.*):
+# logging:
+#   client:
+#     handlers:
+#       otlp_client: { ... }
+#     loggers:
+#       jobmon.client:
+#         handlers: [console, otlp_client]
+  

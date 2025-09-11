@@ -7,8 +7,9 @@ import numpy as np
 import pandas as pd  # type: ignore
 import scipy.stats as st  # type: ignore
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import String, and_, func, select
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.elements import ColumnElement, Label
 
 from jobmon.server.web.error_log_clustering import cluster_error_logs
 from jobmon.server.web.models.arg import Arg
@@ -66,14 +67,41 @@ class TaskTemplateRepository:
         """Initialize the TaskTemplateRepository with a database session."""
         self.session = session
 
+    def _convert_to_task_resource_detail_item(
+        self, row_data: Dict[str, Any]
+    ) -> Optional[TaskResourceDetailItem]:
+        """Convert raw database row to TaskResourceDetailItem, with error handling."""
+        try:
+            return TaskResourceDetailItem(
+                wallclock=(
+                    float(row_data["r_orig"])
+                    if row_data["r_orig"] is not None
+                    else None
+                ),
+                maxrss=(
+                    int(row_data["m_orig"]) if row_data["m_orig"] is not None else None
+                ),
+                node_id=row_data["node_id"],
+                task_id=row_data["task_id"],
+                task_name=row_data.get("task_name"),
+                requested_resources=row_data["requested_resources"],
+                attempt_number_of_instance=row_data.get("attempt_number_of_instance"),
+                status=row_data.get("status_orig"),
+            )
+        except Exception as e:
+            logger.error(
+                f"Error parsing data for task_id {row_data.get('task_id', 'unknown')}: {e}."
+            )
+            return None
+
     def get_task_resource_details(
         self,
         task_template_version_id: int,
         workflows: Optional[List[int]],
         node_args: Optional[Dict[str, List[Any]]],
     ) -> List[TaskResourceDetailItem]:
-        """Fetch and filter task resource details."""
-        query_filter = [
+        """Fetch and filter task resource details with optimized single-query approach."""
+        base_filters = [
             TaskTemplateVersion.id == task_template_version_id,
             TaskInstance.status.in_(
                 [
@@ -86,8 +114,9 @@ class TaskTemplateRepository:
                 ]
             ),
         ]
+
         if workflows:
-            query_filter.append(Task.workflow_id.in_(workflows))
+            base_filters.append(Task.workflow_id.in_(workflows))
 
         attempt_number_col = (
             func.row_number()
@@ -95,33 +124,33 @@ class TaskTemplateRepository:
             .label("attempt_number_of_instance")
         )
 
-        query_base = (
-            select(
-                TaskInstance.wallclock,
-                TaskInstance.maxrss,
-                Node.id.label("node_id_col"),
-                Task.id.label("task_id_col"),
-                Task.name.label("task_name_col"),
-                TaskInstance.id.label("task_instance_id_col"),
-                TaskResources.requested_resources.label("requested_resources_col"),
-                attempt_number_col,
-                TaskInstance.status.label("status_col"),
+        if not node_args:
+            # no node_args filtering - use original optimized query
+            query = (
+                select(
+                    TaskInstance.wallclock,
+                    TaskInstance.maxrss,
+                    Node.id.label("node_id_col"),
+                    Task.id.label("task_id_col"),
+                    Task.name.label("task_name_col"),
+                    TaskInstance.id.label("task_instance_id_col"),
+                    TaskResources.requested_resources.label("requested_resources_col"),
+                    attempt_number_col,
+                    TaskInstance.status.label("status_col"),
+                )
+                .select_from(TaskTemplateVersion)
+                .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+                .join(Task, Node.id == Task.node_id)
+                .join(TaskInstance, Task.id == TaskInstance.task_id)
+                .join(TaskResources, TaskInstance.task_resources_id == TaskResources.id)
+                .where(and_(*base_filters))
             )
-            .select_from(TaskTemplateVersion)
-            .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
-            .join(Task, Node.id == Task.node_id)
-            .join(TaskInstance, Task.id == TaskInstance.task_id)
-            .join(TaskResources, TaskInstance.task_resources_id == TaskResources.id)
-        )
 
-        sql = query_base.where(*query_filter)
+            rows = self.session.execute(query).all()
 
-        rows_from_db = self.session.execute(sql).all()
-
-        intermediate_data: List[Dict[str, Any]] = []
-        for row in rows_from_db:
-            intermediate_data.append(
-                {
+            result = []
+            for row in rows:
+                row_data = {
                     "r_orig": row[0],
                     "m_orig": row[1],
                     "node_id": row[2],
@@ -131,118 +160,102 @@ class TaskTemplateRepository:
                     "attempt_number_of_instance": row[7],
                     "status_orig": row[8],
                 }
+                item = self._convert_to_task_resource_detail_item(row_data)
+                if item:
+                    result.append(item)
+
+            return result
+
+        else:
+            # node_args filtering - use optimized join approach
+            return self._get_task_resource_details_with_node_args(
+                task_template_version_id,
+                workflows,
+                node_args,
+                base_filters,
+                attempt_number_col,
             )
 
-        fetched_tasks_data: List[TaskResourceDetailItem] = []
+    def _get_task_resource_details_with_node_args(
+        self,
+        task_template_version_id: int,
+        workflows: Optional[List[int]],
+        node_args: Dict[str, List[Any]],
+        base_filters: List[ColumnElement],
+        attempt_number_col: Label,
+    ) -> List[TaskResourceDetailItem]:
+        """Optimized node_args filtering using database-level joins and filtering."""
+        base_query = (
+            select(
+                TaskInstance.wallclock,
+                TaskInstance.maxrss,
+                Node.id.label("node_id"),
+                Task.id.label("task_id"),
+                Task.name.label("task_name"),
+                TaskResources.requested_resources,
+                attempt_number_col,
+                TaskInstance.status,
+            )
+            .select_from(TaskTemplateVersion)
+            .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+            .join(Task, Node.id == Task.node_id)
+            .join(TaskInstance, Task.id == TaskInstance.task_id)
+            .join(TaskResources, TaskInstance.task_resources_id == TaskResources.id)
+            .where(and_(*base_filters))
+        ).cte("base_tasks")
 
-        # Apply node_args filtering if present
-        if node_args:
-            node_args_filtered_tasks_intermediate: List[Dict[str, Any]] = []
-            for task_dict in intermediate_data:
-                # Node args filtering logic
-                node_f = [
-                    NodeArg.arg_id == Arg.id,
-                    NodeArg.node_id == task_dict["node_id"],
-                ]
-                node_s = select(Arg.name, NodeArg.val).where(*node_f)
-                actual_node_args_rows = self.session.execute(node_s).all()
+        # For each node_arg filter, create a subquery that validates the constraint
+        node_arg_subqueries = []
+        for arg_name, arg_values in node_args.items():
+            str_values = [str(v) for v in arg_values]
 
-                node_args_on_db: Dict[str, List[str]] = {}
-                for name, val_db in actual_node_args_rows:
-                    if name not in node_args_on_db:
-                        node_args_on_db[name] = []
-                    node_args_on_db[name].append(str(val_db))
-
-                include_task_item = True
-                # Use AND logic - task matches only if ALL filter conditions match
-                for filter_arg_name, filter_arg_values_any in node_args.items():
-                    filter_arg_values = [str(v) for v in filter_arg_values_any]
-
-                    if filter_arg_name not in node_args_on_db:
-                        include_task_item = False
-                        break
-
-                    match_found_for_this_filter_arg = False
-                    for actual_val_for_arg in node_args_on_db[filter_arg_name]:
-                        if actual_val_for_arg in filter_arg_values:
-                            match_found_for_this_filter_arg = True
-                            break
-
-                    if not match_found_for_this_filter_arg:
-                        include_task_item = False
-                        break
-
-                if include_task_item:
-                    node_args_filtered_tasks_intermediate.append(task_dict)
-                else:
-                    continue
-
-            # Convert to Pydantic models after filtering
-            for task_item_dict in node_args_filtered_tasks_intermediate:
-                try:
-                    detail_item = TaskResourceDetailItem(
-                        wallclock=(
-                            float(task_item_dict["r_orig"])
-                            if task_item_dict["r_orig"] is not None
-                            else None
-                        ),
-                        maxrss=(
-                            int(task_item_dict["m_orig"])
-                            if task_item_dict["m_orig"] is not None
-                            else None
-                        ),
-                        node_id=task_item_dict["node_id"],
-                        task_id=task_item_dict["task_id"],
-                        task_name=task_item_dict.get("task_name"),
-                        requested_resources=task_item_dict["requested_resources"],
-                        attempt_number_of_instance=task_item_dict.get(
-                            "attempt_number_of_instance"
-                        ),
-                        status=task_item_dict.get("status_orig"),
+            # Create subquery to find nodes that have this arg with any of the specified values
+            subquery = (
+                select(NodeArg.node_id)
+                .join(Arg, NodeArg.arg_id == Arg.id)
+                .where(
+                    and_(
+                        Arg.name == arg_name,
+                        func.cast(NodeArg.val, String).in_(str_values),
                     )
-                    fetched_tasks_data.append(detail_item)
-                except Exception as e:
-                    logger.error(
-                        f"Error parsing task data after node_args filter for "
-                        f"task_id {task_item_dict['task_id']}: {e}. "
-                        f"Data: {task_item_dict}"
-                    )
-                    continue
+                )
+            )
+            node_arg_subqueries.append(subquery)
 
-            return fetched_tasks_data
-        else:
-            # Convert to Pydantic models if no node_args filtering
-            for task_item_dict in intermediate_data:
-                try:
-                    detail_item = TaskResourceDetailItem(
-                        wallclock=(
-                            float(task_item_dict["r_orig"])
-                            if task_item_dict["r_orig"] is not None
-                            else None
-                        ),
-                        maxrss=(
-                            int(task_item_dict["m_orig"])
-                            if task_item_dict["m_orig"] is not None
-                            else None
-                        ),
-                        node_id=task_item_dict["node_id"],
-                        task_id=task_item_dict["task_id"],
-                        task_name=task_item_dict.get("task_name"),
-                        requested_resources=task_item_dict["requested_resources"],
-                        attempt_number_of_instance=task_item_dict.get(
-                            "attempt_number_of_instance"
-                        ),
-                        status=task_item_dict.get("status_orig"),
-                    )
-                    fetched_tasks_data.append(detail_item)
-                except Exception as e:
-                    logger.error(
-                        f"Error parsing task data for "
-                        f"task_id {task_item_dict['task_id']}: {e}. "
-                        f"Data: {task_item_dict}"
-                    )
-                    continue
-            return fetched_tasks_data
+        # Build the final query that joins base tasks with node arg constraints
+        final_query = select(
+            base_query.c.wallclock,
+            base_query.c.maxrss,
+            base_query.c.node_id,
+            base_query.c.task_id,
+            base_query.c.task_name,
+            base_query.c.requested_resources,
+            base_query.c.attempt_number_of_instance,
+            base_query.c.status,
+        ).select_from(base_query)
+
+        for subquery in node_arg_subqueries:
+            final_query = final_query.where(base_query.c.node_id.in_(subquery))
+
+        rows = self.session.execute(final_query).all()
+
+        result = []
+        for row in rows:
+            row_data = {
+                "r_orig": row[0],
+                "m_orig": row[1],
+                "node_id": row[2],
+                "task_id": row[3],
+                "task_name": row[4],
+                "requested_resources": row[5],
+                "attempt_number_of_instance": row[6],
+                "status_orig": row[7],
+            }
+            item = self._convert_to_task_resource_detail_item(row_data)
+            if item:
+                result.append(item)
+
+        return result
 
     def calculate_resource_statistics(
         self,
