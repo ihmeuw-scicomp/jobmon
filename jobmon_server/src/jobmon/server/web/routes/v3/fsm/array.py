@@ -321,36 +321,44 @@ def _update_task_instance_killed(array_id: int, batch_num: int, db: Session) -> 
 def _update_task_instance(
     array_id: int, batch_num: int, next_report: int, db: Session
 ) -> None:
-
-    task_instance_condition = and_(
-        TaskInstance.array_id == array_id,
-        TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
-        TaskInstance.array_batch_num == batch_num,
+    """Transition task instances with additional safety checks."""
+    # First, get the count of task instances that would be affected
+    count_query = select(func.count(TaskInstance.id)).where(
+        and_(
+            TaskInstance.array_id == array_id,
+            TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
+            TaskInstance.array_batch_num == batch_num,
+        )
     )
 
-    # Acquire a lock and update tasks to launched
-    task_instance_ids_query = (
-        select(TaskInstance.id)
-        .where(task_instance_condition)
-        .with_for_update()
-        .execution_options(synchronize_session=False)
-    )
+    count = db.execute(count_query).scalar()
+    logger.info(f"Found {count} task instances in INSTANTIATED status to transition")
 
-    db.execute(task_instance_ids_query)
+    if count == 0:
+        logger.warning("No task instances in INSTANTIATED status found")
+        return
 
-    # Transition all the task instances in the batch
-    # Bypassing the ORM for performance reasons.
+    # Single atomic update
     update_stmt = (
         update(TaskInstance)
-        .where(task_instance_condition)
+        .where(
+            and_(
+                TaskInstance.array_id == array_id,
+                TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
+                TaskInstance.array_batch_num == batch_num,
+            )
+        )
         .values(
             status=TaskInstanceStatus.LAUNCHED,
             submitted_date=func.now(),
             status_date=func.now(),
             report_by_date=add_time(next_report),
         )
-    ).execution_options(synchronize_session=False)
-    db.execute(update_stmt)
+        .execution_options(synchronize_session=False)
+    )
+
+    result = db.execute(update_stmt)
+    logger.info(f"Successfully updated {result.rowcount} task instances to LAUNCHED")
 
 
 @api_v3_router.post("/array/{array_id}/log_distributor_id")

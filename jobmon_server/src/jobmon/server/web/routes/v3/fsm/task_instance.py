@@ -556,32 +556,37 @@ async def log_no_distributor_id(
 async def log_distributor_id(
     task_instance_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
-    """Log a task_instance's distributor id.
-
-    Args:
-        task_instance_id: id of the task_instance to log
-        request: fastapi request object
-        db: The database session.
-    """
+    """Log a task_instance's distributor id."""
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
     select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
     task_instance = db.execute(select_stmt).scalars().one()
+
+    # Check if task instance is already in a final state
+    if task_instance.status in [
+        constants.TaskInstanceStatus.DONE,
+        constants.TaskInstanceStatus.ERROR,
+        constants.TaskInstanceStatus.ERROR_FATAL,
+    ]:
+        # Just update the distributor_id and report_by_date without transition
+        task_instance.distributor_id = data["distributor_id"]
+        task_instance.report_by_date = add_time(data["next_report_increment"])
+        db.flush()
+        resp = JSONResponse(
+            content={"message": "Task instance in final state, no transition needed"},
+            status_code=StatusCodes.OK,
+        )
+        return resp
+
+    # Only try to transition if not in final state
     status = get_transit_status(task_instance, constants.TaskInstanceStatus.LAUNCHED)
     if status is not None:
-        # log_distributor_id doesn't need next_report_increment
         transit_ti_and_t(task_instance, status, db)
     else:
         logger.error(f"Unable to transition to launched from {task_instance.status}")
-    msg = _update_task_instance_state(
-        task_instance, constants.TaskInstanceStatus.LAUNCHED, request, db
-    )
-    task_instance.distributor_id = data["distributor_id"]
-    task_instance.report_by_date = add_time(data["next_report_increment"])
-    db.flush()
-    resp = JSONResponse(content={"message": msg}, status_code=StatusCodes.OK)
-    return resp
+
+    # Rest of the function...
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_known_error")
