@@ -643,6 +643,7 @@ class TaskTemplateRepository:
         # CLI label mapping (imported from route module)
         cli_label_mapping = {
             "G": "PENDING",
+            "I": "SCHEDULED",  # INSTANTIATING
             "Q": "SCHEDULED",
             "R": "RUNNING",
             "D": "DONE",
