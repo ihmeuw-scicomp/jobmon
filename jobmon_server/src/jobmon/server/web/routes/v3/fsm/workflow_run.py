@@ -315,35 +315,33 @@ async def set_status_for_triaging(
             constants.TaskInstanceStatus.RUNNING,
         ]
     )
-    # Give RUNNING tasks 10 extra seconds before triaging them
+
     time_now = func.now()  # for debugging
     condition3 = TaskInstance.report_by_date <= time_now
     common_condition = and_(condition1, condition2, condition3)
 
-    # lock rows to avoid deadlocks
-    rows_to_update_stmt = (
-        select(TaskInstance.id).where(common_condition).with_for_update()
-    )
-    rows_to_update = db.execute(rows_to_update_stmt).scalars().all()
-
-    if rows_to_update:
-        # Update those rows using their IDs only
-        update_stmt = (
-            update(TaskInstance)
-            .where(TaskInstance.id.in_(rows_to_update))
-            .values(
-                status=case(
-                    (
-                        TaskInstance.status == constants.TaskInstanceStatus.RUNNING,
-                        constants.TaskInstanceStatus.TRIAGING,
-                    ),
-                    else_=constants.TaskInstanceStatus.NO_HEARTBEAT,
-                )
+    # Single atomic update that only updates task instances matching the condition
+    # This prevents race conditions by ensuring the condition is checked at update time
+    update_stmt = (
+        update(TaskInstance)
+        .where(common_condition)
+        .values(
+            status=case(
+                (
+                    TaskInstance.status == constants.TaskInstanceStatus.RUNNING,
+                    constants.TaskInstanceStatus.TRIAGING,
+                ),
+                else_=constants.TaskInstanceStatus.NO_HEARTBEAT,
             )
-            .execution_options(synchronize_session=False)
         )
-        db.execute(update_stmt)
-    # release locks immediately
+        .execution_options(synchronize_session=False)
+    )
+
+    # Execute the update
+    result = db.execute(update_stmt)
+    logger.info(f"Updated {result.rowcount} task instances for triaging")
+
+    # Commit the transaction
     db.commit()
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
