@@ -153,16 +153,27 @@ class WorkflowTaskTemplateStatusItem(BaseModel):
 
 
 class ErrorLogItem(BaseModel):
-    """Individual error log item."""
+    """Error log item - can represent individual errors or clustered errors."""
 
-    task_id: int
-    task_instance_id: int
-    task_instance_err_id: int
-    error_time: str
-    error: str
-    task_instance_stderr_log: str
+    # Individual error fields (required for non-clustered, optional for clustered)
+    task_id: Optional[int] = None
+    task_instance_id: Optional[int] = None
+    task_instance_err_id: Optional[int] = None
+    error_time: Optional[str] = None
+    error: Optional[str] = None
+    task_instance_stderr_log: Optional[str] = None
+
+    # Common fields (always present)
     workflow_run_id: int
     workflow_id: int
+
+    # Clustering fields (only present when clustering is enabled)
+    error_score: Optional[float] = None
+    group_instance_count: Optional[int] = None
+    task_instance_ids: Optional[List[int]] = None
+    task_ids: Optional[List[int]] = None
+    sample_error: Optional[str] = None
+    first_error_time: Optional[str] = None
 
 
 class ErrorLogResponse(BaseModel):

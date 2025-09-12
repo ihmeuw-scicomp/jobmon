@@ -999,6 +999,69 @@ def test_get_tt_error_log_viz(client_env, db_engine):
     assert "not found" in msg["error_logs"][0]["error"]
 
 
+def test_get_tt_error_log_viz_with_clustering(client_env, db_engine):
+    """Test error log visualization with clustering enabled to catch validation errors."""
+    t = Tool(name="gui_tt_error_log_clustering")
+
+    # Create workflow with multiple tasks that will fail with similar errors
+    wf = t.create_workflow(name=f"i_am_a_clustering_test_wf")
+    tt = t.get_task_template(
+        template_name="tt_clustering", command_template="{arg}", node_args=["arg"]
+    )
+
+    # Create multiple tasks with different arguments but same failing command to test clustering
+    tasks = []
+    for i in range(3):
+        task = tt.create_task(
+            arg=f"nonexistent_command_that_will_fail_{i}",
+            cluster_name="sequential",
+            compute_resources={"queue": "null.q", "num_cores": 2},
+            max_attempts=1,
+        )
+        tasks.append(task)
+
+    wf.add_tasks(tasks)
+    wf.run()
+
+    # Test without clustering (should work as before)
+    app_route = f"/tt_error_log_viz/{wf.workflow_id}/{tt.id}"
+    _, msg = wf.requester.send_request(
+        app_route=app_route, message={}, request_type="get"
+    )
+    assert len(msg["error_logs"]) == 3  # Should have 3 individual error logs
+    assert (
+        msg["error_logs"][0]["task_id"] is not None
+    )  # Individual error fields should be present
+
+    # Test with clustering enabled (this was failing before the fix)
+    app_route_with_clustering = (
+        f"/tt_error_log_viz/{wf.workflow_id}/{tt.id}?cluster_errors=true"
+    )
+    _, clustered_msg = wf.requester.send_request(
+        app_route=app_route_with_clustering, message={}, request_type="get"
+    )
+
+    # Should have fewer clustered error logs (similar errors grouped together)
+    assert len(clustered_msg["error_logs"]) <= 3
+    assert len(clustered_msg["error_logs"]) > 0
+
+    # Check that clustering fields are present
+    first_clustered_error = clustered_msg["error_logs"][0]
+    assert "error_score" in first_clustered_error
+    assert "group_instance_count" in first_clustered_error
+    assert "task_instance_ids" in first_clustered_error
+    assert "task_ids" in first_clustered_error
+    assert "sample_error" in first_clustered_error
+
+    # Check that individual error fields are None for clustered data
+    assert first_clustered_error["task_id"] is None
+    assert first_clustered_error["task_instance_id"] is None
+    assert first_clustered_error["task_instance_err_id"] is None
+    assert first_clustered_error["error_time"] is None
+    assert first_clustered_error["error"] is None
+    assert first_clustered_error["task_instance_stderr_log"] is None
+
+
 def test_task_details_by_wf_id(client_env, db_engine):
     t = Tool(name="task_detail_tool")
     wfids = []
