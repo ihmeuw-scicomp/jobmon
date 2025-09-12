@@ -654,6 +654,7 @@ class TaskTemplateRepository:
             "U": "SCHEDULED",
             "W": "SCHEDULED",
             "T": "SCHEDULED",
+            "O": "SCHEDULED",
         }
 
         def serialize_decimal(value: Union[Decimal, float]) -> float:
