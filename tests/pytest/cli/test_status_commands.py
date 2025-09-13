@@ -622,10 +622,6 @@ def test_dynamic_concurrency_limiting_cli(db_engine, client_env, cli):
 
 
 def test_update_task_status(db_engine, client_env, cli):
-    import time
-
-    unique_id = str(int(time.time() * 1000))  # milliseconds timestamp
-
     tool = Tool(name="test_update_task_status_tool")
     tool.set_default_compute_resources_from_dict(
         cluster_name="sequential", compute_resources={"queue": "null.q"}
@@ -633,8 +629,7 @@ def test_update_task_status(db_engine, client_env, cli):
 
     # Create a 5 task DAG. Tasks 1-3 should finish, 4 should error out and block 5
     def generate_workflow_and_tasks(tool):
-        unique_id = str(int(time.time() * 1000))  # milliseconds timestamp
-        wf = tool.create_workflow(workflow_args=f"test_cli_update_workflow_{unique_id}")
+        wf = tool.create_workflow(workflow_args="test_cli_update_workflow")
         tasks = []
         echo_str = "echo {}"
         for i in range(5):
@@ -642,9 +637,7 @@ def test_update_task_status(db_engine, client_env, cli):
                 command_str = echo_str.format(i)
             else:
                 command_str = "exit -9"
-            task_template = get_task_template(
-                tool, template_name=f"phase_{i}_{unique_id}"
-            )
+            task_template = get_task_template(tool, template_name=f"phase_{i}")
             task = task_template.create_task(
                 arg=command_str, name=f"task{i}", upstream_tasks=tasks, max_attempts=1
             )
