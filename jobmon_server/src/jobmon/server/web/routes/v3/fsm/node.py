@@ -1,11 +1,13 @@
 """Routes used by the main jobmon client."""
 
+import time
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, cast
 
 import structlog
 from fastapi import Depends, Request
 from sqlalchemy import insert, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
@@ -49,8 +51,28 @@ async def add_nodes(request: Request, db: Session = Depends(get_db)) -> Any:
     else:
         raise ServerError(f"Unsupported SQL dialect '{DIALECT}'")
 
-    db.execute(node_insert_stmt)
-    db.flush()
+    # Retry logic for deadlock handling
+    max_retries = 3
+    retry_delay = 0.5  # Start with 500ms
+
+    for attempt in range(max_retries):
+        try:
+            db.execute(node_insert_stmt)
+            db.flush()
+            break  # Success, exit retry loop
+        except OperationalError as e:
+            if "Deadlock found" in str(e) and attempt < max_retries - 1:
+                logger.warning(
+                    f"Deadlock detected on node insert, retrying in {retry_delay}s "
+                    f"(attempt {attempt + 1}/{max_retries})"
+                )
+                db.rollback()  # Rollback the failed transaction
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            else:
+                # Re-raise if it's not a deadlock or we've exhausted retries
+                raise
 
     # Retrieve the node IDs
     ttvids, node_arg_hashes = zip(*node_keys)
