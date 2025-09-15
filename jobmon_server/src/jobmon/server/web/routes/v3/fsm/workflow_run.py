@@ -1,12 +1,13 @@
 """Routes for WorkflowRuns."""
 
 from collections import defaultdict
+from datetime import timedelta
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, cast
 
 import structlog
 from fastapi import Depends, Request
-from sqlalchemy import and_, case, func, insert, select, update
+from sqlalchemy import and_, func, insert, select, update
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
@@ -293,12 +294,18 @@ async def task_instances_status_check(
 async def set_status_for_triaging(
     workflow_run_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
-    """Two triaging related status sets.
+    """Two triaging related status sets with improved deadlock prevention.
 
     Query all task instances that are submitted to distributor or running which haven't
     reported as alive in the allocated time, and set them for Triaging(from Running)
-    and Kill_self(from Launched).
+    and NO_HEARTBEAT(from Launched).
     """
+    # unlike postgres, MySql does not support with_for_update(skip_locked=True)
+    # which makes more sence for this use case
+    # thus, there isn't a perfect solution to avoild race conditions/deadlocks
+    # thus, we are using a buffer to account for query execution time and
+    # reduce false positives; split the update for launched and running tasks
+    # this is a trade off between performance and correctness
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
     try:
         workflow_run_id = int(workflow_run_id)
@@ -306,42 +313,114 @@ async def set_status_for_triaging(
         raise InvalidUsage(
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
+
     logger.info(f"Set to triaging those overdue tis for wfr {workflow_run_id}")
 
-    condition1 = TaskInstance.workflow_run_id == workflow_run_id
-    condition2 = TaskInstance.status.in_(
-        [
-            constants.TaskInstanceStatus.LAUNCHED,
-            constants.TaskInstanceStatus.RUNNING,
-        ]
-    )
+    # Buffer to account for query execution time and reduce false positives
+    QUERY_BUFFER_MS = 100
+    buffer_increment = timedelta(milliseconds=QUERY_BUFFER_MS)
 
-    time_now = func.now()  # for debugging
-    condition3 = TaskInstance.report_by_date <= time_now
-    common_condition = and_(condition1, condition2, condition3)
+    total_updated = 0
 
-    # Single atomic update that only updates task instances matching the condition
-    # This prevents race conditions by ensuring the condition is checked at update time
-    update_stmt = (
-        update(TaskInstance)
-        .where(common_condition)
-        .values(
-            status=case(
-                (
-                    TaskInstance.status == constants.TaskInstanceStatus.RUNNING,
-                    constants.TaskInstanceStatus.TRIAGING,
-                ),
-                else_=constants.TaskInstanceStatus.NO_HEARTBEAT,
+    # Process RUNNING tasks first
+    try:
+        # Select RUNNING task instance IDs with buffer
+        initial_time = func.now() + buffer_increment
+        running_select_stmt = select(TaskInstance.id).where(
+            and_(
+                TaskInstance.workflow_run_id == workflow_run_id,
+                TaskInstance.status == constants.TaskInstanceStatus.RUNNING,
+                TaskInstance.report_by_date <= initial_time,
             )
         )
-        .execution_options(synchronize_session=False)
-    )
 
-    # Execute the update
-    result = db.execute(update_stmt)
-    logger.info(f"Updated {result.rowcount} task instances for triaging")
+        running_ti_ids = [row[0] for row in db.execute(running_select_stmt).fetchall()]
 
-    # Commit the transaction
-    db.commit()
+        if running_ti_ids:
+            # Get fresh timestamp
+            update_time = func.now() + buffer_increment
+
+            # Update only the specific task instances with fresh time check
+            running_update_stmt = (
+                update(TaskInstance)
+                .where(
+                    and_(
+                        TaskInstance.id.in_(running_ti_ids),
+                        TaskInstance.status == constants.TaskInstanceStatus.RUNNING,
+                        TaskInstance.report_by_date <= update_time,
+                    )
+                )
+                .values(
+                    status=constants.TaskInstanceStatus.TRIAGING, status_date=func.now()
+                )
+                .execution_options(synchronize_session=False)
+            )
+
+            running_result = db.execute(running_update_stmt)
+            total_updated += running_result.rowcount
+            logger.info(
+                f"Updated {running_result.rowcount} RUNNING task instances to TRIAGING"
+            )
+
+            # Step 4: Commit RUNNING updates
+            db.commit()
+
+    except Exception as e:
+        logger.error(f"Error updating RUNNING task instances: {e}")
+        db.rollback()
+        raise e
+
+    # Process LAUNCHED tasks separately
+    try:
+        # Select LAUNCHED task instance IDs with buffer
+        initial_time = func.now() + buffer_increment
+        launched_select_stmt = select(TaskInstance.id).where(
+            and_(
+                TaskInstance.workflow_run_id == workflow_run_id,
+                TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
+                TaskInstance.report_by_date <= initial_time,
+            )
+        )
+
+        launched_ti_ids = [
+            row[0] for row in db.execute(launched_select_stmt).fetchall()
+        ]
+
+        if launched_ti_ids:
+            # Get fresh timestamp
+            update_time = func.now() + buffer_increment
+
+            # Update only the specific task instances with fresh time check
+            launched_update_stmt = (
+                update(TaskInstance)
+                .where(
+                    and_(
+                        TaskInstance.id.in_(launched_ti_ids),
+                        TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
+                        TaskInstance.report_by_date <= update_time,
+                    )
+                )
+                .values(
+                    status=constants.TaskInstanceStatus.NO_HEARTBEAT,
+                    status_date=func.now(),
+                )
+                .execution_options(synchronize_session=False)
+            )
+
+            launched_result = db.execute(launched_update_stmt)
+            total_updated += launched_result.rowcount
+            logger.info(
+                f"Updated {launched_result.rowcount} LAUNCHED task instances to NO_HEARTBEAT"
+            )
+
+            # Step 4: Commit LAUNCHED updates
+            db.commit()
+
+    except Exception as e:
+        logger.error(f"Error updating LAUNCHED task instances: {e}")
+        db.rollback()
+        raise e
+
+    logger.info(f"Total updated {total_updated} task instances for triaging")
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
