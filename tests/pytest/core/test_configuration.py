@@ -72,7 +72,7 @@ def test_section_retrieval_with_overrides(temp_yaml_file, monkeypatch):
     # Assert that the value from the environment variable is used
     assert section_data["request_timeout"] == "25"
     # Assert other values from YAML file (retries_timeout=0)
-    assert section_data["retries_timeout"] == 0
+    assert int(section_data["retries_timeout"]) == 0
     # Assert new values from env vars are added
     assert section_data["missing"] == "foo"
 
