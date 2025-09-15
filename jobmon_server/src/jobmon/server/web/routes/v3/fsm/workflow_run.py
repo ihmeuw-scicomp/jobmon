@@ -1,7 +1,6 @@
 """Routes for WorkflowRuns."""
 
 from collections import defaultdict
-from datetime import timedelta
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, cast
 
@@ -13,6 +12,7 @@ from starlette.responses import JSONResponse
 
 from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition
+from jobmon.server.web._compat import subtract_time
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -317,15 +317,14 @@ async def set_status_for_triaging(
     logger.info(f"Set to triaging those overdue tis for wfr {workflow_run_id}")
 
     # Buffer to account for query execution time and reduce false positives
-    QUERY_BUFFER_MS = 100
-    buffer_increment = timedelta(milliseconds=QUERY_BUFFER_MS)
+    QUERY_BUFFER_SECONDS = 0.1  # 100ms buffer
 
     total_updated = 0
 
     # Process RUNNING tasks first
     try:
-        # Select RUNNING task instance IDs with buffer
-        initial_time = func.now() + buffer_increment
+        # Use database-agnostic subtract_time function
+        initial_time = subtract_time(QUERY_BUFFER_SECONDS)
         running_select_stmt = select(TaskInstance.id).where(
             and_(
                 TaskInstance.workflow_run_id == workflow_run_id,
@@ -338,7 +337,7 @@ async def set_status_for_triaging(
 
         if running_ti_ids:
             # Get fresh timestamp
-            update_time = func.now() + buffer_increment
+            update_time = subtract_time(QUERY_BUFFER_SECONDS)
 
             # Update only the specific task instances with fresh time check
             running_update_stmt = (
@@ -372,8 +371,8 @@ async def set_status_for_triaging(
 
     # Process LAUNCHED tasks separately
     try:
-        # Select LAUNCHED task instance IDs with buffer
-        initial_time = func.now() + buffer_increment
+        # Use database-agnostic subtract_time function
+        initial_time = subtract_time(QUERY_BUFFER_SECONDS)
         launched_select_stmt = select(TaskInstance.id).where(
             and_(
                 TaskInstance.workflow_run_id == workflow_run_id,
@@ -388,7 +387,7 @@ async def set_status_for_triaging(
 
         if launched_ti_ids:
             # Get fresh timestamp
-            update_time = func.now() + buffer_increment
+            update_time = subtract_time(QUERY_BUFFER_SECONDS)
 
             # Update only the specific task instances with fresh time check
             launched_update_stmt = (
