@@ -260,43 +260,74 @@ async def log_ti_report_by(
     data = cast(Dict, await request.json())
     logger.debug(f"Log report_by for TI {task_instance_id}")
 
-    try:
-        vals = {"report_by_date": add_time(data["next_report_increment"])}
-        for optional_val in ["distributor_id", "stderr", "stdout"]:
-            val = data.get(optional_val, None)
-            if data is not None:
-                vals[optional_val] = val
+    # Retry logic for row lock contention
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            vals = {"report_by_date": add_time(data["next_report_increment"])}
+            for optional_val in ["distributor_id", "stderr", "stdout"]:
+                val = data.get(optional_val, None)
+                if data is not None:
+                    vals[optional_val] = val
 
-        # do not lock TaskInstance
-        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
-        task_instance = db.execute(select_stmt).scalars().one()
-        # Apply value updates directly to ORM object
-        for key, value in vals.items():
-            setattr(task_instance, key, value)
-
-        # Handle possible state transition
-        if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
-            status = get_transit_status(
-                task_instance, constants.TaskInstanceStatus.RUNNING
+            # do not lock TaskInstance
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
             )
-            if status is not None:
-                transit_ti_and_t(
-                    task_instance,
-                    status,
-                    db,
-                    data["next_report_increment"],
+            task_instance = db.execute(select_stmt).scalars().one()
+            # Apply value updates directly to ORM object
+            for key, value in vals.items():
+                setattr(task_instance, key, value)
+
+            # Handle possible state transition
+            if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
+                status = get_transit_status(
+                    task_instance, constants.TaskInstanceStatus.RUNNING
                 )
+                if status is not None:
+                    transit_ti_and_t(
+                        task_instance,
+                        status,
+                        db,
+                        data["next_report_increment"],
+                    )
+                else:
+                    logger.error(
+                        f"Unable to transition to running from {task_instance.status}"
+                    )
+
+            resp = JSONResponse(
+                content={"status": task_instance.status}, status_code=StatusCodes.OK
+            )
+            return resp
+
+        except OperationalError as e:
+            if "database is locked" in str(e) and attempt < max_retries - 1:
+                logger.warning(
+                    f"Database lock detected for TI {task_instance_id}, "
+                    f"retrying attempt {attempt + 1}/{max_retries}"
+                )
+                db.rollback()
+                sleep(0.001 * (attempt + 1))  # 1ms, 2ms delays
+                continue
             else:
                 logger.error(
-                    f"Unable to transition to running from {task_instance.status}"
+                    f"Failed to log report_by for TI {task_instance_id} "
+                    f"after {max_retries} attempts: {e}"
                 )
+                db.rollback()
+                raise e
+        except Exception as e:
+            logger.error(
+                f"Unexpected error logging report_by for TI {task_instance_id}: {e}"
+            )
+            db.rollback()
+            raise e
 
-        resp = JSONResponse(
-            content={"status": task_instance.status}, status_code=StatusCodes.OK
-        )
-        return resp
-    except Exception as e:
-        raise e
+    # Should not reach here, but just in case
+    raise HTTPException(
+        status_code=503, detail="Database temporarily unavailable, please retry"
+    )
 
 
 @api_v3_router.post("/task_instance/log_report_by/batch")
@@ -322,29 +353,54 @@ async def log_ti_report_by_batch(
 
     logger.debug(f"Log report_by for TI {tis}.")
     if tis:
-        # rows are not locked, hit or miss
-        try:
-            update_stmt = (
-                update(TaskInstance)
-                .where(
-                    TaskInstance.id.in_(tis),
-                    TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
+        # Retry logic for row lock contention in batch updates
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                update_stmt = (
+                    update(TaskInstance)
+                    .where(
+                        TaskInstance.id.in_(tis),
+                        TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
+                    )
+                    .values(report_by_date=add_time(next_report_increment))
                 )
-                .values(report_by_date=add_time(next_report_increment))
-            )
 
-            db.execute(update_stmt)
-            # immediately release the lock
-            db.commit()
-            resp = JSONResponse(content={}, status_code=StatusCodes.OK)
-            return resp
-        except Exception as e:
-            # The bulk update may fail if any row is locked by another transaction.
-            # Log this error for investigation.
-            # If this happens a lot, consider update rows one by one.
-            # The locked rows may being updated by worker node; thus, just discard.
-            logger.warning(f"Failed to batch log report_by for TI {tis}: {e}")
-            raise e
+                db.execute(update_stmt)
+                # immediately release the lock
+                db.commit()
+                resp = JSONResponse(content={}, status_code=StatusCodes.OK)
+                return resp
+
+            except OperationalError as e:
+                if "database is locked" in str(e) and attempt < max_retries - 1:
+                    logger.warning(
+                        f"Database lock detected for batch TI {tis}, "
+                        f"retrying attempt {attempt + 1}/{max_retries}"
+                    )
+                    db.rollback()
+                    sleep(0.001 * (attempt + 1))  # 1ms, 2ms delays
+                    continue
+                else:
+                    logger.error(
+                        f"Failed to batch log report_by for TI {tis} "
+                        f"after {max_retries} attempts: {e}"
+                    )
+                    db.rollback()
+                    raise e
+            except Exception as e:
+                # The bulk update may fail if any row is locked by another transaction.
+                # Log this error for investigation.
+                # If this happens a lot, consider update rows one by one.
+                # The locked rows may being updated by worker node; thus, just discard.
+                logger.warning(f"Failed to batch log report_by for TI {tis}: {e}")
+                db.rollback()
+                raise e
+
+        # Should not reach here, but just in case
+        raise HTTPException(
+            status_code=503, detail="Database temporarily unavailable, please retry"
+        )
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_done")
