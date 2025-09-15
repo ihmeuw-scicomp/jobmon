@@ -13,6 +13,7 @@ from starlette.responses import JSONResponse
 from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.server.web._compat import subtract_time
+from jobmon.server.web.config import get_jobmon_config
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -307,6 +308,8 @@ async def set_status_for_triaging(
     # reduce false positives; split the update for launched and running tasks
     # this is a trade off between performance and correctness
     structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
+    # get jobmon heartbeat interval
+
     try:
         workflow_run_id = int(workflow_run_id)
     except Exception as e:
@@ -316,8 +319,12 @@ async def set_status_for_triaging(
 
     logger.info(f"Set to triaging those overdue tis for wfr {workflow_run_id}")
 
-    # Buffer to account for query execution time and reduce false positives
-    QUERY_BUFFER_SECONDS = 0.1  # 100ms buffer
+    # Get heartbeat interval from config to use as buffer
+    config = get_jobmon_config()
+    heartbeat_interval = float(config.get("heartbeat", "task_instance_interval"))
+    # Use heartbeat interval as buffer to account for query execution time
+    # and reduce false positives
+    QUERY_BUFFER_SECONDS = heartbeat_interval
 
     total_updated = 0
 
@@ -397,6 +404,9 @@ async def set_status_for_triaging(
                         TaskInstance.id.in_(launched_ti_ids),
                         TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
                         TaskInstance.report_by_date <= update_time,
+                        # Exclude recently created tasks (likely retries)
+                        # use jobmon heartbeat interval as a buffer
+                        TaskInstance.status_date <= subtract_time(heartbeat_interval),
                     )
                 )
                 .values(

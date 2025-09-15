@@ -154,13 +154,9 @@ def transit_ti_and_t(
             db.commit()
             return
         except OperationalError as e:
-            if "database is locked" in str(e):
-                logger.warning(f"Database lock detected, retrying attempt {i+1}/3...")
-                db.rollback()  # Clear the corrupted session state
-                sleep(0.001 * (i + 1))  # Much faster: 1ms, 2ms, 3ms
-            else:
-                db.rollback()
-                raise e
+            logger.warning(f"Database error  detected {e}, retrying attempt {i+1}/3")
+            db.rollback()  # Clear the corrupted session state
+            sleep(0.001 * (i + 1))  # Much faster: 1ms, 2ms, 3ms
         except Exception as e:
             logger.error(f"Failed to transit task_instance: {e}")
             db.rollback()  # Clear the corrupted session state
