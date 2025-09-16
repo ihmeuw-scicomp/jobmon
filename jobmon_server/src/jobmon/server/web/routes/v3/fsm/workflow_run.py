@@ -322,6 +322,8 @@ async def set_status_for_triaging(
     # Get heartbeat interval from config for retry exclusion logic
     config = get_jobmon_config()
     heartbeat_interval = float(config.get("heartbeat", "task_instance_interval"))
+    hb_buffer_from_config = float(config.get("heartbeat", "report_by_buffer"))
+    hb_buffer = hb_buffer_from_config * heartbeat_interval
 
     total_updated = 0
 
@@ -402,9 +404,8 @@ async def set_status_for_triaging(
                         TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
                         TaskInstance.report_by_date <= update_time,
                         # Exclude recently changed status tasks (likely retries)
-                        # use 3 jobmon heartbeat interval as a buffer
-                        TaskInstance.status_date
-                        <= subtract_time(heartbeat_interval * 3),
+                        # use 2 jobmon heartbeat interval as a buffer
+                        TaskInstance.status_date <= subtract_time(hb_buffer * 2),
                     )
                 )
                 .values(
