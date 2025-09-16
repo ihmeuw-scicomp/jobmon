@@ -401,9 +401,10 @@ async def set_status_for_triaging(
                         TaskInstance.id.in_(launched_ti_ids),
                         TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
                         TaskInstance.report_by_date <= update_time,
-                        # Exclude recently created tasks (likely retries)
-                        # use jobmon heartbeat interval as a buffer
-                        TaskInstance.status_date <= subtract_time(heartbeat_interval),
+                        # Exclude recently changed status tasks (likely retries)
+                        # use 3 jobmon heartbeat interval as a buffer
+                        TaskInstance.status_date
+                        <= subtract_time(heartbeat_interval * 3),
                     )
                 )
                 .values(
