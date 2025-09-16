@@ -254,8 +254,6 @@ async def log_ti_report_by(
     """
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
-    logger.debug(f"Log report_by for TI {task_instance_id}")
-
     # Retry logic for row lock contention
     max_retries = 3
     for attempt in range(max_retries):
@@ -298,21 +296,13 @@ async def log_ti_report_by(
             return resp
 
         except OperationalError as e:
-            if "database is locked" in str(e) and attempt < max_retries - 1:
-                logger.warning(
-                    f"Database lock detected for TI {task_instance_id}, "
-                    f"retrying attempt {attempt + 1}/{max_retries}"
-                )
-                db.rollback()
-                sleep(0.001 * (attempt + 1))  # 1ms, 2ms delays
-                continue
-            else:
-                logger.error(
-                    f"Failed to log report_by for TI {task_instance_id} "
-                    f"after {max_retries} attempts: {e}"
-                )
-                db.rollback()
-                raise e
+            logger.warning(
+                f"Database lock detected for TI {task_instance_id}, "
+                f"retrying attempt {attempt + 1}/{max_retries}. {e}"
+            )
+            db.rollback()
+            sleep(0.001 * (attempt + 1))  # 1ms, 2ms delays
+            continue
         except Exception as e:
             logger.error(
                 f"Unexpected error logging report_by for TI {task_instance_id}: {e}"
