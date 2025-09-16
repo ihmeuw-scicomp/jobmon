@@ -319,19 +319,16 @@ async def set_status_for_triaging(
 
     logger.info(f"Set to triaging those overdue tis for wfr {workflow_run_id}")
 
-    # Get heartbeat interval from config to use as buffer
+    # Get heartbeat interval from config for retry exclusion logic
     config = get_jobmon_config()
     heartbeat_interval = float(config.get("heartbeat", "task_instance_interval"))
-    # Use heartbeat interval as buffer to account for query execution time
-    # and reduce false positives
-    QUERY_BUFFER_SECONDS = heartbeat_interval
 
     total_updated = 0
 
     # Process RUNNING tasks first
     try:
-        # Use database-agnostic subtract_time function
-        initial_time = subtract_time(QUERY_BUFFER_SECONDS)
+        # Check for overdue tasks (client already provides 3.1x buffer)
+        initial_time = func.now()
         running_select_stmt = select(TaskInstance.id).where(
             and_(
                 TaskInstance.workflow_run_id == workflow_run_id,
@@ -343,8 +340,8 @@ async def set_status_for_triaging(
         running_ti_ids = [row[0] for row in db.execute(running_select_stmt).fetchall()]
 
         if running_ti_ids:
-            # Get fresh timestamp
-            update_time = subtract_time(QUERY_BUFFER_SECONDS)
+            # Get fresh timestamp for update
+            update_time = func.now()
 
             # Update only the specific task instances with fresh time check
             running_update_stmt = (
@@ -378,8 +375,8 @@ async def set_status_for_triaging(
 
     # Process LAUNCHED tasks separately
     try:
-        # Use database-agnostic subtract_time function
-        initial_time = subtract_time(QUERY_BUFFER_SECONDS)
+        # Check for overdue tasks (client already provides 3.1x buffer)
+        initial_time = func.now()
         launched_select_stmt = select(TaskInstance.id).where(
             and_(
                 TaskInstance.workflow_run_id == workflow_run_id,
@@ -393,8 +390,8 @@ async def set_status_for_triaging(
         ]
 
         if launched_ti_ids:
-            # Get fresh timestamp
-            update_time = subtract_time(QUERY_BUFFER_SECONDS)
+            # Get fresh timestamp for update
+            update_time = func.now()
 
             # Update only the specific task instances with fresh time check
             launched_update_stmt = (

@@ -634,7 +634,8 @@ async def log_distributor_id(
     # Only try to transition if not in final state
     status = get_transit_status(task_instance, constants.TaskInstanceStatus.LAUNCHED)
     if status is not None:
-        transit_ti_and_t(task_instance, status, db)
+        # need to log report_by_date to avoid race condition
+        transit_ti_and_t(task_instance, status, db, data["next_report_increment"])
     else:
         logger.error(f"Unable to transition to launched from {task_instance.status}")
 
