@@ -135,6 +135,7 @@ def transit_ti_and_t(
                 update(TaskInstance)
                 .where(TaskInstance.id == task_instance.id)
                 .values(ti_values)
+                .execution_options(synchronize_session=False)
             )
             db.execute(update_stmt)
 
@@ -163,8 +164,11 @@ def transit_ti_and_t(
                 "database is locked" in str(e)
                 or "Lock wait timeout" in str(e)
                 or "could not obtain lock" in str(e)
+                or "Deadlock found" in str(e)
             ):
-                logger.warning(f"Lock timeout detected {e}, retrying attempt {i+1}/3")
+                logger.warning(
+                    f"Database error detected {e}, retrying attempt {i+1}/{max_retries}"
+                )
                 db.rollback()  # Clear the corrupted session state
                 sleep(0.001 * (2 ** (i + 1)))  # Exponential backoff: 2ms, 4ms...
             else:
