@@ -65,6 +65,8 @@ async def add_nodes(request: Request, db: Session = Depends(get_db)) -> Any:
                 or "Deadlock found" in str(e)
                 or "Lock wait timeout" in str(e)
                 or "could not obtain lock" in str(e)
+                or "lock(s) could not be acquired immediately and NOWAIT is set"
+                in str(e)
             ):
                 logger.warning(
                     f"Database error detected for node insert, retrying attempt "

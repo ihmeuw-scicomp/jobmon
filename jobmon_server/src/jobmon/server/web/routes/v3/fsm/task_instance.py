@@ -160,21 +160,11 @@ def transit_ti_and_t(
             db.commit()
             return
         except OperationalError as e:
-            if (
-                "database is locked" in str(e)
-                or "Lock wait timeout" in str(e)
-                or "could not obtain lock" in str(e)
-                or "Deadlock found" in str(e)
-            ):
-                logger.warning(
-                    f"Database error detected {e}, retrying attempt {i+1}/{max_retries}"
-                )
-                db.rollback()  # Clear the corrupted session state
-                sleep(0.001 * (2 ** (i + 1)))  # Exponential backoff: 2ms, 4ms...
-            else:
-                logger.error(f"Unexpected database error: {e}")
-                db.rollback()
-                raise e
+            logger.warning(
+                f"Database error detected {e}, retrying attempt {i+1}/{max_retries}"
+            )
+            db.rollback()  # Clear the corrupted session state
+            sleep(0.001 * (2 ** (i + 1)))  # Exponential backoff: 2ms, 4ms...
         except Exception as e:
             logger.error(f"Failed to transit task_instance: {e}")
             db.rollback()  # Clear the corrupted session state

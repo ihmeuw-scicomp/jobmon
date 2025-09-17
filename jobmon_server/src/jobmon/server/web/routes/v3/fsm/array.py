@@ -145,6 +145,8 @@ async def record_array_batch_num(
                     "database is locked" in str(e)
                     or "Lock wait timeout" in str(e)
                     or "could not obtain lock" in str(e)
+                    or "lock(s) could not be acquired immediately and NOWAIT is set"
+                    in str(e)
                 ):
                     logger.warning(
                         f"Lock timeout updating tasks batch, retrying attempt "
@@ -215,6 +217,8 @@ async def record_array_batch_num(
                     "database is locked" in str(e)
                     or "Lock wait timeout" in str(e)
                     or "could not obtain lock" in str(e)
+                    or "lock(s) could not be acquired immediately and NOWAIT is set"
+                    in str(e)
                 ):
                     logger.warning(
                         f"Lock timeout inserting task instances batch, retrying attempt "
