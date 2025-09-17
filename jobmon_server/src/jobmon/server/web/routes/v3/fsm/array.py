@@ -2,11 +2,13 @@
 
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
+from time import sleep
 from typing import Any, Dict, cast
 
 import structlog
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy import and_, case, func, insert, literal_column, select, update
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
@@ -94,71 +96,151 @@ async def record_array_batch_num(
         Task.status.in_([TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]),
     )
 
-    # Acquire locks on tasks to be updated
-    task_locks = (
-        select(Task.id)
-        .where(task_condition)
-        .with_for_update()
-        .execution_options(synchronize_session=False)
-    )
-    db.execute(task_locks)
+    # Step 1: Get list of task IDs to modify without locking
+    task_ids_to_update = [
+        row[0] for row in db.execute(select(Task.id).where(task_condition)).fetchall()
+    ]
 
-    # update task status to acquire lock
-    update_stmt = (
-        update(Task)
-        .where(task_condition)
-        .values(
-            status=TaskStatus.QUEUED,
-            status_date=func.now(),
-            num_attempts=(Task.num_attempts + 1),
-        )
-    )
-    db.execute(update_stmt)
+    if not task_ids_to_update:
+        # No tasks to update, return empty result
+        return JSONResponse(content={"tasks_by_status": {}}, status_code=StatusCodes.OK)
 
-    # now insert them into task instance
-    insert_stmt = insert(TaskInstance).from_select(
-        # columns map 1:1 to selected rows
-        [
-            "task_id",
-            "workflow_run_id",
-            "array_id",
-            "task_resources_id",
-            "array_batch_num",
-            "array_step_id",
-            "status",
-            "status_date",
-        ],
-        # select statement
-        select(
-            # unique id
-            Task.id.label("task_id"),
-            # static associations
-            literal_column(str(workflow_run_id)).label("workflow_run_id"),
-            literal_column(str(array_id)).label("array_id"),
-            literal_column(str(task_resources_id)).label("task_resources_id"),
-            # batch info
-            select(func.coalesce(func.max(TaskInstance.array_batch_num) + 1, 1))
-            .where((TaskInstance.array_id == array_id))
-            .label("array_batch_num"),
-            (func.row_number().over(order_by=Task.id) - 1).label("array_step_id"),
-            # status columns
-            literal_column(f"'{TaskInstanceStatus.QUEUED}'").label("status"),
-            func.now().label("status_date"),
-        )
-        .where(Task.id.in_(task_ids), Task.status == TaskStatus.QUEUED)
-        .with_for_update(),
-        # no python side defaults. Server defaults only
-        include_defaults=False,
-    )
-    db.execute(insert_stmt)
+    # Step 2: Split into batches of 1000
+    batch_size = 1000
+    task_batches = [
+        task_ids_to_update[i : i + batch_size]
+        for i in range(0, len(task_ids_to_update), batch_size)
+    ]
 
+    # Step 3: Process each batch with retries
+    max_retries = 5
+
+    for batch in task_batches:
+        # Update Task status with retries
+        for attempt in range(max_retries):
+            try:
+                # Update task status to QUEUED
+                update_stmt = (
+                    update(Task)
+                    .where(
+                        and_(
+                            Task.id.in_(batch),
+                            Task.status.in_(
+                                [TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]
+                            ),
+                        )
+                    )
+                    .values(
+                        status=TaskStatus.QUEUED,
+                        status_date=func.now(),
+                        num_attempts=(Task.num_attempts + 1),
+                    )
+                    .execution_options(synchronize_session=False)
+                )
+                db.execute(update_stmt)
+                db.commit()  # Immediate commit
+                break  # Success - exit retry loop
+            except OperationalError as e:
+                if (
+                    "database is locked" in str(e)
+                    or "Lock wait timeout" in str(e)
+                    or "could not obtain lock" in str(e)
+                ):
+                    logger.warning(
+                        f"Lock timeout updating tasks batch, retrying attempt "
+                        f"{attempt + 1}/{max_retries}"
+                    )
+                    db.rollback()
+                    sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff
+                else:
+                    logger.error(f"Unexpected database error updating tasks: {e}")
+                    db.rollback()
+                    raise e
+        else:
+            # All retries failed
+            logger.error(f"Failed to update task batch after {max_retries} attempts")
+            db.rollback()
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable, please retry"
+            )
+
+        # Insert into TaskInstance with retries
+        for attempt in range(max_retries):
+            try:
+                insert_stmt = insert(TaskInstance).from_select(
+                    # columns map 1:1 to selected rows
+                    [
+                        "task_id",
+                        "workflow_run_id",
+                        "array_id",
+                        "task_resources_id",
+                        "array_batch_num",
+                        "array_step_id",
+                        "status",
+                        "status_date",
+                    ],
+                    # select statement
+                    select(
+                        # unique id
+                        Task.id.label("task_id"),
+                        # static associations
+                        literal_column(str(workflow_run_id)).label("workflow_run_id"),
+                        literal_column(str(array_id)).label("array_id"),
+                        literal_column(str(task_resources_id)).label(
+                            "task_resources_id"
+                        ),
+                        # batch info
+                        select(
+                            func.coalesce(func.max(TaskInstance.array_batch_num) + 1, 1)
+                        )
+                        .where((TaskInstance.array_id == array_id))
+                        .label("array_batch_num"),
+                        (func.row_number().over(order_by=Task.id) - 1).label(
+                            "array_step_id"
+                        ),
+                        # status columns
+                        literal_column(f"'{TaskInstanceStatus.QUEUED}'").label(
+                            "status"
+                        ),
+                        func.now().label("status_date"),
+                    ).where(Task.id.in_(batch), Task.status == TaskStatus.QUEUED),
+                    # no python side defaults. Server defaults only
+                    include_defaults=False,
+                )
+                db.execute(insert_stmt)
+                db.commit()  # Immediate commit
+                break  # Success - exit retry loop
+            except OperationalError as e:
+                if (
+                    "database is locked" in str(e)
+                    or "Lock wait timeout" in str(e)
+                    or "could not obtain lock" in str(e)
+                ):
+                    logger.warning(
+                        f"Lock timeout inserting task instances batch, retrying attempt "
+                        f"{attempt + 1}/{max_retries}"
+                    )
+                    db.rollback()
+                    sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff
+                else:
+                    logger.error(
+                        f"Unexpected database error inserting task instances: {e}"
+                    )
+                    db.rollback()
+                    raise e
+        else:
+            # All retries failed
+            logger.error(
+                f"Failed to insert task instance batch after {max_retries} attempts"
+            )
+            db.rollback()
+            raise HTTPException(
+                status_code=503, detail="Database temporarily unavailable, please retry"
+            )
+
+    # Step 4: Run the tasks_by_status_query and return
     tasks_by_status_query = (
-        select(Task.status, Task.id)
-        .where(Task.id.in_(task_ids))
-        .with_for_update()
-        .order_by(
-            Task.status
-        )  # This line is optional but helps in organizing the result
+        select(Task.status, Task.id).where(Task.id.in_(task_ids)).order_by(Task.status)
     )
 
     result_dict = defaultdict(list)

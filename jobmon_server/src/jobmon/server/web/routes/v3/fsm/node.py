@@ -1,7 +1,7 @@
 """Routes used by the main jobmon client."""
 
-import time
 from http import HTTPStatus as StatusCodes
+from time import sleep
 from typing import Any, Dict, cast
 
 import structlog
@@ -52,8 +52,7 @@ async def add_nodes(request: Request, db: Session = Depends(get_db)) -> Any:
         raise ServerError(f"Unsupported SQL dialect '{DIALECT}'")
 
     # Retry logic for deadlock handling
-    max_retries = 3
-    retry_delay = 0.5  # Start with 500ms
+    max_retries = 5
 
     for attempt in range(max_retries):
         try:
@@ -61,18 +60,28 @@ async def add_nodes(request: Request, db: Session = Depends(get_db)) -> Any:
             db.flush()
             break  # Success, exit retry loop
         except OperationalError as e:
-            if "Deadlock found" in str(e) and attempt < max_retries - 1:
+            if (
+                "database is locked" in str(e)
+                or "Deadlock found" in str(e)
+                or "Lock wait timeout" in str(e)
+                or "could not obtain lock" in str(e)
+            ):
                 logger.warning(
-                    f"Deadlock detected on node insert, retrying in {retry_delay}s "
-                    f"(attempt {attempt + 1}/{max_retries})"
+                    f"Database error detected for node insert, retrying attempt "
+                    f"{attempt + 1}/{max_retries}. {e}"
                 )
-                db.rollback()  # Rollback the failed transaction
-                time.sleep(retry_delay)
-                retry_delay *= 2  # Exponential backoff
-                continue
+                db.rollback()  # Clear the corrupted session state
+                sleep(
+                    0.001 * (2 ** (attempt + 1))
+                )  # Exponential backoff: 2ms, 4ms, 8ms, 16ms, 32ms
             else:
-                # Re-raise if it's not a deadlock or we've exhausted retries
-                raise
+                logger.error(f"Unexpected database error inserting nodes: {e}")
+                db.rollback()
+                raise e
+        except Exception as e:
+            logger.error(f"Failed to insert nodes: {e}")
+            db.rollback()
+            raise e
 
     # Retrieve the node IDs
     ttvids, node_arg_hashes = zip(*node_keys)

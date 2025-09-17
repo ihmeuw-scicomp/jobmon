@@ -37,6 +37,9 @@ All notable changes to Jobmon will be documented in this file.
 - Added `Task Name` to the tooltip in the resource usage scatter plot.
 - Enabled filtering by `Task Name` in the resource usage scatter plot.
 - Added a `Download CSV button` to the resource usage page, allowing users to export all plot data regardless of filters.
+- **Performance Optimization**: Improved query performance for task template error log visualization by replacing correlated subqueries with CTEs and combining queries using window functions.
+- **Performance Optimization**: Enhanced database lock handling with NOWAIT locks and exponential backoff retry logic for potential race conditions.
+- **Performance Optimization**: Optimized array batch processing with 1000-item batches and immediate commits to reduce lock contention.
 - JSON Compatibility Layer: Added backward compatibility for `downstream_node_ids` field - clients ≤ 3.4.23 receive quoted JSON strings, newer clients receive unquoted arrays
 
 ### Changed

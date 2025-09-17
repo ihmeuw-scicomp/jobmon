@@ -101,21 +101,26 @@ def transit_ti_and_t(
     new_t_status = status_dict["new_t_status"]
     final_t_status = status_dict["final_t_status"]
     task = task_instance.task
-    # retry 3 times for lock because we need to lock two tables in a single transaction
-    for i in range(3):
+    # retry 5 times for lock because we need to lock two tables in a single transaction
+    # use nowait=True to avoid waiting for the lock
+    # thus, increase the max_retries to 5
+    max_retries = 5
+    for i in range(max_retries):
         try:
             # Lock TaskInstance first (by ID - deterministic order)
             # please do not lock the two tables at the same time to avoid deadlock
             ti_lock_stmt = (
                 select(TaskInstance.id, TaskInstance.task_id)
                 .where(TaskInstance.id == task_instance.id)
-                .with_for_update()
+                .with_for_update(nowait=True)
             )
             ti_result = db.execute(ti_lock_stmt).one()
             task_id = ti_result.task_id
 
             # Then lock Task (by ID - deterministic order)
-            task_lock_stmt = select(Task.id).where(Task.id == task_id).with_for_update()
+            task_lock_stmt = (
+                select(Task.id).where(Task.id == task_id).with_for_update(nowait=True)
+            )
             db.execute(task_lock_stmt).one()
 
             # Update TaskInstance with status and optional report_by_date
@@ -154,9 +159,18 @@ def transit_ti_and_t(
             db.commit()
             return
         except OperationalError as e:
-            logger.warning(f"Database error  detected {e}, retrying attempt {i+1}/3")
-            db.rollback()  # Clear the corrupted session state
-            sleep(0.001 * (i + 1))  # Much faster: 1ms, 2ms, 3ms
+            if (
+                "database is locked" in str(e)
+                or "Lock wait timeout" in str(e)
+                or "could not obtain lock" in str(e)
+            ):
+                logger.warning(f"Lock timeout detected {e}, retrying attempt {i+1}/3")
+                db.rollback()  # Clear the corrupted session state
+                sleep(0.001 * (2 ** (i + 1)))  # Exponential backoff: 2ms, 4ms...
+            else:
+                logger.error(f"Unexpected database error: {e}")
+                db.rollback()
+                raise e
         except Exception as e:
             logger.error(f"Failed to transit task_instance: {e}")
             db.rollback()  # Clear the corrupted session state
@@ -301,7 +315,7 @@ async def log_ti_report_by(
                 f"retrying attempt {attempt + 1}/{max_retries}. {e}"
             )
             db.rollback()
-            sleep(0.001 * (attempt + 1))  # 1ms, 2ms delays
+            sleep(0.001 * (2 ** (attempt + 1)))  # 2ms, 4ms, 8ms delays
             continue
         except Exception as e:
             logger.error(
@@ -359,21 +373,13 @@ async def log_ti_report_by_batch(
                 return resp
 
             except OperationalError as e:
-                if "database is locked" in str(e) and attempt < max_retries - 1:
-                    logger.warning(
-                        f"Database lock detected for batch TI {tis}, "
-                        f"retrying attempt {attempt + 1}/{max_retries}"
-                    )
-                    db.rollback()
-                    sleep(0.001 * (attempt + 1))  # 1ms, 2ms delays
-                    continue
-                else:
-                    logger.error(
-                        f"Failed to batch log report_by for TI {tis} "
-                        f"after {max_retries} attempts: {e}"
-                    )
-                    db.rollback()
-                    raise e
+                logger.warning(
+                    f"Database error {e} detected for batch TI {tis}, "
+                    f"retrying attempt {attempt + 1}/{max_retries}"
+                )
+                db.rollback()
+                sleep(0.001 * (2 ** (attempt + 1)))  # 2ms, 4ms, 8ms delays
+                continue
             except Exception as e:
                 # The bulk update may fail if any row is locked by another transaction.
                 # Log this error for investigation.

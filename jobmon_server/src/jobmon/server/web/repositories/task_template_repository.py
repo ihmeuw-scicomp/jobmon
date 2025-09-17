@@ -825,32 +825,41 @@ class TaskTemplateRepository:
         """
         offset = (page - 1) * page_size
 
-        # Base query conditions
-        query_filter = [
+        # Base filter conditions
+        base_filter = [
             TaskTemplateVersion.task_template_id == task_template_id,
             Task.workflow_id == workflow_id,
         ]
 
-        where_conditions = query_filter[:]
+        where_conditions = base_filter[:]
 
-        # Add recent errors filter if requested
+        # Create CTE for latest task instances and workflow runs if recent_errors is True
         if recent_errors_only:
+            # CTE to get the latest task instance for each task
+            latest_task_instances = (
+                select(
+                    TaskInstance.task_id,
+                    func.max(TaskInstance.id).label("latest_task_instance_id"),
+                )
+                .group_by(TaskInstance.task_id)
+                .cte("latest_task_instances")
+            )
+
+            # CTE to get the latest workflow run for each workflow
+            latest_workflow_runs = (
+                select(
+                    WorkflowRun.workflow_id,
+                    func.max(WorkflowRun.id).label("latest_workflow_run_id"),
+                )
+                .group_by(WorkflowRun.workflow_id)
+                .cte("latest_workflow_runs")
+            )
+
             where_conditions.extend(
                 [
-                    (
-                        TaskInstance.id
-                        == select(func.max(TaskInstance.id))
-                        .where(TaskInstance.task_id == Task.id)
-                        .correlate(Task)
-                        .scalar_subquery()
-                    ),
-                    (
-                        TaskInstance.workflow_run_id
-                        == select(func.max(WorkflowRun.id))
-                        .where(WorkflowRun.workflow_id == Task.workflow_id)
-                        .correlate(Task)
-                        .scalar_subquery()
-                    ),
+                    TaskInstance.id == latest_task_instances.c.latest_task_instance_id,
+                    TaskInstance.workflow_run_id
+                    == latest_workflow_runs.c.latest_workflow_run_id,
                 ]
             )
 
@@ -859,74 +868,168 @@ class TaskTemplateRepository:
             where_conditions.append(TaskInstance.id == task_instance_id)
 
         # Count total records
-        total_count_query = (
-            select(func.count(TaskInstanceErrorLog.id))
-            .join_from(
-                TaskInstanceErrorLog,
-                TaskInstance,
-                TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+        if recent_errors_only:
+            # Use CTEs for recent errors query
+            total_count_query = (
+                select(func.count(TaskInstanceErrorLog.id))
+                .join_from(
+                    TaskInstanceErrorLog,
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(
+                    TaskInstance,
+                    WorkflowRun,
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                )
+                .join_from(Task, Node, Task.node_id == Node.id)
+                .join_from(
+                    Node,
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join_from(
+                    TaskTemplateVersion,
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .join_from(
+                    TaskInstance,
+                    latest_task_instances,
+                    TaskInstance.id == latest_task_instances.c.latest_task_instance_id,
+                )
+                .join_from(
+                    TaskInstance,
+                    latest_workflow_runs,
+                    TaskInstance.workflow_run_id
+                    == latest_workflow_runs.c.latest_workflow_run_id,
+                )
+                .where(*base_filter)
             )
-            .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
-            .join_from(
-                TaskInstance,
-                WorkflowRun,
-                TaskInstance.workflow_run_id == WorkflowRun.id,
+        else:
+            # Standard query without CTEs
+            total_count_query = (
+                select(func.count(TaskInstanceErrorLog.id))
+                .join_from(
+                    TaskInstanceErrorLog,
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(
+                    TaskInstance,
+                    WorkflowRun,
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                )
+                .join_from(Task, Node, Task.node_id == Node.id)
+                .join_from(
+                    Node,
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join_from(
+                    TaskTemplateVersion,
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .where(*where_conditions)
             )
-            .join_from(Task, Node, Task.node_id == Node.id)
-            .join_from(
-                Node,
-                TaskTemplateVersion,
-                Node.task_template_version_id == TaskTemplateVersion.id,
-            )
-            .join_from(
-                TaskTemplateVersion,
-                TaskTemplate,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
-            )
-            .where(*where_conditions)
-        )
 
         total_count = self.session.execute(total_count_query).scalar() or 0
 
         # Main data query
-        data_query = (
-            select(
-                Task.id,
-                TaskInstance.id,
-                TaskInstanceErrorLog.id,
-                TaskInstanceErrorLog.error_time,
-                TaskInstanceErrorLog.description,
-                TaskInstance.stderr_log,
-                TaskInstance.workflow_run_id,
-                Task.workflow_id,
+        if recent_errors_only:
+            # Use CTEs for recent errors query
+            data_query = (
+                select(
+                    Task.id,
+                    TaskInstance.id,
+                    TaskInstanceErrorLog.id,
+                    TaskInstanceErrorLog.error_time,
+                    TaskInstanceErrorLog.description,
+                    TaskInstance.stderr_log,
+                    TaskInstance.workflow_run_id,
+                    Task.workflow_id,
+                )
+                .join_from(
+                    TaskInstanceErrorLog,
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(
+                    TaskInstance,
+                    WorkflowRun,
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                )
+                .join_from(Task, Node, Task.node_id == Node.id)
+                .join_from(
+                    Node,
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join_from(
+                    TaskTemplateVersion,
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .join_from(
+                    TaskInstance,
+                    latest_task_instances,
+                    TaskInstance.id == latest_task_instances.c.latest_task_instance_id,
+                )
+                .join_from(
+                    TaskInstance,
+                    latest_workflow_runs,
+                    TaskInstance.workflow_run_id
+                    == latest_workflow_runs.c.latest_workflow_run_id,
+                )
+                .where(*base_filter)
+                .order_by(TaskInstanceErrorLog.id.desc())
+                .offset(offset)
+                .limit(page_size)
             )
-            .join_from(
-                TaskInstanceErrorLog,
-                TaskInstance,
-                TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+        else:
+            # Standard query without CTEs
+            data_query = (
+                select(
+                    Task.id,
+                    TaskInstance.id,
+                    TaskInstanceErrorLog.id,
+                    TaskInstanceErrorLog.error_time,
+                    TaskInstanceErrorLog.description,
+                    TaskInstance.stderr_log,
+                    TaskInstance.workflow_run_id,
+                    Task.workflow_id,
+                )
+                .join_from(
+                    TaskInstanceErrorLog,
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(
+                    TaskInstance,
+                    WorkflowRun,
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                )
+                .join_from(Task, Node, Task.node_id == Node.id)
+                .join_from(
+                    Node,
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join_from(
+                    TaskTemplateVersion,
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .where(*where_conditions)
+                .order_by(TaskInstanceErrorLog.id.desc())
+                .offset(offset)
+                .limit(page_size)
             )
-            .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
-            .join_from(
-                TaskInstance,
-                WorkflowRun,
-                TaskInstance.workflow_run_id == WorkflowRun.id,
-            )
-            .join_from(Task, Node, Task.node_id == Node.id)
-            .join_from(
-                Node,
-                TaskTemplateVersion,
-                Node.task_template_version_id == TaskTemplateVersion.id,
-            )
-            .join_from(
-                TaskTemplateVersion,
-                TaskTemplate,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
-            )
-            .where(*where_conditions)
-            .order_by(TaskInstanceErrorLog.id.desc())
-            .offset(offset)
-            .limit(page_size)
-        )
 
         rows = self.session.execute(data_query).all()
 
