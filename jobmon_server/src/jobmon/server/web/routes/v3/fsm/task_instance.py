@@ -147,7 +147,9 @@ def transit_ti_and_t(
                     .values(status=new_t_status, status_date=func.now())
                 )
                 db.execute(update_stmt)
-                db.flush()
+
+                # do not use flush() here to avoid partial commit
+
                 # update to the final task status
                 if new_t_status != final_t_status:
                     update_stmt = (
@@ -157,6 +159,7 @@ def transit_ti_and_t(
                     )
                     db.execute(update_stmt)
             # release locks immediately; please do not use flush() here
+            # ti and t table are updated atomicity
             db.commit()
             return
         except OperationalError as e:

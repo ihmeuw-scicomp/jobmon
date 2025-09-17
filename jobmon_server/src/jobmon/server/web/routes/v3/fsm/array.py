@@ -116,7 +116,8 @@ async def record_array_batch_num(
     max_retries = 5
 
     for batch in task_batches:
-        # Update Task status with retries
+        # Atomic batch operation: Update Task status AND create TaskInstance
+        # in one transaction
         for attempt in range(max_retries):
             try:
                 # Update task status to QUEUED
@@ -138,37 +139,8 @@ async def record_array_batch_num(
                     .execution_options(synchronize_session=False)
                 )
                 db.execute(update_stmt)
-                db.commit()  # Immediate commit
-                break  # Success - exit retry loop
-            except OperationalError as e:
-                if (
-                    "database is locked" in str(e)
-                    or "Lock wait timeout" in str(e)
-                    or "could not obtain lock" in str(e)
-                    or "lock(s) could not be acquired immediately and NOWAIT is set"
-                    in str(e)
-                ):
-                    logger.warning(
-                        f"Lock timeout updating tasks batch, retrying attempt "
-                        f"{attempt + 1}/{max_retries}"
-                    )
-                    db.rollback()
-                    sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff
-                else:
-                    logger.error(f"Unexpected database error updating tasks: {e}")
-                    db.rollback()
-                    raise e
-        else:
-            # All retries failed
-            logger.error(f"Failed to update task batch after {max_retries} attempts")
-            db.rollback()
-            raise HTTPException(
-                status_code=503, detail="Database temporarily unavailable, please retry"
-            )
 
-        # Insert into TaskInstance with retries
-        for attempt in range(max_retries):
-            try:
+                # Insert into TaskInstance in the same transaction
                 insert_stmt = insert(TaskInstance).from_select(
                     # columns map 1:1 to selected rows
                     [
@@ -210,8 +182,11 @@ async def record_array_batch_num(
                     include_defaults=False,
                 )
                 db.execute(insert_stmt)
-                db.commit()  # Immediate commit
+
+                # ATOMIC COMMIT: Both Task update AND TaskInstance insert together
+                db.commit()
                 break  # Success - exit retry loop
+
             except OperationalError as e:
                 if (
                     "database is locked" in str(e)
@@ -221,21 +196,21 @@ async def record_array_batch_num(
                     in str(e)
                 ):
                     logger.warning(
-                        f"Lock timeout inserting task instances batch, retrying attempt "
+                        f"Lock timeout for atomic batch operation, retrying attempt "
                         f"{attempt + 1}/{max_retries}"
                     )
                     db.rollback()
                     sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff
                 else:
                     logger.error(
-                        f"Unexpected database error inserting task instances: {e}"
+                        f"Unexpected database error in atomic batch operation: {e}"
                     )
                     db.rollback()
                     raise e
         else:
             # All retries failed
             logger.error(
-                f"Failed to insert task instance batch after {max_retries} attempts"
+                f"Failed to complete atomic batch operation after {max_retries} attempts"
             )
             db.rollback()
             raise HTTPException(

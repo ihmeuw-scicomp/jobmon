@@ -60,26 +60,14 @@ async def add_nodes(request: Request, db: Session = Depends(get_db)) -> Any:
             db.flush()
             break  # Success, exit retry loop
         except OperationalError as e:
-            if (
-                "database is locked" in str(e)
-                or "Deadlock found" in str(e)
-                or "Lock wait timeout" in str(e)
-                or "could not obtain lock" in str(e)
-                or "lock(s) could not be acquired immediately and NOWAIT is set"
-                in str(e)
-            ):
-                logger.warning(
-                    f"Database error detected for node insert, retrying attempt "
-                    f"{attempt + 1}/{max_retries}. {e}"
-                )
-                db.rollback()  # Clear the corrupted session state
-                sleep(
-                    0.001 * (2 ** (attempt + 1))
-                )  # Exponential backoff: 2ms, 4ms, 8ms, 16ms, 32ms
-            else:
-                logger.error(f"Unexpected database error inserting nodes: {e}")
-                db.rollback()
-                raise e
+            logger.warning(
+                f"Database error detected for node insert, retrying attempt "
+                f"{attempt + 1}/{max_retries}. {e}"
+            )
+            db.rollback()  # Clear the corrupted session state
+            sleep(
+                0.001 * (2 ** (attempt + 1))
+            )  # Exponential backoff: 2ms, 4ms, 8ms, 16ms, 32ms
         except Exception as e:
             logger.error(f"Failed to insert nodes: {e}")
             db.rollback()
