@@ -100,6 +100,9 @@ async def add_edges(
         )
         db.execute(update_stmt)
 
+    # Commit the transaction to ensure all changes are persisted
+    db.commit()
+
     # return result
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
