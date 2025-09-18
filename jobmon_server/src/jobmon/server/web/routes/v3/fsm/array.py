@@ -243,17 +243,18 @@ async def transition_array_to_launched(
     batch_num = data["batch_number"]
     next_report = data["next_report_increment"]
 
-    # Get task IDs for this array and batch
-    task_ids_query = (
-        select(TaskInstance.task_id)
+    # Get both task IDs and task instance IDs for this array and batch
+    ids_query = (
+        select(TaskInstance.task_id, TaskInstance.id)
         .where(
             TaskInstance.array_id == array_id,
             TaskInstance.array_batch_num == batch_num,
         )
         .execution_options(synchronize_session=False)
     )
-
-    task_ids = db.execute(task_ids_query).scalars()
+    results = db.execute(ids_query).all()
+    task_ids = [row[0] for row in results]
+    task_instance_ids = [row[1] for row in results]
 
     task_condition = and_(
         Task.array_id == array_id,
@@ -280,9 +281,8 @@ async def transition_array_to_launched(
                 update(TaskInstance)
                 .where(
                     and_(
-                        TaskInstance.array_id == array_id,
+                        TaskInstance.id.in_(task_instance_ids),
                         TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
-                        TaskInstance.array_batch_num == batch_num,
                     )
                 )
                 .values(
@@ -352,9 +352,9 @@ async def transition_to_killed(
     #    This is analogous to how transition_to_launched locks tasks
     #    that are INSTANTIATING and sets them to LAUNCHED.
 
-    # Find Task IDs belonging to TIs in this array & batch
-    task_ids_query = (
-        select(TaskInstance.task_id)
+    # Find both Task IDs and TaskInstance IDs in this array & batch
+    ids_query = (
+        select(TaskInstance.task_id, TaskInstance.id)
         .where(
             TaskInstance.array_id == array_id,
             TaskInstance.array_batch_num == batch_num,
@@ -362,7 +362,9 @@ async def transition_to_killed(
         )
         .execution_options(synchronize_session=False)
     )
-    task_ids = db.execute(task_ids_query).scalars().all()
+    results = db.execute(ids_query).all()
+    task_ids = [row[0] for row in results]
+    task_instance_ids = [row[1] for row in results]
 
     # We'll define "killable" Task states. Adjust as appropriate.
     killable_task_states = (
@@ -394,8 +396,7 @@ async def transition_to_killed(
                 update(TaskInstance)
                 .where(
                     and_(
-                        TaskInstance.array_id == array_id,
-                        TaskInstance.array_batch_num == batch_num,
+                        TaskInstance.id.in_(task_instance_ids),
                         TaskInstance.status == TaskInstanceStatus.KILL_SELF,
                     )
                 )

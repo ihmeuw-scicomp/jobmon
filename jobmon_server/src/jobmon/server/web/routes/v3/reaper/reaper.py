@@ -1,11 +1,11 @@
 """Routes used to move through the finite state."""
 
 from http import HTTPStatus as StatusCodes
-from typing import Any, Sequence, Tuple, Union
+from typing import Any, Union
 
 import structlog
 from fastapi import Depends, Query, Request
-from sqlalchemy import Row, Select, func, select, text, update
+from sqlalchemy import case, func, select, text, update
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
@@ -37,10 +37,7 @@ async def fix_wf_inconsistency(
         f"Fix inconsistencies starting at workflow {workflow_id} by {increase_step}"
     )
 
-    sql0 = select(Workflow.id)
-    rows = db.execute(sql0).all()
-    # the id to return to reaper as next start point
-    total_wf = len(rows)
+    total_wf = db.execute(select(func.count(Workflow.id))).scalar() or 0
 
     # move the starting row forward by increase_step
     # It takes about 1 second per thousand; increase_step is passed in from the reaper.
@@ -54,22 +51,29 @@ async def fix_wf_inconsistency(
         current_max_wf_id = 0
 
     # Update wf in F with all task in D to D
-    # count(s) will have the total number of tasks, sum(s) is those in D.
-    # If the two are equal, then the workflow Tasks are all D and therefore the workflow
-    # should be D.
-    query_filter = [
-        Workflow.id > workflow_id,
-        Workflow.id <= int(workflow_id) + increase_step,
-        Workflow.status == "F",
-        Workflow.id == Task.workflow_id,
-    ]
-    sql: Select[Tuple[int, str]] = select(Workflow.id, Task.status).where(*query_filter)
-    rows1: Sequence[Row[Tuple[int, str]]] = db.execute(sql).all()
-    result_set = set([r[0] for r in rows1])
-    for r in rows1:
-        if r[1] != "D" and r[0] in result_set:
-            result_set -= {r[0]}
-    result_list = list(result_set)
+    # Find workflows where all tasks have status 'D' using CTE for better performance
+    workflow_tasks_cte = (
+        select(
+            Task.workflow_id,
+            func.count(Task.id).label("total_tasks"),
+            func.sum(case((Task.status == "D", 1), else_=0)).label("done_tasks"),
+        )
+        .where(
+            Task.workflow_id.in_(
+                select(Workflow.id).where(
+                    Workflow.id > workflow_id,
+                    Workflow.id <= int(workflow_id) + increase_step,
+                    Workflow.status == "F",
+                )
+            )
+        )
+        .group_by(Task.workflow_id)
+        .having(func.count(Task.id) == func.sum(case((Task.status == "D", 1), else_=0)))
+        .cte("workflow_tasks")
+    )
+
+    sql = select(workflow_tasks_cte.c.workflow_id)
+    result_list = [row[0] for row in db.execute(sql).all()]
 
     if result_list is None or len(result_list) == 0:
         logger.debug("No inconsistent F-D workflows to fix.")
