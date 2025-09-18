@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 import scipy.stats as st  # type: ignore
 import structlog
-from sqlalchemy import String, and_, func, select
+from sqlalchemy import String, and_, case, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement, Label
 
@@ -633,6 +633,9 @@ class TaskTemplateRepository:
     ) -> Dict[int, WorkflowTaskTemplateStatusItem]:
         """Get the status of workflow task templates for GUI visualization.
 
+        Optimized version using single query with SQL aggregation instead of two separate
+        queries and Python-level aggregation.
+
         Args:
             workflow_id: ID of the workflow
             dialect: Database dialect for optimization hints
@@ -640,23 +643,6 @@ class TaskTemplateRepository:
         Returns:
             Dictionary mapping task template ID to WorkflowTaskTemplateStatusItem
         """
-        # CLI label mapping (imported from route module)
-        cli_label_mapping = {
-            "G": "PENDING",
-            "I": "SCHEDULED",  # INSTANTIATING
-            "Q": "SCHEDULED",
-            "R": "RUNNING",
-            "D": "DONE",
-            "F": "FATAL",
-            "K": "SCHEDULED",
-            "A": "SCHEDULED",
-            "H": "SCHEDULED",
-            "S": "SCHEDULED",
-            "U": "SCHEDULED",
-            "W": "SCHEDULED",
-            "T": "SCHEDULED",
-            "O": "SCHEDULED",
-        }
 
         def serialize_decimal(value: Union[Decimal, float]) -> float:
             """Convert Decimal to float for JSON serialization."""
@@ -690,114 +676,89 @@ class TaskTemplateRepository:
             )
         )
 
-        sql = (
+        # Single optimized query with SQL aggregation instead of two separate queries
+        optimized_sql = (
             select(
-                TaskTemplate.id,
-                TaskTemplate.name,
-                Task.id,
-                Task.status,
+                TaskTemplate.id.label("task_template_id"),
+                TaskTemplate.name.label("task_template_name"),
+                TaskTemplateVersion.id.label("task_template_version_id"),
                 sub_query.c.max_concurrently_running,
-                TaskTemplateVersion.id,
+                # SQL aggregation instead of Python loops - much faster
+                func.count(Task.id).label("total_tasks"),
+                func.sum(case((Task.status == "G", 1), else_=0)).label("pending_count"),
+                func.sum(
+                    case(
+                        (
+                            Task.status.in_(
+                                ["I", "Q", "K", "A", "H", "S", "U", "W", "T", "O"]
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("scheduled_count"),
+                func.sum(case((Task.status == "R", 1), else_=0)).label("running_count"),
+                func.sum(case((Task.status == "D", 1), else_=0)).label("done_count"),
+                func.sum(case((Task.status == "F", 1), else_=0)).label("fatal_count"),
+                # Attempt statistics in same query - no second database round-trip
+                func.min(Task.num_attempts).label("min_attempts"),
+                func.max(Task.num_attempts).label("max_attempts"),
+                func.avg(Task.num_attempts).label("avg_attempts"),
             )
             .select_from(join_table)
             .where(Task.workflow_id == workflow_id)
-            .order_by(Task.id)
+            .group_by(
+                TaskTemplate.id,
+                TaskTemplate.name,
+                TaskTemplateVersion.id,
+                sub_query.c.max_concurrently_running,
+            )
+            .order_by(TaskTemplate.id)
         )
 
         # Add STRAIGHT_JOIN for MySQL optimization
         if dialect == "mysql":
-            sql = sql.prefix_with("STRAIGHT_JOIN")
+            optimized_sql = optimized_sql.prefix_with("STRAIGHT_JOIN")
 
-        rows = self.session.execute(sql).all()
+        # Single database query instead of two - much faster
+        rows = self.session.execute(optimized_sql).all()
 
-        # Query for attempt statistics
-        attempts_join_table = (
-            Task.__table__.join(Node, Task.node_id == Node.id)
-            .join(
-                TaskTemplateVersion,
-                Node.task_template_version_id == TaskTemplateVersion.id,
-            )
-            .join(
-                TaskTemplate,
-                TaskTemplateVersion.task_template_id == TaskTemplate.id,
-            )
-        )
-
-        attempts_sql = (
-            select(
-                TaskTemplate.id.label("task_template_id"),
-                TaskTemplate.name.label("task_template_name"),
-                func.min(Task.num_attempts).label("min"),
-                func.max(Task.num_attempts).label("max"),
-                func.avg(Task.num_attempts).label("mean"),
-            )
-            .select_from(attempts_join_table)
-            .where(Task.workflow_id == workflow_id)
-            .group_by(TaskTemplate.id)
-        )
-
-        if dialect == "mysql":
-            attempts_sql = attempts_sql.prefix_with("STRAIGHT_JOIN")
-
-        attempts_rows = self.session.execute(attempts_sql).all()
-        attempts_dict = {attempt[0]: attempt for attempt in attempts_rows}
-
-        # Process results
-        result_dict: Dict[int, Dict[str, Any]] = {}
-
+        # Process results (much faster - no loops, direct aggregation from SQL)
+        result_dict = {}
         for row in rows:
-            task_template_id = row[0]
-            task_template_name = row[1]
-            task_status = row[3]
-            max_concurrently = row[4]
-            task_template_version_id = int(row[5])
-
-            if task_template_id not in result_dict:
-                attempt = attempts_dict.get(task_template_id)
-                min_attempts, max_attempts, mean_attempts = (None, None, None)
-                if attempt:
-                    _, _, min_attempts, max_attempts, mean_attempts = attempt
-
-                result_dict[task_template_id] = {
-                    "id": task_template_id,
-                    "name": task_template_name,
-                    "tasks": 0,
-                    "PENDING": 0,
-                    "SCHEDULED": 0,
-                    "RUNNING": 0,
-                    "DONE": 0,
-                    "FATAL": 0,
-                    "MAXC": max_concurrently if max_concurrently is not None else "NA",
-                    "num_attempts_min": (
-                        serialize_decimal(min_attempts)
-                        if min_attempts is not None
-                        else None
-                    ),
-                    "num_attempts_max": (
-                        serialize_decimal(max_attempts)
-                        if max_attempts is not None
-                        else None
-                    ),
-                    "num_attempts_avg": (
-                        serialize_decimal(mean_attempts)
-                        if mean_attempts is not None
-                        else None
-                    ),
-                    "task_template_version_id": task_template_version_id,
-                }
-
-            result_dict[task_template_id]["tasks"] += 1
-            result_dict[task_template_id][cli_label_mapping[task_status]] += 1
-            result_dict[task_template_id]["MAXC"] = (
-                max_concurrently if max_concurrently is not None else "NA"
+            result_dict[row.task_template_id] = WorkflowTaskTemplateStatusItem(
+                id=row.task_template_id,
+                name=row.task_template_name,
+                tasks=row.total_tasks,
+                PENDING=row.pending_count,
+                SCHEDULED=row.scheduled_count,
+                RUNNING=row.running_count,
+                DONE=row.done_count,
+                FATAL=row.fatal_count,
+                MAXC=(
+                    row.max_concurrently_running
+                    if row.max_concurrently_running is not None
+                    else "NA"
+                ),
+                num_attempts_min=(
+                    serialize_decimal(row.min_attempts)
+                    if row.min_attempts is not None
+                    else None
+                ),
+                num_attempts_max=(
+                    serialize_decimal(row.max_attempts)
+                    if row.max_attempts is not None
+                    else None
+                ),
+                num_attempts_avg=(
+                    serialize_decimal(row.avg_attempts)
+                    if row.avg_attempts is not None
+                    else None
+                ),
+                task_template_version_id=row.task_template_version_id,
             )
 
-        # Convert to Pydantic models
-        pydantic_result = {}
-        for tt_id, data in result_dict.items():
-            pydantic_result[tt_id] = WorkflowTaskTemplateStatusItem(**data)
-
-        return pydantic_result
+        return result_dict
 
     def get_tt_error_log_viz(
         self,
