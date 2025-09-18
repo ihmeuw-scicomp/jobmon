@@ -185,66 +185,112 @@ async def log_running(
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
-    try:
-        # load task_instance; do not lock
-        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
-        task_instance = db.execute(select_stmt).scalars().one()
+    # Retry logic for database operations
+    max_retries = 5
 
-        # Update attributes
-        if data.get("distributor_id") is not None:
-            task_instance.distributor_id = data["distributor_id"]
-        if data.get("nodename") is not None:
-            task_instance.nodename = data["nodename"]
-        task_instance.process_group_id = data["process_group_id"]
-
-        # Handle state transition
-        status = get_transit_status(task_instance, constants.TaskInstanceStatus.RUNNING)
-        if status is not None:
-            transit_ti_and_t(
-                task_instance,
-                status,
-                db,
-                data["next_report_increment"],
+    for attempt in range(max_retries):
+        try:
+            # load task_instance; do not lock
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
             )
-        else:
-            if task_instance.status == constants.TaskInstanceStatus.RUNNING:
-                logger.warning(
-                    f"Unable to transition to running from {task_instance.status}"
+            task_instance = db.execute(select_stmt).scalars().one()
+
+            # Update attributes
+            if data.get("distributor_id") is not None:
+                task_instance.distributor_id = data["distributor_id"]
+            if data.get("nodename") is not None:
+                task_instance.nodename = data["nodename"]
+            task_instance.process_group_id = data["process_group_id"]
+
+            # Handle state transition
+            status = get_transit_status(
+                task_instance, constants.TaskInstanceStatus.RUNNING
+            )
+            if status is not None:
+                transit_ti_and_t(
+                    task_instance,
+                    status,
+                    db,
+                    data["next_report_increment"],
                 )
-            elif task_instance.status == constants.TaskInstanceStatus.KILL_SELF:
-                status = get_transit_status(
-                    task_instance, constants.TaskInstanceStatus.ERROR_FATAL
-                )
-                if status is not None:
-                    transit_ti_and_t(
-                        task_instance,
-                        status,
-                        db,
-                        data["next_report_increment"],
-                    )
-            elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
-                status = get_transit_status(
-                    task_instance, constants.TaskInstanceStatus.ERROR
-                )
-                if status is not None:
-                    transit_ti_and_t(
-                        task_instance,
-                        status,
-                        db,
-                        data["next_report_increment"],
-                    )
             else:
-                logger.error(
-                    f"Unable to transition to running from {task_instance.status}"
+                if task_instance.status == constants.TaskInstanceStatus.RUNNING:
+                    logger.warning(
+                        f"Unable to transition to running from {task_instance.status}"
+                    )
+                elif task_instance.status == constants.TaskInstanceStatus.KILL_SELF:
+                    status = get_transit_status(
+                        task_instance, constants.TaskInstanceStatus.ERROR_FATAL
+                    )
+                    if status is not None:
+                        transit_ti_and_t(
+                            task_instance,
+                            status,
+                            db,
+                            data["next_report_increment"],
+                        )
+                elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
+                    status = get_transit_status(
+                        task_instance, constants.TaskInstanceStatus.ERROR
+                    )
+                    if status is not None:
+                        transit_ti_and_t(
+                            task_instance,
+                            status,
+                            db,
+                            data["next_report_increment"],
+                        )
+                else:
+                    logger.error(
+                        f"Unable to transition to running from {task_instance.status}"
+                    )
+
+            # Commit the session to ensure all changes are persisted
+            db.commit()
+
+            wire_format = task_instance.to_wire_as_worker_node_task_instance()
+            return JSONResponse(
+                content={"task_instance": wire_format}, status_code=StatusCodes.OK
+            )
+
+        except OperationalError as e:
+            if (
+                "database is locked" in str(e)
+                or "Lock wait timeout" in str(e)
+                or "could not obtain lock" in str(e)
+                or "Deadlock found" in str(e)
+                or "lock(s) could not be acquired immediately and NOWAIT is set"
+                in str(e)
+            ):
+                logger.warning(
+                    f"Database error detected for log_running, retrying attempt "
+                    f"{attempt + 1}/{max_retries}. {e}"
                 )
+                db.rollback()  # Clear the corrupted session state
+                sleep(
+                    0.001 * (2 ** (attempt + 1))
+                )  # Exponential backoff: 2ms, 4ms, 8ms...
+            else:
+                logger.error(f"Unexpected database error in log_running: {e}")
+                db.rollback()
+                raise e
+        except Exception as e:
+            logger.error(
+                f"Failed to log running for task_instance {task_instance_id}: {e}"
+            )
+            db.rollback()
+            raise e
 
-        wire_format = task_instance.to_wire_as_worker_node_task_instance()
-        return JSONResponse(
-            content={"task_instance": wire_format}, status_code=StatusCodes.OK
-        )
-
-    except Exception as e:
-        raise e
+    # All retries failed
+    logger.error(
+        f"Failed to log running for task_instance {task_instance_id} "
+        f"after {max_retries} attempts"
+    )
+    db.rollback()
+    raise HTTPException(
+        status_code=503, detail="Database temporarily unavailable, please retry"
+    )
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_report_by")
@@ -266,7 +312,7 @@ async def log_ti_report_by(
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
     # Retry logic for row lock contention
-    max_retries = 3
+    max_retries = 5
     for attempt in range(max_retries):
         try:
             vals = {"report_by_date": add_time(data["next_report_increment"])}
@@ -761,99 +807,140 @@ async def instantiate_task_instances(
     data = cast(Dict, await request.json())
     task_instance_ids_list = tuple([int(tid) for tid in data["task_instance_ids"]])
 
-    # update the task table where FSM allows it
-    sub_query = (
-        select(Task.id)
-        .join(TaskInstance, TaskInstance.task_id == Task.id)
-        .where(
-            and_(
-                TaskInstance.id.in_(task_instance_ids_list),
-                Task.status == constants.TaskStatus.QUEUED,
+    # Atomic update of both Task and TaskInstance with retry logic
+    max_retries = 5
+
+    for attempt in range(max_retries):
+        try:
+            # 1) Update the task table where FSM allows it
+            sub_query = (
+                select(Task.id)
+                .join(TaskInstance, TaskInstance.task_id == Task.id)
+                .where(
+                    and_(
+                        TaskInstance.id.in_(task_instance_ids_list),
+                        Task.status == constants.TaskStatus.QUEUED,
+                    )
+                )
+            ).alias("derived_table")
+            task_update = (
+                update(Task)
+                .where(Task.id.in_(select(sub_query.c.id)))
+                .values(
+                    status=constants.TaskStatus.INSTANTIATING, status_date=func.now()
+                )
+                .execution_options(synchronize_session=False)
             )
-        )
-    ).alias("derived_table")
-    task_update = (
-        update(Task)
-        .where(Task.id.in_(select(sub_query.c.id)))
-        .values(status=constants.TaskStatus.INSTANTIATING, status_date=func.now())
-        .execution_options(synchronize_session=False)
-    )
-    db.execute(task_update)
+            db.execute(task_update)
 
-    # then propagate back into task instance where a change was made
-    sub_query = (
-        select(TaskInstance.id)
-        .join(Task, TaskInstance.task_id == Task.id)
-        .where(
-            and_(
-                # a successful transition
-                (Task.status == constants.TaskStatus.INSTANTIATING),
-                # and part of the current set
-                TaskInstance.id.in_(task_instance_ids_list),
+            # 2) Then propagate back into task instance where a change was made
+            sub_query = (
+                select(TaskInstance.id)
+                .join(Task, TaskInstance.task_id == Task.id)
+                .where(
+                    and_(
+                        # a successful transition
+                        (Task.status == constants.TaskStatus.INSTANTIATING),
+                        # and part of the current set
+                        TaskInstance.id.in_(task_instance_ids_list),
+                    )
+                )
+            ).alias("derived_table")
+            task_instance_update = (
+                update(TaskInstance)
+                .where(TaskInstance.id.in_(select(sub_query.c.id)))
+                .values(
+                    status=constants.TaskInstanceStatus.INSTANTIATED,
+                    status_date=func.now(),
+                )
+                .execution_options(synchronize_session=False)
             )
-        )
-    ).alias("derived_table")
-    task_instance_update = (
-        update(TaskInstance)
-        .where(TaskInstance.id.in_(select(sub_query.c.id)))
-        .values(
-            status=constants.TaskInstanceStatus.INSTANTIATED,
-            status_date=func.now(),
-        )
-        .execution_options(synchronize_session=False)
-    )
-    db.execute(task_instance_update)
+            db.execute(task_instance_update)
 
-    db.flush()
-    # fetch rows individually without group_concat
-    # Key is a tuple of array_id, array_name, array_batch_num, task_resources_id
-    # Values are task instances in this batch
-    grouped_data: DefaultDict = defaultdict(list)
-    instantiated_batches_query = (
-        select(
-            TaskInstance.array_id,
-            Array.name,
-            TaskInstance.array_batch_num,
-            TaskInstance.task_resources_id,
-            TaskInstance.id,
-        ).where(
-            TaskInstance.id.in_(task_instance_ids_list)
-            & (TaskInstance.status == constants.TaskInstanceStatus.INSTANTIATED)
-            & (TaskInstance.array_id == Array.id)
-        )
-        # Optionally, add an order_by clause here to make the rows easier to work with
-    )
+            # 3) Atomic commit - both updates succeed or both fail
+            db.commit()
 
-    # Collect the rows into the defaultdict
-    for (
-        array_id,
-        array_name,
-        array_batch_num,
-        task_resources_id,
-        task_instance_id,
-    ) in db.execute(instantiated_batches_query):
-        key = (array_id, array_batch_num, array_name, task_resources_id)
-        grouped_data[key].append(int(task_instance_id))
-
-    # Serialize the grouped data
-    serialized_batches = []
-    for key, task_instance_ids in grouped_data.items():
-        array_id, array_batch_num, array_name, task_resources_id = key
-        serialized_batches.append(
-            SerializeTaskInstanceBatch.to_wire(
-                array_id=array_id,
-                array_name=array_name,
-                array_batch_num=array_batch_num,
-                task_resources_id=task_resources_id,
-                task_instance_ids=task_instance_ids,
+            # Success - continue with the rest of the function
+            # fetch rows individually without group_concat
+            # Key is a tuple of array_id, array_name, array_batch_num, task_resources_id
+            # Values are task instances in this batch
+            grouped_data: DefaultDict = defaultdict(list)
+            instantiated_batches_query = (
+                select(
+                    TaskInstance.array_id,
+                    Array.name,
+                    TaskInstance.array_batch_num,
+                    TaskInstance.task_resources_id,
+                    TaskInstance.id,
+                ).where(
+                    TaskInstance.id.in_(task_instance_ids_list)
+                    & (TaskInstance.status == constants.TaskInstanceStatus.INSTANTIATED)
+                    & (TaskInstance.array_id == Array.id)
+                )
+                # Optionally, add an order_by clause here to make the rows easier to work with
             )
-        )
 
-    resp = JSONResponse(
-        content={"task_instance_batches": serialized_batches},
-        status_code=StatusCodes.OK,
+            # Collect the rows into the defaultdict
+            for (
+                array_id,
+                array_name,
+                array_batch_num,
+                task_resources_id,
+                task_instance_id,
+            ) in db.execute(instantiated_batches_query):
+                key = (array_id, array_batch_num, array_name, task_resources_id)
+                grouped_data[key].append(int(task_instance_id))
+
+            # Serialize the grouped data
+            serialized_batches = []
+            for key, task_instance_ids in grouped_data.items():
+                array_id, array_batch_num, array_name, task_resources_id = key
+                serialized_batches.append(
+                    SerializeTaskInstanceBatch.to_wire(
+                        array_id=array_id,
+                        array_name=array_name,
+                        array_batch_num=array_batch_num,
+                        task_resources_id=task_resources_id,
+                        task_instance_ids=task_instance_ids,
+                    )
+                )
+
+            resp = JSONResponse(
+                content={"task_instance_batches": serialized_batches},
+                status_code=StatusCodes.OK,
+            )
+            return resp
+
+        except OperationalError as e:
+            if (
+                "database is locked" in str(e)
+                or "Lock wait timeout" in str(e)
+                or "could not obtain lock" in str(e)
+                or "Deadlock found" in str(e)
+                or "lock(s) could not be acquired immediately and NOWAIT is set"
+                in str(e)
+            ):
+                logger.warning(
+                    f"Database error detected for atomic Task/TaskInstance instantiation, "
+                    f"retrying attempt {attempt + 1}/{max_retries}. {e}"
+                )
+                db.rollback()  # Clear the corrupted session state
+                sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff: 2ms, 4ms...
+            else:
+                logger.error(f"Unexpected database error in atomic instantiation: {e}")
+                db.rollback()
+                raise e
+        except Exception as e:
+            logger.error(f"Failed to instantiate task instances: {e}")
+            db.rollback()
+            raise e
+
+    # If we get here, all retries failed
+    logger.error(f"Failed to instantiate task instances after {max_retries} attempts")
+    db.rollback()
+    raise HTTPException(
+        status_code=503, detail="Database temporarily unavailable, please retry"
     )
-    return resp
 
 
 # ############################ HELPER FUNCTIONS ###############################

@@ -96,7 +96,7 @@ async def record_array_batch_num(
         Task.status.in_([TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]),
     )
 
-    # Step 1: Get list of task IDs to modify without locking
+    # Get list of task IDs to modify without locking
     task_ids_to_update = [
         row[0] for row in db.execute(select(Task.id).where(task_condition)).fetchall()
     ]
@@ -105,14 +105,14 @@ async def record_array_batch_num(
         # No tasks to update, return empty result
         return JSONResponse(content={"tasks_by_status": {}}, status_code=StatusCodes.OK)
 
-    # Step 2: Split into batches of 1000
+    # Split into batches of 1000
     batch_size = 1000
     task_batches = [
         task_ids_to_update[i : i + batch_size]
         for i in range(0, len(task_ids_to_update), batch_size)
     ]
 
-    # Step 3: Process each batch with retries
+    # Process each batch with retries
     max_retries = 5
 
     for batch in task_batches:
@@ -217,7 +217,7 @@ async def record_array_batch_num(
                 status_code=503, detail="Database temporarily unavailable, please retry"
             )
 
-    # Step 4: Run the tasks_by_status_query and return
+    # Run the tasks_by_status_query and return
     tasks_by_status_query = (
         select(Task.status, Task.id).where(Task.id.in_(task_ids)).order_by(Task.status)
     )
@@ -243,30 +243,30 @@ async def transition_array_to_launched(
     batch_num = data["batch_number"]
     next_report = data["next_report_increment"]
 
-    # Get both task IDs and task instance IDs for this array and batch
-    ids_query = (
-        select(TaskInstance.task_id, TaskInstance.id)
-        .where(
-            TaskInstance.array_id == array_id,
-            TaskInstance.array_batch_num == batch_num,
-        )
-        .execution_options(synchronize_session=False)
-    )
-    results = db.execute(ids_query).all()
-    task_ids = [row[0] for row in results]
-    task_instance_ids = [row[1] for row in results]
-
-    task_condition = and_(
-        Task.array_id == array_id,
-        Task.id.in_(task_ids),
-        Task.status == TaskStatus.INSTANTIATING,
-    )
-
     # Atomic update of both Task and TaskInstance with retry logic
     max_retries = 5
 
     for attempt in range(max_retries):
         try:
+            # Get both task IDs and task instance IDs for this array and batch
+            ids_query = (
+                select(TaskInstance.task_id, TaskInstance.id)
+                .where(
+                    TaskInstance.array_id == array_id,
+                    TaskInstance.array_batch_num == batch_num,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            results = db.execute(ids_query).all()
+            task_ids = [row[0] for row in results]
+            task_instance_ids = [row[1] for row in results]
+
+            # Now define task_condition with the fetched task_ids
+            task_condition = and_(
+                Task.array_id == array_id,
+                Task.id.in_(task_ids),
+                Task.status == TaskStatus.INSTANTIATING,
+            )
             # 1) Transition Tasks to LAUNCHED (UPDATE automatically locks rows)
             update_task_stmt = (
                 update(Task)
@@ -347,34 +347,10 @@ async def transition_to_killed(
     data = cast(Dict, await request.json())
     batch_num = data["batch_number"]
 
-    # 1) Acquire locks on the parent Tasks, and set them to ERROR_FATAL
-    #    if they're in a killable state.
-    #    This is analogous to how transition_to_launched locks tasks
-    #    that are INSTANTIATING and sets them to LAUNCHED.
-
-    # Find both Task IDs and TaskInstance IDs in this array & batch
-    ids_query = (
-        select(TaskInstance.task_id, TaskInstance.id)
-        .where(
-            TaskInstance.array_id == array_id,
-            TaskInstance.array_batch_num == batch_num,
-            TaskInstance.status == TaskInstanceStatus.KILL_SELF,
-        )
-        .execution_options(synchronize_session=False)
-    )
-    results = db.execute(ids_query).all()
-    task_ids = [row[0] for row in results]
-    task_instance_ids = [row[1] for row in results]
-
     # We'll define "killable" Task states. Adjust as appropriate.
     killable_task_states = (
         TaskStatusConstants.LAUNCHED,
         TaskStatusConstants.RUNNING,
-    )
-    task_condition = and_(
-        Task.array_id == array_id,
-        Task.id.in_(task_ids),
-        Task.status.in_(killable_task_states),
     )
 
     # Atomic update of both Task and TaskInstance with retry logic
@@ -382,6 +358,26 @@ async def transition_to_killed(
 
     for attempt in range(max_retries):
         try:
+            # Find both Task IDs and TaskInstance IDs in this array & batch
+            ids_query = (
+                select(TaskInstance.task_id, TaskInstance.id)
+                .where(
+                    TaskInstance.array_id == array_id,
+                    TaskInstance.array_batch_num == batch_num,
+                    TaskInstance.status == TaskInstanceStatus.KILL_SELF,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            results = db.execute(ids_query).all()
+            task_ids = [row[0] for row in results]
+            task_instance_ids = [row[1] for row in results]
+
+            # Now define task_condition with the fetched task_ids
+            task_condition = and_(
+                Task.array_id == array_id,
+                Task.id.in_(task_ids),
+                Task.status.in_(killable_task_states),
+            )
             # 1) Transition Tasks to ERROR_FATAL (UPDATE automatically locks rows)
             update_task_stmt = (
                 update(Task)
@@ -414,12 +410,24 @@ async def transition_to_killed(
             return JSONResponse(content={}, status_code=StatusCodes.OK)
 
         except OperationalError as e:
-            logger.warning(
-                f"Database error detected for atomic Task/TaskInstance update, "
-                f"retrying attempt {attempt + 1}/{max_retries}. {e}"
-            )
-            db.rollback()  # Clear the corrupted session state
-            sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff: 2ms, 4ms...
+            if (
+                "database is locked" in str(e)
+                or "Lock wait timeout" in str(e)
+                or "could not obtain lock" in str(e)
+                or "Deadlock found" in str(e)
+                or "lock(s) could not be acquired immediately and NOWAIT is set"
+                in str(e)
+            ):
+                logger.warning(
+                    f"Database error detected for atomic Task/TaskInstance update, "
+                    f"retrying attempt {attempt + 1}/{max_retries}. {e}"
+                )
+                db.rollback()  # Clear the corrupted session state
+                sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff: 2ms, 4ms...
+            else:
+                logger.error(f"Unexpected database error in atomic update: {e}")
+                db.rollback()
+                raise e
         except Exception as e:
             logger.error(f"Failed to update Tasks and TaskInstances: {e}")
             db.rollback()
