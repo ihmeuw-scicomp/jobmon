@@ -40,6 +40,11 @@ All notable changes to Jobmon will be documented in this file.
 - **Performance Optimization**: Improved query performance for task template error log visualization by replacing correlated subqueries with CTEs and combining queries using window functions.
 - **Performance Optimization**: Enhanced database lock handling with NOWAIT locks and exponential backoff retry logic for potential race conditions.
 - **Performance Optimization**: Optimized array batch processing with 1000-item batches and immediate commits to reduce lock contention.
+- **Performance Optimization**: Optimized `/api/v3/workflow_tt_status_viz/{workflow_id}` endpoint by replacing two separate database queries with a single SQL aggregation query.
+- **Performance Optimization**: Added retry logic with exponential backoff to `/api/v3/task_instance/{task_instance_id}/log_running` endpoint for better deadlock resilience and concurrent request handling.
+- **Performance Optimization**: Enhanced `/api/v3/task_instance/instantiate_task_instances` endpoint with atomic transactions and retry logic to prevent deadlocks during high-concurrency task instantiation.
+- **Performance Optimization**: Improved `/api/v3/dag/{dag_id}/edges` endpoint with explicit transaction commits and standardized error handling patterns.
+- **Performance Optimization**: Optimized array transition endpoints (`/api/v3/array/{array_id}/transition_to_launched` and `/api/v3/array/{array_id}/transition_to_killed`) with atomic Task and TaskInstance updates in single transactions.
 - JSON Compatibility Layer: Added backward compatibility for `downstream_node_ids` field - clients ≤ 3.4.23 receive quoted JSON strings, newer clients receive unquoted arrays
 
 ### Changed
