@@ -315,7 +315,7 @@ def test_reaper_version(db_engine, requester_no_retry, tool, sleepy_task_templat
             WorkflowRunStatus.HOT_RESUME,
         ]
         no_wfrs = reaper._get_lost_workflow_runs(statuses)
-        # reaper no longer checkes version
+        # reaper no longer checkes version, so all will be killed
         assert len(no_wfrs) == 1
 
 

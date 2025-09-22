@@ -126,6 +126,7 @@ def get_lost_workflow_runs(
         status = [status]
     with SessionMaker() as session:
         with session.begin():
+            # remove version check
             query_filter = [
                 WorkflowRun.status.in_(status),
                 WorkflowRun.heartbeat_date <= func.now(),
