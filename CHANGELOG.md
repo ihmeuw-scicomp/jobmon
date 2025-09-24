@@ -37,6 +37,7 @@ All notable changes to Jobmon will be documented in this file.
 - Added `Task Name` to the tooltip in the resource usage scatter plot.
 - Enabled filtering by `Task Name` in the resource usage scatter plot.
 - Added a `Download CSV button` to the resource usage page, allowing users to export all plot data regardless of filters.
+- JSON Compatibility Layer: Added backward compatibility for `downstream_node_ids` field - clients ≤ 3.4.23 receive quoted JSON strings, newer clients receive unquoted arrays
 
 ### Changed
 - **BREAKING: Logging System Migration**: Completely replaced legacy logging system with new elegant architecture:
