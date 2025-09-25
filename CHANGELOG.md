@@ -45,6 +45,7 @@ All notable changes to Jobmon will be documented in this file.
 - **Performance Optimization**: Enhanced `/api/v3/task_instance/instantiate_task_instances` endpoint with atomic transactions and retry logic to prevent deadlocks during high-concurrency task instantiation.
 - **Performance Optimization**: Improved `/api/v3/dag/{dag_id}/edges` endpoint with explicit transaction commits and standardized error handling patterns.
 - **Performance Optimization**: Optimized array transition endpoints (`/api/v3/array/{array_id}/transition_to_launched` and `/api/v3/array/{array_id}/transition_to_killed`) with atomic Task and TaskInstance updates in single transactions.
+- **Performance Optimization**: Dramatically improved `/api/v3/get_task_template_details` endpoint performance by replacing complex 4-table JOIN  with 4 targeted queries and O(n) set intersection.
 - JSON Compatibility Layer: Added backward compatibility for `downstream_node_ids` field - clients ≤ 3.4.23 receive quoted JSON strings, newer clients receive unquoted arrays
 
 ### Changed
