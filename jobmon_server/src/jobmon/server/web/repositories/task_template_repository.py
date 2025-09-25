@@ -417,7 +417,7 @@ class TaskTemplateRepository:
         self, workflow_id: int, task_template_id: int
     ) -> Optional[TaskTemplateDetailsResponse]:
         """Get task template details."""
-        # breach sql to get task template name separately
+        # break down sql to get task template name separately
         sql1 = select(
             TaskTemplate.name,
         ).where(TaskTemplate.id == task_template_id)
