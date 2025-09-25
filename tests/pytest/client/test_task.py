@@ -254,14 +254,22 @@ def test_binding_length(db_engine, client_env, tool):
 
 
 def test_binding_tasks(db_engine, client_env, tool):
+    import time
+
+    unique_id = str(int(time.time() * 1000))  # milliseconds timestamp
+
     tt = tool.get_task_template(
-        template_name="test_tt",
+        template_name=f"test_tt_{unique_id}",
         command_template="{arg1} {arg2} {arg3}",
         node_args=["arg1"],
         task_args=["arg2", "arg3"],
     )
     task1 = tt.create_task(
-        name="foo", task_attributes={"aa": "a"}, arg1="abc", arg2="def", arg3="ghi"
+        name=f"foo_{unique_id}",
+        task_attributes={f"aa_{unique_id}": "a"},
+        arg1="abc",
+        arg2="def",
+        arg3="ghi",
     )
     wf = tool.create_workflow()
     wf.add_task(task1)

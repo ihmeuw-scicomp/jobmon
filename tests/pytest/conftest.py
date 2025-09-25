@@ -12,7 +12,6 @@ from typing import Any, Optional
 
 import pytest
 import requests
-import sqlalchemy
 import uvicorn
 from sqlalchemy.engine import Engine
 
@@ -120,7 +119,9 @@ def db_engine(setup_test_environment) -> Engine:
     init_db()
 
     # Create and return engine
-    eng = sqlalchemy.create_engine(db_uri)
+    from jobmon.server.web.db import get_engine
+
+    eng = get_engine()  # Use the configured engine with WAL mode
 
     # Verify database has expected tables
     from sqlalchemy.orm import Session

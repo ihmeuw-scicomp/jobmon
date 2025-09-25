@@ -79,7 +79,11 @@ def test_set_status_for_triaging(tool, db_engine, task_template):
             update(TaskInstance)
             .where(TaskInstance.task_id.in_([tis[0].task_id, tis[2].task_id]))
             .values(
-                report_by_date=subtract_time(500), status=TaskInstanceStatus.LAUNCHED
+                report_by_date=subtract_time(500),
+                status=TaskInstanceStatus.LAUNCHED,
+                status_date=subtract_time(
+                    3600
+                ),  # 1 hour ago - much older than heartbeat interval
             )
         )
         session.execute(launched_stmt)
@@ -87,7 +91,11 @@ def test_set_status_for_triaging(tool, db_engine, task_template):
             update(TaskInstance)
             .where(TaskInstance.task_id == tis[1].task_id)
             .values(
-                report_by_date=subtract_time(500), status=TaskInstanceStatus.RUNNING
+                report_by_date=subtract_time(500),
+                status=TaskInstanceStatus.RUNNING,
+                status_date=subtract_time(
+                    3600
+                ),  # 1 hour ago - much older than heartbeat interval
             )
         )
         session.execute(running_stmt)

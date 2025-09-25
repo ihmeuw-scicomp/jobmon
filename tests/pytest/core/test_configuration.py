@@ -11,7 +11,7 @@ def temp_yaml_file(tmp_path):
     data = """
     http:
       request_timeout: 20
-      retries_timeout: 300
+      retries_timeout: 0
     """
     file_path = tmp_path / "test_config.yaml"
     file_path.write_text(data)
@@ -29,7 +29,7 @@ def test_basic_configuration_methods(temp_yaml_file):
 
     # Test typed get methods - return proper types
     assert config.get_int("http", "request_timeout") == 20
-    # Note: retries_timeout is overridden to 0 in conftest.py for faster test failures
+    # Note: retries_timeout is set to 0 in the YAML file for faster test failures
     assert config.get_int("http", "retries_timeout") == 0
 
 
@@ -71,8 +71,8 @@ def test_section_retrieval_with_overrides(temp_yaml_file, monkeypatch):
 
     # Assert that the value from the environment variable is used
     assert section_data["request_timeout"] == "25"
-    # Assert other values from test environment (conftest.py sets retries_timeout=0)
-    assert section_data["retries_timeout"] == "0"
+    # Assert other values from YAML file (retries_timeout=0)
+    assert int(section_data["retries_timeout"]) == 0
     # Assert new values from env vars are added
     assert section_data["missing"] == "foo"
 
@@ -86,6 +86,9 @@ def test_configuration_precedence(monkeypatch):
     """
     monkeypatch.setattr("builtins.open", mock_open(read_data=original_config_content))
     monkeypatch.setenv("JOBMON__HTTP__REQUEST_TIMEOUT", "25")
+    monkeypatch.setenv(
+        "JOBMON__HTTP__RETRIES_TIMEOUT", "0"
+    )  # Set test environment variable
 
     # Dict config should override everything
     overriding_dict = {"http": {"request_timeout": 30}}

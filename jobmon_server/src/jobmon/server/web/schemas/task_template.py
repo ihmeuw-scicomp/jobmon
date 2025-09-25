@@ -84,3 +84,102 @@ class TaskTemplateResourceUsageResponse(BaseModel):
             "ci_mem": self.ci_mem,
             "ci_runtime": self.ci_runtime,
         }
+
+
+class TaskTemplateDetailsResponse(BaseModel):
+    task_template_id: int
+    task_template_name: str
+    task_template_version_id: int
+
+
+class TaskTemplateVersionItem(BaseModel):
+    """Individual task template version item."""
+
+    id: int
+    name: str
+
+
+class TaskTemplateVersionResponse(BaseModel):
+    """Response model for task template version queries."""
+
+    task_template_version_ids: List[TaskTemplateVersionItem]
+
+
+class CoreInfoItem(BaseModel):
+    """Individual core info item."""
+
+    id: int
+    min: int
+    max: int
+    avg: int
+
+
+class RequestedCoresResponse(BaseModel):
+    """Response model for requested cores queries."""
+
+    core_info: List[CoreInfoItem]
+
+
+class QueueInfoItem(BaseModel):
+    """Individual queue info item."""
+
+    id: int
+    queue: str
+    queue_id: int
+
+
+class MostPopularQueueResponse(BaseModel):
+    """Response model for most popular queue queries."""
+
+    queue_info: List[QueueInfoItem]
+
+
+class WorkflowTaskTemplateStatusItem(BaseModel):
+    """Individual workflow task template status item."""
+
+    id: int
+    name: str
+    tasks: int
+    PENDING: int
+    SCHEDULED: int
+    RUNNING: int
+    DONE: int
+    FATAL: int
+    MAXC: Union[int, str]  # Can be int or "NA"
+    num_attempts_min: Optional[float]
+    num_attempts_max: Optional[float]
+    num_attempts_avg: Optional[float]
+    task_template_version_id: int
+
+
+class ErrorLogItem(BaseModel):
+    """Error log item - can represent individual errors or clustered errors."""
+
+    # Individual error fields (required for non-clustered, optional for clustered)
+    task_id: Optional[int] = None
+    task_instance_id: Optional[int] = None
+    task_instance_err_id: Optional[int] = None
+    error_time: Optional[str] = None
+    error: Optional[str] = None
+    task_instance_stderr_log: Optional[str] = None
+
+    # Common fields (always present)
+    workflow_run_id: int
+    workflow_id: int
+
+    # Clustering fields (only present when clustering is enabled)
+    error_score: Optional[float] = None
+    group_instance_count: Optional[int] = None
+    task_instance_ids: Optional[List[int]] = None
+    task_ids: Optional[List[int]] = None
+    sample_error: Optional[str] = None
+    first_error_time: Optional[str] = None
+
+
+class ErrorLogResponse(BaseModel):
+    """Response model for error log queries."""
+
+    error_logs: List[ErrorLogItem]
+    total_count: int
+    page: int
+    page_size: int

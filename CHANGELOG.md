@@ -37,6 +37,14 @@ All notable changes to Jobmon will be documented in this file.
 - Added `Task Name` to the tooltip in the resource usage scatter plot.
 - Enabled filtering by `Task Name` in the resource usage scatter plot.
 - Added a `Download CSV button` to the resource usage page, allowing users to export all plot data regardless of filters.
+- **Performance Optimization**: Improved query performance for task template error log visualization by replacing correlated subqueries with CTEs and combining queries using window functions.
+- **Performance Optimization**: Enhanced database lock handling with NOWAIT locks and exponential backoff retry logic for potential race conditions.
+- **Performance Optimization**: Optimized array batch processing with 1000-item batches and immediate commits to reduce lock contention.
+- **Performance Optimization**: Optimized `/api/v3/workflow_tt_status_viz/{workflow_id}` endpoint by replacing two separate database queries with a single SQL aggregation query.
+- **Performance Optimization**: Added retry logic with exponential backoff to `/api/v3/task_instance/{task_instance_id}/log_running` endpoint for better deadlock resilience and concurrent request handling.
+- **Performance Optimization**: Enhanced `/api/v3/task_instance/instantiate_task_instances` endpoint with atomic transactions and retry logic to prevent deadlocks during high-concurrency task instantiation.
+- **Performance Optimization**: Improved `/api/v3/dag/{dag_id}/edges` endpoint with explicit transaction commits and standardized error handling patterns.
+- **Performance Optimization**: Optimized array transition endpoints (`/api/v3/array/{array_id}/transition_to_launched` and `/api/v3/array/{array_id}/transition_to_killed`) with atomic Task and TaskInstance updates in single transactions.
 - JSON Compatibility Layer: Added backward compatibility for `downstream_node_ids` field - clients ≤ 3.4.23 receive quoted JSON strings, newer clients receive unquoted arrays
 
 ### Changed
@@ -59,6 +67,11 @@ All notable changes to Jobmon will be documented in this file.
 - Updated Workflow.add_tasks() parameter type from Sequence[Task] to Iterable[Task] to accept a broader range of iterable types including generators and iterators. (PR 279)
 - Expanded error message when a TaskInstance doesn't report a heartbeat.
 - Refactored task status update endpoint into smaller functions for better maintainability.
+- Replaced SessionMaker with FastAPI DB injection.
+- Locked corresponding rows in both Task and TaskInstance tables when transition states.
+- Reduced conditional selection from twice to once in set_status_for_triaging to shorten locking time, but still aggressively locked all corresponding rows in the TaskInstance table.
+- Added race condition protection in /log_error_worker_node to move task instance in T to R first.
+- Switched to one session logic for /task_template/{task_template_id}/add_version with manual rollback to avoid dead lock.
 - Optimized `/get_task_template_details` and `/task_template_resource_usage` routes.
 - Optimized `/task_template_dag` route to use less memory.
 - Improved isort configuration to correctly identify `jobmon` as first-party package, ensuring proper PEP 8 import order (stdlib → third-party → local).

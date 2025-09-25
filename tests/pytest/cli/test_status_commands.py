@@ -127,6 +127,10 @@ def df_from_stdout(function, arguments):
 
 
 def test_workflow_status(db_engine, tool, client_env, monkeypatch, cli):
+    import time
+
+    unique_id = str(int(time.time() * 1000))  # milliseconds timestamp
+
     monkeypatch.setattr(getpass, "getuser", mock_getuser)
     user = getpass.getuser()
 
@@ -135,8 +139,8 @@ def test_workflow_status(db_engine, tool, client_env, monkeypatch, cli):
         default_compute_resources_set={"sequential": {"queue": "null.q"}},
     )
 
-    task_template_1 = get_task_template(tool, template_name="phase_1")
-    task_template_2 = get_task_template(tool, template_name="phase_2")
+    task_template_1 = get_task_template(tool, template_name=f"phase_1_{unique_id}")
+    task_template_2 = get_task_template(tool, template_name=f"phase_2_{unique_id}")
     t1 = task_template_1.create_task(arg="sleep 10")
     t2 = task_template_2.create_task(arg="sleep 5", upstream_tasks=[t1])
     workflow.add_tasks([t1, t2])
@@ -514,6 +518,10 @@ def test_task_reset_wf_validation(db_engine, client_env, tool, cli):
 
 
 def test_sub_dag(db_engine, client_env, tool):
+    import time
+
+    unique_id = str(int(time.time() * 1000))  # milliseconds timestamp
+
     """
     Dag:
                 t1             t2             t3
@@ -528,9 +536,9 @@ def test_sub_dag(db_engine, client_env, tool):
               t1_11_213_1_1
     """  # noqa W605
     workflow = tool.create_workflow()
-    task_template_1 = get_task_template(tool, template_name="phase_1")
-    task_template_2 = get_task_template(tool, template_name="phase_2")
-    task_template_3 = get_task_template(tool, template_name="phase_3")
+    task_template_1 = get_task_template(tool, template_name=f"phase_1_{unique_id}")
+    task_template_2 = get_task_template(tool, template_name=f"phase_2_{unique_id}")
+    task_template_3 = get_task_template(tool, template_name=f"phase_3_{unique_id}")
     t1 = task_template_1.create_task(arg="echo 1")
     t1_1 = task_template_2.create_task(arg="echo 11")
     t1_2 = task_template_2.create_task(arg="echo 12")

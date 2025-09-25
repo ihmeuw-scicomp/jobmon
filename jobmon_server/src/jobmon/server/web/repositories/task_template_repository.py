@@ -1,25 +1,44 @@
+import json
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
+import pandas as pd  # type: ignore
 import scipy.stats as st  # type: ignore
 import structlog
-from sqlalchemy import String, and_, func, select
+from sqlalchemy import String, and_, case, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement, Label
 
+from jobmon.server.web.error_log_clustering import cluster_error_logs
 from jobmon.server.web.models.arg import Arg
+from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.node_arg import NodeArg
+from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
+from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.task_resources import TaskResources
+from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
+from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.schemas.task_template import (
+    CoreInfoItem,
+    ErrorLogItem,
+    ErrorLogResponse,
+    MostPopularQueueResponse,
+    QueueInfoItem,
+    RequestedCoresResponse,
     TaskResourceDetailItem,
     TaskResourceVizItem,
+    TaskTemplateDetailsResponse,
     TaskTemplateResourceUsageRequest,
+    TaskTemplateVersionItem,
+    TaskTemplateVersionResponse,
+    WorkflowTaskTemplateStatusItem,
 )
 
 logger = structlog.get_logger(__name__)
@@ -393,3 +412,624 @@ class TaskTemplateRepository:
                 )
 
         return viz_data
+
+    def get_task_template_details(
+        self, workflow_id: int, task_template_id: int
+    ) -> Optional[TaskTemplateDetailsResponse]:
+        """Get task template details."""
+        query_filter = [
+            Task.workflow_id == workflow_id,
+            Task.node_id == Node.id,
+            Node.task_template_version_id == TaskTemplateVersion.id,
+            TaskTemplateVersion.task_template_id == task_template_id,
+            TaskTemplateVersion.task_template_id == TaskTemplate.id,
+        ]
+
+        sql = (
+            select(
+                TaskTemplate.id,
+                TaskTemplate.name,
+                TaskTemplateVersion.id.label("task_template_version_id"),
+            )
+            .where(*query_filter)
+            .distinct()
+        )
+
+        row = self.session.execute(sql).one_or_none()
+
+        if row is None:
+            return None
+
+        tt_details_data = TaskTemplateDetailsResponse(
+            task_template_id=row.id,
+            task_template_name=row.name,
+            task_template_version_id=row.task_template_version_id,
+        )
+
+        return tt_details_data
+
+    def get_task_template_versions(
+        self, task_id: Optional[int] = None, workflow_id: Optional[int] = None
+    ) -> Optional[TaskTemplateVersionResponse]:
+        """Get task template version IDs and names for a task or workflow.
+
+        Args:
+            task_id: Optional task ID to get task template version for
+            workflow_id: Optional workflow ID to get all task template versions for
+
+        Returns:
+            TaskTemplateVersionResponse with list of task template versions,
+            or None if no data found.
+
+        Note:
+            If both task_id and workflow_id are provided, task_id takes precedence.
+        """
+        if task_id:
+            # Get task template version for specific task
+            query_filter = [
+                Task.id == task_id,
+                Task.node_id == Node.id,
+                Node.task_template_version_id == TaskTemplateVersion.id,
+                TaskTemplateVersion.task_template_id == TaskTemplate.id,
+            ]
+            sql = select(
+                TaskTemplateVersion.id,
+                TaskTemplate.name,
+            ).where(*query_filter)
+        elif workflow_id:
+            # Get all task template versions for workflow
+            query_filter = [
+                Task.workflow_id == workflow_id,
+                Task.node_id == Node.id,
+                Node.task_template_version_id == TaskTemplateVersion.id,
+                TaskTemplateVersion.task_template_id == TaskTemplate.id,
+            ]
+            sql = (
+                select(
+                    TaskTemplateVersion.id,
+                    TaskTemplate.name,
+                ).where(*query_filter)
+            ).distinct()
+        else:
+            # Neither task_id nor workflow_id provided
+            return None
+
+        rows = self.session.execute(sql).all()
+
+        if not rows:
+            return None
+
+        # Convert rows to Pydantic models
+        task_template_versions = []
+        for row in rows:
+            task_template_versions.append(
+                TaskTemplateVersionItem(id=row.id, name=row.name)
+            )
+
+        return TaskTemplateVersionResponse(
+            task_template_version_ids=task_template_versions
+        )
+
+    def get_requested_cores(
+        self, task_template_version_ids: List[int]
+    ) -> RequestedCoresResponse:
+        """Get the min, max, and avg of requested cores for task template versions.
+
+        Args:
+            task_template_version_ids: List of task template version IDs
+
+        Returns:
+            RequestedCoresResponse with core information for each task template version
+        """
+        query_filter = [
+            TaskTemplateVersion.id.in_(task_template_version_ids),
+            TaskTemplateVersion.id == Node.task_template_version_id,
+            Task.node_id == Node.id,
+            Task.task_resources_id == TaskResources.id,
+        ]
+
+        sql = select(TaskTemplateVersion.id, TaskResources.requested_resources).where(
+            *query_filter
+        )
+
+        rows_raw = self.session.execute(sql).all()
+
+        core_info = []
+        if rows_raw:
+            result_dir: Dict[int, List[int]] = {}
+
+            for row in rows_raw:
+                ttv_id = row[0]
+                requested_resources = row[1]
+
+                # Parse the JSON string, replace single quotes with double quotes
+                j_str = requested_resources.replace("'", '"')
+                j_dir = json.loads(j_str)
+
+                # Default to 1 core if num_cores not specified
+                core = 1 if "num_cores" not in j_dir else int(j_dir["num_cores"])
+
+                if ttv_id in result_dir:
+                    result_dir[ttv_id].append(core)
+                else:
+                    result_dir[ttv_id] = [core]
+
+            # Calculate statistics for each task template version
+            for ttv_id, cores in result_dir.items():
+                item_min = int(np.min(cores))
+                item_max = int(np.max(cores))
+                item_mean = round(np.mean(cores))
+
+                core_info.append(
+                    CoreInfoItem(id=ttv_id, min=item_min, max=item_max, avg=item_mean)
+                )
+
+        return RequestedCoresResponse(core_info=core_info)
+
+    def get_most_popular_queue(
+        self, task_template_version_ids: List[int]
+    ) -> MostPopularQueueResponse:
+        """Get the most popular queue for task template versions.
+
+        Args:
+            task_template_version_ids: List of task template version IDs
+
+        Returns:
+            MostPopularQueueResponse with queue information for each task template version
+        """
+        query_filter = [
+            TaskTemplateVersion.id.in_(task_template_version_ids),
+            TaskTemplateVersion.id == Node.task_template_version_id,
+            Task.node_id == Node.id,
+            TaskInstance.task_id == Task.id,
+            TaskInstance.task_resources_id == TaskResources.id,
+            TaskResources.queue_id.isnot(None),
+        ]
+
+        sql = select(TaskTemplateVersion.id, TaskResources.queue_id).where(
+            *query_filter
+        )
+        rows_raw = self.session.execute(sql).all()
+
+        queue_info = []
+        if rows_raw:
+            result_dir: Dict[int, Dict[int, int]] = {}
+
+            # Count queue usage per task template version
+            for row in rows_raw:
+                ttv_id = row[0]
+                queue_id = row[1]
+
+                if ttv_id in result_dir:
+                    if queue_id in result_dir[ttv_id]:
+                        result_dir[ttv_id][queue_id] += 1
+                    else:
+                        result_dir[ttv_id][queue_id] = 1
+                else:
+                    result_dir[ttv_id] = {queue_id: 1}
+
+            # Find most popular queue for each task template version
+            for ttv_id, queue_counts in result_dir.items():
+                popular_queue_id = max(
+                    queue_counts.keys(), key=lambda q: queue_counts[q]
+                )
+
+                # Get queue name
+                queue_name_query = select(Queue.name).where(
+                    Queue.id == popular_queue_id
+                )
+                popular_queue_name = self.session.execute(queue_name_query).scalar_one()
+
+                queue_info.append(
+                    QueueInfoItem(
+                        id=ttv_id, queue=popular_queue_name, queue_id=popular_queue_id
+                    )
+                )
+
+        return MostPopularQueueResponse(queue_info=queue_info)
+
+    def get_workflow_tt_status_viz(
+        self, workflow_id: int, dialect: str = "sqlite"
+    ) -> Dict[int, WorkflowTaskTemplateStatusItem]:
+        """Get the status of workflow task templates for GUI visualization.
+
+        Optimized version using single query with SQL aggregation instead of two separate
+        queries and Python-level aggregation.
+
+        Args:
+            workflow_id: ID of the workflow
+            dialect: Database dialect for optimization hints
+
+        Returns:
+            Dictionary mapping task template ID to WorkflowTaskTemplateStatusItem
+        """
+
+        def serialize_decimal(value: Union[Decimal, float]) -> float:
+            """Convert Decimal to float for JSON serialization."""
+            if isinstance(value, Decimal):
+                return float(value)
+            return value
+
+        # Query for task template data with Array join (outer join for backward compatibility)
+        sub_query = (
+            select(
+                Array.id,
+                Array.task_template_version_id,
+                Array.max_concurrently_running,
+            ).where(Array.workflow_id == workflow_id)
+        ).subquery()
+
+        join_table = (
+            Task.__table__.join(Node, Task.node_id == Node.id)
+            .join(
+                TaskTemplateVersion,
+                Node.task_template_version_id == TaskTemplateVersion.id,
+            )
+            .join(
+                TaskTemplate,
+                TaskTemplateVersion.task_template_id == TaskTemplate.id,
+            )
+            .join(
+                sub_query,
+                sub_query.c.task_template_version_id == TaskTemplateVersion.id,
+                isouter=True,
+            )
+        )
+
+        # Single optimized query with SQL aggregation instead of two separate queries
+        optimized_sql = (
+            select(
+                TaskTemplate.id.label("task_template_id"),
+                TaskTemplate.name.label("task_template_name"),
+                TaskTemplateVersion.id.label("task_template_version_id"),
+                sub_query.c.max_concurrently_running,
+                # SQL aggregation instead of Python loops - much faster
+                func.count(Task.id).label("total_tasks"),
+                func.sum(case((Task.status == "G", 1), else_=0)).label("pending_count"),
+                func.sum(
+                    case(
+                        (
+                            Task.status.in_(
+                                ["I", "Q", "K", "A", "H", "S", "U", "W", "T", "O"]
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("scheduled_count"),
+                func.sum(case((Task.status == "R", 1), else_=0)).label("running_count"),
+                func.sum(case((Task.status == "D", 1), else_=0)).label("done_count"),
+                func.sum(case((Task.status == "F", 1), else_=0)).label("fatal_count"),
+                # Attempt statistics in same query - no second database round-trip
+                func.min(Task.num_attempts).label("min_attempts"),
+                func.max(Task.num_attempts).label("max_attempts"),
+                func.avg(Task.num_attempts).label("avg_attempts"),
+            )
+            .select_from(join_table)
+            .where(Task.workflow_id == workflow_id)
+            .group_by(
+                TaskTemplate.id,
+                TaskTemplate.name,
+                TaskTemplateVersion.id,
+                sub_query.c.max_concurrently_running,
+            )
+            .order_by(TaskTemplate.id)
+        )
+
+        # Add STRAIGHT_JOIN for MySQL optimization
+        if dialect == "mysql":
+            optimized_sql = optimized_sql.prefix_with("STRAIGHT_JOIN")
+
+        # Single database query instead of two - much faster
+        rows = self.session.execute(optimized_sql).all()
+
+        # Process results (much faster - no loops, direct aggregation from SQL)
+        result_dict = {}
+        for row in rows:
+            result_dict[row.task_template_id] = WorkflowTaskTemplateStatusItem(
+                id=row.task_template_id,
+                name=row.task_template_name,
+                tasks=row.total_tasks,
+                PENDING=row.pending_count,
+                SCHEDULED=row.scheduled_count,
+                RUNNING=row.running_count,
+                DONE=row.done_count,
+                FATAL=row.fatal_count,
+                MAXC=(
+                    row.max_concurrently_running
+                    if row.max_concurrently_running is not None
+                    else "NA"
+                ),
+                num_attempts_min=(
+                    serialize_decimal(row.min_attempts)
+                    if row.min_attempts is not None
+                    else None
+                ),
+                num_attempts_max=(
+                    serialize_decimal(row.max_attempts)
+                    if row.max_attempts is not None
+                    else None
+                ),
+                num_attempts_avg=(
+                    serialize_decimal(row.avg_attempts)
+                    if row.avg_attempts is not None
+                    else None
+                ),
+                task_template_version_id=row.task_template_version_id,
+            )
+
+        return result_dict
+
+    def get_tt_error_log_viz(
+        self,
+        workflow_id: int,
+        task_template_id: int,
+        task_instance_id: Optional[int] = None,
+        page: int = 1,
+        page_size: int = 10,
+        recent_errors_only: bool = False,
+        cluster_errors: bool = False,
+    ) -> ErrorLogResponse:
+        """Get error logs for a task template ID for GUI visualization.
+
+        Args:
+            workflow_id: ID of the workflow
+            task_template_id: ID of the task template
+            task_instance_id: Optional specific task instance ID
+            page: Page number for pagination
+            page_size: Number of items per page
+            recent_errors_only: Whether to show only recent errors
+            cluster_errors: Whether to cluster similar errors
+
+        Returns:
+            ErrorLogResponse with paginated error log data
+        """
+        offset = (page - 1) * page_size
+
+        # Base filter conditions
+        base_filter = [
+            TaskTemplateVersion.task_template_id == task_template_id,
+            Task.workflow_id == workflow_id,
+        ]
+
+        where_conditions = base_filter[:]
+
+        # Create CTE for latest task instances and workflow runs if recent_errors is True
+        if recent_errors_only:
+            # CTE to get the latest task instance for each task
+            latest_task_instances = (
+                select(
+                    TaskInstance.task_id,
+                    func.max(TaskInstance.id).label("latest_task_instance_id"),
+                )
+                .group_by(TaskInstance.task_id)
+                .cte("latest_task_instances")
+            )
+
+            # CTE to get the latest workflow run for each workflow
+            latest_workflow_runs = (
+                select(
+                    WorkflowRun.workflow_id,
+                    func.max(WorkflowRun.id).label("latest_workflow_run_id"),
+                )
+                .group_by(WorkflowRun.workflow_id)
+                .cte("latest_workflow_runs")
+            )
+
+            where_conditions.extend(
+                [
+                    TaskInstance.id == latest_task_instances.c.latest_task_instance_id,
+                    TaskInstance.workflow_run_id
+                    == latest_workflow_runs.c.latest_workflow_run_id,
+                ]
+            )
+
+        # Add specific task instance filter if provided
+        if task_instance_id:
+            where_conditions.append(TaskInstance.id == task_instance_id)
+
+        # Count total records
+        if recent_errors_only:
+            # Use CTEs for recent errors query
+            total_count_query = (
+                select(func.count(TaskInstanceErrorLog.id))
+                .join_from(
+                    TaskInstanceErrorLog,
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(
+                    TaskInstance,
+                    WorkflowRun,
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                )
+                .join_from(Task, Node, Task.node_id == Node.id)
+                .join_from(
+                    Node,
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join_from(
+                    TaskTemplateVersion,
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .join_from(
+                    TaskInstance,
+                    latest_task_instances,
+                    TaskInstance.id == latest_task_instances.c.latest_task_instance_id,
+                )
+                .join_from(
+                    TaskInstance,
+                    latest_workflow_runs,
+                    TaskInstance.workflow_run_id
+                    == latest_workflow_runs.c.latest_workflow_run_id,
+                )
+                .where(*base_filter)
+            )
+        else:
+            # Standard query without CTEs
+            total_count_query = (
+                select(func.count(TaskInstanceErrorLog.id))
+                .join_from(
+                    TaskInstanceErrorLog,
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(
+                    TaskInstance,
+                    WorkflowRun,
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                )
+                .join_from(Task, Node, Task.node_id == Node.id)
+                .join_from(
+                    Node,
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join_from(
+                    TaskTemplateVersion,
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .where(*where_conditions)
+            )
+
+        total_count = self.session.execute(total_count_query).scalar() or 0
+
+        # Main data query
+        if recent_errors_only:
+            # Use CTEs for recent errors query
+            data_query = (
+                select(
+                    Task.id,
+                    TaskInstance.id,
+                    TaskInstanceErrorLog.id,
+                    TaskInstanceErrorLog.error_time,
+                    TaskInstanceErrorLog.description,
+                    TaskInstance.stderr_log,
+                    TaskInstance.workflow_run_id,
+                    Task.workflow_id,
+                )
+                .join_from(
+                    TaskInstanceErrorLog,
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(
+                    TaskInstance,
+                    WorkflowRun,
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                )
+                .join_from(Task, Node, Task.node_id == Node.id)
+                .join_from(
+                    Node,
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join_from(
+                    TaskTemplateVersion,
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .join_from(
+                    TaskInstance,
+                    latest_task_instances,
+                    TaskInstance.id == latest_task_instances.c.latest_task_instance_id,
+                )
+                .join_from(
+                    TaskInstance,
+                    latest_workflow_runs,
+                    TaskInstance.workflow_run_id
+                    == latest_workflow_runs.c.latest_workflow_run_id,
+                )
+                .where(*base_filter)
+                .order_by(TaskInstanceErrorLog.id.desc())
+                .offset(offset)
+                .limit(page_size)
+            )
+        else:
+            # Standard query without CTEs
+            data_query = (
+                select(
+                    Task.id,
+                    TaskInstance.id,
+                    TaskInstanceErrorLog.id,
+                    TaskInstanceErrorLog.error_time,
+                    TaskInstanceErrorLog.description,
+                    TaskInstance.stderr_log,
+                    TaskInstance.workflow_run_id,
+                    Task.workflow_id,
+                )
+                .join_from(
+                    TaskInstanceErrorLog,
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(
+                    TaskInstance,
+                    WorkflowRun,
+                    TaskInstance.workflow_run_id == WorkflowRun.id,
+                )
+                .join_from(Task, Node, Task.node_id == Node.id)
+                .join_from(
+                    Node,
+                    TaskTemplateVersion,
+                    Node.task_template_version_id == TaskTemplateVersion.id,
+                )
+                .join_from(
+                    TaskTemplateVersion,
+                    TaskTemplate,
+                    TaskTemplateVersion.task_template_id == TaskTemplate.id,
+                )
+                .where(*where_conditions)
+                .order_by(TaskInstanceErrorLog.id.desc())
+                .offset(offset)
+                .limit(page_size)
+            )
+
+        rows = self.session.execute(data_query).all()
+
+        # Convert to error log items
+        error_logs = []
+        for row in rows:
+            error_logs.append(
+                ErrorLogItem(
+                    task_id=row[0],
+                    task_instance_id=row[1],
+                    task_instance_err_id=row[2],
+                    error_time=str(row[3]),
+                    error=str(row[4]),
+                    task_instance_stderr_log=str(row[5]),
+                    workflow_run_id=row[6],
+                    workflow_id=row[7],
+                )
+            )
+
+        # Apply error clustering if requested
+        if cluster_errors and error_logs:
+            # Convert to DataFrame for clustering
+            error_data = [item.model_dump() for item in error_logs]
+            errors_df = pd.DataFrame(error_data)
+
+            # Apply clustering
+            clustered_df = cluster_error_logs(errors_df)
+
+            # Convert back to ErrorLogItem objects
+            error_logs = [
+                ErrorLogItem(**row) for row in clustered_df.to_dict(orient="records")
+            ]
+
+            # Update total count after clustering
+            total_count = len(error_logs)
+
+        return ErrorLogResponse(
+            error_logs=error_logs,
+            total_count=total_count,
+            page=page,
+            page_size=page_size,
+        )
