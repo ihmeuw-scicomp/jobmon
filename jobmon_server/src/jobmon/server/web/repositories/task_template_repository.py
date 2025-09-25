@@ -417,33 +417,60 @@ class TaskTemplateRepository:
         self, workflow_id: int, task_template_id: int
     ) -> Optional[TaskTemplateDetailsResponse]:
         """Get task template details."""
-        query_filter = [
-            Task.workflow_id == workflow_id,
-            Task.node_id == Node.id,
-            Node.task_template_version_id == TaskTemplateVersion.id,
-            TaskTemplateVersion.task_template_id == task_template_id,
-            TaskTemplateVersion.task_template_id == TaskTemplate.id,
-        ]
+        # breach sql to get task template name separately
+        sql1 = select(
+            TaskTemplate.name,
+        ).where(TaskTemplate.id == task_template_id)
 
-        sql = (
-            select(
-                TaskTemplate.id,
-                TaskTemplate.name,
-                TaskTemplateVersion.id.label("task_template_version_id"),
-            )
-            .where(*query_filter)
-            .distinct()
-        )
-
-        row = self.session.execute(sql).one_or_none()
+        row = self.session.execute(sql1).one_or_none()
 
         if row is None:
             return None
+        else:
+            tt_name = row.name
+
+        # get or node.id for the task template
+        sql2 = (
+            select(Node.id)
+            .where(
+                Node.task_template_version_id.in_(
+                    select(TaskTemplateVersion.id).where(
+                        TaskTemplateVersion.task_template_id == task_template_id
+                    )
+                )
+            )
+            .order_by(Node.id)
+        )
+
+        rows2 = self.session.execute(sql2).all()
+
+        # get node.id from the task
+        sql3 = select((Task.node_id)).where(Task.workflow_id == workflow_id)
+        rows3 = self.session.execute(sql3).all()
+
+        # find one node.id that is in both rows2 and rows3
+        node_id = None
+        row2_node_ids = {row2.id for row2 in rows2}
+        row3_node_ids = [row3.node_id for row3 in rows3]
+        for r in row3_node_ids:
+            if r in row2_node_ids:
+                node_id = r
+                break
+        if node_id is None:
+            return None
+        else:
+            # get task template version id for the node
+            sql4 = select(Node.task_template_version_id).where(Node.id == node_id)
+            row4 = self.session.execute(sql4).one_or_none()
+            if row4 is None:
+                return None
+            else:
+                task_template_version_id = row4.task_template_version_id
 
         tt_details_data = TaskTemplateDetailsResponse(
-            task_template_id=row.id,
-            task_template_name=row.name,
-            task_template_version_id=row.task_template_version_id,
+            task_template_id=task_template_id,
+            task_template_name=tt_name,
+            task_template_version_id=task_template_version_id,
         )
 
         return tt_details_data
