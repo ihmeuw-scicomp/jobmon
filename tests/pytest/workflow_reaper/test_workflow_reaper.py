@@ -120,7 +120,7 @@ def test_error_state(
     assert wfr_status == WorkflowRunStatus.ERROR
 
 
-def test_halted_state(db_engine, requester_no_retry, tool, sleepy_task_template):
+def test_halted_state(db_engine, requester_no_retry, tool):
     """Tests that the workflow reaper successfully checks for halted state.
 
     Halted state occurs when a workflow run is either in C (cold resume) or
@@ -130,6 +130,13 @@ def test_halted_state(db_engine, requester_no_retry, tool, sleepy_task_template)
     from jobmon.client.workflow_run import WorkflowRun
     from jobmon.server.workflow_reaper.workflow_reaper import WorkflowReaper
 
+    sleepy_task_template = tool.get_task_template(
+        template_name="sleepy_template",
+        command_template="sleep {sleep} && echo a",
+        node_args=["sleep"],
+        default_cluster_name="sequential",
+        default_compute_resources={"queue": "null.q"},
+    )
     # Create first WorkflowRun and leave it in running state. log a heartbeat so it doesn't
     # get reaped
     task1 = sleepy_task_template.create_task(sleep=10)
@@ -222,10 +229,17 @@ def test_halted_state(db_engine, requester_no_retry, tool, sleepy_task_template)
     assert workflow3_status == WorkflowStatus.HALTED
 
 
-def test_aborted_state(db_engine, requester_no_retry, tool, sleepy_task_template):
+def test_aborted_state(db_engine, requester_no_retry, tool):
     from jobmon.client.workflow_run import WorkflowRun
     from jobmon.server.workflow_reaper.workflow_reaper import WorkflowReaper
 
+    sleepy_task_template = tool.get_task_template(
+        template_name="sleepy_template",
+        command_template="sleep {sleep} && echo ab",
+        node_args=["sleep"],
+        default_cluster_name="sequential",
+        default_compute_resources={"queue": "null.q"},
+    )
     # create a workflow without binding the tasks. log a heartbeat so it doesn't get reaped
     task = sleepy_task_template.create_task(sleep=10)
     task2 = sleepy_task_template.create_task(sleep=11)
@@ -279,10 +293,17 @@ def test_aborted_state(db_engine, requester_no_retry, tool, sleepy_task_template
     assert workflow_status == WorkflowStatus.ABORTED
 
 
-def test_reaper_version(db_engine, requester_no_retry, tool, sleepy_task_template):
+def test_reaper_version(db_engine, requester_no_retry, tool):
     from jobmon.client.workflow_run import WorkflowRun
     from jobmon.server.workflow_reaper.workflow_reaper import WorkflowReaper
 
+    sleepy_task_template = tool.get_task_template(
+        template_name="sleepy_template",
+        command_template="sleep {sleep} && echo abc",
+        node_args=["sleep"],
+        default_cluster_name="sequential",
+        default_compute_resources={"queue": "null.q"},
+    )
     # create a workflow without binding the tasks. log a heartbeat so it doesn't get reaped
     task = sleepy_task_template.create_task(sleep=10)
     task2 = sleepy_task_template.create_task(sleep=11)
