@@ -397,7 +397,7 @@ async def log_ti_report_by_batch(
     logger.debug(f"Log report_by for TI {tis}.")
     if tis:
         # Retry logic for row lock contention in batch updates
-        max_retries = 3
+        max_retries = 5
         for attempt in range(max_retries):
             try:
                 update_stmt = (
@@ -553,7 +553,8 @@ async def log_error_worker_node(
             description=error_description,
         )
         db.add(error)
-        db.flush()
+        # release locks immediately
+        db.commit()
 
         return JSONResponse(
             content={"status": task_instance.status},
@@ -631,16 +632,53 @@ async def log_no_distributor_id(
     logger.debug(f"Log NO DISTRIBUTOR ID. Data {data['no_id_err_msg']}")
     err_msg = data["no_id_err_msg"]
 
-    select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
-    task_instance = db.execute(select_stmt).scalars().one()
-    msg = _update_task_instance_state(
-        task_instance, constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID, request, db
+    # Retry logic for database operations
+    max_retries = 5
+
+    for attempt in range(max_retries):
+        try:
+            select_stmt = select(TaskInstance).where(
+                TaskInstance.id == task_instance_id
+            )
+            task_instance = db.execute(select_stmt).scalars().one()
+            msg = _update_task_instance_state(
+                task_instance,
+                constants.TaskInstanceStatus.NO_DISTRIBUTOR_ID,
+                request,
+                db,
+            )
+            error = TaskInstanceErrorLog(
+                task_instance_id=task_instance.id, description=err_msg
+            )
+            db.add(error)
+            # release locks immediately
+            db.commit()
+            resp = JSONResponse(content={"message": msg}, status_code=StatusCodes.OK)
+            return resp
+
+        except OperationalError as e:
+            logger.warning(
+                f"Database lock detected for TI {task_instance_id}, "
+                f"retrying attempt {attempt + 1}/{max_retries}. {e}"
+            )
+            db.rollback()
+            sleep(0.001 * (2 ** (attempt + 1)))  # 2ms, 4ms, 8ms delays
+            continue
+        except Exception as e:
+            logger.error(
+                f"Failed to log no distributor id for task_instance {task_instance_id}: {e}"
+            )
+            db.rollback()
+            raise HTTPException(status_code=503, detail=f"{e}")
+    # All retries failed
+    logger.error(
+        f"Failed to log no distributor id for task_instance {task_instance_id} "
+        f"after {max_retries} attempts"
     )
-    error = TaskInstanceErrorLog(task_instance_id=task_instance.id, description=err_msg)
-    db.add(error)
-    db.flush()
-    resp = JSONResponse(content={"message": msg}, status_code=StatusCodes.OK)
-    return resp
+    db.rollback()
+    raise HTTPException(
+        status_code=503, detail="Database temporarily unavailable, please retry"
+    )
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_distributor_id")
@@ -654,31 +692,81 @@ async def log_distributor_id(
     select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
     task_instance = db.execute(select_stmt).scalars().one()
 
-    # Check if task instance is already in a final state
+    # Update distributor_id and report_by_date with retry logic
+    # This must happen regardless of whether we need to transit status or not
+    max_retries = 5
+    update_successful = False
+
+    for attempt in range(max_retries):
+        try:
+            task_instance.distributor_id = data["distributor_id"]
+            task_instance.report_by_date = add_time(data["next_report_increment"])
+            # release locks immediately
+            db.commit()
+            update_successful = True
+            break  # Success - exit retry loop
+        except OperationalError as e:
+            logger.warning(
+                f"Database lock detected for TI {task_instance_id}, "
+                f"retrying attempt {attempt + 1}/{max_retries}. {e}"
+            )
+            db.rollback()
+            sleep(0.001 * (2 ** (attempt + 1)))  # 2ms, 4ms, 8ms delays
+            continue
+        except Exception as e:
+            logger.error(
+                f"Failed to log distributor id for task_instance {task_instance_id}: {e}"
+            )
+            db.rollback()
+            raise HTTPException(status_code=503, detail=f"{e}")
+
+    # If all retries failed for the distributor update, we need to exit
+    if not update_successful:
+        logger.error(f"Failed to update distributor_id after {max_retries} attempts")
+        db.rollback()
+        raise HTTPException(
+            status_code=503, detail="Database temporarily unavailable, please retry"
+        )
+
+    # Check if task instance is in a final state
     if task_instance.status in [
         constants.TaskInstanceStatus.DONE,
         constants.TaskInstanceStatus.ERROR,
         constants.TaskInstanceStatus.ERROR_FATAL,
     ]:
-        # Just update the distributor_id and report_by_date without transition
-        task_instance.distributor_id = data["distributor_id"]
-        task_instance.report_by_date = add_time(data["next_report_increment"])
-        db.flush()
-        resp = JSONResponse(
+        logger.info(
+            f"Task instance {task_instance_id} is in final state, no transition needed"
+        )
+
+        return JSONResponse(
             content={"message": "Task instance in final state, no transition needed"},
             status_code=StatusCodes.OK,
         )
-        return resp
-
-    # Only try to transition if not in final state
-    status = get_transit_status(task_instance, constants.TaskInstanceStatus.LAUNCHED)
-    if status is not None:
-        # need to log report_by_date to avoid race condition
-        transit_ti_and_t(task_instance, status, db, data["next_report_increment"])
     else:
-        logger.error(f"Unable to transition to launched from {task_instance.status}")
-
-    # Rest of the function...
+        # Only try to transition if not in final state (distributor_id already updated above)
+        status = get_transit_status(
+            task_instance, constants.TaskInstanceStatus.LAUNCHED
+        )
+        if status is not None:
+            # need to log report_by_date to avoid race condition
+            # this already has retry logic
+            transit_ti_and_t(task_instance, status, db, data["next_report_increment"])
+            db.commit()  # commit any additional changes from transit
+            return JSONResponse(
+                content={"message": "Task instance transitioned to LAUNCHED"},
+                status_code=StatusCodes.OK,
+            )
+        else:
+            logger.error(
+                f"Unable to transition to launched from {task_instance.status}"
+            )
+            # distributor_id was already committed above, so we're done
+            return JSONResponse(
+                content={
+                    "message": f"Unable to transition to launched from {task_instance.status}"
+                },
+                status_code=StatusCodes.OK,
+            )
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_known_error")
@@ -700,10 +788,11 @@ async def log_known_error(
     nodename = data.get("nodename", None)
     logger.info(f"Log ERROR for TI:{task_instance_id}.")
 
-    try:
-        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
-        task_instance = db.execute(select_stmt).scalars().one()
+    # Query task_instance outside try-except to ensure it's always available
+    select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+    task_instance = db.execute(select_stmt).scalars().one()
 
+    try:
         resp = _log_error(
             db,
             task_instance,
@@ -1005,18 +1094,46 @@ def _log_error(
     if distributor_id is not None:
         ti.distributor_id = str(distributor_id)
 
-    try:
-        error = TaskInstanceErrorLog(task_instance_id=ti.id, description=error_msg)
-        session.add(error)
-        msg = _update_task_instance_state(ti, error_state, request, session)  # type: ignore
-        session.flush()
-        resp = JSONResponse(content={"message": msg}, status_code=StatusCodes.OK)
-    except Exception as e:
-        # Always complete the request successfully to avoid infinite retries
-        logger.error(f"Failed to log error for task_instance {ti.id}: {e}")
-        resp = JSONResponse(
-            content={"message": "Error logged with warnings"},
-            status_code=StatusCodes.OK,
-        )
+    # Retry logic for database operations
+    max_retries = 5
+
+    for attempt in range(max_retries):
+        try:
+            error = TaskInstanceErrorLog(task_instance_id=ti.id, description=error_msg)
+            session.add(error)
+            if request is not None:
+                msg = _update_task_instance_state(ti, error_state, request, session)
+            else:
+                msg = ""
+            session.commit()
+            resp = JSONResponse(content={"message": msg}, status_code=StatusCodes.OK)
+            return resp  # Success - exit the function
+        except OperationalError as e:
+            logger.warning(
+                f"Database lock detected for TI {ti.id}, "
+                f"retrying attempt {attempt + 1}/{max_retries}. {e}"
+            )
+            session.rollback()
+            sleep(0.001 * (2 ** (attempt + 1)))  # 2ms, 4ms, 8ms delays
+            continue
+        except Exception as e:
+            # Always complete the request successfully to avoid infinite retries
+            logger.error(f"Failed to log error for task_instance {ti.id}: {e}")
+            session.rollback()
+            resp = JSONResponse(
+                content={"message": "Error logged with warnings"},
+                status_code=StatusCodes.OK,
+            )
+            return resp
+
+    # If all retries failed
+    logger.error(
+        f"Failed to log error for task_instance {ti.id} after {max_retries} attempts"
+    )
+    session.rollback()
+    resp = JSONResponse(
+        content={"message": "Error logged with warnings after retry failure"},
+        status_code=StatusCodes.OK,
+    )
 
     return resp
