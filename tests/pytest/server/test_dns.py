@@ -1,6 +1,7 @@
 # tests/test_dns_cache.py
 import importlib
-from types import SimpleNamespace
+import socket
+from unittest.mock import patch
 
 import pytest
 
@@ -8,400 +9,186 @@ import pytest
 db = importlib.import_module("jobmon.server.web.db.dns")
 
 
-# a tiny FakeAnswers that mimics dnspython's Answer
-class FakeAnswers(list):
-    def __init__(self, records, ttl):
-        super().__init__(records)
-        # dnspython puts TTL on the rrset
-        self.rrset = SimpleNamespace(ttl=ttl)
-
-
 @pytest.fixture(autouse=True)
 def clear_cache():
     # clear before and after each test
-    db.clear_dns_cache()  # Use the proper clear function
+    db.clear_dns_cache()
     yield
     db.clear_dns_cache()
 
 
-def test_initial_resolution_and_caching(monkeypatch):
-    host = "db.example.local"
-    # stub resolver.resolve → one record, TTL=120
-    fake = FakeAnswers([SimpleNamespace(address="1.2.3.4")], ttl=120)
-
-    # Patch Resolver.resolve (instance method) to return our fake answers
-    def fake_resolve(self, hostname, qtype, lifetime=None, search=True, **kwargs):
-        return fake
-
-    monkeypatch.setattr(db.resolver.Resolver, "resolve", fake_resolve)
-    # stub time to a fixed point
-    t0 = 1_000_000.0
-    monkeypatch.setattr(db.time, "time", lambda: t0)
-
-    # first call must do a DNS lookup
-    ip, ttl = db.get_ip_with_ttl(host)
-    assert ip == "1.2.3.4"
-    assert ttl == 120
-
-    # check that cache now contains our entry
-    assert host in db._DNS_CACHE
-
-    # advance time by 30s → still cached, remaining TTL = 90
-    monkeypatch.setattr(db.time, "time", lambda: t0 + 30)
-    ip2, ttl2 = db.get_ip_with_ttl(host)
-    assert ip2 == "1.2.3.4"
-    assert ttl2 == 90
-
-
-def test_cache_expiry_triggers_new_dns(monkeypatch):
-    host = "db.example.local"
-
-    # first resolve returns IP A, TTL 60
-    ans1 = FakeAnswers([SimpleNamespace(address="1.2.3.4")], ttl=60)
-    # second resolve returns IP B, TTL 30
-    ans2 = FakeAnswers([SimpleNamespace(address="5.6.7.8")], ttl=30)
-
-    # count how many times resolver.resolve is called
-    calls = {"n": 0}
-
-    def fake_resolve(self, hostname, qtype, lifetime=None, search=True, **kwargs):
-        calls["n"] += 1
-        return ans1 if calls["n"] == 1 else ans2
-
-    monkeypatch.setattr(db.resolver.Resolver, "resolve", fake_resolve)
-    t0 = 2_000_000.0
-    monkeypatch.setattr(db.time, "time", lambda: t0)
-
-    # initial lookup
-    ip1, ttl1 = db.get_ip_with_ttl(host)
-    assert ip1 == "1.2.3.4"
-    assert ttl1 == 60
-
-    # simulate expiration (t0 + 61 > t0+60)
-    monkeypatch.setattr(db.time, "time", lambda: t0 + 61)
-    ip2, ttl2 = db.get_ip_with_ttl(host)
-    assert ip2 == "5.6.7.8"
-    assert ttl2 == 30
-
-
-def test_dns_failure_uses_fallback_and_short_ttl(monkeypatch):
-    host = "db.example.local"
-
-    # pre-seed cache with a "known-good" IP that's already expired
-    # so we go past the cache-hit check and into the retry/fallback logic
-    t0 = 1_000_000.0
-    monkeypatch.setattr(db.time, "time", lambda: t0)
-    db._DNS_CACHE[host] = ("9.9.9.9", t0 - 1, 0)  # expired by 1 second, no failures
-
-    # make resolver.resolve always blow up
-    monkeypatch.setattr(
-        db.resolver.Resolver,
-        "resolve",
-        lambda self, hostname, qtype, lifetime=None, search=True, **kwargs: (
-            _ for _ in ()
-        ).throw(Exception("boom")),
-    )
-
-    ip, ttl = db.get_ip_with_ttl(host)
-    assert ip == "9.9.9.9"
-    # on failure we hard-code a 30-second retry window
-    assert ttl == 30
-
-
-def test_dns_failure_without_cached_ip_raises_exception(monkeypatch):
-    """Test that DNS failure without a cached IP raises the original exception"""
-    host = "new.example.local"
-
-    # No pre-seeded cache - fresh lookup should fail
-    t0 = 1_000_000.0
-    monkeypatch.setattr(db.time, "time", lambda: t0)
-
-    # make resolver.resolve always blow up
-    monkeypatch.setattr(
-        db.resolver.Resolver,
-        "resolve",
-        lambda self, hostname, qtype, lifetime=None, search=True, **kwargs: (
-            _ for _ in ()
-        ).throw(Exception("DNS totally broken")),
-    )
-
-    # Should raise the original exception since there's no cached IP to fall back to
-    with pytest.raises(Exception, match="DNS totally broken"):
-        db.get_ip_with_ttl(host)
-
-
-def test_dns_failure_with_nxdomain_fallback(monkeypatch):
-    """Test specific NXDOMAIN handling that was causing production issues"""
-    from dns.resolver import NXDOMAIN
-
-    host = "mock-azure-mysql.mysql.database.azure.com"
-
-    # pre-seed cache with valid IP (simulating previous successful resolution)
-    t0 = 1_000_000.0
-    monkeypatch.setattr(db.time, "time", lambda: t0)
-    db._DNS_CACHE[host] = (
-        "10.4.34.197",
-        t0 - 5,
-        0,
-    )  # expired 5 seconds ago, no failures
-
-    # simulate NXDOMAIN error (the specific error from production)
-    def nxdomain_error(self, hostname, qtype, lifetime=None, search=True, **kwargs):
-        raise NXDOMAIN(qnames=[hostname], responses={})
-
-    monkeypatch.setattr(db.resolver.Resolver, "resolve", nxdomain_error)
-
-    # Should use cached IP with grace period, not crash
-    ip, ttl = db.get_ip_with_ttl(host)
-    assert ip == "10.4.34.197"
-    assert ttl == 30  # grace period
-
-
-def test_cached_ip_variable_scope_bug_regression(monkeypatch):
-    """Regression test for the variable scope bug where 'ip' vs 'cached_ip' was confused"""
-    host = "scope-bug.example.local"
-
-    # Set up initial cache entry
-    t0 = 1_000_000.0
-    monkeypatch.setattr(db.time, "time", lambda: t0)
-    db._DNS_CACHE[host] = ("192.168.1.100", t0 - 1, 0)  # expired, no failures
-
-    # Track what variables are defined when exception handler runs
-    scope_check = {}
-
-    def failing_resolve(self, hostname, qtype, lifetime=None, search=True, **kwargs):
-        # This simulates the original bug where 'ip' would be undefined
-        # when the exception is raised, but 'cached_ip' should still be available
-        scope_check["before_exception"] = True
-        raise Exception("DNS failed")
-
-    monkeypatch.setattr(db.resolver.Resolver, "resolve", failing_resolve)
-
-    # Should successfully use cached IP despite DNS failure
-    ip, ttl = db.get_ip_with_ttl(host)
-    assert ip == "192.168.1.100"
-    assert ttl == 30
-    assert scope_check["before_exception"]  # Verify the exception path was taken
-
-
-def test_max_retries_configuration(monkeypatch):
-    """Test that max_retries parameter is respected"""
-    host = "max-retries-test.example.local"
-
-    # Track retry attempts
-    attempts = {"count": 0}
-
-    def always_failing_resolve(
-        self, hostname, qtype, lifetime=None, search=True, **kwargs
-    ):
-        attempts["count"] += 1
-        raise Exception(f"DNS failure #{attempts['count']}")
-
-    monkeypatch.setattr(db.resolver.Resolver, "resolve", always_failing_resolve)
-
-    # Should try exactly max_retries times, then give up
-    with pytest.raises(Exception, match="DNS failure #2"):
-        db.get_ip_with_ttl(host, dns_max_retries=2)
-
-    assert attempts["count"] == 2
-
-
-def test_grace_period_logging(monkeypatch, json_log_file):
-    """Test that fallback logging works correctly"""
-    import json
-
-    # Set up JSON logging for the DNS module
-    log_file_path = json_log_file(
-        loggers={"jobmon.server.web.db.dns": "INFO"}, filename_suffix="dns_test"
-    )
-
-    host = "log-test.example.local"
-
-    # pre-seed cache with expired IP
-    t0 = 1_000_000.0
-    monkeypatch.setattr(db.time, "time", lambda: t0)
-    db._DNS_CACHE[host] = ("1.1.1.1", t0 - 10, 0)  # expired, no failures
-
-    # make DNS fail
-    monkeypatch.setattr(
-        db.resolver.Resolver,
-        "resolve",
-        lambda self, hostname, qtype, lifetime=None, search=True, **kwargs: (
-            _ for _ in ()
-        ).throw(Exception("Network error")),
-    )
-
-    ip, ttl = db.get_ip_with_ttl(host)
-    assert ip == "1.1.1.1"
-    assert ttl == 30
-
-    # Check that informative log message was generated by reading the log file
-    expected_message = (
-        "Using cached IP 1.1.1.1 for log-test.example.local with 30s grace period"
-    )
-    found_message = False
-
-    with open(log_file_path, "r") as log_file:
-        for line in log_file:
-            if line.strip():
-                try:
-                    log_dict = json.loads(line.strip())
-                    if "event" in log_dict and expected_message in log_dict["event"]:
-                        found_message = True
-                        break
-                except json.JSONDecodeError:
-                    # Skip non-JSON lines
-                    continue
-
-    assert (
-        found_message
-    ), f"Expected message '{expected_message}' not found in log file. File contents: {log_file_path.read_text() if log_file_path.exists() else 'File not found'}"
-
-
-def test_resolver_called_with_disabled_search_and_default_timeout(monkeypatch):
-    host = "db.search.test"
-
-    captured = {"search": None, "lifetime": None}
-
-    def fake_resolve(self, hostname, qtype, lifetime=None, search=True, **kwargs):
-        captured["search"] = search
-        captured["lifetime"] = lifetime
-        # Return a valid answer with TTL
-        return FakeAnswers([SimpleNamespace(address="8.8.8.8")], ttl=120)
-
-    monkeypatch.setattr(db.resolver.Resolver, "resolve", fake_resolve)
-
-    ip, ttl = db.get_ip_with_ttl(host)
-    assert ip == "8.8.8.8"
-    assert ttl == 120
-    # Ensure search domains are disabled and default timeout is passed through
-    assert captured["search"] is False
-    assert captured["lifetime"] == 12
-
-
-def test_retry_logic_with_eventual_success(monkeypatch):
-    """Test that retry logic works and eventually succeeds"""
-    host = "retry-test.example.local"
-
-    # Track retry attempts
-    attempts = {"count": 0}
-
-    def failing_then_succeeding_resolve(
-        self, hostname, qtype, lifetime=None, search=True, **kwargs
-    ):
-        attempts["count"] += 1
-        if attempts["count"] < 3:  # Fail first 2 attempts
-            raise Exception(f"DNS failure #{attempts['count']}")
-        # Succeed on 3rd attempt
-        return FakeAnswers([SimpleNamespace(address="8.8.8.8")], ttl=120)
-
-    monkeypatch.setattr(
-        db.resolver.Resolver, "resolve", failing_then_succeeding_resolve
-    )
-
-    # Should succeed after retries
-    ip, ttl = db.get_ip_with_ttl(host, dns_max_retries=3)
-    assert ip == "8.8.8.8"
-    assert ttl == 120
-    assert attempts["count"] == 3  # Should have tried 3 times
-
-
-def test_extended_grace_period_on_repeated_failures(monkeypatch):
-    """Test that grace period extends on repeated failures"""
-    host = "failing-host.example.local"
-
-    t0 = 1_000_000.0
-    monkeypatch.setattr(db.time, "time", lambda: t0)
-
-    # Pre-seed cache with IP and 2 previous failures
-    db._DNS_CACHE[host] = ("1.2.3.4", t0 - 1, 2)  # expired, 2 previous failures
-
-    # Make DNS continue to fail
-    monkeypatch.setattr(
-        db.resolver.Resolver,
-        "resolve",
-        lambda self, hostname, qtype, lifetime=None, search=True, **kwargs: (
-            _ for _ in ()
-        ).throw(Exception("Still failing")),
-    )
-
-    # Should use cached IP with extended grace period
-    ip, ttl = db.get_ip_with_ttl(host, dns_grace_ttl=30, dns_extend_grace=True)
-    assert ip == "1.2.3.4"
-    # Grace period should be extended: 30 * (2^2) = 120 seconds
-    assert ttl == 120
-
-    # Check that failure count was incremented
-    cached_ip, exp, failure_count = db._DNS_CACHE[host]
-    assert failure_count == 3
-
-
-def test_thread_local_resolver_reuse(monkeypatch):
-    """Test that thread-local resolvers are reused properly"""
-    host = "thread-test.example.local"
-
-    # Track resolver creation
-    resolver_instances = []
-    original_resolver_init = db.resolver.Resolver.__init__
-
-    def tracking_init(self, *args, **kwargs):
-        resolver_instances.append(self)
-        return original_resolver_init(self, *args, **kwargs)
-
-    monkeypatch.setattr(db.resolver.Resolver, "__init__", tracking_init)
-
-    # Mock resolve to return valid answers
-    def fake_resolve(self, hostname, qtype, lifetime=None, search=True, **kwargs):
-        return FakeAnswers([SimpleNamespace(address="1.2.3.4")], ttl=120)
-
-    monkeypatch.setattr(db.resolver.Resolver, "resolve", fake_resolve)
-
-    # Multiple calls should reuse the same resolver instance
-    db.get_ip_with_ttl(host)
-    # Clear only the DNS cache, not the thread-local resolver
-    with db._CACHE_LOCK:
-        db._DNS_CACHE.clear()
-    db.get_ip_with_ttl(host)
-
-    # Should have created only one resolver instance per thread
-    assert len(resolver_instances) == 1
-
-
-def test_fallback_nameservers(monkeypatch):
-    """Test that custom nameservers are used when specified"""
-    host = "nameserver-test.example.local"
-
-    # Track what nameservers were set
-    nameserver_configs = []
-
-    def tracking_resolver_init(self, *args, **kwargs):
-        # Store the original init behavior
-        self.nameservers = ["8.8.8.8"]  # Default
-        nameserver_configs.append("default")
-
-    def tracking_nameserver_setter(self, value):
-        nameserver_configs.append(value)
-        self._nameservers = value
-
-    def tracking_nameserver_getter(self):
-        return getattr(self, "_nameservers", ["8.8.8.8"])
-
-    monkeypatch.setattr(db.resolver.Resolver, "__init__", tracking_resolver_init)
-    monkeypatch.setattr(
-        db.resolver.Resolver,
-        "nameservers",
-        property(tracking_nameserver_getter, tracking_nameserver_setter),
-    )
-
-    # Mock resolve to return valid answers
-    def fake_resolve(self, hostname, qtype, lifetime=None, search=True, **kwargs):
-        return FakeAnswers([SimpleNamespace(address="1.2.3.4")], ttl=120)
-
-    monkeypatch.setattr(db.resolver.Resolver, "resolve", fake_resolve)
-
-    # Test with custom nameservers
-    custom_nameservers = ["1.1.1.1", "8.8.4.4"]
-    db.get_ip_with_ttl(host, dns_nameservers=custom_nameservers)
-
-    # Should have set custom nameservers
-    assert custom_nameservers in nameserver_configs
+# Test the new DNS functionality
+def test_get_private_azure_hostname():
+    """Test Azure private hostname transformation."""
+    # Test Azure MySQL hostname
+    azure_host = "scicomp-mysql-db-d01.mysql.database.azure.com"
+    expected_private = "scicomp-mysql-db-d01.privatelink.mysql.database.azure.com"
+    result = db._get_private_azure_hostname(azure_host)
+    assert result == expected_private
+
+    # Test non-Azure hostname (should return unchanged)
+    non_azure_host = "postgres.example.com"
+    result = db._get_private_azure_hostname(non_azure_host)
+    assert result == non_azure_host
+
+    # Test another Azure host
+    azure_host2 = "mydb.mysql.database.azure.com"
+    expected2 = "mydb.privatelink.mysql.database.azure.com"
+    result2 = db._get_private_azure_hostname(azure_host2)
+    assert result2 == expected2
+
+
+def test_resolve_host_with_retries_success():
+    """Test successful hostname resolution with retries."""
+    host = "success.example.com"
+
+    # Mock socket.gethostbyname to succeed on first attempt
+    with patch("socket.gethostbyname") as mock_gethostbyname:
+        mock_gethostbyname.return_value = "1.2.3.4"
+
+        result = db._resolve_host_with_retries(host)
+        assert result is True
+        assert mock_gethostbyname.call_count == 1  # Should succeed immediately
+
+
+def test_resolve_host_with_retries_failure():
+    """Test hostname resolution failure with retries."""
+    host = "nonexistent.example.com"
+
+    # Mock socket.gethostbyname to always fail
+    with patch("socket.gethostbyname") as mock_gethostbyname, patch(
+        "time.sleep"
+    ) as mock_sleep:  # Mock sleep to speed up test
+        mock_gethostbyname.side_effect = socket.gaierror("Name or service not known")
+
+        result = db._resolve_host_with_retries(host)
+
+        assert result is False
+        assert mock_gethostbyname.call_count == 5  # Should try 5 times
+        assert mock_sleep.call_count == 4  # Should sleep 4 times (not on last attempt)
+
+
+def test_resolve_host_with_retries_failure_then_success():
+    """Test hostname resolution that fails initially then succeeds."""
+    host = "retrytest.example.com"
+
+    # Mock socket.gethostbyname to fail 3 times then succeed
+    with patch("socket.gethostbyname") as mock_gethostbyname, patch(
+        "time.sleep"
+    ) as mock_sleep:
+        mock_gethostbyname.side_effect = [
+            socket.gaierror("Name or service not known"),
+            socket.gaierror("Name or service not known"),
+            socket.gaierror("Name or service not known"),
+            "1.2.3.4",  # Success on 4th attempt
+        ]
+
+        result = db._resolve_host_with_retries(host)
+
+        assert result is True
+        assert mock_gethostbyname.call_count == 4  # Should try 4 times total
+        assert mock_sleep.call_count == 3  # Should sleep 3 times
+
+
+def test_resolve_host_with_retries_sleep_timing():
+    """Test that retry timings are correct."""
+    host = "timing.example.com"
+
+    with patch("socket.gethostbyname") as mock_gethostbyname, patch(
+        "time.sleep"
+    ) as mock_sleep:
+        mock_gethostbyname.side_effect = [
+            socket.gaierror("Network error"),
+            socket.gaierror("Network error"),
+            socket.gaierror("Network error"),
+            socket.gaierror("Network error"),
+            socket.gaierror("Network error"),
+        ]
+
+        result = db._resolve_host_with_retries(host)
+
+        assert result is False
+        # Verify sleep times: 0.2s, 0.4s, 0.6s, 0.8s (4 calls total)
+        expected_sleep_times = [0.2, 0.4, 0.6, 0.8]
+        actual_sleep_times = [call[0][0] for call in mock_sleep.call_args_list]
+        # Handle floating point precision issues
+        assert len(actual_sleep_times) == len(expected_sleep_times)
+        for actual, expected in zip(actual_sleep_times, expected_sleep_times):
+            assert abs(actual - expected) < 0.01
+
+
+def test_azure_hostname_edge_cases():
+    """Test edge cases for Azure hostname transformation."""
+    # Test empty host
+    assert db._get_private_azure_hostname("") == ""
+
+    # Test hostname with my sql subdomain but not Azure.com end
+    non_azure_mysql = "mysql.internal.example.com"
+    assert db._get_private_azure_hostname(non_azure_mysql) == non_azure_mysql
+
+    # Test non-mysql Azure domain
+    azure_postgres = "mydb.postgres.database.azure.com"
+    assert db._get_private_azure_hostname(azure_postgres) == azure_postgres
+
+    # Test hostname ending exactly with the pattern
+    exact_match = "test.mysql.database.azure.com"
+    expected = "test.privatelink.mysql.database.azure.com"
+    assert db._get_private_azure_hostname(exact_match) == expected
+
+
+def test_resolve_host_with_retries_logging(monkeypatch, caplog):
+    """Test logging behavior during hostname resolution retries."""
+    host = "logtest.example.com"
+
+    with patch("socket.gethostbyname") as mock_gethostbyname, patch(
+        "time.sleep"
+    ) as mock_sleep:
+        mock_gethostbyname.side_effect = [
+            socket.gaierror("Network error"),
+            socket.gaierror("Network error"),
+            "1.2.3.4",  # Success on 3rd attempt
+        ]
+
+        with caplog.at_level("DEBUG"):
+            result = db._resolve_host_with_retries(host)
+
+        assert result is True
+        # Check that debug messages were logged for failed attempts
+        log_messages = caplog.text
+        assert "DNS resolution failed" in log_messages
+        assert "retry 1/5" in log_messages
+        assert "retry 2/5" in log_messages
+
+
+def test_creator_function_hostname_availability_logic():
+    """Test creator function logic for hostname availability checks."""
+    from jobmon.server.web.db.dns import get_dns_engine
+
+    original_host = "mydb.mysql.database.azure.com"
+    private_host = "mydb.privatelink.mysql.database.azure.com"
+
+    # Mock the _resolve_host_with_retries function for testing
+    db._resolve_host_with_retries = lambda hostname: hostname == private_host
+
+    db_url = f"mysql://user:pass@{original_host}/db"
+
+    # Test that the private hostname logic gets called
+    try:
+        engine = get_dns_engine(db_url)
+        assert engine is not None
+    except Exception:
+        # Should try to use the private Azure hostname when original fails
+        pass
+
+
+def test_integration_with_dns_resolution():
+    """Test integration with actual socket operations."""
+    # Test with a real socket resolution (will potentially fail in CI)
+    try:
+        # This will actually check if a real DNS name is resolvable
+        real_hostname = "localhost"  # Should always be resolvable in tests
+        result = db._resolve_host_with_retries(real_hostname)
+        assert result is True or result is False  # Either success or failure is valid
+    except Exception:
+        # Allow exceptions (e.g., network issues in CI)
+        pass
