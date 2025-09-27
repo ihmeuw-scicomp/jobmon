@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 import scipy.stats as st  # type: ignore
 import structlog
-from sqlalchemy import String, and_, case, func, select
+from sqlalchemy import String, and_, case, func, select, desc
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement, Label
 
@@ -413,6 +413,51 @@ class TaskTemplateRepository:
 
         return viz_data
 
+    def _find_ttvid(self, 
+                    workflow_id: int, 
+                    task_template_id: int, 
+                    ) -> Optional[int]:
+        """Find the task template version id using workflow and task template ids.
+        
+        This could be slow for tt with huge nodes.
+        However, given one workflow only us one tt version of a tt,
+        we can search all the versions backwords to get the first
+        none 0 version.
+
+        Args:
+            workflow_id: ID of the workflow
+            task_template_id: ID of the task template
+            db: Database session
+
+        Returns:
+            Task template version id
+        """
+        # get all task template version for the task template
+        sql_all_ttv = (select(TaskTemplateVersion.id)
+            .where(TaskTemplateVersion.task_template_id == task_template_id)
+            .order_by(desc(TaskTemplateVersion.id))
+        )
+
+        rows2 = self.session.execute(sql_all_ttv).all()
+        tt_version_ids = [row2.id for row2 in rows2]
+
+        # considering the for each tt, a wf only has one version
+        # and most likely the latest version, 
+        # search all the versions backwords to get the first
+        # none 0 version
+        task_template_version_id = None
+        for tt_version_id in tt_version_ids:
+            sql = (select(func.count(Task.id))
+                    .join(Node, Task.node_id == Node.id)
+                    .where(Task.workflow_id == workflow_id, 
+                    Node.task_template_version_id == tt_version_id))
+            count = self.session.execute(sql).scalar()
+            if count > 0:
+                task_template_version_id = tt_version_id
+                break
+
+        return task_template_version_id
+
     def get_task_template_details(
         self, workflow_id: int, task_template_id: int
     ) -> Optional[TaskTemplateDetailsResponse]:
@@ -429,43 +474,9 @@ class TaskTemplateRepository:
         else:
             tt_name = row.name
 
-        # get or node.id for the task template
-        sql2 = (
-            select(Node.id)
-            .where(
-                Node.task_template_version_id.in_(
-                    select(TaskTemplateVersion.id).where(
-                        TaskTemplateVersion.task_template_id == task_template_id
-                    )
-                )
-            )
-            .order_by(Node.id)
-        )
-
-        rows2 = self.session.execute(sql2).all()
-
-        # get node.id from the task
-        sql3 = select((Task.node_id)).where(Task.workflow_id == workflow_id)
-        rows3 = self.session.execute(sql3).all()
-
-        # find one node.id that is in both rows2 and rows3
-        node_id = None
-        row2_node_ids = {row2.id for row2 in rows2}
-        row3_node_ids = [row3.node_id for row3 in rows3]
-        for r in row3_node_ids:
-            if r in row2_node_ids:
-                node_id = r
-                break
-        if node_id is None:
+        task_template_version_id = self._find_ttvid(workflow_id, task_template_id)
+        if task_template_version_id is None:
             return None
-        else:
-            # get task template version id for the node
-            sql4 = select(Node.task_template_version_id).where(Node.id == node_id)
-            row4 = self.session.execute(sql4).one_or_none()
-            if row4 is None:
-                return None
-            else:
-                task_template_version_id = row4.task_template_version_id
 
         tt_details_data = TaskTemplateDetailsResponse(
             task_template_id=task_template_id,
@@ -812,16 +823,63 @@ class TaskTemplateRepository:
             ErrorLogResponse with paginated error log data
         """
         offset = (page - 1) * page_size
+        
+        # optimize for large case like wf 490688 tt 9739
+        ttv_id = self._find_ttvid(workflow_id, task_template_id)
+        if ttv_id is None:
+            return ErrorLogResponse(
+                error_logs=[],
+                total_count=0,
+                page=page,
+                page_size=page_size,
+            )
+        
+        error_logs = []
+        # if task instance id is provided, just check that instance
+        if task_instance_id is not None:
+            sql = (select(
+                    TaskInstance.task_id,
+                    TaskInstance.id,
+                    TaskInstanceErrorLog.id,
+                    TaskInstanceErrorLog.error_time,
+                    TaskInstanceErrorLog.description,
+                    TaskInstance.stderr_log,
+                    TaskInstance.workflow_run_id,
+                    Task.workflow_id,
+                ).join_from(
+                    TaskInstanceErrorLog,
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                ).join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .where(TaskInstance.id == task_instance_id))
+            rows = self.session.execute(sql).all()
+            if len(rows) == 0:
+                return ErrorLogResponse(
+                    error_logs=[],
+                    total_count=0,
+                    page=page,
+                    page_size=page_size,
+                )
+            for row in rows:
+                error_logs.append(ErrorLogItem(
+                    id=row.id,
+                    error_time=row.error_time,
+                    description=row.description,
+                ))
+            # just in case page_size is smaller than error logs
+            if len(error_logs) > page_size:
+                error_logs = error_logs[:page_size]
+            return ErrorLogResponse(
+                error_logs=error_logs,
+                total_count=len(error_logs),
+                page=page,
+                page_size=page_size,
+            )
+        
+        ## weekend back. Haven't optimized for large case yet.
+        ## TODO: optimize for large case.
 
-        # Base filter conditions
-        base_filter = [
-            TaskTemplateVersion.task_template_id == task_template_id,
-            Task.workflow_id == workflow_id,
-        ]
 
-        where_conditions = base_filter[:]
-
-        # Create CTE for latest task instances and workflow runs if recent_errors is True
         if recent_errors_only:
             # CTE to get the latest task instance for each task
             latest_task_instances = (
@@ -974,7 +1032,7 @@ class TaskTemplateRepository:
                     == latest_workflow_runs.c.latest_workflow_run_id,
                 )
                 .where(*base_filter)
-                .order_by(TaskInstanceErrorLog.id.desc())
+                .order_by(desc(TaskInstanceErrorLog.id))
                 .offset(offset)
                 .limit(page_size)
             )
@@ -1014,7 +1072,7 @@ class TaskTemplateRepository:
                     TaskTemplateVersion.task_template_id == TaskTemplate.id,
                 )
                 .where(*where_conditions)
-                .order_by(TaskInstanceErrorLog.id.desc())
+                .order_by(desc(TaskInstanceErrorLog.id))
                 .offset(offset)
                 .limit(page_size)
             )
