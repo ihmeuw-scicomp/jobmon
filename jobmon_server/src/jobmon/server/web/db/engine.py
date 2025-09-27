@@ -24,7 +24,8 @@ def get_engine() -> Engine:
         return _engine
 
     cfg = get_jobmon_config()
-    uri = cfg.get("db", "sqlalchemy_database_uri")
+    # Hard code the database URI to use private hostname
+    uri = "mysql+mysqldb://service_user:NDJKWKixfPhFcNK6@scicomp-mysql-db-d01.privatelink.mysql.database.azure.com:3306/jobmon_stage?ssl=True"
 
     # Get database configuration with automatic type coercion
     try:
