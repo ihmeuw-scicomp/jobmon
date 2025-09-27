@@ -194,28 +194,30 @@ def get_dns_engine(
     def creator() -> DBAPIConnection:
         """Return a connection to the currently resolved IP address."""
         try:
-            private_host = None
             # First check if original hostname is available
             if _resolve_host_with_retries(host):
                 target_host = host
+                logger.debug(f"Using original hostname: {target_host}")
             else:
+                # Try private Azure hostname as fallback
                 private_host = _get_private_azure_hostname(host)
-                # if private host is different from original host,
-                # then check if it's available
-                if private_host != host:
-                    if _resolve_host_with_retries(private_host):
-                        target_host = private_host
-                    else:
-                        raise RuntimeError(
-                            f"DNS resolution failed for \
-                            both {host} and {private_host}"
-                        )
+                if private_host != host and _resolve_host_with_retries(private_host):
+                    target_host = private_host
+                    logger.info(
+                        f"Original hostname {host} failed, \
+                            using private hostname: {target_host}"
+                    )
                 else:
-                    raise RuntimeError(f"DNS resolution failed for {host}")
+                    raise RuntimeError(
+                        f"DNS resolution failed for both {host} and {private_host}"
+                    )
 
+            # Create new URL with the resolved hostname
             connect_url = url.set(host=target_host)
+            logger.debug(f"Connecting to resolved hostname: {target_host}")
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"DNS resolution failed: {e}")
             raise
         cargs, cparams = minimal_dialect.create_connect_args(connect_url)
 
