@@ -975,7 +975,7 @@ class TaskTemplateRepository:
                  and node.task_template_version_id=22938253
                  group by task.id
                  order by ttel_id
-            takes 0.006s (0.108s for Joh's).
+            takes 0.006s (0.108s for Jon's).
 
             At last, test a case of many failures, wf 492914 ttv 53173:
                 Original count query: 3 min 13.148 sec;
@@ -994,8 +994,8 @@ class TaskTemplateRepository:
                 .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
                 .join_from(Task, Node, Task.node_id == Node.id)
                 .where(
-                    TaskInstance.workflow_run_id == 351880,
-                    Node.task_template_version_id == 23926275,
+                    TaskInstance.workflow_run_id == workflow_run_id,
+                    Node.task_template_version_id == ttv_id,
                 )
                 .group_by(Task.id)
                 .order_by("ttel_id")
