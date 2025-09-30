@@ -953,7 +953,7 @@ class TaskTemplateRepository:
                 and node.task_template_version_id=22938253;
             takes 0.006s.
 
-            Joh's trouble some query that can not return within db timeout:
+            Jon's trouble some query that can not return within db timeout:
                 select count(distinct task.id)
                 from task_instance_error_log
                 join task_instance on
@@ -1116,7 +1116,7 @@ class TaskTemplateRepository:
             # this one is similar without latest wfr and ti restriction
             # Benchmark:
             """
-            Use Joh's quiery as example:
+            Use Jon's quiery as example:
                 workflow_id: 490688
                 task_template_id: 9739
 
