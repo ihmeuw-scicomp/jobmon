@@ -140,7 +140,15 @@ async def record_array_batch_num(
                 )
                 db.execute(update_stmt)
 
-                # Insert into TaskInstance in the same transaction
+                # Calculate array_batch_num separately to avoid deadlock
+                # Use SELECT FOR UPDATE with NOWAIT to prevent waiting on locks
+                batch_num_result = db.execute(
+                    select(func.coalesce(func.max(TaskInstance.array_batch_num) + 1, 1))
+                    .where(TaskInstance.array_id == array_id)
+                    .with_for_update(nowait=True)
+                ).scalar()
+
+                # Insert into TaskInstance with the calculated batch number
                 insert_stmt = insert(TaskInstance).from_select(
                     # columns map 1:1 to selected rows
                     [
@@ -163,12 +171,8 @@ async def record_array_batch_num(
                         literal_column(str(task_resources_id)).label(
                             "task_resources_id"
                         ),
-                        # batch info
-                        select(
-                            func.coalesce(func.max(TaskInstance.array_batch_num) + 1, 1)
-                        )
-                        .where((TaskInstance.array_id == array_id))
-                        .label("array_batch_num"),
+                        # batch info - use the pre-calculated value
+                        literal_column(str(batch_num_result)).label("array_batch_num"),
                         (func.row_number().over(order_by=Task.id) - 1).label(
                             "array_step_id"
                         ),
@@ -188,25 +192,11 @@ async def record_array_batch_num(
                 break  # Success - exit retry loop
 
             except OperationalError as e:
-                if (
-                    "database is locked" in str(e)
-                    or "Lock wait timeout" in str(e)
-                    or "could not obtain lock" in str(e)
-                    or "lock(s) could not be acquired immediately and NOWAIT is set"
-                    in str(e)
-                ):
-                    logger.warning(
-                        f"Lock timeout for atomic batch operation, retrying attempt "
-                        f"{attempt + 1}/{max_retries}"
-                    )
-                    db.rollback()
-                    sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff
-                else:
-                    logger.error(
-                        f"Unexpected database error in atomic batch operation: {e}"
-                    )
-                    db.rollback()
-                    raise e
+                logger.warning(
+                    f"DB error {e}, retrying attempt " f"{attempt + 1}/{max_retries}"
+                )
+                db.rollback()
+                sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff
         else:
             # All retries failed
             logger.error(
