@@ -1047,9 +1047,12 @@ class TaskTemplateRepository:
             clustered_df = cluster_error_logs(errors_df)
 
             # Convert back to ErrorLogItem objects
-            error_logs = [
-                ErrorLogItem(**row) for row in clustered_df.to_dict(orient="records")
-            ]
+            error_logs = []
+            for row_dict in clustered_df.to_dict(orient="records"):
+                # Ensure error_time is converted to string if it exists
+                if "error_time" in row_dict and row_dict["error_time"] is not None:
+                    row_dict["error_time"] = str(row_dict["error_time"])
+                error_logs.append(ErrorLogItem(**row_dict))
 
             # Update total count after clustering
             total_count = len(error_logs)

@@ -29,7 +29,7 @@ def cluster_error_logs(df: DataFrame) -> DataFrame:
             task_instance_ids=("task_instance_id", lambda x: list(set(x))),
             task_ids=("task_id", lambda x: list(set(x))),
             sample_error=("processed_log", "first"),
-            first_error_time=("error_time", "first"),
+            first_error_time=("error_time", lambda x: str(x.iloc[0])),
             workflow_run_id=("workflow_run_id", "first"),
             workflow_id=("workflow_id", "first"),
         )
