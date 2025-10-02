@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
 from jobmon.core import constants
-from jobmon.server.web.db import get_sessionmaker
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.workflow import Workflow
@@ -211,28 +210,25 @@ async def update_task_statuses(request: Request, db: Session = Depends(get_db)) 
         data = cast(Dict, await request.json())
         workflow_id, recursive, task_ids, new_status = parse_request_data(data)
 
-        with get_sessionmaker()() as session, session.begin():
-            if isinstance(task_ids, str):
-                if task_ids != "all":
-                    raise InvalidUsage(
-                        f"Invalid task_ids value: {task_ids}", status_code=400
-                    )
-                task_ids_for_validation = [
-                    task_id
-                    for task_id, in session.query(Task.id)
-                    .filter(Task.workflow_id == workflow_id)
-                    .all()
-                ]
-            else:
-                task_ids_for_validation = task_ids
+        if isinstance(task_ids, str):
+            if task_ids != "all":
+                raise InvalidUsage(
+                    f"Invalid task_ids value: {task_ids}", status_code=400
+                )
+            task_ids_for_validation = [
+                task_id
+                for task_id, in db.query(Task.id)
+                .filter(Task.workflow_id == workflow_id)
+                .all()
+            ]
+        else:
+            task_ids_for_validation = task_ids
 
-            workflow_status = validate_workflow_for_update(
-                task_ids_for_validation, session
-            )
+        workflow_status = validate_workflow_for_update(task_ids_for_validation, db)
 
-            TaskRepository(session).update_task_statuses(
-                workflow_id, recursive, workflow_status, task_ids, new_status
-            )
+        TaskRepository(db).update_task_statuses(
+            workflow_id, recursive, workflow_status, task_ids, new_status
+        )
 
         return add_cors_headers(create_response(new_status))
 
