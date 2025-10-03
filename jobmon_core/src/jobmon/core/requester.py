@@ -5,12 +5,11 @@ from __future__ import annotations
 import contextlib
 import functools
 import json
-import logging
-import logging.config
 from typing import Any, Callable, Dict, Tuple, Type
 
 import aiohttp
 import requests
+import structlog
 import tenacity
 import urllib3
 
@@ -18,7 +17,7 @@ from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.exceptions import InvalidRequest, InvalidResponse
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def http_request_ok(status_code: int) -> bool:
@@ -124,6 +123,33 @@ class Requester:
         for key, value in kwargs.items():
             self.server_structlog_context[key] = value
 
+    def _get_current_structlog_context(self) -> Dict[str, Any]:
+        """Get current structlog context variables to pass to server.
+
+        Captures context like workflow_run_id, cluster_name, etc. so the server
+        can include them in its logs for correlation.
+        """
+        try:
+            import structlog
+
+            # Get current context vars
+            ctx = structlog.contextvars.get_contextvars()
+
+            # Only pass serializable values
+            context = {}
+            for key, value in ctx.items():
+                if isinstance(value, (str, int, float, bool, type(None))):
+                    context[key] = value
+                elif isinstance(value, (list, dict)):
+                    context[key] = str(value)
+
+            # Merge with manually added context
+            context.update(self.server_structlog_context)
+            return context
+        except Exception:
+            # If structlog not configured or error, just return manual context
+            return dict(self.server_structlog_context)
+
     @contextlib.contextmanager
     def tracing_span(self, app_route: str, request_type: str) -> Any:
         if self._otlp_manager and hasattr(self._otlp_manager, "get_tracer"):
@@ -151,7 +177,7 @@ class Requester:
 
     def _should_retry_exception(self, exception: Any) -> bool:
         """Determine if an exception should trigger a retry."""
-        logger.warning(f"Exception occurred: {exception}")
+        logger.warning("HTTP request exception", error=str(exception))
 
         # Do not retry for certain client errors.
         if isinstance(exception, InvalidRequest):
@@ -208,17 +234,19 @@ class Requester:
     ) -> Tuple[int, Any]:
         # Construct URL
         route = self.service_url + app_route
-        logger.info(f"Route: {route}, message: {message}")
+        logger.info("Making HTTP request", route=route, request_type=request_type)
 
         # Add version to query parameters
         params = {"client_jobmon_version": __version__}
         if request_type == "get":
             params.update(message)
 
-        # Set headers, including the custom header for structlog context
+        # Set headers, including current structlog context for server correlation
         headers = {
             "Content-Type": "application/json",
-            "X-Server-Structlog-Context": json.dumps(self.server_structlog_context),
+            "X-Server-Structlog-Context": json.dumps(
+                self._get_current_structlog_context()
+            ),
         }
 
         # Send the appropriate request
@@ -298,17 +326,19 @@ class Requester:
         """Async version of _send_request using aiohttp."""
         # Construct URL
         route = self.service_url + app_route
-        logger.info(f"Route: {route}, message: {message}")
+        logger.info("Making HTTP request", route=route, request_type=request_type)
 
         # Add version to query parameters
         params = {"client_jobmon_version": __version__}
         if request_type == "get":
             params.update(message)
 
-        # Set headers, including the custom header for structlog context
+        # Set headers, including current structlog context for server correlation
         headers = {
             "Content-Type": "application/json",
-            "X-Server-Structlog-Context": json.dumps(self.server_structlog_context),
+            "X-Server-Structlog-Context": json.dumps(
+                self._get_current_structlog_context()
+            ),
         }
 
         # Send the appropriate request

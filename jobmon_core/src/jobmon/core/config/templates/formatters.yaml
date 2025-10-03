@@ -19,6 +19,10 @@ formatters:
   structlog_json:
     '()': jobmon.core.config.formatters.JobmonStructlogJSONFormatter
 
+  # Structlog formatter that shows only the event (traditional log style)
+  structlog_event_only:
+    '()': jobmon.core.config.formatters.JobmonStructlogEventOnlyFormatter
+
   # Basic JSON formatter (simple, no dependencies)
   simple_json:
     format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}' 

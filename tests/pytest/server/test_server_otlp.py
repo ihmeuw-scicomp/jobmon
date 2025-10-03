@@ -456,7 +456,7 @@ class TestServerLoggingConfigIntegration:
 
     def test_server_default_config_selection(self):
         """Test that server uses basic config by default (OTLP via overrides)."""
-        from jobmon.server.web.log_config import configure_logging
+        from jobmon.server.web.log_config import configure_logging  # Compatibility shim
 
         with patch("jobmon.server.web.log_config.JobmonConfig") as mock_config_class:
             mock_config = Mock()

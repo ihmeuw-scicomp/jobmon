@@ -84,10 +84,13 @@ class TestServerLoggingIntegration:
         server_logger.handlers.clear()
 
         # Import and test configure_logging with explicit dict config (highest precedence)
-        from jobmon.server.web.log_config import configure_logging
+        import logging.config
 
-        # Should use the dict config
-        configure_logging(dict_config=custom_config)
+        from jobmon.core.config.structlog_config import configure_structlog
+
+        # Apply the dict config directly
+        logging.config.dictConfig(custom_config)
+        configure_structlog(component_name="server")
 
         # Check that custom configuration was applied
         assert len(server_logger.handlers) > 0
@@ -161,10 +164,14 @@ loggers:
                     server_logger.handlers.clear()
 
                     # Import and test configure_logging
-                    from jobmon.server.web.log_config import configure_logging
+                    from jobmon.core.config.logconfig_utils import (
+                        configure_component_logging,
+                    )
+                    from jobmon.core.config.structlog_config import configure_structlog
 
                     # Should apply section override
-                    configure_logging()
+                    configure_component_logging("server")
+                    configure_structlog(component_name="server")
 
                     # Check that configuration was applied
                     assert len(server_logger.handlers) > 0
@@ -181,10 +188,14 @@ loggers:
                 mock_validate.return_value = True
 
                 # Import and test configure_logging
-                from jobmon.server.web.log_config import configure_logging
+                from jobmon.core.config.logconfig_utils import (
+                    configure_component_logging,
+                )
+                from jobmon.core.config.structlog_config import configure_structlog
 
-                # Should call OTLP validation
-                configure_logging()
+                # Configure using core utilities
+                configure_component_logging("server")
+                configure_structlog(component_name="server")
 
                 # Validation should have been called
                 mock_validate.assert_called_once()
@@ -217,10 +228,13 @@ loggers:
         server_logger.handlers.clear()
 
         # Import and test configure_logging with explicit dict
-        from jobmon.server.web.log_config import configure_logging
+        import logging.config
 
-        # Should use the dict config
-        configure_logging(dict_config=dict_config)
+        from jobmon.core.config.structlog_config import configure_structlog
+
+        # Apply the dict config directly
+        logging.config.dictConfig(dict_config)
+        configure_structlog(component_name="server")
 
         # Check that configuration was applied
         assert len(server_logger.handlers) > 0

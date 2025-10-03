@@ -11,9 +11,10 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
+from jobmon.core.config.logconfig_utils import configure_component_logging
+from jobmon.core.config.structlog_config import configure_structlog
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
-from jobmon.server.web.log_config import configure_logging, configure_structlog
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
 from jobmon.server.web.routes.utils import (
     get_user,
@@ -31,9 +32,9 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     """
     config = JobmonConfig()
 
-    # Configure logging AFTER OTLP instrumentation is set up
-    # Server uses existing sophisticated logging system with OTLP safety
-    configure_logging()
+    # Configure logging using shared component configuration
+    # Same pattern as distributor, worker, etc.
+    configure_component_logging("server")
 
     # Initialize the FastAPI app
     app_title = "jobmon"
@@ -67,9 +68,11 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         server_otlp.instrument_requests()
 
         server_otlp.instrument_app(app)
-        configure_structlog([add_span_details_processor])
+        configure_structlog(
+            component_name="server", extra_processors=[add_span_details_processor]
+        )
     else:  # Configure structlog without OTLP
-        configure_structlog()
+        configure_structlog(component_name="server")
 
     # Mount static files
     docs_static_uri = "/static"  # Adjust as necessary
@@ -119,9 +122,13 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         )
 
     app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
-    app.add_middleware(
-        SessionMiddleware, secret_key=config.get("session", "secret_key")
-    )
+
+    # Only add session middleware when authentication is enabled
+    if auth_enabled:
+        app.add_middleware(
+            SessionMiddleware, secret_key=config.get("session", "secret_key")
+        )
+
     app.add_middleware(SecurityHeadersMiddleware, csp=True)
 
     # Include routers with conditional authentication

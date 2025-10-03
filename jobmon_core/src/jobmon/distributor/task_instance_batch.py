@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import ast
 import hashlib
-import logging
 from typing import TYPE_CHECKING, Any, Dict, Set
+
+import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.requester import Requester
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from jobmon.distributor.distributor_task_instance import DistributorTaskInstance
 
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class TaskInstanceBatch:
@@ -82,6 +83,15 @@ class TaskInstanceBatch:
         # Assertion that all bound task instances are indeed instantiated
         for ti in self.task_instances:
             if ti.status != TaskInstanceStatus.INSTANTIATED:
+                # Log validation error - this adds info beyond main service
+                logger.error(
+                    "Task instance in incorrect state for launch",
+                    task_instance_id=ti.task_instance_id,
+                    expected_status=TaskInstanceStatus.INSTANTIATED,
+                    actual_status=ti.status,
+                    array_id=self.array_id,
+                    batch_number=self.batch_number,
+                )
                 raise ValueError(
                     f"{ti} is not in INSTANTIATED state, prior to launching."
                 )

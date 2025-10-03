@@ -130,7 +130,7 @@ class TestEndToEndLoggingScenarios:
 
         # Configure server logging
         from jobmon.server.web.log_config import (
-            configure_logging as configure_server_logging,
+            configure_logging as configure_server_logging,  # Compatibility shim
         )
 
         configure_server_logging()
@@ -425,10 +425,14 @@ class TestProductionScenarios:
                     mock_otlp_manager.get_instance.return_value = mock_manager
 
                     # Configuration should still complete (with fallback to non-OTLP)
-                    from jobmon.server.web.log_config import configure_logging
+                    from jobmon.core.config.logconfig_utils import (
+                        configure_component_logging,
+                    )
+                    from jobmon.core.config.structlog_config import configure_structlog
 
                     try:
-                        configure_logging()
+                        configure_component_logging("server")
+                        configure_structlog(component_name="server")
 
                         # Should still have basic logging
                         server_logger = logging.getLogger("jobmon.server.web")

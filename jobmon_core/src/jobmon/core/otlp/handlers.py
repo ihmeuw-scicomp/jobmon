@@ -11,6 +11,76 @@ from . import OTLP_AVAILABLE
 from .formatters import JobmonOTLPFormatter
 
 
+class _JobmonOTLPLoggingHandler(logging.Handler):
+    """Custom OTLP LoggingHandler that extracts attributes from thread-local event_dict.
+
+    Retrieves the raw structlog event_dict from thread-local storage (stored before
+    JSON rendering) to extract clean attributes for OTLP.
+    """
+
+    def __init__(self, level: int, logger_provider: Any) -> None:
+        """Initialize with logger provider."""
+        super().__init__(level)
+        self._logger_provider = logger_provider
+        self._logger = logger_provider.get_logger(__name__)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Emit log record to OTLP with extracted attributes."""
+        try:
+            from opentelemetry.sdk._logs import LogRecord as OTLPLogRecord
+            from opentelemetry.trace import get_current_span
+
+            # Extract attributes from thread-local event_dict (before formatting)
+            from jobmon.core.config.structlog_config import _thread_local
+
+            attributes = {}
+            message = record.getMessage()
+
+            # Try to get event_dict from thread-local
+            event_dict = getattr(_thread_local, "last_event_dict", None)
+
+            if event_dict:
+                # Extract all fields as OTLP attributes
+                for key, value in event_dict.items():
+                    if not key.startswith("_") and key not in (
+                        "event",
+                        "timestamp",
+                        "logger",
+                        "level",
+                    ):
+                        if isinstance(value, (str, int, float, bool, type(None))):
+                            attributes[key] = value
+                        elif isinstance(value, (list, dict)):
+                            attributes[key] = str(value)
+
+                # Use event field as clean message
+                message = event_dict.get("event", message)
+
+            # Get trace context
+            span = get_current_span()
+            trace_context = span.get_span_context() if span else None
+
+            # Create OTLP log record (set trace context after creation to avoid deprecation)
+            otlp_record = OTLPLogRecord(
+                timestamp=int(record.created * 1e9),
+                severity_text=record.levelname,
+                severity_number=None,  # Type issue: Let SDK determine from severity_text
+                body=record.getMessage(),
+                resource=self._logger_provider.resource,
+                attributes=attributes,
+            )
+
+            # Set trace context if available
+            if trace_context and trace_context.is_valid:
+                otlp_record.trace_id = trace_context.trace_id
+                otlp_record.span_id = trace_context.span_id
+                otlp_record.trace_flags = trace_context.trace_flags
+
+            self._logger.emit(otlp_record)
+        except Exception:
+            pass
+
+
 class JobmonOTLPLoggingHandler(logging.Handler):
     """Universal OTLP logging handler supporting dict configs and pre-configured exporters.
 
@@ -71,6 +141,7 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         # Emit to OTLP if handler is available
         if self._otlp_handler:
             try:
+                # Call emit directly (no filters needed with thread-local approach)
                 self._otlp_handler.emit(record)
             except Exception as e:
                 if self._debug_mode:
@@ -81,7 +152,7 @@ class JobmonOTLPLoggingHandler(logging.Handler):
     def _create_handler(self) -> Optional[logging.Handler]:
         """Create OTLP handler by processing the exporter configuration."""
         try:
-            from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+            from opentelemetry.sdk._logs import LoggerProvider
             from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 
             from .resources import create_jobmon_resources
@@ -112,8 +183,11 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
             logger_provider.add_log_record_processor(processor)
 
-            # Create and return the handler
-            handler = LoggingHandler(level=self.level, logger_provider=logger_provider)
+            # Use CUSTOM OTLP handler that properly extracts attributes
+            # Standard LoggingHandler doesn't extract custom record.__dict__ fields
+            handler = _JobmonOTLPLoggingHandler(
+                level=self.level, logger_provider=logger_provider
+            )
             handler.setFormatter(self.formatter)
             return handler
 
@@ -195,27 +269,12 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
 
 class JobmonOTLPStructlogHandler(JobmonOTLPLoggingHandler):
-    """OTLP logging handler with structlog formatting for structured logs.
+    """OTLP logging handler for structlog.
 
-    This handler extends JobmonOTLPLoggingHandler to provide structured logging
-    using structlog formatting before sending to OTLP.
+    Identical to JobmonOTLPLoggingHandler - uses the same custom handler that
+    extracts attributes from thread-local event_dict. This class exists for
+    clarity in configuration (to indicate structlog support) but functionally
+    is the same as the parent class.
     """
 
-    def __init__(
-        self, level: int = logging.NOTSET, exporter: Optional[Union[Any, Dict]] = None
-    ) -> None:
-        """Initialize with structlog formatter."""
-        super().__init__(level, exporter)
-
-        # Set up structlog formatting if available
-        try:
-            import structlog
-
-            self.setFormatter(
-                structlog.stdlib.ProcessorFormatter(
-                    processor=structlog.processors.JSONRenderer(), foreign_pre_chain=[]
-                )
-            )
-        except ImportError:
-            # Fall back to regular OTLP formatter if structlog not available
-            pass
+    pass  # No need to override anything

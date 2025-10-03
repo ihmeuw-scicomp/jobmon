@@ -6,6 +6,17 @@ All notable changes to Jobmon will be documented in this file.
 ## [Unreleased]
 ### Added
 - Added `jobmon update_config` command to allow users to update configuration values in their defaults.yaml file using dot notation (e.g., `jobmon update_config http.retries_attempts 15`).
+- **Structured Logging with Context Binding and OTLP Integration**: Complete implementation of structured logging across all Jobmon components with automatic context binding, OTLP attribute extraction, and APM integration:
+  - **Context Binding Decorator** (`@bind_context`): Automatically bind function/method parameters to log context with support for nested attribute extraction and automatic cleanup
+  - **Automatic Configuration**: All components (client, server, distributor, worker) auto-configure structlog via CLI inheritance with zero manual setup required
+  - **OTLP Attribute Extraction**: Custom handler extracts structlog fields as separate OTLP attributes using thread-local storage, enabling searchable fields in APM/Elasticsearch
+  - **Clean Console Output**: Traditional log format for console (timestamp, level, logger, message) while sending full structured data to OTLP
+  - **Context Propagation**: Automatic context propagation from client through HTTP requests to server via `X-Server-Structlog-Context` header for distributed tracing
+  - **Distributor Enhanced**: 15+ strategic structured logs added with `@bind_context` decorators on key methods (launch_task_instance, launch_task_instance_batch, triage_error, etc.)
+  - **Readable Event Names**: Human-friendly event names ("Batch launched" not "batch_launched") for better log readability
+  - **Code Consolidation**: Removed 162 lines of duplicate server logging configuration, consolidated to shared core utilities
+  - **APM Query Support**: All context fields (workflow_run_id, task_instance_id, cluster_name, etc.) searchable as `numeric_labels.*` or `labels.*` in Kibana/APM
+  - **Test Utilities**: Added `tests/workflows/emit_single_log.py` for verifying OTLP attribute extraction in development
 - **Enhanced Logging System**: Redesigned Jobmon's logging architecture with automatic component configuration and production-ready features:
   - Automatic logging configuration for all CLI components (distributor, worker, server, client) with console logging by default
   - Template-based logging configurations with user override support (file-based and section-based customization)

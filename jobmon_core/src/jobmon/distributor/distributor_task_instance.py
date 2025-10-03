@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, List, Set, Tuple
+
+import structlog
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.requester import Requester
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from jobmon.distributor.task_instance_batch import TaskInstanceBatch
 
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class DistributorTaskInstance:
@@ -108,6 +109,11 @@ class DistributorTaskInstance:
             no_id_err_msg: The error msg from the executor when failed to obtain distributor
                 id.
         """
+        # Main service already logs launch failure, only log if error details differ
+        logger.warning(
+            "Failed to get distributor ID", task_instance_id=self.task_instance_id
+        )
+
         app_route = f"/task_instance/{self.task_instance_id}/log_no_distributor_id"
         self.requester.send_request(
             app_route=app_route,
@@ -120,9 +126,20 @@ class DistributorTaskInstance:
         if self.distributor_id is None:
             raise ValueError("distributor_id cannot be None during log_error")
         distributor_id = self.distributor_id
-        logger.debug(f"log_error for distributor_id {distributor_id}")
+
         if not error_state:
             raise ValueError("cannot log error if error_state isn't set")
+
+        # Only log error details not captured by main service
+        error_type = (
+            "unknown" if error_state == TaskInstanceStatus.UNKNOWN_ERROR else "known"
+        )
+        logger.info(
+            f"Task transitioned to {error_type} error",
+            task_instance_id=self.task_instance_id,
+            error_state=error_state,
+            distributor_id=distributor_id,
+        )
 
         if error_state == TaskInstanceStatus.UNKNOWN_ERROR:
             app_route = f"/task_instance/{self.task_instance_id}/log_unknown_error"
