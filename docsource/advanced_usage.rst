@@ -250,12 +250,33 @@ To resume by ID, you can either use the CLI function:
 
 ``jobmon workflow_resume -w <workflow_id> -c <cluster_name>``
 
-The "workflow_resume" CLI has two optional flags:
+Examples:
+
+.. code-block:: bash
+
+   # Basic resume with default timeouts
+   jobmon workflow_resume -w 12345 -c slurm
+
+   # Resume with custom execution timeout (2 hours)
+   jobmon workflow_resume -w 12345 -c slurm --seconds-until-timeout 7200
+
+   # Resume with both custom resume timeout and execution timeout
+   jobmon workflow_resume -w 12345 -c slurm --timeout 300 --seconds-until-timeout 14400
+
+   # Resume with cold restart and extended execution timeout
+   jobmon workflow_resume -w 12345 -c slurm --reset-running-jobs --seconds-until-timeout 21600
+
+The "workflow_resume" CLI has three optional flags:
 
 * ``--reset-running-jobs`` - Whether to kill currently running jobs or let them finish. Setting this flag means that it
   will be a cold resume i.e. currently running jobs are also terminated and rerun. Default is set to False.
-* ``--timeout`` or ``-t`` - Allows users to set the Workflow timeout. Default is 180.
+* ``--timeout`` or ``-t`` - Timeout in seconds to wait for workflow to become resumable. This controls how long Jobmon waits for the workflow to reach a resumable state before giving up. Default is 180 seconds.
+* ``--seconds-until-timeout`` - Timeout in seconds for workflow execution after resume. This controls how long the workflow can run after resuming before timing out. If not all tasks complete within this time, the workflow will error but submitted tasks will continue running. Default is 36000 seconds (10 hours).
 
+
+.. note::
+
+   **Timeout Behavior**: If the workflow execution timeout (``--seconds-until-timeout``) is reached, Jobmon will raise an error indicating that not all tasks completed within the specified time. However, any tasks that were already submitted to the cluster will continue running. You can resume the workflow again to check for completion or extend the timeout for longer-running workflows.
 
 Important caveat: if resuming a workflow by ID, you will not have the ability to change certain parameters that have been
 bound to the database, such as the workflow attributes or the compute resources. To run a workflow with updated resources,
