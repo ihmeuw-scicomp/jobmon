@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -159,7 +160,7 @@ class ErrorLogItem(BaseModel):
     task_id: Optional[int] = None
     task_instance_id: Optional[int] = None
     task_instance_err_id: Optional[int] = None
-    error_time: Optional[str] = None
+    error_time: Optional[datetime] = None
     error: Optional[str] = None
     task_instance_stderr_log: Optional[str] = None
 
@@ -173,7 +174,12 @@ class ErrorLogItem(BaseModel):
     task_instance_ids: Optional[List[int]] = None
     task_ids: Optional[List[int]] = None
     sample_error: Optional[str] = None
-    first_error_time: Optional[str] = None
+    first_error_time: Optional[datetime] = None
+
+    model_config = ConfigDict(
+        # This will serialize datetime objects to ISO strings in JSON responses
+        json_encoders={datetime: lambda v: v.isoformat()}
+    )
 
 
 class ErrorLogResponse(BaseModel):
