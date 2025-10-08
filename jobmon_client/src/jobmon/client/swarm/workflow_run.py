@@ -594,7 +594,7 @@ class WorkflowRun:
 
         # unexpected errors. raise
         except Exception as e:
-            logger.error("Workflow run error", error=str(e), exc_info=True)
+            logger.exception("Workflow run error", error=str(e))
             try:
                 self._update_status(WorkflowRunStatus.ERROR)
             except TransitionError as trans:

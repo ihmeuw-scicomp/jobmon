@@ -206,7 +206,7 @@ class DistributorService:
         except DistributorInterruptedError as e:
             logger.info(f"Distributor interrupted: {e}")
         except Exception as e:
-            logger.error("Distributor error", error=str(e), exc_info=True)
+            logger.exception("Distributor error", error=str(e))
             raise
         finally:
             logger.info("Distributor stopping")
@@ -399,11 +399,10 @@ class DistributorService:
         except Exception as e:
             # if other error, transition to No ID status
             stack_trace = traceback.format_exc()
-            logger.error(
+            logger.exception(
                 "Batch launch failed",
                 error=str(e),
                 batch_size=batch_size,
-                exc_info=True,
             )
             for task_instance in task_instance_batch.task_instances:
                 distributor_command = DistributorCommand(
@@ -458,7 +457,7 @@ class DistributorService:
             logger.debug("Task instance launched", distributor_id=distributor_id)
         except Exception as e:
             stack_trace = traceback.format_exc()
-            logger.error("Task instance launch failed", error=str(e), exc_info=True)
+            logger.exception("Task instance launch failed", error=str(e))
             task_instance.transition_to_no_distributor_id(no_id_err_msg=stack_trace)
 
         else:

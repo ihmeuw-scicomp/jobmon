@@ -70,7 +70,7 @@ class WorkerNodeCLI(CLI):
             )
             worker_node_task_instance.run()
         except Exception as e:
-            logger.error("Worker node error", error=str(e), exc_info=True)
+            logger.exception("Worker node error", error=str(e))
             sys.exit(ReturnCodes.WORKER_NODE_CLI_FAILURE)
 
         return worker_node_task_instance.command_returncode
@@ -117,7 +117,7 @@ class WorkerNodeCLI(CLI):
             )
             worker_node_task_instance.run()
         except Exception as e:
-            logger.error("Worker node array error", error=str(e), exc_info=True)
+            logger.exception("Worker node array error", error=str(e))
             sys.exit(ReturnCodes.WORKER_NODE_CLI_FAILURE)
 
         return worker_node_task_instance.command_returncode
@@ -162,9 +162,7 @@ class WorkerNodeCLI(CLI):
             task_generator.run(args.args[0])
             return ReturnCodes.OK
         except Exception as e:
-            logger.error(
-                "Worker node task generator error", error=str(e), exc_info=True
-            )
+            logger.exception("Worker node task generator error", error=str(e))
             raise e
 
     def _add_run_task_generator_parser(self) -> None:

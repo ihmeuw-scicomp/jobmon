@@ -460,7 +460,7 @@ class WorkerNodeTaskInstance:
             # Log unexpected errors. This could be any exception raised by
             # the reading or writing operations. Consider appending an error message
             # to `mem_buffer` to indicate that an error occurred.
-            logger.error("Stream reading error", error=str(e), exc_info=True)
+            logger.exception("Stream reading error", error=str(e))
             mem_buffer += "\n[Error reading stream: {}]".format(e)
         finally:
             # Ensure that the method always returns the buffer, even if an error occurred.
@@ -550,11 +550,10 @@ class WorkerNodeTaskInstance:
                 process.kill()
                 await process.wait()
 
-            logger.error(
+            logger.exception(
                 "Task instance command execution failed",
                 error=str(e),
                 command=self.command,
-                exc_info=True,
             )
             raise RuntimeError(
                 f"Failed to execute command '{self.command}': {e}"

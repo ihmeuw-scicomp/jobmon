@@ -23,6 +23,9 @@ worker_node:
 # Override default logconfig location to use mounted file
 logging:
   server_logconfig_file: /app/config/logconfig.example.yaml
+  distributor_logconfig_file: /app/config/logconfig.otlp.yaml
+  client_logconfig_file: /app/config/logconfig.otlp.yaml
+  worker_logconfig_file: /app/config/logconfig.otlp.yaml
 
 # Authentication disabled for local development
 auth:
@@ -31,23 +34,37 @@ auth:
 # Telemetry configuration (replaces otlp section)
 telemetry:
   # Environment identifier for telemetry resources
-  deployment_environment: dev
+  deployment_environment: local
   debug: true
 
   # Distributed tracing configuration
   tracing:
-    requester_enabled: false    # Client-side HTTP request tracing  
-    server_enabled: false        # Server-side tracing disabled for local dev
-    # span_exporter: "grpc_span"  # Commented out since tracing is disabled
-    
+    requester_enabled: true    # Client-side HTTP request tracing  
+    server_enabled: true        # Server-side tracing enabled for local dev
+    span_exporter: "grpc_span"  # Use GRPC exporter for real OTLP export
+  
     exporters:
-      # Production GRPC span exporter with proper TLS
       grpc_span:
         module: "opentelemetry.exporter.otlp.proto.grpc.trace_exporter"
         class: "OTLPSpanExporter"
         endpoint: "https://otelcol.aks.scicomp.ihme.washington.edu:443"
         timeout: 30
-        insecure: false  # Secure connection
+        insecure: false
+        headers: {}
+        compression: "gzip"
+  
+  # OTLP logging configuration (shared across all components)
+  logging:
+    enabled: true
+    log_exporter: "grpc_log"
+    
+    exporters:
+      grpc_log:
+        module: "opentelemetry.exporter.otlp.proto.grpc._log_exporter"
+        class: "OTLPLogExporter"
+        endpoint: "https://otelcol.aks.scicomp.ihme.washington.edu:443"
+        timeout: 30
+        insecure: false
         headers: {}
         compression: "gzip"
 

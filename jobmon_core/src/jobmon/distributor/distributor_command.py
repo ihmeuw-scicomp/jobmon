@@ -28,4 +28,4 @@ class DistributorCommand:
             if raise_on_error:
                 raise
             else:
-                logger.error("Distributor command failed", error=str(e), exc_info=True)
+                logger.exception("Distributor command failed", error=str(e))

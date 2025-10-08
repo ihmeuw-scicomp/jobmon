@@ -725,7 +725,7 @@ class Workflow(object):
             if raise_on_error:
                 raise
             else:
-                logger.error("Workflow validation error", error=str(e), exc_info=True)
+                logger.exception("Workflow validation error", error=str(e))
 
     def bind(self) -> None:
         """Get a workflow_id."""

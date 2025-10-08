@@ -153,8 +153,8 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                     )
             except Exception as e:
                 if self._debug_mode:
-                    logging.getLogger("jobmon.otlp.debug").error(
-                        f"OTLP handler initialization failed: {e}", exc_info=True
+                    logging.getLogger("jobmon.otlp.debug").exception(
+                        f"OTLP handler initialization failed: {e}"
                     )
 
         # Emit to OTLP if handler is available
