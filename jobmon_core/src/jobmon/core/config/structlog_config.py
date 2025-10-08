@@ -73,11 +73,11 @@ def configure_structlog(
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
         *extra_processors,  # OTLP processors, custom processors go here
-        _store_event_dict_for_otlp,  # Store for OTLP before JSON rendering
         structlog.stdlib.PositionalArgumentsFormatter(),
         structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S"),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
+        _store_event_dict_for_otlp,  # Store for OTLP after exception processing
         structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
     ]
 

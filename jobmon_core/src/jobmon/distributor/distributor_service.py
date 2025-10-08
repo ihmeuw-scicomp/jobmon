@@ -160,7 +160,7 @@ class DistributorService:
                 time_till_next_heartbeat = self._workflow_run_heartbeat_interval - (
                     time.time() - self._last_heartbeat_time
                 )
-
+                raise Exception("test")
                 while todo and time_till_next_heartbeat > 0:
                     # log when this status started
                     start_time = time.time()
