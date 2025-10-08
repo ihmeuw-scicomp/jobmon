@@ -36,8 +36,8 @@ To install both at once via pip::
 
     pip install jobmon[ihme]
 
-Then issue a "jobmon_config update" command to configure the web service and port, as described on
-the HUB at
+
+See versions at:
 `Jobmon Conda Versions <https://hub.ihme.washington.edu/display/DataScience/Jobmon+Conda+Versions>`_
 
 
