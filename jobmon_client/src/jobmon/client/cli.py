@@ -233,6 +233,7 @@ class ClientCLI(CLI):
             cluster_name=args.cluster_name,
             reset_if_running=args.reset_running_jobs,
             timeout=args.timeout,
+            seconds_until_timeout=args.seconds_until_timeout,
         )
 
     @staticmethod
@@ -622,9 +623,16 @@ class ClientCLI(CLI):
         workflow_resume_parser.add_argument(
             "-t",
             "--timeout",
-            help="timeout for resume command",
+            help="timeout in seconds to wait for workflow to become resumable (default: 180)",
             required=False,
             default=180,
+            type=int,
+        )
+        workflow_resume_parser.add_argument(
+            "--seconds-until-timeout",
+            help="timeout in seconds for workflow execution after resume (default: 36000)",
+            required=False,
+            default=36000,
             type=int,
         )
 

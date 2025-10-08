@@ -1041,7 +1041,7 @@ class TaskTemplateRepository:
                         {
                             "task_instance_err_id": r[0],
                             "task_instance_id": r[1],
-                            "error_time": str(r[2]) if r[2] is not None else None,
+                            "error_time": r[2],
                             "error": str(r[3]) if r[3] is not None else None,
                             "task_instance_stderr_log": (
                                 str(r[4]) if r[4] is not None else None
@@ -1078,11 +1078,7 @@ class TaskTemplateRepository:
                                 if crow["sample_error"] is not None
                                 else None
                             ),
-                            first_error_time=(
-                                str(crow["first_error_time"])
-                                if crow["first_error_time"] is not None
-                                else None
-                            ),
+                            first_error_time=crow["first_error_time"],
                         )
                     )
 
@@ -1099,7 +1095,7 @@ class TaskTemplateRepository:
                             task_id=ttev_t_map[row[0]],
                             task_instance_id=row[1],
                             task_instance_err_id=row[0],
-                            error_time=str(row[2]),
+                            error_time=row[2],
                             error=str(row[3]),
                             task_instance_stderr_log=str(row[4]),
                             workflow_run_id=row[5],
@@ -1184,7 +1180,7 @@ class TaskTemplateRepository:
                         {
                             "task_instance_err_id": r[0],
                             "task_instance_id": r[1],
-                            "error_time": str(r[2]) if r[2] is not None else None,
+                            "error_time": r[2],
                             "error": str(r[3]) if r[3] is not None else None,
                             "task_instance_stderr_log": (
                                 str(r[4]) if r[4] is not None else None
@@ -1228,11 +1224,7 @@ class TaskTemplateRepository:
                                 if crow["sample_error"] is not None
                                 else None
                             ),
-                            first_error_time=(
-                                str(crow["first_error_time"])
-                                if crow["first_error_time"] is not None
-                                else None
-                            ),
+                            first_error_time=crow["first_error_time"],
                         )
                     )
 
@@ -1258,7 +1250,7 @@ class TaskTemplateRepository:
                         task_id=row[6],
                         task_instance_id=row[1],
                         task_instance_err_id=row[0],
-                        error_time=str(row[2]),
+                        error_time=row[2],
                         error=str(row[3]),
                         task_instance_stderr_log=str(row[4]),
                         workflow_run_id=row[5],

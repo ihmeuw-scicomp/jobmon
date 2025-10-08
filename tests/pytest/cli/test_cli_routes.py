@@ -998,6 +998,22 @@ def test_get_tt_error_log_viz(client_env, db_engine):
     assert msg["error_logs"][0]["task_id"] == t2.task_id
     assert "not found" in msg["error_logs"][0]["error"]
 
+    # Validate error_time field format and type (datetime validation)
+    error_log = msg["error_logs"][0]
+    assert "error_time" in error_log
+    assert error_log["error_time"] is not None
+    assert isinstance(
+        error_log["error_time"], str
+    ), f"error_time should be string, got {type(error_log['error_time'])}"
+    # Verify it's a valid datetime string format
+    import datetime
+
+    try:
+        datetime.datetime.fromisoformat(error_log["error_time"].replace("Z", "+00:00"))
+    except ValueError:
+        # Try parsing as ISO format with different separators
+        datetime.datetime.strptime(error_log["error_time"], "%Y-%m-%d %H:%M:%S")
+
 
 def test_get_tt_error_log_viz_with_clustering(client_env, db_engine):
     """Test error log visualization with clustering enabled to catch validation errors."""
@@ -1060,6 +1076,93 @@ def test_get_tt_error_log_viz_with_clustering(client_env, db_engine):
     assert first_clustered_error["error_time"] is None
     assert first_clustered_error["error"] is None
     assert first_clustered_error["task_instance_stderr_log"] is None
+
+    # Validate first_error_time field format and type (datetime validation for clustering)
+    assert "first_error_time" in first_clustered_error
+    assert first_clustered_error["first_error_time"] is not None
+    assert isinstance(
+        first_clustered_error["first_error_time"], str
+    ), f"first_error_time should be string, got {type(first_clustered_error['first_error_time'])}"
+
+    # Verify first_error_time is a valid datetime string format
+    import datetime
+
+    try:
+        datetime.datetime.fromisoformat(
+            first_clustered_error["first_error_time"].replace("Z", "+00:00")
+        )
+    except ValueError:
+        # Try parsing as ISO format with different separators
+        datetime.datetime.strptime(
+            first_clustered_error["first_error_time"], "%Y-%m-%d %H:%M:%S"
+        )
+
+    # Test that the response can be serialized without Pydantic validation errors
+    # This specifically tests the fix for the datetime validation issue
+    import json
+
+    json.dumps(clustered_msg)  # This should not raise any serialization errors
+
+    # Additional test: verify all error logs in clustered response have proper string types
+    for error_log in clustered_msg["error_logs"]:
+        # Individual error fields should be None for clustered data
+        assert error_log["error_time"] is None
+        # But first_error_time should be a valid string
+        if error_log.get("first_error_time"):
+            assert isinstance(error_log["first_error_time"], str)
+
+    # Additional test: Test the exact scenario that was failing before the fix
+    # Create a workflow with multiple similar errors to ensure clustering works without datetime validation errors
+    wf_detailed = t.create_workflow(name=f"i_am_a_detailed_clustering_test_wf")
+    tt_detailed = t.get_task_template(
+        template_name="tt_detailed_clustering",
+        command_template="python -c 'raise Exception(\"Test error for clustering {arg}\")'",
+        node_args=["arg"],
+    )
+
+    # Create multiple tasks that will fail with similar but not identical errors
+    detailed_tasks = []
+    for i in range(5):
+        task = tt_detailed.create_task(
+            arg=f"test_{i}",
+            cluster_name="sequential",
+            compute_resources={"queue": "null.q", "num_cores": 2},
+            max_attempts=1,
+        )
+        detailed_tasks.append(task)
+
+    wf_detailed.add_tasks(detailed_tasks)
+    wf_detailed.run()
+
+    # Test clustering with similar errors (should group them together)
+    app_route_detailed = f"/tt_error_log_viz/{wf_detailed.workflow_id}/{tt_detailed.id}?cluster_errors=true"
+    _, detailed_clustered_msg = wf_detailed.requester.send_request(
+        app_route=app_route_detailed, message={}, request_type="get"
+    )
+
+    # Should have fewer clustered error logs (similar errors should be grouped)
+    assert len(detailed_clustered_msg["error_logs"]) <= 5
+    assert len(detailed_clustered_msg["error_logs"]) > 0
+
+    # Validate that all clustered error logs have proper string types for datetime fields
+    for error_log in detailed_clustered_msg["error_logs"]:
+        assert error_log["error_time"] is None  # Individual error_time should be None
+        if error_log.get("first_error_time"):
+            assert isinstance(
+                error_log["first_error_time"], str
+            ), f"first_error_time should be string, got {type(error_log['first_error_time'])}"
+            # Verify it's a valid datetime string
+            try:
+                datetime.datetime.fromisoformat(
+                    error_log["first_error_time"].replace("Z", "+00:00")
+                )
+            except ValueError:
+                datetime.datetime.strptime(
+                    error_log["first_error_time"], "%Y-%m-%d %H:%M:%S"
+                )
+
+    # Final validation: ensure the entire response can be JSON serialized without errors
+    json.dumps(detailed_clustered_msg)
 
 
 def test_task_details_by_wf_id(client_env, db_engine):
