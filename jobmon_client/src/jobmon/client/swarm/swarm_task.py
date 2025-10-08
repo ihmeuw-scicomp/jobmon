@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Callable, Dict, List, Optional, Set
+
+import structlog
 
 from jobmon.client.task_resources import TaskResources
 from jobmon.core.cluster import Cluster
 from jobmon.core.cluster_protocol import ClusterQueue
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class SwarmTask(object):

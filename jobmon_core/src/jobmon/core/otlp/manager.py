@@ -10,26 +10,30 @@ from . import OTLP_AVAILABLE
 if OTLP_AVAILABLE:
     from opentelemetry import trace
     from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk._logs import LoggerProvider
 
 from .resources import create_jobmon_resources
 
 
 class JobmonOTLPManager:
-    """Minimal OTLP manager for shared trace resources only.
+    """OTLP manager for shared trace and log resources.
 
-    With pure separation, this manager only handles:
+    This manager handles:
     - Trace provider setup (for distributed tracing)
+    - Logger provider setup (for OTLP log export)
     - Resource detection (shared across components)
     - Request instrumentation (shared utility)
 
-    Log exporters are handled directly by handlers with pre-configured exporters.
+    All OTLP handlers should use the shared logger provider to avoid
+    duplicate connections and log emissions.
     """
 
     _instance: Optional[JobmonOTLPManager] = None
 
     def __init__(self) -> None:
-        """Initialize the minimal OTLP manager."""
+        """Initialize the OTLP manager."""
         self.tracer_provider: Optional[Any] = None
+        self.logger_provider: Optional[Any] = None
         self._initialized = False
 
     @classmethod
@@ -40,7 +44,7 @@ class JobmonOTLPManager:
         return cls._instance
 
     def initialize(self) -> None:
-        """Initialize trace provider with jobmon resources and configure span exporters."""
+        """Initialize trace and log providers with jobmon resources."""
         if self._initialized or not OTLP_AVAILABLE:
             return
 
@@ -50,6 +54,12 @@ class JobmonOTLPManager:
 
             # Create trace provider
             self.tracer_provider = TracerProvider(resource=resource_group)
+
+            # Create logger provider (shared across all OTLP handlers)
+            self.logger_provider = LoggerProvider(resource=resource_group)
+
+            # Configure log processor (single processor for all handlers)
+            self._configure_log_processor()
 
             # Configure span exporters from telemetry configuration
             self._configure_span_exporters()
@@ -61,6 +71,125 @@ class JobmonOTLPManager:
 
         except Exception as e:
             logging.getLogger(__name__).warning(f"Failed to initialize OTLP: {e}")
+
+    def _configure_log_processor(self) -> None:
+        """Configure log processor from telemetry configuration."""
+        if not OTLP_AVAILABLE or not self.logger_provider:
+            return
+
+        try:
+            from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+
+            from jobmon.core.configuration import JobmonConfig
+
+            config = JobmonConfig()
+            telemetry_config = config.get_section_coerced("telemetry")
+            logging_config = telemetry_config.get("logging", {})
+
+            # Check if logging is enabled
+            enabled = logging_config.get("enabled", False)
+            if not enabled:
+                return
+
+            # Get the configured log exporter
+            log_exporter_name = logging_config.get("log_exporter")
+            if not log_exporter_name:
+                return
+
+            # Get the exporter configuration
+            exporters_config = logging_config.get("exporters", {})
+            exporter_config = exporters_config.get(log_exporter_name)
+
+            if not exporter_config:
+                logging.getLogger(__name__).warning(
+                    f"Log exporter '{log_exporter_name}' not found in configuration"
+                )
+                return
+
+            # Create the exporter
+            exporter = self._create_log_exporter(exporter_config)
+            if exporter:
+                # Create processor with batch configuration
+                processor_args = {}
+
+                # Use aggressive batching for faster export
+                processor_args["max_export_batch_size"] = exporter_config.get(
+                    "max_export_batch_size", 512
+                )
+                processor_args["export_timeout_millis"] = exporter_config.get(
+                    "export_timeout_millis", 30000
+                )
+                processor_args["schedule_delay_millis"] = exporter_config.get(
+                    "schedule_delay_millis", 5000
+                )
+                processor_args["max_queue_size"] = exporter_config.get(
+                    "max_queue_size", 2048
+                )
+
+                # Add processor to logger provider (only once!)
+                processor = BatchLogRecordProcessor(exporter, **processor_args)
+                self.logger_provider.add_log_record_processor(processor)
+                logging.getLogger(__name__).info(
+                    f"Configured log exporter: {log_exporter_name}"
+                )
+            else:
+                logging.getLogger(__name__).warning(
+                    f"Failed to create log exporter: {log_exporter_name}"
+                )
+
+        except Exception as e:
+            logging.getLogger(__name__).warning(
+                f"Failed to configure log processor: {e}"
+            )
+
+    def _create_log_exporter(self, config: Any) -> Optional[Any]:
+        """Create a log exporter from configuration dictionary."""
+        try:
+            import importlib
+
+            module_name = config.get("module")
+            class_name = config.get("class")
+
+            if not module_name or not class_name:
+                return None
+
+            # Dynamically import and instantiate the exporter
+            module = importlib.import_module(module_name)
+            exporter_class = getattr(module, class_name)
+
+            # Build exporter arguments (same as span exporter)
+            exporter_args = {}
+
+            if "endpoint" in config:
+                exporter_args["endpoint"] = config["endpoint"]
+            if "headers" in config:
+                exporter_args["headers"] = dict(config["headers"])
+            if "timeout" in config:
+                exporter_args["timeout"] = config["timeout"]
+            if "compression" in config:
+                compression_str = config["compression"].lower()
+                try:
+                    import grpc  # type: ignore[import-untyped]
+
+                    if compression_str == "gzip":
+                        exporter_args["compression"] = grpc.Compression.Gzip
+                    elif compression_str == "deflate":
+                        exporter_args["compression"] = grpc.Compression.Deflate
+                    elif compression_str in ("none", "nocompression"):
+                        exporter_args["compression"] = grpc.Compression.NoCompression
+                except ImportError:
+                    pass
+            if "insecure" in config:
+                exporter_args["insecure"] = config["insecure"]
+            if "options" in config:
+                options_list = config["options"]
+                exporter_args["options"] = [tuple(option) for option in options_list]
+
+            return exporter_class(**exporter_args)
+
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Failed to create log exporter: {e}")
+            return None
 
     def _configure_span_exporters(self) -> None:
         """Configure span exporters from telemetry configuration."""
@@ -195,13 +324,15 @@ class JobmonOTLPManager:
             pass
 
     def shutdown(self) -> None:
-        """Shutdown trace provider."""
+        """Shutdown trace and log providers."""
         if not self._initialized:
             return
 
         try:
             if self.tracer_provider and hasattr(self.tracer_provider, "shutdown"):
                 self.tracer_provider.shutdown()
+            if self.logger_provider and hasattr(self.logger_provider, "shutdown"):
+                self.logger_provider.shutdown()
         except Exception as e:
             logging.getLogger(__name__).warning(f"Error during OTLP shutdown: {e}")
         finally:
@@ -209,13 +340,13 @@ class JobmonOTLPManager:
 
 
 def initialize_jobmon_otlp() -> JobmonOTLPManager:
-    """Initialize minimal OTLP for shared resources (traces only).
+    """Initialize OTLP for shared resources (traces and logs).
 
-    For log export, use create_log_exporter() to get pre-configured exporters
-    that can be passed to JobmonOTLPLoggingHandler.
+    This creates shared TracerProvider and LoggerProvider instances that
+    should be used by all OTLP handlers to avoid duplicate connections.
 
     Returns:
-        The minimal OTLP manager instance
+        The OTLP manager instance with shared providers
     """
     manager = JobmonOTLPManager.get_instance()
     manager.initialize()

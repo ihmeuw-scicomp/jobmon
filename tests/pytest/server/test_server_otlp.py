@@ -134,14 +134,16 @@ class TestServerOTLPManager:
             "opentelemetry.instrumentation.requests.RequestsInstrumentor"
         ) as mock_requests, patch(
             "opentelemetry.instrumentation.sqlalchemy.SQLAlchemyInstrumentor"
-        ) as mock_sqlalchemy:
+        ) as mock_sqlalchemy, patch(
+            "jobmon.server.web.otlp.manager._server_otlp_manager", None
+        ):
 
             mock_requests_instance = Mock()
             mock_sqlalchemy_instance = Mock()
             mock_requests.return_value = mock_requests_instance
             mock_sqlalchemy.return_value = mock_sqlalchemy_instance
 
-            # Test requests instrumentation
+            # Test requests instrumentation (singleton auto-initializes)
             ServerOTLPManager.instrument_requests()
             mock_requests.assert_called_once()
             mock_requests_instance.instrument.assert_called_once()
@@ -155,10 +157,11 @@ class TestServerOTLPManager:
             mock_engine = Mock()
             ServerOTLPManager.instrument_engine(mock_engine)
 
-            # Should have been called again for engine-specific instrumentation
-            assert mock_sqlalchemy.call_count == 2
-            mock_sqlalchemy_instance.instrument.assert_called_with(
-                engine=mock_engine, enable_commenter=True, skip_dep_check=True
+            # Should not be called again since already instrumented globally
+            assert mock_sqlalchemy.call_count == 1
+            # Only the global instrumentation should have been called
+            mock_sqlalchemy_instance.instrument.assert_called_once_with(
+                enable_commenter=True, skip_dep_check=True
             )
 
     @patch("jobmon.server.web.otlp.manager.OTLP_AVAILABLE", False)
@@ -196,13 +199,12 @@ class TestOTLPStructlogHandler:
         """Test JobmonOTLPStructlogHandler initialization."""
         from jobmon.core.otlp.handlers import JobmonOTLPStructlogHandler
 
-        with patch("structlog.stdlib.ProcessorFormatter") as mock_formatter:
-            handler = JobmonOTLPStructlogHandler(level=logging.INFO)
+        handler = JobmonOTLPStructlogHandler(level=logging.INFO)
 
-            # Should have attempted to create ProcessorFormatter for structlog
-            mock_formatter.assert_called_once()
-            assert handler._exporter_config is None  # No exporter config yet
-            assert handler._otlp_handler is None  # Handler not created yet
+        # Should be identical to JobmonOTLPLoggingHandler
+        assert handler._exporter_config is None  # No exporter config yet
+        assert handler._otlp_handler is None  # Handler not created yet
+        assert handler.level == logging.INFO
 
     def test_handler_with_exporter_config(self):
         """Test handler with pre-configured exporter."""
@@ -456,30 +458,23 @@ class TestServerLoggingConfigIntegration:
 
     def test_server_default_config_selection(self):
         """Test that server uses basic config by default (OTLP via overrides)."""
-        from jobmon.server.web.log_config import configure_logging  # Compatibility shim
+        from jobmon.core.config.logconfig_utils import configure_component_logging
 
-        with patch("jobmon.server.web.log_config.JobmonConfig") as mock_config_class:
+        with patch("jobmon.core.configuration.JobmonConfig") as mock_config_class:
             mock_config = Mock()
             mock_config.get.return_value = ""  # No file override
             mock_config.get_section_coerced.return_value = {}
             mock_config_class.return_value = mock_config
 
             with patch(
-                "jobmon.core.config.logconfig_utils.load_logconfig_with_overrides"
-            ) as mock_load:
-                mock_load.return_value = {
-                    "version": 1,
-                    "handlers": {
-                        "console_structlog": {"class": "logging.StreamHandler"}
-                    },
-                }
-
+                "jobmon.core.config.logconfig_utils.configure_logging_with_overrides"
+            ) as mock_configure:
                 # Should configure with basic config
-                configure_logging()
+                configure_component_logging("server")
 
-                # Should have loaded basic server config
-                mock_load.assert_called_once()
-                args, kwargs = mock_load.call_args
+                # Should have called configure_logging_with_overrides
+                mock_configure.assert_called_once()
+                args, kwargs = mock_configure.call_args
                 assert "logconfig_server.yaml" in kwargs["default_template_path"]
 
     def test_server_template_integration_with_otlp(self):

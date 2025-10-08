@@ -45,8 +45,6 @@ class _JobmonOTLPLoggingHandler(logging.Handler):
                     if not key.startswith("_") and key not in (
                         "event",
                         "timestamp",
-                        "logger",
-                        "level",
                     ):
                         if isinstance(value, (str, int, float, bool, type(None))):
                             attributes[key] = value
@@ -56,25 +54,42 @@ class _JobmonOTLPLoggingHandler(logging.Handler):
                 # Use event field as clean message
                 message = event_dict.get("event", message)
 
-            # Get trace context
-            span = get_current_span()
-            trace_context = span.get_span_context() if span else None
+            # Use trace IDs from structlog context (stable) instead of current span (unstable)
+            # This ensures consistent trace correlation
+            trace_id_int = 0
+            span_id_int = 0
 
-            # Create OTLP log record (set trace context after creation to avoid deprecation)
+            if event_dict:
+                # Parse hex trace_id/span_id from structlog context to integers
+                try:
+                    if "trace_id" in event_dict:
+                        trace_id_int = int(event_dict["trace_id"], 16)
+                    if "span_id" in event_dict:
+                        span_id_int = int(event_dict["span_id"], 16)
+                except (ValueError, TypeError):
+                    # If parsing fails, try current span as fallback
+                    span = get_current_span()
+                    if span:
+                        ctx = span.get_span_context()
+                        if ctx and ctx.is_valid:
+                            trace_id_int = ctx.trace_id
+                            span_id_int = ctx.span_id
+
+            # Create OTLP log record with stable trace IDs
             otlp_record = OTLPLogRecord(
                 timestamp=int(record.created * 1e9),
                 severity_text=record.levelname,
-                severity_number=None,  # Type issue: Let SDK determine from severity_text
-                body=record.getMessage(),
+                severity_number=None,
+                body=message,
                 resource=self._logger_provider.resource,
                 attributes=attributes,
             )
 
-            # Set trace context if available
-            if trace_context and trace_context.is_valid:
-                otlp_record.trace_id = trace_context.trace_id
-                otlp_record.span_id = trace_context.span_id
-                otlp_record.trace_flags = trace_context.trace_flags
+            # Set trace context from structlog (stable across duplicates)
+            if trace_id_int:
+                otlp_record.trace_id = trace_id_int
+            if span_id_int:
+                otlp_record.span_id = span_id_int
 
             self._logger.emit(otlp_record)
         except Exception:
@@ -125,7 +140,11 @@ class JobmonOTLPLoggingHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         """Emit a log record to OTLP."""
         # Create handler on first use
-        if not self._otlp_handler and self._exporter_config and OTLP_AVAILABLE:
+        if (
+            not self._otlp_handler
+            and self._exporter_config is not None
+            and OTLP_AVAILABLE
+        ):
             try:
                 self._otlp_handler = self._create_handler()
                 if self._debug_mode and self._otlp_handler:
@@ -150,38 +169,23 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                     )
 
     def _create_handler(self) -> Optional[logging.Handler]:
-        """Create OTLP handler by processing the exporter configuration."""
+        """Create OTLP handler using the shared logger provider.
+
+        The shared logger provider is configured once in JobmonOTLPManager with
+        a single processor/exporter to avoid duplicate log emissions.
+        """
         try:
-            from opentelemetry.sdk._logs import LoggerProvider
-            from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+            from .manager import JobmonOTLPManager
 
-            from .resources import create_jobmon_resources
+            # Get shared logger provider from manager
+            # The manager has already configured the processor/exporter
+            manager = JobmonOTLPManager.get_instance()
 
-            # Create isolated provider with jobmon resources
-            resource_group = create_jobmon_resources()
-            logger_provider = LoggerProvider(resource=resource_group)
-
-            # Determine if we have a dict config or pre-configured exporter
-            # Handle both dict and ConvertingDict (from logging config)
-            if hasattr(self._exporter_config, "get") and hasattr(
-                self._exporter_config, "keys"
-            ):
-                # Handle inline dict configuration (server pattern)
-                exporter = self._create_exporter_from_dict(self._exporter_config)
-                processor = self._create_processor_from_dict(
-                    exporter, self._exporter_config
-                )
-            else:
-                # Handle pre-configured exporter instance
-                exporter = self._exporter_config
-                if not exporter:
-                    return None
-                processor = BatchLogRecordProcessor(exporter)
-
-            if not exporter:
+            logger_provider = manager.logger_provider
+            if not logger_provider:
+                # If not initialized yet, we can't create handler
+                # This is expected during early logging config
                 return None
-
-            logger_provider.add_log_record_processor(processor)
 
             # Use CUSTOM OTLP handler that properly extracts attributes
             # Standard LoggingHandler doesn't extract custom record.__dict__ fields
@@ -193,79 +197,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
         except Exception:
             return None
-
-    def _create_exporter_from_dict(self, config: Any) -> Optional[Any]:
-        """Create an OTLP exporter from dictionary configuration (handles ConvertingDict)."""
-        try:
-            # Extract exporter configuration
-            module_name = config.get("module")
-            class_name = config.get("class")
-
-            if not module_name or not class_name:
-                return None
-
-            # Dynamically import and instantiate the exporter
-            import importlib
-
-            module = importlib.import_module(module_name)
-            exporter_class = getattr(module, class_name)
-
-            # Build exporter arguments
-            exporter_args = {}
-
-            # Common exporter arguments
-            if "endpoint" in config:
-                exporter_args["endpoint"] = config["endpoint"]
-            if "headers" in config:
-                exporter_args["headers"] = dict(
-                    config["headers"]
-                )  # Convert ConvertingDict to dict
-            if "timeout" in config:
-                exporter_args["timeout"] = config["timeout"]
-            if "compression" in config:
-                exporter_args["compression"] = config["compression"]
-            if "insecure" in config:
-                exporter_args["insecure"] = config["insecure"]
-            if "options" in config:
-                # Convert list of [key, value] pairs to list of tuples
-                options_list = config["options"]
-                exporter_args["options"] = [tuple(option) for option in options_list]
-
-            return exporter_class(**exporter_args)
-
-        except Exception:
-            return None
-
-    def _create_processor_from_dict(self, exporter: Any, config: Any) -> Any:
-        """Create a batch processor with configuration from dict (handles ConvertingDict)."""
-        try:
-            from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-
-            # Extract batch processor configuration
-            processor_args = {}
-
-            if "max_export_batch_size" in config:
-                processor_args["max_export_batch_size"] = config[
-                    "max_export_batch_size"
-                ]
-            if "export_timeout_millis" in config:
-                processor_args["export_timeout_millis"] = config[
-                    "export_timeout_millis"
-                ]
-            if "schedule_delay_millis" in config:
-                processor_args["schedule_delay_millis"] = config[
-                    "schedule_delay_millis"
-                ]
-            if "max_queue_size" in config:
-                processor_args["max_queue_size"] = config["max_queue_size"]
-
-            return BatchLogRecordProcessor(exporter, **processor_args)
-
-        except Exception:
-            # Fallback to basic processor
-            from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-
-            return BatchLogRecordProcessor(exporter)
 
 
 class JobmonOTLPStructlogHandler(JobmonOTLPLoggingHandler):

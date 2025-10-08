@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import copy
 import hashlib
-import logging
 from http import HTTPStatus as StatusCodes
 from typing import (
     TYPE_CHECKING,
@@ -18,6 +17,7 @@ from typing import (
     Union,
 )
 
+import structlog
 import yaml
 
 from jobmon.client.array import Array
@@ -34,7 +34,7 @@ from jobmon.core.serializers import (
 if TYPE_CHECKING:
     from jobmon.client.tool_version import ToolVersion
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class TaskTemplate:

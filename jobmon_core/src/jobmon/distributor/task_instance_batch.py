@@ -80,6 +80,13 @@ class TaskInstanceBatch:
 
     def transition_to_launched(self, next_report_by: float) -> None:
         """Transition all associated task instances to LAUNCHED state."""
+        logger.info(
+            "Transitioning batch to LAUNCHED",
+            array_id=self.array_id,
+            array_batch_num=self.batch_number,
+            batch_size=len(self.task_instances),
+        )
+
         # Assertion that all bound task instances are indeed instantiated
         for ti in self.task_instances:
             if ti.status != TaskInstanceStatus.INSTANTIATED:
@@ -106,8 +113,22 @@ class TaskInstanceBatch:
             app_route=app_route, message=data, request_type="post"
         )
 
+        # Update local status and log each task instance (info level - state transition)
         for ti in self.task_instances:
             ti.status = TaskInstanceStatus.LAUNCHED
+            logger.info(
+                "Task instance transitioned to LAUNCHED",
+                task_instance_id=ti.task_instance_id,
+                array_id=self.array_id,
+                array_batch_num=self.batch_number,
+            )
+
+        logger.info(
+            "Batch transition to LAUNCHED completed",
+            array_id=self.array_id,
+            array_batch_num=self.batch_number,
+            batch_size=len(self.task_instances),
+        )
 
     def log_distributor_ids(self) -> None:
         """Log the distributor ID in the database for all task instances in the batch."""
@@ -119,12 +140,34 @@ class TaskInstanceBatch:
 
     def transition_to_killed(self) -> None:
         """Mark all TIs in this batch as killed in the DB (ERROR_FATAL)."""
+        logger.info(
+            "Transitioning killed batch to ERROR_FATAL",
+            array_id=self.array_id,
+            array_batch_num=self.batch_number,
+            batch_size=len(self.task_instances),
+        )
+
+        # Log each task instance being killed (info level - state transition)
+        for ti in self.task_instances:
+            logger.info(
+                "Task instance transitioning to ERROR_FATAL (killed)",
+                task_instance_id=ti.task_instance_id,
+                array_id=self.array_id,
+                array_batch_num=self.batch_number,
+            )
+
         # 1) Make an HTTP call to the server if you have a relevant endpoint
         #    that transitions them to a 'killed' or ERROR_FATAL state in bulk.
         app_route = f"/array/{self.array_id}/transition_to_killed"
         data = {"batch_number": self.batch_number}
         self.requester.send_request(
             app_route=app_route, message=data, request_type="post"
+        )
+
+        logger.info(
+            "Batch transition to ERROR_FATAL completed",
+            array_id=self.array_id,
+            array_batch_num=self.batch_number,
         )
 
     def __hash__(self) -> int:

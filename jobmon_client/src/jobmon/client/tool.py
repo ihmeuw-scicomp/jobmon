@@ -6,10 +6,10 @@ The Tool may evolve over time.
 from __future__ import annotations
 
 import getpass
-import logging
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Optional, Union
 
+import structlog
 import yaml
 
 from jobmon.client.task_template import TaskTemplate
@@ -20,7 +20,7 @@ from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeClientTool
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class InvalidToolError(Exception):

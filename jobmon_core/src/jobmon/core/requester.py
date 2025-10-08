@@ -234,7 +234,7 @@ class Requester:
     ) -> Tuple[int, Any]:
         # Construct URL
         route = self.service_url + app_route
-        logger.info("Making HTTP request", route=route, request_type=request_type)
+        logger.debug("Making HTTP request", route=route, request_type=request_type)
 
         # Add version to query parameters
         params = {"client_jobmon_version": __version__}
@@ -326,7 +326,7 @@ class Requester:
         """Async version of _send_request using aiohttp."""
         # Construct URL
         route = self.service_url + app_route
-        logger.info("Making HTTP request", route=route, request_type=request_type)
+        logger.debug("Making HTTP request", route=route, request_type=request_type)
 
         # Add version to query parameters
         params = {"client_jobmon_version": __version__}

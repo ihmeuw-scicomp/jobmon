@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import itertools as it
-import os
 import signal
 import sys
 import time
@@ -52,8 +51,6 @@ class DistributorService:
     ) -> None:
         """Initialization of DistributorService."""
         # Bind distributor instance context
-        structlog.contextvars.bind_contextvars(distributor_pid=os.getpid())
-
         # operational args
         config = JobmonConfig()
         if workflow_run_heartbeat_interval is None:
@@ -127,6 +124,7 @@ class DistributorService:
 
     def set_workflow_run(self, workflow_run_id: int) -> None:
         """Set the workflow run for this distributor service."""
+        structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
         workflow_run = DistributorWorkflowRun(workflow_run_id, requester=self.requester)
         self.workflow_run = workflow_run
         self.workflow_run.transition_to_instantiated()
@@ -191,7 +189,9 @@ class DistributorService:
                     duration = int(end_time - start_time)
                     if duration > 5:  # Only log if took significant time
                         logger.info(
-                            f"Status {status} processed", duration_seconds=duration
+                            f"Status processing completed in {duration}s",
+                            status=status,
+                            duration_seconds=duration,
                         )
 
                 # append done work to the end of the work order
@@ -258,22 +258,34 @@ class DistributorService:
     def instantiate_task_instances(
         self, task_instances: List[DistributorTaskInstance]
     ) -> None:
-        logger.info("Instantiating task instances", num_tasks=len(task_instances))
+        task_instance_ids = [ti.task_instance_id for ti in task_instances]
+
+        # Log each task instance ID for traceability (info level - state transition)
+        for ti in task_instances:
+            logger.info(
+                f"Task instance {ti.task_instance_id} queued for instantiation",
+                task_instance_id=ti.task_instance_id,
+            )
+
+        logger.debug(
+            f"Requesting instantiation of {len(task_instances)} task instances",
+            num_tasks=len(task_instances),
+        )
 
         app_route = "/task_instance/instantiate_task_instances"
         _, result = self.requester.send_request(
             app_route=app_route,
-            message={
-                "task_instance_ids": [
-                    task_instance.task_instance_id for task_instance in task_instances
-                ]
-            },
+            message={"task_instance_ids": task_instance_ids},
             request_type="post",
         )
 
         # construct batch. associations are made inside batch init
         num_batches = len(result["task_instance_batches"])
-        logger.info("Task instances instantiated", num_batches=num_batches)
+        logger.debug(
+            "Batch instantiation completed",
+            num_batches=num_batches,
+            num_tasks=len(task_instances),
+        )
 
         for batch in result["task_instance_batches"]:
             task_instance_batch_kwargs = SerializeTaskInstanceBatch.kwargs_from_wire(
@@ -282,6 +294,12 @@ class DistributorService:
 
             array_id = task_instance_batch_kwargs["array_id"]
             batch_number = task_instance_batch_kwargs["array_batch_num"]
+            logger.debug(
+                "Distributor processing instantiated batch",
+                array_id=array_id,
+                array_batch_num=batch_number,
+                batch_size=len(task_instance_batch_kwargs["task_instance_ids"]),
+            )
             try:
                 task_instance_batch = self._task_instance_batches[
                     (array_id, batch_number)
@@ -313,6 +331,22 @@ class DistributorService:
         self._task_instance_batches.pop(
             (task_instance_batch.array_id, task_instance_batch.batch_number)
         )
+
+        batch_size = len(task_instance_batch.task_instances)
+        logger.debug(
+            "Distributor preparing batch for launch",
+            array_id=task_instance_batch.array_id,
+            array_batch_num=task_instance_batch.batch_number,
+            batch_size=batch_size,
+        )
+
+        # Log each task instance (info level - state transition)
+        for ti in task_instance_batch.task_instances:
+            logger.info(
+                f"Task instance {ti.task_instance_id} preparing for launch",
+                task_instance_id=ti.task_instance_id,
+            )
+
         # record batch info in db
         task_instance_batch.prepare_task_instance_batch_for_launch()
 
@@ -324,10 +358,15 @@ class DistributorService:
         )
         distributor_commands: List[DistributorCommand] = []
 
-        batch_size = len(task_instance_batch.task_instances)
-
         try:
-            # submit array to distributor
+            # submit array to batch distributor
+            logger.debug(
+                "Submitting batch to cluster",
+                array_id=task_instance_batch.array_id,
+                array_batch_num=task_instance_batch.batch_number,
+                batch_size=batch_size,
+                submission_name=task_instance_batch.submission_name,
+            )
             distributor_id_map = (
                 self.cluster_interface.submit_array_to_batch_distributor(
                     command=command,
@@ -337,11 +376,16 @@ class DistributorService:
                 )
             )
             task_instance_batch.set_distributor_ids(distributor_id_map)
-            logger.info("Batch launched", batch_size=batch_size)
+            logger.info(
+                "Batch submitted to cluster successfully",
+                array_id=task_instance_batch.array_id,
+                array_batch_num=task_instance_batch.batch_number,
+                batch_size=batch_size,
+            )
 
         except NotImplementedError:
             # create DistributorCommands to submit the launch if array isn't implemented
-            logger.info(
+            logger.debug(
                 "Array submission not supported, launching individually",
                 batch_size=batch_size,
             )
@@ -411,7 +455,7 @@ class DistributorService:
                 name=task_instance.submission_name,
                 requested_resources=requested_resources,
             )
-            logger.info("Task instance launched", distributor_id=distributor_id)
+            logger.debug("Task instance launched", distributor_id=distributor_id)
         except Exception as e:
             stack_trace = traceback.format_exc()
             logger.error("Task instance launch failed", error=str(e), exc_info=True)
@@ -429,11 +473,29 @@ class DistributorService:
 
         Allowed transitions are (R, U, Z, F)
         """
+        logger.info(
+            "Distributor triaging task instance error",
+            distributor_id=task_instance.distributor_id,
+        )
+
         r_value, r_msg = self.cluster_interface.get_remote_exit_info(
             task_instance.distributor_id
         )
-        logger.info("Triaging task error", return_code=r_value)
+        logger.info(
+            "Retrieved exit info from cluster",
+            return_code=r_value,
+            error_message=(
+                r_msg[:100] if r_msg else None
+            ),  # Truncate for log readability
+        )
+
         task_instance.transition_to_error(r_msg, r_value)
+
+        logger.info(
+            "Task instance triage completed",
+            new_status=task_instance.status,
+            error_state=task_instance.error_state,
+        )
 
     @bind_context(
         array_id="task_instance_batch.array_id",
@@ -445,6 +507,12 @@ class DistributorService:
         Args:
             task_instance_batch: The batch of task instances to terminate.
         """
+        batch_size = len(task_instance_batch.task_instances)
+        logger.info(
+            "Distributor terminating KILL_SELF batch",
+            batch_size=batch_size,
+        )
+
         # 1) Collect the distributor IDs to terminate
         distributor_ids = [
             ti.distributor_id
@@ -454,8 +522,16 @@ class DistributorService:
 
         # 2) If there are jobs to terminate, call the cluster
         if distributor_ids:
-            logger.info("Terminating batch", num_tasks=len(distributor_ids))
+            logger.info(
+                "Sending termination signal to cluster",
+                num_tasks=len(distributor_ids),
+                distributor_ids=distributor_ids[:10],  # Log first 10
+            )
             self.cluster_interface.terminate_task_instances(distributor_ids)
+            logger.info(
+                "Cluster termination completed",
+                num_tasks=len(distributor_ids),
+            )
 
         # 3) Mark them as killed in the DB
         task_instance_batch.transition_to_killed()
@@ -470,7 +546,11 @@ class DistributorService:
 
         ERROR state allows for a retry, so that a new task instance can attempt to run.
         """
-        logger.warning("Task instance never sent heartbeat")
+        logger.info(
+            "Distributor processing NO_HEARTBEAT task instance",
+            distributor_id=task_instance.distributor_id,
+        )
+
         task_instance.transition_to_error(
             "Task instance never reported a heartbeat after scheduling. Will retry. "
             "May be caused by distributor heartbeat failure or worker startup issue often due "
@@ -478,6 +558,11 @@ class DistributorService:
             "enabled by setting 'standard_error' and 'standard_output' in your compute "
             "resources dictionary.",
             TaskInstanceStatus.ERROR,
+        )
+
+        logger.info(
+            "Task instance transitioned NO_HEARTBEAT → ERROR",
+            new_status=task_instance.status,
         )
 
     def log_task_instance_report_by_date(self) -> None:
@@ -506,7 +591,7 @@ class DistributorService:
 
             # Send heartbeat for each batch
             logger.info(
-                "Sending heartbeats",
+                f"Sending heartbeats for {len(task_instance_ids_to_heartbeat)} task instances",
                 num_tasks=len(task_instance_ids_to_heartbeat),
                 num_batches=len(task_instance_batches),
             )
@@ -638,6 +723,13 @@ class DistributorService:
         triaging_task_instances = self._task_instance_status_map[
             TaskInstanceStatus.TRIAGING
         ]
+
+        if triaging_task_instances:
+            logger.info(
+                "Distributor processing TRIAGING task instances",
+                num_task_instances=len(triaging_task_instances),
+            )
+
         for task_instance in triaging_task_instances:
             yield DistributorCommand(self.triage_error, task_instance)
 
@@ -646,6 +738,20 @@ class DistributorService:
         kill_self_task_instances = list(
             self._task_instance_status_map[TaskInstanceStatus.KILL_SELF]
         )
+
+        if kill_self_task_instances:
+            logger.info(
+                "Distributor processing KILL_SELF task instances",
+                num_task_instances=len(kill_self_task_instances),
+            )
+
+            # Log each task instance being killed (info level - state transition)
+            for ti in kill_self_task_instances:
+                logger.info(
+                    "Task instance marked for termination",
+                    task_instance_id=ti.task_instance_id,
+                    distributor_id=ti.distributor_id,
+                )
 
         # Group TIs by their batch
         batch_map = defaultdict(list)
@@ -664,6 +770,12 @@ class DistributorService:
         no_heartbeat_task_instances = self._task_instance_status_map[
             TaskInstanceStatus.NO_HEARTBEAT
         ]
+
+        if no_heartbeat_task_instances:
+            logger.info(
+                "Distributor processing NO_HEARTBEAT task instances",
+                num_task_instances=len(no_heartbeat_task_instances),
+            )
 
         for task_instance in no_heartbeat_task_instances:
             yield DistributorCommand(self.no_heartbeat_error, task_instance)

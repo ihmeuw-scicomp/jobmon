@@ -1,11 +1,11 @@
 """Commands to check for workflow and task status (from CLI)."""
 
 import getpass
-import logging
 from io import StringIO
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
+import structlog
 
 from jobmon.client.logging import configure_client_logging
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
@@ -20,7 +20,7 @@ from jobmon.core.constants import (
 from jobmon.core.exceptions import WorkflowRunStateError
 from jobmon.core.requester import Requester
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def update_config_value(

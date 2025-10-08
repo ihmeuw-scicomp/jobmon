@@ -21,6 +21,10 @@ class ServerOTLPManager:
         """Initialize server OTLP manager."""
         self._core_manager: Optional[Any] = None
         self._initialized = False
+        # Guard flags to prevent double instrumentation warnings
+        self._fastapi_instrumented = False
+        self._requests_instrumented = False
+        self._sqlalchemy_instrumented = False
 
     def initialize(self) -> None:
         """Initialize the core OTLP manager for server use."""
@@ -75,13 +79,14 @@ class ServerOTLPManager:
 
         This is server-specific functionality that should not be in core.
         """
-        if not OTLP_AVAILABLE or not self._initialized:
+        if not OTLP_AVAILABLE or not self._initialized or self._fastapi_instrumented:
             return
 
         try:
             from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
             FastAPIInstrumentor().instrument_app(app)
+            self._fastapi_instrumented = True
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.warning(f"Failed to instrument FastAPI app: {e}")
@@ -95,7 +100,11 @@ class ServerOTLPManager:
         try:
             from opentelemetry.instrumentation.requests import RequestsInstrumentor
 
-            RequestsInstrumentor().instrument()
+            # Use a class-level guard on the singleton to avoid duplicate calls
+            manager = get_server_otlp_manager()
+            if not manager._requests_instrumented:
+                RequestsInstrumentor().instrument()
+                manager._requests_instrumented = True
         except ImportError:
             pass
 
@@ -108,7 +117,13 @@ class ServerOTLPManager:
         try:
             from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
-            SQLAlchemyInstrumentor().instrument()
+            manager = get_server_otlp_manager()
+            if not manager._sqlalchemy_instrumented:
+                # Instrument globally once with desired options.
+                SQLAlchemyInstrumentor().instrument(
+                    enable_commenter=True, skip_dep_check=True
+                )
+                manager._sqlalchemy_instrumented = True
         except ImportError:
             pass
 
@@ -121,9 +136,13 @@ class ServerOTLPManager:
         try:
             from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
-            SQLAlchemyInstrumentor().instrument(
-                engine=engine, enable_commenter=True, skip_dep_check=True
-            )
+            manager = get_server_otlp_manager()
+            # If already instrumented globally, skip per-engine
+            if not manager._sqlalchemy_instrumented:
+                SQLAlchemyInstrumentor().instrument(
+                    engine=engine, enable_commenter=True, skip_dep_check=True
+                )
+                manager._sqlalchemy_instrumented = True
         except ImportError:
             pass
 

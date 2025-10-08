@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import logging
 from http import HTTPStatus as StatusCodes
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
+
+import structlog
 
 from jobmon.client.task_template import TaskTemplate
 from jobmon.core.exceptions import InvalidResponse
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
     from jobmon.client.tool import Tool
 
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class ToolVersion:

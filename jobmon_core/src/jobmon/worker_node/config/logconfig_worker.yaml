@@ -13,7 +13,7 @@ handlers:
   console:
     class: logging.StreamHandler
     level: INFO
-    formatter: console_default
+    formatter: structlog_text
     stream: ext://sys.stdout
 
 # Worker logger configurations (console by default, OTLP via config overrides)  
@@ -22,13 +22,13 @@ loggers:
   jobmon.worker_node:
     handlers: [console]
     level: INFO
-    propagate: true
+    propagate: false
   
   # Core job processing
   jobmon.core:
     handlers: [console]
     level: WARNING
-    propagate: true
+    propagate: false
     
 # OTLP can be enabled via configuration overrides:
 # 

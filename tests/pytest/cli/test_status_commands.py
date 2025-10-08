@@ -85,13 +85,28 @@ def df_from_stdout(function, arguments):
     # Capture the tabulate dataframe in stdout
     string_df = capture_stdout(function, arguments)
 
+    # Remove ANSI escape sequences (color codes) that interfere with parsing
+    import re
+
+    ansi_escape = re.compile(r"\x1b\[[0-9;]*m")
+    string_df = ansi_escape.sub("", string_df)
+
     # Take the string and split into list of lines
     output_lines = string_df.split("\n")
 
     # Filter out any lines that make up the box around the table or between header and data
-    filtered_output_lines = filter(
-        lambda x: ("--" not in x) or (x == "\n"), output_lines
-    )
+    # For psql format, we need to filter out lines with +, -, and | characters that form the borders
+    # Also filter out log lines that don't start with |
+    filtered_output_lines = []
+    for line in output_lines:
+        # Skip lines that are just borders (contain only +, -, |, and spaces)
+        # Skip log lines that don't start with |
+        if (
+            line.strip()
+            and not all(c in "+-| " for c in line.strip())
+            and line.strip().startswith("|")
+        ):
+            filtered_output_lines.append(line)
 
     # Merge the lines back into one string (newlines are preserved from before)
     join_filter_output_lines = "\n".join(filtered_output_lines)

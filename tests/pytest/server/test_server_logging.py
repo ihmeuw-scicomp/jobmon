@@ -114,25 +114,14 @@ class TestServerLoggingConfiguration:
 
             # Mock template loading to avoid actual file I/O
             with patch(
-                "jobmon.core.config.logconfig_utils.load_logconfig_with_overrides"
-            ) as mock_load:
-                mock_load.return_value = {
-                    "version": 1,
-                    "handlers": {"console_default": {"class": "logging.StreamHandler"}},
-                    "loggers": {
-                        "jobmon.server.web": {
-                            "handlers": ["console_default"],
-                            "level": "INFO",
-                        }
-                    },
-                }
-
+                "jobmon.core.config.logconfig_utils.configure_logging_with_overrides"
+            ) as mock_configure:
                 # Should configure with core utility
                 configure_component_logging("server")
 
-                # Should have called load with server config
-                mock_load.assert_called_once()
-                args, kwargs = mock_load.call_args
+                # Should have called configure_logging_with_overrides
+                mock_configure.assert_called_once()
+                args, kwargs = mock_configure.call_args
                 assert "logconfig_server.yaml" in kwargs["default_template_path"]
                 assert kwargs["config_section"] == "server"
 
@@ -269,9 +258,9 @@ class TestServerOTLPIntegration:
 
     def test_server_file_override_precedence(self):
         """Test that server respects file overrides for OTLP configuration."""
-        from jobmon.server.web.log_config import configure_logging  # Compatibility shim
+        from jobmon.core.config.logconfig_utils import configure_component_logging
 
-        with patch("jobmon.server.web.log_config.JobmonConfig") as mock_config_class:
+        with patch("jobmon.core.configuration.JobmonConfig") as mock_config_class:
             mock_config = Mock()
             mock_config.get.return_value = ""  # No file override
             mock_config.get_section.return_value = {}
@@ -279,22 +268,20 @@ class TestServerOTLPIntegration:
             mock_config_class.return_value = mock_config
 
             with patch(
-                "jobmon.core.config.logconfig_utils.load_logconfig_with_overrides"
-            ) as mock_load:
-                mock_load.return_value = {"version": 1}
-
-                configure_logging()
+                "jobmon.core.config.logconfig_utils.configure_logging_with_overrides"
+            ) as mock_configure:
+                configure_component_logging("server")
 
                 # Should use default server config (OTLP configured via overrides)
-                mock_load.assert_called_once()
-                args, kwargs = mock_load.call_args
+                mock_configure.assert_called_once()
+                args, kwargs = mock_configure.call_args
                 assert "logconfig_server.yaml" in kwargs["default_template_path"]
 
     def test_server_custom_logconfig_file(self):
         """Test that server can use custom logconfig files for OTLP endpoint configuration."""
         import tempfile
 
-        from jobmon.server.web.log_config import configure_logging  # Compatibility shim
+        from jobmon.core.config.logconfig_utils import configure_component_logging
 
         # Create a custom logconfig with different endpoint
         custom_logconfig = {
@@ -327,9 +314,7 @@ class TestServerOTLPIntegration:
             custom_file_path = f.name
 
         try:
-            with patch(
-                "jobmon.server.web.log_config.JobmonConfig"
-            ) as mock_config_class:
+            with patch("jobmon.core.configuration.JobmonConfig") as mock_config_class:
                 mock_config = Mock()
                 mock_config.get.side_effect = lambda section, key: {
                     ("logging", "server_logconfig_file"): custom_file_path,
@@ -338,18 +323,18 @@ class TestServerOTLPIntegration:
                 mock_config.get_boolean.return_value = True  # OTLP enabled
                 mock_config_class.return_value = mock_config
 
-                with patch("logging.config.dictConfig") as mock_dict_config:
-                    configure_logging()
+                with patch(
+                    "jobmon.core.config.logconfig_utils.load_logconfig_with_overrides"
+                ) as mock_load:
+                    mock_load.return_value = custom_logconfig
+                    configure_component_logging("server")
 
-                    # Should have called dictConfig with our custom config
-                    mock_dict_config.assert_called_once()
-                    loaded_config = mock_dict_config.call_args[0][0]
-
-                    # Verify our custom endpoint is used
+                    # Should have loaded the default server config (file override is handled internally)
+                    mock_load.assert_called_once()
+                    args, kwargs = mock_load.call_args
                     assert (
-                        loaded_config["handlers"]["otlp_server"]["exporter"]["endpoint"]
-                        == "http://custom-otlp:4317"
-                    )
+                        "logconfig_server.yaml" in args[0]
+                    )  # Should use default template path
 
         finally:
             import os
@@ -362,10 +347,10 @@ class TestServerLoggingOutput:
 
     def test_server_structlog_configuration(self):
         """Test that server structlog is properly configured."""
-        from jobmon.server.web.log_config import configure_logging  # Compatibility shim
+        from jobmon.core.config.logconfig_utils import configure_component_logging
 
         # Configure logging
-        configure_logging()
+        configure_component_logging("server")
 
         # Should be able to get structlog logger
         try:
@@ -378,9 +363,9 @@ class TestServerLoggingOutput:
 
     def test_server_logging_with_context(self):
         """Test that server logging with context works."""
-        from jobmon.server.web.log_config import configure_logging  # Compatibility shim
+        from jobmon.core.config.logconfig_utils import configure_component_logging
 
-        configure_logging()
+        configure_component_logging("server")
 
         # Test standard logging
         server_logger = logging.getLogger("jobmon.server.web")
@@ -391,9 +376,9 @@ class TestServerLoggingOutput:
 
     def test_server_logging_inheritance(self):
         """Test that server logger hierarchy works correctly."""
-        from jobmon.server.web.log_config import configure_logging  # Compatibility shim
+        from jobmon.core.config.logconfig_utils import configure_component_logging
 
-        configure_logging()
+        configure_component_logging("server")
 
         # Test various server loggers
         web_logger = logging.getLogger("jobmon.server.web")

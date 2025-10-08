@@ -31,9 +31,7 @@ class DistributorCLI(CLI):
     def run_distributor(args: argparse.Namespace) -> None:
         """Start the distributor service for a workflow run."""
         # Bind global context for this distributor instance
-        structlog.contextvars.bind_contextvars(
-            cluster_name=args.cluster_name, workflow_run_id=args.workflow_run_id
-        )
+        structlog.contextvars.bind_contextvars(workflow_run_id=args.workflow_run_id)
 
         logger.info("Distributor starting")
 

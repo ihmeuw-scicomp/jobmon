@@ -129,11 +129,9 @@ class TestEndToEndLoggingScenarios:
         configure_client_logging()
 
         # Configure server logging
-        from jobmon.server.web.log_config import (
-            configure_logging as configure_server_logging,  # Compatibility shim
-        )
+        from jobmon.core.config.logconfig_utils import configure_component_logging
 
-        configure_server_logging()
+        configure_component_logging("server")
 
         # Test that both client and server loggers exist
         client_logger = logging.getLogger("jobmon.client")
@@ -205,13 +203,13 @@ class TestEndToEndLoggingScenarios:
 
                     # Configure all components
                     from jobmon.client.logging import configure_client_logging
-                    from jobmon.core.requester import Requester
-                    from jobmon.server.web.log_config import (
-                        configure_logging as configure_server_logging,
+                    from jobmon.core.config.logconfig_utils import (
+                        configure_component_logging,
                     )
+                    from jobmon.core.requester import Requester
 
                     configure_client_logging()
-                    configure_server_logging()
+                    configure_component_logging("server")
                     Requester._init_otlp()
 
                     # All should configure without errors
@@ -254,12 +252,12 @@ class TestEndToEndLoggingScenarios:
 
                 # Configure all components
                 from jobmon.client.logging import configure_client_logging
-                from jobmon.server.web.log_config import (
-                    configure_logging as configure_server_logging,
+                from jobmon.core.config.logconfig_utils import (
+                    configure_component_logging,
                 )
 
                 configure_client_logging()
-                configure_server_logging()
+                configure_component_logging("server")
 
                 # All components should use the global configuration
                 # (This test verifies that the override system works consistently)
@@ -348,8 +346,8 @@ class TestProductionScenarios:
 
                 # Configure all components - should handle mixed overrides gracefully
                 from jobmon.client.logging import configure_client_logging
-                from jobmon.server.web.log_config import (
-                    configure_logging as configure_server_logging,
+                from jobmon.core.config.logconfig_utils import (
+                    configure_component_logging,
                 )
 
                 # Mock template loading for client to avoid file I/O issues
@@ -360,7 +358,7 @@ class TestProductionScenarios:
                     configure_client_logging()
 
                 # Server should use the production file
-                configure_server_logging()
+                configure_component_logging("server")
 
                 # Should complete without errors
                 assert True
@@ -384,13 +382,13 @@ class TestProductionScenarios:
 
                 # All configuration functions should handle errors gracefully
                 from jobmon.client.logging import configure_client_logging
-                from jobmon.server.web.log_config import (
-                    configure_logging as configure_server_logging,
+                from jobmon.core.config.logconfig_utils import (
+                    configure_component_logging,
                 )
 
                 try:
                     configure_client_logging()
-                    configure_server_logging()
+                    configure_component_logging("server")
 
                     # Should still have basic logging functionality
                     client_logger = logging.getLogger("jobmon.client")

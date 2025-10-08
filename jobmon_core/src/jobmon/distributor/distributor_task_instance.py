@@ -109,9 +109,10 @@ class DistributorTaskInstance:
             no_id_err_msg: The error msg from the executor when failed to obtain distributor
                 id.
         """
-        # Main service already logs launch failure, only log if error details differ
-        logger.warning(
-            "Failed to get distributor ID", task_instance_id=self.task_instance_id
+        logger.info(
+            "Distributor failed to get distributor ID for task instance",
+            task_instance_id=self.task_instance_id,
+            error_msg=no_id_err_msg[:200],  # Truncate for readability
         )
 
         app_route = f"/task_instance/{self.task_instance_id}/log_no_distributor_id"
@@ -119,6 +120,11 @@ class DistributorTaskInstance:
             app_route=app_route,
             message={"no_id_err_msg": no_id_err_msg},
             request_type="post",
+        )
+
+        logger.info(
+            "Task instance transitioned INSTANTIATED → NO_DISTRIBUTOR_ID",
+            task_instance_id=self.task_instance_id,
         )
 
     def _transition_to_error(self, error_message: str, error_state: str) -> None:

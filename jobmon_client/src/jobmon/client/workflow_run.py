@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import getpass
-import logging
 import time
 from typing import Optional
+
+import structlog
 
 from jobmon.client import __version__
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.exceptions import WorkflowNotResumable
 from jobmon.core.requester import Requester
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class WorkflowRunFactory:

@@ -91,6 +91,14 @@ async def record_array_batch_num(
     task_ids = [int(task_id) for task_id in data["task_ids"]]
     task_resources_id = int(data["task_resources_id"])
     workflow_run_id = int(data["workflow_run_id"])
+
+    logger.info(
+        "Server received batch creation request",
+        array_id=array_id,
+        task_count=len(task_ids),
+        task_resources_id=task_resources_id,
+        workflow_run_id=workflow_run_id,
+    )
     task_condition = and_(
         Task.id.in_(task_ids),
         Task.status.in_([TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]),
@@ -189,6 +197,14 @@ async def record_array_batch_num(
 
                 # ATOMIC COMMIT: Both Task update AND TaskInstance insert together
                 db.commit()
+
+                logger.info(
+                    "Batch created successfully",
+                    array_id=array_id,
+                    array_batch_num=batch_num_result,
+                    task_count=len(batch),
+                    workflow_run_id=workflow_run_id,
+                )
                 break  # Success - exit retry loop
 
             except OperationalError as e:
@@ -232,6 +248,12 @@ async def transition_array_to_launched(
     data = cast(Dict, await request.json())
     batch_num = data["batch_number"]
     next_report = data["next_report_increment"]
+
+    logger.info(
+        "Server received batch launch transition request",
+        array_id=array_id,
+        array_batch_num=batch_num,
+    )
 
     # Atomic update of both Task and TaskInstance with retry logic
     max_retries = 5
@@ -287,7 +309,22 @@ async def transition_array_to_launched(
 
             # 3) Atomic commit - both updates succeed or both fail
             db.commit()
-            logger.info("Successfully updated Tasks and TaskInstances to LAUNCHED")
+
+            # Log each task instance (info level - state transition)
+            for task_instance_id in task_instance_ids:
+                logger.info(
+                    "Task instance transitioned to LAUNCHED in database",
+                    task_instance_id=task_instance_id,
+                    array_id=array_id,
+                    array_batch_num=batch_num,
+                )
+
+            logger.info(
+                "Batch successfully transitioned to LAUNCHED",
+                array_id=array_id,
+                array_batch_num=batch_num,
+                num_tasks=len(task_instance_ids),
+            )
             return JSONResponse(content={}, status_code=StatusCodes.OK)
 
         except OperationalError as e:
@@ -336,6 +373,12 @@ async def transition_to_killed(
 
     data = cast(Dict, await request.json())
     batch_num = data["batch_number"]
+
+    logger.info(
+        "Server received kill batch request",
+        array_id=array_id,
+        array_batch_num=batch_num,
+    )
 
     # We'll define "killable" Task states. Adjust as appropriate.
     killable_task_states = (
@@ -396,7 +439,22 @@ async def transition_to_killed(
 
             # 3) Atomic commit - both updates succeed or both fail
             db.commit()
-            logger.info("Successfully updated Tasks and TaskInstances to ERROR_FATAL")
+
+            # Log each killed task instance (info level - state transition)
+            for task_instance_id in task_instance_ids:
+                logger.info(
+                    "Task instance killed (KILL_SELF → ERROR_FATAL)",
+                    task_instance_id=task_instance_id,
+                    array_id=array_id,
+                    array_batch_num=batch_num,
+                )
+
+            logger.info(
+                "Batch successfully transitioned from KILL_SELF to ERROR_FATAL",
+                array_id=array_id,
+                array_batch_num=batch_num,
+                num_tasks=len(task_instance_ids),
+            )
             return JSONResponse(content={}, status_code=StatusCodes.OK)
 
         except OperationalError as e:

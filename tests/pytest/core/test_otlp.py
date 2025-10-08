@@ -218,22 +218,21 @@ class TestOTLPHandlers:
         """Test the structured logging OTLP handler."""
         from jobmon.core.otlp import JobmonOTLPStructlogHandler
 
-        with patch("structlog.stdlib.ProcessorFormatter") as mock_formatter:
-            handler = JobmonOTLPStructlogHandler(level=logging.INFO)
+        handler = JobmonOTLPStructlogHandler(level=logging.INFO)
 
-            # Should have attempted to create ProcessorFormatter
-            mock_formatter.assert_called_once()
-            assert handler._otlp_handler is None
+        # Should be identical to JobmonOTLPLoggingHandler
+        assert handler._otlp_handler is None
+        assert handler.level == logging.INFO
 
     def test_structlog_handler_without_structlog(self):
         """Test structlog handler fallback when structlog not available."""
         from jobmon.core.otlp import JobmonOTLPStructlogHandler
 
-        with patch("structlog.stdlib.ProcessorFormatter", side_effect=ImportError):
-            handler = JobmonOTLPStructlogHandler()
+        handler = JobmonOTLPStructlogHandler()
 
-            # Should have fallen back to default formatter
-            assert isinstance(handler.formatter, logging.Formatter)
+        # Should work without structlog dependencies
+        assert handler._otlp_handler is None
+        assert handler.level == logging.NOTSET
 
 
 class TestOTLPUtilities:

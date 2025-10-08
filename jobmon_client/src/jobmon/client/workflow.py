@@ -6,8 +6,6 @@ import copy
 import fcntl
 import hashlib
 import itertools
-import logging
-import logging.config
 import os
 import sys
 import time
@@ -17,6 +15,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Union
 
 import psutil
+import structlog
 
 from jobmon.client.array import Array
 from jobmon.client.dag import Dag
@@ -46,7 +45,7 @@ if TYPE_CHECKING:
     from jobmon.client.tool import Tool
 
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class DistributorContext:
@@ -726,7 +725,7 @@ class Workflow(object):
             if raise_on_error:
                 raise
             else:
-                logger.info(e)
+                logger.error("Workflow validation error", error=str(e), exc_info=True)
 
     def bind(self) -> None:
         """Get a workflow_id."""

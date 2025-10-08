@@ -14,7 +14,7 @@ handlers:
   console:
     class: logging.StreamHandler
     level: INFO
-    formatter: console_default
+    formatter: structlog_text  # Colored output with key=value pairs
     stream: ext://sys.stdout
   
   # Optional OTLP handler (can be enabled via config overrides)
@@ -30,13 +30,13 @@ loggers:
   jobmon.client:
     handlers: [console]
     level: INFO
-    propagate: true
+    propagate: false
 
   # Cluster interface operations (important for distributor)
   jobmon.core:
     handlers: [console]
     level: WARNING
-    propagate: true
+    propagate: false
     
 # OTLP can be enabled via configuration overrides:
 # 

@@ -317,7 +317,10 @@ async def set_status_for_triaging(
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    logger.info(f"Set to triaging those overdue tis for wfr {workflow_run_id}")
+    logger.info(
+        "Server checking for overdue task instances to set to TRIAGING",
+        workflow_run_id=workflow_run_id,
+    )
 
     # Get heartbeat interval from config for retry exclusion logic
     config = get_jobmon_config()
@@ -363,8 +366,17 @@ async def set_status_for_triaging(
 
             running_result = db.execute(running_update_stmt)
             total_updated += running_result.rowcount
+
+            # Log each task instance set to triaging (info level - state transition)
+            for ti_id in running_ti_ids[: running_result.rowcount]:
+                logger.info(
+                    "Task instance set to TRIAGING (overdue from RUNNING)",
+                    task_instance_id=ti_id,
+                )
+
             logger.info(
-                f"Updated {running_result.rowcount} RUNNING task instances to TRIAGING"
+                "Set RUNNING task instances to TRIAGING",
+                num_task_instances=running_result.rowcount,
             )
 
             # Step 4: Commit RUNNING updates
@@ -417,8 +429,17 @@ async def set_status_for_triaging(
 
             launched_result = db.execute(launched_update_stmt)
             total_updated += launched_result.rowcount
+
+            # Log each task instance set to no heartbeat (info level - state transition)
+            for ti_id in launched_ti_ids[: launched_result.rowcount]:
+                logger.info(
+                    "Task instance set to NO_HEARTBEAT (overdue from LAUNCHED)",
+                    task_instance_id=ti_id,
+                )
+
             logger.info(
-                f"Updated {launched_result.rowcount} LAUNCHED task instances to NO_HEARTBEAT"
+                "Set LAUNCHED task instances to NO_HEARTBEAT",
+                num_task_instances=launched_result.rowcount,
             )
 
             # Step 4: Commit LAUNCHED updates
@@ -429,6 +450,10 @@ async def set_status_for_triaging(
         db.rollback()
         raise e
 
-    logger.info(f"Total updated {total_updated} task instances for triaging")
+    logger.info(
+        "Triage check completed",
+        total_updated=total_updated,
+        workflow_run_id=workflow_run_id,
+    )
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp

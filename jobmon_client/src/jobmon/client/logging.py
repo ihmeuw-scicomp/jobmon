@@ -61,6 +61,7 @@ def configure_client_logging() -> None:
     """
     try:
         from jobmon.core.config.logconfig_utils import configure_logging_with_overrides
+        from jobmon.core.config.structlog_config import configure_structlog
 
         # Get default template path
         current_dir = os.path.dirname(__file__)
@@ -68,12 +69,15 @@ def configure_client_logging() -> None:
             current_dir, "config/logconfig_client.yaml"
         )
 
-        # Configure with override support
+        # Configure Python logging with override support
         configure_logging_with_overrides(
             default_template_path=default_template_path,
             config_section="client",
             fallback_config=default_config,
         )
+
+        # Configure structlog so requester logs use formatters
+        configure_structlog(component_name="client")
 
     except Exception:
         # Fall back to basic configuration for any error:

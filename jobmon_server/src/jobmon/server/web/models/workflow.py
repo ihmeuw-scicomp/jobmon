@@ -90,13 +90,14 @@ class Workflow(Base):
 
     def transition(self, new_state: str) -> None:
         """Transition the state of the workflow."""
-        # bind_to_logger(workflow_id=self.id)
         logger.info(f"Transitioning workflow_id from {self.status} to {new_state}")
         if self._is_timely_transition(new_state):
             self._validate_transition(new_state)
             self.status = new_state
             self.status_date = func.now()
-        logger.info(f"WorkflowStatus is now {self.status}")
+        logger.info(
+            "WorkflowStatus updated", new_status=self.status, workflow_id=self.id
+        )
 
     def _validate_transition(self, new_state: str) -> None:
         """Ensure the Job state transition is valid."""

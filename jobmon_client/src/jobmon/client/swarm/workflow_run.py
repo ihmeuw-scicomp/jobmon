@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-import logging
 import numbers
 import time
 from collections import deque
@@ -20,6 +19,8 @@ from typing import (
     Union,
 )
 
+import structlog
+
 from jobmon.client.array import Array
 from jobmon.client.swarm.swarm_array import SwarmArray
 from jobmon.client.swarm.swarm_task import SwarmTask
@@ -35,13 +36,14 @@ from jobmon.core.exceptions import (
     WorkflowTestError,
 )
 from jobmon.core.requester import Requester
+from jobmon.core.structlog_utils import bind_method_context
 
 # avoid circular imports on backrefs
 if TYPE_CHECKING:
     from jobmon.client.workflow import Workflow
 
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class SwarmCommand:
@@ -89,6 +91,8 @@ class WorkflowRun:
     ) -> None:
         """Initialization of the swarm WorkflowRun."""
         self.workflow_run_id = workflow_run_id
+
+        structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
 
         # state tracking
         self._active_states = [
@@ -188,10 +192,14 @@ class WorkflowRun:
             logger.warning("Swarm has already been initialized")
             return
 
+        logger.debug("Initializing swarm from workflow", num_tasks=len(workflow.tasks))
+
         # construct arrays
         array: Array
         for array in workflow.arrays.values():
-            swarm_array = SwarmArray(array.array_id, array.max_concurrently_running)
+            swarm_array = SwarmArray(
+                array.array_id, array.max_concurrently_running, array.name
+            )
             self.arrays[array.array_id] = swarm_array
 
         # construct SwarmTasks from Client Tasks and populate registry
@@ -586,10 +594,13 @@ class WorkflowRun:
 
         # unexpected errors. raise
         except Exception as e:
+            logger.error("Workflow run error", error=str(e), exc_info=True)
             try:
                 self._update_status(WorkflowRunStatus.ERROR)
             except TransitionError as trans:
-                logger.warning(trans)
+                logger.warning(
+                    "Failed to update workflow run status to ERROR", error=str(trans)
+                )
             raise e
 
         # no more active tasks
@@ -618,6 +629,11 @@ class WorkflowRun:
         ]:
             self._set_validated_task_resources(t)
             self.ready_to_run.append(t)
+
+        logger.debug(
+            "Initial fringe set. ready_to_run_count: %s",
+            ready_to_run_count=len(self.ready_to_run),
+        )
 
     def get_swarm_commands(self) -> Generator[SwarmCommand, None, None]:
         """Generator to get next chunk of work to be done. Must be idempotent."""
@@ -673,6 +689,12 @@ class WorkflowRun:
                     # set final array capacity
                     array_capacity_lookup[array_id] = array_capacity
 
+                    array_name = self.arrays[array_id].array_name
+                    logger.info(
+                        f"Created batch of {current_batch_size} tasks for {array_name}",
+                        array_id=array_id,
+                        batch_size=current_batch_size,
+                    )
                     yield SwarmCommand(self.queue_task_batch, current_batch)
 
                 # no room. keep track for next time method is called
@@ -709,12 +731,24 @@ class WorkflowRun:
                 # stop processing commands if we are out of commands
                 keep_processing = False
 
+        logger.debug(
+            "Swarm commands processed. ready_to_run_count: %s, processing_duration: %s",
+            ready_to_run_count=len(self.ready_to_run),
+            processing_duration=time.time() - loop_start,
+        )
+
     def synchronize_state(self, full_sync: bool = False) -> None:
         self._set_status_for_triaging()
         self._log_heartbeat()
         self._task_status_updates(full_sync=full_sync)
         self._synchronize_max_concurrently_running()
         self._synchronize_array_max_concurrently_running()
+
+        logger.debug(
+            "State synchronized. ready_to_run_count: %s, full_sync: %s",
+            ready_to_run_count=len(self.ready_to_run),
+            full_sync=full_sync,
+        )
 
     def _refresh_task_status_map(self, updated_tasks: Set[SwarmTask]) -> None:
         # remove these tasks from old mapping
@@ -755,7 +789,7 @@ class WorkflowRun:
 
             else:
                 logger.debug(
-                    f"Got status update {task.status} for task_id: {task.task_id}."
+                    f"Got status update {task.status} for task_id: {task.task_id}. "
                     "No actions necessary."
                 )
 
@@ -765,7 +799,10 @@ class WorkflowRun:
                 (len(self._task_status_map[TaskStatus.DONE]) / len(self.tasks)) * 100, 2
             )
             logger.info(
-                f"{num_newly_completed} newly completed tasks. {percent_done} percent done."
+                f"Workflow {percent_done}% complete "
+                f"({len(self.done_tasks)}/{len(self.tasks)} tasks)",
+                newly_completed=num_newly_completed,
+                percent_done=percent_done,
             )
 
         # if newly failed, report failures and check if we should error out
@@ -773,10 +810,12 @@ class WorkflowRun:
             logger.warning(f"{num_newly_failed} newly failed tasks.")
 
     def _set_status_for_triaging(self) -> None:
+        logger.debug("Swarm requesting triage check for overdue task instances")
         app_route = f"/workflow_run/{self.workflow_run_id}/set_status_for_triaging"
         self.requester.send_request(
             app_route=app_route, message={}, request_type="post"
         )
+        logger.debug("Triage check completed")
 
     def _log_heartbeat(self) -> None:
         next_report_increment = (
@@ -878,11 +917,18 @@ class WorkflowRun:
                 "max_concurrently_running"
             ]
 
+    @bind_method_context(workflow_run_id="workflow_run_id")
     def queue_task_batch(self, tasks: List[SwarmTask]) -> None:
         first_task = tasks[0]
         task_resources = first_task.current_task_resources
         if not task_resources.is_bound:
             task_resources.bind()
+
+        logger.debug(
+            f"Queueing {len(tasks)} tasks to server",
+            array_id=first_task.array_id,
+            batch_size=len(tasks),
+        )
 
         app_route = f"/array/{first_task.array_id}/queue_task_batch"
         _, response = self.requester.send_request(
