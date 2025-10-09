@@ -631,8 +631,7 @@ class WorkflowRun:
             self.ready_to_run.append(t)
 
         logger.debug(
-            "Initial fringe set. ready_to_run_count: %s",
-            ready_to_run_count=len(self.ready_to_run),
+            f"Initial fringe set. ready_to_run_count: {len(self.ready_to_run)}"
         )
 
     def get_swarm_commands(self) -> Generator[SwarmCommand, None, None]:
@@ -732,9 +731,8 @@ class WorkflowRun:
                 keep_processing = False
 
         logger.debug(
-            "Swarm commands processed. ready_to_run_count: %s, processing_duration: %s",
-            ready_to_run_count=len(self.ready_to_run),
-            processing_duration=time.time() - loop_start,
+            f"Swarm commands processed. ready_to_run_count: {len(self.ready_to_run)}, "
+            f"processing_duration: {time.time() - loop_start}"
         )
 
     def synchronize_state(self, full_sync: bool = False) -> None:
@@ -745,9 +743,8 @@ class WorkflowRun:
         self._synchronize_array_max_concurrently_running()
 
         logger.debug(
-            "State synchronized. ready_to_run_count: %s, full_sync: %s",
-            ready_to_run_count=len(self.ready_to_run),
-            full_sync=full_sync,
+            f"State synchronized. ready_to_run_count: {len(self.ready_to_run)}, "
+            f"full_sync: {full_sync}"
         )
 
     def _refresh_task_status_map(self, updated_tasks: Set[SwarmTask]) -> None:
