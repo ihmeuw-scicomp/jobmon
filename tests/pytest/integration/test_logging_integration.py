@@ -46,9 +46,12 @@ class TestCrossComponentConsistency:
             handler_config = handlers[handler_name]
             if "exporter" in handler_config:
                 exporter = handler_config["exporter"]
-                assert "class" in exporter
-                assert exporter["class"] == "OTLPLogExporter"
-                assert "endpoint" in exporter
+                # New simplified templates use empty dict for shared LoggerProvider
+                # Legacy templates had full exporter config
+                if exporter:  # Non-empty exporter dict
+                    assert "class" in exporter
+                    assert exporter["class"] == "OTLPLogExporter"
+                    assert "endpoint" in exporter
 
     def test_component_configs_load_successfully(self):
         """Test that all component configurations load without errors."""
@@ -106,16 +109,19 @@ class TestCrossComponentConsistency:
                 if "exporter" in handler_config:
                     exporter = handler_config["exporter"]
 
-                    # Should have consistent OTLP structure
-                    assert "module" in exporter
-                    assert "class" in exporter
-                    assert "endpoint" in exporter
-                    assert exporter["class"] == "OTLPLogExporter"
+                    # New simplified templates use empty dict for shared LoggerProvider
+                    # Legacy templates had full exporter config
+                    if exporter:  # Non-empty exporter dict
+                        # Should have consistent OTLP structure
+                        assert "module" in exporter
+                        assert "class" in exporter
+                        assert "endpoint" in exporter
+                        assert exporter["class"] == "OTLPLogExporter"
 
-                    # Should have reasonable batch settings
-                    if "max_export_batch_size" in exporter:
-                        assert isinstance(exporter["max_export_batch_size"], int)
-                        assert exporter["max_export_batch_size"] > 0
+                        # Should have reasonable batch settings
+                        if "max_export_batch_size" in exporter:
+                            assert isinstance(exporter["max_export_batch_size"], int)
+                            assert exporter["max_export_batch_size"] > 0
 
 
 class TestEndToEndLoggingScenarios:

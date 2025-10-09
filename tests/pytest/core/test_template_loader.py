@@ -50,30 +50,32 @@ class TestTemplateLoader:
         assert "handlers" in templates
         handlers = templates["handlers"]
 
-        # Should have loaded expected handlers
+        # Should have loaded expected handlers (new simplified templates)
         expected_handlers = [
-            "otlp_complete_template",
-            "otlp_structlog_complete_template",
+            "console_default_template",
+            "console_structlog_template",
+            "otlp_template",
+            "otlp_structlog_template",
         ]
         for handler_name in expected_handlers:
             assert handler_name in handlers
 
-        # Check otlp_complete_template structure
-        otlp_handler = handlers["otlp_complete_template"]
-        assert "class" in otlp_handler
-        assert otlp_handler["class"] == "jobmon.core.otlp.JobmonOTLPLoggingHandler"
-        assert "exporter" in otlp_handler
-        assert "formatter" in otlp_handler
+        # Check console_structlog_template structure
+        console_handler = handlers["console_structlog_template"]
+        assert "class" in console_handler
+        assert console_handler["class"] == "logging.StreamHandler"
+        assert "formatter" in console_handler
+        assert console_handler["formatter"] == "structlog_event_only"
 
-        # Check otlp_structlog_complete_template structure
-        otlp_structlog_handler = handlers["otlp_structlog_complete_template"]
+        # Check otlp_structlog_template structure
+        otlp_structlog_handler = handlers["otlp_structlog_template"]
         assert "class" in otlp_structlog_handler
         assert (
             otlp_structlog_handler["class"]
             == "jobmon.core.otlp.JobmonOTLPStructlogHandler"
         )
+        # Simplified handler uses shared LoggerProvider (empty exporter dict)
         assert "exporter" in otlp_structlog_handler
-        assert "formatter" in otlp_structlog_handler
 
     def test_template_directive_resolution(self):
         """Test that !template directives resolve correctly."""
