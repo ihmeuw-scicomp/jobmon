@@ -104,13 +104,18 @@ class _JobmonOTLPLoggingHandler(logging.Handler):
             otlp_record.span_id = span_id_int if span_id_int else 0
 
             # Set trace flags from current span context if available
-            # Don't set trace_flags if not available - let OTLPLogRecord use its default
+            # Default to TraceFlags(0) to avoid NoneType errors
+            from opentelemetry.trace import TraceFlags
+
+            trace_flags: TraceFlags = TraceFlags(0)
             if trace_id_int and span_id_int:
                 span = get_current_span()
                 if span:
                     ctx = span.get_span_context()
-                    if ctx and ctx.is_valid and ctx.trace_flags is not None:
-                        otlp_record.trace_flags = ctx.trace_flags
+                    if ctx and ctx.is_valid:
+                        trace_flags = ctx.trace_flags
+
+            otlp_record.trace_flags = trace_flags
 
             # Always emit the log record, even without trace context
             self._logger.emit(otlp_record)
