@@ -198,7 +198,7 @@ class WorkflowRun:
         array: Array
         for array in workflow.arrays.values():
             swarm_array = SwarmArray(
-                array.array_id, array.max_concurrently_running, array.name
+                array.array_id, array.max_concurrently_running, array_name=array.name
             )
             self.arrays[array.array_id] = swarm_array
 
