@@ -651,9 +651,9 @@ class Workflow(object):
 
     def _configure_component_logging(self) -> None:
         """Configure component logging for client workflow operations."""
-        from jobmon.core.config.logconfig_utils import configure_component_logging
+        from jobmon.client.logging import configure_client_logging
 
-        configure_component_logging("client")
+        configure_client_logging()
 
     def set_task_template_max_concurrency_limit(
         self, task_template_name: str, limit: int

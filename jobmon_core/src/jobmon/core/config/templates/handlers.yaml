@@ -1,32 +1,27 @@
-# Shared OTLP handler templates for jobmon logging  
-# Only complex handlers with extensive exporter configuration are templated
-# Simple console handlers are inlined in each config
+# Shared handler templates for jobmon logging  
+# Console and OTLP handlers that are reused across components
 
 handlers:
-  # Complete OTLP handlers with exporter included
-  otlp_complete_template: &otlp_complete_template
+  # Console handler templates
+  console_default_template: &console_default_template
+    class: logging.StreamHandler
+    level: INFO
+    formatter: console_default
+    stream: ext://sys.stdout
+    
+  console_structlog_template: &console_structlog_template
+    class: logging.StreamHandler
+    level: INFO
+    formatter: structlog_event_only  # Clean, traditional log style
+    stream: ext://sys.stdout
+
+  # OTLP handler templates (use shared LoggerProvider)
+  otlp_template: &otlp_template
     class: jobmon.core.otlp.JobmonOTLPLoggingHandler
     level: INFO
     formatter: otlp_default
-    exporter:
-      module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
-      class: OTLPLogExporter
-      endpoint: http://localhost:4317
-      max_export_batch_size: 8
-      export_timeout_millis: 5000
-      schedule_delay_millis: 1000
-      max_queue_size: 256
 
-  # Complete OTLP structlog handler (server focused)
-  otlp_structlog_complete_template: &otlp_structlog_complete_template
+  otlp_structlog_template: &otlp_structlog_template
     class: jobmon.core.otlp.JobmonOTLPStructlogHandler
-    level: INFO
-    formatter: structlog_json
-    exporter:
-      module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
-      class: OTLPLogExporter
-      endpoint: http://localhost:4317
-      max_export_batch_size: 8
-      export_timeout_millis: 5000
-      schedule_delay_millis: 1000
-      max_queue_size: 256 
+    level: DEBUG
+    exporter: {}  # Empty dict triggers shared LoggerProvider usage

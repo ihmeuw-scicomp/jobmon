@@ -689,7 +689,7 @@ class WorkflowRun:
                     array_capacity_lookup[array_id] = array_capacity
 
                     array_name = self.arrays[array_id].array_name
-                    logger.info(
+                    logger.debug(
                         f"Created batch of {current_batch_size} tasks for {array_name}",
                         array_id=array_id,
                         batch_size=current_batch_size,
@@ -732,6 +732,7 @@ class WorkflowRun:
 
         logger.debug(
             f"Swarm commands processed. ready_to_run_count: {len(self.ready_to_run)}, "
+            f"active_tasks: {self.active_tasks}, "
             f"processing_duration: {time.time() - loop_start}"
         )
 
@@ -744,6 +745,7 @@ class WorkflowRun:
 
         logger.debug(
             f"State synchronized. ready_to_run_count: {len(self.ready_to_run)}, "
+            f"active_tasks: {self.active_tasks}, "
             f"full_sync: {full_sync}"
         )
 

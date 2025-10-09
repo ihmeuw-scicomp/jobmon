@@ -10,8 +10,6 @@ enabled (handled by the Requester class itself).
 
 from __future__ import annotations
 
-import logging
-import logging.config
 import os
 import sys
 from typing import Dict
@@ -59,42 +57,16 @@ def configure_client_logging() -> None:
 
     Note: Requester OTLP is handled separately by the Requester class.
     """
-    try:
-        from jobmon.core.config.logconfig_utils import configure_logging_with_overrides
-        from jobmon.core.config.structlog_config import configure_structlog
+    from jobmon.core.config.logconfig_utils import configure_logging_with_overrides
 
-        # Get default template path
-        current_dir = os.path.dirname(__file__)
-        default_template_path = os.path.join(
-            current_dir, "config/logconfig_client.yaml"
-        )
+    # Get default template path
+    current_dir = os.path.dirname(__file__)
+    default_template_path = os.path.join(current_dir, "config/logconfig_client.yaml")
 
-        # Configure Python logging with override support
-        configure_logging_with_overrides(
-            default_template_path=default_template_path,
-            config_section="client",
-            fallback_config=default_config,
-        )
-
-        # Configure structlog so requester logs use formatters
-        configure_structlog(component_name="client")
-
-    except Exception:
-        # Fall back to basic configuration for any error:
-        # - ImportError: core module not available
-        # - FileNotFoundError: template file missing
-        # - yaml.YAMLError: malformed YAML
-        # - ValueError: template resolution errors
-        # - PermissionError: file access issues
-        # - OSError: other I/O errors
-        # - logging configuration errors
-        try:
-            logging.config.dictConfig(default_config)
-        except Exception:
-            # If even the fallback config fails, set up minimal logging
-            logging.basicConfig(
-                level=logging.INFO,
-                format=_DEFAULT_LOG_FORMAT,
-                datefmt="%Y-%m-%d %H:%M:%S",
-                stream=sys.stdout,
-            )
+    # Configure Python logging with override support
+    # Note: structlog is already configured in __init__.py
+    configure_logging_with_overrides(
+        default_template_path=default_template_path,
+        config_section="client",
+        fallback_config=default_config,
+    )

@@ -75,22 +75,44 @@ class _JobmonOTLPLoggingHandler(logging.Handler):
                             trace_id_int = ctx.trace_id
                             span_id_int = ctx.span_id
 
+            # Map log level to severity number enum
+            from opentelemetry._logs.severity import SeverityNumber
+
+            severity_map = {
+                "DEBUG": SeverityNumber.DEBUG,
+                "INFO": SeverityNumber.INFO,
+                "WARNING": SeverityNumber.WARN,
+                "ERROR": SeverityNumber.ERROR,
+                "CRITICAL": SeverityNumber.FATAL,
+            }
+            severity_number = severity_map.get(record.levelname, SeverityNumber.INFO)
+
             # Create OTLP log record with stable trace IDs
             otlp_record = OTLPLogRecord(
                 timestamp=int(record.created * 1e9),
                 severity_text=record.levelname,
-                severity_number=None,
+                severity_number=severity_number,
                 body=message,
                 resource=self._logger_provider.resource,
                 attributes=attributes,
             )
 
             # Set trace context from structlog (stable across duplicates)
-            if trace_id_int:
-                otlp_record.trace_id = trace_id_int
-            if span_id_int:
-                otlp_record.span_id = span_id_int
+            # Trace context is optional - emit logs even without trace correlation
+            # Use 0 as default values to avoid NoneType errors in OTLP exporter
+            otlp_record.trace_id = trace_id_int if trace_id_int else 0
+            otlp_record.span_id = span_id_int if span_id_int else 0
 
+            # Set trace flags from current span context if available
+            # Don't set trace_flags if not available - let OTLPLogRecord use its default
+            if trace_id_int and span_id_int:
+                span = get_current_span()
+                if span:
+                    ctx = span.get_span_context()
+                    if ctx and ctx.is_valid and ctx.trace_flags is not None:
+                        otlp_record.trace_flags = ctx.trace_flags
+
+            # Always emit the log record, even without trace context
             self._logger.emit(otlp_record)
         except Exception:
             pass
