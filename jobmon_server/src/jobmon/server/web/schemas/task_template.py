@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer
 
 
 class TaskTemplateResourceUsageRequest(BaseModel):
@@ -176,10 +176,10 @@ class ErrorLogItem(BaseModel):
     sample_error: Optional[str] = None
     first_error_time: Optional[datetime] = None
 
-    model_config = ConfigDict(
-        # This will serialize datetime objects to ISO strings in JSON responses
-        json_encoders={datetime: lambda v: v.isoformat()}
-    )
+    @field_serializer("error_time", "first_error_time")
+    def serialize_datetime(self, value: Optional[datetime]) -> Optional[str]:
+        """Serialize datetime fields to ISO format strings."""
+        return value.isoformat() if value is not None else None
 
 
 class ErrorLogResponse(BaseModel):

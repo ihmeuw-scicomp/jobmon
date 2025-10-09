@@ -383,7 +383,8 @@ async def update_max_running(
     )
     res = db.execute(update_stmt)
     db.flush()
-    if res.rowcount == 0:  # Return a warning message if no update was performed
+    rowcount = res.rowcount if hasattr(res, "rowcount") else 0
+    if rowcount == 0:  # Return a warning message if no update was performed
         message = (
             f"No update performed for workflow ID {workflow_id}, "
             f"max_concurrently_running is "
@@ -595,7 +596,8 @@ async def update_array_max_running(
 
     res = db.execute(update_stmt)
     db.commit()
-    if res.rowcount == 0:  # Return a warning message if no update was performed
+    rowcount = res.rowcount if hasattr(res, "rowcount") else 0
+    if rowcount == 0:  # Return a warning message if no update was performed
         message = (
             f"Error updating max_concurrently_running for workflow ID {workflow_id} and "
             f"task_template_version_id {task_template_version_id}."

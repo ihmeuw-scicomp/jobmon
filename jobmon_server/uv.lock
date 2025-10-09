@@ -313,7 +313,9 @@ sqlalchemy-utils==0.41.2
 starlette==0.46.2
     # via fastapi
 structlog==25.3.0
-    # via jobmon-server (jobmon_server/pyproject.toml)
+    # via
+    #   jobmon-server (jobmon_server/pyproject.toml)
+    #   jobmon-core
 tenacity==9.1.2
     # via
     #   fastapi-plugins

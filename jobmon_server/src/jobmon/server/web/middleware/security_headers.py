@@ -4,9 +4,9 @@ From: https://github.com/tiangolo/fastapi/issues/4420#issuecomment-1234146365
 """
 
 from collections import OrderedDict
-from typing import List, Union
+from typing import Any, List, Union
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 swagger_bundle_shasum = "sha256-eV3QMumkWxytVHa/LDvu+mnW+PcSAEI4SfFu0iIlbDc="
@@ -58,12 +58,11 @@ def parse_policy(policy: Union[dict[str, Union[str, List[str]]], str]) -> str:
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Add security headers to all responses."""
 
-    def __init__(self, app: FastAPI, csp: bool = True) -> None:
+    def __init__(self, app: Any, csp: bool = True) -> None:
         """Init SecurityHeadersMiddleware.
 
         :param app: FastAPI instance
-        :param no_csp: If no CSP should be used;
-            defaults to :py:obj:`False`
+        :param csp: If CSP should be used; defaults to :py:obj:`True`
         """
         super().__init__(app)
         self.csp = csp

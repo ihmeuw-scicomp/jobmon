@@ -365,10 +365,13 @@ async def set_status_for_triaging(
             )
 
             running_result = db.execute(running_update_stmt)
-            total_updated += running_result.rowcount
+            running_rowcount = (
+                running_result.rowcount if hasattr(running_result, "rowcount") else 0
+            )
+            total_updated += running_rowcount
 
             # Log each task instance set to triaging (info level - state transition)
-            for ti_id in running_ti_ids[: running_result.rowcount]:
+            for ti_id in running_ti_ids[:running_rowcount]:
                 logger.info(
                     "Task instance set to TRIAGING (overdue from RUNNING)",
                     task_instance_id=ti_id,
@@ -376,7 +379,7 @@ async def set_status_for_triaging(
 
             logger.info(
                 "Set RUNNING task instances to TRIAGING",
-                num_task_instances=running_result.rowcount,
+                num_task_instances=running_rowcount,
             )
 
             # Step 4: Commit RUNNING updates
@@ -428,10 +431,13 @@ async def set_status_for_triaging(
             )
 
             launched_result = db.execute(launched_update_stmt)
-            total_updated += launched_result.rowcount
+            launched_rowcount = (
+                launched_result.rowcount if hasattr(launched_result, "rowcount") else 0
+            )
+            total_updated += launched_rowcount
 
             # Log each task instance set to no heartbeat (info level - state transition)
-            for ti_id in launched_ti_ids[: launched_result.rowcount]:
+            for ti_id in launched_ti_ids[:launched_rowcount]:
                 logger.info(
                     "Task instance set to NO_HEARTBEAT (overdue from LAUNCHED)",
                     task_instance_id=ti_id,
@@ -439,7 +445,7 @@ async def set_status_for_triaging(
 
             logger.info(
                 "Set LAUNCHED task instances to NO_HEARTBEAT",
-                num_task_instances=launched_result.rowcount,
+                num_task_instances=launched_rowcount,
             )
 
             # Step 4: Commit LAUNCHED updates

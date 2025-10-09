@@ -162,11 +162,10 @@ root:
         workflow = Workflow(tool_version=mock_tool_version)
 
         # Test _configure_component_logging method directly
-        with patch(
-            "jobmon.core.config.logconfig_utils.configure_component_logging"
-        ) as mock_configure:
+        # Now calls configure_client_logging() instead of configure_component_logging()
+        with patch("jobmon.client.logging.configure_client_logging") as mock_configure:
             workflow._configure_component_logging()
-            mock_configure.assert_called_once_with("client")
+            mock_configure.assert_called_once()
 
     def test_workflow_configure_logging_option(self):
         """Test workflow.run(configure_logging=True) uses component logging."""
