@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional, Union
 
-
 from . import OTLP_AVAILABLE
 from .formatters import JobmonOTLPFormatter
 
@@ -74,7 +73,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         self._logger_provider = logger_provider
         self._logger: Optional[Any] = None
         self._initialized = False
-
 
         self.setFormatter(JobmonOTLPFormatter())
 
@@ -182,12 +180,14 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
             # Get trace context
             trace_id_int, span_id_int = self._parse_trace_context(event_dict)
-            
+
             # Add deduplication metadata
             # Generate stable event_id: hash of (timestamp, message, trace_id, span_id, pid)
-            event_key = f"{record.created}:{message}:{trace_id_int}:{span_id_int}:{os.getpid()}"
+            event_key = (
+                f"{record.created}:{message}:{trace_id_int}:{span_id_int}:{os.getpid()}"
+            )
             event_id = hashlib.sha256(event_key.encode()).hexdigest()[:16]
-            
+
             attributes["jobmon.event_id"] = event_id
             attributes["jobmon.process_id"] = os.getpid()
             attributes["jobmon.thread_id"] = record.thread

@@ -364,12 +364,12 @@ def initialize_jobmon_otlp() -> JobmonOTLPManager:
 
 def get_shared_logger_provider() -> Optional[Any]:
     """Get the shared logger provider, initializing if needed.
-    
+
     This function provides a clean interface for handlers to access the
     shared LoggerProvider without dealing with manager instances directly.
     Uses double-checked locking to prevent race conditions in multi-threaded
     environments like Kubernetes with multiple workers.
-    
+
     Returns:
         The shared LoggerProvider instance, or None if unavailable
     """
