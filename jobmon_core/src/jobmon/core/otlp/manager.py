@@ -35,6 +35,7 @@ class JobmonOTLPManager:
         self.tracer_provider: Optional[Any] = None
         self.logger_provider: Optional[Any] = None
         self._initialized = False
+        self._log_processor_configured = False
 
     @classmethod
     def get_instance(cls: Type[JobmonOTLPManager]) -> JobmonOTLPManager:
@@ -75,6 +76,10 @@ class JobmonOTLPManager:
     def _configure_log_processor(self) -> None:
         """Configure log processor from telemetry configuration."""
         if not OTLP_AVAILABLE or not self.logger_provider:
+            return
+
+        # Guard against adding processor multiple times
+        if self._log_processor_configured:
             return
 
         try:
@@ -129,6 +134,7 @@ class JobmonOTLPManager:
                 # Add processor to logger provider (only once!)
                 processor = BatchLogRecordProcessor(exporter, **processor_args)
                 self.logger_provider.add_log_record_processor(processor)
+                self._log_processor_configured = True
                 logging.getLogger(__name__).info(
                     f"Configured log exporter: {log_exporter_name}"
                 )
