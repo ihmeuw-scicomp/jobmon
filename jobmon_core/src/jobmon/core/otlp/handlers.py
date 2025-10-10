@@ -175,7 +175,13 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             handler_id = id(self)
             timestamp = time.time()
             
-            logging.getLogger("jobmon.otlp.debug").info(
+            # Ensure debug logger has a handler
+            debug_logger = logging.getLogger("jobmon.otlp.debug")
+            if not debug_logger.handlers:
+                debug_logger.addHandler(logging.StreamHandler())
+                debug_logger.setLevel(logging.DEBUG)
+            
+            debug_logger.info(
                 f"OTLP emit called - event_key={event_key} handler_id={handler_id} timestamp={timestamp:.6f} "
                 f"message={record.getMessage()[:50]} level={record.levelname}"
             )
@@ -238,7 +244,12 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             
             # Debug instrumentation to track successful emission
             if self._debug_mode:
-                logging.getLogger("jobmon.otlp.debug").info(
+                debug_logger = logging.getLogger("jobmon.otlp.debug")
+                if not debug_logger.handlers:
+                    debug_logger.addHandler(logging.StreamHandler())
+                    debug_logger.setLevel(logging.DEBUG)
+                
+                debug_logger.info(
                     f"OTLP emit completed - event_key={event_key} handler_id={handler_id}"
                 )
                 
