@@ -250,7 +250,8 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                     debug_logger.setLevel(logging.DEBUG)
                 
                 debug_logger.info(
-                    f"OTLP emit completed - event_key={event_key} handler_id={handler_id}"
+                    f"OTLP emit completed - event_key={event_key} handler_id={handler_id} "
+                    f"otlp_record_id={id(otlp_record)} logger_id={id(self._logger)}"
                 )
                 
         except Exception as e:
