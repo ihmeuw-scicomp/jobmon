@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any, Optional, Type
 
 from . import OTLP_AVAILABLE
@@ -14,8 +15,9 @@ if OTLP_AVAILABLE:
 
 from .resources import create_jobmon_resources
 
-# Module-level singleton for shared logger provider
+# Module-level singleton for shared logger provider with thread safety
 _logger_provider: Optional[Any] = None
+_logger_provider_lock = threading.Lock()
 
 
 class JobmonOTLPManager:
@@ -32,6 +34,7 @@ class JobmonOTLPManager:
     """
 
     _instance: Optional[JobmonOTLPManager] = None
+    _instance_lock = threading.Lock()
 
     def __init__(self) -> None:
         """Initialize the OTLP manager."""
@@ -40,12 +43,16 @@ class JobmonOTLPManager:
         self._initialized = False
         self._log_processor_configured = False
         self._processor_count = 0  # Track how many processors we've added
+        self._init_lock = threading.Lock()
 
     @classmethod
     def get_instance(cls: Type[JobmonOTLPManager]) -> JobmonOTLPManager:
-        """Get or create the singleton OTLP manager."""
+        """Get or create the singleton OTLP manager with thread safety."""
         if cls._instance is None:
-            cls._instance = cls()
+            with cls._instance_lock:
+                # Double-check pattern: another thread might have created while we waited
+                if cls._instance is None:
+                    cls._instance = cls()
         return cls._instance
 
     def initialize(self) -> None:
@@ -53,30 +60,35 @@ class JobmonOTLPManager:
         if self._initialized or not OTLP_AVAILABLE:
             return
 
-        try:
-            # Create shared resources
-            resource_group = create_jobmon_resources()
+        with self._init_lock:
+            # Double-check pattern: another thread might have initialized while we waited
+            if self._initialized:
+                return
 
-            # Create trace provider
-            self.tracer_provider = TracerProvider(resource=resource_group)
+            try:
+                # Create shared resources
+                resource_group = create_jobmon_resources()
 
-            # Create logger provider (shared across all OTLP handlers)
-            self.logger_provider = LoggerProvider(resource=resource_group)
+                # Create trace provider
+                self.tracer_provider = TracerProvider(resource=resource_group)
 
-            # Configure log processor (single processor for all handlers)
-            self._configure_log_processor()
+                # Create logger provider (shared across all OTLP handlers)
+                self.logger_provider = LoggerProvider(resource=resource_group)
 
-            # Configure span exporters from telemetry configuration
-            self._configure_span_exporters()
+                # Configure log processor (single processor for all handlers)
+                self._configure_log_processor()
 
-            # Set the global tracer provider
-            trace.set_tracer_provider(self.tracer_provider)
+                # Configure span exporters from telemetry configuration
+                self._configure_span_exporters()
 
-            self._initialized = True
+                # Set the global tracer provider
+                trace.set_tracer_provider(self.tracer_provider)
 
-        except Exception:
-            # Don't log here to avoid circular dependency during initialization
-            pass
+                self._initialized = True
+
+            except Exception:
+                # Don't log here to avoid circular dependency during initialization
+                pass
 
     def _configure_log_processor(self) -> None:
         """Configure log processor from telemetry configuration."""
@@ -352,18 +364,23 @@ def initialize_jobmon_otlp() -> JobmonOTLPManager:
 
 def get_shared_logger_provider() -> Optional[Any]:
     """Get the shared logger provider, initializing if needed.
-
+    
     This function provides a clean interface for handlers to access the
     shared LoggerProvider without dealing with manager instances directly.
-
+    Uses double-checked locking to prevent race conditions in multi-threaded
+    environments like Kubernetes with multiple workers.
+    
     Returns:
         The shared LoggerProvider instance, or None if unavailable
     """
     global _logger_provider
     if _logger_provider is None:
-        manager = JobmonOTLPManager.get_instance()
-        manager.initialize()
-        _logger_provider = manager.logger_provider
+        with _logger_provider_lock:
+            # Double-check pattern: another thread might have initialized while we waited
+            if _logger_provider is None:
+                manager = JobmonOTLPManager.get_instance()
+                manager.initialize()
+                _logger_provider = manager.logger_provider
     return _logger_provider
 
 
