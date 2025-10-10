@@ -12,7 +12,13 @@ except ImportError:
 
 from .formatters import JobmonOTLPFormatter
 from .handlers import JobmonOTLPLoggingHandler, JobmonOTLPStructlogHandler
-from .manager import JobmonOTLPManager, create_log_exporter, initialize_jobmon_otlp
+from .manager import (
+    JobmonOTLPManager,
+    create_log_exporter,
+    get_logger,
+    get_shared_logger_provider,
+    initialize_jobmon_otlp,
+)
 from .utils import add_span_details_processor, get_current_span_details
 
 # Legacy alias for backward compatibility
@@ -23,6 +29,8 @@ __all__ = [
     "JobmonOTLPManager",
     "initialize_jobmon_otlp",
     "create_log_exporter",
+    "get_logger",
+    "get_shared_logger_provider",
     "JobmonOTLPLoggingHandler",
     "JobmonOTLPStructlogHandler",
     "JobmonOTLPFormatter",

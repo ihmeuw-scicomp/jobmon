@@ -16,6 +16,10 @@ from . import OTLP_AVAILABLE
 if OTLP_AVAILABLE:
     from opentelemetry.sdk import resources
     from opentelemetry.sdk.resources import ResourceDetector
+else:
+    # Dummy base class when OTLP is not available
+    class ResourceDetector:  # type: ignore
+        pass
 
 
 def create_jobmon_resources() -> Optional[Any]:

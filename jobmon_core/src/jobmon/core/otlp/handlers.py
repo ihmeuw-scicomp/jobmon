@@ -36,21 +36,26 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         handler = JobmonOTLPLoggingHandler(logger_provider=my_provider)
     """
 
-    # Map log level to OTLP severity
-    from opentelemetry._logs.severity import SeverityNumber
+    # Map log level to OTLP severity (lazy import)
+    _SEVERITY_MAP = None
 
-    _SEVERITY_MAP = {
-        "DEBUG": SeverityNumber.DEBUG,
-        "INFO": SeverityNumber.INFO,
-        "WARNING": SeverityNumber.WARN,
-        "ERROR": SeverityNumber.ERROR,
-        "CRITICAL": SeverityNumber.FATAL,
-    }
+    @classmethod
+    def _get_severity_map(cls: type["JobmonOTLPLoggingHandler"]) -> Dict[str, Any]:
+        """Get severity map with lazy import."""
+        if cls._SEVERITY_MAP is None:
+            if OTLP_AVAILABLE:
+                from opentelemetry._logs.severity import SeverityNumber
 
-    # Shared logger instance to prevent duplicate emissions
-    _shared_logger: Optional[Any] = None
-    _shared_logger_provider: Optional[Any] = None
-    _class_initialized: bool = False  # Class-level initialization flag
+                cls._SEVERITY_MAP = {
+                    "DEBUG": SeverityNumber.DEBUG,
+                    "INFO": SeverityNumber.INFO,
+                    "WARNING": SeverityNumber.WARN,
+                    "ERROR": SeverityNumber.ERROR,
+                    "CRITICAL": SeverityNumber.FATAL,
+                }
+            else:
+                cls._SEVERITY_MAP = {}
+        return cls._SEVERITY_MAP
 
     def __init__(
         self,
@@ -84,32 +89,22 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
     def _ensure_initialized(self) -> bool:
         """Ensure logger provider is initialized. Returns True if ready."""
-        # Use class-level initialization to prevent multiple handlers from initializing
-        if JobmonOTLPLoggingHandler._class_initialized:
-            self._logger_provider = JobmonOTLPLoggingHandler._shared_logger_provider
-            self._logger = JobmonOTLPLoggingHandler._shared_logger
-            self._initialized = True
+        if self._initialized:
             return True
 
         if not OTLP_AVAILABLE:
             return False
 
-        # Try to initialize from manager (only once per class)
         try:
-            from .manager import JobmonOTLPManager
+            from .manager import get_logger
 
-            manager = JobmonOTLPManager.get_instance()
-            provider = manager.logger_provider
+            # Get logger from shared provider (handles initialization automatically)
+            self._logger = get_logger(__name__)
+            if self._logger:
+                # Get the provider for resource access
+                from .manager import get_shared_logger_provider
 
-            if provider:
-                # Set class-level shared resources
-                JobmonOTLPLoggingHandler._shared_logger_provider = provider
-                JobmonOTLPLoggingHandler._shared_logger = provider.get_logger(__name__)
-                JobmonOTLPLoggingHandler._class_initialized = True
-
-                # Set instance-level references
-                self._logger_provider = provider
-                self._logger = JobmonOTLPLoggingHandler._shared_logger
+                self._logger_provider = get_shared_logger_provider()
                 self._initialized = True
 
                 if self._debug_mode:
@@ -196,8 +191,9 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             trace_id_int, span_id_int = self._parse_trace_context(event_dict)
 
             # Create OTLP log record
-            severity_number = self._SEVERITY_MAP.get(
-                record.levelname, self._SEVERITY_MAP["INFO"]
+            severity_map = self._get_severity_map()
+            severity_number = severity_map.get(
+                record.levelname, severity_map.get("INFO", 0)
             )
             otlp_record = OTLPLogRecord(
                 timestamp=int(record.created * 1e9),

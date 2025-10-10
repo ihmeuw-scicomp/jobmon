@@ -14,6 +14,9 @@ if OTLP_AVAILABLE:
 
 from .resources import create_jobmon_resources
 
+# Module-level singleton for shared logger provider
+_logger_provider: Optional[Any] = None
+
 
 class JobmonOTLPManager:
     """OTLP manager for shared trace and log resources.
@@ -361,6 +364,39 @@ def initialize_jobmon_otlp() -> JobmonOTLPManager:
     manager = JobmonOTLPManager.get_instance()
     manager.initialize()
     return manager
+
+
+def get_shared_logger_provider() -> Optional[Any]:
+    """Get the shared logger provider, initializing if needed.
+
+    This function provides a clean interface for handlers to access the
+    shared LoggerProvider without dealing with manager instances directly.
+
+    Returns:
+        The shared LoggerProvider instance, or None if unavailable
+    """
+    global _logger_provider
+    if _logger_provider is None:
+        manager = JobmonOTLPManager.get_instance()
+        manager.initialize()
+        _logger_provider = manager.logger_provider
+    return _logger_provider
+
+
+def get_logger(name: str) -> Optional[Any]:
+    """Get a logger from the shared provider.
+
+    This is the cleanest way for handlers to get OTLP loggers without
+    dealing with manager instances or initialization complexity.
+
+    Args:
+        name: Logger name (typically __name__)
+
+    Returns:
+        OTLP logger instance, or None if unavailable
+    """
+    provider = get_shared_logger_provider()
+    return provider.get_logger(name) if provider else None
 
 
 def create_log_exporter(**kwargs: Any) -> Optional[Any]:
