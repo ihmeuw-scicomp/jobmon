@@ -47,6 +47,11 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         "CRITICAL": SeverityNumber.FATAL,
     }
 
+    # Shared logger instance to prevent duplicate emissions
+    _shared_logger: Optional[Any] = None
+    _shared_logger_provider: Optional[Any] = None
+    _class_initialized: bool = False  # Class-level initialization flag
+
     def __init__(
         self,
         level: int = logging.NOTSET,
@@ -79,21 +84,32 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
     def _ensure_initialized(self) -> bool:
         """Ensure logger provider is initialized. Returns True if ready."""
-        if self._initialized:
+        # Use class-level initialization to prevent multiple handlers from initializing
+        if JobmonOTLPLoggingHandler._class_initialized:
+            self._logger_provider = JobmonOTLPLoggingHandler._shared_logger_provider
+            self._logger = JobmonOTLPLoggingHandler._shared_logger
+            self._initialized = True
             return True
 
         if not OTLP_AVAILABLE:
             return False
 
-        # Try to initialize from manager
+        # Try to initialize from manager (only once per class)
         try:
             from .manager import JobmonOTLPManager
 
             manager = JobmonOTLPManager.get_instance()
-            self._logger_provider = manager.logger_provider
+            provider = manager.logger_provider
 
-            if self._logger_provider:
-                self._logger = self._logger_provider.get_logger(__name__)
+            if provider:
+                # Set class-level shared resources
+                JobmonOTLPLoggingHandler._shared_logger_provider = provider
+                JobmonOTLPLoggingHandler._shared_logger = provider.get_logger(__name__)
+                JobmonOTLPLoggingHandler._class_initialized = True
+
+                # Set instance-level references
+                self._logger_provider = provider
+                self._logger = JobmonOTLPLoggingHandler._shared_logger
                 self._initialized = True
 
                 if self._debug_mode:
