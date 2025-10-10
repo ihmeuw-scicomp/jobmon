@@ -39,4 +39,4 @@ RUN python -m nltk.downloader popular punkt_tab
 
 # Ensure the main.py used by CMD is correctly pathed
 COPY jobmon_server/main.py $APP_HOME/main.py
-CMD ["fastapi", "run", "$APP_HOME/main.py", "--port", "80"]
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
