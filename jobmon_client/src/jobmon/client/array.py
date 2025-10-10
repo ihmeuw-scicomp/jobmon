@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import copy
-import logging
 from collections.abc import Iterable
 from http import HTTPStatus as StatusCodes
 from itertools import product
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Union
+
+import structlog
 
 from jobmon.client.node import Node
 from jobmon.client.task import Task, validate_task_resource_scales
@@ -17,7 +18,7 @@ from jobmon.core.requester import Requester
 if TYPE_CHECKING:
     from jobmon.client.workflow import Workflow
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class Array:
@@ -86,7 +87,12 @@ class Array:
             requester = Requester.from_defaults()
         self.requester = requester
 
-        self.tasks: Dict[int, Task] = {}  # Initialize to empty dict
+        self.tasks: Dict[int, Task] = {}
+
+    @property
+    def name(self) -> str:
+        """Return the array name."""
+        return self._name
 
     @property
     def is_bound(self) -> bool:
@@ -104,11 +110,6 @@ class Array:
     def array_id(self, val: int) -> None:
         """Set the array id."""
         self._array_id = val
-
-    @property
-    def name(self) -> str:
-        """Return the array name."""
-        return self._name
 
     @property
     def compute_resources(self) -> Dict[str, Any]:

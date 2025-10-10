@@ -26,7 +26,7 @@ loggers:
   jobmon.server.web:
     handlers: [console_structlog] 
     level: INFO
-    propagate: true
+    propagate: false
 
   # Standard server library loggers using shared console pattern
   sqlalchemy:

@@ -9,12 +9,18 @@ formatters: !template formatters
 
 # Worker handlers (console by default, OTLP via overrides)
 handlers:
-  # Console handler for worker subprocess
+  # Console handler for worker subprocess with structlog
   console:
     class: logging.StreamHandler
     level: INFO
-    formatter: console_default
+    formatter: structlog_event_only  # Clean, traditional log style (message only)
     stream: ext://sys.stdout
+  
+  # Optional OTLP handler (can be enabled via config overrides)
+  otlp_structlog:
+    class: jobmon.core.otlp.JobmonOTLPStructlogHandler
+    level: INFO
+    exporter: {}  # Empty dict triggers shared LoggerProvider usage
 
 # Worker logger configurations (console by default, OTLP via config overrides)  
 loggers:
@@ -22,13 +28,13 @@ loggers:
   jobmon.worker_node:
     handlers: [console]
     level: INFO
-    propagate: true
+    propagate: false
   
   # Core job processing
   jobmon.core:
     handlers: [console]
     level: WARNING
-    propagate: true
+    propagate: false
     
 # OTLP can be enabled via configuration overrides:
 # 

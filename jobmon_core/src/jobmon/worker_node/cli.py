@@ -4,15 +4,16 @@ import argparse
 import importlib
 import importlib.machinery
 import importlib.util
-import logging
 import os
 import sys
 from typing import Optional
 
+import structlog
+
 from jobmon.core.cli import CLI
 from jobmon.core.task_generator import TaskGenerator
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class WorkerNodeCLI(CLI):
@@ -38,22 +39,38 @@ class WorkerNodeCLI(CLI):
         from jobmon.worker_node import __version__
         from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
 
+        # Bind global context for this worker instance
+        structlog.contextvars.bind_contextvars(
+            cluster_name=args.cluster_name,
+            task_instance_id=args.task_instance_id,
+        )
+
         if __version__ != args.expected_jobmon_version:
-            msg = (
-                f"Your expected Jobmon version is {args.expected_jobmon_version} and your "
-                f"worker node is using {__version__}. Please check your bash profile "
+            logger.error(
+                "Version mismatch",
+                expected=args.expected_jobmon_version,
+                actual=__version__,
             )
-            logger.error(msg)
             sys.exit(ReturnCodes.WORKER_NODE_ENV_FAILURE)
+
+        logger.debug(
+            "Worker node starting for task instance",
+            task_instance_id=args.task_instance_id,
+            cluster_name=args.cluster_name,
+        )
 
         worker_node_factory = WorkerNodeFactory(cluster_name=args.cluster_name)
         worker_node_task_instance = worker_node_factory.get_job_task_instance(
             task_instance_id=args.task_instance_id
         )
         try:
+            logger.debug(
+                "Worker node executing task instance",
+                task_instance_id=args.task_instance_id,
+            )
             worker_node_task_instance.run()
         except Exception as e:
-            logger.error(e)
+            logger.exception("Worker node error", error=str(e))
             sys.exit(ReturnCodes.WORKER_NODE_CLI_FAILURE)
 
         return worker_node_task_instance.command_returncode
@@ -64,13 +81,27 @@ class WorkerNodeCLI(CLI):
         from jobmon.worker_node import __version__
         from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
 
+        # Bind global context for this array worker instance
+        structlog.contextvars.bind_contextvars(
+            cluster_name=args.cluster_name,
+            array_id=args.array_id,
+            batch_number=args.batch_number,
+        )
+
         if __version__ != args.expected_jobmon_version:
-            msg = (
-                f"Your expected Jobmon version is {args.expected_jobmon_version} and your "
-                f"worker node is using {__version__}. Please check your bash profile "
+            logger.error(
+                "Version mismatch",
+                expected=args.expected_jobmon_version,
+                actual=__version__,
             )
-            logger.error(msg)
             sys.exit(ReturnCodes.WORKER_NODE_ENV_FAILURE)
+
+        logger.info(
+            "Worker node array starting",
+            array_id=args.array_id,
+            batch_number=args.batch_number,
+            cluster_name=args.cluster_name,
+        )
 
         worker_node_factory = WorkerNodeFactory(cluster_name=args.cluster_name)
         worker_node_task_instance = worker_node_factory.get_array_task_instance(
@@ -79,9 +110,14 @@ class WorkerNodeCLI(CLI):
         )
 
         try:
+            logger.info(
+                "Worker node array executing task instance",
+                array_id=args.array_id,
+                batch_number=args.batch_number,
+            )
             worker_node_task_instance.run()
         except Exception as e:
-            logger.error(e)
+            logger.exception("Worker node array error", error=str(e))
             sys.exit(ReturnCodes.WORKER_NODE_CLI_FAILURE)
 
         return worker_node_task_instance.command_returncode
@@ -126,7 +162,7 @@ class WorkerNodeCLI(CLI):
             task_generator.run(args.args[0])
             return ReturnCodes.OK
         except Exception as e:
-            print(e)
+            logger.exception("Worker node task generator error", error=str(e))
             raise e
 
     def _add_run_task_generator_parser(self) -> None:

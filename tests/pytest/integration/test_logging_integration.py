@@ -46,9 +46,12 @@ class TestCrossComponentConsistency:
             handler_config = handlers[handler_name]
             if "exporter" in handler_config:
                 exporter = handler_config["exporter"]
-                assert "class" in exporter
-                assert exporter["class"] == "OTLPLogExporter"
-                assert "endpoint" in exporter
+                # New simplified templates use empty dict for shared LoggerProvider
+                # Legacy templates had full exporter config
+                if exporter:  # Non-empty exporter dict
+                    assert "class" in exporter
+                    assert exporter["class"] == "OTLPLogExporter"
+                    assert "endpoint" in exporter
 
     def test_component_configs_load_successfully(self):
         """Test that all component configurations load without errors."""
@@ -106,16 +109,19 @@ class TestCrossComponentConsistency:
                 if "exporter" in handler_config:
                     exporter = handler_config["exporter"]
 
-                    # Should have consistent OTLP structure
-                    assert "module" in exporter
-                    assert "class" in exporter
-                    assert "endpoint" in exporter
-                    assert exporter["class"] == "OTLPLogExporter"
+                    # New simplified templates use empty dict for shared LoggerProvider
+                    # Legacy templates had full exporter config
+                    if exporter:  # Non-empty exporter dict
+                        # Should have consistent OTLP structure
+                        assert "module" in exporter
+                        assert "class" in exporter
+                        assert "endpoint" in exporter
+                        assert exporter["class"] == "OTLPLogExporter"
 
-                    # Should have reasonable batch settings
-                    if "max_export_batch_size" in exporter:
-                        assert isinstance(exporter["max_export_batch_size"], int)
-                        assert exporter["max_export_batch_size"] > 0
+                        # Should have reasonable batch settings
+                        if "max_export_batch_size" in exporter:
+                            assert isinstance(exporter["max_export_batch_size"], int)
+                            assert exporter["max_export_batch_size"] > 0
 
 
 class TestEndToEndLoggingScenarios:
@@ -129,11 +135,9 @@ class TestEndToEndLoggingScenarios:
         configure_client_logging()
 
         # Configure server logging
-        from jobmon.server.web.log_config import (
-            configure_logging as configure_server_logging,
-        )
+        from jobmon.core.config.logconfig_utils import configure_component_logging
 
-        configure_server_logging()
+        configure_component_logging("server")
 
         # Test that both client and server loggers exist
         client_logger = logging.getLogger("jobmon.client")
@@ -205,13 +209,13 @@ class TestEndToEndLoggingScenarios:
 
                     # Configure all components
                     from jobmon.client.logging import configure_client_logging
-                    from jobmon.core.requester import Requester
-                    from jobmon.server.web.log_config import (
-                        configure_logging as configure_server_logging,
+                    from jobmon.core.config.logconfig_utils import (
+                        configure_component_logging,
                     )
+                    from jobmon.core.requester import Requester
 
                     configure_client_logging()
-                    configure_server_logging()
+                    configure_component_logging("server")
                     Requester._init_otlp()
 
                     # All should configure without errors
@@ -254,12 +258,12 @@ class TestEndToEndLoggingScenarios:
 
                 # Configure all components
                 from jobmon.client.logging import configure_client_logging
-                from jobmon.server.web.log_config import (
-                    configure_logging as configure_server_logging,
+                from jobmon.core.config.logconfig_utils import (
+                    configure_component_logging,
                 )
 
                 configure_client_logging()
-                configure_server_logging()
+                configure_component_logging("server")
 
                 # All components should use the global configuration
                 # (This test verifies that the override system works consistently)
@@ -348,8 +352,8 @@ class TestProductionScenarios:
 
                 # Configure all components - should handle mixed overrides gracefully
                 from jobmon.client.logging import configure_client_logging
-                from jobmon.server.web.log_config import (
-                    configure_logging as configure_server_logging,
+                from jobmon.core.config.logconfig_utils import (
+                    configure_component_logging,
                 )
 
                 # Mock template loading for client to avoid file I/O issues
@@ -360,7 +364,7 @@ class TestProductionScenarios:
                     configure_client_logging()
 
                 # Server should use the production file
-                configure_server_logging()
+                configure_component_logging("server")
 
                 # Should complete without errors
                 assert True
@@ -384,13 +388,13 @@ class TestProductionScenarios:
 
                 # All configuration functions should handle errors gracefully
                 from jobmon.client.logging import configure_client_logging
-                from jobmon.server.web.log_config import (
-                    configure_logging as configure_server_logging,
+                from jobmon.core.config.logconfig_utils import (
+                    configure_component_logging,
                 )
 
                 try:
                     configure_client_logging()
-                    configure_server_logging()
+                    configure_component_logging("server")
 
                     # Should still have basic logging functionality
                     client_logger = logging.getLogger("jobmon.client")
@@ -425,10 +429,14 @@ class TestProductionScenarios:
                     mock_otlp_manager.get_instance.return_value = mock_manager
 
                     # Configuration should still complete (with fallback to non-OTLP)
-                    from jobmon.server.web.log_config import configure_logging
+                    from jobmon.core.config.logconfig_utils import (
+                        configure_component_logging,
+                    )
+                    from jobmon.core.config.structlog_config import configure_structlog
 
                     try:
-                        configure_logging()
+                        configure_component_logging("server")
+                        configure_structlog(component_name="server")
 
                         # Should still have basic logging
                         server_logger = logging.getLogger("jobmon.server.web")

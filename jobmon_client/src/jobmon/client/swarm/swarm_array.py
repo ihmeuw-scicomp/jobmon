@@ -2,18 +2,25 @@
 
 from __future__ import annotations
 
-import logging
-from typing import Set
+from typing import Optional, Set
+
+import structlog
 
 from jobmon.client.swarm.swarm_task import SwarmTask
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class SwarmArray:
-    def __init__(self, array_id: int, max_concurrently_running: int) -> None:
+    def __init__(
+        self,
+        array_id: int,
+        max_concurrently_running: int,
+        array_name: Optional[str] = None,
+    ) -> None:
         """Initialization of the SwarmArray."""
         self.array_id = array_id
+        self.array_name = array_name or f"array_{array_id}"
         self.tasks: Set[SwarmTask] = set()
         self.max_concurrently_running = max_concurrently_running
 

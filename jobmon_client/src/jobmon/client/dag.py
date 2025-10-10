@@ -1,9 +1,10 @@
 """The DAG captures the interconnected graph of tasks and their dependencies."""
 
 import hashlib
-import logging
 from http import HTTPStatus as StatusCodes
 from typing import Dict, List, Optional, Set, Tuple, Union
+
+import structlog
 
 from jobmon.client.node import Node
 from jobmon.core.exceptions import (
@@ -14,7 +15,7 @@ from jobmon.core.exceptions import (
 )
 from jobmon.core.requester import Requester
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class Dag(object):

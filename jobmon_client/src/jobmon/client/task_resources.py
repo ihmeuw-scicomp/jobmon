@@ -4,19 +4,20 @@ from __future__ import annotations
 
 import hashlib
 import json
-import logging
 import numbers
 import re
 from http import HTTPStatus as StatusCodes
 from math import ceil
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
 
+import structlog
+
 from jobmon.client.units import MemUnit, TimeUnit
 from jobmon.core.cluster_protocol import ClusterQueue
 from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class TaskResources:

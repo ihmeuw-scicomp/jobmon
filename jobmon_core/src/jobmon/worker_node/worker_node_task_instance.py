@@ -1,12 +1,13 @@
 """The Task Instance Object once it has been submitted to run on a worker node."""
 
 import asyncio
-import logging
 import os
 import signal
 import socket
 from time import time
 from typing import Dict, Optional, TextIO
+
+import structlog
 
 from jobmon.core.cluster_protocol import ClusterWorkerNode
 from jobmon.core.configuration import JobmonConfig
@@ -14,8 +15,9 @@ from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import ReturnCodes, TransitionError
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeTaskInstance
+from jobmon.core.structlog_utils import bind_method_context
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class WorkerNodeTaskInstance:
@@ -184,9 +186,14 @@ class WorkerNodeTaskInstance:
             )
         return self._proc_stderr
 
+    @bind_method_context(task_instance_id="_task_instance_id")
     def log_done(self) -> None:
         """Tell the JobStateManager that this task_instance is done."""
-        logger.info(f"Logging done for task_instance {self.task_instance_id}")
+        logger.info(
+            f"Task instance {self.task_instance_id} marked as DONE",
+            task_instance_id=self.task_instance_id,
+            return_code=self.command_returncode,
+        )
 
         message = {
             "stdout": self.stdout,
@@ -205,14 +212,31 @@ class WorkerNodeTaskInstance:
         )
         self._status = response["status"]
         if self.status != TaskInstanceStatus.DONE:
+            logger.error(
+                "Task instance failed to transition to DONE",
+                expected_status=TaskInstanceStatus.DONE,
+                actual_status=self.status,
+            )
             raise TransitionError(
                 f"TaskInstance {self.task_instance_id} failed because it could not transition "
                 f"to {TaskInstanceStatus.DONE} status. Current status is {self.status}."
             )
 
+        logger.info(
+            "Task instance successfully transitioned to DONE",
+            status=self.status,
+        )
+
+    @bind_method_context(task_instance_id="_task_instance_id")
     def log_error(self, error_state: str, description: str) -> None:
         """Tell the JobStateManager that this task_instance has errored."""
-        logger.info(f"Logging error for task_instance {self.task_instance_id}")
+        logger.info(
+            "Worker node logging task instance error",
+            error_state=error_state,
+            error_description=description[:200],  # Truncate for readability
+            nodename=self.nodename,
+            distributor_id=self.distributor_id,
+        )
 
         message = {
             "error_state": error_state,
@@ -233,18 +257,36 @@ class WorkerNodeTaskInstance:
         )
         self._status = response["status"]
         if self.status != error_state:
+            logger.error(
+                "Task instance failed to transition to error state",
+                expected_status=error_state,
+                actual_status=self.status,
+            )
             raise TransitionError(
                 f"TaskInstance {self.task_instance_id} failed because it could not transition "
                 f"to {error_state} status. Current status is {self.status}."
             )
 
+        logger.info(
+            "Task instance successfully transitioned to error state",
+            error_state=self.status,
+        )
+
+    @bind_method_context(
+        task_instance_id="_task_instance_id",
+        nodename="nodename",
+        distributor_id="distributor_id",
+    )
     def log_running(self) -> None:
         """Tell the JobStateManager that this task_instance is running.
 
         Update the report_by_date to be further in the future in case it gets reconciled
         immediately.
         """
-        logger.info(f"Log running for task_instance {self.task_instance_id}")
+        logger.info(
+            f"Task instance {self.task_instance_id} started running",
+            task_instance_id=self.task_instance_id,
+        )
         message = {
             "nodename": self.nodename,
             "process_group_id": str(self.process_group_id),
@@ -256,9 +298,7 @@ class WorkerNodeTaskInstance:
         if self.distributor_id is not None:
             message["distributor_id"] = str(self.distributor_id)
         else:
-            logger.info(
-                "No distributor_id was found in the worker_node env at this time."
-            )
+            logger.warning("No distributor_id in worker environment")
 
         app_route = f"/task_instance/{self.task_instance_id}/log_running"
         _, response = self.requester.send_request(
@@ -284,14 +324,25 @@ class WorkerNodeTaskInstance:
         }
         self.last_heartbeat_time = time()
         if self.status != TaskInstanceStatus.RUNNING:
+            logger.error(
+                "Task instance failed to transition to RUNNING",
+                expected_status=TaskInstanceStatus.RUNNING,
+                actual_status=self.status,
+            )
             raise TransitionError(
                 f"TaskInstance {self.task_instance_id} failed because it could not transition "
                 f"to {TaskInstanceStatus.RUNNING} status. Current status is {self.status}."
             )
 
+        logger.info(
+            "Task instance successfully transitioned to RUNNING",
+            status=self.status,
+        )
+
+    @bind_method_context(task_instance_id="_task_instance_id")
     def log_report_by(self) -> None:
         """Log the heartbeat to show that the task instance is still alive."""
-        logger.debug(f"Logging heartbeat for task_instance {self.task_instance_id}")
+        logger.debug("Worker node logging heartbeat")
         message: Dict = {
             "next_report_increment": (
                 self._task_instance_heartbeat_interval
@@ -342,7 +393,7 @@ class WorkerNodeTaskInstance:
                     f"TaskInstance is in status '{self.status}'. Expected status 'R'."
                     f" Terminating command {self.command}."
                 )
-                logger.error(msg)
+                logger.error("Task in unexpected state", current_status=self.status)
 
                 # log an error with db if we are in K state
                 if self.status == TaskInstanceStatus.KILL_SELF:
@@ -350,7 +401,7 @@ class WorkerNodeTaskInstance:
                         f"Command: '{self.command}' got KILL_SELF event. Process shut down"
                         f" with exit code: '{self.command_returncode}'"
                     )
-                    logger.error(msg)
+                    logger.error("Task killed", exit_code=self.command_returncode)
                     self.log_error(TaskInstanceStatus.ERROR_FATAL, msg)
 
                 # otherwise raise the error cause we are in trouble
@@ -362,11 +413,16 @@ class WorkerNodeTaskInstance:
         # normal happy path
         else:
             if self.command_returncode == ReturnCodes.OK:
-                logger.info(f"Command: {self.command}. Finished Successfully.")
+                logger.info(
+                    f"Task instance {self.task_instance_id} completed successfully",
+                    task_instance_id=self.task_instance_id,
+                    return_code=self.command_returncode,
+                )
                 self.log_done()
             else:
                 logger.info(
-                    f"Command: {self.command} exited with signal {self.command_returncode}"
+                    "Command exited with non-zero code",
+                    return_code=self.command_returncode,
                 )
                 error_state, msg = self.cluster_interface.get_exit_info(
                     self.command_returncode, self.command_stderr
@@ -404,6 +460,7 @@ class WorkerNodeTaskInstance:
             # Log unexpected errors. This could be any exception raised by
             # the reading or writing operations. Consider appending an error message
             # to `mem_buffer` to indicate that an error occurred.
+            logger.exception("Stream reading error", error=str(e))
             mem_buffer += "\n[Error reading stream: {}]".format(e)
         finally:
             # Ensure that the method always returns the buffer, even if an error occurred.
@@ -493,6 +550,11 @@ class WorkerNodeTaskInstance:
                 process.kill()
                 await process.wait()
 
+            logger.exception(
+                "Task instance command execution failed",
+                error=str(e),
+                command=self.command,
+            )
             raise RuntimeError(
                 f"Failed to execute command '{self.command}': {e}"
             ) from e

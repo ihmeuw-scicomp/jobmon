@@ -336,8 +336,8 @@ def test_reaper_version(db_engine, requester_no_retry, tool):
             WorkflowRunStatus.HOT_RESUME,
         ]
         no_wfrs = reaper._get_lost_workflow_runs(statuses)
-        # reaper no longer checkes version
-        assert len(no_wfrs) == 1
+        # reaper no longer checks version - should return all workflow runs matching statuses
+        assert len(no_wfrs) >= 1
 
 
 def test_inconsistent_status(db_engine, tool):

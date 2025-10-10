@@ -200,7 +200,7 @@ def _cached_ip(
         return ip, ttl
 
     except Exception as err:
-        logger.warning(f"DNS resolve failed for {host}: {err}", exc_info=True)
+        logger.exception(f"DNS resolve failed for {host}: {err}")
 
         # Enhanced fallback logic
         if cached_ip:

@@ -10,19 +10,19 @@ formatters: !template formatters
 
 # Client-specific handlers
 handlers:
-  # Console handler for interactive use
+  # Console handler for interactive use with structlog
   console:
     class: logging.StreamHandler
     level: INFO
-    formatter: console_default
+    formatter: structlog_event_only  # Clean, traditional log style (message only)
     stream: ext://sys.stdout
   
   # Optional OTLP handler (can be enabled via config overrides)
   # Disabled by default since client operations are usually interactive
-  otlp:
-    class: opentelemetry.sdk._logs.LoggingHandler
-    level: INFO
-    formatter: json_default
+  otlp_structlog:
+    class: jobmon.core.otlp.JobmonOTLPStructlogHandler
+    level: DEBUG
+    exporter: {}  # Empty dict triggers shared LoggerProvider usage
 
 # Client logger configuration
 loggers:
@@ -30,13 +30,13 @@ loggers:
   jobmon.client:
     handlers: [console]
     level: INFO
-    propagate: true
+    propagate: false
 
   # Cluster interface operations (important for distributor)
   jobmon.core:
     handlers: [console]
     level: WARNING
-    propagate: true
+    propagate: false
     
 # OTLP can be enabled via configuration overrides:
 # 

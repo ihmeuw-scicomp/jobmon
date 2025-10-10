@@ -80,7 +80,7 @@ def six_job_test(cluster_name: str, wf_id_file: str = None):
         name='six_job_test')
     wf.add_tasks([t1, t2, t3, t4, t5, t6])
     print("Running the workflow, about 70 seconds minimum")
-    wfr_status = wf.run(configure_logging=True)
+    wfr_status = wf.run()
     print(f"workflow_id={wf.workflow_id}")
     if wf_id_file is not None:
         f = open(wf_id_file, "w")

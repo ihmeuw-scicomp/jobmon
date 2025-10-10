@@ -3,9 +3,13 @@
 import argparse
 from typing import Optional
 
+import structlog
+
 from jobmon.core.cli import CLI
 from jobmon.core.cluster import Cluster
 from jobmon.distributor.api import DistributorService
+
+logger = structlog.get_logger(__name__)
 
 
 class DistributorCLI(CLI):
@@ -25,9 +29,15 @@ class DistributorCLI(CLI):
 
     @staticmethod
     def run_distributor(args: argparse.Namespace) -> None:
-        """Configuration for the jobmon worker node."""
+        """Start the distributor service for a workflow run."""
+        # Bind global context for this distributor instance
+        structlog.contextvars.bind_contextvars(workflow_run_id=args.workflow_run_id)
+
+        logger.info("Distributor starting")
+
         cluster = Cluster.get_cluster(args.cluster_name)
         cluster_interface = cluster.get_distributor()
+
         distributor_service = DistributorService(cluster_interface)
         distributor_service.set_workflow_run(args.workflow_run_id)
         distributor_service.run()

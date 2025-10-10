@@ -156,14 +156,25 @@ class WorkflowRun(Base):
         if self.status == WorkflowRunStatus.RUNNING:
             logger.debug(f"Transitioning wfr {self.id} to ERROR")
             self.transition(WorkflowRunStatus.ERROR)
-        logger.info(f"Transitioned workflow to {self.status}")
+        logger.info(
+            f"Workflow run transitioned to {self.status}",
+            workflow_run_id=self.id,
+            workflow_id=self.workflow_id,
+            new_status=self.status,
+        )
 
     def transition(self, new_state: str) -> None:
         """Transition the Workflow Run's state."""
         structlog.contextvars.bind_contextvars(
             workflow_run_id=self.id, workflow_id=self.workflow_id
         )
-        logger.info(f"Transitioning workflow_run from {self.status} to {new_state}")
+        logger.info(
+            f"Workflow run transitioned from {self.status} to {new_state}",
+            workflow_run_id=self.id,
+            workflow_id=self.workflow_id,
+            old_status=self.status,
+            new_status=new_state,
+        )
         if self._is_timely_transition(new_state):
             self._validate_transition(new_state)
             self.status = new_state
@@ -192,7 +203,12 @@ class WorkflowRun(Base):
         structlog.contextvars.bind_contextvars(
             workflow_run_id=self.id, workflow_id=self.workflow_id
         )
-        logger.info("Transitioning workflow_run to HOT_RESUME.")
+        logger.info(
+            "Workflow run transitioned to HOT_RESUME",
+            workflow_run_id=self.id,
+            workflow_id=self.workflow_id,
+            new_status="HOT_RESUME",
+        )
         self.transition(WorkflowRunStatus.HOT_RESUME)
 
     def cold_reset(self) -> None:
@@ -200,7 +216,12 @@ class WorkflowRun(Base):
         structlog.contextvars.bind_contextvars(
             workflow_run_id=self.id, workflow_id=self.workflow_id
         )
-        logger.info("Transitioning workflow_run to COLD_RESUME.")
+        logger.info(
+            "Workflow run transitioned to COLD_RESUME",
+            workflow_run_id=self.id,
+            workflow_id=self.workflow_id,
+            new_status="COLD_RESUME",
+        )
         self.transition(WorkflowRunStatus.COLD_RESUME)
 
     def _validate_transition(self, new_state: str) -> None:

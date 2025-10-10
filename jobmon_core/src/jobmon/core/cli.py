@@ -31,10 +31,15 @@ class CLI:
 
         This method can be called directly when needed (e.g., by plugins that
         bypass the normal main() flow).
+
+        Configures both:
+        1. Standard logging (handlers, formatters, etc.)
+        2. Structlog (processors, context merging, OTLP integration)
         """
         if not self.component_name:
             return
 
+        # Configure standard logging (handlers, formatters)
         try:
             from jobmon.core.config.logconfig_utils import configure_component_logging
 
@@ -43,6 +48,13 @@ class CLI:
             # Fail silently - component starts with no logging
             # This ensures components always start successfully
             pass
+
+        # Configure structlog (processors, context variables)
+        # This enables @bind_context decorator and bind_contextvars()
+        # Structlog is a required dependency, so this should always succeed
+        from jobmon.core.config.structlog_config import configure_structlog_with_otlp
+
+        configure_structlog_with_otlp(component_name=self.component_name)
 
     def parse_args(self, argstr: Optional[str] = None) -> argparse.Namespace:
         """Construct a parser, parse either sys.argv (default) or the provided argstr.

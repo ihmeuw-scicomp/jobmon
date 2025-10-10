@@ -42,7 +42,8 @@ dev = [
     "types-setuptools",
     "types-mysqlclient",
     "build",
-    "nox"
+    "nox",
+    "pre-commit"
 ]
 
 [tool.uv.sources]

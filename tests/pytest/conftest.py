@@ -163,40 +163,13 @@ class WebServerProcess:
 
         signal.signal(signal.SIGTERM, sigterm_handler)
 
-        from jobmon.core.config.template_loader import (
-            get_core_templates_path,
-            load_all_templates,
-        )
-        from jobmon.server.web import log_config
+        from jobmon.core.config.logconfig_utils import configure_component_logging
+        from jobmon.core.config.structlog_config import configure_structlog
         from jobmon.server.web.api import get_app
 
-        # Load templates from the config directory
-        templates = load_all_templates(get_core_templates_path())
-
-        dict_config = {
-            "version": 1,
-            "disable_existing_loggers": True,
-            "formatters": templates["formatters"],
-            "handlers": {
-                "console_text": {
-                    "class": "logging.StreamHandler",
-                    "level": "DEBUG",
-                    "formatter": "console_default",
-                }
-            },
-            "loggers": {
-                "jobmon.server.web": {
-                    "handlers": ["console_text"],
-                    "level": "INFO",
-                },
-                # enable SQL debug
-                "sqlalchemy": {
-                    "handlers": ["console_text"],
-                    "level": "WARNING",
-                },
-            },
-        }
-        log_config.configure_logging(dict_config=dict_config)
+        # Configure logging using core utilities
+        configure_component_logging("server")
+        configure_structlog(component_name="server")
 
         app = get_app(versions=["v3"])
         uvicorn.run(app, host="0.0.0.0", port=int(self.web_port))

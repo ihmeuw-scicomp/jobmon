@@ -1,6 +1,32 @@
 # Local development configuration for docker-compose
 # Fixed: Using proper GRPC endpoints with TLS for both logs and traces
 
+distributor:
+  poll_interval: 10
+
+heartbeat:
+  report_by_buffer: 3.1
+  task_instance_interval: 90
+  workflow_run_interval: 30
+
+http:
+  request_timeout: 20
+  retries_timeout: 300
+  retries_attempts: 10
+  route_prefix: /api/v3
+  service_url: http://jobmon_backend:80
+
+# Worker Node Config
+worker_node:
+  command_interrupt_timeout: 10
+
+# Override default logconfig location to use mounted file
+logging:
+  server_logconfig_file: /app/config/logconfig.example.yaml
+  distributor_logconfig_file: /app/config/logconfig.otlp.yaml
+  client_logconfig_file: /app/config/logconfig.otlp.yaml
+  worker_logconfig_file: /app/config/logconfig.otlp.yaml
+
 # Authentication disabled for local development
 auth:
   enabled: false
@@ -8,30 +34,39 @@ auth:
 # Telemetry configuration (replaces otlp section)
 telemetry:
   # Environment identifier for telemetry resources
-  deployment_environment: dev
+  deployment_environment: local
   debug: true
 
   # Distributed tracing configuration
   tracing:
-    requester_enabled: false    # Client-side HTTP request tracing  
-    server_enabled: false        # Server-side tracing enabled for local dev
-    span_exporter: "console_span"  # Use GRPC exporter for real OTLP export
-    
+    requester_enabled: true    # Client-side HTTP request tracing  
+    server_enabled: true        # Server-side tracing enabled for local dev
+    span_exporter: "grpc_span"  # Use GRPC exporter for real OTLP export
+  
     exporters:
-      # Production GRPC span exporter with proper TLS
       grpc_span:
         module: "opentelemetry.exporter.otlp.proto.grpc.trace_exporter"
         class: "OTLPSpanExporter"
-        endpoint: "https://localhost:4317"  # Add https://
+        endpoint: "https://otelcol.aks.scicomp.ihme.washington.edu:443"
         timeout: 30
-        insecure: false  # Secure connection
+        insecure: false
         headers: {}
         compression: "gzip"
-        
-      # Console exporter for debugging (not available for logs)
-      console_span:
-        module: "opentelemetry.exporter.console.trace_exporter"
-        class: "ConsoleSpanExporter"
+  
+  # OTLP logging configuration (shared across all components)
+  logging:
+    enabled: true
+    log_exporter: "grpc_log"
+    
+    exporters:
+      grpc_log:
+        module: "opentelemetry.exporter.otlp.proto.grpc._log_exporter"
+        class: "OTLPLogExporter"
+        endpoint: "https://otelcol.aks.scicomp.ihme.washington.edu:443"
+        timeout: 30
+        insecure: false
+        headers: {}
+        compression: "gzip"
 
 cors:
   allowed_origins: "http://localhost:3000"  # Local frontend
@@ -43,18 +78,3 @@ db:
     recycle: 300
     pre_ping: true
     timeout: 20
-
-reaper:
-  slack_api_url: ""  # Disabled for local dev
-  slack_channel_default: ""
-  poll_interval_minutes: 5
-
-http:
-  request_timeout: 20
-  retries_timeout: 300
-  retries_attempts: 10
-  route_prefix: /api/v3
-
-# Override default logconfig location to use mounted file
-logging:
-  server_logconfig_file: /app/config/logconfig.example.yaml

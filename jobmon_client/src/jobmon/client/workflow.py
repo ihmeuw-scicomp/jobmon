@@ -6,8 +6,6 @@ import copy
 import fcntl
 import hashlib
 import itertools
-import logging
-import logging.config
 import os
 import sys
 import time
@@ -17,6 +15,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Union
 
 import psutil
+import structlog
 
 from jobmon.client.array import Array
 from jobmon.client.dag import Dag
@@ -46,7 +45,7 @@ if TYPE_CHECKING:
     from jobmon.client.tool import Tool
 
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class DistributorContext:
@@ -652,9 +651,9 @@ class Workflow(object):
 
     def _configure_component_logging(self) -> None:
         """Configure component logging for client workflow operations."""
-        from jobmon.core.config.logconfig_utils import configure_component_logging
+        from jobmon.client.logging import configure_client_logging
 
-        configure_component_logging("client")
+        configure_client_logging()
 
     def set_task_template_max_concurrency_limit(
         self, task_template_name: str, limit: int
@@ -726,7 +725,7 @@ class Workflow(object):
             if raise_on_error:
                 raise
             else:
-                logger.info(e)
+                logger.exception("Workflow validation error", error=str(e))
 
     def bind(self) -> None:
         """Get a workflow_id."""

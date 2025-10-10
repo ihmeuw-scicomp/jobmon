@@ -67,11 +67,13 @@ def json_log_file(tmp_path):
                         log_entry = json.loads(line.strip())
                         assert "expected_message" in log_entry.get("event", "")
     """
+    import logging.config
+
+    from jobmon.core.config.structlog_config import configure_structlog
     from jobmon.core.config.template_loader import (
         get_core_templates_path,
         load_all_templates,
     )
-    from jobmon.server.web import log_config
 
     def _setup_logging(loggers=None, filename_suffix="test"):
         if loggers is None:
@@ -110,22 +112,24 @@ def json_log_file(tmp_path):
         }
 
         # Apply the test logging configuration
-        original_config = log_config.configure_logging(dict_config=dict_config)
-        return log_file_path, original_config
+        logging.config.dictConfig(dict_config)
+        configure_structlog(component_name="server")
+        return log_file_path, None
 
     setups = []
 
     def setup_logging_wrapper(**kwargs):
-        log_file_path, original_config = _setup_logging(**kwargs)
-        setups.append((log_file_path, original_config))
+        log_file_path, _ = _setup_logging(**kwargs)
+        setups.append(log_file_path)
         return log_file_path
 
     yield setup_logging_wrapper
 
-    # Cleanup: restore original logging configuration
-    from jobmon.server.web import log_config
+    # Cleanup: restore default logging configuration
+    from jobmon.core.config.logconfig_utils import configure_component_logging
 
-    log_config.configure_logging()
+    configure_component_logging("server")
+    configure_structlog(component_name="server")
 
 
 def get_test_content(response):

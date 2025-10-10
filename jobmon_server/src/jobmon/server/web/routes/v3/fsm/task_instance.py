@@ -91,6 +91,7 @@ def transit_ti_and_t(
     status_dict: dict,
     db: Session,
     report_by_date: Optional[float] = None,
+    log_message: Optional[str] = None,
 ) -> None:
     """Transit the task_instance and task to the new status.
 
@@ -161,10 +162,15 @@ def transit_ti_and_t(
             # release locks immediately; please do not use flush() here
             # ti and t table are updated atomicity
             db.commit()
+
+            # Log only on successful completion
+            if log_message:
+                logger.info(log_message, nodename=task_instance.nodename)
+
             return
         except OperationalError as e:
             logger.warning(
-                f"Database error detected {e}, retrying attempt {i+1}/{max_retries}"
+                f"Database error detected {e}, retrying attempt {i + 1}/{max_retries}"
             )
             db.rollback()  # Clear the corrupted session state
             sleep(0.001 * (2 ** (i + 1)))  # Exponential backoff: 2ms, 4ms...
@@ -184,6 +190,13 @@ async def log_running(
     """Log a task_instance as running."""
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
+
+    logger.info(
+        "Server received log_running request",
+        task_instance_id=task_instance_id,
+        nodename=data.get("nodename"),
+        distributor_id=data.get("distributor_id"),
+    )
 
     # Retry logic for database operations
     max_retries = 5
@@ -213,6 +226,7 @@ async def log_running(
                     status,
                     db,
                     data["next_report_increment"],
+                    log_message="Task instance transitioned to RUNNING in database",
                 )
             else:
                 if task_instance.status == constants.TaskInstanceStatus.RUNNING:
@@ -311,6 +325,11 @@ async def log_ti_report_by(
     """
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
+
+    logger.debug(
+        "Server received heartbeat",
+        distributor_id=data.get("distributor_id"),
+    )
     # Retry logic for row lock contention
     max_retries = 5
     for attempt in range(max_retries):
@@ -342,10 +361,16 @@ async def log_ti_report_by(
                         db,
                         data["next_report_increment"],
                     )
+                    logger.info(
+                        "Heartbeat triggered transition from TRIAGING to RUNNING",
+                        task_instance_id=task_instance_id,
+                    )
                 else:
                     logger.error(
                         f"Unable to transition to running from {task_instance.status}"
                     )
+
+            logger.debug("Heartbeat processed successfully")
 
             resp = JSONResponse(
                 content={"status": task_instance.status}, status_code=StatusCodes.OK
@@ -394,7 +419,10 @@ async def log_ti_report_by_batch(
 
     next_report_increment = float(data["next_report_increment"])
 
-    logger.debug(f"Log report_by for TI {tis}.")
+    logger.debug(
+        "Server received batch heartbeat",
+        num_task_instances=len(tis) if tis else 0,
+    )
     if tis:
         # Retry logic for row lock contention in batch updates
         max_retries = 5
@@ -412,6 +440,12 @@ async def log_ti_report_by_batch(
                 db.execute(update_stmt)
                 # immediately release the lock
                 db.commit()
+
+                logger.debug(
+                    "Batch heartbeat processed successfully",
+                    num_task_instances=len(tis) if tis else 0,
+                )
+
                 resp = JSONResponse(content={}, status_code=StatusCodes.OK)
                 return resp
 
@@ -446,6 +480,12 @@ async def log_done(
     structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
+    logger.info(
+        "Server received log_done request",
+        nodename=data.get("nodename"),
+        distributor_id=data.get("distributor_id"),
+    )
+
     try:
         # Do not lock TaskInstance
         select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
@@ -469,7 +509,12 @@ async def log_done(
         status = get_transit_status(task_instance, constants.TaskInstanceStatus.DONE)
         if status is not None:
             # log_done doesn't provide next_report_increment
-            transit_ti_and_t(task_instance, status, db)
+            transit_ti_and_t(
+                task_instance,
+                status,
+                db,
+                log_message="Task instance transitioned to DONE in database",
+            )
         else:
             if task_instance.status == constants.TaskInstanceStatus.DONE:
                 logger.warning(
@@ -734,8 +779,9 @@ async def log_distributor_id(
         constants.TaskInstanceStatus.ERROR,
         constants.TaskInstanceStatus.ERROR_FATAL,
     ]:
-        logger.info(
-            f"Task instance {task_instance_id} is in final state, no transition needed"
+        logger.debug(
+            "Task instance in final state, no transition needed",
+            current_status=task_instance.status,
         )
 
         return JSONResponse(
@@ -786,7 +832,13 @@ async def log_known_error(
     error_message = data["error_message"]
     distributor_id = data.get("distributor_id", None)
     nodename = data.get("nodename", None)
-    logger.info(f"Log ERROR for TI:{task_instance_id}.")
+
+    logger.info(
+        "Server received known error from triage",
+        error_state=error_state,
+        distributor_id=distributor_id,
+        nodename=nodename,
+    )
 
     # Query task_instance outside try-except to ensure it's always available
     select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
@@ -841,7 +893,13 @@ async def log_unknown_error(
     error_message = data["error_message"]
     distributor_id = data.get("distributor_id", None)
     nodename = data.get("nodename", None)
-    logger.info(f"Log ERROR for TI:{task_instance_id}.")
+
+    logger.info(
+        "Server received unknown error from triage",
+        error_state=error_state,
+        distributor_id=distributor_id,
+        nodename=nodename,
+    )
 
     # make sure the task hasn't logged a new heartbeat since we began
     # reconciliation
@@ -896,6 +954,12 @@ async def instantiate_task_instances(
     data = cast(Dict, await request.json())
     task_instance_ids_list = tuple([int(tid) for tid in data["task_instance_ids"]])
 
+    logger.info(
+        "Server received batch instantiation request",
+        num_tasks=len(task_instance_ids_list),
+        task_instance_ids=task_instance_ids_list[:10],  # Log first 10 for debugging
+    )
+
     # Atomic update of both Task and TaskInstance with retry logic
     max_retries = 5
 
@@ -949,6 +1013,18 @@ async def instantiate_task_instances(
             # 3) Atomic commit - both updates succeed or both fail
             db.commit()
 
+            # Log each successfully instantiated task instance (info level - state transition)
+            for task_instance_id in task_instance_ids_list:
+                logger.info(
+                    "Task instance transitioned to INSTANTIATED",
+                    task_instance_id=task_instance_id,
+                )
+
+            logger.info(
+                "Batch instantiation transition completed",
+                num_tasks=len(task_instance_ids_list),
+            )
+
             # Success - continue with the rest of the function
             # fetch rows individually without group_concat
             # Key is a tuple of array_id, array_name, array_batch_num, task_resources_id
@@ -992,6 +1068,23 @@ async def instantiate_task_instances(
                         task_resources_id=task_resources_id,
                         task_instance_ids=task_instance_ids,
                     )
+                )
+                # Log each task instance in the batch (info level - state transition)
+                for task_instance_id in task_instance_ids:
+                    logger.info(
+                        "Task instance added to instantiated batch",
+                        task_instance_id=task_instance_id,
+                        array_id=array_id,
+                        array_batch_num=array_batch_num,
+                        array_name=array_name,
+                    )
+
+                logger.info(
+                    "Batch instantiated and serialized",
+                    array_id=array_id,
+                    array_batch_num=array_batch_num,
+                    array_name=array_name,
+                    batch_size=len(task_instance_ids),
                 )
 
             resp = JSONResponse(
@@ -1094,6 +1187,13 @@ def _log_error(
     if distributor_id is not None:
         ti.distributor_id = str(distributor_id)
 
+    logger.info(
+        "Processing error transition for task instance",
+        task_instance_id=ti.id,
+        error_state=error_state,
+        current_status=ti.status,
+    )
+
     # Retry logic for database operations
     max_retries = 5
 
@@ -1106,6 +1206,13 @@ def _log_error(
             else:
                 msg = ""
             session.commit()
+
+            logger.info(
+                "Task instance transitioned to error state",
+                task_instance_id=ti.id,
+                error_state=error_state,
+            )
+
             resp = JSONResponse(content={"message": msg}, status_code=StatusCodes.OK)
             return resp  # Success - exit the function
         except OperationalError as e:
