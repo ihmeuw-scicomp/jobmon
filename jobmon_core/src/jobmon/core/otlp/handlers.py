@@ -170,14 +170,14 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             import hashlib
             import time
             
-            # Create unique key for this log event
-            event_key = hashlib.md5(f"{record.trace_id}:{record.span_id}:{record.getMessage()}:{record.created}".encode()).hexdigest()[:8]
+            # Create unique key for this log event (trace_id/span_id come from event_dict, not record)
+            event_key = hashlib.md5(f"{record.getMessage()}:{record.created}:{record.levelname}".encode()).hexdigest()[:8]
             handler_id = id(self)
             timestamp = time.time()
             
             logging.getLogger("jobmon.otlp.debug").info(
                 f"OTLP emit called - event_key={event_key} handler_id={handler_id} timestamp={timestamp:.6f} "
-                f"trace_id={record.trace_id} span_id={record.span_id} message={record.getMessage()[:50]}"
+                f"message={record.getMessage()[:50]} level={record.levelname}"
             )
         
         # Lazy initialization on first emit
