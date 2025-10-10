@@ -74,8 +74,9 @@ class JobmonOTLPManager:
 
             self._initialized = True
 
-        except Exception as e:
-            logging.getLogger(__name__).warning(f"Failed to initialize OTLP: {e}")
+        except Exception:
+            # Don't log here to avoid circular dependency during initialization
+            pass
 
     def _configure_log_processor(self) -> None:
         """Configure log processor from telemetry configuration."""
@@ -84,9 +85,7 @@ class JobmonOTLPManager:
 
         # Guard against adding processor multiple times
         if self._log_processor_configured:
-            logging.getLogger(__name__).debug(
-                "Log processor already configured, skipping"
-            )
+            # Don't log here to avoid circular dependency during initialization
             return
 
         try:
@@ -113,9 +112,7 @@ class JobmonOTLPManager:
             exporter_config = exporters_config.get(log_exporter_name)
 
             if not exporter_config:
-                logging.getLogger(__name__).warning(
-                    f"Log exporter '{log_exporter_name}' not found in configuration"
-                )
+                # Don't log here to avoid circular dependency during initialization
                 return
 
             # Create the exporter
@@ -142,18 +139,14 @@ class JobmonOTLPManager:
                 processor = BatchLogRecordProcessor(exporter, **processor_args)
                 self.logger_provider.add_log_record_processor(processor)
                 self._log_processor_configured = True
-                logging.getLogger(__name__).info(
-                    f"Configured log exporter: {log_exporter_name}"
-                )
+                # Don't log here to avoid circular dependency during initialization
             else:
-                logging.getLogger(__name__).warning(
-                    f"Failed to create log exporter: {log_exporter_name}"
-                )
+                # Don't log here to avoid circular dependency during initialization
+                pass
 
-        except Exception as e:
-            logging.getLogger(__name__).warning(
-                f"Failed to configure log processor: {e}"
-            )
+        except Exception:
+            # Don't log here to avoid circular dependency during initialization
+            pass
 
     def _create_log_exporter(self, config: Any) -> Optional[Any]:
         """Create a log exporter from configuration dictionary."""
@@ -200,8 +193,8 @@ class JobmonOTLPManager:
 
             return exporter_class(**exporter_args)
 
-        except Exception as e:
-            logging.getLogger(__name__).warning(f"Failed to create log exporter: {e}")
+        except Exception:
+            # Don't log here to avoid circular dependency during initialization
             return None
 
     def _configure_span_exporters(self) -> None:
@@ -234,9 +227,7 @@ class JobmonOTLPManager:
             exporter_config = exporters_config.get(span_exporter_name)
 
             if not exporter_config:
-                logging.getLogger(__name__).warning(
-                    f"Span exporter '{span_exporter_name}' not found in configuration"
-                )
+                # Don't log here to avoid circular dependency during initialization
                 return
 
             # Create the exporter
@@ -245,18 +236,14 @@ class JobmonOTLPManager:
                 # Add processor to tracer provider
                 processor = BatchSpanProcessor(exporter)
                 self.tracer_provider.add_span_processor(processor)
-                logging.getLogger(__name__).info(
-                    f"Configured span exporter: {span_exporter_name}"
-                )
+                # Don't log here to avoid circular dependency during initialization
             else:
-                logging.getLogger(__name__).warning(
-                    f"Failed to create span exporter: {span_exporter_name}"
-                )
+                # Don't log here to avoid circular dependency during initialization
+                pass
 
-        except Exception as e:
-            logging.getLogger(__name__).warning(
-                f"Failed to configure span exporters: {e}"
-            )
+        except Exception:
+            # Don't log here to avoid circular dependency during initialization
+            pass
 
     def _create_span_exporter(self, config: Any) -> Optional[Any]:
         """Create a span exporter from configuration dictionary."""
@@ -296,14 +283,11 @@ class JobmonOTLPManager:
                     elif compression_str in ("none", "nocompression"):
                         exporter_args["compression"] = grpc.Compression.NoCompression
                     else:
-                        logging.getLogger(__name__).warning(
-                            f"Unknown compression type: {compression_str}, "
-                            "skipping compression"
-                        )
+                        # Don't log here to avoid circular dependency during initialization
+                        pass
                 except ImportError:
-                    logging.getLogger(__name__).warning(
-                        "grpc not available, skipping compression parameter"
-                    )
+                    # Don't log here to avoid circular dependency during initialization
+                    pass
             if "insecure" in config:
                 exporter_args["insecure"] = config["insecure"]
             if "options" in config:
@@ -313,8 +297,8 @@ class JobmonOTLPManager:
 
             return exporter_class(**exporter_args)
 
-        except Exception as e:
-            logging.getLogger(__name__).warning(f"Failed to create exporter: {e}")
+        except Exception:
+            # Don't log here to avoid circular dependency during initialization
             return None
 
     def get_tracer(self, name: str) -> Optional[Any]:
