@@ -97,9 +97,16 @@ class _JobmonOTLPLoggingHandler(logging.Handler):
                 attributes=attributes,
             )
 
-            # Set trace context from structlog (stable across duplicates)
-            # Trace context is optional - emit logs even without trace correlation
-            # Only set trace_id/span_id if non-zero (0 is invalid in OpenTelemetry)
+            # Initialize trace context to 0 (required by OTLP exporter)
+            # 0 indicates "no trace context" per OTLP spec
+            from opentelemetry.trace import TraceFlags
+
+            otlp_record.trace_id = 0
+            otlp_record.span_id = 0
+            otlp_record.trace_flags = TraceFlags(0)
+
+            # Update with actual trace context from structlog if available
+            # This enables proper trace correlation when traces exist
             if trace_id_int and span_id_int:
                 otlp_record.trace_id = trace_id_int
                 otlp_record.span_id = span_id_int
