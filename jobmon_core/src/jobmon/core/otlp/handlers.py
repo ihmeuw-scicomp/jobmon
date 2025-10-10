@@ -163,6 +163,23 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         """Emit log record to OTLP with extracted attributes."""
+        # Debug instrumentation to track duplicate emissions
+        event_key = None
+        handler_id = None
+        if self._debug_mode:
+            import hashlib
+            import time
+            
+            # Create unique key for this log event
+            event_key = hashlib.md5(f"{record.trace_id}:{record.span_id}:{record.getMessage()}:{record.created}".encode()).hexdigest()[:8]
+            handler_id = id(self)
+            timestamp = time.time()
+            
+            logging.getLogger("jobmon.otlp.debug").info(
+                f"OTLP emit called - event_key={event_key} handler_id={handler_id} timestamp={timestamp:.6f} "
+                f"trace_id={record.trace_id} span_id={record.span_id} message={record.getMessage()[:50]}"
+            )
+        
         # Lazy initialization on first emit
         if not self._ensure_initialized():
             return
@@ -218,6 +235,13 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                         otlp_record.trace_flags = ctx.trace_flags
 
             self._logger.emit(otlp_record)
+            
+            # Debug instrumentation to track successful emission
+            if self._debug_mode:
+                logging.getLogger("jobmon.otlp.debug").info(
+                    f"OTLP emit completed - event_key={event_key} handler_id={handler_id}"
+                )
+                
         except Exception as e:
             if self._debug_mode:
                 logging.getLogger("jobmon.otlp.debug").error(f"OTLP emit failed: {e}")
