@@ -163,29 +163,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         """Emit log record to OTLP with extracted attributes."""
-        # Debug instrumentation to track duplicate emissions
-        event_key = None
-        handler_id = None
-        if self._debug_mode:
-            import hashlib
-            import time
-            
-            # Create unique key for this log event (trace_id/span_id come from event_dict, not record)
-            event_key = hashlib.md5(f"{record.getMessage()}:{record.created}:{record.levelname}".encode()).hexdigest()[:8]
-            handler_id = id(self)
-            timestamp = time.time()
-            
-            # Ensure debug logger has a handler
-            debug_logger = logging.getLogger("jobmon.otlp.debug")
-            if not debug_logger.handlers:
-                debug_logger.addHandler(logging.StreamHandler())
-                debug_logger.setLevel(logging.DEBUG)
-            
-            debug_logger.info(
-                f"OTLP emit called - event_key={event_key} handler_id={handler_id} timestamp={timestamp:.6f} "
-                f"message={record.getMessage()[:50]} level={record.levelname}"
-            )
-        
         # Lazy initialization on first emit
         if not self._ensure_initialized():
             return
@@ -241,19 +218,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                         otlp_record.trace_flags = ctx.trace_flags
 
             self._logger.emit(otlp_record)
-            
-            # Debug instrumentation to track successful emission
-            if self._debug_mode:
-                debug_logger = logging.getLogger("jobmon.otlp.debug")
-                if not debug_logger.handlers:
-                    debug_logger.addHandler(logging.StreamHandler())
-                    debug_logger.setLevel(logging.DEBUG)
-                
-                debug_logger.info(
-                    f"OTLP emit completed - event_key={event_key} handler_id={handler_id} "
-                    f"otlp_record_id={id(otlp_record)} logger_id={id(self._logger)}"
-                )
-                
         except Exception as e:
             if self._debug_mode:
                 logging.getLogger("jobmon.otlp.debug").error(f"OTLP emit failed: {e}")
