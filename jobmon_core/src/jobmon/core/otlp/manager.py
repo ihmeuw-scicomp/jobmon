@@ -36,6 +36,7 @@ class JobmonOTLPManager:
         self.logger_provider: Optional[Any] = None
         self._initialized = False
         self._log_processor_configured = False
+        self._processor_count = 0  # Track how many processors we've added
 
     @classmethod
     def get_instance(cls: Type[JobmonOTLPManager]) -> JobmonOTLPManager:
@@ -80,6 +81,9 @@ class JobmonOTLPManager:
 
         # Guard against adding processor multiple times
         if self._log_processor_configured:
+            logging.getLogger(__name__).debug(
+                "Log processor already configured, skipping"
+            )
             return
 
         try:
