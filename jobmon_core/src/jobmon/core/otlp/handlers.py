@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional, Union
 
-from jobmon.core.configuration import JobmonConfig
 
 from . import OTLP_AVAILABLE
 from .formatters import JobmonOTLPFormatter
@@ -76,9 +75,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         self._logger: Optional[Any] = None
         self._initialized = False
 
-        # Simple debug mode for troubleshooting
-        config = JobmonConfig()
-        self._debug_mode = config.get_boolean("telemetry", "debug")
 
         self.setFormatter(JobmonOTLPFormatter())
 
@@ -107,17 +103,11 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                 self._logger_provider = get_shared_logger_provider()
                 self._initialized = True
 
-                if self._debug_mode:
-                    logging.getLogger("jobmon.otlp.debug").info(
-                        "OTLP handler initialized successfully"
-                    )
                 return True
 
-        except Exception as e:
-            if self._debug_mode:
-                logging.getLogger("jobmon.otlp.debug").exception(
-                    f"OTLP handler initialization failed: {e}"
-                )
+        except Exception:
+            # Silently ignore initialization failures
+            pass
 
         return False
 
@@ -218,9 +208,9 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                         otlp_record.trace_flags = ctx.trace_flags
 
             self._logger.emit(otlp_record)
-        except Exception as e:
-            if self._debug_mode:
-                logging.getLogger("jobmon.otlp.debug").error(f"OTLP emit failed: {e}")
+        except Exception:
+            # Silently ignore OTLP emission failures to avoid circular logging
+            pass
 
 
 class JobmonOTLPStructlogHandler(JobmonOTLPLoggingHandler):
