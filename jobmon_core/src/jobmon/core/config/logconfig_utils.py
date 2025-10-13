@@ -94,7 +94,12 @@ def load_logconfig_with_overrides(
         if custom_file and os.path.exists(custom_file):
             # User specified a custom logconfig file - use it directly
             try:
-                return load_logconfig_with_templates(custom_file)
+                logconfig_from_file = load_logconfig_with_templates(custom_file)
+                # IMPORTANT: Always set disable_existing_loggers to true for file overrides
+                # to prevent handler accumulation from base template handlers.
+                # File overrides are meant to be complete configurations.
+                logconfig_from_file["disable_existing_loggers"] = True
+                return logconfig_from_file
             except Exception:
                 # Fall back to default if custom file fails to load
                 pass

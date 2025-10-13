@@ -2,7 +2,7 @@
 # Console logging by default, OTLP can be enabled via configuration overrides
 
 version: 1
-disable_existing_loggers: false
+disable_existing_loggers: true
 
 # Import shared formatters and handlers from core templates
 formatters: !template formatters
