@@ -209,7 +209,10 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                 attributes["jobmon.request_id"] = event_dict["request_id"]
             
             # Add full stack trace for specific problematic messages
-            if "transitioned to RUNNING in database" in message or "Ignoring transition" in message:
+            if ("transitioned to RUNNING in database" in message or 
+                "Ignoring transition" in message or 
+                "Add workflow_run:" in message or
+                "Get tasks by status" in message):
                 full_stack = '\n'.join([f"{frame.filename}:{frame.lineno} in {frame.name}" for frame in stack[-10:]])
                 attributes["jobmon.full_stack"] = full_stack
                 
