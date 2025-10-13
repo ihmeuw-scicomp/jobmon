@@ -139,10 +139,15 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
         """
         structlog.contextvars.clear_contextvars()
 
+        # Generate unique request ID for correlation
+        import uuid
+        request_id = str(uuid.uuid4())[:8]
+        
         # Bind request context
         structlog.contextvars.bind_contextvars(
             path=request.url.path,
             method=request.method,
+            request_id=request_id,
         )
 
         context_data = None

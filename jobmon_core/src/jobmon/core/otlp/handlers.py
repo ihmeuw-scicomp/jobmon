@@ -188,10 +188,40 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             )
             event_id = hashlib.sha256(event_key.encode()).hexdigest()[:16]
 
+            # Add debug instrumentation to track duplicate emissions
+            import traceback
+            
+            # Capture call stack for debugging
+            stack = traceback.extract_stack()
+            callsite = stack[-3] if len(stack) >= 3 else stack[-1]  # Skip emit() and internal calls
+            
             attributes["jobmon.event_id"] = event_id
             attributes["jobmon.process_id"] = os.getpid()
             attributes["jobmon.thread_id"] = record.thread
             attributes["jobmon.handler_class"] = self.__class__.__name__
+            attributes["jobmon.callsite_filename"] = callsite.filename.split('/')[-1]
+            attributes["jobmon.callsite_function"] = callsite.name
+            attributes["jobmon.callsite_line"] = callsite.lineno
+            attributes["jobmon.callsite_code"] = callsite.line.strip() if callsite.line else ""
+            
+            # Add request correlation if available
+            if event_dict and "request_id" in event_dict:
+                attributes["jobmon.request_id"] = event_dict["request_id"]
+            
+            # Add full stack trace for specific problematic messages
+            if "transitioned to RUNNING in database" in message or "Ignoring transition" in message:
+                full_stack = '\n'.join([f"{frame.filename}:{frame.lineno} in {frame.name}" for frame in stack[-10:]])
+                attributes["jobmon.full_stack"] = full_stack
+                
+                # Add exporter debug info for problematic messages
+                from jobmon.core.otlp.manager import get_exporter_debug_info
+                exporter_debug = get_exporter_debug_info()
+                if exporter_debug:
+                    attributes["jobmon.exporter_export_count"] = exporter_debug.get("export_count", 0)
+                    attributes["jobmon.exporter_failure_count"] = exporter_debug.get("failure_count", 0)
+                    attributes["jobmon.exporter_success_rate"] = exporter_debug.get("success_rate", 0.0)
+                    if exporter_debug.get("last_error"):
+                        attributes["jobmon.exporter_last_error"] = exporter_debug["last_error"]
 
             # Create OTLP log record
             severity_map = self._get_severity_map()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Optional, Type
+from typing import Any, Dict, Optional, Type
 
 from . import OTLP_AVAILABLE
 
@@ -14,6 +14,42 @@ if OTLP_AVAILABLE:
     from opentelemetry.sdk._logs import LoggerProvider
 
 from .resources import create_jobmon_resources
+
+
+class _DebugOTLPExporterWrapper:
+    """Debug wrapper for OTLP exporter to track export attempts and failures."""
+    
+    def __init__(self, exporter):
+        self._exporter = exporter
+        self._export_count = 0
+        self._failure_count = 0
+        self._last_error = None
+    
+    def export(self, logs_data):
+        """Export logs and track statistics."""
+        self._export_count += 1
+        try:
+            result = self._exporter.export(logs_data)
+            return result
+        except Exception as e:
+            self._failure_count += 1
+            self._last_error = str(e)
+            raise
+    
+    def shutdown(self):
+        """Shutdown the wrapped exporter."""
+        return self._exporter.shutdown()
+    
+    def get_debug_info(self) -> Dict[str, Any]:
+        """Get debug information about export attempts."""
+        success_rate = (self._export_count - self._failure_count) / self._export_count if self._export_count > 0 else 0.0
+        return {
+            "export_count": self._export_count,
+            "failure_count": self._failure_count,
+            "success_rate": success_rate,
+            "last_error": self._last_error
+        }
+
 
 # Module-level singleton for shared logger provider with thread safety
 _logger_provider: Optional[Any] = None
@@ -46,6 +82,7 @@ class JobmonOTLPManager:
         self._log_processor_configured = False
         self._processor_count = 0  # Track how many processors we've added
         self._init_lock = threading.Lock()
+        self._debug_exporter: Optional[_DebugOTLPExporterWrapper] = None
 
     @classmethod
     def get_instance(cls: Type[JobmonOTLPManager]) -> JobmonOTLPManager:
@@ -130,9 +167,12 @@ class JobmonOTLPManager:
             # Create the exporter
             exporter = self._create_log_exporter(exporter_config)
             if exporter:
+                # Wrap exporter with debug wrapper to track export attempts
+                self._debug_exporter = _DebugOTLPExporterWrapper(exporter)
+                
                 # Use BatchLogRecordProcessor for efficient batching
                 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-                processor = BatchLogRecordProcessor(exporter)
+                processor = BatchLogRecordProcessor(self._debug_exporter)
 
                 self.logger_provider.add_log_record_processor(processor)
                 self._log_processor_configured = True
@@ -384,6 +424,18 @@ def get_logger(name: str) -> Optional[Any]:
     """
     provider = get_shared_logger_provider()
     return provider.get_logger(name) if provider else None
+
+
+def get_exporter_debug_info() -> Optional[Dict[str, Any]]:
+    """Get debug information about OTLP exporter activity.
+
+    Returns:
+        Dictionary with export statistics, or None if unavailable
+    """
+    manager = JobmonOTLPManager.get_instance()
+    if manager._debug_exporter:
+        return manager._debug_exporter.get_debug_info()
+    return None
 
 
 def create_log_exporter(**kwargs: Any) -> Optional[Any]:
