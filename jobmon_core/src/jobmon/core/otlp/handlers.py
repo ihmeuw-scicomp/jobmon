@@ -176,6 +176,8 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             # Only debug for workflow_run logger to avoid spam
             if "workflow_run" in record.name:
                 print(f"[HANDLER_DEBUG] Logger: {record.name}, Handlers: {handler_count}, Classes: {handler_classes}, Handler ID: {id(self)}")
+                print(f"[HANDLER_DEBUG] Record ID: {id(record)}, Message: {record.getMessage()[:50]}...")
+                print(f"[HANDLER_DEBUG] Record created: {record.created}, Thread: {record.thread}")
 
             # Get event_dict from thread-local
             event_dict = getattr(_thread_local, "last_event_dict", None)
