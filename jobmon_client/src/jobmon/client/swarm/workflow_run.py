@@ -505,7 +505,7 @@ class WorkflowRun:
 
             while self.active_tasks:
                 # Expire the swarm after the requested number of seconds
-                if total_elapsed_time > seconds_until_timeout:
+                if total_elapsed_time >= seconds_until_timeout:
                     raise RuntimeError(
                         f"Not all tasks completed within the given workflow timeout length "
                         f"({seconds_until_timeout} seconds). Submitted tasks will still run, "
