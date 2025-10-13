@@ -211,16 +211,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             # Add full stack trace for all messages to debug duplicate logs
             full_stack = '\n'.join([f"{frame.filename}:{frame.lineno} in {frame.name}" for frame in stack[-10:]])
             attributes["jobmon.full_stack"] = full_stack
-            
-            # Add exporter debug info for all messages
-            from jobmon.core.otlp.manager import get_exporter_debug_info
-            exporter_debug = get_exporter_debug_info()
-            if exporter_debug:
-                attributes["jobmon.exporter_export_count"] = exporter_debug.get("export_count", 0)
-                attributes["jobmon.exporter_failure_count"] = exporter_debug.get("failure_count", 0)
-                attributes["jobmon.exporter_success_rate"] = exporter_debug.get("success_rate", 0.0)
-                if exporter_debug.get("last_error"):
-                    attributes["jobmon.exporter_last_error"] = exporter_debug["last_error"]
 
             # Create OTLP log record
             severity_map = self._get_severity_map()
