@@ -64,11 +64,8 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
 
         server_otlp.instrument_app(app)
 
-    # Configure stdlib logging with override support (like client pattern)
-    # This happens after structlog to avoid double configuration
-    from jobmon.server.web.logging import configure_server_logging
-    
-    configure_server_logging()
+    # Logging is already configured at module import time to avoid duplicate
+    # configuration in multi-worker environments
 
     # Mount static files
     docs_static_uri = "/static"  # Adjust as necessary
