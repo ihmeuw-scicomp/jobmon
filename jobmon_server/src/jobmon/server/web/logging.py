@@ -36,6 +36,9 @@ default_config: Dict = {
 }
 
 
+# Module-level flag to prevent duplicate configuration
+_server_logging_configured = False
+
 def configure_server_logging() -> None:
     """Configure server logging with template and user override support.
 
@@ -53,6 +56,12 @@ def configure_server_logging() -> None:
 
     Note: Server OTLP is handled separately by the server OTLP manager.
     """
+    global _server_logging_configured
+    
+    # Prevent duplicate configuration in multi-worker environments
+    if _server_logging_configured:
+        return
+    
     from jobmon.core.config.logconfig_utils import configure_logging_with_overrides
 
     # Get default template path
@@ -66,3 +75,5 @@ def configure_server_logging() -> None:
         config_section="server",
         fallback_config=default_config,
     )
+    
+    _server_logging_configured = True
