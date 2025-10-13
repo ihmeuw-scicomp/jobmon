@@ -222,6 +222,15 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                 attributes["jobmon.callsite_function"] = frame.name
                 attributes["jobmon.callsite_line"] = frame.lineno
                 attributes["jobmon.callsite_code"] = frame.line.strip() if frame.line else ""
+                
+                # Add full stack trace for "WorkflowStatus updated" logs
+                if "WorkflowStatus updated" in message:
+                    stack_frames = traceback.extract_stack()[:-2]  # Skip emit and _emit
+                    stack_trace = []
+                    for frame_info in stack_frames[-10:]:  # Last 10 frames
+                        stack_trace.append(f"{os.path.basename(frame_info.filename)}:{frame_info.lineno} in {frame_info.name}")
+                    attributes["jobmon.full_stack"] = " -> ".join(stack_trace)
+                    
             except Exception:
                 # Silently ignore callsite extraction failures
                 pass
