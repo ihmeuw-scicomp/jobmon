@@ -9,6 +9,7 @@ This module provides structlog configuration that enables:
 
 from __future__ import annotations
 
+import os
 import threading
 from typing import Any, Callable, Dict, List, Optional
 
@@ -25,6 +26,39 @@ def _store_event_dict_for_otlp(
     """
     # Store a copy of the event_dict
     _thread_local.last_event_dict = dict(event_dict)
+    return event_dict
+
+
+def _duplicate_detection_processor(
+    logger: Any, method_name: str, event_dict: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Detect duplicate log emissions within the same request."""
+    import hashlib
+    
+    # Create a stable key for this log event
+    event_key = f"{event_dict.get('event', '')}:{event_dict.get('level', '')}:{event_dict.get('logger', '')}"
+    event_hash = hashlib.sha256(event_key.encode()).hexdigest()[:8]
+    
+    # Thread-local storage for tracking emissions per request
+    if not hasattr(_thread_local, 'emission_counts'):
+        _thread_local.emission_counts = {}
+    
+    # Get request_id from context (set by middleware)
+    request_id = event_dict.get('request_id', 'unknown')
+    request_key = f"{request_id}:{event_hash}"
+    
+    # Count emissions for this request+event
+    _thread_local.emission_counts[request_key] = _thread_local.emission_counts.get(request_key, 0) + 1
+    emission_count = _thread_local.emission_counts[request_key]
+    
+    # Add duplicate detection metadata
+    event_dict['jobmon_emission_count'] = emission_count
+    event_dict['jobmon_event_hash'] = event_hash
+    
+    # Log warning for duplicates
+    if emission_count > 1:
+        event_dict['jobmon_duplicate_warning'] = f"Duplicate emission #{emission_count} for event {event_hash}"
+    
     return event_dict
 
 
@@ -73,6 +107,7 @@ def configure_structlog(
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
         *extra_processors,  # OTLP processors, custom processors go here
+        _duplicate_detection_processor,  # Detect duplicates (env-gated)
         structlog.stdlib.PositionalArgumentsFormatter(),
         structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S"),
         structlog.processors.StackInfoRenderer(),

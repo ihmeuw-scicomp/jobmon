@@ -101,8 +101,6 @@ class JobmonOTLPManager:
             return
 
         try:
-            from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-
             from jobmon.core.configuration import JobmonConfig
 
             config = JobmonConfig()
@@ -130,25 +128,10 @@ class JobmonOTLPManager:
             # Create the exporter
             exporter = self._create_log_exporter(exporter_config)
             if exporter:
-                # Create processor with batch configuration
-                processor_args = {}
+                # Use SimpleLogRecordProcessor for immediate export (no batching) for debugging
+                from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor
+                processor = SimpleLogRecordProcessor(exporter)
 
-                # Use aggressive batching for faster export
-                processor_args["max_export_batch_size"] = exporter_config.get(
-                    "max_export_batch_size", 512
-                )
-                processor_args["export_timeout_millis"] = exporter_config.get(
-                    "export_timeout_millis", 30000
-                )
-                processor_args["schedule_delay_millis"] = exporter_config.get(
-                    "schedule_delay_millis", 5000
-                )
-                processor_args["max_queue_size"] = exporter_config.get(
-                    "max_queue_size", 2048
-                )
-
-                # Add processor to logger provider (only once!)
-                processor = BatchLogRecordProcessor(exporter, **processor_args)
                 self.logger_provider.add_log_record_processor(processor)
                 self._log_processor_configured = True
                 # Don't log here to avoid circular dependency during initialization

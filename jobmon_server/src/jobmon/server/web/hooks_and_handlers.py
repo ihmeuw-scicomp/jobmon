@@ -1,5 +1,7 @@
 import json
+import os
 import traceback
+import uuid
 from typing import Any, Callable, Optional
 
 import structlog
@@ -138,6 +140,16 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
         """
         structlog.contextvars.clear_contextvars()
 
+        # Generate unique request ID for correlation
+        request_id = str(uuid.uuid4())[:8]
+        
+        # Bind request correlation context
+        structlog.contextvars.bind_contextvars(
+            request_id=request_id,
+            path=request.url.path,
+            method=request.method,
+        )
+
         context_data = None
 
         # Step 1: Check headers for X-Server-Structlog-Context (newer clients)
@@ -147,7 +159,6 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
                 context_data = json.loads(context_str)
             except json.JSONDecodeError:
                 structlog.contextvars.bind_contextvars(
-                    path=request.url.path,
                     error="Invalid JSON in X-Server-Structlog-Context header",
                 )
 
@@ -174,15 +185,12 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
                         context_data = json.loads(context_str)
                     except json.JSONDecodeError:
                         structlog.contextvars.bind_contextvars(
-                            path=request.url.path,
                             error="Invalid JSON in server_structlog_context query param",
                         )
 
         # Step 3: Bind the context if found
         if context_data:
-            structlog.contextvars.bind_contextvars(
-                path=request.url.path, **context_data
-            )
+            structlog.contextvars.bind_contextvars(**context_data)
 
         # Step 4: Proceed with the request
         response = await call_next(request)
