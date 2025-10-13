@@ -24,7 +24,7 @@ handlers:
 loggers:
   # Server web module
   jobmon.server.web:
-    handlers: [console_structlog] 
+    handlers: [console_structlog]  # Console only - OTLP added via overrides
     level: INFO
     propagate: false
 

@@ -11,8 +11,6 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
-from jobmon.core.config.logconfig_utils import configure_component_logging
-from jobmon.core.config.structlog_config import configure_structlog
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
@@ -32,9 +30,7 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     """
     config = JobmonConfig()
 
-    # Configure logging using shared component configuration
-    # Same pattern as distributor, worker, etc.
-    configure_component_logging("server")
+    # Structlog is already configured in __init__.py (like client pattern)
 
     # Initialize the FastAPI app
     app_title = "jobmon"
@@ -56,7 +52,6 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         USE_OTEL = False
     if USE_OTEL:
         # Import OTel modules here to avoid unnecessary imports when OTel is disabled
-        from jobmon.core.otlp import add_span_details_processor
         from jobmon.server.web.otlp import get_server_otlp_manager
 
         # Initialize server OTLP manager
@@ -68,11 +63,12 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         server_otlp.instrument_requests()
 
         server_otlp.instrument_app(app)
-        configure_structlog(
-            component_name="server", extra_processors=[add_span_details_processor]
-        )
-    else:  # Configure structlog without OTLP
-        configure_structlog(component_name="server")
+
+    # Configure stdlib logging with override support (like client pattern)
+    # This happens after structlog to avoid double configuration
+    from jobmon.server.web.logging import configure_server_logging
+    
+    configure_server_logging()
 
     # Mount static files
     docs_static_uri = "/static"  # Adjust as necessary
