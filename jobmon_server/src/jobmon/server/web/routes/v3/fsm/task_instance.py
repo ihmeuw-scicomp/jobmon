@@ -226,7 +226,7 @@ async def log_running(
                     status,
                     db,
                     data["next_report_increment"],
-                    log_message="Task instance transitioned to RUNNING in database",
+                    log_message=f"Task instance {task_instance_id} transitioned to RUNNING in database",
                 )
             else:
                 if task_instance.status == constants.TaskInstanceStatus.RUNNING:
@@ -513,7 +513,7 @@ async def log_done(
                 task_instance,
                 status,
                 db,
-                log_message="Task instance transitioned to DONE in database",
+                log_message=f"Task instance {task_instance_id} transitioned to DONE in database",
             )
         else:
             if task_instance.status == constants.TaskInstanceStatus.DONE:
@@ -1080,11 +1080,7 @@ async def instantiate_task_instances(
                     )
 
                 logger.info(
-                    "Batch instantiated and serialized",
-                    array_id=array_id,
-                    array_batch_num=array_batch_num,
-                    array_name=array_name,
-                    batch_size=len(task_instance_ids),
+                    f"Batch {array_batch_num} for array {array_name} (ID: {array_id}) instantiated and serialized with {len(task_instance_ids)} task instances"
                 )
 
             resp = JSONResponse(

@@ -412,7 +412,7 @@ async def task_status_updates(
     """
     structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
     data = cast(Dict, await request.json())
-    logger.info("Get task by status")
+    logger.info(f"Get tasks by status for workflow {workflow_id}")
 
     try:
         filter_criteria: Tuple = (

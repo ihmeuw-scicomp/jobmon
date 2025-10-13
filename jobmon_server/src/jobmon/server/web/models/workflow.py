@@ -96,7 +96,7 @@ class Workflow(Base):
             self.status = new_state
             self.status_date = func.now()
             logger.info(
-                "WorkflowStatus updated", new_status=self.status, workflow_id=self.id
+                f"Workflow {self.id} status updated to {self.status}"
             )
 
     def _validate_transition(self, new_state: str) -> None:

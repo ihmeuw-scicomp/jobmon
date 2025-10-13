@@ -236,7 +236,7 @@ class WorkflowRun(Base):
         )
         if (self.status, new_state) in self.untimely_transitions:
             logger.info(
-                f"Ignoring transition of workflow_run from {self.status} to {new_state}"
+                f"Ignoring transition of workflow_run {self.id} from {self.status} to {new_state} (untimely transition)"
             )
             return False
         else:

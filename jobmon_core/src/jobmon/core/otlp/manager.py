@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional, Type
 
 from . import OTLP_AVAILABLE
 
@@ -20,48 +20,6 @@ _logger_provider: Optional[Any] = None
 _logger_provider_lock = threading.Lock()
 
 
-class _DebugOTLPExporterWrapper:
-    """Debug wrapper for OTLP exporter to track export failures and retries."""
-    
-    def __init__(self, exporter: Any) -> None:
-        self._exporter = exporter
-        self._export_count = 0
-        self._failure_count = 0
-        self._last_error = None
-        
-    def export(self, log_records: Any) -> Any:
-        """Export log records with debug tracking."""
-        self._export_count += 1
-        
-        try:
-            result = self._exporter.export(log_records)
-            
-            # Track export results
-            if hasattr(result, 'status_code'):
-                if result.status_code != 0:  # Non-success status
-                    self._failure_count += 1
-                    self._last_error = f"Export failed with status {result.status_code}"
-                    
-            return result
-            
-        except Exception as e:
-            self._failure_count += 1
-            self._last_error = str(e)
-            raise
-            
-    def shutdown(self) -> None:
-        """Shutdown the wrapped exporter."""
-        if hasattr(self._exporter, 'shutdown'):
-            self._exporter.shutdown()
-            
-    def get_debug_info(self) -> Dict[str, Any]:
-        """Get debug information about export attempts."""
-        return {
-            "export_count": self._export_count,
-            "failure_count": self._failure_count,
-            "last_error": self._last_error,
-            "success_rate": (self._export_count - self._failure_count) / max(self._export_count, 1)
-        }
 
 
 class JobmonOTLPManager:
@@ -88,7 +46,6 @@ class JobmonOTLPManager:
         self._log_processor_configured = False
         self._processor_count = 0  # Track how many processors we've added
         self._init_lock = threading.Lock()
-        self._debug_exporter: Optional[_DebugOTLPExporterWrapper] = None
 
     @classmethod
     def get_instance(cls: Type[JobmonOTLPManager]) -> JobmonOTLPManager:
@@ -173,12 +130,9 @@ class JobmonOTLPManager:
             # Create the exporter
             exporter = self._create_log_exporter(exporter_config)
             if exporter:
-                # Wrap exporter with debug wrapper to track failures
-                self._debug_exporter = _DebugOTLPExporterWrapper(exporter)
-                
-                # Use SimpleLogRecordProcessor for immediate export (no batching) for debugging
-                from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor
-                processor = SimpleLogRecordProcessor(self._debug_exporter)
+                # Use BatchLogRecordProcessor for efficient batching
+                from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+                processor = BatchLogRecordProcessor(exporter)
 
                 self.logger_provider.add_log_record_processor(processor)
                 self._log_processor_configured = True
@@ -363,11 +317,6 @@ class JobmonOTLPManager:
         except ImportError:
             pass
 
-    def get_exporter_debug_info(self) -> Optional[Dict[str, Any]]:
-        """Get debug information from the OTLP exporter."""
-        if self._debug_exporter:
-            return self._debug_exporter.get_debug_info()
-        return None
 
     def shutdown(self) -> None:
         """Shutdown trace and log providers."""

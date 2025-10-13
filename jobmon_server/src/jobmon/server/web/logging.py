@@ -59,12 +59,8 @@ def configure_server_logging() -> None:
     """
     global _server_logging_configured
 
-    # DEBUG: Track configuration calls
-    print(f"[SERVER_LOGGING_DEBUG] configure_server_logging called, _server_logging_configured={_server_logging_configured}")
-
     # Prevent duplicate configuration in multi-worker environments
     if _server_logging_configured:
-        print(f"[SERVER_LOGGING_DEBUG] Skipping duplicate configuration")
         return
 
     from jobmon.core.config.logconfig_utils import configure_logging_with_overrides
@@ -72,8 +68,6 @@ def configure_server_logging() -> None:
     # Get default template path
     current_dir = os.path.dirname(__file__)
     default_template_path = os.path.join(current_dir, "config/logconfig_server.yaml")
-
-    print(f"[SERVER_LOGGING_DEBUG] Configuring logging with template: {default_template_path}")
 
     # Configure Python logging with override support
     # Note: structlog is already configured in __init__.py
@@ -84,4 +78,3 @@ def configure_server_logging() -> None:
     )
 
     _server_logging_configured = True
-    print(f"[SERVER_LOGGING_DEBUG] Server logging configuration completed")

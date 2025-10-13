@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import traceback
 from typing import Any, Dict, Optional, Union
 
 from . import OTLP_AVAILABLE
@@ -169,23 +168,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
             from jobmon.core.config.structlog_config import _thread_local
 
-            # DEBUG: Count handlers attached to this logger
-            logger = logging.getLogger(record.name)
-            handler_count = len(logger.handlers)
-            handler_classes = [h.__class__.__name__ for h in logger.handlers]
-
-            # Only debug for workflow_run logger to avoid spam
-            if "workflow_run" in record.name:
-                print(
-                    f"[HANDLER_DEBUG] Logger: {record.name}, Handlers: {handler_count}, Classes: {handler_classes}, Handler ID: {id(self)}"
-                )
-                print(
-                    f"[HANDLER_DEBUG] Record ID: {id(record)}, Message: {record.getMessage()[:50]}..."
-                )
-                print(
-                    f"[HANDLER_DEBUG] Record created: {record.created}, Thread: {record.thread}"
-                )
-
             # Get event_dict from thread-local
             event_dict = getattr(_thread_local, "last_event_dict", None)
 
@@ -210,56 +192,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             attributes["jobmon.process_id"] = os.getpid()
             attributes["jobmon.thread_id"] = record.thread
             attributes["jobmon.handler_class"] = self.__class__.__name__
-            attributes["jobmon.handler_id"] = id(self)
-            attributes["jobmon.handler_count"] = handler_count
-
-            # Add callsite attributes for debugging
-            try:
-                import os
-                # Get the current stack frame (skip this function and emit)
-                frame = traceback.extract_stack()[-3]  # Skip emit -> _emit -> this frame
-                attributes["jobmon.callsite_filename"] = os.path.basename(frame.filename)
-                attributes["jobmon.callsite_function"] = frame.name
-                attributes["jobmon.callsite_line"] = frame.lineno
-                attributes["jobmon.callsite_code"] = frame.line.strip() if frame.line else ""
-                
-                # Add full stack trace for "WorkflowStatus updated" logs
-                if "WorkflowStatus updated" in message:
-                    stack_frames = traceback.extract_stack()[:-2]  # Skip emit and _emit
-                    stack_trace = []
-                    for frame_info in stack_frames[-10:]:  # Last 10 frames
-                        stack_trace.append(f"{os.path.basename(frame_info.filename)}:{frame_info.lineno} in {frame_info.name}")
-                    attributes["jobmon.full_stack"] = " -> ".join(stack_trace)
-                    
-                    # Add exporter debug info
-                    try:
-                        # Get the logger provider to access exporter info
-                        if hasattr(self._logger_provider, 'resource'):
-                            attributes["jobmon.exporter_endpoint"] = "https://otelcol.aks.scicomp.ihme.washington.edu:443"
-                            attributes["jobmon.exporter_timeout"] = 30
-                            attributes["jobmon.exporter_compression"] = "gzip"
-                            attributes["jobmon.exporter_insecure"] = False
-                            
-                            # Add current time for correlation
-                            import time
-                            attributes["jobmon.export_timestamp"] = int(time.time() * 1000)
-                            
-                            # Get exporter debug info from manager
-                            try:
-                                from .manager import JobmonOTLPManager
-                                manager = JobmonOTLPManager.get_instance()
-                                debug_info = manager.get_exporter_debug_info()
-                                if debug_info:
-                                    attributes["jobmon.exporter_debug"] = str(debug_info)
-                            except Exception:
-                                pass
-                            
-                    except Exception:
-                        pass
-                        
-            except Exception:
-                # Silently ignore callsite extraction failures
-                pass
 
             # Create OTLP log record
             severity_map = self._get_severity_map()
