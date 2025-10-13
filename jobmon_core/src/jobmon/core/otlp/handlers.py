@@ -231,6 +231,32 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                         stack_trace.append(f"{os.path.basename(frame_info.filename)}:{frame_info.lineno} in {frame_info.name}")
                     attributes["jobmon.full_stack"] = " -> ".join(stack_trace)
                     
+                    # Add exporter debug info
+                    try:
+                        # Get the logger provider to access exporter info
+                        if hasattr(self._logger_provider, 'resource'):
+                            attributes["jobmon.exporter_endpoint"] = "https://otelcol.aks.scicomp.ihme.washington.edu:443"
+                            attributes["jobmon.exporter_timeout"] = 30
+                            attributes["jobmon.exporter_compression"] = "gzip"
+                            attributes["jobmon.exporter_insecure"] = False
+                            
+                            # Add current time for correlation
+                            import time
+                            attributes["jobmon.export_timestamp"] = int(time.time() * 1000)
+                            
+                            # Get exporter debug info from manager
+                            try:
+                                from .manager import JobmonOTLPManager
+                                manager = JobmonOTLPManager.get_instance()
+                                debug_info = manager.get_exporter_debug_info()
+                                if debug_info:
+                                    attributes["jobmon.exporter_debug"] = str(debug_info)
+                            except Exception:
+                                pass
+                            
+                    except Exception:
+                        pass
+                        
             except Exception:
                 # Silently ignore callsite extraction failures
                 pass
