@@ -246,6 +246,7 @@ def get_logconfig_examples() -> Dict[str, Dict[str, Any]]:
 
 _configured_components = set()
 
+
 def configure_component_logging(component_name: str) -> None:
     """Configure logging for jobmon components using existing override system.
 
@@ -262,15 +263,23 @@ def configure_component_logging(component_name: str) -> None:
         component_name: Component name ('distributor', 'worker', 'server')
     """
     import sys
-    
+
     # Prevent duplicate configuration in the same process
     if component_name in _configured_components:
-        print(f"[LOGCONFIG_DEBUG] Skipping duplicate configure_component_logging({component_name}) - already configured", file=sys.stderr, flush=True)
+        msg = (
+            f"[LOGCONFIG_DEBUG] Skipping duplicate "
+            f"configure_component_logging({component_name}) - already configured"
+        )
+        print(msg, file=sys.stderr, flush=True)
         return
-    
-    print(f"[LOGCONFIG_DEBUG] Configuring logging for component: {component_name}", file=sys.stderr, flush=True)
+
+    print(
+        f"[LOGCONFIG_DEBUG] Configuring logging for component: {component_name}",
+        file=sys.stderr,
+        flush=True,
+    )
     _configured_components.add(component_name)
-    
+
     try:
         # Get default template path from component's local package
         # (follows client/server pattern)
