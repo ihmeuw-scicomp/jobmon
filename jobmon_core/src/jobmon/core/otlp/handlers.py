@@ -162,21 +162,11 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         try:
             import hashlib
             import os
-            import sys
 
             from opentelemetry.sdk._logs import LogRecord as OTLPLogRecord
             from opentelemetry.trace import TraceFlags, get_current_span
 
             from jobmon.core.config.structlog_config import _thread_local
-
-            # DEBUG: Print to stderr to trace duplicate emissions
-            msg = record.getMessage()[:50]
-            print(
-                f"[OTLP_DEBUG] emit() called: handler_id={id(self)}, "
-                f"record_time={record.created}, msg={msg}",
-                file=sys.stderr,
-                flush=True,
-            )
 
             # Get event_dict from thread-local
             event_dict = getattr(_thread_local, "last_event_dict", None)
