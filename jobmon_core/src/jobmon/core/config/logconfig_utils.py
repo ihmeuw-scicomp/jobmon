@@ -149,8 +149,25 @@ def configure_logging_with_overrides(
         logconfig_data = load_logconfig_with_overrides(
             default_template_path, config_section, config
         )
+
+        # DEBUG: Track dictConfig calls and handler counts
+        print(f"[DICTCONFIG_DEBUG] Calling dictConfig for {config_section}")
+        print(f"[DICTCONFIG_DEBUG] disable_existing_loggers: {logconfig_data.get('disable_existing_loggers', 'NOT_SET')}")
+        print(f"[DICTCONFIG_DEBUG] handlers defined: {len(logconfig_data.get('handlers', {}))}")
+        print(f"[DICTCONFIG_DEBUG] loggers defined: {len(logconfig_data.get('loggers', {}))}")
+        
+        # Check existing handlers before dictConfig
+        jobmon_logger = logging.getLogger('jobmon.server.web')
+        existing_handlers = len(jobmon_logger.handlers)
+        print(f"[DICTCONFIG_DEBUG] Existing handlers on jobmon.server.web: {existing_handlers}")
         
         logging.config.dictConfig(logconfig_data)
+        
+        # Check handlers after dictConfig
+        jobmon_logger_after = logging.getLogger('jobmon.server.web')
+        handlers_after = len(jobmon_logger_after.handlers)
+        print(f"[DICTCONFIG_DEBUG] Handlers after dictConfig: {handlers_after}")
+        print(f"[DICTCONFIG_DEBUG] Handler classes: {[h.__class__.__name__ for h in jobmon_logger_after.handlers]}")
 
     except Exception:
         # Fall back to basic configuration if everything fails
