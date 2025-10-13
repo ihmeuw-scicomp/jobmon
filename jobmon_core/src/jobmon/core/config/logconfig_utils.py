@@ -150,7 +150,16 @@ def configure_logging_with_overrides(
             default_template_path, config_section, config
         )
         
+        # DEBUG: Show key configuration details
+        disable_existing = logconfig_data.get("disable_existing_loggers", "NOT_SET")
+        handler_count = len(logconfig_data.get("handlers", {}))
+        logger_count = len(logconfig_data.get("loggers", {}))
+        print(f"[CONFIG_DEBUG] disable_existing_loggers: {disable_existing}")
+        print(f"[CONFIG_DEBUG] handlers defined: {handler_count}")
+        print(f"[CONFIG_DEBUG] loggers defined: {logger_count}")
+        
         logging.config.dictConfig(logconfig_data)
+        print(f"[CONFIG_DEBUG] Applied dictConfig for {config_section}")
 
     except Exception:
         # Fall back to basic configuration if everything fails
@@ -265,9 +274,14 @@ def configure_component_logging(component_name: str) -> None:
         # (follows client/server pattern)
         default_template_path = _get_component_template_path(component_name)
 
+        # DEBUG: Track configuration loading
+        print(f"[CONFIG_DEBUG] Loading logging config for component: {component_name}")
+        print(f"[CONFIG_DEBUG] Template path: {default_template_path}")
+
         # Check if component template exists
         if not default_template_path or not os.path.exists(default_template_path):
             # No template = no logging available for this component
+            print(f"[CONFIG_DEBUG] No template found for {component_name}")
             return
 
         # Use existing override system (same pattern as client)
@@ -276,6 +290,8 @@ def configure_component_logging(component_name: str) -> None:
             config_section=component_name,
             fallback_config=None,  # No fallback - fail silently if problems
         )
+
+        print(f"[CONFIG_DEBUG] Applied logging config for {component_name}")
 
         # Note: Resource attributes are set once during OTLP initialization
         # Generic "jobmon" service with process-level attributes is sufficient
