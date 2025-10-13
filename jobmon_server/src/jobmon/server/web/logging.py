@@ -36,8 +36,10 @@ default_config: Dict = {
 }
 
 
-# Module-level flag to prevent duplicate configuration
-_server_logging_configured = False
+# Use a file-based lock to prevent duplicate configuration across multiple workers
+import fcntl
+import tempfile
+import atexit
 
 
 def configure_server_logging() -> None:
@@ -57,31 +59,42 @@ def configure_server_logging() -> None:
 
     Note: Server OTLP is handled separately by the server OTLP manager.
     """
-    global _server_logging_configured
+    import os
+    import tempfile
+    
+    # Use a file-based lock to prevent duplicate configuration across multiple workers
+    lock_file_path = os.path.join(tempfile.gettempdir(), "jobmon_server_logging.lock")
+    
+    try:
+        # Try to acquire an exclusive lock
+        lock_file = open(lock_file_path, 'w')
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        
+        # DEBUG: Track configuration calls
+        print(f"[SERVER_LOGGING_DEBUG] configure_server_logging called, acquired lock")
+        
+        from jobmon.core.config.logconfig_utils import configure_logging_with_overrides
 
-    # DEBUG: Track configuration calls
-    print(f"[SERVER_LOGGING_DEBUG] configure_server_logging called, _server_logging_configured={_server_logging_configured}")
+        # Get default template path
+        current_dir = os.path.dirname(__file__)
+        default_template_path = os.path.join(current_dir, "config/logconfig_server.yaml")
 
-    # Prevent duplicate configuration in multi-worker environments
-    if _server_logging_configured:
-        print(f"[SERVER_LOGGING_DEBUG] Skipping duplicate configuration")
+        print(f"[SERVER_LOGGING_DEBUG] Configuring logging with template: {default_template_path}")
+
+        # Configure Python logging with override support
+        # Note: structlog is already configured in __init__.py
+        configure_logging_with_overrides(
+            default_template_path=default_template_path,
+            config_section="server",
+            fallback_config=default_config,
+        )
+
+        print(f"[SERVER_LOGGING_DEBUG] Server logging configuration completed")
+        
+        # Keep the lock file open until process exit
+        atexit.register(lambda: lock_file.close())
+        
+    except (OSError, IOError):
+        # Another worker already has the lock, skip configuration
+        print(f"[SERVER_LOGGING_DEBUG] Skipping duplicate configuration - another worker is configuring")
         return
-
-    from jobmon.core.config.logconfig_utils import configure_logging_with_overrides
-
-    # Get default template path
-    current_dir = os.path.dirname(__file__)
-    default_template_path = os.path.join(current_dir, "config/logconfig_server.yaml")
-
-    print(f"[SERVER_LOGGING_DEBUG] Configuring logging with template: {default_template_path}")
-
-    # Configure Python logging with override support
-    # Note: structlog is already configured in __init__.py
-    configure_logging_with_overrides(
-        default_template_path=default_template_path,
-        config_section="server",
-        fallback_config=default_config,
-    )
-
-    _server_logging_configured = True
-    print(f"[SERVER_LOGGING_DEBUG] Server logging configuration completed")
