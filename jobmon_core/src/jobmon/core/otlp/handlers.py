@@ -168,16 +168,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
             from jobmon.core.config.structlog_config import _thread_local
 
-            # DEBUG: Count handlers attached to this logger
-            logger = logging.getLogger(record.name)
-            handler_count = len(logger.handlers)
-            handler_classes = [h.__class__.__name__ for h in logger.handlers]
-            
-            # Only debug for workflow_run logger to avoid spam
-            if "workflow_run" in record.name:
-                print(f"[HANDLER_DEBUG] Logger: {record.name}, Handlers: {handler_count}, Classes: {handler_classes}, Handler ID: {id(self)}")
-                print(f"[HANDLER_DEBUG] Record ID: {id(record)}, Message: {record.getMessage()[:50]}...")
-                print(f"[HANDLER_DEBUG] Record created: {record.created}, Thread: {record.thread}")
 
             # Get event_dict from thread-local
             event_dict = getattr(_thread_local, "last_event_dict", None)
@@ -203,8 +193,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             attributes["jobmon.process_id"] = os.getpid()
             attributes["jobmon.thread_id"] = record.thread
             attributes["jobmon.handler_class"] = self.__class__.__name__
-            attributes["jobmon.handler_id"] = id(self)
-            attributes["jobmon.handler_count"] = handler_count
 
             # Create OTLP log record
             severity_map = self._get_severity_map()

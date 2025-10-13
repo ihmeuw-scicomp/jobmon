@@ -68,9 +68,33 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         server_otlp.instrument_requests()
 
         server_otlp.instrument_app(app)
+        
+        # Configure structlog with OTLP integration
+        # This replaces the stdlib OTLP handlers to prevent duplicates
         configure_structlog(
             component_name="server", extra_processors=[add_span_details_processor]
         )
+        
+        # Add OTLP handler directly to structlog's stdlib integration
+        # This ensures single-path logging: structlog -> stdlib -> OTLP
+        import structlog
+        import logging
+        from jobmon.core.otlp import JobmonOTLPStructlogHandler
+        
+        # Get the shared logger provider
+        from jobmon.core.otlp import get_shared_logger_provider
+        logger_provider = get_shared_logger_provider()
+        
+        if logger_provider:
+            # Create OTLP handler with shared provider
+            otlp_handler = JobmonOTLPStructlogHandler(
+                level=logging.DEBUG,
+                logger_provider=logger_provider
+            )
+            
+            # Add to root logger so structlog's stdlib integration picks it up
+            root_logger = logging.getLogger()
+            root_logger.addHandler(otlp_handler)
     else:  # Configure structlog without OTLP
         configure_structlog(component_name="server")
 
