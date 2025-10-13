@@ -39,6 +39,7 @@ default_config: Dict = {
 # Module-level flag to prevent duplicate configuration
 _server_logging_configured = False
 
+
 def configure_server_logging() -> None:
     """Configure server logging with template and user override support.
 
@@ -57,16 +58,22 @@ def configure_server_logging() -> None:
     Note: Server OTLP is handled separately by the server OTLP manager.
     """
     global _server_logging_configured
-    
+
+    # DEBUG: Track configuration calls
+    print(f"[SERVER_LOGGING_DEBUG] configure_server_logging called, _server_logging_configured={_server_logging_configured}")
+
     # Prevent duplicate configuration in multi-worker environments
     if _server_logging_configured:
+        print(f"[SERVER_LOGGING_DEBUG] Skipping duplicate configuration")
         return
-    
+
     from jobmon.core.config.logconfig_utils import configure_logging_with_overrides
 
     # Get default template path
     current_dir = os.path.dirname(__file__)
     default_template_path = os.path.join(current_dir, "config/logconfig_server.yaml")
+
+    print(f"[SERVER_LOGGING_DEBUG] Configuring logging with template: {default_template_path}")
 
     # Configure Python logging with override support
     # Note: structlog is already configured in __init__.py
@@ -75,5 +82,6 @@ def configure_server_logging() -> None:
         config_section="server",
         fallback_config=default_config,
     )
-    
+
     _server_logging_configured = True
+    print(f"[SERVER_LOGGING_DEBUG] Server logging configuration completed")
