@@ -172,18 +172,10 @@ class JobmonOTLPManager:
             return
 
         try:
-            from opentelemetry.sdk._logs import get_logger_provider, set_logger_provider
             from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
             
-            # Explicit check: ensure we have a proper LoggerProvider and no existing processors
-            global_lp = get_logger_provider()
-            if not isinstance(global_lp, LoggerProvider):
-                # Set our provider as the global one
-                set_logger_provider(self.logger_provider)
-                global_lp = self.logger_provider
-            
-            # Check if BatchLogRecordProcessor already exists
-            existing_processors = getattr(global_lp, "_processors", [])
+            # Check if BatchLogRecordProcessor already exists on our logger provider
+            existing_processors = getattr(self.logger_provider, "_processors", [])
             if any(isinstance(p, BatchLogRecordProcessor) for p in existing_processors):
                 # Processor already exists, don't add another
                 self._log_processor_configured = True
@@ -222,7 +214,7 @@ class JobmonOTLPManager:
                 # Use BatchLogRecordProcessor for efficient batching (prevents blocking retries)
                 processor = BatchLogRecordProcessor(self._debug_exporter)
 
-                global_lp.add_log_record_processor(processor)
+                self.logger_provider.add_log_record_processor(processor)
                 self._log_processor_configured = True
                 
                 # One-time pipeline dump at startup to prove single-init
@@ -418,10 +410,9 @@ class JobmonOTLPManager:
         """Dump pipeline state at startup to prove single-init."""
         try:
             import logging
-            from opentelemetry.sdk._logs import get_logger_provider
             
-            lp = get_logger_provider()
-            processors = getattr(lp, "_processors", [])
+            # Use our logger provider
+            processors = getattr(self.logger_provider, "_processors", [])
             
             # Get root and uvicorn handlers
             root_logger = logging.getLogger()
