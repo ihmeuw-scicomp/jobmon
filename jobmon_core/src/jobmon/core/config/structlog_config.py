@@ -81,7 +81,8 @@ def configure_structlog(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         _store_event_dict_for_otlp,  # Store for OTLP after exception processing
-        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        # REMOVED: ProcessorFormatter.wrap_for_formatter - causes duplicate emissions
+        # Our OTLP handler reads directly from _thread_local.last_event_dict
     ]
 
     # Add component name to all logs if provided
