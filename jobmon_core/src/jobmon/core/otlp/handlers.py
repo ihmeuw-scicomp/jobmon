@@ -219,10 +219,15 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                 exporter_debug = manager.get_exporter_debug_info()
                 if exporter_debug:
                     attributes["jobmon.exporter_export_count"] = exporter_debug.get("export_count", 0)
+                    attributes["jobmon.exporter_success_count"] = exporter_debug.get("success_count", 0)
                     attributes["jobmon.exporter_failure_count"] = exporter_debug.get("failure_count", 0)
                     attributes["jobmon.exporter_success_rate"] = exporter_debug.get("success_rate", 0.0)
                     if exporter_debug.get("last_error"):
                         attributes["jobmon.exporter_last_error"] = exporter_debug["last_error"]
+                    if exporter_debug.get("time_since_last_success") is not None:
+                        attributes["jobmon.exporter_time_since_success"] = exporter_debug["time_since_last_success"]
+                    if exporter_debug.get("time_since_last_failure") is not None:
+                        attributes["jobmon.exporter_time_since_failure"] = exporter_debug["time_since_last_failure"]
                     attributes["jobmon.is_retry"] = True
                 else:
                     attributes["jobmon.is_retry"] = False
