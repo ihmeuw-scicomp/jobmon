@@ -62,7 +62,10 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         server_otlp.instrument_sqlalchemy()
         server_otlp.instrument_requests()
 
-        server_otlp.instrument_app(app)
+        # TEMPORARILY DISABLED: FastAPI instrumentation causes log duplication
+        # The ASGI middleware re-emits logs during HTTP response send phase
+        # TODO: Re-enable once we find a way to prevent log capture
+        # server_otlp.instrument_app(app)
 
     # Logging is already configured at module import time to avoid duplicate
     # configuration in multi-worker environments
