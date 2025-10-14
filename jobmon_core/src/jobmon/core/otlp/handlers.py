@@ -210,7 +210,7 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             current_time = time.time()
             emission_count = 1
             is_duplicate = False
-            
+
             with _dedup_lock:
                 if event_hash in _dedup_cache:
                     last_time, last_count = _dedup_cache[event_hash]
@@ -221,10 +221,10 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                     else:
                         # Outside TTL window - reset count
                         emission_count = 1
-                
+
                 # Update cache
                 _dedup_cache[event_hash] = (current_time, emission_count)
-                
+
                 # Clean up expired entries
                 expired_keys = [
                     key for key, (timestamp, _) in _dedup_cache.items()
@@ -239,7 +239,13 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             # Capture call stack for debugging
             stack = traceback.extract_stack()
             callsite = stack[-3] if len(stack) >= 3 else stack[-1]  # Skip emit() and internal calls
-            
+
+            # Track handler instance and call count
+            handler_id = id(self)
+            if not hasattr(self, '_call_count'):
+                self._call_count = 0
+            self._call_count += 1
+
             attributes["jobmon.event_id"] = event_id
             attributes["jobmon.event_hash"] = event_hash
             attributes["jobmon.emission_count"] = emission_count
@@ -247,6 +253,8 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             attributes["jobmon.process_id"] = os.getpid()
             attributes["jobmon.thread_id"] = record.thread
             attributes["jobmon.handler_class"] = self.__class__.__name__
+            attributes["jobmon.handler_id"] = handler_id
+            attributes["jobmon.handler_call_count"] = self._call_count
             attributes["jobmon.callsite_filename"] = callsite.filename.split('/')[-1]
             attributes["jobmon.callsite_function"] = callsite.name
             attributes["jobmon.callsite_line"] = callsite.lineno
@@ -260,26 +268,26 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             full_stack = '\n'.join([f"{frame.filename}:{frame.lineno} in {frame.name}" for frame in stack[-10:]])
             attributes["jobmon.full_stack"] = full_stack
             
-            # Add exporter debug info for messages with retry pattern (ASGI middleware in stack)
-            if "starlette/middleware" in full_stack or "otel_send" in full_stack:
-                from jobmon.core.otlp.manager import JobmonOTLPManager
-                manager = JobmonOTLPManager.get_instance()
-                exporter_debug = manager.get_exporter_debug_info()
-                if exporter_debug:
-                    attributes["jobmon.exporter_id"] = exporter_debug.get("exporter_id", "unknown")
-                    attributes["jobmon.exporter_export_count"] = exporter_debug.get("export_count", 0)
-                    attributes["jobmon.exporter_success_count"] = exporter_debug.get("success_count", 0)
-                    attributes["jobmon.exporter_failure_count"] = exporter_debug.get("failure_count", 0)
-                    attributes["jobmon.exporter_success_rate"] = exporter_debug.get("success_rate", 0.0)
-                    if exporter_debug.get("last_error"):
-                        attributes["jobmon.exporter_last_error"] = exporter_debug["last_error"]
-                    if exporter_debug.get("time_since_last_success") is not None:
-                        attributes["jobmon.exporter_time_since_success"] = exporter_debug["time_since_last_success"]
-                    if exporter_debug.get("time_since_last_failure") is not None:
-                        attributes["jobmon.exporter_time_since_failure"] = exporter_debug["time_since_last_failure"]
-                    attributes["jobmon.is_retry"] = True
-                else:
-                    attributes["jobmon.is_retry"] = False
+            # Add exporter debug info for all messages to track multiple exporters
+            from jobmon.core.otlp.manager import JobmonOTLPManager
+            manager = JobmonOTLPManager.get_instance()
+            exporter_debug = manager.get_exporter_debug_info()
+            if exporter_debug:
+                attributes["jobmon.exporter_id"] = exporter_debug.get("exporter_id", "unknown")
+                attributes["jobmon.exporter_export_count"] = exporter_debug.get("export_count", 0)
+                attributes["jobmon.exporter_success_count"] = exporter_debug.get("success_count", 0)
+                attributes["jobmon.exporter_failure_count"] = exporter_debug.get("failure_count", 0)
+                attributes["jobmon.exporter_success_rate"] = exporter_debug.get("success_rate", 0.0)
+                if exporter_debug.get("last_error"):
+                    attributes["jobmon.exporter_last_error"] = exporter_debug["last_error"]
+                if exporter_debug.get("time_since_last_success") is not None:
+                    attributes["jobmon.exporter_time_since_success"] = exporter_debug["time_since_last_success"]
+                if exporter_debug.get("time_since_last_failure") is not None:
+                    attributes["jobmon.exporter_time_since_failure"] = exporter_debug["time_since_last_failure"]
+                attributes["jobmon.is_retry"] = True
+            else:
+                attributes["jobmon.exporter_id"] = "none"
+                attributes["jobmon.is_retry"] = False
 
             # Create OTLP log record
             severity_map = self._get_severity_map()
