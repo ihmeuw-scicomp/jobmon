@@ -217,8 +217,9 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                 attributes["jobmon.full_stack"] = full_stack
                 
                 # Add exporter debug info for problematic messages
-                from jobmon.core.otlp.manager import get_exporter_debug_info
-                exporter_debug = get_exporter_debug_info()
+                from jobmon.core.otlp.manager import JobmonOTLPManager
+                manager = JobmonOTLPManager.get_instance()
+                exporter_debug = manager.get_exporter_debug_info()
                 if exporter_debug:
                     attributes["jobmon.exporter_export_count"] = exporter_debug.get("export_count", 0)
                     attributes["jobmon.exporter_failure_count"] = exporter_debug.get("failure_count", 0)

@@ -17,37 +17,46 @@ from .resources import create_jobmon_resources
 
 
 class _DebugOTLPExporterWrapper:
-    """Debug wrapper for OTLP exporter to track export attempts and failures."""
+    """Debug wrapper for OTLP exporter to track export failures and retries."""
     
-    def __init__(self, exporter):
+    def __init__(self, exporter: Any) -> None:
         self._exporter = exporter
         self._export_count = 0
         self._failure_count = 0
         self._last_error = None
-    
-    def export(self, logs_data):
-        """Export logs and track statistics."""
+        
+    def export(self, log_records: Any) -> Any:
+        """Export log records with debug tracking."""
         self._export_count += 1
+        
         try:
-            result = self._exporter.export(logs_data)
+            result = self._exporter.export(log_records)
+            
+            # Track export results
+            if hasattr(result, 'status_code'):
+                if result.status_code != 0:  # Non-success status
+                    self._failure_count += 1
+                    self._last_error = f"Export failed with status {result.status_code}"
+                    
             return result
+            
         except Exception as e:
             self._failure_count += 1
             self._last_error = str(e)
             raise
-    
-    def shutdown(self):
+            
+    def shutdown(self) -> None:
         """Shutdown the wrapped exporter."""
-        return self._exporter.shutdown()
-    
+        if hasattr(self._exporter, 'shutdown'):
+            self._exporter.shutdown()
+            
     def get_debug_info(self) -> Dict[str, Any]:
         """Get debug information about export attempts."""
-        success_rate = (self._export_count - self._failure_count) / self._export_count if self._export_count > 0 else 0.0
         return {
             "export_count": self._export_count,
             "failure_count": self._failure_count,
-            "success_rate": success_rate,
-            "last_error": self._last_error
+            "last_error": self._last_error,
+            "success_rate": (self._export_count - self._failure_count) / max(self._export_count, 1)
         }
 
 
@@ -167,12 +176,12 @@ class JobmonOTLPManager:
             # Create the exporter
             exporter = self._create_log_exporter(exporter_config)
             if exporter:
-                # Wrap exporter with debug wrapper to track export attempts
+                # Wrap exporter with debug wrapper to track failures
                 self._debug_exporter = _DebugOTLPExporterWrapper(exporter)
                 
-                # Use BatchLogRecordProcessor for efficient batching
-                from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-                processor = BatchLogRecordProcessor(self._debug_exporter)
+                # Use SimpleLogRecordProcessor for immediate export (no batching) for debugging
+                from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor
+                processor = SimpleLogRecordProcessor(self._debug_exporter)
 
                 self.logger_provider.add_log_record_processor(processor)
                 self._log_processor_configured = True
@@ -357,6 +366,11 @@ class JobmonOTLPManager:
         except ImportError:
             pass
 
+    def get_exporter_debug_info(self) -> Optional[Dict[str, Any]]:
+        """Get debug information from the OTLP exporter."""
+        if self._debug_exporter:
+            return self._debug_exporter.get_debug_info()
+        return None
 
     def shutdown(self) -> None:
         """Shutdown trace and log providers."""
@@ -426,16 +440,6 @@ def get_logger(name: str) -> Optional[Any]:
     return provider.get_logger(name) if provider else None
 
 
-def get_exporter_debug_info() -> Optional[Dict[str, Any]]:
-    """Get debug information about OTLP exporter activity.
-
-    Returns:
-        Dictionary with export statistics, or None if unavailable
-    """
-    manager = JobmonOTLPManager.get_instance()
-    if manager._debug_exporter:
-        return manager._debug_exporter.get_debug_info()
-    return None
 
 
 def create_log_exporter(**kwargs: Any) -> Optional[Any]:
