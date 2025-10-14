@@ -183,11 +183,14 @@ class JobmonOTLPManager:
                 global_lp = self.logger_provider
             
             # Check if BatchLogRecordProcessor already exists
-            existing_processors = getattr(global_lp, "_processors", [])
-            if any(isinstance(p, BatchLogRecordProcessor) for p in existing_processors):
-                # Processor already exists, don't add another
-                self._log_processor_configured = True
-                return
+            # Processors are stored in _multi_log_record_processor._log_record_processors
+            multi_processor = getattr(global_lp, "_multi_log_record_processor", None)
+            if multi_processor:
+                existing_processors = getattr(multi_processor, "_log_record_processors", [])
+                if any(isinstance(p, BatchLogRecordProcessor) for p in existing_processors):
+                    # Processor already exists, don't add another
+                    self._log_processor_configured = True
+                    return
 
             from jobmon.core.configuration import JobmonConfig
 
@@ -422,7 +425,9 @@ class JobmonOTLPManager:
             
             # Use global logger provider
             global_lp = get_logger_provider()
-            processors = getattr(global_lp, "_processors", [])
+            # Processors are stored in _multi_log_record_processor._log_record_processors
+            multi_processor = getattr(global_lp, "_multi_log_record_processor", None)
+            processors = getattr(multi_processor, "_log_record_processors", []) if multi_processor else []
             
             # Get root and uvicorn handlers
             root_logger = logging.getLogger()
