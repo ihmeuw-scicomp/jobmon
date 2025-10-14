@@ -91,6 +91,7 @@ async def record_array_batch_num(
     task_ids = [int(task_id) for task_id in data["task_ids"]]
     task_resources_id = int(data["task_resources_id"])
     workflow_run_id = int(data["workflow_run_id"])
+
     task_condition = and_(
         Task.id.in_(task_ids),
         Task.status.in_([TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]),
@@ -102,110 +103,124 @@ async def record_array_batch_num(
     ]
 
     if not task_ids_to_update:
-        # No tasks to update, return empty result
-        return JSONResponse(content={"tasks_by_status": {}}, status_code=StatusCodes.OK)
+        # No tasks to update, but still return their current status (like v2)
+        logger.warning(
+            f"queue_task_batch: No tasks to update from {len(task_ids)} requested. "
+            f"Tasks may already be in QUEUED or other status."
+        )
+    else:
+        # Split into batches of 1000
+        batch_size = 1000
+        task_batches = [
+            task_ids_to_update[i : i + batch_size]
+            for i in range(0, len(task_ids_to_update), batch_size)
+        ]
 
-    # Split into batches of 1000
-    batch_size = 1000
-    task_batches = [
-        task_ids_to_update[i : i + batch_size]
-        for i in range(0, len(task_ids_to_update), batch_size)
-    ]
+        # Process each batch with retries
+        max_retries = 5
 
-    # Process each batch with retries
-    max_retries = 5
-
-    for batch in task_batches:
-        # Atomic batch operation: Update Task status AND create TaskInstance
-        # in one transaction
-        for attempt in range(max_retries):
-            try:
-                # Update task status to QUEUED
-                update_stmt = (
-                    update(Task)
-                    .where(
-                        and_(
-                            Task.id.in_(batch),
-                            Task.status.in_(
-                                [TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]
-                            ),
+        for batch in task_batches:
+            # Atomic batch operation: Update Task status AND create TaskInstance
+            # in one transaction
+            for attempt in range(max_retries):
+                try:
+                    # Update task status to QUEUED
+                    update_stmt = (
+                        update(Task)
+                        .where(
+                            and_(
+                                Task.id.in_(batch),
+                                Task.status.in_(
+                                    [
+                                        TaskStatus.REGISTERING,
+                                        TaskStatus.ADJUSTING_RESOURCES,
+                                    ]
+                                ),
+                            )
                         )
+                        .values(
+                            status=TaskStatus.QUEUED,
+                            status_date=func.now(),
+                            num_attempts=(Task.num_attempts + 1),
+                        )
+                        .execution_options(synchronize_session=False)
                     )
-                    .values(
-                        status=TaskStatus.QUEUED,
-                        status_date=func.now(),
-                        num_attempts=(Task.num_attempts + 1),
+                    db.execute(update_stmt)
+
+                    # Calculate array_batch_num separately to avoid deadlock
+                    # Use SELECT FOR UPDATE with NOWAIT to prevent waiting on locks
+                    batch_num_result = db.execute(
+                        select(
+                            func.coalesce(func.max(TaskInstance.array_batch_num) + 1, 1)
+                        )
+                        .where(TaskInstance.array_id == array_id)
+                        .with_for_update(nowait=True)
+                    ).scalar()
+
+                    # Insert into TaskInstance with the calculated batch number
+                    insert_stmt = insert(TaskInstance).from_select(
+                        # columns map 1:1 to selected rows
+                        [
+                            "task_id",
+                            "workflow_run_id",
+                            "array_id",
+                            "task_resources_id",
+                            "array_batch_num",
+                            "array_step_id",
+                            "status",
+                            "status_date",
+                        ],
+                        # select statement
+                        select(
+                            # unique id
+                            Task.id.label("task_id"),
+                            # static associations
+                            literal_column(str(workflow_run_id)).label(
+                                "workflow_run_id"
+                            ),
+                            literal_column(str(array_id)).label("array_id"),
+                            literal_column(str(task_resources_id)).label(
+                                "task_resources_id"
+                            ),
+                            # batch info - use the pre-calculated value
+                            literal_column(str(batch_num_result)).label(
+                                "array_batch_num"
+                            ),
+                            (func.row_number().over(order_by=Task.id) - 1).label(
+                                "array_step_id"
+                            ),
+                            # status columns
+                            literal_column(f"'{TaskInstanceStatus.QUEUED}'").label(
+                                "status"
+                            ),
+                            func.now().label("status_date"),
+                        ).where(Task.id.in_(batch), Task.status == TaskStatus.QUEUED),
+                        # no python side defaults. Server defaults only
+                        include_defaults=False,
                     )
-                    .execution_options(synchronize_session=False)
-                )
-                db.execute(update_stmt)
+                    db.execute(insert_stmt)
 
-                # Calculate array_batch_num separately to avoid deadlock
-                # Use SELECT FOR UPDATE with NOWAIT to prevent waiting on locks
-                batch_num_result = db.execute(
-                    select(func.coalesce(func.max(TaskInstance.array_batch_num) + 1, 1))
-                    .where(TaskInstance.array_id == array_id)
-                    .with_for_update(nowait=True)
-                ).scalar()
+                    # ATOMIC COMMIT: Both Task update AND TaskInstance insert together
+                    db.commit()
+                    break  # Success - exit retry loop
 
-                # Insert into TaskInstance with the calculated batch number
-                insert_stmt = insert(TaskInstance).from_select(
-                    # columns map 1:1 to selected rows
-                    [
-                        "task_id",
-                        "workflow_run_id",
-                        "array_id",
-                        "task_resources_id",
-                        "array_batch_num",
-                        "array_step_id",
-                        "status",
-                        "status_date",
-                    ],
-                    # select statement
-                    select(
-                        # unique id
-                        Task.id.label("task_id"),
-                        # static associations
-                        literal_column(str(workflow_run_id)).label("workflow_run_id"),
-                        literal_column(str(array_id)).label("array_id"),
-                        literal_column(str(task_resources_id)).label(
-                            "task_resources_id"
-                        ),
-                        # batch info - use the pre-calculated value
-                        literal_column(str(batch_num_result)).label("array_batch_num"),
-                        (func.row_number().over(order_by=Task.id) - 1).label(
-                            "array_step_id"
-                        ),
-                        # status columns
-                        literal_column(f"'{TaskInstanceStatus.QUEUED}'").label(
-                            "status"
-                        ),
-                        func.now().label("status_date"),
-                    ).where(Task.id.in_(batch), Task.status == TaskStatus.QUEUED),
-                    # no python side defaults. Server defaults only
-                    include_defaults=False,
-                )
-                db.execute(insert_stmt)
-
-                # ATOMIC COMMIT: Both Task update AND TaskInstance insert together
-                db.commit()
-                break  # Success - exit retry loop
-
-            except OperationalError as e:
-                logger.warning(
-                    f"DB error {e}, retrying attempt " f"{attempt + 1}/{max_retries}"
+                except OperationalError as e:
+                    logger.warning(
+                        f"DB error {e}, retrying attempt "
+                        f"{attempt + 1}/{max_retries}"
+                    )
+                    db.rollback()
+                    sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff
+            else:
+                # All retries failed
+                logger.error(
+                    f"Failed to complete atomic batch operation after {max_retries} attempts"
                 )
                 db.rollback()
-                sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff
-        else:
-            # All retries failed
-            logger.error(
-                f"Failed to complete atomic batch operation after {max_retries} attempts"
-            )
-            db.rollback()
-            raise HTTPException(
-                status_code=503, detail="Database temporarily unavailable, please retry"
-            )
+                raise HTTPException(
+                    status_code=503,
+                    detail="Database temporarily unavailable, please retry",
+                )
 
     # Run the tasks_by_status_query and return
     tasks_by_status_query = (
