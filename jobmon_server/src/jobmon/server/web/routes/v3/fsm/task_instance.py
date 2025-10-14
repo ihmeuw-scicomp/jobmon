@@ -164,7 +164,7 @@ def transit_ti_and_t(
             return
         except OperationalError as e:
             logger.warning(
-                f"Database error detected {e}, retrying attempt {i+1}/{max_retries}"
+                f"Database error detected {e}, retrying attempt {i + 1}/{max_retries}"
             )
             db.rollback()  # Clear the corrupted session state
             sleep(0.001 * (2 ** (i + 1)))  # Exponential backoff: 2ms, 4ms...
