@@ -20,6 +20,7 @@ class _DebugOTLPExporterWrapper:
     """Debug wrapper for OTLP exporter to track export failures and retries."""
     
     def __init__(self, exporter: Any) -> None:
+        import uuid
         self._exporter = exporter
         self._export_count = 0
         self._failure_count = 0
@@ -27,6 +28,7 @@ class _DebugOTLPExporterWrapper:
         self._last_error = None
         self._last_success_time = None
         self._last_failure_time = None
+        self._exporter_id = str(uuid.uuid4())[:8]  # Unique ID for this exporter instance
         
     def export(self, log_records: Any) -> Any:
         """Export log records with debug tracking."""
@@ -70,6 +72,7 @@ class _DebugOTLPExporterWrapper:
         
         current_time = time.time()
         return {
+            "exporter_id": self._exporter_id,
             "export_count": self._export_count,
             "success_count": self._success_count,
             "failure_count": self._failure_count,
@@ -169,6 +172,23 @@ class JobmonOTLPManager:
             return
 
         try:
+            from opentelemetry.sdk._logs import get_logger_provider, set_logger_provider
+            from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+            
+            # Explicit check: ensure we have a proper LoggerProvider and no existing processors
+            global_lp = get_logger_provider()
+            if not isinstance(global_lp, LoggerProvider):
+                # Set our provider as the global one
+                set_logger_provider(self.logger_provider)
+                global_lp = self.logger_provider
+            
+            # Check if BatchLogRecordProcessor already exists
+            existing_processors = getattr(global_lp, "_processors", [])
+            if any(isinstance(p, BatchLogRecordProcessor) for p in existing_processors):
+                # Processor already exists, don't add another
+                self._log_processor_configured = True
+                return
+
             from jobmon.core.configuration import JobmonConfig
 
             config = JobmonConfig()
@@ -200,11 +220,13 @@ class JobmonOTLPManager:
                 self._debug_exporter = _DebugOTLPExporterWrapper(exporter)
                 
                 # Use BatchLogRecordProcessor for efficient batching (prevents blocking retries)
-                from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
                 processor = BatchLogRecordProcessor(self._debug_exporter)
 
-                self.logger_provider.add_log_record_processor(processor)
+                global_lp.add_log_record_processor(processor)
                 self._log_processor_configured = True
+                
+                # One-time pipeline dump at startup to prove single-init
+                self._dump_pipeline_state()
                 # Don't log here to avoid circular dependency during initialization
             else:
                 # Don't log here to avoid circular dependency during initialization
@@ -391,6 +413,28 @@ class JobmonOTLPManager:
         if self._debug_exporter:
             return self._debug_exporter.get_debug_info()
         return None
+
+    def _dump_pipeline_state(self) -> None:
+        """Dump pipeline state at startup to prove single-init."""
+        try:
+            import logging
+            from opentelemetry.sdk._logs import get_logger_provider
+            
+            lp = get_logger_provider()
+            processors = getattr(lp, "_processors", [])
+            
+            # Get root and uvicorn handlers
+            root_logger = logging.getLogger()
+            uvicorn_logger = logging.getLogger("uvicorn")
+            
+            # Use print to avoid circular logging dependency
+            print(f"[OTLP_INIT] otel_log_processors={[type(p).__name__ for p in processors]}")
+            print(f"[OTLP_INIT] root_handlers={[type(h).__name__ for h in root_logger.handlers]}")
+            print(f"[OTLP_INIT] uvicorn_handlers={[type(h).__name__ for h in uvicorn_logger.handlers]}")
+            
+        except Exception:
+            # Silently ignore errors during pipeline dump
+            pass
 
     def shutdown(self) -> None:
         """Shutdown trace and log providers."""

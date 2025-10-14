@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from typing import Any, Dict, Optional, Union
 
 from . import OTLP_AVAILABLE
 from .formatters import JobmonOTLPFormatter
+
+# TTL-based deduplication cache
+_dedup_cache: Dict[str, tuple[float, int]] = {}  # event_hash -> (timestamp, emission_count)
+_dedup_lock = threading.Lock()
+TTL_SECONDS = 10  # 10 second TTL window
 
 
 class JobmonOTLPLoggingHandler(logging.Handler):
@@ -187,6 +194,44 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                 f"{record.created}:{message}:{trace_id_int}:{span_id_int}:{os.getpid()}"
             )
             event_id = hashlib.sha256(event_key.encode()).hexdigest()[:16]
+            
+            # TTL-based deduplication: hash of (message, level, trace_id, span_id, workflow_run_id)
+            dedup_key_parts = [message, record.levelname, str(trace_id_int), str(span_id_int)]
+            if event_dict:
+                # Add workflow_run_id if available for better deduplication
+                workflow_run_id = event_dict.get("workflow_run_id")
+                if workflow_run_id:
+                    dedup_key_parts.append(str(workflow_run_id))
+            
+            dedup_key = ":".join(dedup_key_parts)
+            event_hash = hashlib.sha256(dedup_key.encode()).hexdigest()[:8]
+
+            # TTL-based deduplication check
+            current_time = time.time()
+            emission_count = 1
+            is_duplicate = False
+            
+            with _dedup_lock:
+                if event_hash in _dedup_cache:
+                    last_time, last_count = _dedup_cache[event_hash]
+                    if current_time - last_time <= TTL_SECONDS:
+                        # Within TTL window - this is a duplicate
+                        emission_count = last_count + 1
+                        is_duplicate = True
+                    else:
+                        # Outside TTL window - reset count
+                        emission_count = 1
+                
+                # Update cache
+                _dedup_cache[event_hash] = (current_time, emission_count)
+                
+                # Clean up expired entries
+                expired_keys = [
+                    key for key, (timestamp, _) in _dedup_cache.items()
+                    if current_time - timestamp > TTL_SECONDS
+                ]
+                for key in expired_keys:
+                    del _dedup_cache[key]
 
             # Add debug instrumentation to track duplicate emissions
             import traceback
@@ -196,6 +241,9 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             callsite = stack[-3] if len(stack) >= 3 else stack[-1]  # Skip emit() and internal calls
             
             attributes["jobmon.event_id"] = event_id
+            attributes["jobmon.event_hash"] = event_hash
+            attributes["jobmon.emission_count"] = emission_count
+            attributes["jobmon.is_duplicate"] = is_duplicate
             attributes["jobmon.process_id"] = os.getpid()
             attributes["jobmon.thread_id"] = record.thread
             attributes["jobmon.handler_class"] = self.__class__.__name__
@@ -218,6 +266,7 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                 manager = JobmonOTLPManager.get_instance()
                 exporter_debug = manager.get_exporter_debug_info()
                 if exporter_debug:
+                    attributes["jobmon.exporter_id"] = exporter_debug.get("exporter_id", "unknown")
                     attributes["jobmon.exporter_export_count"] = exporter_debug.get("export_count", 0)
                     attributes["jobmon.exporter_success_count"] = exporter_debug.get("success_count", 0)
                     attributes["jobmon.exporter_failure_count"] = exporter_debug.get("failure_count", 0)
