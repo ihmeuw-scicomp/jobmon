@@ -69,12 +69,16 @@ def configure_server_logging() -> None:
     current_dir = os.path.dirname(__file__)
     default_template_path = os.path.join(current_dir, "config/logconfig_server.yaml")
 
-    # Configure Python logging with override support
-    # Note: structlog is already configured in __init__.py
+    # Configure Python stdlib logging with override support
     configure_logging_with_overrides(
         default_template_path=default_template_path,
         config_section="server",
         fallback_config=default_config,
     )
+
+    # Configure structlog to integrate with stdlib loggers
+    # This must come AFTER stdlib logging is configured
+    from jobmon.core.config.structlog_config import configure_structlog
+    configure_structlog(component_name="server")
 
     _server_logging_configured = True
