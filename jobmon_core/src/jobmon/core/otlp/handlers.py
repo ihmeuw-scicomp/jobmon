@@ -260,6 +260,13 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             attributes["jobmon.callsite_line"] = callsite.lineno
             attributes["jobmon.callsite_code"] = callsite.line.strip() if callsite.line else ""
             
+            # Probe A: Track if same LogRecord reaches handler twice
+            attributes["jobmon.record_object_id"] = id(record)
+            attributes["jobmon.logger_name"] = record.name
+            attributes["jobmon.pathname"] = record.pathname
+            attributes["jobmon.funcName"] = record.funcName
+            attributes["jobmon.lineno"] = record.lineno
+            
             # Add request correlation if available
             if event_dict and "request_id" in event_dict:
                 attributes["jobmon.request_id"] = event_dict["request_id"]

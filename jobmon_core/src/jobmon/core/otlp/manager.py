@@ -438,8 +438,41 @@ class JobmonOTLPManager:
             print(f"[OTLP_INIT] root_handlers={[type(h).__name__ for h in root_logger.handlers]}")
             print(f"[OTLP_INIT] uvicorn_handlers={[type(h).__name__ for h in uvicorn_logger.handlers]}")
             
+            # Probe B: Dump all OTLP handler attachments
+            self._dump_handler_attachments()
+            
         except Exception:
             # Silently ignore errors during pipeline dump
+            pass
+    
+    def _dump_handler_attachments(self) -> None:
+        """Probe B: Dump which loggers have OTLP handlers attached."""
+        try:
+            import logging
+            from jobmon.core.otlp.handlers import JobmonOTLPStructlogHandler
+            
+            target_ids = set()
+            
+            # Check root
+            roots = [logging.getLogger()]
+            all_loggers = [l for l in logging.root.manager.loggerDict.values()
+                          if isinstance(l, logging.Logger)]
+            
+            for lg in roots + all_loggers:
+                for h in lg.handlers:
+                    if isinstance(h, JobmonOTLPStructlogHandler):
+                        target_ids.add(id(h))
+                        logger_name = lg.name if hasattr(lg, 'name') and lg.name else 'root'
+                        propagate = getattr(lg, 'propagate', None)
+                        print(f"[HANDLER_ATTACH] logger={logger_name} "
+                              f"handler_id={id(h)} class={type(h).__name__} "
+                              f"propagate={propagate}")
+            
+            if not target_ids:
+                print("[HANDLER_ATTACH] none")
+                
+        except Exception:
+            # Silently ignore errors during handler attachment dump
             pass
 
     def shutdown(self) -> None:
