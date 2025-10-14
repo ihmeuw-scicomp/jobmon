@@ -23,26 +23,40 @@ class _DebugOTLPExporterWrapper:
         self._exporter = exporter
         self._export_count = 0
         self._failure_count = 0
+        self._success_count = 0
         self._last_error = None
+        self._last_success_time = None
+        self._last_failure_time = None
         
     def export(self, log_records: Any) -> Any:
         """Export log records with debug tracking."""
+        import time
+        
         self._export_count += 1
         
         try:
             result = self._exporter.export(log_records)
             
-            # Track export results
+            # Track export results based on status code
             if hasattr(result, 'status_code'):
-                if result.status_code != 0:  # Non-success status
+                if result.status_code == 0:  # Success
+                    self._success_count += 1
+                    self._last_success_time = time.time()
+                else:  # Non-success status
                     self._failure_count += 1
                     self._last_error = f"Export failed with status {result.status_code}"
+                    self._last_failure_time = time.time()
+            else:
+                # No status code = assume success
+                self._success_count += 1
+                self._last_success_time = time.time()
                     
             return result
             
         except Exception as e:
             self._failure_count += 1
-            self._last_error = str(e)
+            self._last_error = f"{type(e).__name__}: {str(e)}"
+            self._last_failure_time = time.time()
             raise
             
     def shutdown(self) -> None:
@@ -52,11 +66,17 @@ class _DebugOTLPExporterWrapper:
             
     def get_debug_info(self) -> Dict[str, Any]:
         """Get debug information about export attempts."""
+        import time
+        
+        current_time = time.time()
         return {
             "export_count": self._export_count,
+            "success_count": self._success_count,
             "failure_count": self._failure_count,
             "last_error": self._last_error,
-            "success_rate": (self._export_count - self._failure_count) / max(self._export_count, 1)
+            "success_rate": self._success_count / max(self._export_count, 1),
+            "time_since_last_success": current_time - self._last_success_time if self._last_success_time else None,
+            "time_since_last_failure": current_time - self._last_failure_time if self._last_failure_time else None,
         }
 
 
@@ -179,9 +199,9 @@ class JobmonOTLPManager:
                 # Wrap exporter with debug wrapper to track failures
                 self._debug_exporter = _DebugOTLPExporterWrapper(exporter)
                 
-                # Use SimpleLogRecordProcessor for immediate export (no batching) for debugging
-                from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor
-                processor = SimpleLogRecordProcessor(self._debug_exporter)
+                # Use BatchLogRecordProcessor for efficient batching (prevents blocking retries)
+                from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+                processor = BatchLogRecordProcessor(self._debug_exporter)
 
                 self.logger_provider.add_log_record_processor(processor)
                 self._log_processor_configured = True

@@ -208,15 +208,12 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             if event_dict and "request_id" in event_dict:
                 attributes["jobmon.request_id"] = event_dict["request_id"]
             
-            # Add full stack trace for specific problematic messages
-            if ("transitioned to RUNNING in database" in message or 
-                "Ignoring transition" in message or 
-                "Add workflow_run:" in message or
-                "Get tasks by status" in message):
-                full_stack = '\n'.join([f"{frame.filename}:{frame.lineno} in {frame.name}" for frame in stack[-10:]])
-                attributes["jobmon.full_stack"] = full_stack
-                
-                # Add exporter debug info for problematic messages
+            # Add full stack trace for all messages to debug duplicate logs
+            full_stack = '\n'.join([f"{frame.filename}:{frame.lineno} in {frame.name}" for frame in stack[-10:]])
+            attributes["jobmon.full_stack"] = full_stack
+            
+            # Add exporter debug info for messages with retry pattern (ASGI middleware in stack)
+            if "starlette/middleware" in full_stack or "otel_send" in full_stack:
                 from jobmon.core.otlp.manager import JobmonOTLPManager
                 manager = JobmonOTLPManager.get_instance()
                 exporter_debug = manager.get_exporter_debug_info()
@@ -226,6 +223,9 @@ class JobmonOTLPLoggingHandler(logging.Handler):
                     attributes["jobmon.exporter_success_rate"] = exporter_debug.get("success_rate", 0.0)
                     if exporter_debug.get("last_error"):
                         attributes["jobmon.exporter_last_error"] = exporter_debug["last_error"]
+                    attributes["jobmon.is_retry"] = True
+                else:
+                    attributes["jobmon.is_retry"] = False
 
             # Create OTLP log record
             severity_map = self._get_severity_map()
