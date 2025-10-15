@@ -623,3 +623,102 @@ def test_queue_task_batch_and_log_done_concurrently(db_engine, tool):
             TaskInstanceStatus.INSTANTIATED,
             TaskInstanceStatus.LAUNCHED,
         )
+
+
+def test_queue_task_batch_returns_status_for_already_queued_tasks(db_engine, tool):
+    """Test that queue_task_batch returns task status even when tasks are already QUEUED.
+
+    This tests the fix for the production bug where workflows would stop mid-execution
+    because queue_task_batch returned an empty response when tasks were already in QUEUED status.
+
+    Steps:
+    1. Create a workflow with array tasks (not running it)
+    2. Directly update tasks' status to 'Q' (QUEUED) in the database
+    3. Call queue_task_batch route
+    4. Verify it returns tasks with their current status (not empty response)
+    """
+    from jobmon.core.constants import TaskStatus
+
+    # Create a task template and workflow (but don't run it)
+    tt = tool.get_task_template(
+        template_name="already_queued_test",
+        command_template="echo {arg}",
+        node_args=["arg"],
+        task_args=[],
+        op_args=[],
+        default_cluster_name="sequential",
+        default_compute_resources={"queue": "null.q"},
+    )
+
+    # Create tasks
+    tasks = tt.create_tasks(arg=[1, 2, 3, 4, 5], compute_resources={"queue": "null.q"})
+    wf = tool.create_workflow()
+    wf.add_tasks(tasks)
+    wf.bind()
+    wf._bind_tasks()
+
+    # Get the array ID and create a workflow run
+    array_id = tasks[0].array.array_id
+    factory = WorkflowRunFactory(wf.workflow_id)
+    wfr = factory.create_workflow_run()
+    workflow_run_id = wfr.workflow_run_id
+    task_resources_id = 1
+
+    # Directly update tasks to QUEUED status in the database
+    with Session(db_engine) as session:
+        for task in tasks:
+            update_query = text("UPDATE task SET status = :status WHERE id = :task_id")
+            session.execute(
+                update_query, {"status": TaskStatus.QUEUED, "task_id": task.task_id}
+            )
+        session.commit()
+
+    # Verify tasks are now in QUEUED status
+    with Session(db_engine) as session:
+        for task in tasks:
+            query = text("SELECT status FROM task WHERE id = :task_id")
+            result = session.execute(query, {"task_id": task.task_id})
+            status = result.scalar()
+            assert status == TaskStatus.QUEUED, f"Expected status 'Q', got {status}"
+
+    # Call queue_task_batch route
+    request_data = {
+        "task_ids": [task.task_id for task in tasks],
+        "task_resources_id": task_resources_id,
+        "workflow_run_id": workflow_run_id,
+    }
+
+    return_code, response = wf.requester.send_request(
+        app_route=f"/array/{array_id}/queue_task_batch",
+        message=request_data,
+        request_type="post",
+    )
+
+    # Verify response is not empty and contains task status
+    assert return_code == 200, f"Expected status code 200, got {return_code}"
+    assert "tasks_by_status" in response, "Response should contain 'tasks_by_status'"
+
+    tasks_by_status = response["tasks_by_status"]
+
+    # The critical assertion: response should NOT be empty
+    assert len(tasks_by_status) > 0, (
+        "BUG: queue_task_batch returned empty response for already-queued tasks! "
+        "This would cause workflows to stop mid-execution."
+    )
+
+    # Verify all tasks are returned with QUEUED status
+    assert (
+        TaskStatus.QUEUED in tasks_by_status
+    ), f"Expected QUEUED status in response, got statuses: {list(tasks_by_status.keys())}"
+
+    queued_task_ids = tasks_by_status.get(TaskStatus.QUEUED, [])
+    assert len(queued_task_ids) == len(
+        tasks
+    ), f"Expected {len(tasks)} tasks in QUEUED status, got {len(queued_task_ids)}"
+
+    # Verify all task IDs are present
+    expected_task_ids = set(task.task_id for task in tasks)
+    returned_task_ids = set(queued_task_ids)
+    assert (
+        returned_task_ids == expected_task_ids
+    ), f"Returned task IDs don't match. Expected: {expected_task_ids}, Got: {returned_task_ids}"
