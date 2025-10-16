@@ -182,15 +182,21 @@ class DistributorService:
                         f"Status processing for status={status} took "
                         f"{int((end_time - start_time))}s."
                     )
-                    print(f"Distributor Status processing for status={status} took "
-                          f"{int((end_time - start_time))}s.")
+                    print(
+                        f"Distributor Status processing for status={status} took "
+                        f"{int((end_time - start_time))}s."
+                    )
 
                 # append done work to the end of the work order
                 todo += done
                 done = []
 
-                logger.info(f"Distributor service time_till_next_heartbeat: {time_till_next_heartbeat}")
-                print(f"Distributor Distributor service time_till_next_heartbeat: {time_till_next_heartbeat}")
+                logger.info(
+                    f"Distributor service time_till_next_heartbeat: {time_till_next_heartbeat}"
+                )
+                print(
+                    f"Distributor time_till_next_heartbeat: {time_till_next_heartbeat}"
+                )
                 if time_till_next_heartbeat > 0:
                     time.sleep(time_till_next_heartbeat)
 

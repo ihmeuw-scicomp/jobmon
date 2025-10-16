@@ -304,7 +304,9 @@ class WorkflowRun:
                 logger.info(
                     f"Still fetching tasks, {len(self.tasks)} collected so far..."
                 )
-                print(f"Swarm Still fetching tasks, {len(self.tasks)} collected so far...")
+                print(
+                    f"Swarm Still fetching tasks, {len(self.tasks)} collected so far..."
+                )
 
             _, resp = self.requester.send_request(
                 app_route=f"/workflow/get_tasks/{self.workflow_id}",
@@ -538,7 +540,9 @@ class WorkflowRun:
                         logger.warning(
                             f"Workflow Run set to {self.status}. Waiting for tasks to stop"
                         )
-                        print(f"Swarm Workflow Run set to {self.status}. Waiting for tasks to stop")
+                        print(
+                            f"Swarm Workflow Run set to {self.status}. Wait for tasks finish"
+                        )
                         # Active task instances will be set to "K", the processing loop then
                         # keeps running until all of the states are appropriately set.
                         self._terminate_task_instances()
@@ -563,7 +567,7 @@ class WorkflowRun:
                 time_till_next_heartbeat = self._workflow_run_heartbeat_interval - (
                     loop_start - self._last_heartbeat_time
                 )
-          
+
                 if self.status == WorkflowRunStatus.RUNNING:
                     self.process_commands(timeout=time_till_next_heartbeat)
 
@@ -581,18 +585,19 @@ class WorkflowRun:
                 else:
                     time_since_last_full_sync += loop_elapsed
                     self.synchronize_state()
-                
+
                 # if there is active tasks, loop continue
                 if self.active_tasks:
                     graceful_termination_counting = 0
                 else:
                     # if all tasks are final, break the loop
-                    if len(self.tasks) == len(self._task_status_map[TaskStatus.DONE])\
-                         + len(self._task_status_map[TaskStatus.ERROR_FATAL]):
+                    if len(self.tasks) == len(
+                        self._task_status_map[TaskStatus.DONE]
+                    ) + len(self._task_status_map[TaskStatus.ERROR_FATAL]):
                         loop_continue = False
                         graceful_termination_counting = 0
                     else:
-                        # run a full sync; if still no active tasks, in create the graceful termination counting
+                        # run a full sync; if still no active tasks, and retry
                         self.synchronize_state(full_sync=True)
                         time_since_last_full_sync = 0.0
                         if not self.active_tasks:
@@ -671,8 +676,8 @@ class WorkflowRun:
             - len(active_tasks.intersection(array.tasks))
             for aid, array in self.arrays.items()
         }
-        logger.info(f"********************************active tasks: {active_tasks}")
-        print(f"Swarm ********************************active tasks: {active_tasks}")
+        logger.info(f"active tasks: {active_tasks}")
+        print(f"Swarm active tasks: {active_tasks}")
 
         try:
             unscheduled_tasks: List[SwarmTask] = []
@@ -714,8 +719,8 @@ class WorkflowRun:
 
                     # set final array capacity
                     array_capacity_lookup[array_id] = array_capacity
-                    logger.info("*******************************ready to run: {self.ready_to_run}")
-                    print(f"Swarm *******************************ready to run: {self.ready_to_run}")
+                    logger.info("ready to run: {self.ready_to_run}")
+                    print(f"Swarm ready to run: {self.ready_to_run}")
 
                     yield SwarmCommand(self.queue_task_batch, current_batch)
 
@@ -746,8 +751,8 @@ class WorkflowRun:
                 swarm_command()
 
                 # if we need a status sync close the generator. next will raise StopIteration
-                print(f"**!******************************time_till_next_heartbeat: {time.time() - loop_start}")
-                print(f"**@******************************timeout: {timeout}")
+                print(f"time_till_next_heartbeat: {time.time() - loop_start}")
+                print(f"timeout: {timeout}")
                 if not ((time.time() - loop_start) < timeout or timeout == -1):
                     logger.info("Stopping processing as timeout reached")
                     print("Swarm Stopping processing as timeout reached")
@@ -808,22 +813,9 @@ class WorkflowRun:
                     f"Got status update {task.status} for task_id: {task.task_id}."
                     "No actions necessary."
                 )
-                print(f"Swarm Got status update {task.status} for task_id: {task.task_id}. No actions necessary.")
-
-        # if newly done report percent done and check if all done
-        if num_newly_completed > 0:
-            percent_done = round(
-                (len(self._task_status_map[TaskStatus.DONE]) / len(self.tasks)) * 100, 2
-            )
-            logger.info(
-                f"{num_newly_completed} newly completed tasks. {percent_done} percent done."
-            )
-            print(f"Swarm {num_newly_completed} newly completed tasks. {percent_done} percent done.")
-
-        # if newly failed, report failures and check if we should error out
-        if num_newly_failed > 0:
-            logger.warning(f"{num_newly_failed} newly failed tasks.")
-            print(f"Swarm {num_newly_failed} newly failed tasks.")
+                print(
+                    f"Swarm Got status update {task.status} for task_id: {task.task_id}."
+                )
 
     def _set_status_for_triaging(self) -> None:
         app_route = f"/workflow_run/{self.workflow_run_id}/set_status_for_triaging"
