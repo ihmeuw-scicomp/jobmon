@@ -627,6 +627,8 @@ class Workflow(object):
 
             try:
                 swarm.run(distributor.alive, seconds_until_timeout)
+            except Exception as e:
+                logger.warning(f"Error running workflow: {e}")
             finally:
                 # figure out doneness
                 num_new_completed = (
