@@ -530,14 +530,16 @@ class DistributorService:
             ],
             "status": status,
         }
-        logger.info(f"Send to sync_status: {message}")
-        print(f"Distributor Send to sync_status: {message}")
+        print(
+            f"Distributor Send to sync_status: {len(message['task_instance_ids'])} tis for status {status} at {time.time()}"
+        )
         app_route = f"/workflow_run/{self.workflow_run.workflow_run_id}/sync_status"
         _, result = self.requester.send_request(
             app_route=app_route, message=message, request_type="post"
         )
-        logger.info(f"Received from sync_status: {result}")
-        print(f"Distributor Received from sync_status: {result}")
+        print(
+            f"Distributor Received from sync_status: {len(result['status_updates'])} tis"
+        )
         # mutate the statuses and update the status map
         status_updates: Dict[str, List[int]] = result["status_updates"]
         for new_status, task_instance_ids in status_updates.items():

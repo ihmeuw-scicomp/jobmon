@@ -676,8 +676,7 @@ class WorkflowRun:
             - len(active_tasks.intersection(array.tasks))
             for aid, array in self.arrays.items()
         }
-        logger.info(f"active tasks: {active_tasks}")
-        print(f"Swarm active tasks: {active_tasks}")
+        print(f"Swarm active tasks: {len(active_tasks)}")
 
         try:
             unscheduled_tasks: List[SwarmTask] = []
