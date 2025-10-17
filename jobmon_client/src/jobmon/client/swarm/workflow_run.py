@@ -782,7 +782,7 @@ class WorkflowRun:
 
             except StopIteration:
                 # stop processing commands if we are out of commands
-                logger.info("Stopping processing as there is no more work")
+                logger.info("Stopping command processing as there is no more work")
                 print("Swarm command stopping processing as there is no more work")
                 keep_processing = False
 
