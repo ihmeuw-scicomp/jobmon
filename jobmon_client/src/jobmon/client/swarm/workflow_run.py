@@ -783,7 +783,7 @@ class WorkflowRun:
             except StopIteration:
                 # stop processing commands if we are out of commands
                 logger.info("Stopping processing as there is no more work")
-                print("Swarm Stopping processing as there is no more work")
+                print("Swarm command stopping processing as there is no more work")
                 keep_processing = False
 
     def synchronize_state(self, full_sync: bool = False) -> None:
