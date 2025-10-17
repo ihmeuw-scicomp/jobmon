@@ -17,6 +17,7 @@ from typing import (
     List,
     Optional,
     Set,
+    Tuple,
     Union,
 )
 
@@ -567,6 +568,7 @@ class WorkflowRun:
                 time_till_next_heartbeat = self._workflow_run_heartbeat_interval - (
                     loop_start - self._last_heartbeat_time
                 )
+                print(f"Swarm time_till_next_heartbeat: {time_till_next_heartbeat}")
 
                 if self.status == WorkflowRunStatus.RUNNING:
                     self.process_commands(timeout=time_till_next_heartbeat)
@@ -601,6 +603,8 @@ class WorkflowRun:
                         self.synchronize_state(full_sync=True)
                         time_since_last_full_sync = 0.0
                         if not self.active_tasks:
+                            # need to log a heartbeat here
+                            self._log_heartbeat()
                             graceful_termination_counting += 1
                         else:
                             graceful_termination_counting = 0
@@ -718,8 +722,7 @@ class WorkflowRun:
 
                     # set final array capacity
                     array_capacity_lookup[array_id] = array_capacity
-                    logger.info("ready to run: {self.ready_to_run}")
-                    print(f"Swarm ready to run: {self.ready_to_run}")
+                    print(f"Swarm ready to run: {len(self.ready_to_run)} tasks")
 
                     yield SwarmCommand(self.queue_task_batch, current_batch)
 
@@ -730,6 +733,23 @@ class WorkflowRun:
         # make sure to put unscheduled back on queue, even when the generator is closed
         finally:
             self.ready_to_run.extendleft(unscheduled_tasks)
+
+    def _get_time_till_next_heartbeat(
+        self, timeout: Union[int, float], loop_start: float
+    ) -> Tuple[float, Union[int, float]]:
+        """A method to calculate the time till the next heartbeat.
+
+        This method is used to test a bug in FHS where the timeout is not updated.
+
+        Args:
+            timeout: time until we stop processing. -1 means process till no more work
+            loop_start: the time the loop started
+        """
+        if timeout < 0:
+            logger.warning("Swarm Timeout is negative")
+            print(f"Swarm Timeout is negative: {timeout}")
+        elapsed_time = time.time() - loop_start
+        return elapsed_time, timeout
 
     def process_commands(self, timeout: Union[int, float] = -1) -> None:
         """Processes swarm commands until all work is done or timeout is reached.
@@ -750,9 +770,12 @@ class WorkflowRun:
                 swarm_command()
 
                 # if we need a status sync close the generator. next will raise StopIteration
-                print(f"time_till_next_heartbeat: {time.time() - loop_start}")
-                print(f"timeout: {timeout}")
-                if not ((time.time() - loop_start) < timeout or timeout == -1):
+                elapsed_time, timeout = self._get_time_till_next_heartbeat(
+                    timeout, loop_start
+                )
+                print(f"Swarm elapsed_time: {time.time() - loop_start}")
+                print(f"Swarm timeout: {timeout}")
+                if not (elapsed_time < timeout or timeout == -1):
                     logger.info("Stopping processing as timeout reached")
                     print("Swarm Stopping processing as timeout reached")
                     swarm_commands.close()
@@ -837,6 +860,7 @@ class WorkflowRun:
         )
         self._status = response["status"]
         self._last_heartbeat_time = time.time()
+        print(f"Swarm last_heartbeat_time: {self._last_heartbeat_time}")
 
     def _update_status(self, status: str) -> None:
         """Update the status of the workflow_run with whatever status is passed."""

@@ -531,7 +531,8 @@ class DistributorService:
             "status": status,
         }
         print(
-            f"Distributor Send to sync_status: {len(message['task_instance_ids'])} tis for status {status} at {time.time()}"
+            f"Distributor Send to sync_status: {len(message['task_instance_ids'])} "
+            f"tis for status {status} at {time.time()}"
         )
         app_route = f"/workflow_run/{self.workflow_run.workflow_run_id}/sync_status"
         _, result = self.requester.send_request(
