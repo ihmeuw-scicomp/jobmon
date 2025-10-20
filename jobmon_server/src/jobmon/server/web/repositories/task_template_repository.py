@@ -881,6 +881,7 @@ class TaskTemplateRepository:
                         task_instance_err_id=row.id,
                         error_time=row.error_time,
                         error=row.description,
+                        task_instance_stderr_log=row.stderr_log,
                         workflow_run_id=row.workflow_run_id,
                         workflow_id=row.workflow_id,
                     )
