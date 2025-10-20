@@ -503,6 +503,8 @@ class WorkflowRun:
                 self._update_status(WorkflowRunStatus.RUNNING)
 
             time_since_last_full_sync = 0.0
+            # Track overall runtime from a fixed start time for accurate timeout checks
+            swarm_start_time = time.time()
             total_elapsed_time = 0.0
             terminating_states = [
                 WorkflowRunStatus.COLD_RESUME,
@@ -512,6 +514,8 @@ class WorkflowRun:
             loop_continue = True
             graceful_termination_counting = 0
             while loop_continue:
+                # Per-iteration start time used for heartbeat and per-iteration elapsed
+                iteration_start = time.time()
                 # Expire the swarm after the requested number of seconds
                 if total_elapsed_time > seconds_until_timeout:
                     raise RuntimeError(
@@ -564,9 +568,8 @@ class WorkflowRun:
                     )
 
                 # process any commands that we can in the time allotted
-                loop_start = time.time()
                 time_till_next_heartbeat = self._workflow_run_heartbeat_interval - (
-                    loop_start - self._last_heartbeat_time
+                    iteration_start - self._last_heartbeat_time
                 )
                 print(f"Swarm time_till_next_heartbeat: {time_till_next_heartbeat}")
 
@@ -574,7 +577,7 @@ class WorkflowRun:
                     self.process_commands(timeout=time_till_next_heartbeat)
 
                 # take a break if needed
-                loop_elapsed = time.time() - loop_start
+                loop_elapsed = time.time() - iteration_start
                 if loop_elapsed < time_till_next_heartbeat:
                     sleep_time = time_till_next_heartbeat - loop_elapsed
                     time.sleep(sleep_time)
@@ -611,7 +614,9 @@ class WorkflowRun:
                         if graceful_termination_counting >= 3:
                             loop_continue = False
 
-                total_elapsed_time += time.time() - loop_start
+                # Recompute total elapsed time against the fixed swarm start time
+                total_elapsed_time = time.time() - swarm_start_time
+                print(f"Swarm total_elapsed_time: {total_elapsed_time}")
 
         # user interrupt
         except KeyboardInterrupt:
@@ -760,7 +765,7 @@ class WorkflowRun:
         swarm_commands = self.get_swarm_commands()
 
         # this way we always process at least 1 command
-        loop_start = time.time()
+        loop_start_pc = time.time()
         keep_processing = True
         while keep_processing:
             # run commands
@@ -771,9 +776,9 @@ class WorkflowRun:
 
                 # if we need a status sync close the generator. next will raise StopIteration
                 elapsed_time, timeout = self._get_time_till_next_heartbeat(
-                    timeout, loop_start
+                    timeout, loop_start_pc
                 )
-                print(f"Swarm elapsed_time: {time.time() - loop_start}")
+                print(f"Swarm elapsed_time: {time.time() - loop_start_pc}")
                 print(f"Swarm timeout: {timeout}")
                 if not (elapsed_time < timeout or timeout == -1):
                     logger.info("Stopping processing as timeout reached")
@@ -787,6 +792,7 @@ class WorkflowRun:
                 keep_processing = False
 
     def synchronize_state(self, full_sync: bool = False) -> None:
+        print("Swarm synchronizing state")
         self._set_status_for_triaging()
         self._log_heartbeat()
         self._task_status_updates(full_sync=full_sync)
