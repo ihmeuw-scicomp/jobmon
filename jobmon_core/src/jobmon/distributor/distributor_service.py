@@ -182,10 +182,6 @@ class DistributorService:
                         f"Status processing for status={status} took "
                         f"{int((end_time - start_time))}s."
                     )
-                    print(
-                        f"Distributor Status processing for status={status} took "
-                        f"{int((end_time - start_time))}s."
-                    )
 
                 # append done work to the end of the work order
                 todo += done
@@ -194,9 +190,6 @@ class DistributorService:
                 logger.info(
                     f"Distributor service time_till_next_heartbeat: {time_till_next_heartbeat}"
                 )
-                print(
-                    f"Distributor time_till_next_heartbeat: {time_till_next_heartbeat}"
-                )
                 if time_till_next_heartbeat > 0:
                     time.sleep(time_till_next_heartbeat)
 
@@ -204,10 +197,8 @@ class DistributorService:
 
         except DistributorInterruptedError as e:
             logger.info(f"Interrupt received! {e}")
-            print(f"Distributor Interrupt received! {e}")
         except Exception as e:
             logger.exception(e)
-            print(f"Distributor Exception: {e}")
             raise
         finally:
             # stop distributor
@@ -340,7 +331,6 @@ class DistributorService:
             # if other error, transition to No ID status
             stack_trace = traceback.format_exc()
             logger.exception(e)
-            print(f"Distributor Exception: {e}")
             for task_instance in task_instance_batch.task_instances:
                 distributor_command = DistributorCommand(
                     task_instance.transition_to_no_distributor_id,
@@ -393,7 +383,6 @@ class DistributorService:
         except Exception as e:
             stack_trace = traceback.format_exc()
             logger.exception(e)
-            print(f"Distributor Exception: {e}")
             task_instance.transition_to_no_distributor_id(no_id_err_msg=stack_trace)
 
         else:
@@ -530,16 +519,9 @@ class DistributorService:
             ],
             "status": status,
         }
-        print(
-            f"Distributor Send to sync_status: {len(message['task_instance_ids'])} "
-            f"tis for status {status} at {time.time()}"
-        )
         app_route = f"/workflow_run/{self.workflow_run.workflow_run_id}/sync_status"
         _, result = self.requester.send_request(
             app_route=app_route, message=message, request_type="post"
-        )
-        print(
-            f"Distributor Received from sync_status: {len(result['status_updates'])} tis"
         )
         # mutate the statuses and update the status map
         status_updates: Dict[str, List[int]] = result["status_updates"]

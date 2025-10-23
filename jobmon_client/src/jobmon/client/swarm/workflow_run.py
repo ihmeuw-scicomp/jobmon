@@ -145,14 +145,6 @@ class WorkflowRun:
         else:
             self._heartbeat_report_by_buffer = heartbeat_report_by_buffer
 
-        # Graceful termination retry settings
-        self._graceful_termination_retry_count = config.get_int(
-            "heartbeat", "graceful_termination_retry_count"
-        )
-        self._graceful_termination_retry_heartbeat = config.get_boolean(
-            "heartbeat", "graceful_termination_retry_heartbeat"
-        )
-
         if requester is None:
             requester = Requester.from_defaults()
         self.requester = requester
@@ -191,6 +183,43 @@ class WorkflowRun:
             [any(self._task_status_map[s]) for s in self._active_states]
         ) or any(self.ready_to_run)
         return any_active_tasks
+
+    def _get_active_tasks_count(self) -> int:
+        """Return the number of active tasks."""
+        active_count = 0
+        for status in self._active_states:
+            active_count += len(self._task_status_map[status])
+        return active_count
+
+    def _get_ready_to_run_count(self) -> int:
+        """Return the number of tasks ready to run."""
+        return len(self.ready_to_run)
+
+    def _decide_run_loop_continue(
+        self, time_since_last_full_sync: float
+    ) -> tuple[bool, float]:
+        """Decide whether the run loop should continue based on task states.
+
+        Returns:
+            tuple: (should_continue, updated_time_since_last_full_sync)
+        """
+        if self._get_active_tasks_count() + self._get_ready_to_run_count() > 0:
+            logger.debug("Swarm has active or ready to run")
+            return True, time_since_last_full_sync
+        else:
+            # if all tasks are final, break the loop
+            if len(self.tasks) == len(self._task_status_map[TaskStatus.DONE]) + len(
+                self._task_status_map[TaskStatus.ERROR_FATAL]
+            ):
+                logger.debug("Swarm all tasks are done")
+                return False, time_since_last_full_sync
+            else:
+                # run a full sync; if still no active tasks, exit immediately
+                self.synchronize_state(full_sync=True)
+                time_since_last_full_sync = 0.0
+                if self._get_active_tasks_count() + self._get_ready_to_run_count() == 0:
+                    return False, time_since_last_full_sync
+                return True, time_since_last_full_sync
 
     def from_workflow(self, workflow: Workflow) -> None:
         if self.initialized:
@@ -507,7 +536,6 @@ class WorkflowRun:
             ]
 
             loop_continue = True
-            graceful_termination_counting = 0
             while loop_continue:
                 # Per-iteration start time used for heartbeat and per-iteration elapsed
                 iteration_start = time.time()
@@ -559,22 +587,15 @@ class WorkflowRun:
                     )
 
                 # process any commands that we can in the time allotted
-                timing_metrics = self._calculate_timing_metrics(
-                    iteration_start, swarm_start_time
+                time_till_next_heartbeat = self._workflow_run_heartbeat_interval - (
+                    iteration_start - self._last_heartbeat_time
                 )
-                time_till_next_heartbeat = timing_metrics["time_till_next_heartbeat"]
 
                 if self.status == WorkflowRunStatus.RUNNING:
-                    # When wedged_workflow_sync_interval is negative, we are in a forced
-                    # full-sync recovery mode. In this mode, avoid dispatching new work and
-                    # only rebuild internal state so downstream tasks become ready without
-                    # being immediately queued. This matches expected behavior for wedged
-                    # DAG recovery workflows/tests.
-                    if self.wedged_workflow_sync_interval >= 0:
-                        self.process_commands(timeout=time_till_next_heartbeat)
+                    self.process_commands(timeout=time_till_next_heartbeat)
 
                 # take a break if needed
-                loop_elapsed = timing_metrics["loop_elapsed"]
+                loop_elapsed = time.time() - iteration_start
                 if loop_elapsed < time_till_next_heartbeat:
                     sleep_time = time_till_next_heartbeat - loop_elapsed
                     time.sleep(sleep_time)
@@ -584,64 +605,17 @@ class WorkflowRun:
                 if time_since_last_full_sync > self.wedged_workflow_sync_interval:
                     time_since_last_full_sync = 0.0
                     self.synchronize_state(full_sync=True)
-
-                    # In forced full-sync recovery (negative interval), rebuild ready queue
-                    # strictly from current statuses without mutating statuses, so that
-                    # downstreams whose upstreams are DONE become ready.
-                    if self.wedged_workflow_sync_interval < 0:
-                        # Clear any stale ready queue content
-                        self.ready_to_run.clear()
-
-                        # Recompute upstream completion counts and rebuild ready queue
-                        for task in self.tasks.values():
-                            # Reset computed upstream done count; it will be recomputed
-                            task.num_upstreams_done = 0
-
-                        for task in self.tasks.values():
-                            if task.status == TaskStatus.DONE:
-                                for downstream in task.downstream_swarm_tasks:
-                                    downstream.num_upstreams_done += 1
-
-                        for task in self.tasks.values():
-                            if (
-                                task.status == TaskStatus.REGISTERING
-                                and task.all_upstreams_done
-                            ):
-                                self._set_validated_task_resources(task)
-                                self.ready_to_run.append(task)
                 else:
                     time_since_last_full_sync += loop_elapsed
                     self.synchronize_state()
 
                 # if there is active tasks, loop continue
-                if self.active_tasks:
-                    graceful_termination_counting = 0
-                else:
-                    # if all tasks are final, break the loop
-                    if len(self.tasks) == len(
-                        self._task_status_map[TaskStatus.DONE]
-                    ) + len(self._task_status_map[TaskStatus.ERROR_FATAL]):
-                        loop_continue = False
-                        graceful_termination_counting = 0
-                    else:
-                        # run a full sync; if still no active tasks, and retry
-                        self.synchronize_state(full_sync=True)
-                        time_since_last_full_sync = 0.0
-                        if not self.active_tasks:
-                            # need to log a heartbeat here if configured
-                            if self._graceful_termination_retry_heartbeat:
-                                self._log_heartbeat()
-                            graceful_termination_counting += 1
-                        else:
-                            graceful_termination_counting = 0
-                        if (
-                            graceful_termination_counting
-                            >= self._graceful_termination_retry_count
-                        ):
-                            loop_continue = False
+                loop_continue, time_since_last_full_sync = (
+                    self._decide_run_loop_continue(time_since_last_full_sync)
+                )
 
                 # Recompute total elapsed time against the fixed swarm start time
-                total_elapsed_time = timing_metrics["total_elapsed_time"]
+                total_elapsed_time = time.time() - swarm_start_time
 
         # user interrupt
         except KeyboardInterrupt:
@@ -757,42 +731,6 @@ class WorkflowRun:
         # make sure to put unscheduled back on queue, even when the generator is closed
         finally:
             self.ready_to_run.extendleft(unscheduled_tasks)
-
-    def _calculate_timing_metrics(
-        self, iteration_start: float, swarm_start_time: float
-    ) -> Dict[str, float]:
-        """Calculate all timing metrics for the workflow run.
-
-        This method centralizes all time calculations for easier testing and maintenance.
-
-        Args:
-            iteration_start: the time the current loop iteration started
-            swarm_start_time: the time the entire workflow run started
-
-        Returns:
-            Dictionary containing all timing metrics:
-            - time_till_next_heartbeat: time until next heartbeat is due
-            - loop_elapsed: time elapsed in current iteration
-            - total_elapsed_time: total time elapsed since workflow start
-        """
-        current_time = time.time()
-
-        # Calculate time until next heartbeat
-        time_till_next_heartbeat = self._workflow_run_heartbeat_interval - (
-            iteration_start - self._last_heartbeat_time
-        )
-
-        # Calculate loop elapsed time
-        loop_elapsed = current_time - iteration_start
-
-        # Calculate total elapsed time since workflow start
-        total_elapsed_time = current_time - swarm_start_time
-
-        return {
-            "time_till_next_heartbeat": time_till_next_heartbeat,
-            "loop_elapsed": loop_elapsed,
-            "total_elapsed_time": total_elapsed_time,
-        }
 
     def _get_time_till_next_heartbeat(
         self, timeout: Union[int, float], loop_start: float
