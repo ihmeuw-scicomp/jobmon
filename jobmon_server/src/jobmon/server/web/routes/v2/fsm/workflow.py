@@ -494,7 +494,6 @@ def get_available_workflow_statuses() -> Any:
         with session.begin():
             select_stmt = select(WorkflowStatus.label).distinct()
             res = session.execute(select_stmt).scalars().all()
-            print(f"DB Testing Route*******************{res}")
         resp = JSONResponse(
             content={"available_statuses": res}, status_code=StatusCodes.OK
         )
