@@ -79,6 +79,7 @@ def configure_server_logging() -> None:
     # Configure structlog to integrate with stdlib loggers
     # This must come AFTER stdlib logging is configured
     from jobmon.core.config.structlog_config import configure_structlog
+
     configure_structlog(component_name="server")
 
     _server_logging_configured = True

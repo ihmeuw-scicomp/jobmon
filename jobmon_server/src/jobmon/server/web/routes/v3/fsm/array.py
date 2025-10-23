@@ -199,7 +199,8 @@ async def record_array_batch_num(
                 db.commit()
 
                 logger.info(
-                    f"Batch {batch_num_result} created successfully for array {array_id} with {len(batch)} tasks in workflow_run {workflow_run_id}"
+                    f"Batch {batch_num_result} created successfully for array {array_id} "
+                    f"with {len(batch)} tasks in workflow_run {workflow_run_id}"
                 )
                 break  # Success - exit retry loop
 

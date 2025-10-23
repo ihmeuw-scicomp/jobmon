@@ -32,6 +32,7 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
 
     # Configure logging after uvicorn workers are forked to prevent duplicate emissions
     from jobmon.server.web.logging import configure_server_logging
+
     configure_server_logging()
 
     # Initialize the FastAPI app

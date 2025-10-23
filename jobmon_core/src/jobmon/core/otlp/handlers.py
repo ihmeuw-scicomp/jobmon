@@ -11,7 +11,9 @@ from . import OTLP_AVAILABLE
 from .formatters import JobmonOTLPFormatter
 
 # TTL-based deduplication cache
-_dedup_cache: Dict[str, tuple[float, int]] = {}  # event_hash -> (timestamp, emission_count)
+_dedup_cache: Dict[str, tuple[float, int]] = (
+    {}
+)  # event_hash -> (timestamp, emission_count)
 _dedup_lock = threading.Lock()
 TTL_SECONDS = 10  # 10 second TTL window
 
@@ -170,7 +172,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             import hashlib
             import os
 
-            from opentelemetry.sdk._logs import LogRecord as OTLPLogRecord
             from opentelemetry.trace import TraceFlags, get_current_span
 
             from jobmon.core.config.structlog_config import _thread_local
@@ -188,21 +189,19 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             # Get trace context
             trace_id_int, span_id_int = self._parse_trace_context(event_dict)
 
-            # Add deduplication metadata
-            # Generate stable event_id: hash of (timestamp, message, trace_id, span_id, pid)
-            event_key = (
-                f"{record.created}:{message}:{trace_id_int}:{span_id_int}:{os.getpid()}"
-            )
-            event_id = hashlib.sha256(event_key.encode()).hexdigest()[:16]
-            
-            # TTL-based deduplication: hash of (message, level, trace_id, span_id, workflow_run_id)
-            dedup_key_parts = [message, record.levelname, str(trace_id_int), str(span_id_int)]
+            # TTL-based deduplication: hash of message, level, trace/span IDs, workflow_run_id
+            dedup_key_parts = [
+                message,
+                record.levelname,
+                str(trace_id_int),
+                str(span_id_int),
+            ]
             if event_dict:
                 # Add workflow_run_id if available for better deduplication
                 workflow_run_id = event_dict.get("workflow_run_id")
                 if workflow_run_id:
                     dedup_key_parts.append(str(workflow_run_id))
-            
+
             dedup_key = ":".join(dedup_key_parts)
             event_hash = hashlib.sha256(dedup_key.encode()).hexdigest()[:8]
 
@@ -227,81 +226,30 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
                 # Clean up expired entries
                 expired_keys = [
-                    key for key, (timestamp, _) in _dedup_cache.items()
+                    key
+                    for key, (timestamp, _) in _dedup_cache.items()
                     if current_time - timestamp > TTL_SECONDS
                 ]
                 for key in expired_keys:
                     del _dedup_cache[key]
 
-            # Add debug instrumentation to track duplicate emissions
-            import traceback
-            
-            # Capture call stack for debugging
-            stack = traceback.extract_stack()
-            callsite = stack[-3] if len(stack) >= 3 else stack[-1]  # Skip emit() and internal calls
-
-            # Track handler instance and call count
-            handler_id = id(self)
-            if not hasattr(self, '_call_count'):
-                self._call_count = 0
-            self._call_count += 1
-
-            attributes["jobmon.event_id"] = event_id
-            attributes["jobmon.event_hash"] = event_hash
+            # Add monitoring attributes for deduplication tracking
             attributes["jobmon.emission_count"] = emission_count
             attributes["jobmon.is_duplicate"] = is_duplicate
             attributes["jobmon.process_id"] = os.getpid()
-            attributes["jobmon.thread_id"] = record.thread
-            attributes["jobmon.handler_class"] = self.__class__.__name__
-            attributes["jobmon.handler_id"] = handler_id
-            attributes["jobmon.handler_call_count"] = self._call_count
-            attributes["jobmon.callsite_filename"] = callsite.filename.split('/')[-1]
-            attributes["jobmon.callsite_function"] = callsite.name
-            attributes["jobmon.callsite_line"] = callsite.lineno
-            attributes["jobmon.callsite_code"] = callsite.line.strip() if callsite.line else ""
-            
-            # Probe A: Track if same LogRecord reaches handler twice
-            attributes["jobmon.record_object_id"] = id(record)
-            attributes["jobmon.logger_name"] = record.name
-            attributes["jobmon.pathname"] = record.pathname
-            attributes["jobmon.funcName"] = record.funcName
-            attributes["jobmon.lineno"] = record.lineno
-            
+
             # Add request correlation if available
             if event_dict and "request_id" in event_dict:
                 attributes["jobmon.request_id"] = event_dict["request_id"]
-            
-            # Add full stack trace for all messages to debug duplicate logs
-            full_stack = '\n'.join([f"{frame.filename}:{frame.lineno} in {frame.name}" for frame in stack[-10:]])
-            attributes["jobmon.full_stack"] = full_stack
-            
-            # Add exporter debug info for all messages to track multiple exporters
-            from jobmon.core.otlp.manager import JobmonOTLPManager
-            manager = JobmonOTLPManager.get_instance()
-            exporter_debug = manager.get_exporter_debug_info()
-            if exporter_debug:
-                attributes["jobmon.exporter_id"] = exporter_debug.get("exporter_id", "unknown")
-                attributes["jobmon.exporter_export_count"] = exporter_debug.get("export_count", 0)
-                attributes["jobmon.exporter_success_count"] = exporter_debug.get("success_count", 0)
-                attributes["jobmon.exporter_failure_count"] = exporter_debug.get("failure_count", 0)
-                attributes["jobmon.exporter_success_rate"] = exporter_debug.get("success_rate", 0.0)
-                if exporter_debug.get("last_error"):
-                    attributes["jobmon.exporter_last_error"] = exporter_debug["last_error"]
-                if exporter_debug.get("time_since_last_success") is not None:
-                    attributes["jobmon.exporter_time_since_success"] = exporter_debug["time_since_last_success"]
-                if exporter_debug.get("time_since_last_failure") is not None:
-                    attributes["jobmon.exporter_time_since_failure"] = exporter_debug["time_since_last_failure"]
-                attributes["jobmon.is_retry"] = True
-            else:
-                attributes["jobmon.exporter_id"] = "none"
-                attributes["jobmon.is_retry"] = False
 
             # Create OTLP log record
+            from opentelemetry.sdk._logs import LogRecord as OTLPLogRecord
+
             severity_map = self._get_severity_map()
             severity_number = severity_map.get(
                 record.levelname, severity_map.get("INFO", 0)
             )
-            otlp_record = OTLPLogRecord(
+            otlp_record = OTLPLogRecord(  # type: ignore[deprecated]
                 timestamp=int(record.created * 1e9),
                 severity_text=record.levelname,
                 severity_number=severity_number,

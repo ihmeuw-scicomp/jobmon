@@ -35,7 +35,7 @@ class TestServerLoggingIntegration:
         """Test that server web app automatically configures logging."""
         # Need to patch BEFORE import to avoid module caching issues in xdist
         with patch(
-            "jobmon.core.config.logconfig_utils.configure_component_logging"
+            "jobmon.core.config.logconfig_utils.configure_logging_with_overrides"
         ) as mock_configure:
             with patch("jobmon.core.configuration.JobmonConfig"):
                 # Clear module cache to ensure fresh import in parallel tests
@@ -50,8 +50,11 @@ class TestServerLoggingIntegration:
 
                 app = get_app()
 
-                # Verify that logging configuration was called
-                mock_configure.assert_called_once_with("server")
+                # Verify that logging configuration was called with server section
+                # Server web app uses configure_logging_with_overrides directly, not configure_component_logging
+                mock_configure.assert_called_once()
+                args, kwargs = mock_configure.call_args
+                assert kwargs["config_section"] == "server"
 
                 # Verify the app was created
                 assert app is not None

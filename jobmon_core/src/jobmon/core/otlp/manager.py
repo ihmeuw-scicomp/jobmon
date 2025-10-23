@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional, Type
 
 from . import OTLP_AVAILABLE
 
@@ -15,79 +15,9 @@ if OTLP_AVAILABLE:
 
 from .resources import create_jobmon_resources
 
-
-class _DebugOTLPExporterWrapper:
-    """Debug wrapper for OTLP exporter to track export failures and retries."""
-    
-    def __init__(self, exporter: Any) -> None:
-        import uuid
-        self._exporter = exporter
-        self._export_count = 0
-        self._failure_count = 0
-        self._success_count = 0
-        self._last_error = None
-        self._last_success_time = None
-        self._last_failure_time = None
-        self._exporter_id = str(uuid.uuid4())[:8]  # Unique ID for this exporter instance
-        
-    def export(self, log_records: Any) -> Any:
-        """Export log records with debug tracking."""
-        import time
-        
-        self._export_count += 1
-        
-        try:
-            result = self._exporter.export(log_records)
-            
-            # Track export results based on status code
-            if hasattr(result, 'status_code'):
-                if result.status_code == 0:  # Success
-                    self._success_count += 1
-                    self._last_success_time = time.time()
-                else:  # Non-success status
-                    self._failure_count += 1
-                    self._last_error = f"Export failed with status {result.status_code}"
-                    self._last_failure_time = time.time()
-            else:
-                # No status code = assume success
-                self._success_count += 1
-                self._last_success_time = time.time()
-                    
-            return result
-            
-        except Exception as e:
-            self._failure_count += 1
-            self._last_error = f"{type(e).__name__}: {str(e)}"
-            self._last_failure_time = time.time()
-            raise
-            
-    def shutdown(self) -> None:
-        """Shutdown the wrapped exporter."""
-        if hasattr(self._exporter, 'shutdown'):
-            self._exporter.shutdown()
-            
-    def get_debug_info(self) -> Dict[str, Any]:
-        """Get debug information about export attempts."""
-        import time
-        
-        current_time = time.time()
-        return {
-            "exporter_id": self._exporter_id,
-            "export_count": self._export_count,
-            "success_count": self._success_count,
-            "failure_count": self._failure_count,
-            "last_error": self._last_error,
-            "success_rate": self._success_count / max(self._export_count, 1),
-            "time_since_last_success": current_time - self._last_success_time if self._last_success_time else None,
-            "time_since_last_failure": current_time - self._last_failure_time if self._last_failure_time else None,
-        }
-
-
 # Module-level singleton for shared logger provider with thread safety
 _logger_provider: Optional[Any] = None
 _logger_provider_lock = threading.Lock()
-
-
 
 
 class JobmonOTLPManager:
@@ -112,9 +42,7 @@ class JobmonOTLPManager:
         self.logger_provider: Optional[Any] = None
         self._initialized = False
         self._log_processor_configured = False
-        self._processor_count = 0  # Track how many processors we've added
         self._init_lock = threading.Lock()
-        self._debug_exporter: Optional[_DebugOTLPExporterWrapper] = None
 
     @classmethod
     def get_instance(cls: Type[JobmonOTLPManager]) -> JobmonOTLPManager:
@@ -174,20 +102,24 @@ class JobmonOTLPManager:
         try:
             from opentelemetry._logs import get_logger_provider, set_logger_provider
             from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-            
+
             # Explicit check: ensure we have a proper LoggerProvider and no existing processors
             global_lp = get_logger_provider()
             if not isinstance(global_lp, LoggerProvider):
                 # Set our provider as the global one
                 set_logger_provider(self.logger_provider)
                 global_lp = self.logger_provider
-            
+
             # Check if BatchLogRecordProcessor already exists
             # Processors are stored in _multi_log_record_processor._log_record_processors
             multi_processor = getattr(global_lp, "_multi_log_record_processor", None)
             if multi_processor:
-                existing_processors = getattr(multi_processor, "_log_record_processors", [])
-                if any(isinstance(p, BatchLogRecordProcessor) for p in existing_processors):
+                existing_processors = getattr(
+                    multi_processor, "_log_record_processors", []
+                )
+                if any(
+                    isinstance(p, BatchLogRecordProcessor) for p in existing_processors
+                ):
                     # Processor already exists, don't add another
                     self._log_processor_configured = True
                     return
@@ -219,18 +151,11 @@ class JobmonOTLPManager:
             # Create the exporter
             exporter = self._create_log_exporter(exporter_config)
             if exporter:
-                # Wrap exporter with debug wrapper to track failures
-                self._debug_exporter = _DebugOTLPExporterWrapper(exporter)
-                
-                # Use BatchLogRecordProcessor for efficient batching (prevents blocking retries)
-                processor = BatchLogRecordProcessor(self._debug_exporter)
+                # Use BatchLogRecordProcessor for efficient batching
+                processor = BatchLogRecordProcessor(exporter)
 
-                global_lp.add_log_record_processor(processor)
+                global_lp.add_log_record_processor(processor)  # type: ignore[attr-defined]
                 self._log_processor_configured = True
-                
-                # One-time pipeline dump at startup to prove single-init
-                self._dump_pipeline_state()
-                # Don't log here to avoid circular dependency during initialization
             else:
                 # Don't log here to avoid circular dependency during initialization
                 pass
@@ -411,70 +336,6 @@ class JobmonOTLPManager:
         except ImportError:
             pass
 
-    def get_exporter_debug_info(self) -> Optional[Dict[str, Any]]:
-        """Get debug information from the OTLP exporter."""
-        if self._debug_exporter:
-            return self._debug_exporter.get_debug_info()
-        return None
-
-    def _dump_pipeline_state(self) -> None:
-        """Dump pipeline state at startup to prove single-init."""
-        try:
-            import logging
-            from opentelemetry._logs import get_logger_provider
-            
-            # Use global logger provider
-            global_lp = get_logger_provider()
-            # Processors are stored in _multi_log_record_processor._log_record_processors
-            multi_processor = getattr(global_lp, "_multi_log_record_processor", None)
-            processors = getattr(multi_processor, "_log_record_processors", []) if multi_processor else []
-            
-            # Get root and uvicorn handlers
-            root_logger = logging.getLogger()
-            uvicorn_logger = logging.getLogger("uvicorn")
-            
-            # Use print to avoid circular logging dependency
-            print(f"[OTLP_INIT] otel_log_processors={[type(p).__name__ for p in processors]}")
-            print(f"[OTLP_INIT] root_handlers={[type(h).__name__ for h in root_logger.handlers]}")
-            print(f"[OTLP_INIT] uvicorn_handlers={[type(h).__name__ for h in uvicorn_logger.handlers]}")
-            
-            # Probe B: Dump all OTLP handler attachments
-            self._dump_handler_attachments()
-            
-        except Exception:
-            # Silently ignore errors during pipeline dump
-            pass
-    
-    def _dump_handler_attachments(self) -> None:
-        """Probe B: Dump which loggers have OTLP handlers attached."""
-        try:
-            import logging
-            from jobmon.core.otlp.handlers import JobmonOTLPStructlogHandler
-            
-            target_ids = set()
-            
-            # Check root
-            roots = [logging.getLogger()]
-            all_loggers = [l for l in logging.root.manager.loggerDict.values()
-                          if isinstance(l, logging.Logger)]
-            
-            for lg in roots + all_loggers:
-                for h in lg.handlers:
-                    if isinstance(h, JobmonOTLPStructlogHandler):
-                        target_ids.add(id(h))
-                        logger_name = lg.name if hasattr(lg, 'name') and lg.name else 'root'
-                        propagate = getattr(lg, 'propagate', None)
-                        print(f"[HANDLER_ATTACH] logger={logger_name} "
-                              f"handler_id={id(h)} class={type(h).__name__} "
-                              f"propagate={propagate}")
-            
-            if not target_ids:
-                print("[HANDLER_ATTACH] none")
-                
-        except Exception:
-            # Silently ignore errors during handler attachment dump
-            pass
-
     def shutdown(self) -> None:
         """Shutdown trace and log providers."""
         if not self._initialized:
@@ -541,8 +402,6 @@ def get_logger(name: str) -> Optional[Any]:
     """
     provider = get_shared_logger_provider()
     return provider.get_logger(name) if provider else None
-
-
 
 
 def create_log_exporter(**kwargs: Any) -> Optional[Any]:

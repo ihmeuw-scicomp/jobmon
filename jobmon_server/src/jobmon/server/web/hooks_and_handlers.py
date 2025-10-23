@@ -1,5 +1,4 @@
 import json
-import os
 import traceback
 from typing import Any, Callable, Optional
 
@@ -141,8 +140,9 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
 
         # Generate unique request ID for correlation
         import uuid
+
         request_id = str(uuid.uuid4())[:8]
-        
+
         # Bind request context
         structlog.contextvars.bind_contextvars(
             path=request.url.path,

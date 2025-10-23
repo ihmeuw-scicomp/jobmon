@@ -9,7 +9,6 @@ This module provides structlog configuration that enables:
 
 from __future__ import annotations
 
-import os
 import threading
 from typing import Any, Callable, Dict, List, Optional
 
@@ -27,8 +26,6 @@ def _store_event_dict_for_otlp(
     # Store a copy of the event_dict
     _thread_local.last_event_dict = dict(event_dict)
     return event_dict
-
-
 
 
 def configure_structlog(

@@ -451,7 +451,8 @@ async def set_status_for_triaging(
         raise e
 
     logger.info(
-        f"Triage check completed for workflow_run {workflow_run_id}: {total_updated} task instances updated"
+        f"Triage check completed for workflow_run {workflow_run_id}: "
+        f"{total_updated} task instances updated"
     )
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
