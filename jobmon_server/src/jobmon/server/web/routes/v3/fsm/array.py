@@ -91,6 +91,7 @@ async def record_array_batch_num(
     task_ids = [int(task_id) for task_id in data["task_ids"]]
     task_resources_id = int(data["task_resources_id"])
     workflow_run_id = int(data["workflow_run_id"])
+
     task_condition = and_(
         Task.id.in_(task_ids),
         Task.status.in_([TaskStatus.REGISTERING, TaskStatus.ADJUSTING_RESOURCES]),
@@ -102,8 +103,11 @@ async def record_array_batch_num(
     ]
 
     if not task_ids_to_update:
-        # No tasks to update, return empty result
-        logger.info("No tasks to update, returning tasks in QUEUED status")
+        # No tasks to update, but still return their current status (like v2)
+        logger.warning(
+            f"queue_task_batch: No tasks to update from {len(task_ids)} requested. "
+            f"Tasks may already be in QUEUED or other status."
+        )
     else:
         # Split into batches of 1000
         batch_size = 1000

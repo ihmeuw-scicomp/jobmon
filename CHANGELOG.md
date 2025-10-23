@@ -93,6 +93,7 @@ All notable changes to Jobmon will be documented in this file.
 ### Deprecated
 - Legacy logging classes `JobmonLoggerConfig` and `ClientLogging` are deprecated in favor of new `configure_client_logging()` function
 - Direct import of OTLP classes from `jobmon.core.otlp` and `jobmon.server.web.otlp` module roots (use specific submodules)
+- Removed jobmon update_config CLI command
 
 ### Removed
 - Removed legacy `JobmonLoggerConfig.attach_default_handler()` method and `ClientLogging().attach()` pattern
