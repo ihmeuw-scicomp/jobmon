@@ -61,7 +61,7 @@ def get_task_status(
     status: Optional[Union[str, list[str]]] = Query(None),
 ) -> Any:
     """Get the status of a task."""
-    logger.info(f"*********************task_ids: {task_ids}, status_request: {status}")
+    logger.info(f"task_ids: {task_ids}, status_request: {status}")
     if task_ids is None:
         raise InvalidUsage("Missing task_ids in request", status_code=400)
 

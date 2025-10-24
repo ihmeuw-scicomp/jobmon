@@ -246,6 +246,7 @@ async def task_instances_status_check(
         workflow_run_id = int(workflow_run_id)
         data = cast(Dict, await request.json())
         task_instance_ids = data["task_instance_ids"]
+        logger.info(f"task_instance_ids: {task_instance_ids}")
         status = data["status"]
     except Exception as e:
         raise InvalidUsage(

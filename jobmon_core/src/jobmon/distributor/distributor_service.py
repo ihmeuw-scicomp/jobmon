@@ -198,6 +198,9 @@ class DistributorService:
                 todo += done
                 done = []
 
+                logger.info(
+                    f"Distributor service time_till_next_heartbeat: {time_till_next_heartbeat}"
+                )
                 if time_till_next_heartbeat > 0:
                     time.sleep(time_till_next_heartbeat)
 
@@ -653,7 +656,6 @@ class DistributorService:
         _, result = self.requester.send_request(
             app_route=app_route, message=message, request_type="post"
         )
-
         # mutate the statuses and update the status map
         status_updates: Dict[str, List[int]] = result["status_updates"]
         for new_status, task_instance_ids in status_updates.items():
