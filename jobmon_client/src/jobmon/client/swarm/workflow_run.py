@@ -547,6 +547,8 @@ class WorkflowRun:
             while loop_continue:
                 # Per-iteration start time used for heartbeat and per-iteration elapsed
                 iteration_start = time.time()
+                # Recompute total elapsed time at START for accurate timeout check
+                total_elapsed_time = time.time() - swarm_start_time
                 # Expire the swarm after the requested number of seconds
                 if total_elapsed_time >= seconds_until_timeout:
                     raise RuntimeError(
@@ -621,9 +623,6 @@ class WorkflowRun:
                 loop_continue, time_since_last_full_sync = (
                     self._decide_run_loop_continue(time_since_last_full_sync)
                 )
-
-                # Recompute total elapsed time against the fixed swarm start time
-                total_elapsed_time = time.time() - swarm_start_time
 
         # user interrupt
         except KeyboardInterrupt:
@@ -839,15 +838,7 @@ class WorkflowRun:
                 # if task is done check if there are downstreams that can run
                 for downstream in task.downstream_swarm_tasks:
                     downstream.num_upstreams_done += 1
-                    logger.info(
-                        f"Task {task.task_id} DONE, downstream {downstream.task_id} "
-                        f"num_upstreams_done={downstream.num_upstreams_done}/"
-                        f"{downstream.num_upstreams}"
-                    )
                     if downstream.all_upstreams_done:
-                        logger.info(
-                            f"Downstream task {downstream.task_id} ready to run"
-                        )
                         self._set_validated_task_resources(downstream)
                         self.ready_to_run.append(downstream)
 
@@ -968,17 +959,11 @@ class WorkflowRun:
         self.last_sync = response["time"]
 
         new_status_tasks: Set[SwarmTask] = set()
-        logger.info(
-            f"Task status updates (full_sync={full_sync}): {response['tasks_by_status']}"
-        )
         for current_status, task_ids in response["tasks_by_status"].items():
             task_ids = set(task_ids).intersection(self.tasks)
             for task_id in task_ids:
                 task = self.tasks[task_id]
                 if current_status != task.status:
-                    logger.info(
-                        f"Task {task_id} status changed from {task.status} to {current_status}"
-                    )
                     task.status = current_status
                     new_status_tasks.add(task)
         self._refresh_task_status_map(new_status_tasks)
