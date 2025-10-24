@@ -839,13 +839,13 @@ class WorkflowRun:
                 # if task is done check if there are downstreams that can run
                 for downstream in task.downstream_swarm_tasks:
                     downstream.num_upstreams_done += 1
-                    logger.debug(
+                    logger.info(
                         f"Task {task.task_id} DONE, downstream {downstream.task_id} "
                         f"num_upstreams_done={downstream.num_upstreams_done}/"
                         f"{downstream.num_upstreams}"
                     )
                     if downstream.all_upstreams_done:
-                        logger.debug(
+                        logger.info(
                             f"Downstream task {downstream.task_id} ready to run"
                         )
                         self._set_validated_task_resources(downstream)
@@ -968,11 +968,17 @@ class WorkflowRun:
         self.last_sync = response["time"]
 
         new_status_tasks: Set[SwarmTask] = set()
+        logger.info(
+            f"Task status updates (full_sync={full_sync}): {response['tasks_by_status']}"
+        )
         for current_status, task_ids in response["tasks_by_status"].items():
             task_ids = set(task_ids).intersection(self.tasks)
             for task_id in task_ids:
                 task = self.tasks[task_id]
                 if current_status != task.status:
+                    logger.info(
+                        f"Task {task_id} status changed from {task.status} to {current_status}"
+                    )
                     task.status = current_status
                     new_status_tasks.add(task)
         self._refresh_task_status_map(new_status_tasks)
