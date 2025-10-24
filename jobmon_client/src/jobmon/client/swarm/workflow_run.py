@@ -839,7 +839,15 @@ class WorkflowRun:
                 # if task is done check if there are downstreams that can run
                 for downstream in task.downstream_swarm_tasks:
                     downstream.num_upstreams_done += 1
+                    logger.debug(
+                        f"Task {task.task_id} DONE, downstream {downstream.task_id} "
+                        f"num_upstreams_done={downstream.num_upstreams_done}/"
+                        f"{downstream.num_upstreams}"
+                    )
                     if downstream.all_upstreams_done:
+                        logger.debug(
+                            f"Downstream task {downstream.task_id} ready to run"
+                        )
                         self._set_validated_task_resources(downstream)
                         self.ready_to_run.append(downstream)
 
