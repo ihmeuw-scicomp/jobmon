@@ -1075,19 +1075,14 @@ async def instantiate_task_instances(
                         task_instance_ids=task_instance_ids,
                     )
                 )
-                # Log each task instance in the batch (info level - state transition)
-                for task_instance_id in task_instance_ids:
-                    logger.info(
-                        "Task instance added to instantiated batch",
-                        task_instance_id=task_instance_id,
-                        array_id=array_id,
-                        array_batch_num=array_batch_num,
-                        array_name=array_name,
-                    )
-
+                # Log batch summary
                 logger.info(
                     f"Batch {array_batch_num} for array {array_name} (ID: {array_id}) "
-                    f"instantiated and serialized with {len(task_instance_ids)} task instances"
+                    f"instantiated with {len(task_instance_ids)} task instances",
+                    array_id=array_id,
+                    array_batch_num=array_batch_num,
+                    array_name=array_name,
+                    task_instance_ids=task_instance_ids,
                 )
 
             resp = JSONResponse(

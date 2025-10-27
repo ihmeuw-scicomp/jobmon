@@ -168,14 +168,14 @@ class WorkflowRun(Base):
         structlog.contextvars.bind_contextvars(
             workflow_run_id=self.id, workflow_id=self.workflow_id
         )
-        logger.info(
-            f"Workflow run transitioned from {self.status} to {new_state}",
-            workflow_run_id=self.id,
-            workflow_id=self.workflow_id,
-            old_status=self.status,
-            new_status=new_state,
-        )
         if self._is_timely_transition(new_state):
+            logger.info(
+                f"Workflow run transitioned from {self.status} to {new_state}",
+                workflow_run_id=self.id,
+                workflow_id=self.workflow_id,
+                old_status=self.status,
+                new_status=new_state,
+            )
             self._validate_transition(new_state)
             self.status = new_state
             self.status_date = func.now()
