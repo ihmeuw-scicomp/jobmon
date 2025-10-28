@@ -91,29 +91,39 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             self._initialized = True
 
     def _ensure_initialized(self) -> bool:
-        """Ensure logger provider is initialized. Returns True if ready."""
-        if self._initialized:
-            return True
+        """Ensure logger provider is initialized. Returns True if ready.
 
+        This method detects if the manager was shut down (e.g., for fork-safety)
+        and re-initializes the handler with the new logger provider.
+        """
         if not OTLP_AVAILABLE:
             return False
 
         try:
-            from .manager import get_logger
+            from .manager import get_logger, get_shared_logger_provider
 
-            # Get logger from shared provider (handles initialization automatically)
+            # Check if we need to re-initialize due to manager shutdown/restart
+            # This handles the fork-safety case where OTLP is shut down before fork
+            # and reinitialized after subprocess creation
+            if self._initialized:
+                # Check if our cached provider is stale (manager was reinitialized)
+                current_provider = get_shared_logger_provider()
+                if current_provider is not self._logger_provider:
+                    # Manager was shut down and reinitialized - refresh our references
+                    self._initialized = False
+                else:
+                    # Still valid
+                    return True
+
+            # Initialize or re-initialize
             self._logger = get_logger(__name__)
             if self._logger:
-                # Get the provider for resource access
-                from .manager import get_shared_logger_provider
-
                 self._logger_provider = get_shared_logger_provider()
                 self._initialized = True
-
                 return True
 
         except Exception:
-            # Silently ignore initialization failures
+            # Silently ignore initialization failures to avoid recursion
             pass
 
         return False

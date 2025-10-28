@@ -20,6 +20,72 @@ from jobmon.core.structlog_utils import bind_method_context
 logger = structlog.get_logger(__name__)
 
 
+def _shutdown_otlp_safely() -> None:
+    """Shutdown OTLP exporters before forking to prevent gRPC fork-safety issues.
+
+    When using gRPC OTLP exporters, background threads with open TLS sockets can cause
+    fork() to trigger "BAD_RECORD_MAC / TSI_DATA_CORRUPTED" errors. This function
+    safely shuts down all OTLP providers before subprocess creation.
+
+    See: https://github.com/grpc/grpc/blob/master/doc/fork_support.md
+    """
+    try:
+        from jobmon.core.otlp import OTLP_AVAILABLE, JobmonOTLPManager
+
+        if not OTLP_AVAILABLE:
+            logger.debug("OTLP not available, skipping shutdown")
+            return
+
+        manager = JobmonOTLPManager.get_instance()
+        if manager and manager._initialized:
+            logger.debug("Shutting down OTLP exporters before subprocess fork")
+            manager.shutdown()
+            logger.debug("OTLP shutdown completed successfully")
+        else:
+            logger.debug("OTLP manager not initialized, skipping shutdown")
+    except Exception as e:
+        # Log but don't fail - we still need to run the task
+        logger.warning(f"Error during OTLP shutdown before fork: {e}")
+
+
+def _reinitialize_otlp() -> None:
+    """Reinitialize OTLP exporters after subprocess is created.
+
+    After forking and subprocess creation, we need to reinitialize OTLP to restore
+    tracing and logging telemetry for heartbeats and error reporting. Also performs
+    an immediate flush to ensure logs are exported before process exit.
+    """
+    try:
+        from jobmon.core.otlp import (
+            OTLP_AVAILABLE,
+            JobmonOTLPManager,
+            initialize_jobmon_otlp,
+        )
+
+        if not OTLP_AVAILABLE:
+            logger.debug("OTLP not available, skipping reinitialization")
+            return
+
+        logger.debug("Starting OTLP reinitialization after subprocess creation")
+        initialize_jobmon_otlp()
+
+        # Re-instrument requests for HTTP tracing in heartbeats
+        JobmonOTLPManager.instrument_requests()
+
+        logger.debug("OTLP reinitialization completed successfully")
+
+        # Flush immediately to ensure logs are exported before process exits
+        # This is critical for worker nodes that exit quickly after task completion
+        manager = JobmonOTLPManager.get_instance()
+        if manager and manager._initialized:
+            logger.debug("Flushing OTLP telemetry before completion")
+            manager.force_flush(timeout_millis=1000)
+            logger.debug("OTLP flush completed")
+    except Exception as e:
+        # Log but don't fail - telemetry is nice-to-have
+        logger.warning(f"Error during OTLP reinitialization after fork: {e}")
+
+
 class WorkerNodeTaskInstance:
     """The Task Instance object once it has been submitted to run on a worker node."""
 
@@ -222,7 +288,7 @@ class WorkerNodeTaskInstance:
                 f"to {TaskInstanceStatus.DONE} status. Current status is {self.status}."
             )
 
-        logger.info(
+        logger.debug(
             "Task instance successfully transitioned to DONE",
             status=self.status,
         )
@@ -267,7 +333,7 @@ class WorkerNodeTaskInstance:
                 f"to {error_state} status. Current status is {self.status}."
             )
 
-        logger.info(
+        logger.debug(
             "Task instance successfully transitioned to error state",
             error_state=self.status,
         )
@@ -334,7 +400,7 @@ class WorkerNodeTaskInstance:
                 f"to {TaskInstanceStatus.RUNNING} status. Current status is {self.status}."
             )
 
-        logger.info(
+        logger.debug(
             "Task instance successfully transitioned to RUNNING",
             status=self.status,
         )
@@ -382,6 +448,10 @@ class WorkerNodeTaskInstance:
         # If it logs running and is not able to transition it raises TransitionError
         self.log_running()
 
+        # Shutdown OTLP gRPC exporters before fork to prevent fork-safety issues
+        # (BAD_RECORD_MAC / TSI_DATA_CORRUPTED errors with gRPC background threads)
+        _shutdown_otlp_safely()
+
         try:
             # run the command in a subprocess
             asyncio.run(self._run_cmd())
@@ -428,6 +498,11 @@ class WorkerNodeTaskInstance:
                     self.command_returncode, self.command_stderr
                 )
                 self.log_error(error_state, msg)
+
+        finally:
+            # Reinitialize OTLP exporters after subprocess completes to restore telemetry
+            # for any subsequent heartbeats or error reporting
+            _reinitialize_otlp()
 
     def set_command_output(self, returncode: int, stdout: str, stderr: str) -> None:
         self._proc_returncode = returncode

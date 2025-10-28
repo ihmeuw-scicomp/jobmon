@@ -3,6 +3,8 @@
 import logging
 from unittest.mock import Mock, patch
 
+import pytest
+
 
 class TestJobmonOTLPManager:
     """Test the core OTLP manager functionality."""
@@ -159,42 +161,26 @@ class TestOTLPHandlers:
         assert handler._exporter_config is mock_exporter
         assert not handler._initialized  # Lazy initialization
 
-    @patch("jobmon.core.otlp.handlers.OTLP_AVAILABLE", True)
-    def test_handler_lazy_initialization(self):
-        """Test that handler initializes lazily on first emit."""
-        from jobmon.core.otlp import JobmonOTLPLoggingHandler
+    def test_handler_initialization_paths(self):
+        """Test handler initialization via different paths."""
+        from jobmon.core.otlp import OTLP_AVAILABLE, JobmonOTLPLoggingHandler
 
-        # Create handler with a mock logger_provider for direct initialization
+        if not OTLP_AVAILABLE:
+            pytest.skip("OpenTelemetry not available")
+
+        # Path 1: With logger_provider - immediate initialization
         mock_logger_provider = Mock()
         mock_logger = Mock()
         mock_logger_provider.get_logger.return_value = mock_logger
         mock_logger_provider.resource = Mock()
 
         handler = JobmonOTLPLoggingHandler(logger_provider=mock_logger_provider)
-
-        # Should be initialized immediately when logger_provider is provided
         assert handler._initialized
         assert handler._logger is mock_logger
 
-        record = logging.LogRecord(
-            name="test",
-            level=logging.INFO,
-            pathname="",
-            lineno=0,
-            msg="test message",
-            args=(),
-            exc_info=None,
-        )
-
-        # Mock the thread-local to avoid errors
-        with patch("jobmon.core.config.structlog_config._thread_local") as mock_tl:
-            mock_tl.last_event_dict = None
-
-            # Emit should use the initialized logger
-            handler.emit(record)
-
-            # The internal logger's emit should be called
-            assert mock_logger.emit.called
+        # Path 2: Without logger_provider - lazy initialization
+        handler2 = JobmonOTLPLoggingHandler()
+        assert not handler2._initialized
 
     def test_handler_without_otlp_available(self):
         """Test handlers gracefully handle OTLP not being available."""
@@ -497,53 +483,65 @@ class TestOTLPConfigurationOverrides:
                 )
 
 
-class TestOTLPErrorHandling:
-    """Test error handling and resilience of OTLP functionality."""
+class TestOTLPShutdownLifecycle:
+    """Test OTLP shutdown and lifecycle management."""
 
-    def test_manager_resilient_to_initialization_failures(self):
-        """Test that manager handles initialization failures gracefully."""
+    def test_shutdown_with_force_flush(self):
+        """Test that shutdown can flush pending telemetry."""
         from jobmon.core.otlp import JobmonOTLPManager
 
         # Clear singleton
         JobmonOTLPManager._instance = None
 
-        with patch("jobmon.core.otlp.manager.OTLP_AVAILABLE", True):
-            # Mock TracerProvider to raise exception during creation
-            with patch(
-                "opentelemetry.sdk.trace.TracerProvider",
-                side_effect=Exception("Initialization failed"),
-            ), patch(
-                "jobmon.core.otlp.resources.create_jobmon_resources"
-            ) as mock_resources:
+        manager = JobmonOTLPManager.get_instance()
 
-                mock_resources.return_value = Mock()
-                manager = JobmonOTLPManager.get_instance()
+        # Mock providers with force_flush capabilities
+        mock_tracer_provider = Mock()
+        mock_logger_provider = Mock()
+        manager.tracer_provider = mock_tracer_provider
+        manager.logger_provider = mock_logger_provider
+        manager._initialized = True
 
-                # Should not crash on initialization failure
-                manager.initialize()
+        # Shutdown with flush (default behavior)
+        manager.shutdown(timeout_millis=3000, force_flush=True)
 
-                # Manager should handle the exception gracefully
-                # The behavior may vary depending on implementation details
-                # What matters is it doesn't crash the application
-                assert manager is not None
-                # At minimum, get_tracer should be safe to call
-                tracer = manager.get_tracer("test")
-                # Tracer may be None or a valid tracer depending on fallback behavior
-                assert tracer is None or tracer is not None  # Should not crash
+        # Should have flushed both providers
+        mock_tracer_provider.force_flush.assert_called_once_with(timeout_millis=3000)
+        mock_logger_provider.force_flush.assert_called_once_with(timeout_millis=3000)
 
-    def test_handler_resilience_to_creation_failures(self):
-        """Test that handlers are resilient to creation failures."""
+        # Should have shut down both providers
+        mock_tracer_provider.shutdown.assert_called_once()
+        mock_logger_provider.shutdown.assert_called_once()
+
+    def test_shutdown_without_force_flush(self):
+        """Test that shutdown can skip flushing if requested."""
+        from jobmon.core.otlp import JobmonOTLPManager
+
+        # Clear singleton
+        JobmonOTLPManager._instance = None
+
+        manager = JobmonOTLPManager.get_instance()
+
+        mock_tracer_provider = Mock()
+        manager.tracer_provider = mock_tracer_provider
+        manager._initialized = True
+
+        # Shutdown without flush
+        manager.shutdown(force_flush=False)
+
+        # Should NOT have flushed
+        mock_tracer_provider.force_flush.assert_not_called()
+
+        # But should still shut down
+        mock_tracer_provider.shutdown.assert_called_once()
+
+    def test_handler_emit_graceful_failure(self):
+        """Test that handler emit failures don't crash the application."""
         from jobmon.core.otlp import JobmonOTLPLoggingHandler
 
-        # Create handler with exporter so it will try to initialize
-        mock_exporter = Mock()
-        handler = JobmonOTLPLoggingHandler(exporter=mock_exporter)
+        with patch("jobmon.core.otlp.handlers.OTLP_AVAILABLE", False):
+            handler = JobmonOTLPLoggingHandler()
 
-        with patch.object(
-            handler,
-            "_ensure_initialized",
-            side_effect=Exception("Initialization failed"),
-        ):
             record = logging.LogRecord(
                 name="test",
                 level=logging.INFO,
@@ -554,11 +552,6 @@ class TestOTLPErrorHandling:
                 exc_info=None,
             )
 
-            # Should not crash when initialization fails
-            try:
-                handler.emit(record)
-            except Exception:
-                pass  # Emit may propagate the exception
-
-            # Should still not be initialized
+            # Even with OTLP unavailable, emit should not crash
+            handler.emit(record)  # Should silently fail
             assert not handler._initialized

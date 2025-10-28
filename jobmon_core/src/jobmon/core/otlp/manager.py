@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import atexit
 import logging
 import threading
 from typing import Any, Optional, Type
@@ -42,6 +43,7 @@ class JobmonOTLPManager:
         self.logger_provider: Optional[Any] = None
         self._initialized = False
         self._log_processor_configured = False
+        self._atexit_registered = False
         self._init_lock = threading.Lock()
 
     @classmethod
@@ -83,6 +85,12 @@ class JobmonOTLPManager:
                 # Set the global tracer provider
                 trace.set_tracer_provider(self.tracer_provider)
 
+                # Register atexit handler to ensure graceful shutdown on normal exit
+                # This prevents telemetry loss when processes exit normally
+                if not self._atexit_registered:
+                    atexit.register(self._atexit_shutdown)
+                    self._atexit_registered = True
+
                 self._initialized = True
 
             except Exception:
@@ -100,19 +108,18 @@ class JobmonOTLPManager:
             return
 
         try:
-            from opentelemetry._logs import get_logger_provider, set_logger_provider
+            from opentelemetry._logs import set_logger_provider
             from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 
-            # Explicit check: ensure we have a proper LoggerProvider and no existing processors
-            global_lp = get_logger_provider()
-            if not isinstance(global_lp, LoggerProvider):
-                # Set our provider as the global one
-                set_logger_provider(self.logger_provider)
-                global_lp = self.logger_provider
+            # Always set our new provider as the global one
+            # This ensures that after shutdown+reinit, we use the new provider not the old one
+            set_logger_provider(self.logger_provider)
 
-            # Check if BatchLogRecordProcessor already exists
+            # Check if BatchLogRecordProcessor already exists on OUR provider
             # Processors are stored in _multi_log_record_processor._log_record_processors
-            multi_processor = getattr(global_lp, "_multi_log_record_processor", None)
+            multi_processor = getattr(
+                self.logger_provider, "_multi_log_record_processor", None
+            )
             if multi_processor:
                 existing_processors = getattr(
                     multi_processor, "_log_record_processors", []
@@ -154,7 +161,9 @@ class JobmonOTLPManager:
                 # Use BatchLogRecordProcessor for efficient batching
                 processor = BatchLogRecordProcessor(exporter)
 
-                global_lp.add_log_record_processor(processor)  # type: ignore[attr-defined]
+                self.logger_provider.add_log_record_processor(
+                    processor
+                )  # type: ignore[attr-defined]
                 self._log_processor_configured = True
             else:
                 # Don't log here to avoid circular dependency during initialization
@@ -336,11 +345,66 @@ class JobmonOTLPManager:
         except ImportError:
             pass
 
-    def shutdown(self) -> None:
-        """Shutdown trace and log providers."""
+    def force_flush(self, timeout_millis: int = 5000) -> bool:
+        """Force flush pending telemetry without shutting down.
+
+        This is useful for ensuring telemetry is exported before process exit
+        or during signal handling, without disrupting ongoing telemetry collection.
+
+        Args:
+            timeout_millis: Maximum time to wait for flush (default 5 seconds)
+
+        Returns:
+            True if flush succeeded, False otherwise
+        """
+        if not self._initialized:
+            return False
+
+        try:
+            if self.tracer_provider and hasattr(self.tracer_provider, "force_flush"):
+                self.tracer_provider.force_flush(timeout_millis=timeout_millis)
+            if self.logger_provider and hasattr(self.logger_provider, "force_flush"):
+                self.logger_provider.force_flush(timeout_millis=timeout_millis)
+            return True
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Error flushing OTLP: {e}")
+            return False
+
+    def _atexit_shutdown(self) -> None:
+        """Shutdown hook called automatically on normal process exit.
+
+        This ensures that pending telemetry is flushed before the process terminates.
+        Uses a short timeout since the process is already exiting.
+        """
         if not self._initialized:
             return
 
+        try:
+            # Use shutdown() with explicit flush and timeout
+            # The force_flush=True parameter ensures telemetry is exported before shutdown
+            self.shutdown(timeout_millis=5000, force_flush=True)
+        except Exception:
+            # Silently ignore shutdown errors - don't block process exit
+            pass
+
+    def shutdown(self, timeout_millis: int = 5000, force_flush: bool = True) -> None:
+        """Shutdown trace and log providers and clear global caches.
+
+        This ensures that after shutdown (e.g., for fork-safety), subsequent
+        reinitialization will create fresh providers rather than reusing stale ones.
+
+        Args:
+            timeout_millis: Maximum time to wait for flush operations (default 5 seconds)
+            force_flush: Whether to flush pending telemetry before shutdown (default True)
+        """
+        if not self._initialized:
+            return
+
+        # First, flush any pending telemetry to ensure it's exported
+        if force_flush:
+            self.force_flush(timeout_millis=timeout_millis)
+
+        # Now shutdown the providers
         try:
             if self.tracer_provider and hasattr(self.tracer_provider, "shutdown"):
                 self.tracer_provider.shutdown()
@@ -349,7 +413,31 @@ class JobmonOTLPManager:
         except Exception as e:
             logging.getLogger(__name__).warning(f"Error during OTLP shutdown: {e}")
         finally:
+            # Clear the global OpenTelemetry providers to prevent stale references
+            # This is critical for fork-safety: after shutdown, reinitialization must
+            # create fresh providers and exporters, not reuse shut-down ones
+            try:
+                from opentelemetry._logs import set_logger_provider
+                from opentelemetry.sdk._logs import LoggerProvider as NoOpLoggerProvider
+
+                # Reset to a no-op provider so get_logger_provider() doesn't return
+                # the shut-down provider on next initialization
+                set_logger_provider(NoOpLoggerProvider())
+            except Exception:
+                pass
+
+            # Clear the module-level logger provider cache so handlers will fetch the new one
+            # after reinitialization
+            global _logger_provider
+            with _logger_provider_lock:
+                _logger_provider = None
+
+            # Clear instance state and provider references
+            self.tracer_provider = None
+            self.logger_provider = None
             self._initialized = False
+            self._log_processor_configured = False
+            # Note: Don't clear _atexit_registered - atexit handlers can't be unregistered
 
 
 def initialize_jobmon_otlp() -> JobmonOTLPManager:
@@ -382,9 +470,12 @@ def get_shared_logger_provider() -> Optional[Any]:
         with _logger_provider_lock:
             # Double-check pattern: another thread might have initialized while we waited
             if _logger_provider is None:
-                manager = JobmonOTLPManager.get_instance()
-                manager.initialize()
-                _logger_provider = manager.logger_provider
+                try:
+                    manager = JobmonOTLPManager.get_instance()
+                    manager.initialize()
+                    _logger_provider = manager.logger_provider
+                except Exception:
+                    pass
     return _logger_provider
 
 

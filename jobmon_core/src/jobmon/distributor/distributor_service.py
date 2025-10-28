@@ -629,15 +629,46 @@ class DistributorService:
             tenacious=True,
         )
 
+    def _flush_otlp_on_signal(self, timeout_millis: int = 5000) -> None:
+        """Flush OTLP telemetry before process shutdown on signal.
+
+        This ensures that pending telemetry is exported when the distributor
+        is terminated via SIGTERM/SIGINT/SIGHUP signals.
+
+        Args:
+            timeout_millis: Maximum time to wait for flush (default 5 seconds)
+        """
+        try:
+            from jobmon.core.otlp import OTLP_AVAILABLE, JobmonOTLPManager
+
+            if not OTLP_AVAILABLE:
+                return
+
+            manager = JobmonOTLPManager.get_instance()
+            if manager._initialized:
+                logger.debug(
+                    "Flushing OTLP telemetry on signal", timeout_ms=timeout_millis
+                )
+                manager.force_flush(timeout_millis=timeout_millis)
+                logger.debug("OTLP flush complete")
+        except Exception as e:
+            # Don't let OTLP flush errors prevent shutdown
+            logger.warning("Error flushing OTLP on signal", error=str(e))
+
     def _initialize_signal_handlers(self) -> None:
         def handle_sighup(signal: int, frame: Any) -> None:
+            # Flush OTLP before shutdown
+            self._flush_otlp_on_signal(timeout_millis=5000)
             raise DistributorInterruptedError("Got signal SIGHUP.")
 
         def handle_sigterm(signal: int, frame: Any) -> None:
+            # Flush OTLP before shutdown
+            self._flush_otlp_on_signal(timeout_millis=5000)
             raise DistributorInterruptedError("Got signal SIGTERM.")
 
         def handle_sigint(signal: int, frame: Any) -> None:
-            pass
+            # Flush OTLP quickly for Ctrl+C (user is waiting)
+            self._flush_otlp_on_signal(timeout_millis=2000)
 
         signal.signal(signal.SIGTERM, handle_sigterm)
         signal.signal(signal.SIGHUP, handle_sighup)

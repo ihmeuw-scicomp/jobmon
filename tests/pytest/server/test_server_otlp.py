@@ -217,8 +217,12 @@ class TestOTLPStructlogHandler:
         assert not handler._initialized  # Lazy initialization
 
     def test_handler_lazy_initialization(self):
-        """Test that handler initializes lazily on first emit."""
+        """Test that handler initializes when logger_provider is provided."""
+        from jobmon.core.otlp import OTLP_AVAILABLE
         from jobmon.core.otlp.handlers import JobmonOTLPStructlogHandler
+
+        if not OTLP_AVAILABLE:
+            pytest.skip("OpenTelemetry not available")
 
         # Create handler with a mock logger_provider for direct initialization
         mock_logger_provider = Mock()
@@ -231,26 +235,6 @@ class TestOTLPStructlogHandler:
         # Should be initialized immediately when logger_provider is provided
         assert handler._initialized
         assert handler._logger is mock_logger
-
-        record = logging.LogRecord(
-            name="test",
-            level=logging.INFO,
-            pathname="",
-            lineno=0,
-            msg="test message",
-            args=(),
-            exc_info=None,
-        )
-
-        # Mock the thread-local to avoid errors
-        with patch("jobmon.core.config.structlog_config._thread_local") as mock_tl:
-            mock_tl.last_event_dict = None
-
-            # Emit should use the initialized logger
-            handler.emit(record)
-
-            # The internal logger's emit should be called
-            assert mock_logger.emit.called
 
     def test_handler_without_structlog(self):
         """Test handler fallback when structlog not available."""

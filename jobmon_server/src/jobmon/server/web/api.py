@@ -1,6 +1,7 @@
 import os
+from contextlib import asynccontextmanager
 from importlib import import_module
-from typing import List, Optional
+from typing import AsyncGenerator, List, Optional
 
 # Additional imports for middlewares and dependencies
 from fastapi import Depends, FastAPI
@@ -35,7 +36,39 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
 
     configure_server_logging()
 
-    # Initialize the FastAPI app
+    # Check if OTLP is enabled
+    try:
+        telemetry_section = config.get_section_coerced("telemetry")
+        tracing_config = telemetry_section.get("tracing", {})
+        USE_OTEL = tracing_config.get("server_enabled", False)
+    except Exception:
+        USE_OTEL = False
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        """Manage OTLP lifecycle: startup and shutdown."""
+        server_otlp = None
+        if USE_OTEL:
+            from jobmon.server.web.otlp import get_server_otlp_manager
+
+            server_otlp = get_server_otlp_manager()
+            server_otlp.initialize()
+            server_otlp.instrument_sqlalchemy()
+            server_otlp.instrument_requests()
+
+        yield  # Application runs
+
+        # Shutdown: flush OTLP telemetry
+        if USE_OTEL and server_otlp:
+            try:
+                if server_otlp._core_manager and server_otlp._core_manager._initialized:
+                    server_otlp._core_manager.shutdown(
+                        timeout_millis=3000, force_flush=True
+                    )
+            except Exception:
+                pass
+
+    # Initialize the FastAPI app with lifespan
     app_title = "jobmon"
     openapi_url = "/api/openapi.json"
 
@@ -43,30 +76,15 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         title=app_title,
         openapi_url=openapi_url,
         docs_url=None,
+        lifespan=lifespan,
     )
     app = add_hooks_and_handlers(app)
 
-    # Configure remaining OTLP components
-    try:
-        telemetry_section = config.get_section_coerced("telemetry")
-        tracing_config = telemetry_section.get("tracing", {})
-        USE_OTEL = tracing_config.get("server_enabled", False)
-    except Exception:
-        USE_OTEL = False
+    # Instrument FastAPI after app creation
     if USE_OTEL:
-        # Import OTel modules here to avoid unnecessary imports when OTel is disabled
         from jobmon.server.web.otlp import get_server_otlp_manager
 
-        # Initialize server OTLP manager
         server_otlp = get_server_otlp_manager()
-        server_otlp.initialize()  # Actually initialize the manager!
-
-        # Instrument SQLAlchemy BEFORE any engine creation
-        server_otlp.instrument_sqlalchemy()
-        server_otlp.instrument_requests()
-
-        # Instrument FastAPI for HTTP request tracing
-        # OTEL_LOGS_EXPORTER=none prevents auto log export (we use manual LoggerProvider)
         server_otlp.instrument_app(app)
 
     # Logging is already configured at module import time to avoid duplicate
