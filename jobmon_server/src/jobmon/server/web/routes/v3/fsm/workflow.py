@@ -1,7 +1,10 @@
 """Routes for Workflows."""
 
+import ast
+import json
 from collections import defaultdict
 from http import HTTPStatus as StatusCodes
+from math import ceil
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 import sqlalchemy
@@ -23,6 +26,8 @@ from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.models.task import Task
+from jobmon.server.web.models.task_instance import TaskInstance
+from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.task_template import TaskTemplate
@@ -543,6 +548,127 @@ def get_available_workflow_statuses(db: Session = Depends(get_db)) -> Any:
     res = db.execute(select_stmt).scalars().all()
 
     resp = JSONResponse(content={"available_statuses": res}, status_code=StatusCodes.OK)
+    return resp
+
+
+@api_v3_router.post("/workflow/{workflow_id}/increase_resources")
+async def increase_resources_for_resource_error_tasks(
+    workflow_id: int, request: Request, db: Session = Depends(get_db)
+) -> Any:
+    """Increase resources for tasks in E or F whose latest TaskInstance is Z.
+
+    Steps per task:
+    - Update Task.status -> ERROR_RECOVERABLE (E)
+    - Load TaskResources.requested_resources JSON
+    - Load Task.resource_scales (stringified dict)
+    - Apply scaling:
+        * numeric value => ceil(val * (1 + scale))
+        * list value => absolute value chosen by attempt index
+    - Update TaskResources.requested_resources JSON
+    - Set TaskResources.task_resources_type_id -> 'A' (Adjusted)
+    """
+    structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
+    logger.info("Increase resources for tasks with RESOURCE_ERROR latest TI")
+
+    # Subquery to get latest TaskInstance per task by most recent status_date
+    latest_ti_subq = (
+        select(
+            TaskInstance.task_id,
+            func.max(TaskInstance.status_date).label("max_status_date"),
+        )
+        .group_by(TaskInstance.task_id)
+        .subquery()
+    )
+
+    # Join to fetch tasks in (E, F) with latest TI status == Z
+    query = (
+        select(Task, TaskResources, TaskInstance)
+        .join(TaskResources, Task.task_resources_id == TaskResources.id)
+        .join(latest_ti_subq, latest_ti_subq.c.task_id == Task.id)
+        .join(
+            TaskInstance,
+            (TaskInstance.task_id == Task.id)
+            & (TaskInstance.status_date == latest_ti_subq.c.max_status_date),
+        )
+        .where(
+            Task.workflow_id == workflow_id,
+            Task.status.in_([TaskStatus.ERROR_RECOVERABLE, TaskStatus.ERROR_FATAL]),
+            TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
+        )
+    )
+
+    rows = db.execute(query).all()
+
+    def _scale_numeric(val: int, factor: float) -> int:
+        return int(ceil(val * (1 + factor)))
+
+    updated_tasks: list[int] = []
+    details: list[dict] = []
+
+    for task, task_res, last_ti in rows:
+        # Parse requested resources
+        try:
+            req_res: dict = json.loads(task_res.requested_resources or "{}")
+        except Exception:
+            req_res = {}
+
+        # Parse resource scales from string representation
+        try:
+            scales: dict = (
+                ast.literal_eval(task.resource_scales) if task.resource_scales else {}
+            )
+        except Exception:
+            scales = {}
+
+        # Determine attempt-based index for list scalers: first adjustment after 1st attempt
+        attempt_index = max(0, int(task.num_attempts) - 1)
+
+        # Apply scaling
+        before = req_res.copy()
+        for resource_name, scaler in list(scales.items()):
+            if resource_name not in req_res:
+                continue
+            current_val = req_res[resource_name]
+            try:
+                if isinstance(scaler, (int, float)):
+                    new_val = int(ceil(current_val * (1 + float(scaler))))
+                elif isinstance(scaler, list) and len(scaler) > 0:
+                    idx = (
+                        attempt_index
+                        if attempt_index < len(scaler)
+                        else len(scaler) - 1
+                    )
+                    new_val = int(scaler[idx])
+                else:
+                    # Unsupported scaler types (e.g. callable names); skip
+                    continue
+            except Exception:
+                continue
+            req_res[resource_name] = new_val
+
+        # Update DB objects
+        task.status = TaskStatus.ERROR_RECOVERABLE
+        task_res.requested_resources = json.dumps(req_res)
+        task_res.task_resources_type_id = "A"
+        updated_tasks.append(task.id)
+        details.append(
+            {
+                "task_id": task.id,
+                "before": before,
+                "after": req_res,
+            }
+        )
+
+    db.flush()
+
+    resp = JSONResponse(
+        content={
+            "updated_task_count": len(updated_tasks),
+            "updated_task_ids": updated_tasks,
+            "details": details,
+        },
+        status_code=StatusCodes.OK,
+    )
     return resp
 
 

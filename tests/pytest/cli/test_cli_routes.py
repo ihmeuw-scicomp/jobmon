@@ -12,6 +12,7 @@ from jobmon.client.api import Tool
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import (
     MaxConcurrentlyRunning,
+    TaskInstanceStatus,
     TaskStatus,
     WorkflowRunStatus,
     WorkflowStatus,
@@ -19,6 +20,8 @@ from jobmon.core.constants import (
 from jobmon.core.exceptions import InvalidRequest
 from jobmon.server.web.models import load_model
 from jobmon.server.web.models.task import Task
+from jobmon.server.web.models.task_instance import TaskInstance
+from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.workflow import Workflow
 
 load_model()
@@ -1309,3 +1312,220 @@ def test_task_update_statuses(client_env, db_engine, tool):
         ).fetchone()
         # According to the code in update_task_statuses, the workflow status should be updated to D if all tasks are done
         assert res[0] == "D"
+
+
+def test_increase_resources_for_resource_error_tasks(client_env, db_engine, tool):
+    """Test the increase_resources route for tasks with latest TaskInstance in RESOURCE_ERROR status."""
+    import json
+    import time
+    from datetime import datetime
+
+    unique_id = str(int(time.time() * 1000))
+
+    # Create workflow with tasks that have resource scales
+    wf = tool.create_workflow(workflow_args=f"test_increase_resources_{unique_id}")
+
+    # Create task template with resource scales
+    tt = tool.get_task_template(
+        template_name=f"resource_test_tt_{unique_id}",
+        command_template="sleep {arg}",
+        node_args=["arg"],
+        default_compute_resources={"queue": "null.q", "memory": 1, "runtime": 60},
+        default_cluster_name="sequential",
+    )
+
+    # Create tasks with different resource scales
+    task1 = tt.create_task(
+        arg=1,
+        name=f"task1_{unique_id}",
+        resource_scales={"memory": 0.5, "runtime": 0.2},  # numeric scales
+        compute_resources={"memory": 2, "runtime": 120},
+    )
+
+    task2 = tt.create_task(
+        arg=2,
+        name=f"task2_{unique_id}",
+        resource_scales={
+            "memory": iter([4, 8, 16]),
+            "runtime": iter([240, 480]),
+        },  # iterator scales
+        compute_resources={"memory": 1, "runtime": 60},
+    )
+
+    wf.add_tasks([task1, task2])
+    wf.bind()
+    wf._bind_tasks()
+
+    # Get task IDs from database
+    with Session(bind=db_engine) as session:
+        tasks = (
+            session.execute(select(Task).where(Task.workflow_id == wf.workflow_id))
+            .scalars()
+            .all()
+        )
+
+        task1_db = next(t for t in tasks if t.name == f"task1_{unique_id}")
+        task2_db = next(t for t in tasks if t.name == f"task2_{unique_id}")
+
+        # Set tasks to ERROR_RECOVERABLE and ERROR_FATAL status
+        task1_db.status = TaskStatus.ERROR_RECOVERABLE
+        task1_db.num_attempts = 1
+        task2_db.status = TaskStatus.ERROR_FATAL
+        task2_db.num_attempts = 2
+
+        # Get task resources
+        task1_resources = session.get(TaskResources, task1_db.task_resources_id)
+        task2_resources = session.get(TaskResources, task2_db.task_resources_id)
+
+        # Set initial requested resources
+        task1_resources.requested_resources = json.dumps({"memory": 2, "runtime": 120})
+        task2_resources.requested_resources = json.dumps({"memory": 1, "runtime": 60})
+
+        # Create TaskInstances with RESOURCE_ERROR status
+        now = datetime.now()
+        task1_ti = TaskInstance(
+            workflow_run_id=1,  # dummy workflow run
+            array_id=1,  # dummy array
+            task_id=task1_db.id,
+            task_resources_id=task1_resources.id,
+            array_batch_num=1,
+            array_step_id=1,
+            status=TaskInstanceStatus.RESOURCE_ERROR,
+            status_date=now,
+        )
+
+        task2_ti = TaskInstance(
+            workflow_run_id=1,
+            array_id=1,
+            task_id=task2_db.id,
+            task_resources_id=task2_resources.id,
+            array_batch_num=1,
+            array_step_id=1,
+            status=TaskInstanceStatus.RESOURCE_ERROR,
+            status_date=now,
+        )
+
+        session.add_all([task1_ti, task2_ti])
+        session.commit()
+
+        # Store original values for comparison and task IDs
+        original_task1_resources = json.loads(task1_resources.requested_resources)
+        original_task2_resources = json.loads(task2_resources.requested_resources)
+        task1_id = task1_db.id
+        task2_id = task2_db.id
+
+    # Call the increase_resources route
+    app_route = f"/workflow/{wf.workflow_id}/increase_resources"
+    return_code, response = wf.requester.send_request(
+        app_route=app_route,
+        message={},
+        request_type="post",
+    )
+
+    # Verify response
+    assert return_code == 200
+    assert response["updated_task_count"] == 2
+    assert len(response["updated_task_ids"]) == 2
+    assert task1_id in response["updated_task_ids"]
+    assert task2_id in response["updated_task_ids"]
+
+    # Verify task status changes
+    with Session(bind=db_engine) as session:
+        updated_task1 = session.get(Task, task1_id)
+        updated_task2 = session.get(Task, task2_id)
+
+        # Both tasks should now be ERROR_RECOVERABLE
+        assert updated_task1.status == TaskStatus.ERROR_RECOVERABLE
+        assert updated_task2.status == TaskStatus.ERROR_RECOVERABLE
+
+        # Verify resource scaling
+        updated_task1_resources = session.get(TaskResources, task1_resources.id)
+        updated_task2_resources = session.get(TaskResources, task2_resources.id)
+
+        # Task1: memory=2, runtime=120 with scales 0.5, 0.2
+        # Expected: memory = ceil(2 * (1 + 0.5)) = ceil(3) = 3
+        # Expected: runtime = ceil(120 * (1 + 0.2)) = ceil(144) = 144
+        task1_new_resources = json.loads(updated_task1_resources.requested_resources)
+        assert task1_new_resources["memory"] == 3
+        assert task1_new_resources["runtime"] == 144
+
+        # Task2: memory=1, runtime=60 with scales iter([4,8,16]), iter([240,480])
+        # num_attempts=2, so attempt_index = max(0, 2-1) = 1
+        # Expected: memory = 8 (index 1 from iter([4,8,16]))
+        # Expected: runtime = 480 (index 1 from iter([240,480]))
+        task2_new_resources = json.loads(updated_task2_resources.requested_resources)
+        assert task2_new_resources["memory"] == 8
+        assert task2_new_resources["runtime"] == 480
+
+        # Verify task_resources_type_id changed to 'A' (Adjusted)
+        assert updated_task1_resources.task_resources_type_id == "A"
+        assert updated_task2_resources.task_resources_type_id == "A"
+
+    # Verify response details
+    details = response["details"]
+    assert len(details) == 2
+
+    # Find details for each task
+    task1_detail = next(d for d in details if d["task_id"] == task1_id)
+    task2_detail = next(d for d in details if d["task_id"] == task2_id)
+
+    assert task1_detail["before"] == original_task1_resources
+    assert task1_detail["after"] == task1_new_resources
+    assert task2_detail["before"] == original_task2_resources
+    assert task2_detail["after"] == task2_new_resources
+
+
+def test_increase_resources_no_matching_tasks(client_env, db_engine, tool):
+    """Test the increase_resources route when no tasks match the criteria."""
+    import time
+
+    unique_id = str(int(time.time() * 1000))
+
+    # Create workflow with tasks that don't match criteria
+    wf = tool.create_workflow(workflow_args=f"test_no_matching_{unique_id}")
+
+    tt = tool.get_task_template(
+        template_name=f"no_match_tt_{unique_id}",
+        command_template="echo {arg}",
+        node_args=["arg"],
+        default_compute_resources={"queue": "null.q"},
+        default_cluster_name="sequential",
+    )
+
+    task = tt.create_task(arg=1, name=f"task_{unique_id}")
+    wf.add_tasks([task])
+    wf.bind()
+    wf._bind_tasks()
+
+    # Call the increase_resources route
+    app_route = f"/workflow/{wf.workflow_id}/increase_resources"
+    return_code, response = wf.requester.send_request(
+        app_route=app_route,
+        message={},
+        request_type="post",
+    )
+
+    # Verify response for no matching tasks
+    assert return_code == 200
+    assert response["updated_task_count"] == 0
+    assert len(response["updated_task_ids"]) == 0
+    assert len(response["details"]) == 0
+
+
+def test_increase_resources_invalid_workflow_id(client_env, db_engine, tool):
+    """Test the increase_resources route with invalid workflow ID."""
+    invalid_workflow_id = 99999
+
+    # Call the increase_resources route with invalid workflow ID
+    app_route = f"/workflow/{invalid_workflow_id}/increase_resources"
+    return_code, response = tool.requester.send_request(
+        app_route=app_route,
+        message={},
+        request_type="post",
+    )
+
+    # Should return empty result, not error
+    assert return_code == 200
+    assert response["updated_task_count"] == 0
+    assert len(response["updated_task_ids"]) == 0
+    assert len(response["details"]) == 0
