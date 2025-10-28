@@ -603,7 +603,6 @@ async def increase_resources_for_resource_error_tasks(
         return int(ceil(val * (1 + factor)))
 
     updated_tasks: list[int] = []
-    details: list[dict] = []
 
     for task, task_res, last_ti in rows:
         # Parse requested resources
@@ -624,7 +623,6 @@ async def increase_resources_for_resource_error_tasks(
         attempt_index = max(0, int(task.num_attempts) - 1)
 
         # Apply scaling
-        before = req_res.copy()
         for resource_name, scaler in list(scales.items()):
             if resource_name not in req_res:
                 continue
@@ -651,13 +649,6 @@ async def increase_resources_for_resource_error_tasks(
         task_res.requested_resources = json.dumps(req_res)
         task_res.task_resources_type_id = "A"
         updated_tasks.append(task.id)
-        details.append(
-            {
-                "task_id": task.id,
-                "before": before,
-                "after": req_res,
-            }
-        )
 
     db.flush()
 
@@ -665,7 +656,6 @@ async def increase_resources_for_resource_error_tasks(
         content={
             "updated_task_count": len(updated_tasks),
             "updated_task_ids": updated_tasks,
-            "details": details,
         },
         status_code=StatusCodes.OK,
     )

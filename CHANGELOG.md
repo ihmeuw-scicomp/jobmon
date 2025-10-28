@@ -5,6 +5,7 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- Added `--increase-resource` flag to `jobmon workflow_resume` command to automatically increase resources for tasks that failed due to resource errors. This feature identifies tasks in ERROR_RECOVERABLE or ERROR_FATAL status whose latest task instance is in RESOURCE_ERROR status, updates their resources using the defined resource scales, and sets their status to ERROR_RECOVERABLE for retry.
 - Added `jobmon update_config` command to allow users to update configuration values in their defaults.yaml file using dot notation (e.g., `jobmon update_config http.retries_attempts 15`).
 - **Structured Logging with Context Binding and OTLP Integration**: Complete implementation of structured logging across all Jobmon components with automatic context binding, OTLP attribute extraction, and APM integration:
   - **Context Binding Decorator** (`@bind_context`): Automatically bind function/method parameters to log context with support for nested attribute extraction and automatic cleanup

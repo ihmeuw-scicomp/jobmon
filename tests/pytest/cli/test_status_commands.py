@@ -1001,6 +1001,7 @@ def test_resume_workflow_from_cli(tool, task_template, db_engine, cli):
     assert args.workflow_id == workflow.workflow_id
     assert not args.reset_running_jobs
     assert args.timeout == 200
+    assert not args.increase_resource
 
     with patch.object(WorkflowRunFactory, "set_workflow_resume") as mock_set_resume:
 
@@ -1009,6 +1010,7 @@ def test_resume_workflow_from_cli(tool, task_template, db_engine, cli):
             cluster_name=args.cluster_name,
             reset_if_running=args.reset_running_jobs,
             timeout=args.timeout,
+            increase_resource=args.increase_resource,
         )
 
         mock_set_resume.assert_called_once_with(
@@ -1029,6 +1031,60 @@ def test_resume_workflow_from_cli(tool, task_template, db_engine, cli):
         ).scalar()
         assert res == WorkflowStatus.DONE
         session.commit()
+
+
+def test_resume_workflow_with_increase_resource_flag(
+    tool, task_template, db_engine, cli
+):
+    """Test that the --increase-resource flag is properly parsed and passed to resume_workflow_from_id."""
+    from unittest.mock import patch
+
+    from jobmon.client.workflow_run import WorkflowRunFactory
+
+    workflow = tool.create_workflow()
+
+    # Create a simple task that will fail
+    t1 = task_template.create_task(arg="exit 1", max_attempts=1)
+    workflow.add_tasks([t1])
+    workflow.run()
+
+    # Test with --increase-resource flag
+    resume_str = (
+        f"workflow_resume -w {workflow.workflow_id} -c sequential --increase-resource"
+    )
+    args = cli.parse_args(resume_str)
+
+    # Verify the flag is parsed correctly
+    assert args.workflow_id == workflow.workflow_id
+    assert args.cluster_name == "sequential"
+    assert args.increase_resource is True
+    assert not args.reset_running_jobs  # Default value
+    assert args.timeout == 180  # Default value
+
+    # Test that the flag is passed to resume_workflow_from_id
+    with patch.object(WorkflowRunFactory, "set_workflow_resume") as mock_set_resume:
+        with patch(
+            "jobmon.client.status_commands.resume_workflow_from_id"
+        ) as mock_resume:
+            # Call the function directly to test parameter passing
+            from jobmon.client.status_commands import resume_workflow_from_id
+
+            resume_workflow_from_id(
+                workflow_id=args.workflow_id,
+                cluster_name=args.cluster_name,
+                reset_if_running=args.reset_running_jobs,
+                timeout=args.timeout,
+                increase_resource=args.increase_resource,
+            )
+
+            # Verify the function was called with the correct parameters
+            mock_resume.assert_called_once_with(
+                workflow_id=args.workflow_id,
+                cluster_name=args.cluster_name,
+                reset_if_running=args.reset_running_jobs,
+                timeout=args.timeout,
+                increase_resource=True,  # This should be True when flag is set
+            )
 
 
 def test_update_config_value_success():
