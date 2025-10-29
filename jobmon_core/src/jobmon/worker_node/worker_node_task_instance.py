@@ -52,8 +52,8 @@ def _reinitialize_otlp() -> None:
     """Reinitialize OTLP exporters after subprocess is created.
 
     After forking and subprocess creation, we need to reinitialize OTLP to restore
-    tracing and logging telemetry for heartbeats and error reporting. Also performs
-    an immediate flush to ensure logs are exported before process exit.
+    tracing and logging telemetry for heartbeats and error reporting during subprocess
+    execution. Flush happens separately at process completion.
     """
     try:
         from jobmon.core.otlp import (
@@ -73,14 +73,6 @@ def _reinitialize_otlp() -> None:
         JobmonOTLPManager.instrument_requests()
 
         logger.debug("OTLP reinitialization completed successfully")
-
-        # Flush immediately to ensure logs are exported before process exits
-        # This is critical for worker nodes that exit quickly after task completion
-        manager = JobmonOTLPManager.get_instance()
-        if manager and manager._initialized:
-            logger.debug("Flushing OTLP telemetry before completion")
-            manager.force_flush(timeout_millis=1000)
-            logger.debug("OTLP flush completed")
     except Exception as e:
         # Log but don't fail - telemetry is nice-to-have
         logger.warning(f"Error during OTLP reinitialization after fork: {e}")
@@ -448,10 +440,6 @@ class WorkerNodeTaskInstance:
         # If it logs running and is not able to transition it raises TransitionError
         self.log_running()
 
-        # Shutdown OTLP gRPC exporters before fork to prevent fork-safety issues
-        # (BAD_RECORD_MAC / TSI_DATA_CORRUPTED errors with gRPC background threads)
-        _shutdown_otlp_safely()
-
         try:
             # run the command in a subprocess
             asyncio.run(self._run_cmd())
@@ -498,11 +486,6 @@ class WorkerNodeTaskInstance:
                     self.command_returncode, self.command_stderr
                 )
                 self.log_error(error_state, msg)
-
-        finally:
-            # Reinitialize OTLP exporters after subprocess completes to restore telemetry
-            # for any subsequent heartbeats or error reporting
-            _reinitialize_otlp()
 
     def set_command_output(self, returncode: int, stdout: str, stderr: str) -> None:
         self._proc_returncode = returncode
@@ -567,13 +550,23 @@ class WorkerNodeTaskInstance:
         env = os.environ.copy()
         env.update(self.command_add_env)
 
+        # Shutdown OTLP gRPC exporters right before fork to prevent fork-safety issues
+        # (BAD_RECORD_MAC / TSI_DATA_CORRUPTED errors with gRPC background threads)
+        # This happens just before create_subprocess_shell() which triggers the fork
+        _shutdown_otlp_safely()
+
         # capture stdout and stderr for asynchronous reading
+        # This is where the fork() happens - we need OTLP shut down before this
         process = await asyncio.create_subprocess_shell(
             self.command,
             env=env,
             stdout=asyncio.subprocess.PIPE,  # Captures stdout
             stderr=asyncio.subprocess.PIPE,  # Captures stderr
         )
+
+        # Reinitialize OTLP immediately after subprocess creation (fork is complete)
+        # This restores telemetry for heartbeats and error reporting during execution
+        _reinitialize_otlp()
 
         # Assert that stdout and stderr are not None for the type checker.
         assert process.stdout is not None
