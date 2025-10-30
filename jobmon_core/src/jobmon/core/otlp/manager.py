@@ -189,18 +189,29 @@ class JobmonOTLPManager:
             if "timeout" in config:
                 exporter_args["timeout"] = config["timeout"]
             if "compression" in config:
+                # Handle compression parameter - gRPC uses enum, HTTP uses string
                 compression_str = config["compression"].lower()
-                try:
-                    import grpc  # type: ignore[import-untyped]
+                is_grpc = ".grpc." in module_name
 
-                    if compression_str == "gzip":
-                        exporter_args["compression"] = grpc.Compression.Gzip
-                    elif compression_str == "deflate":
-                        exporter_args["compression"] = grpc.Compression.Deflate
-                    elif compression_str in ("none", "nocompression"):
-                        exporter_args["compression"] = grpc.Compression.NoCompression
-                except ImportError:
-                    pass
+                if is_grpc:
+                    # gRPC: convert string to grpc.Compression enum
+                    try:
+                        import grpc  # type: ignore[import-untyped]
+
+                        if compression_str == "gzip":
+                            exporter_args["compression"] = grpc.Compression.Gzip
+                        elif compression_str == "deflate":
+                            exporter_args["compression"] = grpc.Compression.Deflate
+                        elif compression_str in ("none", "nocompression"):
+                            exporter_args["compression"] = (
+                                grpc.Compression.NoCompression
+                            )
+                    except ImportError:
+                        pass
+                else:
+                    # HTTP: pass compression as string (or skip if none)
+                    if compression_str not in ("none", "nocompression"):
+                        exporter_args["compression"] = compression_str
             if "insecure" in config:
                 exporter_args["insecure"] = config["insecure"]
             if "options" in config:
@@ -287,23 +298,33 @@ class JobmonOTLPManager:
             if "timeout" in config:
                 exporter_args["timeout"] = config["timeout"]
             if "compression" in config:
-                # Handle compression parameter - convert string to grpc.Compression enum
+                # Handle compression parameter - gRPC uses enum, HTTP uses string
                 compression_str = config["compression"].lower()
-                try:
-                    import grpc  # type: ignore[import-untyped]
+                is_grpc = ".grpc." in module_name
 
-                    if compression_str == "gzip":
-                        exporter_args["compression"] = grpc.Compression.Gzip
-                    elif compression_str == "deflate":
-                        exporter_args["compression"] = grpc.Compression.Deflate
-                    elif compression_str in ("none", "nocompression"):
-                        exporter_args["compression"] = grpc.Compression.NoCompression
-                    else:
+                if is_grpc:
+                    # gRPC: convert string to grpc.Compression enum
+                    try:
+                        import grpc  # type: ignore[import-untyped]
+
+                        if compression_str == "gzip":
+                            exporter_args["compression"] = grpc.Compression.Gzip
+                        elif compression_str == "deflate":
+                            exporter_args["compression"] = grpc.Compression.Deflate
+                        elif compression_str in ("none", "nocompression"):
+                            exporter_args["compression"] = (
+                                grpc.Compression.NoCompression
+                            )
+                        else:
+                            # Don't log here to avoid circular dependency during initialization
+                            pass
+                    except ImportError:
                         # Don't log here to avoid circular dependency during initialization
                         pass
-                except ImportError:
-                    # Don't log here to avoid circular dependency during initialization
-                    pass
+                else:
+                    # HTTP: pass compression as string (or skip if none)
+                    if compression_str not in ("none", "nocompression"):
+                        exporter_args["compression"] = compression_str
             if "insecure" in config:
                 exporter_args["insecure"] = config["insecure"]
             if "options" in config:

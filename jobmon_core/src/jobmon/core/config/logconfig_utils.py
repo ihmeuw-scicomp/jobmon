@@ -223,9 +223,9 @@ def get_logconfig_examples() -> Dict[str, Dict[str, Any]]:
             "section_override_example": {
                 "handlers": {
                     "custom_otlp": {
-                        "class": "jobmon.core.otlp.JobmonOTLPLoggingHandler",
+                        "class": "jobmon.core.otlp.JobmonOTLPStructlogHandler",
                         "level": "DEBUG",
-                        "formatter": "otlp_default",
+                        "exporter": {},
                     }
                 },
                 "loggers": {

@@ -43,7 +43,6 @@ handlers:
   otlp:
     class: jobmon.core.otlp.JobmonOTLPLoggingHandler
     level: INFO
-    formatter: otlp_default
     exporter:
       module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
       class: OTLPLogExporter
@@ -86,7 +85,6 @@ logging:
       otlp_distributor:
         class: jobmon.core.otlp.JobmonOTLPLoggingHandler
         level: INFO
-        formatter: otlp_default
         exporter:
           module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
           class: OTLPLogExporter
@@ -109,7 +107,6 @@ logging:
       otlp_worker:
         class: jobmon.core.otlp.JobmonOTLPLoggingHandler
         level: INFO
-        formatter: otlp_default
         exporter:
           module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
           class: OTLPLogExporter
@@ -140,7 +137,6 @@ logging:
       otlp:
         class: jobmon.core.otlp.JobmonOTLPLoggingHandler
         level: INFO
-        formatter: otlp_default
         exporter:
           module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
           class: OTLPLogExporter
@@ -163,7 +159,6 @@ logging:
       otlp_distributor:
         class: jobmon.core.otlp.JobmonOTLPLoggingHandler
         level: INFO
-        formatter: otlp_default
         exporter:
           module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
           class: OTLPLogExporter
@@ -191,7 +186,6 @@ logging:
       otlp_worker:
         class: jobmon.core.otlp.JobmonOTLPLoggingHandler
         level: INFO
-        formatter: otlp_default
         exporter:
           module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
           class: OTLPLogExporter
@@ -224,7 +218,6 @@ logging:
       otlp_distributor:
         class: jobmon.core.otlp.JobmonOTLPLoggingHandler
         level: WARNING  # Reduce log volume
-        formatter: otlp_default
         exporter:
           module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
           class: OTLPLogExporter
@@ -247,7 +240,6 @@ logging:
       otlp_worker:
         class: jobmon.core.otlp.JobmonOTLPLoggingHandler
         level: ERROR  # Only errors for workers in high-volume
-        formatter: otlp_default
         exporter:
           module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
           class: OTLPLogExporter
@@ -281,7 +273,6 @@ logging:
       otlp_distributor:
         class: jobmon.core.otlp.JobmonOTLPLoggingHandler
         level: DEBUG
-        formatter: otlp_default
         exporter:
           module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
           class: OTLPLogExporter
@@ -337,7 +328,6 @@ logging:
       otlp_distributor:
         class: jobmon.core.otlp.JobmonOTLPLoggingHandler
         level: INFO
-        formatter: otlp_default
         exporter:
           module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
           class: OTLPLogExporter
@@ -431,7 +421,6 @@ logging:
 #       otlp_server:
 #         class: jobmon.core.otlp.JobmonOTLPLoggingHandler
 #         level: INFO
-#         formatter: otlp_default
 #         exporter:
 #           module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
 #           class: OTLPLogExporter
@@ -446,7 +435,7 @@ logging:
 #       console_structlog:
 #         class: logging.StreamHandler
 #         level: INFO
-#         formatter: structlog_text
+#         formatter: structlog_event_only
 #     loggers:
 #       jobmon.server.web:
 #         handlers: [console_structlog, otlp_server]

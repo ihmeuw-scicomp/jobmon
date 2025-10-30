@@ -108,7 +108,6 @@ Override specific sections while keeping template defaults:
          custom_otlp:
            class: jobmon.core.otlp.JobmonOTLPLoggingHandler
            level: DEBUG
-           formatter: otlp_default
            exporter: !template otlp_grpc_exporter
 
 **Environment Variables:**
@@ -243,7 +242,6 @@ Components use default templates with console logging in their local package dir
          otlp_distributor:
            class: jobmon.core.otlp.JobmonOTLPLoggingHandler
            level: INFO
-           formatter: otlp_default
            exporter:
              module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
              class: OTLPLogExporter
@@ -341,13 +339,16 @@ Example 2: Custom Server Logging for Production
    # /etc/jobmon/config.yaml
    logging:
      server:
+       formatters:
+         custom_json:
+           format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}'
        handlers:
          json_file:
            class: logging.handlers.RotatingFileHandler
            filename: "/var/log/jobmon_server.json"
            maxBytes: 10485760  # 10MB
            backupCount: 5
-           formatter: structlog_json
+           formatter: custom_json
        loggers:
          jobmon.server.web:
            handlers: [console_structlog, json_file]
@@ -368,7 +369,6 @@ Example 3: Custom OTLP Configuration
          custom_otlp:
            class: jobmon.core.otlp.JobmonOTLPLoggingHandler
            level: DEBUG
-           formatter: otlp_default
            exporter:
              module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
              class: OTLPLogExporter
