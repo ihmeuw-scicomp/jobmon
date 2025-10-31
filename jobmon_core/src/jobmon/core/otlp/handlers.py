@@ -5,10 +5,16 @@ from __future__ import annotations
 import logging
 import threading
 import time
+import warnings
 from typing import Any, Dict, Optional, Union
 
+from jobmon.core.config.structlog_config import (
+    disable_structlog_otlp_capture,
+    enable_structlog_otlp_capture,
+)
+
 from . import OTLP_AVAILABLE
-from .formatters import JobmonOTLPFormatter
+from .utils import JobmonOTLPFormatter
 
 # TTL-based deduplication cache
 _dedup_cache: Dict[str, tuple[float, int]] = (
@@ -82,8 +88,13 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         self._logger_provider = logger_provider
         self._logger: Optional[Any] = None
         self._initialized = False
+        self._capture_registered = False
 
         self.setFormatter(JobmonOTLPFormatter())
+
+        # Ensure structlog captures event_dict for OTLP export once a handler exists.
+        enable_structlog_otlp_capture()
+        self._capture_registered = True
 
         # If logger_provider is provided directly, initialize immediately
         if logger_provider:
@@ -117,6 +128,12 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             pass
 
         return False
+
+    def close(self) -> None:
+        if self._capture_registered:
+            disable_structlog_otlp_capture()
+            self._capture_registered = False
+        super().close()
 
     def _extract_attributes(self, event_dict: Dict[str, Any]) -> Dict[str, Any]:
         """Extract OTLP attributes from event_dict."""
@@ -249,14 +266,17 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             severity_number = severity_map.get(
                 record.levelname, severity_map.get("INFO", 0)
             )
-            otlp_record = OTLPLogRecord(  # type: ignore[deprecated]
-                timestamp=int(record.created * 1e9),
-                severity_text=record.levelname,
-                severity_number=severity_number,
-                body=message,
-                resource=self._logger_provider.resource,
-                attributes=attributes,
-            )
+            # Suppress deprecation warning for OTLPLogRecord (will be replaced in 1.39.0)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                otlp_record = OTLPLogRecord(  # type: ignore[deprecated]
+                    timestamp=int(record.created * 1e9),
+                    severity_text=record.levelname,
+                    severity_number=severity_number,
+                    body=message,
+                    resource=self._logger_provider.resource,
+                    attributes=attributes,
+                )
 
             # Set trace context (defaults to 0 per OTLP spec)
             otlp_record.trace_id = trace_id_int

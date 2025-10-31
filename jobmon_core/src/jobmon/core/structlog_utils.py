@@ -6,7 +6,7 @@ import functools
 import inspect
 from typing import Any, Callable, Optional, TypeVar
 
-import structlog
+from jobmon.core.logging import set_jobmon_context, unset_jobmon_context
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -76,12 +76,14 @@ def bind_context(*param_names: str, **renames: str) -> Callable[[F], F]:
 
             # Bind context and execute function
             if context_data:
-                structlog.contextvars.bind_contextvars(**context_data)
+                set_jobmon_context(allow_non_jobmon_keys=True, **context_data)
                 try:
                     return func(*args, **kwargs)
                 finally:
                     # Clean up context
-                    structlog.contextvars.unbind_contextvars(*context_data.keys())
+                    unset_jobmon_context(
+                        *context_data.keys(), allow_non_jobmon_keys=True
+                    )
             else:
                 # No context to bind, just execute
                 return func(*args, **kwargs)

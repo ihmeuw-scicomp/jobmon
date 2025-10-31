@@ -8,4 +8,4 @@ formatters:
 
   # Structlog formatter that shows only the event (traditional log style)
   structlog_event_only:
-    '()': jobmon.core.config.formatters.JobmonStructlogEventOnlyFormatter 
+    '()': jobmon.core.config.structlog_formatters.JobmonStructlogEventOnlyFormatter 

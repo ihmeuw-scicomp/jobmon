@@ -36,6 +36,7 @@ from jobmon.core.exceptions import (
     TransitionError,
     WorkflowTestError,
 )
+from jobmon.core.logging import set_jobmon_context
 from jobmon.core.requester import Requester
 from jobmon.core.structlog_utils import bind_method_context
 
@@ -93,7 +94,7 @@ class WorkflowRun:
         """Initialization of the swarm WorkflowRun."""
         self.workflow_run_id = workflow_run_id
 
-        structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
+        set_jobmon_context(workflow_run_id=workflow_run_id)
 
         # state tracking
         self._active_states = [

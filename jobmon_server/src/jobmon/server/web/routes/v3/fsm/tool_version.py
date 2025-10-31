@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
+from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.tool_version import ToolVersion
@@ -54,7 +55,7 @@ async def add_tool_version(request: Request, db: Session = Depends(get_db)) -> A
 def get_task_templates(tool_version_id: int, db: Session = Depends(get_db)) -> Any:
     """Get the Tool Version."""
     # check input variable
-    structlog.contextvars.bind_contextvars(tool_version_id=tool_version_id)
+    set_jobmon_context(tool_version_id=tool_version_id)
     logger.info("Getting available task_templates")
 
     select_stmt = select(TaskTemplate).where(

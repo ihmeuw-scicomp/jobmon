@@ -541,6 +541,13 @@ class Workflow(object):
         Returns:
             str of WorkflowRunStatus
         """
+        # LAZY STRUCTLOG CONFIGURATION: Ensure structlog is configured before any logging
+        # This happens on first workflow.run() call, ensuring host application always
+        # has the opportunity to configure structlog first (eliminating import-order issues)
+        from jobmon.client.logging import ensure_structlog_configured
+
+        ensure_structlog_configured()
+
         # Set gRPC fork support environment variables BEFORE any gRPC initialization
         # This must happen before configure_logging as OTLP handlers create gRPC connections
         if configure_logging is True:
@@ -733,6 +740,11 @@ class Workflow(object):
         """Get a workflow_id."""
         if self.is_bound:
             return
+
+        # LAZY STRUCTLOG CONFIGURATION: Ensure structlog is configured before any logging
+        from jobmon.client.logging import ensure_structlog_configured
+
+        ensure_structlog_configured()
 
         # strict = False means we can coerce. obviously we need to raise at this point
         self.validate(strict=False, raise_on_error=True)

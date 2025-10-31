@@ -7,6 +7,7 @@ import structlog
 
 from jobmon.core.cli import CLI
 from jobmon.core.cluster import Cluster
+from jobmon.core.logging import set_jobmon_context
 from jobmon.distributor.api import DistributorService
 
 logger = structlog.get_logger(__name__)
@@ -31,7 +32,7 @@ class DistributorCLI(CLI):
     def run_distributor(args: argparse.Namespace) -> None:
         """Start the distributor service for a workflow run."""
         # Bind global context for this distributor instance
-        structlog.contextvars.bind_contextvars(workflow_run_id=args.workflow_run_id)
+        set_jobmon_context(workflow_run_id=args.workflow_run_id)
 
         logger.info("Distributor starting")
 

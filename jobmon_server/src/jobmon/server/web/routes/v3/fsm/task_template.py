@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
 from jobmon.core import constants
+from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.arg import Arg
 from jobmon.server.web.models.task_template import TaskTemplate
@@ -35,7 +36,7 @@ async def get_task_template(request: Request, db: Session = Depends(get_db)) -> 
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    structlog.contextvars.bind_contextvars(tool_version_id=tool_version_id)
+    set_jobmon_context(tool_version_id=tool_version_id)
     logger.info(f"Add task tamplate for tool_version_id {tool_version_id} ")
 
     # add to DB
@@ -65,7 +66,7 @@ def get_task_template_versions(
 ) -> Any:
     """Get the task_template_version."""
     # get task template version object
-    structlog.contextvars.bind_contextvars(task_template_id=task_template_id)
+    set_jobmon_context(task_template_id=task_template_id)
     logger.info(f"Getting task template version for task template: {task_template_id}")
 
     select_stmt = select(TaskTemplateVersion).where(
@@ -87,7 +88,7 @@ async def add_task_template_version(
     db: Session = Depends(get_db),
 ) -> Any:
     """Add a task_template_version safely using injected DB session."""
-    structlog.contextvars.bind_contextvars(task_template_id=task_template_id)
+    set_jobmon_context(task_template_id=task_template_id)
 
     def _add_or_get_arg(name: str, session: Session) -> Arg:
         try:
@@ -195,9 +196,7 @@ def get_task_template_id_for_task_template_version(
     db: Session = Depends(get_db),
 ) -> int:
     """Get the task_template_id for a given task_template_version_id."""
-    structlog.contextvars.bind_contextvars(
-        task_template_version_id=task_template_version_id
-    )
+    set_jobmon_context(task_template_version_id=task_template_version_id)
     logger.info(
         f"Getting task template id for task template version: {task_template_version_id}"
     )

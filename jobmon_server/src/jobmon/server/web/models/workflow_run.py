@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from jobmon.core.exceptions import InvalidStateTransition
+from jobmon.core.logging import set_jobmon_context
 from jobmon.core.serializers import SerializeWorkflowRun
 from jobmon.server import __version__
 from jobmon.server.web._compat import add_time
@@ -143,9 +144,7 @@ class WorkflowRun(Base):
 
     def reap(self) -> None:
         """Transition dead workflow runs to a terminal state."""
-        structlog.contextvars.bind_contextvars(
-            workflow_run_id=self.id, workflow_id=self.workflow_id
-        )
+        set_jobmon_context(workflow_run_id=self.id, workflow_id=self.workflow_id)
         logger.info("Dead workflow_run will be reaped.")
         if self.status == WorkflowRunStatus.LINKING:
             logger.debug(f"Transitioning wfr {self.id} to ABORTED")
@@ -165,9 +164,7 @@ class WorkflowRun(Base):
 
     def transition(self, new_state: str) -> None:
         """Transition the Workflow Run's state."""
-        structlog.contextvars.bind_contextvars(
-            workflow_run_id=self.id, workflow_id=self.workflow_id
-        )
+        set_jobmon_context(workflow_run_id=self.id, workflow_id=self.workflow_id)
         if self._is_timely_transition(new_state):
             logger.info(
                 f"Workflow run transitioned from {self.status} to {new_state}",
@@ -200,9 +197,7 @@ class WorkflowRun(Base):
 
     def hot_reset(self) -> None:
         """Set Workflow Run to Hot Resume."""
-        structlog.contextvars.bind_contextvars(
-            workflow_run_id=self.id, workflow_id=self.workflow_id
-        )
+        set_jobmon_context(workflow_run_id=self.id, workflow_id=self.workflow_id)
         logger.info(
             "Workflow run transitioned to HOT_RESUME",
             workflow_run_id=self.id,
@@ -213,9 +208,7 @@ class WorkflowRun(Base):
 
     def cold_reset(self) -> None:
         """Set Workflow Run to Cold Resume."""
-        structlog.contextvars.bind_contextvars(
-            workflow_run_id=self.id, workflow_id=self.workflow_id
-        )
+        set_jobmon_context(workflow_run_id=self.id, workflow_id=self.workflow_id)
         logger.info(
             "Workflow run transitioned to COLD_RESUME",
             workflow_run_id=self.id,
@@ -231,9 +224,7 @@ class WorkflowRun(Base):
 
     def _is_timely_transition(self, new_state: str) -> bool:
         """Check if the transition is invalid due to a race condition."""
-        structlog.contextvars.bind_contextvars(
-            workflow_run_id=self.id, workflow_id=self.workflow_id
-        )
+        set_jobmon_context(workflow_run_id=self.id, workflow_id=self.workflow_id)
         if (self.status, new_state) in self.untimely_transitions:
             logger.info(
                 f"Ignoring transition of workflow_run {self.id} "
