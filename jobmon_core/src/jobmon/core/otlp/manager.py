@@ -9,6 +9,7 @@ from typing import Any, Optional, Type
 from . import OTLP_AVAILABLE
 
 if OTLP_AVAILABLE:
+
     from opentelemetry import trace
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk._logs import LoggerProvider

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import structlog
 
-from jobmon.core.config.structlog_config import create_telemetry_isolation_processor
+from jobmon.core.config.structlog_config import (
+    _store_event_dict_for_otlp,
+    create_telemetry_isolation_processor,
+)
 from jobmon.core.logging.context import (
     bind_jobmon_context,
     clear_jobmon_context,
@@ -189,6 +192,12 @@ def test_jobmon_as_library_with_fhs_style_config():
 
     prepend_jobmon_processors_to_existing_config()
 
+    processors_after_prepend = structlog.get_config().get("processors", [])
+    assert processors_after_prepend[0] is structlog.contextvars.merge_contextvars
+    assert any(
+        proc is _store_event_dict_for_otlp for proc in processors_after_prepend
+    ), "_store_event_dict_for_otlp should be present after prepending processors"
+
     # Test that FHS logging still works
     captured_output2 = io.StringIO()
     with redirect_stdout(captured_output2):
@@ -210,6 +219,38 @@ def test_jobmon_as_library_with_fhs_style_config():
     assert "workflow_run_id" not in fhs_output
 
     unset_jobmon_context("workflow_run_id", "task_instance_id")
+
+
+def test_prepend_jobmon_processors_enforces_correct_ordering() -> None:
+    structlog.configure(
+        processors=[
+            structlog.contextvars.merge_contextvars,
+            structlog.stdlib.add_log_level,
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+    )
+
+    from jobmon.core.config.structlog_config import (
+        prepend_jobmon_processors_to_existing_config,
+    )
+
+    prepend_jobmon_processors_to_existing_config()
+
+    processors = structlog.get_config().get("processors", [])
+
+    # Jobmon processors should be at the beginning in correct order
+    assert processors[0] is structlog.contextvars.merge_contextvars
+    assert processors[1] is structlog.stdlib.filter_by_level
+    assert processors[2] is structlog.stdlib.add_logger_name
+    isolation_processor = processors[3]
+    assert getattr(isolation_processor, "__jobmon_telemetry_isolation__") == (
+        "jobmon.",
+    )
+    assert processors[4] is _store_event_dict_for_otlp
+
+    # Host processors should follow (duplicates removed)
+    assert structlog.stdlib.add_log_level in processors
 
 
 def test_lazy_configuration_allows_host_to_configure_first():

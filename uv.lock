@@ -1522,7 +1522,7 @@ requires-dist = [
     { name = "opentelemetry-instrumentation", marker = "extra == 'otlp'" },
     { name = "opentelemetry-instrumentation-fastapi", marker = "extra == 'otlp'" },
     { name = "opentelemetry-instrumentation-requests", marker = "extra == 'otlp'" },
-    { name = "opentelemetry-sdk", marker = "extra == 'otlp'", specifier = "<1.39.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'otlp'", specifier = "<1.34.0" },
     { name = "psutil" },
     { name = "python-dotenv" },
     { name = "pyyaml" },

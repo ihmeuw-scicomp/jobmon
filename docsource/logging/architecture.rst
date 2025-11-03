@@ -78,6 +78,8 @@ rendering to the host application.  The default chain is:
 ``prepend_jobmon_processors_to_existing_config`` supports host-controlled
 configurations by prepending missing processors.  Callers may now pass
 ``telemetry_logger_prefixes`` to keep Jobmon metadata on additional namespaces.
+Ensures OTLP capture is available by injecting ``_store_event_dict_for_otlp``
+when the host configuration does not already include it.
 
 The helper ``_uses_stdlib_integration`` identifies whether the host relies on
 stdlib logging based on the configured logger factory and wrapper class.  When

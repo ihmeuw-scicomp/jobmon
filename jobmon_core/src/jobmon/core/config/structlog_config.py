@@ -351,35 +351,51 @@ def prepend_jobmon_processors_to_existing_config(
 
     # Get current configuration
     current_config = structlog.get_config()
-    existing_processors = current_config.get("processors", [])
+    existing_processors = list(current_config.get("processors", []))
     logger_factory = current_config.get("logger_factory")
     wrapper_class = current_config.get("wrapper_class")
 
     # Check if host app uses stdlib logging integration
     uses_stdlib_integration = _uses_stdlib_integration(logger_factory, wrapper_class)
 
-    # Build Jobmon processors based on host app's architecture
+    # Build Jobmon processors ensuring correct ordering: merge contextvars must
+    # always run first.
     jobmon_processors: List[Callable] = []
 
-    if not _processor_present(
-        existing_processors, structlog.contextvars.merge_contextvars
-    ):
-        jobmon_processors.append(structlog.contextvars.merge_contextvars)
+    # Always ensure merge_contextvars runs first
+    merge_contextvars = structlog.contextvars.merge_contextvars
+    jobmon_processors.append(merge_contextvars)
 
     if uses_stdlib_integration:
         for processor in (
             structlog.stdlib.filter_by_level,
             structlog.stdlib.add_logger_name,
         ):
-            if not _processor_present(existing_processors, processor):
-                jobmon_processors.append(processor)
+            jobmon_processors.append(processor)
 
     prefixes = telemetry_logger_prefixes or ["jobmon."]
     prefixes_tuple = tuple(prefixes)
     if not _has_isolation_processor(existing_processors, prefixes_tuple):
         jobmon_processors.append(create_telemetry_isolation_processor(prefixes))
 
-    # Combine: Jobmon processors first, then existing processors
+    if not _processor_present(existing_processors, _store_event_dict_for_otlp):
+        jobmon_processors.append(_store_event_dict_for_otlp)
+
+    # Remove Jobmon processors from existing chain to avoid duplicates
+    def _remove_processor(processors: List[Callable], processor: Callable) -> None:
+        """Remove first occurrence of processor from list."""
+        try:
+            processors.remove(processor)
+        except ValueError:
+            pass  # Not present, that's fine
+
+    _remove_processor(existing_processors, merge_contextvars)
+    if uses_stdlib_integration:
+        _remove_processor(existing_processors, structlog.stdlib.filter_by_level)
+        _remove_processor(existing_processors, structlog.stdlib.add_logger_name)
+    _remove_processor(existing_processors, _store_event_dict_for_otlp)
+
+    # Combine: Jobmon processors first (in correct order), then remaining host processors
     new_processors = jobmon_processors + existing_processors
 
     # Update configuration with combined processors
