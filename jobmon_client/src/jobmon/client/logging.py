@@ -128,9 +128,13 @@ def configure_client_logging() -> None:
 
     # Check host app's logging architecture
     current_config = structlog.get_config()
-    host_uses_stdlib = _uses_stdlib_integration(
-        current_config, structlog.stdlib.BoundLogger
-    )
+    logger_factory = current_config.get("logger_factory")
+    wrapper_class = current_config.get("wrapper_class")
+
+    if wrapper_class is None:
+        wrapper_class = structlog.stdlib.BoundLogger
+
+    host_uses_stdlib = _uses_stdlib_integration(logger_factory, wrapper_class)
 
     if host_uses_stdlib:
         configure_logging_with_overrides(

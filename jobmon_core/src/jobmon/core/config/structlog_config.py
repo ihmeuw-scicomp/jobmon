@@ -10,6 +10,7 @@ This module provides structlog configuration that enables:
 
 from __future__ import annotations
 
+import logging
 import threading
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional
@@ -33,6 +34,51 @@ def _store_event_dict_for_otlp(
     # Keep a shallow copy so handlers can mutate safely.
     _thread_local.last_event_dict = dict(event_dict)
     return event_dict
+
+
+def _forward_event_to_logging_handlers(
+    logger: Any, method_name: str, event_dict: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Forward structlog events to stdlib handlers when hosts render directly."""
+    log_name = getattr(logger, "name", event_dict.get("logger", "jobmon.client"))
+    level = logging._nameToLevel.get(method_name.upper(), logging.INFO)
+
+    target_logger = logging.getLogger(log_name)
+    if not target_logger.handlers:
+        return event_dict
+
+    record = logging.LogRecord(
+        name=log_name,
+        level=level,
+        pathname="jobmon/core/config/structlog_config.py",
+        lineno=0,
+        msg=event_dict.get("event", ""),
+        args=(),
+        exc_info=_extract_exc_info(event_dict),
+    )
+
+    target_logger.handle(record)
+    return event_dict
+
+
+def _extract_exc_info(event_dict: Dict[str, Any]) -> Optional[Any]:
+    """Translate structlog exception metadata into logging exc_info tuple."""
+    if "exc_info" in event_dict:
+        exc_info = event_dict["exc_info"]
+        if isinstance(exc_info, tuple):
+            return exc_info
+        if isinstance(exc_info, BaseException):
+            return (exc_info.__class__, exc_info, exc_info.__traceback__)
+        if exc_info:
+            try:
+                return tuple(exc_info)  # type: ignore[arg-type]
+            except TypeError:
+                pass
+
+    if event_dict.get("exc_text"):
+        return (None, event_dict["exc_text"], None)
+
+    return None
 
 
 def enable_structlog_otlp_capture() -> None:
@@ -381,6 +427,11 @@ def prepend_jobmon_processors_to_existing_config(
     if not _processor_present(existing_processors, _store_event_dict_for_otlp):
         jobmon_processors.append(_store_event_dict_for_otlp)
 
+    if not uses_stdlib_integration and not _processor_present(
+        existing_processors, _forward_event_to_logging_handlers
+    ):
+        jobmon_processors.append(_forward_event_to_logging_handlers)
+
     # Remove Jobmon processors from existing chain to avoid duplicates
     def _remove_processor(processors: List[Callable], processor: Callable) -> None:
         """Remove first occurrence of processor from list."""
@@ -394,6 +445,8 @@ def prepend_jobmon_processors_to_existing_config(
         _remove_processor(existing_processors, structlog.stdlib.filter_by_level)
         _remove_processor(existing_processors, structlog.stdlib.add_logger_name)
     _remove_processor(existing_processors, _store_event_dict_for_otlp)
+    if not uses_stdlib_integration:
+        _remove_processor(existing_processors, _forward_event_to_logging_handlers)
 
     # Combine: Jobmon processors first (in correct order), then remaining host processors
     new_processors = jobmon_processors + existing_processors

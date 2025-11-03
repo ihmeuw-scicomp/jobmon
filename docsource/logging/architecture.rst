@@ -16,6 +16,7 @@ The architecture is composed of five primary pieces:
 3. Structlog configuration strategy
 4. Python logging handler configuration
 5. Thread-local event storage for OTLP exporters
+6. Direct-rendering forwarding shim
 
 Context Isolation System
 ========================
@@ -72,8 +73,10 @@ rendering to the host application.  The default chain is:
 6. Telemetry isolation processor (optional)
 7. Extra processors supplied by the caller
 8. ``_store_event_dict_for_otlp`` – captures the raw event for OTLP handlers
-9. ``structlog.stdlib.ProcessorFormatter.wrap_for_formatter`` – ensures stdlib
-   logging handlers continue to function
+9. ``_forward_event_to_logging_handlers`` – mirrors structlog events to stdlib
+   handlers when the host renders output directly
+10. ``structlog.stdlib.ProcessorFormatter.wrap_for_formatter`` – ensures stdlib
+    logging handlers continue to function
 
 ``prepend_jobmon_processors_to_existing_config`` supports host-controlled
 configurations by prepending missing processors.  Callers may now pass
@@ -81,10 +84,18 @@ configurations by prepending missing processors.  Callers may now pass
 Ensures OTLP capture is available by injecting ``_store_event_dict_for_otlp``
 when the host configuration does not already include it.
 
-The helper ``_uses_stdlib_integration`` identifies whether the host relies on
-stdlib logging based on the configured logger factory and wrapper class.  When
-the architecture cannot be determined, the function defaults to assuming stdlib
-integration so that logging behaviour remains safe.
+Two helper functions keep the layering accurate:
+
+* ``_uses_stdlib_integration`` inspects both the configured logger factory and
+  wrapper class.  It recognises ``structlog.stdlib.LoggerFactory``/``BoundLogger``
+  pairs as stdlib, while ``structlog.PrintLoggerFactory`` or custom factories are
+  handled as direct renderers.  Unknown factories default to "stdlib" to retain
+  safe behaviour.
+* ``_forward_event_to_logging_handlers`` is only appended when Jobmon detects a
+  direct-rendering host.  It synthesises a ``logging.LogRecord`` (including
+  ``exc_info``) and hands it to any stdlib handlers attached to the logger.  OTLP
+  handlers therefore receive identical payloads regardless of how the host
+  renders console output.
 
 Python Logging Handlers
 =======================
@@ -93,10 +104,23 @@ Python Logging Handlers
 
 Two pathways exist:
 
-* **Direct rendering hosts** (e.g. FHS) – ``_configure_minimal_client_logging``
-  establishes logger hierarchy without installing handlers.  Console output is
-  handled entirely by the host, while telemetry flows through the structlog
-  processors.
+* **Direct rendering hosts** (e.g. FHS) – ``_configure_client_logging_for_direct_rendering``
+  still loads the standard template but prunes non-Jobmon handlers, retaining
+  only the OTLP handler definitions.  Combined with
+  ``_forward_event_to_logging_handlers`` this preserves host-controlled console
+  rendering while keeping OTLP telemetry flowing.
+Direct-rendering Forwarding Shim
+================================
+
+``_forward_event_to_logging_handlers`` bridges the remaining gap between
+structlog's direct-rendering factories and stdlib handlers.  When Jobmon detects
+that the host renders events itself (no stdlib integration) the processor copies
+each processed event into a ``logging.LogRecord`` and forwards it to the
+configured handlers.  The shim preserves ``exc_info`` tuples so OTLP exports
+include stack traces and error types.
+
+This processor is only installed once (``_processor_present`` guards it) and is
+ignored when the logger has no handlers, keeping the hot path inexpensive.
 * **Stdlib integration** – ``configure_client_logging`` delegates to the
   template-based configuration system (``logconfig_client.yaml``) which defines
   console and OTLP handlers.  Overrides can be provided through JobmonConfig
@@ -187,7 +211,8 @@ complex structures are stringified to avoid errors.
 Testing Strategy
 ================
 
-Unit tests in ``tests/pytest/core/test_jobmon_context.py`` cover:
+Unit tests in ``tests/pytest/core/test_jobmon_context.py`` and
+``tests/pytest/client/test_client_logging.py`` cover:
 
 * Telemetry isolation for Jobmon vs host namespaces
 * Context manager cleanup
@@ -195,7 +220,7 @@ Unit tests in ``tests/pytest/core/test_jobmon_context.py`` cover:
 * Compatibility with FHS rendering
 
 Integration tests cover host-first vs Jobmon-first configuration, OTLP export
-behaviour, and lazy configuration orchestration.
+behaviour, direct-rendering forwarding, and lazy configuration orchestration.
 
 Troubleshooting Tips
 ====================
@@ -254,6 +279,6 @@ When debugging processor chains::
 Document History
 ================
 
-*Last updated:* 2025-10-31 – Major structlog simplification and configurable
-telemetry prefixes.
+*Last updated:* 2025-11-03 – Added direct-rendering forwarding shim, refined
+client logging configuration for OTLP, and documented detection heuristics.
 

@@ -1,11 +1,28 @@
+import copy
 import logging
 import os
+import sys
 import tempfile
+from typing import List
 from unittest.mock import Mock, patch
 
+import structlog
 import yaml
 
+from jobmon.client import logging as jobmon_client_logging
 from jobmon.client.logging import configure_client_logging
+
+
+class _StubOTLPHandler(logging.Handler):
+    """Test substitute for OTLP handler that records emitted log records."""
+
+    emitted_records: List[logging.LogRecord] = []
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(kwargs.get("level", logging.NOTSET))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.emitted_records.append(record)
 
 
 def test_client_logging_default_format(client_env, capsys):
@@ -124,7 +141,6 @@ class TestClientLoggingIntegration:
             test_logger = logging.getLogger("jobmon.client.test")
             if len(test_logger.handlers) > 0:
                 # Should have our custom handler
-                handler = test_logger.handlers[0]
                 assert test_logger.level == logging.WARNING
 
             # Clean up
@@ -153,7 +169,7 @@ class TestClientLoggingIntegration:
             from jobmon.client.workflow import Workflow
 
             # Create a simple workflow with required tool_version
-            workflow = Workflow(
+            _ = Workflow(
                 workflow_args="test_workflow_logging",
                 name="test_logging_workflow",
                 tool_version="test_version_1.0.0",
@@ -232,9 +248,7 @@ class TestClientLoggingOutput:
         # but we can verify that the logger is configured and functional
         captured = capsys.readouterr()
 
-        # Either output was captured, or logging is working in library-safe mode
-        # Both are acceptable for a well-behaved library
-        all_output = captured.err + captured.out
+        _ = captured.err + captured.out
 
         # Success criteria: No exceptions during logging AND proper logger configuration
         assert True, "Client logging configured and functional"
@@ -278,3 +292,133 @@ class TestClientLoggingOutput:
 
         # The logger should exist and be configured
         assert client_logger is not None
+
+
+def test_direct_rendering_forwards_to_stdlib_handlers(client_env):
+    """Ensure direct-rendering hosts still emit to stdlib handlers for OTLP."""
+
+    _StubOTLPHandler.emitted_records.clear()
+    structlog.reset_defaults()
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+
+    class _DirectLogger:
+        def __init__(self, name: str) -> None:
+            self.name = name
+
+        def msg(self, *args, **kwargs) -> None:  # pragma: no cover - host stub
+            return None
+
+        def error(self, event, **kwargs) -> None:  # noqa: ANN001
+            self.msg(event, **kwargs)
+
+        def warning(self, event, **kwargs) -> None:  # noqa: ANN001
+            self.msg(event, **kwargs)
+
+        def info(self, event, **kwargs) -> None:  # noqa: ANN001
+            self.msg(event, **kwargs)
+
+    class _DirectLoggerFactory:
+        def __call__(self, *args) -> _DirectLogger:
+            name = args[0] if args else "jobmon.client"
+            return _DirectLogger(name)
+
+    direct_factory = _DirectLoggerFactory()
+
+    base_logconfig = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "structlog_event_only": {
+                "()": "jobmon.core.config.structlog_formatters.JobmonStructlogEventOnlyFormatter"
+            }
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "level": "INFO",
+            },
+            "otlp_structlog": {
+                "class": "jobmon.core.otlp.JobmonOTLPStructlogHandler",
+                "level": "DEBUG",
+                "exporter": {},
+            },
+        },
+        "loggers": {
+            "jobmon.client": {
+                "handlers": ["console", "otlp_structlog"],
+                "level": "INFO",
+                "propagate": False,
+            },
+            "jobmon.core": {
+                "handlers": ["console", "otlp_structlog"],
+                "level": "WARNING",
+                "propagate": False,
+            },
+        },
+    }
+
+    structlog.configure(
+        processors=[lambda logger, method_name, event_dict: event_dict],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        logger_factory=direct_factory,
+    )
+
+    from jobmon.core.config import structlog_config as core_structlog_config
+
+    original_client_uses = jobmon_client_logging._uses_stdlib_integration
+    original_core_uses = core_structlog_config._uses_stdlib_integration
+
+    def _is_direct_factory(obj: object) -> bool:
+        return isinstance(obj, _DirectLoggerFactory) or obj is _DirectLoggerFactory
+
+    def _patched_client_uses(
+        logger_factory, wrapper_class
+    ):  # pragma: no cover - helper
+        if _is_direct_factory(logger_factory):
+            return False
+        return original_client_uses(logger_factory, wrapper_class)
+
+    def _patched_core_uses(logger_factory, wrapper_class):  # pragma: no cover - helper
+        if _is_direct_factory(logger_factory):
+            return False
+        return original_core_uses(logger_factory, wrapper_class)
+
+    with patch(
+        "jobmon.core.otlp.handlers.JobmonOTLPStructlogHandler", _StubOTLPHandler
+    ), patch("jobmon.core.otlp.JobmonOTLPStructlogHandler", _StubOTLPHandler), patch(
+        "jobmon.client.logging._uses_stdlib_integration", _patched_client_uses
+    ), patch(
+        "jobmon.core.config.structlog_config._uses_stdlib_integration",
+        _patched_core_uses,
+    ), patch(
+        "jobmon.client.logging.load_logconfig_with_overrides",
+        side_effect=lambda *args, **kwargs: copy.deepcopy(base_logconfig),
+    ):
+        configure_client_logging()
+
+        client_logger = logging.getLogger("jobmon.client")
+        assert any(
+            isinstance(handler, _StubOTLPHandler) for handler in client_logger.handlers
+        ), "Client logger should include the OTLP handler in direct mode"
+
+        logger = structlog.get_logger("jobmon.client")
+        try:
+            raise ValueError("boom")
+        except ValueError:
+            exc_info = sys.exc_info()
+            logger.bind(exc_info=exc_info).error("boom")
+
+    assert (
+        len(_StubOTLPHandler.emitted_records) >= 1
+    ), "Structlog events should be forwarded to OTLP handlers"
+
+    record = _StubOTLPHandler.emitted_records[-1]
+    assert record.levelno == logging.ERROR
+    assert record.getMessage() == "boom"
+    assert record.exc_info is not None
+    assert isinstance(record.exc_info[1], ValueError)
+
+    logging.getLogger("jobmon.client").handlers.clear()
+    _StubOTLPHandler.emitted_records.clear()
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+    structlog.reset_defaults()

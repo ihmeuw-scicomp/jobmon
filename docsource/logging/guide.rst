@@ -20,6 +20,9 @@ Core Principles
 * **Metadata isolation** – telemetry fields stay on loggers that belong to the
   Jobmon namespace (``jobmon.*`` by default) so the host application's output
   is not polluted.
+* **Direct-rendering friendly** – when hosts render events themselves (for
+  example via ``structlog.PrintLoggerFactory``), Jobmon mirrors the structured
+  event into stdlib handlers so OTLP exporters still see the full payload.
 * **Safe integration** – host :mod:`structlog` configuration remains in
   control; Jobmon only prepends the processors it requires.
 
@@ -52,15 +55,17 @@ FHS-style Application
    wf = Tool("my_tool").create_workflow("my_workflow")
    wf.bind()
 
-   wf.run()                      # Silent – telemetry captured only
-   wf.run(configure_logging=True) # Console output rendered by host processors
+   wf.run()                       # Silent – telemetry captured only
+   wf.run(configure_logging=True) # Console output rendered by host processors + OTLP
 
 What you see:
 
 * Application logs are unchanged.
 * Jobmon console output only appears when explicitly enabled and uses your
   renderer.
-* Telemetry is captured and exported whenever OTLP logging is enabled.
+* Telemetry is captured and exported whenever OTLP logging is enabled—even for
+  direct-rendering hosts—because Jobmon forwards structured events to the OTLP
+  handler on your behalf.
 
 Lazy Configuration
 ------------------
