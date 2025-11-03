@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import tempfile
+from contextlib import contextmanager
 from typing import List
 from unittest.mock import Mock, patch
 
@@ -23,6 +24,60 @@ class _StubOTLPHandler(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         self.emitted_records.append(record)
+
+
+class _DirectLogger:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def msg(self, *args, **kwargs) -> None:  # pragma: no cover - host stub
+        return None
+
+    def error(self, event, **kwargs) -> None:  # noqa: ANN001
+        self.msg(event, **kwargs)
+
+    def warning(self, event, **kwargs) -> None:  # noqa: ANN001
+        self.msg(event, **kwargs)
+
+    def info(self, event, **kwargs) -> None:  # noqa: ANN001
+        self.msg(event, **kwargs)
+
+
+class _DirectLoggerFactory:
+    def __call__(self, *args) -> _DirectLogger:
+        name = args[0] if args else "jobmon.client"
+        return _DirectLogger(name)
+
+
+@contextmanager
+def _patched_direct_detection():
+    from jobmon.core.config import structlog_config as core_structlog_config
+
+    original_client_uses = jobmon_client_logging._uses_stdlib_integration
+    original_core_uses = core_structlog_config._uses_stdlib_integration
+
+    def _is_direct_factory(obj: object) -> bool:
+        return isinstance(obj, _DirectLoggerFactory) or obj is _DirectLoggerFactory
+
+    def _patched_client_uses(
+        logger_factory, wrapper_class
+    ):  # pragma: no cover - helper
+        if _is_direct_factory(logger_factory):
+            return False
+        return original_client_uses(logger_factory, wrapper_class)
+
+    def _patched_core_uses(logger_factory, wrapper_class):  # pragma: no cover - helper
+        if _is_direct_factory(logger_factory):
+            return False
+        return original_core_uses(logger_factory, wrapper_class)
+
+    with patch(
+        "jobmon.client.logging._uses_stdlib_integration", _patched_client_uses
+    ), patch(
+        "jobmon.core.config.structlog_config._uses_stdlib_integration",
+        _patched_core_uses,
+    ):
+        yield
 
 
 def test_client_logging_default_format(client_env, capsys):
@@ -300,27 +355,8 @@ def test_direct_rendering_forwards_to_stdlib_handlers(client_env):
     _StubOTLPHandler.emitted_records.clear()
     structlog.reset_defaults()
     jobmon_client_logging._structlog_configured_by_jobmon = False
-
-    class _DirectLogger:
-        def __init__(self, name: str) -> None:
-            self.name = name
-
-        def msg(self, *args, **kwargs) -> None:  # pragma: no cover - host stub
-            return None
-
-        def error(self, event, **kwargs) -> None:  # noqa: ANN001
-            self.msg(event, **kwargs)
-
-        def warning(self, event, **kwargs) -> None:  # noqa: ANN001
-            self.msg(event, **kwargs)
-
-        def info(self, event, **kwargs) -> None:  # noqa: ANN001
-            self.msg(event, **kwargs)
-
-    class _DirectLoggerFactory:
-        def __call__(self, *args) -> _DirectLogger:
-            name = args[0] if args else "jobmon.client"
-            return _DirectLogger(name)
+    jobmon_client_logging._telemetry_debug_enabled = None
+    jobmon_client_logging._telemetry_debug_emitted = False
 
     direct_factory = _DirectLoggerFactory()
 
@@ -363,34 +399,11 @@ def test_direct_rendering_forwards_to_stdlib_handlers(client_env):
         logger_factory=direct_factory,
     )
 
-    from jobmon.core.config import structlog_config as core_structlog_config
-
-    original_client_uses = jobmon_client_logging._uses_stdlib_integration
-    original_core_uses = core_structlog_config._uses_stdlib_integration
-
-    def _is_direct_factory(obj: object) -> bool:
-        return isinstance(obj, _DirectLoggerFactory) or obj is _DirectLoggerFactory
-
-    def _patched_client_uses(
-        logger_factory, wrapper_class
-    ):  # pragma: no cover - helper
-        if _is_direct_factory(logger_factory):
-            return False
-        return original_client_uses(logger_factory, wrapper_class)
-
-    def _patched_core_uses(logger_factory, wrapper_class):  # pragma: no cover - helper
-        if _is_direct_factory(logger_factory):
-            return False
-        return original_core_uses(logger_factory, wrapper_class)
-
     with patch(
         "jobmon.core.otlp.handlers.JobmonOTLPStructlogHandler", _StubOTLPHandler
-    ), patch("jobmon.core.otlp.JobmonOTLPStructlogHandler", _StubOTLPHandler), patch(
-        "jobmon.client.logging._uses_stdlib_integration", _patched_client_uses
     ), patch(
-        "jobmon.core.config.structlog_config._uses_stdlib_integration",
-        _patched_core_uses,
-    ), patch(
+        "jobmon.core.otlp.JobmonOTLPStructlogHandler", _StubOTLPHandler
+    ), _patched_direct_detection(), patch(
         "jobmon.client.logging.load_logconfig_with_overrides",
         side_effect=lambda *args, **kwargs: copy.deepcopy(base_logconfig),
     ):
@@ -421,4 +434,130 @@ def test_direct_rendering_forwards_to_stdlib_handlers(client_env):
     logging.getLogger("jobmon.client").handlers.clear()
     _StubOTLPHandler.emitted_records.clear()
     jobmon_client_logging._structlog_configured_by_jobmon = False
+    structlog.reset_defaults()
+
+
+def test_direct_rendering_attaches_otlp_handler_when_none_remaining(client_env):
+    """Verify fallback attaches OTLP handler if config leaves jobmon loggers empty."""
+
+    structlog.reset_defaults()
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+    jobmon_client_logging._telemetry_debug_enabled = None
+    jobmon_client_logging._telemetry_debug_emitted = False
+
+    direct_factory = _DirectLoggerFactory()
+
+    base_logconfig = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "level": "INFO",
+            }
+        },
+        "loggers": {
+            "jobmon.client": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propagate": False,
+            }
+        },
+    }
+
+    structlog.configure(
+        processors=[lambda logger, method_name, event_dict: event_dict],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        logger_factory=direct_factory,
+    )
+
+    class _CountingStub(logging.Handler):
+        instances: List["_CountingStub"] = []
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(kwargs.get("level", logging.NOTSET))
+            self.__class__.instances.append(self)
+
+        def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - stub
+            return None
+
+    with patch(
+        "jobmon.core.otlp.handlers.JobmonOTLPStructlogHandler", _CountingStub
+    ), patch(
+        "jobmon.core.otlp.JobmonOTLPStructlogHandler", _CountingStub
+    ), _patched_direct_detection(), patch(
+        "jobmon.client.logging.load_logconfig_with_overrides",
+        side_effect=lambda *args, **kwargs: copy.deepcopy(base_logconfig),
+    ):
+        configure_client_logging()
+
+        client_logger = logging.getLogger("jobmon.client")
+        assert len(client_logger.handlers) == 1
+        assert isinstance(client_logger.handlers[0], _CountingStub)
+        assert _CountingStub.instances
+
+    logging.getLogger("jobmon.client").handlers.clear()
+    structlog.reset_defaults()
+
+
+def test_direct_rendering_multiple_config_calls_keep_single_handler(client_env):
+    """Ensure repeated configuration does not accumulate fallback handlers."""
+
+    structlog.reset_defaults()
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+    jobmon_client_logging._telemetry_debug_enabled = None
+    jobmon_client_logging._telemetry_debug_emitted = False
+
+    direct_factory = _DirectLoggerFactory()
+
+    base_logconfig = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "level": "INFO",
+            }
+        },
+        "loggers": {
+            "jobmon.client": {
+                "handlers": ["console"],
+                "level": "INFO",
+                "propagate": False,
+            }
+        },
+    }
+
+    structlog.configure(
+        processors=[lambda logger, method_name, event_dict: event_dict],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        logger_factory=direct_factory,
+    )
+
+    class _TrackingStub(logging.Handler):
+        instances: List["_TrackingStub"] = []
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(kwargs.get("level", logging.NOTSET))
+            self.__class__.instances.append(self)
+
+        def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - stub
+            return None
+
+    with patch(
+        "jobmon.core.otlp.handlers.JobmonOTLPStructlogHandler", _TrackingStub
+    ), patch(
+        "jobmon.core.otlp.JobmonOTLPStructlogHandler", _TrackingStub
+    ), _patched_direct_detection(), patch(
+        "jobmon.client.logging.load_logconfig_with_overrides",
+        side_effect=lambda *args, **kwargs: copy.deepcopy(base_logconfig),
+    ):
+        for _ in range(2):
+            configure_client_logging()
+            client_logger = logging.getLogger("jobmon.client")
+            assert len(client_logger.handlers) == 1
+
+    assert len(_TrackingStub.instances) == 2
+
+    logging.getLogger("jobmon.client").handlers.clear()
     structlog.reset_defaults()

@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Set
 
 from jobmon.core.logging.context import get_jobmon_context
 
@@ -474,12 +474,98 @@ def is_structlog_configured() -> bool:
     return structlog.is_configured()
 
 
+def _iter_factory_candidates(factory: Any) -> Iterator[Any]:
+    """Yield the given factory and any nested factories exposed via common attrs."""
+    if factory is None:
+        return
+
+    stack = [factory]
+    seen: Set[int] = set()
+
+    while stack:
+        current = stack.pop()
+        current_id = id(current)
+        if current_id in seen:
+            continue
+        seen.add(current_id)
+
+        yield current
+
+        for attr in ("__wrapped__", "wrapped_factory", "factory", "inner_factory"):
+            nested = getattr(current, attr, None)
+            if nested is not None:
+                stack.append(nested)
+
+        func = getattr(current, "func", None)  # functools.partial
+        if func is not None:
+            stack.append(func)
+
+
+def _looks_like_direct_rendering_factory(factory: Any) -> bool:
+    """Best-effort detection of structlog PrintLogger-based factories."""
+    import structlog
+
+    print_factory_cls = getattr(structlog, "PrintLoggerFactory", None)
+    print_logger_cls = getattr(structlog, "PrintLogger", None)
+
+    if not print_factory_cls and not print_logger_cls:
+        return False
+
+    for candidate in _iter_factory_candidates(factory):
+        try:
+            if print_factory_cls and (
+                isinstance(candidate, print_factory_cls)
+                or (
+                    isinstance(candidate, type)
+                    and issubclass(candidate, print_factory_cls)
+                )
+            ):
+                return True
+
+            candidate_cls = getattr(candidate, "__class__", None)
+            if (
+                print_factory_cls
+                and isinstance(candidate_cls, type)
+                and issubclass(candidate_cls, print_factory_cls)
+            ):
+                return True
+
+            if print_logger_cls and (
+                isinstance(candidate, print_logger_cls)
+                or (
+                    isinstance(candidate, type)
+                    and issubclass(candidate, print_logger_cls)
+                )
+            ):
+                return True
+        except Exception:  # noqa: BLE001 - heuristic guard
+            continue
+
+    return False
+
+
+def _wrapper_indicates_direct_rendering(wrapper_class: Any) -> bool:
+    """Detect wrapper classes that imply direct rendering (e.g., PrintLogger)."""
+    import structlog
+
+    print_logger_cls = getattr(structlog, "PrintLogger", None)
+    if not print_logger_cls or not isinstance(wrapper_class, type):
+        return False
+
+    try:
+        return issubclass(wrapper_class, print_logger_cls)
+    except Exception:  # noqa: BLE001 - guard against atypical wrapper types
+        return False
+
+
 def _uses_stdlib_integration(logger_factory: Any, wrapper_class: Any) -> bool:
     """Best-effort detection of stdlib integration vs direct rendering."""
     import structlog
 
-    print_factory_cls = getattr(structlog, "PrintLoggerFactory", None)
-    if print_factory_cls and isinstance(logger_factory, print_factory_cls):
+    if _looks_like_direct_rendering_factory(logger_factory):
+        return False
+
+    if _wrapper_indicates_direct_rendering(wrapper_class):
         return False
 
     logger_factory_cls = getattr(structlog.stdlib, "LoggerFactory", None)
@@ -493,6 +579,9 @@ def _uses_stdlib_integration(logger_factory: Any, wrapper_class: Any) -> bool:
         and issubclass(wrapper_class, bound_logger_cls)  # type: ignore[arg-type]
     ):
         return True
+
+    if _looks_like_direct_rendering_factory(getattr(logger_factory, "__class__", None)):
+        return False
 
     factory_repr = repr(logger_factory)
     if "PrintLogger" in factory_repr:
