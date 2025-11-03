@@ -10,10 +10,17 @@ enabled (handled by the Requester class itself).
 
 from __future__ import annotations
 
+import logging.config
 import os
 import sys
 import threading
-from typing import Dict
+from typing import Dict, List
+
+from jobmon.core.config.logconfig_utils import (
+    configure_logging_with_overrides,
+    load_logconfig_with_overrides,
+)
+from jobmon.core.config.structlog_config import _uses_stdlib_integration
 
 # Lazy configuration state
 _structlog_configured_lock = threading.Lock()
@@ -112,8 +119,6 @@ def configure_client_logging() -> None:
     """
     import structlog
 
-    from jobmon.core.config.logconfig_utils import configure_logging_with_overrides
-
     # Ensure structlog is configured first (lazy initialization)
     ensure_structlog_configured()
 
@@ -123,53 +128,51 @@ def configure_client_logging() -> None:
 
     # Check host app's logging architecture
     current_config = structlog.get_config()
-    logger_factory = current_config.get("logger_factory")
-    host_uses_direct_rendering = hasattr(logger_factory, "__name__") and (
-        "PrintLogger" in str(logger_factory) or "Print" in str(logger_factory)
+    host_uses_stdlib = _uses_stdlib_integration(
+        current_config, structlog.stdlib.BoundLogger
     )
 
-    if host_uses_direct_rendering:
-        # Host app (like FHS) handles output directly - set up minimal passthrough handlers
-        _configure_minimal_client_logging_for_direct_rendering()
-    else:
-        # Host app uses stdlib integration - set up full Jobmon logging
+    if host_uses_stdlib:
         configure_logging_with_overrides(
             default_template_path=default_template_path,
             config_section="client",
             fallback_config=default_config,
         )
+    else:
+        _configure_client_logging_for_direct_rendering(default_template_path)
 
 
-def _configure_minimal_client_logging_for_direct_rendering() -> None:
-    """Configure minimal stdlib logging when host app uses direct rendering.
+def _remove_non_jobmon_handlers(logconfig: Dict) -> None:
+    """Keep only Jobmon OTLP handlers when host renders output directly."""
+    handlers = logconfig.get("handlers", {})
 
-    When host applications (like FHS) use direct structlog rendering that prints
-    output directly, we set up minimal stdlib infrastructure that:
-    1. Doesn't interfere with host app's direct output
-    2. Provides logger hierarchy for Jobmon components
-    3. Allows OTLP telemetry to work (data comes from thread-local, not handlers)
-
-    Since FHS handles all console output through structlog rendering, we don't
-    set up console handlers to avoid double-processing or conflicts.
-    """
-    import logging.config
-
-    # Minimal configuration - just logger hierarchy, no handlers
-    # OTLP telemetry works through thread-local data, not stdlib handlers
-    minimal_config = {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "loggers": {
-            # Define logger hierarchy without handlers (since FHS handles output)
-            "jobmon.client": {
-                "level": "INFO",
-                "propagate": False,  # Don't interfere with FHS
-            },
-            "jobmon.core": {
-                "level": "WARNING",
-                "propagate": False,
-            },
-        },
+    # Identify OTLP handlers Jobmon manages
+    jobmon_handlers = {
+        name
+        for name, cfg in handlers.items()
+        if cfg.get("class", "").startswith("jobmon.core.otlp")
     }
 
-    logging.config.dictConfig(minimal_config)
+    # Drop everything except Jobmon's handlers
+    to_remove = set(handlers) - jobmon_handlers
+    for name in to_remove:
+        handlers.pop(name, None)
+
+    # Update logger handler lists to only reference remaining handlers
+    loggers = logconfig.get("loggers", {})
+    for logger_config in loggers.values():
+        handler_list: List[str] = logger_config.get("handlers", [])
+        if handler_list:
+            logger_config["handlers"] = [h for h in handler_list if h in handlers]
+
+
+def _configure_client_logging_for_direct_rendering(default_template_path: str) -> None:
+    """Configure logging for direct-rendering hosts while preserving telemetry."""
+    logconfig_data = load_logconfig_with_overrides(
+        default_template_path=default_template_path,
+        config_section="client",
+    )
+
+    _remove_non_jobmon_handlers(logconfig_data)
+
+    logging.config.dictConfig(logconfig_data)
