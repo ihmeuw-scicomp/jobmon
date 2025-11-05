@@ -198,6 +198,26 @@ loggers:
                 result = cli.main("test")
                 assert result == "success"
 
+    def test_worker_cli_flushes_otlp_on_exit(self):
+        """Ensure worker CLI flushes OTLP telemetry after execution."""
+        cli = WorkerNodeCLI()
+
+        mock_args = MagicMock()
+        mock_args.func = MagicMock(return_value="ok")
+
+        with patch.object(cli, "parse_args", return_value=mock_args), patch(
+            "jobmon.core.otlp.manager.otlp_flush_on_exit"
+        ) as mock_flush_context:
+            mock_enter = mock_flush_context.return_value.__enter__
+            mock_exit = mock_flush_context.return_value.__exit__
+
+            result = cli.main("worker_node_job")
+
+            assert result == "ok"
+            mock_flush_context.assert_called_once()
+            mock_enter.assert_called_once()
+            mock_exit.assert_called_once()
+
     def test_worker_logging_with_section_override(self, tmp_path):
         """Test worker logging with section-based configuration override."""
         # Create default template

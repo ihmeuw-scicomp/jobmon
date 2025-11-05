@@ -13,9 +13,54 @@ from __future__ import annotations
 import logging
 import threading
 from contextlib import contextmanager
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Set
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Set,
+)
+
+from structlog._output import PrintLogger, PrintLoggerFactory
 
 from jobmon.core.logging.context import get_jobmon_context
+
+
+class _NamedPrintLogger:
+    """Wrapper that adds a ``name`` attribute to ``PrintLogger``."""
+
+    __slots__ = ("_logger", "name")
+
+    def __init__(self, logger_name: str, base_logger: PrintLogger) -> None:
+        self._logger = base_logger
+        self.name = logger_name
+
+    def __getattr__(self, item: str) -> Any:
+        return getattr(self._logger, item)
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return f"<_NamedPrintLogger name={self.name!r} logger={self._logger!r}>"
+
+
+class _NamedPrintLoggerFactory:
+    """Factory that decorates ``PrintLogger`` instances with a name."""
+
+    __jobmon_named_factory__ = True
+
+    def __init__(self, base_factory: PrintLoggerFactory) -> None:
+        self._base_factory = base_factory
+
+    def __call__(self, *args: Any) -> _NamedPrintLogger:
+        base_logger = self._base_factory(*args)
+        logger_name: Optional[str] = None
+        if args and isinstance(args[0], str):
+            logger_name = args[0]
+        return _NamedPrintLogger(logger_name or "jobmon.client", base_logger)
+
 
 # Thread-local storage for event_dict captured by OTLP handlers.
 _thread_local = threading.local()
@@ -44,8 +89,23 @@ def _forward_event_to_logging_handlers(
     level = logging._nameToLevel.get(method_name.upper(), logging.INFO)
 
     target_logger = logging.getLogger(log_name)
+
+    if not target_logger.handlers:
+        parent_name = log_name
+        while not target_logger.handlers and target_logger.propagate:
+            parent_name, _, _ = parent_name.rpartition(".")
+            if not parent_name:
+                break
+            target_logger = logging.getLogger(parent_name)
+
     if not target_logger.handlers:
         return event_dict
+
+    event_dict.setdefault("logger", log_name)
+    if hasattr(_thread_local, "last_event_dict") and isinstance(
+        _thread_local.last_event_dict, dict
+    ):
+        _thread_local.last_event_dict.setdefault("logger", log_name)
 
     record = logging.LogRecord(
         name=log_name,
@@ -58,7 +118,191 @@ def _forward_event_to_logging_handlers(
     )
 
     target_logger.handle(record)
+
+    return _prune_event_dict_for_console(event_dict)
+
+
+def _prune_event_dict_for_console(event_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Strip Jobmon-bound metadata while leaving host formatting intact.
+
+    Removes all keys starting with 'telemetry_' prefix to keep console output
+    clean while preserving the full context for OTLP exports.
+    """
+    for key in list(event_dict.keys()):
+        if key.startswith("telemetry_"):
+            event_dict.pop(key, None)
     return event_dict
+
+
+def _ensure_logger_name(
+    logger: Any, method_name: str, event_dict: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Ensure the event dict contains a ``logger`` field."""
+    if "logger" in event_dict and isinstance(event_dict["logger"], str):
+        return event_dict
+
+    candidate = getattr(logger, "name", None)
+    if not candidate:
+        factory_args = getattr(logger, "_logger_factory_args", ())
+        if isinstance(factory_args, tuple) and factory_args:
+            candidate = factory_args[0]
+
+    event_dict["logger"] = candidate or "jobmon.client"
+    return event_dict
+
+
+def _wrap_print_logger_factory(factory: Any) -> Any:
+    """Decorate PrintLogger factories so produced loggers expose ``name``."""
+    if isinstance(factory, PrintLoggerFactory) and not getattr(
+        factory, "__jobmon_named_factory__", False
+    ):
+        return _NamedPrintLoggerFactory(factory)
+    return factory
+
+
+def _wrap_wrapper_class_for_otlp(wrapper_class: Any) -> Any:
+    """Ensure filtered log levels still execute processors for OTLP capture."""
+    if not isinstance(wrapper_class, type):
+        return wrapper_class
+
+    if getattr(wrapper_class, "__jobmon_otlp_passthrough__", False):
+        return wrapper_class
+
+    try:
+        from structlog._native import _nop  # type: ignore[attr-defined]
+    except Exception:  # pragma: no cover - structlog internals unavailable
+        return wrapper_class
+
+    filtered_methods = {
+        name
+        for name in ("debug", "trace", "verbose")
+        if wrapper_class.__dict__.get(name) is _nop
+    }
+
+    if not filtered_methods:
+        return wrapper_class
+
+    try:
+        from structlog.exceptions import DropEvent
+    except Exception:  # pragma: no cover - defensive import
+
+        class DropEvent(Exception):  # type: ignore[no-redef]
+            """Fallback DropEvent placeholder when structlog is unavailable."""
+
+    def _jobmon_process_filtered_event(
+        self: Any, method_name: str, event: Any, args: Sequence[Any], kw: Dict[str, Any]
+    ) -> None:
+        level = logging._nameToLevel.get(method_name.upper(), logging.INFO)
+        log_name = getattr(getattr(self, "_logger", None), "name", None)
+        if not log_name:
+            log_name = kw.get("logger") or kw.get("name")
+
+        if log_name:
+            target_logger = logging.getLogger(log_name)
+        if not target_logger.isEnabledFor(level):
+            return
+
+        rendered_event = event
+        if args:
+            try:
+                rendered_event = event % tuple(args)
+            except Exception:
+                rendered_event = event
+
+        event_kw = dict(kw)
+        try:
+            self._process_event(method_name, rendered_event, event_kw)
+        except DropEvent:
+            return
+        except Exception:
+            return
+
+    def _make_method(name: str) -> Callable[..., Any]:
+        def _method(self: Any, event: Any, *args: Any, **kw: Any) -> Any:
+            _jobmon_process_filtered_event(self, name, event, args, kw)
+            return None
+
+        return _method
+
+    def _make_async_method(name: str) -> Callable[..., Any]:
+        async def _amethod(self: Any, event: Any, *args: Any, **kw: Any) -> Any:
+            _jobmon_process_filtered_event(self, name, event, args, kw)
+            return None
+
+        return _amethod
+
+    attrs: Dict[str, Any] = {
+        "__jobmon_otlp_passthrough__": True,
+        "_jobmon_process_filtered_event": _jobmon_process_filtered_event,
+    }
+
+    for method_name in filtered_methods:
+        attrs[method_name] = _make_method(method_name)
+        async_name = f"a{method_name}"
+        if wrapper_class.__dict__.get(async_name) is not None:
+            attrs[async_name] = _make_async_method(method_name)
+
+    jobmon_wrapper = type(
+        f"JobmonOTLPPassthrough{wrapper_class.__name__}",
+        (wrapper_class,),
+        attrs,
+    )
+
+    return jobmon_wrapper
+
+
+def _build_structlog_processor_chain(
+    *,
+    uses_stdlib_integration: bool,
+    component_name: Optional[str],
+    enable_jobmon_context: bool,
+    telemetry_logger_prefixes: Optional[Sequence[str]],
+    extra_processors: Iterable[Callable],
+    include_store_for_otlp: bool,
+    include_add_log_level: Optional[bool] = None,
+    include_forward_to_handlers: Optional[bool] = None,
+    include_wrap_for_formatter: bool,
+    ensure_logger_name_on_direct: bool = True,
+) -> List[Callable]:
+    """Compose the processor chain shared across Jobmon structlog setup paths."""
+    import structlog
+
+    processors: List[Callable] = [structlog.contextvars.merge_contextvars]
+
+    if component_name:
+        processors.append(_create_component_processor(component_name))
+
+    if include_add_log_level is None:
+        include_add_log_level = uses_stdlib_integration
+    if include_forward_to_handlers is None:
+        include_forward_to_handlers = not uses_stdlib_integration
+
+    if uses_stdlib_integration:
+        processors.append(structlog.stdlib.filter_by_level)
+        processors.append(structlog.stdlib.add_logger_name)
+        if include_add_log_level:
+            processors.append(structlog.stdlib.add_log_level)
+    elif ensure_logger_name_on_direct:
+        processors.append(_ensure_logger_name)
+
+    prefixes = list(telemetry_logger_prefixes or ["jobmon."])
+    if enable_jobmon_context:
+        processors.append(create_telemetry_isolation_processor(prefixes))
+
+    if include_store_for_otlp:
+        processors.append(_store_event_dict_for_otlp)
+
+    processors.extend(list(extra_processors))
+
+    if include_forward_to_handlers:
+        if not uses_stdlib_integration:
+            processors.append(structlog.stdlib.add_log_level)
+        processors.append(_forward_event_to_logging_handlers)
+
+    if include_wrap_for_formatter:
+        processors.append(structlog.stdlib.ProcessorFormatter.wrap_for_formatter)
+
+    return processors
 
 
 def _extract_exc_info(event_dict: Dict[str, Any]) -> Optional[Any]:
@@ -146,8 +390,9 @@ def configure_structlog(
     - This prevents telemetry metadata from leaking into host rendering
     - Avoid duplicate processors (timestamps, exception formatting, etc.) in extra_processors
     - Use unique event_dict keys to avoid overwrites
-    - Jobmon telemetry keys: workflow_run_id, task_instance_id, array_id, etc.
-      (see jobmon.core.logging.context.JOBMON_METADATA_KEYS)
+    - Jobmon telemetry keys use the 'telemetry_' prefix: telemetry_workflow_run_id,
+      telemetry_task_instance_id, telemetry_array_id, etc. The prefix is added
+      automatically by set_jobmon_context() and @bind_context.
     - Standard keys to avoid duplicating: timestamp, level, logger, event, exc_info
 
     Args:
@@ -184,38 +429,17 @@ def configure_structlog(
     """
     import structlog
 
-    if extra_processors is None:
-        extra_processors = []
-
-    # Build processor chain
-    processors: List[Callable] = [
-        # CRITICAL: merge_contextvars enables @bind_context decorator
-        # and manual bind_contextvars() calls
-        structlog.contextvars.merge_contextvars,
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_logger_name,
-        structlog.stdlib.add_log_level,
-    ]
-
-    # Run isolation before any downstream processors so host processors never
-    # observe Jobmon-only telemetry fields unless explicitly opted in.
-    if enable_jobmon_context:
-        prefixes = telemetry_logger_prefixes or ["jobmon."]
-        processor = create_telemetry_isolation_processor(prefixes)
-        processors.append(processor)
-
-    processors.extend(
-        [
-            *extra_processors,
-            _store_event_dict_for_otlp,  # Capture raw event_dict for OTLP handlers
-            # Required so stdlib logging handlers using ProcessorFormatter keep working.
-            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
-        ]
+    processors = _build_structlog_processor_chain(
+        uses_stdlib_integration=True,
+        component_name=component_name,
+        enable_jobmon_context=enable_jobmon_context,
+        telemetry_logger_prefixes=telemetry_logger_prefixes,
+        extra_processors=extra_processors or [],
+        include_store_for_otlp=True,
+        include_add_log_level=True,
+        include_forward_to_handlers=False,
+        include_wrap_for_formatter=True,
     )
-
-    # Add component name to all logs if provided
-    if component_name:
-        processors.insert(1, _create_component_processor(component_name))
 
     # Configure structlog globally
     structlog.configure(
@@ -404,33 +628,34 @@ def prepend_jobmon_processors_to_existing_config(
     # Check if host app uses stdlib logging integration
     uses_stdlib_integration = _uses_stdlib_integration(logger_factory, wrapper_class)
 
-    # Build Jobmon processors ensuring correct ordering: merge contextvars must
-    # always run first.
-    jobmon_processors: List[Callable] = []
-
-    # Always ensure merge_contextvars runs first
-    merge_contextvars = structlog.contextvars.merge_contextvars
-    jobmon_processors.append(merge_contextvars)
-
-    if uses_stdlib_integration:
-        for processor in (
-            structlog.stdlib.filter_by_level,
-            structlog.stdlib.add_logger_name,
-        ):
-            jobmon_processors.append(processor)
-
     prefixes = telemetry_logger_prefixes or ["jobmon."]
     prefixes_tuple = tuple(prefixes)
-    if not _has_isolation_processor(existing_processors, prefixes_tuple):
-        jobmon_processors.append(create_telemetry_isolation_processor(prefixes))
 
-    if not _processor_present(existing_processors, _store_event_dict_for_otlp):
-        jobmon_processors.append(_store_event_dict_for_otlp)
-
-    if not uses_stdlib_integration and not _processor_present(
+    need_isolation = not _has_isolation_processor(existing_processors, prefixes_tuple)
+    need_store = not _processor_present(existing_processors, _store_event_dict_for_otlp)
+    need_forward = not uses_stdlib_integration and not _processor_present(
         existing_processors, _forward_event_to_logging_handlers
-    ):
-        jobmon_processors.append(_forward_event_to_logging_handlers)
+    )
+    ensure_named_direct = not uses_stdlib_integration and not _processor_present(
+        existing_processors, _ensure_logger_name
+    )
+
+    jobmon_processors = _build_structlog_processor_chain(
+        uses_stdlib_integration=uses_stdlib_integration,
+        component_name=None,
+        enable_jobmon_context=need_isolation,
+        telemetry_logger_prefixes=prefixes,
+        extra_processors=[],
+        include_store_for_otlp=need_store,
+        include_add_log_level=False,
+        include_forward_to_handlers=need_forward,
+        include_wrap_for_formatter=False,
+        ensure_logger_name_on_direct=ensure_named_direct,
+    )
+
+    if not uses_stdlib_integration:
+        logger_factory = _wrap_print_logger_factory(logger_factory)
+        wrapper_class = _wrap_wrapper_class_for_otlp(wrapper_class)
 
     # Remove Jobmon processors from existing chain to avoid duplicates
     def _remove_processor(processors: List[Callable], processor: Callable) -> None:
@@ -440,13 +665,8 @@ def prepend_jobmon_processors_to_existing_config(
         except ValueError:
             pass  # Not present, that's fine
 
-    _remove_processor(existing_processors, merge_contextvars)
-    if uses_stdlib_integration:
-        _remove_processor(existing_processors, structlog.stdlib.filter_by_level)
-        _remove_processor(existing_processors, structlog.stdlib.add_logger_name)
-    _remove_processor(existing_processors, _store_event_dict_for_otlp)
-    if not uses_stdlib_integration:
-        _remove_processor(existing_processors, _forward_event_to_logging_handlers)
+    for processor in jobmon_processors:
+        _remove_processor(existing_processors, processor)
 
     # Combine: Jobmon processors first (in correct order), then remaining host processors
     new_processors = jobmon_processors + existing_processors
@@ -454,6 +674,9 @@ def prepend_jobmon_processors_to_existing_config(
     # Update configuration with combined processors
     new_config = current_config.copy()
     new_config["processors"] = new_processors
+    new_config["logger_factory"] = logger_factory
+    if wrapper_class is not None:
+        new_config["wrapper_class"] = wrapper_class
 
     structlog.configure(**new_config)
 

@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import atexit
+import importlib
 import logging
+import os
+import signal
 import threading
-from typing import Any, Optional, Type
+from contextlib import contextmanager
+from typing import Any, Callable, Dict, Generator, Optional, Tuple, Type
 
 from . import OTLP_AVAILABLE
 
@@ -19,6 +24,77 @@ from .resources import create_jobmon_resources
 # Module-level singleton for shared logger provider with thread safety
 _logger_provider: Optional[Any] = None
 _logger_provider_lock = threading.Lock()
+
+_shutdown_lock = threading.Lock()
+_shutdown_invoked = False
+_signal_handlers_installed = False
+
+
+def _build_exporter_args(config: Dict[str, Any], module_name: str) -> Dict[str, Any]:
+    exporter_args: Dict[str, Any] = {}
+
+    if "endpoint" in config:
+        exporter_args["endpoint"] = config["endpoint"]
+
+    if "headers" in config:
+        exporter_args["headers"] = dict(config["headers"])
+
+    if "timeout" in config:
+        exporter_args["timeout"] = config["timeout"]
+
+    if "insecure" in config:
+        exporter_args["insecure"] = config["insecure"]
+
+    compression = config.get("compression")
+    if compression is not None:
+        compression_str = str(compression).lower()
+        is_grpc = ".grpc." in module_name
+
+        if is_grpc:
+            try:
+                import grpc  # type: ignore[import-untyped]
+
+                mapping = {
+                    "gzip": grpc.Compression.Gzip,
+                    "deflate": grpc.Compression.Deflate,
+                    "none": grpc.Compression.NoCompression,
+                    "nocompression": grpc.Compression.NoCompression,
+                }
+                if compression_str in mapping:
+                    exporter_args["compression"] = mapping[compression_str]
+            except ImportError:
+                pass
+        elif compression_str not in {"none", "nocompression"}:
+            exporter_args["compression"] = compression_str
+
+    if "options" in config:
+        options_list = config["options"]
+        exporter_args["options"] = [tuple(option) for option in options_list]
+
+    return exporter_args
+
+
+def _normalize_exporter_config(
+    config: Any, defaults: Optional[Dict[str, Any]] = None
+) -> Tuple[Optional[Type[Any]], Dict[str, Any]]:
+    if not isinstance(config, dict):
+        return None, {}
+
+    module_name = config.get("module")
+    class_name = config.get("class")
+
+    if not module_name or not class_name:
+        return None, {}
+
+    try:
+        module = importlib.import_module(module_name)
+        exporter_class = getattr(module, class_name)
+    except Exception:
+        return None, {}
+
+    exporter_args = dict(defaults or {})
+    exporter_args.update(_build_exporter_args(config, module_name))
+    return exporter_class, exporter_args
 
 
 class JobmonOTLPManager:
@@ -168,57 +244,9 @@ class JobmonOTLPManager:
     def _create_log_exporter(self, config: Any) -> Optional[Any]:
         """Create a log exporter from configuration dictionary."""
         try:
-            import importlib
-
-            module_name = config.get("module")
-            class_name = config.get("class")
-
-            if not module_name or not class_name:
+            exporter_class, exporter_args = _normalize_exporter_config(config)
+            if exporter_class is None:
                 return None
-
-            # Dynamically import and instantiate the exporter
-            module = importlib.import_module(module_name)
-            exporter_class = getattr(module, class_name)
-
-            # Build exporter arguments (same as span exporter)
-            exporter_args = {}
-
-            if "endpoint" in config:
-                exporter_args["endpoint"] = config["endpoint"]
-            if "headers" in config:
-                exporter_args["headers"] = dict(config["headers"])
-            if "timeout" in config:
-                exporter_args["timeout"] = config["timeout"]
-            if "compression" in config:
-                # Handle compression parameter - gRPC uses enum, HTTP uses string
-                compression_str = config["compression"].lower()
-                is_grpc = ".grpc." in module_name
-
-                if is_grpc:
-                    # gRPC: convert string to grpc.Compression enum
-                    try:
-                        import grpc  # type: ignore[import-untyped]
-
-                        if compression_str == "gzip":
-                            exporter_args["compression"] = grpc.Compression.Gzip
-                        elif compression_str == "deflate":
-                            exporter_args["compression"] = grpc.Compression.Deflate
-                        elif compression_str in ("none", "nocompression"):
-                            exporter_args["compression"] = (
-                                grpc.Compression.NoCompression
-                            )
-                    except ImportError:
-                        pass
-                else:
-                    # HTTP: pass compression as string (or skip if none)
-                    if compression_str not in ("none", "nocompression"):
-                        exporter_args["compression"] = compression_str
-            if "insecure" in config:
-                exporter_args["insecure"] = config["insecure"]
-            if "options" in config:
-                options_list = config["options"]
-                exporter_args["options"] = [tuple(option) for option in options_list]
-
             return exporter_class(**exporter_args)
 
         except Exception:
@@ -276,63 +304,9 @@ class JobmonOTLPManager:
     def _create_span_exporter(self, config: Any) -> Optional[Any]:
         """Create a span exporter from configuration dictionary."""
         try:
-            import importlib
-
-            module_name = config.get("module")
-            class_name = config.get("class")
-
-            if not module_name or not class_name:
+            exporter_class, exporter_args = _normalize_exporter_config(config)
+            if exporter_class is None:
                 return None
-
-            # Dynamically import and instantiate the exporter
-            module = importlib.import_module(module_name)
-            exporter_class = getattr(module, class_name)
-
-            # Build exporter arguments
-            exporter_args = {}
-
-            # Common exporter arguments
-            if "endpoint" in config:
-                exporter_args["endpoint"] = config["endpoint"]
-            if "headers" in config:
-                exporter_args["headers"] = dict(config["headers"])
-            if "timeout" in config:
-                exporter_args["timeout"] = config["timeout"]
-            if "compression" in config:
-                # Handle compression parameter - gRPC uses enum, HTTP uses string
-                compression_str = config["compression"].lower()
-                is_grpc = ".grpc." in module_name
-
-                if is_grpc:
-                    # gRPC: convert string to grpc.Compression enum
-                    try:
-                        import grpc  # type: ignore[import-untyped]
-
-                        if compression_str == "gzip":
-                            exporter_args["compression"] = grpc.Compression.Gzip
-                        elif compression_str == "deflate":
-                            exporter_args["compression"] = grpc.Compression.Deflate
-                        elif compression_str in ("none", "nocompression"):
-                            exporter_args["compression"] = (
-                                grpc.Compression.NoCompression
-                            )
-                        else:
-                            # Don't log here to avoid circular dependency during initialization
-                            pass
-                    except ImportError:
-                        # Don't log here to avoid circular dependency during initialization
-                        pass
-                else:
-                    # HTTP: pass compression as string (or skip if none)
-                    if compression_str not in ("none", "nocompression"):
-                        exporter_args["compression"] = compression_str
-            if "insecure" in config:
-                exporter_args["insecure"] = config["insecure"]
-            if "options" in config:
-                # Convert list of [key, value] pairs to list of tuples
-                options_list = config["options"]
-                exporter_args["options"] = [tuple(option) for option in options_list]
-
             return exporter_class(**exporter_args)
 
         except Exception:
@@ -373,8 +347,159 @@ class JobmonOTLPManager:
         finally:
             self._initialized = False
 
+    def flush_and_shutdown(self) -> None:
+        """Flush pending OTLP telemetry and shut down providers."""
+        if not OTLP_AVAILABLE:
+            return
+
+        self._force_flush_logger_provider()
+        self._force_flush_tracer_provider()
+
+        self.shutdown()
+
+    def _force_flush_logger_provider(self) -> None:
+        provider = self.logger_provider
+        if not provider:
+            return
+
+        flush = getattr(provider, "force_flush", None)
+        if callable(flush):
+            try:
+                flush()
+            except Exception:
+                pass
+
+    def _force_flush_tracer_provider(self) -> None:
+        provider = self.tracer_provider
+        if not provider:
+            return
+
+        flush = getattr(provider, "force_flush", None)
+        if callable(flush):
+            try:
+                flush()
+            except Exception:
+                pass
+
 
 # Configuration validation utilities
+
+
+def _flush_otlp_once(reason: str = "atexit") -> None:
+    """Flush OTLP telemetry a single time per process."""
+    if not OTLP_AVAILABLE:
+        return
+
+    global _shutdown_invoked
+    with _shutdown_lock:
+        if _shutdown_invoked:
+            return
+        _shutdown_invoked = True
+
+    try:
+        manager = JobmonOTLPManager.get_instance()
+        manager.flush_and_shutdown()
+    except Exception:
+        # Best-effort shutdown; suppress failures during interpreter teardown
+        pass
+
+
+def _register_atexit_hook() -> None:
+    """Register the OTLP flush hook for interpreter shutdown."""
+    if not OTLP_AVAILABLE:
+        return
+
+    atexit.register(_flush_otlp_once)
+
+
+def _register_signal_handlers() -> None:
+    """Install signal handlers that flush OTLP before termination."""
+    if not OTLP_AVAILABLE:
+        return
+
+    global _signal_handlers_installed
+    if _signal_handlers_installed:
+        return
+
+    def _make_handler(previous_handler: Any, signum: int) -> Callable[[int, Any], None]:
+        def _handler(signum_inner: int, frame: Any) -> None:
+            _flush_otlp_once(f"signal:{signum_inner}")
+
+            if callable(previous_handler):
+                try:
+                    previous_handler(signum_inner, frame)
+                except Exception:
+                    pass
+            elif previous_handler == signal.SIG_DFL:
+                try:
+                    signal.signal(signum_inner, signal.SIG_DFL)
+                    if hasattr(signal, "raise_signal"):
+                        signal.raise_signal(signum_inner)
+                    else:
+                        os.kill(os.getpid(), signum_inner)
+                except Exception:
+                    pass
+            # Ignore SIG_IGN (do nothing)
+
+        return _handler
+
+    for signum in (getattr(signal, "SIGTERM", None), getattr(signal, "SIGINT", None)):
+        if signum is None:
+            continue
+
+        try:
+            previous = signal.getsignal(signum)
+            handler = _make_handler(previous, signum)
+            signal.signal(signum, handler)
+        except Exception:
+            continue
+
+    _signal_handlers_installed = True
+
+
+def _install_lifecycle_hooks() -> None:
+    """Ensure lifecycle hooks are installed exactly once."""
+    _register_atexit_hook()
+    _register_signal_handlers()
+
+
+_install_lifecycle_hooks()
+
+
+_install_lifecycle_hooks()
+
+
+@contextmanager
+def otlp_flush_on_exit() -> Generator[Optional[JobmonOTLPManager], None, None]:
+    """Context manager that guarantees OTLP flush when exiting."""
+    if not OTLP_AVAILABLE:
+        yield None
+        return
+
+    manager = JobmonOTLPManager.get_instance()
+    try:
+        yield manager
+    finally:
+        manager.flush_and_shutdown()
+
+
+def register_otlp_shutdown_event(app: Any) -> None:
+    """Register a FastAPI shutdown hook that flushes OTLP telemetry."""
+    if not OTLP_AVAILABLE:
+        return
+
+    try:
+        on_event = getattr(app, "on_event")
+    except AttributeError:
+        return
+
+    @on_event("shutdown")
+    async def _flush_otlp_on_shutdown() -> (
+        None
+    ):  # pragma: no cover - exercised in integration
+        _flush_otlp_once("fastapi-shutdown")
+
+
 def validate_otlp_exporter_config(config: Any, exporter_type: str = "log") -> list[str]:
     """Validate OTLP exporter configuration and return list of issues.
 
@@ -628,17 +753,19 @@ def create_log_exporter(**kwargs: Any) -> Optional[Any]:
         return None
 
     try:
-        from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
-
-        # Default configuration for resource exhaustion prevention
-        default_config = {
-            "insecure": True,  # For internal development endpoints
+        config: Dict[str, Any] = {
+            "module": "opentelemetry.exporter.otlp.proto.grpc._log_exporter",
+            "class": "OTLPLogExporter",
         }
+        config.update(kwargs)
 
-        # Merge with user configuration
-        config = {**default_config, **kwargs}
+        exporter_class, exporter_args = _normalize_exporter_config(
+            config, defaults={"insecure": True}
+        )
+        if exporter_class is None:
+            return None
 
-        return OTLPLogExporter(**config)
+        return exporter_class(**exporter_args)
 
     except Exception:
         return None

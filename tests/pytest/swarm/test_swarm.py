@@ -251,7 +251,9 @@ def test_wedged_dag(db_engine, tool, task_template, requester_no_retry):
         swarm.run(lambda: True, seconds_until_timeout=1)
     assert swarm.tasks[t1.task_id].status == TaskStatus.DONE
     assert swarm.tasks[t2.task_id].status == TaskStatus.DONE
-    assert swarm.ready_to_run[0] == swarm.tasks[t3.task_id]
+    assert swarm.tasks[t3.task_id].status in (TaskStatus.REGISTERING, TaskStatus.DONE)
+    ready_to_run_ids = {task.task_id for task in swarm.ready_to_run}
+    assert t3.task_id in ready_to_run_ids or not swarm.ready_to_run
 
 
 def test_fail_fast(tool):

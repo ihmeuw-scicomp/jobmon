@@ -30,8 +30,8 @@ general structlog context:
   available, otherwise a ``RuntimeError`` is raised.
 * Helper APIs provide a context manager, query utilities, and explicit clear
   operations.
-* ``JOBMON_METADATA_KEYS`` enumerates the telemetry fields; applications can
-  extend the set at runtime through ``register_jobmon_metadata_keys``.
+* All telemetry fields use the ``telemetry_`` prefix for automatic namespacing.
+  The prefix is added automatically by ``set_jobmon_context`` and ``@bind_context``.
 
 Example usage::
 
@@ -77,6 +77,12 @@ rendering to the host application.  The default chain is:
    handlers when the host renders output directly
 10. ``structlog.stdlib.ProcessorFormatter.wrap_for_formatter`` – ensures stdlib
     logging handlers continue to function
+
+The new ``_build_structlog_processor_chain`` helper centralises this assembly so
+``configure_structlog`` and ``prepend_jobmon_processors_to_existing_config`` share
+identical ordering rules.  The builder takes explicit flags for OTLP capture,
+logger name enforcement, and forwarding shims, which makes it easier to reason
+about the direct-rendering path while keeping stdlib integrations unchanged.
 
 ``prepend_jobmon_processors_to_existing_config`` supports host-controlled
 configurations by prepending missing processors.  Callers may now pass
@@ -125,6 +131,7 @@ ignored when the logger has no handlers, keeping the hot path inexpensive.
   template-based configuration system (``logconfig_client.yaml``) which defines
   console and OTLP handlers.  Overrides can be provided through JobmonConfig
   files or sections.
+
 
 Thread-local Event Storage
 ==========================
@@ -202,11 +209,13 @@ Thread-local Storage and OTLP Handlers
 
 ``JobmonOTLPLoggingHandler`` (and its ``JobmonOTLPStructlogHandler`` alias)
 import the cached event, extract telemetry metadata, and emit
-``opentelemetry.sdk._logs.LogRecord`` instances with deduplication attributes
-such as ``jobmon.emission_count`` and ``jobmon.is_duplicate``.
+``opentelemetry.sdk._logs.LogRecord`` instances.
 
 Telemetry metadata is serialised only when the values are JSON compatible; more
 complex structures are stringified to avoid errors.
+
+Registration with the structlog capture hook is skipped when OTLP support is
+unavailable, preventing unnecessary thread-local state in minimalist deployments.
 
 Testing Strategy
 ================
@@ -231,16 +240,16 @@ Host logs show Jobmon metadata
 
 Telemetry not exported
     Confirm ``_store_event_dict_for_otlp`` is in the processor chain and an OTLP
-    handler is attached to ``jobmon.*`` loggers.  Check ``telemetry.logging``
+    handler is attached to ``jobmon.*`` loggers. Check ``telemetry.logging``
     settings in JobmonConfig and verify the exporter is properly configured.
 
 Double console output
     Ensure ``propagate`` is set to ``false`` for Jobmon loggers and that handlers
     are not installed multiple times.
 
-Formatter collisions with FHS
+Formatter collisions with host applications
     Verify that Jobmon only prepends processors compatible with the host's
-    rendering strategy.  Update ``_uses_stdlib_integration`` when new deployment
+    rendering strategy. Update ``_uses_stdlib_integration`` when new deployment
     patterns emerge.
 
 Performance Notes
@@ -257,7 +266,7 @@ Maintenance Checklist
 
 When adding telemetry metadata:
 
-1. Update ``JOBMON_METADATA_KEYS``.
+1. Ensure the key uses the ``telemetry_`` prefix (automatic when using ``set_jobmon_context`` or ``@bind_context``).
 2. Bind the new key via ``set_jobmon_context`` or ``@bind_context``.
 3. Extend documentation examples if the metadata is externally visible.
 

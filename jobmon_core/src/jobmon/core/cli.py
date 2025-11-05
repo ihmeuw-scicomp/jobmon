@@ -24,6 +24,12 @@ class CLI:
         if self.component_name:
             self.configure_component_logging()
 
+        if self.component_name:
+            from jobmon.core.otlp.manager import otlp_flush_on_exit
+
+            with otlp_flush_on_exit():
+                return args.func(args)
+
         return args.func(args)
 
     def configure_component_logging(self) -> None:
@@ -67,3 +73,12 @@ class CLI:
             arglist = shlex.split(argstr)
         args = self.parser.parse_args(arglist)
         return args
+
+    def _shutdown_otlp_providers(self) -> None:
+        """Deprecated: retained for backwards compatibility."""
+        try:
+            from jobmon.core.otlp.manager import JobmonOTLPManager
+
+            JobmonOTLPManager.get_instance().flush_and_shutdown()
+        except Exception:
+            pass

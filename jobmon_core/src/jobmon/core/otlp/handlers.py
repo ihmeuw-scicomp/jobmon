@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import threading
-import time
 import warnings
 from typing import Any, Dict, Optional, Union
 
@@ -15,13 +13,6 @@ from jobmon.core.config.structlog_config import (
 
 from . import OTLP_AVAILABLE
 from .utils import JobmonOTLPFormatter
-
-# TTL-based deduplication cache
-_dedup_cache: Dict[str, tuple[float, int]] = (
-    {}
-)  # event_hash -> (timestamp, emission_count)
-_dedup_lock = threading.Lock()
-TTL_SECONDS = 10  # 10 second TTL window
 
 
 class JobmonOTLPLoggingHandler(logging.Handler):
@@ -93,8 +84,9 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         self.setFormatter(JobmonOTLPFormatter())
 
         # Ensure structlog captures event_dict for OTLP export once a handler exists.
-        enable_structlog_otlp_capture()
-        self._capture_registered = True
+        if OTLP_AVAILABLE:
+            enable_structlog_otlp_capture()
+            self._capture_registered = True
 
         # If logger_provider is provided directly, initialize immediately
         if logger_provider:
@@ -136,15 +128,23 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         super().close()
 
     def _extract_attributes(self, event_dict: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract OTLP attributes from event_dict."""
+        """Extract OTLP attributes from event_dict.
+
+        Strips the 'telemetry_' prefix from attribute names for cleaner OTLP exports
+        while maintaining internal namespacing.
+        """
         attributes = {}
         for key, value in event_dict.items():
             if key.startswith("_") or key in ("event", "timestamp"):
                 continue
+
+            # Strip telemetry_ prefix for OTLP export
+            export_key = key[10:] if key.startswith("telemetry_") else key
+
             if isinstance(value, (str, int, float, bool, type(None))):
-                attributes[key] = value
+                attributes[export_key] = value
             elif isinstance(value, (list, dict)):
-                attributes[key] = str(value)
+                attributes[export_key] = str(value)
         return attributes
 
     def _parse_trace_context(
@@ -186,9 +186,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         assert self._logger is not None
 
         try:
-            import hashlib
-            import os
-
             from opentelemetry.trace import TraceFlags, get_current_span
 
             from jobmon.core.config.structlog_config import _thread_local
@@ -205,55 +202,6 @@ class JobmonOTLPLoggingHandler(logging.Handler):
 
             # Get trace context
             trace_id_int, span_id_int = self._parse_trace_context(event_dict)
-
-            # TTL-based deduplication: hash of message, level, trace/span IDs, workflow_run_id
-            dedup_key_parts = [
-                message,
-                record.levelname,
-                str(trace_id_int),
-                str(span_id_int),
-            ]
-            if event_dict:
-                # Add workflow_run_id if available for better deduplication
-                workflow_run_id = event_dict.get("workflow_run_id")
-                if workflow_run_id:
-                    dedup_key_parts.append(str(workflow_run_id))
-
-            dedup_key = ":".join(dedup_key_parts)
-            event_hash = hashlib.sha256(dedup_key.encode()).hexdigest()[:8]
-
-            # TTL-based deduplication check
-            current_time = time.time()
-            emission_count = 1
-            is_duplicate = False
-
-            with _dedup_lock:
-                if event_hash in _dedup_cache:
-                    last_time, last_count = _dedup_cache[event_hash]
-                    if current_time - last_time <= TTL_SECONDS:
-                        # Within TTL window - this is a duplicate
-                        emission_count = last_count + 1
-                        is_duplicate = True
-                    else:
-                        # Outside TTL window - reset count
-                        emission_count = 1
-
-                # Update cache
-                _dedup_cache[event_hash] = (current_time, emission_count)
-
-                # Clean up expired entries
-                expired_keys = [
-                    key
-                    for key, (timestamp, _) in _dedup_cache.items()
-                    if current_time - timestamp > TTL_SECONDS
-                ]
-                for key in expired_keys:
-                    del _dedup_cache[key]
-
-            # Add monitoring attributes for deduplication tracking
-            attributes["jobmon.emission_count"] = emission_count
-            attributes["jobmon.is_duplicate"] = is_duplicate
-            attributes["jobmon.process_id"] = os.getpid()
 
             # Add request correlation if available
             if event_dict and "request_id" in event_dict:

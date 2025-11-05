@@ -4,7 +4,7 @@ import os
 import sys
 import tempfile
 from contextlib import contextmanager
-from typing import List
+from typing import Any, Dict, List
 from unittest.mock import Mock, patch
 
 import structlog
@@ -12,18 +12,32 @@ import yaml
 
 from jobmon.client import logging as jobmon_client_logging
 from jobmon.client.logging import configure_client_logging
+from jobmon.core.config import structlog_config as core_structlog_config
 
 
 class _StubOTLPHandler(logging.Handler):
     """Test substitute for OTLP handler that records emitted log records."""
 
     emitted_records: List[logging.LogRecord] = []
+    last_event_dict: Dict[str, object] | None = None
 
     def __init__(self, *args, **kwargs):
-        super().__init__(kwargs.get("level", logging.NOTSET))
+        level = kwargs.get("level", logging.NOTSET)
+        super().__init__(level)
+        core_structlog_config.enable_structlog_otlp_capture()
+        self._capture_registered = True
 
     def emit(self, record: logging.LogRecord) -> None:
         self.emitted_records.append(record)
+        self.__class__.last_event_dict = getattr(
+            core_structlog_config._thread_local, "last_event_dict", None
+        )
+
+    def close(self) -> None:  # pragma: no cover - test helper cleanup
+        if getattr(self, "_capture_registered", False):
+            core_structlog_config.disable_structlog_otlp_capture()
+            self._capture_registered = False
+        super().close()
 
 
 class _DirectLogger:
@@ -355,8 +369,6 @@ def test_direct_rendering_forwards_to_stdlib_handlers(client_env):
     _StubOTLPHandler.emitted_records.clear()
     structlog.reset_defaults()
     jobmon_client_logging._structlog_configured_by_jobmon = False
-    jobmon_client_logging._telemetry_debug_enabled = None
-    jobmon_client_logging._telemetry_debug_emitted = False
 
     direct_factory = _DirectLoggerFactory()
 
@@ -431,7 +443,204 @@ def test_direct_rendering_forwards_to_stdlib_handlers(client_env):
     assert record.exc_info is not None
     assert isinstance(record.exc_info[1], ValueError)
 
+    event_dict = _StubOTLPHandler.last_event_dict or {}
+    logger_name = event_dict.get("logger")
+    assert isinstance(logger_name, str)
+    assert logger_name.startswith("jobmon.client")
+
     logging.getLogger("jobmon.client").handlers.clear()
+    _StubOTLPHandler.emitted_records.clear()
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+    structlog.reset_defaults()
+
+
+def test_print_logger_factory_adds_logger_name(client_env):
+    structlog.reset_defaults()
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+
+    structlog.configure(
+        processors=[
+            lambda logger, method_name, event_dict: event_dict,
+            structlog.dev.ConsoleRenderer(colors=False),
+        ],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        logger_factory=structlog.PrintLoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
+    with patch(
+        "jobmon.core.otlp.handlers.JobmonOTLPStructlogHandler", _StubOTLPHandler
+    ), patch("jobmon.core.otlp.JobmonOTLPStructlogHandler", _StubOTLPHandler):
+        configure_client_logging()
+
+        logger = structlog.get_logger("jobmon.client.swarm.workflow_run")
+        logger.info(
+            "Workflow 16.67% complete (1/6 tasks)",
+            newly_completed=1,
+            percent_done=16.67,
+        )
+
+    event_dict = _StubOTLPHandler.last_event_dict or {}
+    assert event_dict.get("logger") == "jobmon.client.swarm.workflow_run"
+
+    logging.getLogger("jobmon.client.swarm.workflow_run").handlers.clear()
+    _StubOTLPHandler.emitted_records.clear()
+    _StubOTLPHandler.last_event_dict = None
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+    structlog.reset_defaults()
+
+
+def test_direct_rendering_console_output_is_message_only(client_env):
+    structlog.reset_defaults()
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+
+    captured: Dict[str, object] = {}
+
+    def capture_processor(
+        logger: Any, method_name: str, event_dict: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        captured.clear()
+        captured.update(event_dict)
+        return event_dict
+
+    structlog.configure(
+        processors=[
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.add_log_level,
+            capture_processor,
+            structlog.dev.ConsoleRenderer(colors=False),
+        ],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        logger_factory=structlog.PrintLoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
+    with patch(
+        "jobmon.core.otlp.handlers.JobmonOTLPStructlogHandler", _StubOTLPHandler
+    ), patch("jobmon.core.otlp.JobmonOTLPStructlogHandler", _StubOTLPHandler):
+        configure_client_logging()
+
+        from jobmon.core.logging import set_jobmon_context
+
+        set_jobmon_context(workflow_run_id=123)
+
+        logger = structlog.get_logger("jobmon.client.swarm.workflow_run")
+        logger.info(
+            "Workflow 16.67% complete (1/6 tasks)",
+            telemetry_newly_completed=1,
+            telemetry_percent_done=16.67,
+        )
+
+    assert captured
+    assert "logger" in captured
+    assert "event" in captured
+    assert "level" in captured
+    assert "timestamp" in captured
+    assert captured.get("event") == "Workflow 16.67% complete (1/6 tasks)"
+    assert captured.get("logger") == "jobmon.client.swarm.workflow_run"
+
+    console_keys = set(captured.keys())
+    assert "telemetry_newly_completed" not in console_keys
+    assert "telemetry_percent_done" not in console_keys
+    assert "telemetry_workflow_run_id" not in console_keys
+    assert all(not key.startswith("telemetry_") for key in console_keys)
+
+    otlp_event = _StubOTLPHandler.last_event_dict or {}
+    assert otlp_event.get("logger") == "jobmon.client.swarm.workflow_run"
+    assert otlp_event.get("event") == "Workflow 16.67% complete (1/6 tasks)"
+    assert otlp_event.get("telemetry_workflow_run_id") == 123
+    assert otlp_event.get("telemetry_newly_completed") == 1
+    assert otlp_event.get("telemetry_percent_done") == 16.67
+
+    logging.getLogger("jobmon.client.swarm.workflow_run").handlers.clear()
+    _StubOTLPHandler.emitted_records.clear()
+    _StubOTLPHandler.last_event_dict = None
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+    structlog.reset_defaults()
+
+
+def test_direct_rendering_filtered_debug_reaches_otlp(client_env):
+    structlog.reset_defaults()
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+    _StubOTLPHandler.emitted_records.clear()
+    _StubOTLPHandler.last_event_dict = None
+
+    structlog.configure(
+        processors=[
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.add_log_level,
+            structlog.dev.ConsoleRenderer(colors=False),
+        ],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        logger_factory=structlog.PrintLoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
+    with patch(
+        "jobmon.core.otlp.handlers.JobmonOTLPStructlogHandler", _StubOTLPHandler
+    ), patch("jobmon.core.otlp.JobmonOTLPStructlogHandler", _StubOTLPHandler), patch(
+        "structlog._output.PrintLogger.msg"
+    ) as mock_msg:
+        configure_client_logging()
+
+        from jobmon.core.logging import set_jobmon_context
+
+        set_jobmon_context(workflow_run_id=321)
+
+        logger = structlog.get_logger("jobmon.client.swarm.workflow_run")
+        logging.getLogger("jobmon.client.swarm.workflow_run").setLevel(logging.DEBUG)
+        logger.debug(
+            "Filtered debug visible in OTLP",
+            telemetry_newly_completed=2,
+        )
+
+    mock_msg.assert_not_called()
+
+    otlp_event = _StubOTLPHandler.last_event_dict or {}
+    assert otlp_event.get("logger") == "jobmon.client.swarm.workflow_run"
+    assert otlp_event.get("telemetry_workflow_run_id") == 321
+    assert otlp_event.get("telemetry_newly_completed") == 2
+    assert otlp_event.get("event") == "Filtered debug visible in OTLP"
+
+    logging.getLogger("jobmon.client.swarm.workflow_run").handlers.clear()
+    _StubOTLPHandler.emitted_records.clear()
+    _StubOTLPHandler.last_event_dict = None
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+    structlog.reset_defaults()
+
+
+def test_direct_rendering_filtered_debug_respects_stdlib_level(client_env):
+    structlog.reset_defaults()
+    jobmon_client_logging._structlog_configured_by_jobmon = False
+    _StubOTLPHandler.emitted_records.clear()
+    _StubOTLPHandler.last_event_dict = None
+
+    structlog.configure(
+        processors=[structlog.dev.ConsoleRenderer(colors=False)],
+        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        logger_factory=structlog.PrintLoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
+    with patch(
+        "jobmon.core.otlp.handlers.JobmonOTLPStructlogHandler", _StubOTLPHandler
+    ), patch("jobmon.core.otlp.JobmonOTLPStructlogHandler", _StubOTLPHandler), patch(
+        "structlog._output.PrintLogger.msg"
+    ) as mock_msg:
+        configure_client_logging()
+
+        from jobmon.core.logging import set_jobmon_context
+
+        set_jobmon_context(workflow_run_id=654)
+
+        logger = structlog.get_logger("jobmon.client.swarm.workflow_run")
+        logging.getLogger("jobmon.client.swarm.workflow_run").setLevel(logging.INFO)
+        logger.debug("Suppressed debug event", telemetry_newly_completed=3)
+
+    mock_msg.assert_not_called()
+    assert _StubOTLPHandler.last_event_dict is None
+
+    logging.getLogger("jobmon.client.swarm.workflow_run").handlers.clear()
     _StubOTLPHandler.emitted_records.clear()
     jobmon_client_logging._structlog_configured_by_jobmon = False
     structlog.reset_defaults()
@@ -442,8 +651,6 @@ def test_direct_rendering_attaches_otlp_handler_when_none_remaining(client_env):
 
     structlog.reset_defaults()
     jobmon_client_logging._structlog_configured_by_jobmon = False
-    jobmon_client_logging._telemetry_debug_enabled = None
-    jobmon_client_logging._telemetry_debug_emitted = False
 
     direct_factory = _DirectLoggerFactory()
 
@@ -505,8 +712,6 @@ def test_direct_rendering_multiple_config_calls_keep_single_handler(client_env):
 
     structlog.reset_defaults()
     jobmon_client_logging._structlog_configured_by_jobmon = False
-    jobmon_client_logging._telemetry_debug_enabled = None
-    jobmon_client_logging._telemetry_debug_emitted = False
 
     direct_factory = _DirectLoggerFactory()
 

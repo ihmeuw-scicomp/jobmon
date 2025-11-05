@@ -44,14 +44,14 @@ def test_jobmon_metadata_injected_only_for_jobmon_loggers() -> None:
     jobmon_event = {"logger": "jobmon.client.workflow", "event": "started"}
     result = processor(None, "info", jobmon_event.copy())
 
-    assert result["workflow_run_id"] == 123
-    assert result["task_instance_id"] == 456
+    assert result["telemetry_workflow_run_id"] == 123
+    assert result["telemetry_task_instance_id"] == 456
 
     fhs_event = {"logger": "fhs.pipeline.runner", "event": "started"}
     non_jobmon_result = processor(None, "info", fhs_event.copy())
 
-    assert "workflow_run_id" not in non_jobmon_result
-    assert "task_instance_id" not in non_jobmon_result
+    assert "telemetry_workflow_run_id" not in non_jobmon_result
+    assert "telemetry_task_instance_id" not in non_jobmon_result
 
     unset_jobmon_context("workflow_run_id", "task_instance_id")
     cleared = processor(
@@ -60,8 +60,8 @@ def test_jobmon_metadata_injected_only_for_jobmon_loggers() -> None:
         {"logger": "jobmon.client.workflow", "event": "stopped"},
     )
 
-    assert "workflow_run_id" not in cleared
-    assert "task_instance_id" not in cleared
+    assert "telemetry_workflow_run_id" not in cleared
+    assert "telemetry_task_instance_id" not in cleared
 
 
 def test_bind_jobmon_context_manager_resets_metadata() -> None:
@@ -69,8 +69,8 @@ def test_bind_jobmon_context_manager_resets_metadata() -> None:
 
     with bind_jobmon_context(workflow_run_id=999, task_instance_id=111):
         current = get_jobmon_context()
-        assert current["workflow_run_id"] == 999
-        assert current["task_instance_id"] == 111
+        assert current["telemetry_workflow_run_id"] == 999
+        assert current["telemetry_task_instance_id"] == 111
 
         processor = get_test_processor()
         event = processor(
@@ -78,16 +78,16 @@ def test_bind_jobmon_context_manager_resets_metadata() -> None:
             "info",
             {"logger": "jobmon.worker.runner", "event": "heartbeat"},
         )
-        assert event["workflow_run_id"] == 999
-        assert event["task_instance_id"] == 111
+        assert event["telemetry_workflow_run_id"] == 999
+        assert event["telemetry_task_instance_id"] == 111
 
         other = processor(
             None,
             "info",
             {"logger": "fhs.pipeline.runner", "event": "heartbeat"},
         )
-        assert "workflow_run_id" not in other
-        assert "task_instance_id" not in other
+        assert "telemetry_workflow_run_id" not in other
+        assert "telemetry_task_instance_id" not in other
 
     assert get_jobmon_context() == {}
 
@@ -107,19 +107,19 @@ def test_custom_telemetry_prefixes() -> None:
     # Test that custom prefixes get telemetry
     telemetry_event = {"logger": "myapp.telemetry.worker", "event": "processing"}
     result = custom_processor(None, "info", telemetry_event.copy())
-    assert result["workflow_run_id"] == 555
-    assert result["task_instance_id"] == 777
+    assert result["telemetry_workflow_run_id"] == 555
+    assert result["telemetry_task_instance_id"] == 777
 
     special_event = {"logger": "special.handler", "event": "handling"}
     result2 = custom_processor(None, "info", special_event.copy())
-    assert result2["workflow_run_id"] == 555
-    assert result2["task_instance_id"] == 777
+    assert result2["telemetry_workflow_run_id"] == 555
+    assert result2["telemetry_task_instance_id"] == 777
 
     # Test that jobmon prefix doesn't get telemetry with custom config
     jobmon_event = {"logger": "jobmon.client.workflow", "event": "started"}
     result3 = custom_processor(None, "info", jobmon_event.copy())
-    assert "workflow_run_id" not in result3
-    assert "task_instance_id" not in result3
+    assert "telemetry_workflow_run_id" not in result3
+    assert "telemetry_task_instance_id" not in result3
 
     unset_jobmon_context("workflow_run_id", "task_instance_id")
 
@@ -128,22 +128,23 @@ def test_bind_restores_previous_values() -> None:
     set_jobmon_context(workflow_run_id=42)
 
     with bind_jobmon_context(workflow_run_id=99):
-        assert get_jobmon_context()["workflow_run_id"] == 99
+        assert get_jobmon_context()["telemetry_workflow_run_id"] == 99
 
     restored = get_jobmon_context()
-    assert restored["workflow_run_id"] == 42
+    assert restored["telemetry_workflow_run_id"] == 42
 
     unset_jobmon_context("workflow_run_id")
 
 
 def test_register_jobmon_metadata_keys() -> None:
-    register_jobmon_metadata_keys("jobmon_test_key")
-    set_jobmon_context(jobmon_test_key="value-123")
+    # register_jobmon_metadata_keys is now a no-op, prefix is automatic
+    register_jobmon_metadata_keys("test_key")
+    set_jobmon_context(test_key="value-123")
 
     context = get_jobmon_context()
-    assert context["jobmon_test_key"] == "value-123"
+    assert context["telemetry_test_key"] == "value-123"
 
-    unset_jobmon_context("jobmon_test_key")
+    unset_jobmon_context("test_key")
 
 
 def test_jobmon_as_library_with_fhs_style_config():
@@ -216,7 +217,7 @@ def test_jobmon_as_library_with_fhs_style_config():
     fhs_output = captured_output3.getvalue()
     assert "[FHS]" in fhs_output
     # Telemetry should be isolated - not in FHS output
-    assert "workflow_run_id" not in fhs_output
+    assert "telemetry_workflow_run_id" not in fhs_output
 
     unset_jobmon_context("workflow_run_id", "task_instance_id")
 

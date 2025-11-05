@@ -26,10 +26,10 @@ Core Principles
 * **Safe integration** – host :mod:`structlog` configuration remains in
   control; Jobmon only prepends the processors it requires.
 
-The telemetry metadata lives in
-``jobmon.core.logging.context.JOBMON_METADATA_KEYS`` and includes identifiers
-such as ``workflow_run_id``, ``task_instance_id``, ``array_id`` and
-``tool_version_id``.
+All telemetry metadata uses the ``telemetry_`` prefix for automatic namespacing,
+including identifiers such as ``telemetry_workflow_run_id``, ``telemetry_task_instance_id``,
+``telemetry_array_id`` and ``telemetry_tool_version_id``. The prefix is added automatically
+by ``set_jobmon_context`` and ``@bind_context``, and stripped when exporting to OTLP.
 
 Quick Start – Host Applications
 ===============================
@@ -115,10 +115,14 @@ Manual control:
 Telemetry & Console Behaviour
 =============================
 
-* ``set_jobmon_context()`` stores metadata in structlog's context variables.
+* ``set_jobmon_context()`` stores metadata in structlog's context variables with
+  automatic ``telemetry_`` prefixing.
 * ``create_telemetry_isolation_processor()`` injects metadata into loggers whose
   names start with configured prefixes (``["jobmon."]`` by default) and removes
   the metadata for other namespaces.
+* ``_prune_event_dict_for_console()`` strips all keys starting with ``telemetry_``
+  from console output while preserving them for OTLP exports.
+* OTLP handlers strip the ``telemetry_`` prefix before export for backward compatibility.
 * ``_store_event_dict_for_otlp`` copies the event dictionary to thread-local
   storage when OTLP handlers are active.
 * Console logging is disabled by default; enable via
@@ -184,9 +188,10 @@ Why are Jobmon logs formatted like my application logs?
     the chain, so your format applies to every log entry.
 
 Can I surface ``workflow_run_id`` in host logs?
-    Not by default.  Disable isolation via
-    ``configure_structlog(enable_jobmon_context=False)`` to copy metadata into
-    host namespaces deliberately.
+    Not by default. Fields with the ``telemetry_`` prefix are automatically
+    stripped from console output. To surface them, disable isolation via
+    ``configure_structlog(enable_jobmon_context=False)`` or configure your
+    host renderer to show keys with the ``telemetry_`` prefix.
 
 Does Jobmon slow down logging?
     Typical overhead is ~3 microseconds per log call (context merge + isolation

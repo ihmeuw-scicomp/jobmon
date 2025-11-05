@@ -52,6 +52,11 @@ Structlog pipeline
   wrapper chain (``__wrapped__``, ``wrapped_factory``, ``factory``, ``func``),
   and the wrapper class MRO to distinguish stdlib integration from direct
   renderers such as custom subclasses around ``structlog.PrintLoggerFactory``.
+* When a direct renderer is detected, Jobmon wraps the host's
+  ``PrintLoggerFactory`` with a light-weight proxy that adds a ``.name``
+  attribute to the resulting logger while delegating every other behaviour to
+  the host factory. This preserves fully-qualified logger names inside Jobmon's
+  processors without altering console rendering.
 
 Client logging configuration
 ---------------------------
@@ -61,12 +66,33 @@ Client logging configuration
   duplicate console output.
 * When stdlib integration is detected, Jobmon applies the template unchanged
   (console + OTLP handlers).
-* With ``telemetry.debug`` enabled, the direct-rendering path emits a single
-  debug snapshot summarising the detected architecture, pruned handler list, and
-  live ``jobmon.*`` handlers after configuration.
-* After pruning, Jobmon now attaches ``JobmonOTLPStructlogHandler`` directly to
+* After pruning, Jobmon attaches ``JobmonOTLPStructlogHandler`` directly to
   any ``jobmon.*`` logger that ends up without handlers, ensuring the OTLP
   fallback remains in place even when ``dictConfig`` drops the handler entries.
+* Console neutrality is enforced by pruning Jobmon-supplied metadata from the
+  event dictionary before returning control to the host renderer. Host-provided
+  keys (such as FHS' ``[logger : function]`` segment) remain untouched, while
+  Jobmon context keys (``workflow_run_id`` et al.) and diagnostic fields are
+  only present in the OTLP payload.
+* The shared OTLP manager exposes ``flush_and_shutdown()`` and installs
+  best-effort ``atexit``/signal hooks so every short-lived component (client,
+  distributor, worker node) pushes its final telemetry batch before exiting.
+
+Host integration checklist
+--------------------------
+The following conditions must be satisfied by any host that renders structlog
+events directly:
+
+* Call ``jobmon.client.logging.configure_client_logging()`` *after* the host has
+  invoked ``structlog.configure``.
+* Avoid mutating ``jobmon.*`` loggers after Jobmon configuration. Jobmon relies
+  on the handler set to detect whether OTLP capture is active.
+* When binding workflow-level context, call ``set_jobmon_context`` as soon as a
+  ``WorkflowRun`` identifier is available (in Jobmon client code this now happens
+  immediately after the run object is created). This ensures downstream loggers
+  and OTLP exports share the same ``workflow_run_id``.
+* Leave the ``jobmon.core.otlp`` handlers intact in the final logging
+  configuration.
 
 Testing additions
 -----------------
@@ -83,58 +109,50 @@ Testing additions
 * ``tests/pytest/core/test_structlog_detection.py`` covers subclasses,
   wrappers, and ``functools.partial`` wrappers around
   ``structlog.PrintLoggerFactory`` to keep detection heuristics honest.
+* ``test_print_logger_factory_adds_logger_name`` verifies that the wrapper
+  factory delivers fully-qualified logger names to the OTLP processors even when
+  the host uses ``PrintLoggerFactory``.
+* ``test_direct_rendering_console_output_is_message_only`` asserts that console
+  renderers see only host-provided keys (event, level, timestamp, logger) while
+  the OTLP stub receives the full structured payload with Jobmon metadata.
 
 Observed Behaviour
 ==================
 
-* In controlled unit tests, the OTLP stub successfully receives forwarded
-  records.
-* In staging-like runs (FHS application + Jobmon client), OTLP telemetry for
-  ``jobmon.client`` loggers remains absent. Distributor and server telemetry is
-  present, so the pipeline itself is functional.
-* Manual logging configuration inspection during the failing scenario shows
-  that the final ``logging.config.dictConfig`` call installs an OTLP handler in
-  the configuration dictionary, but the resulting ``jobmon.client`` logger in
-  the runtime still has no handlers attached.
+* Local docker-compose environments that mimic FHS' structlog configuration now
+  emit every ``jobmon.client`` log to OTLP with the expected context metadata and
+  fully-qualified logger names.
+* Console output in direct-rendering hosts retains the host's human-readable
+  format while omitting Jobmon telemetry keys, preventing duplicate context
+  fragments from being shown to operators.
+* Distributor, server, and worker node components continue to deliver OTLP
+  telemetry with their existing pipelines.
+* Worker nodes, which run as short-lived processes, now flush their final
+  telemetry batch via the shared OTLP manager before exiting.
 
-Identified Gaps & Questions
-===========================
+Debugging guidance
+==================
 
-1. **Handler removal logic**
-   - ``_remove_non_jobmon_handlers`` can still leave an empty handler list when
-     overrides omit OTLP definitions. Capture the new debug snapshot in staging
-     to confirm the pruned configuration that reaches ``dictConfig``.
+1. Inspect ``structlog.get_config()`` after Jobmon configuration to confirm that
+   the wrapper around ``PrintLoggerFactory`` is active (``__jobmon_named_factory__``)
+   and the processor chain includes ``_ensure_logger_name``.
+2. Check Elasticsearch or another OTLP sink for ``labels.logger`` values in the
+   ``jobmon.client.*`` namespace and ensure ``numeric_labels.workflow_run_id`` is
+   present.
+3. When debugging console output, add a temporary processor to print the
+   event dict immediately before the host renderer; Jobmon's pruning should have
+    removed all keys beginning with ``jobmon_`` and any registered context keys.
 
-2. **Direct-rendering detection**
-   - Heuristics now unwrap nested factories, but we still need to confirm the
-     actual factory type emitted by FHS deployments and extend the rules if it
-     diverges further.
+Future work
+===========
 
-3. **Handler attachment timing**
-   - The fallback reinstates OTLP handlers when ``dictConfig`` drops them, yet
-     repeated reconfiguration might still produce short windows without
-     handlers. Monitor the debug output to ensure the fallback fires only when
-     necessary.
-
-4. **OTLP handler registration**
-   - Fallback attachment guarantees a handler instance, but we still need to
-     verify that OTLP export is active by observing telemetry in staging after
-     these changes land.
-
-Plan for Further Investigation
-===============================
-
-1. Enable ``telemetry.debug`` in staging and collect the new snapshot to confirm
-   the detected architecture, pruned handler lists, and any fallback activity.
-2. Inspect ``structlog.get_config()`` during a failing run to verify that the
-   expanded heuristics recognise the factory/wrapper chain provided by FHS.
-3. Observe OTLP traffic (or the absence thereof) after the fallback attachment
-   to confirm that ``JobmonOTLPStructlogHandler`` is instantiating and exporting
-   successfully.
-4. If telemetry is still missing, add targeted logging around
-   ``logging.config.dictConfig`` invocation counts to spot duplicate
-   reconfiguration cycles.
-
-This document should be updated as new findings emerge so the requirements and
-observed behaviour stay aligned.
+* Perform staging validation to ensure the new wrapper and console pruning
+  behave identically under FHS load. Capture debug snapshots and OTLP samples to
+  confirm parity with local results.
+* Investigate whether progress counters (``newly_completed``/``percent_done``)
+  should be exposed to console renderers behind a configuration flag for hosts
+  that want them.
+* Review other Jobmon components (distributor, worker, CLI tools) to determine
+  whether the named ``PrintLogger`` wrapper should be reused there for
+  consistency.
 

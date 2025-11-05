@@ -109,7 +109,6 @@ def load_logconfig_with_overrides(
 
     # Load default template-based configuration
     logconfig_data = load_logconfig_with_templates(default_template_path)
-
     # Apply section-based overrides
     try:
         # Get all section overrides for this component

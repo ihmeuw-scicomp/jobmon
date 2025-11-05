@@ -2,7 +2,13 @@ import functools
 
 import structlog
 
-from jobmon.core.config.structlog_config import _uses_stdlib_integration
+from jobmon.core.config.structlog_config import _ensure_logger_name  # noqa: PLC0414
+from jobmon.core.config.structlog_config import (
+    _build_structlog_processor_chain,
+    _forward_event_to_logging_handlers,
+    _store_event_dict_for_otlp,
+    _uses_stdlib_integration,
+)
 
 
 def test_direct_detection_with_printlogger_subclass() -> None:
@@ -42,3 +48,51 @@ def test_stdlib_detection_still_true() -> None:
     factory = structlog.stdlib.LoggerFactory()
 
     assert _uses_stdlib_integration(factory, structlog.stdlib.BoundLogger)
+
+
+def test_build_processor_chain_for_stdlib_integration() -> None:
+    processors = _build_structlog_processor_chain(
+        uses_stdlib_integration=True,
+        component_name="client",
+        enable_jobmon_context=True,
+        telemetry_logger_prefixes=["jobmon."],
+        extra_processors=[],
+        include_store_for_otlp=True,
+        include_add_log_level=True,
+        include_forward_to_handlers=False,
+        include_wrap_for_formatter=True,
+    )
+
+    assert structlog.contextvars.merge_contextvars in processors
+    assert structlog.stdlib.filter_by_level in processors
+    assert structlog.stdlib.add_logger_name in processors
+    assert structlog.stdlib.add_log_level in processors
+    assert processors[-2] is _store_event_dict_for_otlp
+    assert processors[-1] is structlog.stdlib.ProcessorFormatter.wrap_for_formatter
+
+    # Component processor should inject component field
+    component_processor = processors[1]
+    event_dict: dict[str, object] = {}
+    component_processor(structlog.get_logger("jobmon.client"), "info", event_dict)
+    assert event_dict.get("component") == "client"
+
+
+def test_build_processor_chain_for_direct_rendering() -> None:
+    processors = _build_structlog_processor_chain(
+        uses_stdlib_integration=False,
+        component_name=None,
+        enable_jobmon_context=True,
+        telemetry_logger_prefixes=["jobmon."],
+        extra_processors=[],
+        include_store_for_otlp=True,
+        include_add_log_level=False,
+        include_forward_to_handlers=True,
+        include_wrap_for_formatter=False,
+        ensure_logger_name_on_direct=True,
+    )
+
+    assert _ensure_logger_name in processors
+    assert structlog.stdlib.filter_by_level not in processors
+    assert structlog.stdlib.add_logger_name not in processors
+    assert processors[-2] is _store_event_dict_for_otlp
+    assert processors[-1] is _forward_event_to_logging_handlers

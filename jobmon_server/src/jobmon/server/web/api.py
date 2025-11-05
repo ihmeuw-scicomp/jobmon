@@ -46,6 +46,10 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     )
     app = add_hooks_and_handlers(app)
 
+    from jobmon.core.otlp.manager import register_otlp_shutdown_event
+
+    register_otlp_shutdown_event(app)
+
     # Configure remaining OTLP components
     try:
         telemetry_section = config.get_section_coerced("telemetry")

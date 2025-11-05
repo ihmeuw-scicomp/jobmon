@@ -870,8 +870,8 @@ class WorkflowRun:
             logger.info(
                 f"Workflow {percent_done}% complete "
                 f"({len(self.done_tasks)}/{len(self.tasks)} tasks)",
-                newly_completed=num_newly_completed,
-                percent_done=percent_done,
+                telemetry_newly_completed=num_newly_completed,
+                telemetry_percent_done=percent_done,
             )
 
         # if newly failed, report failures and check if we should error out

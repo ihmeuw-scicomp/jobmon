@@ -1,10 +1,14 @@
-"""Telemetry context helpers for Jobmon structlog instrumentation."""
+"""Telemetry context helpers for Jobmon structlog instrumentation.
+
+All Jobmon telemetry metadata is namespaced with the 'telemetry_' prefix.
+This clearly indicates data that is exported to OTLP but stripped from
+console output, without requiring explicit key registries.
+"""
 
 from __future__ import annotations
 
-import threading
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, Mapping, Sequence, Set
+from typing import Any, Dict, Iterator, Sequence
 
 import structlog
 
@@ -16,39 +20,14 @@ if not hasattr(structlog, "contextvars") or not hasattr(
         "structlog.contextvars must provide get_contextvars() for Jobmon telemetry"
     )
 
-# Metadata keys that Jobmon treats as telemetry fields.
-JOBMON_METADATA_KEYS: Set[str] = {
-    "array_id",
-    "batch_number",
-    "cluster_name",
-    "dag_hash",
-    "dag_id",
-    "error",
-    "method",
-    "path",
-    "request_id",
-    "task_hash",
-    "task_id",
-    "task_instance_id",
-    "task_resources_id",
-    "task_template_id",
-    "task_template_version_id",
-    "tool_id",
-    "tool_version_id",
-    "workflow_args_hash",
-    "workflow_id",
-    "workflow_run_id",
-}
-
-_METADATA_LOCK = threading.RLock()
-
 
 def get_jobmon_context() -> Dict[str, Any]:
-    """Return a copy of the active Jobmon telemetry metadata."""
+    """Return a copy of all active Jobmon telemetry metadata.
+
+    Returns all context variables with the 'telemetry_' prefix.
+    """
     ctx = structlog.contextvars.get_contextvars()
-    with _METADATA_LOCK:
-        keys = tuple(JOBMON_METADATA_KEYS)
-    return {k: ctx[k] for k in keys if k in ctx}
+    return {k: v for k, v in ctx.items() if k.startswith("telemetry_")}
 
 
 def clear_jobmon_context() -> None:
@@ -59,11 +38,25 @@ def clear_jobmon_context() -> None:
 
 
 def set_jobmon_context(*, allow_non_jobmon_keys: bool = False, **metadata: Any) -> None:
-    """Bind telemetry metadata to the current structlog context."""
+    """Bind telemetry metadata to the current structlog context.
+
+    All keys are automatically prefixed with 'telemetry_' unless allow_non_jobmon_keys is True.
+
+    Args:
+        allow_non_jobmon_keys: If True, bind keys as-is without adding telemetry_ prefix.
+                              Used for server-side context propagation and decorators.
+        **metadata: Key-value pairs to bind to context.
+    """
     if allow_non_jobmon_keys:
+        # Allow arbitrary keys without prefixing (for server context propagation)
         filtered = {k: v for k, v in metadata.items() if v is not None}
     else:
-        filtered = _filter_jobmon_metadata(metadata)
+        # Ensure all keys have telemetry_ prefix (for Jobmon telemetry)
+        filtered = {
+            (k if k.startswith("telemetry_") else f"telemetry_{k}"): v
+            for k, v in metadata.items()
+            if v is not None
+        }
 
     if not filtered:
         return
@@ -72,16 +65,26 @@ def set_jobmon_context(*, allow_non_jobmon_keys: bool = False, **metadata: Any) 
 
 
 def unset_jobmon_context(*keys: str, allow_non_jobmon_keys: bool = False) -> None:
-    """Remove telemetry metadata keys from the current context."""
+    """Remove telemetry metadata keys from the current context.
+
+    Keys are automatically prefixed with 'telemetry_' unless allow_non_jobmon_keys is True.
+
+    Args:
+        *keys: Keys to remove from context.
+        allow_non_jobmon_keys: If True, remove keys as-is without adding telemetry_ prefix.
+                              Used for server-side context propagation and decorators.
+    """
     if not keys:
         return
 
     if allow_non_jobmon_keys:
+        # Remove arbitrary keys without prefixing
         filtered: Sequence[str] = tuple(key for key in keys if key)
     else:
-        with _METADATA_LOCK:
-            allowed = set(JOBMON_METADATA_KEYS)
-        filtered = tuple(key for key in keys if key in allowed)
+        # Ensure all keys have telemetry_ prefix
+        filtered = tuple(
+            k if k.startswith("telemetry_") else f"telemetry_{k}" for k in keys if k
+        )
 
     if not filtered:
         return
@@ -91,8 +94,16 @@ def unset_jobmon_context(*keys: str, allow_non_jobmon_keys: bool = False) -> Non
 
 @contextmanager
 def bind_jobmon_context(**metadata: Any) -> Iterator[None]:
-    """Context manager that binds Jobmon telemetry metadata temporarily."""
-    filtered = _filter_jobmon_metadata(metadata)
+    """Context manager that binds Jobmon telemetry metadata temporarily.
+
+    All keys are automatically prefixed with 'telemetry_' if not already.
+    """
+    # Ensure all keys have telemetry_ prefix
+    filtered = {
+        (k if k.startswith("telemetry_") else f"telemetry_{k}"): v
+        for k, v in metadata.items()
+        if v is not None
+    }
 
     if not filtered:
         yield
@@ -102,25 +113,18 @@ def bind_jobmon_context(**metadata: Any) -> Iterator[None]:
     current = contextvars_module.get_contextvars()
     previous = {k: current[k] for k in filtered if k in current}
 
-    set_jobmon_context(**filtered)
+    structlog.contextvars.bind_contextvars(**filtered)
     try:
         yield
     finally:
-        unset_jobmon_context(*filtered.keys())
+        structlog.contextvars.unbind_contextvars(*filtered.keys())
         if previous:
             contextvars_module.bind_contextvars(**previous)
 
 
 def register_jobmon_metadata_keys(*keys: str) -> None:
-    """Register additional telemetry metadata keys at runtime."""
-    if not keys:
-        return
+    """No-op for backward compatibility.
 
-    with _METADATA_LOCK:
-        JOBMON_METADATA_KEYS.update(keys)
-
-
-def _filter_jobmon_metadata(metadata: Mapping[str, Any]) -> Dict[str, Any]:
-    with _METADATA_LOCK:
-        allowed = set(JOBMON_METADATA_KEYS)
-    return {k: v for k, v in metadata.items() if k in allowed}
+    Metadata keys no longer need registration - any key with 'telemetry_' prefix
+    is automatically treated as Jobmon telemetry metadata.
+    """
