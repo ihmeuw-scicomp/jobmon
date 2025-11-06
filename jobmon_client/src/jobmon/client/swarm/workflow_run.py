@@ -792,12 +792,19 @@ class WorkflowRun:
                     timeout, loop_start_pc
                 )
                 if not (elapsed_time < timeout or timeout == -1):
-                    logger.info("Stopping processing as timeout reached")
+                    logger.debug(
+                        (
+                            "Stopping task processing after loop timeout: "
+                            f"elapsed={elapsed_time} timeout={timeout}"
+                        )
+                    )
                     swarm_commands.close()
 
             except StopIteration:
                 # stop processing commands if we are out of commands
-                logger.info("Stopping command processing as there is no more work")
+                logger.debug(
+                    "Stopping task processing because command generator returned StopIteration"
+                )
                 keep_processing = False
 
         logger.debug(

@@ -532,14 +532,13 @@ def test_direct_rendering_console_output_is_message_only(client_env):
         )
 
     assert captured
-    assert "logger" in captured
     assert "event" in captured
-    assert "level" in captured
     assert "timestamp" in captured
     assert captured.get("event") == "Workflow 16.67% complete (1/6 tasks)"
-    assert captured.get("logger") == "jobmon.client.swarm.workflow_run"
 
     console_keys = set(captured.keys())
+    assert "logger" not in console_keys
+    assert "level" not in console_keys
     assert "telemetry_newly_completed" not in console_keys
     assert "telemetry_percent_done" not in console_keys
     assert "telemetry_workflow_run_id" not in console_keys

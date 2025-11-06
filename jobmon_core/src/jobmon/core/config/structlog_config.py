@@ -122,16 +122,25 @@ def _forward_event_to_logging_handlers(
     return _prune_event_dict_for_console(event_dict)
 
 
-def _prune_event_dict_for_console(event_dict: Dict[str, Any]) -> Dict[str, Any]:
+def _prune_event_dict_for_console(
+    event_dict: Dict[str, Any],
+) -> Dict[str, Any]:
     """Strip Jobmon-bound metadata while leaving host formatting intact.
 
-    Removes all keys starting with 'telemetry_' prefix to keep console output
+    Removes all keys starting with 'telemetry_' prefix along with helper fields
+    added for OTLP forwarding (``logger`` and ``level``). This keeps console output
     clean while preserving the full context for OTLP exports.
     """
-    for key in list(event_dict.keys()):
+    cleaned = dict(event_dict)
+
+    for key in list(cleaned.keys()):
         if key.startswith("telemetry_"):
-            event_dict.pop(key, None)
-    return event_dict
+            cleaned.pop(key, None)
+
+    cleaned.pop("level", None)
+    cleaned.pop("logger", None)
+
+    return cleaned
 
 
 def _ensure_logger_name(
