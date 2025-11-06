@@ -117,6 +117,9 @@ Telemetry & Console Behaviour
 
 * ``set_jobmon_context()`` stores metadata in structlog's context variables with
   automatic ``telemetry_`` prefixing.
+* Both ``set_jobmon_context`` and ``bind_jobmon_context`` share the same
+  normalization rules, so ``None`` values are dropped automatically and keys are
+  always prefixed consistently.
 * ``create_telemetry_isolation_processor()`` injects metadata into loggers whose
   names start with configured prefixes (``["jobmon."]`` by default) and removes
   the metadata for other namespaces.
@@ -168,16 +171,22 @@ Custom Console Logging
        handlers: [custom_console]
        level: DEBUG
 
-Disable Telemetry Isolation
----------------------------
+Configure Component Name
+-------------------------
 
 .. code-block:: python
 
    from jobmon.core.config.structlog_config import configure_structlog
 
+   configure_structlog(component_name="client")
+
+Add custom processors without rebuilding the Jobmon defaults::
+
+   from jobmon.core.config.structlog_config import configure_structlog
+
    configure_structlog(
        component_name="client",
-       enable_jobmon_context=False,
+       extra_processors=[my_custom_processor],
    )
 
 FAQ
@@ -189,9 +198,8 @@ Why are Jobmon logs formatted like my application logs?
 
 Can I surface ``workflow_run_id`` in host logs?
     Not by default. Fields with the ``telemetry_`` prefix are automatically
-    stripped from console output. To surface them, disable isolation via
-    ``configure_structlog(enable_jobmon_context=False)`` or configure your
-    host renderer to show keys with the ``telemetry_`` prefix.
+    stripped from console output to keep telemetry separate from user-facing logs.
+    Configure your host renderer to show keys with the ``telemetry_`` prefix if needed.
 
 Does Jobmon slow down logging?
     Typical overhead is ~3 microseconds per log call (context merge + isolation

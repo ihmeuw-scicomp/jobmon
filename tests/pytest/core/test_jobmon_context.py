@@ -12,7 +12,6 @@ from jobmon.core.logging.context import (
     bind_jobmon_context,
     clear_jobmon_context,
     get_jobmon_context,
-    register_jobmon_metadata_keys,
     set_jobmon_context,
     unset_jobmon_context,
 )
@@ -134,17 +133,6 @@ def test_bind_restores_previous_values() -> None:
     assert restored["telemetry_workflow_run_id"] == 42
 
     unset_jobmon_context("workflow_run_id")
-
-
-def test_register_jobmon_metadata_keys() -> None:
-    # register_jobmon_metadata_keys is now a no-op, prefix is automatic
-    register_jobmon_metadata_keys("test_key")
-    set_jobmon_context(test_key="value-123")
-
-    context = get_jobmon_context()
-    assert context["telemetry_test_key"] == "value-123"
-
-    unset_jobmon_context("test_key")
 
 
 def test_jobmon_as_library_with_fhs_style_config():

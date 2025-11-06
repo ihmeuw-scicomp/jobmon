@@ -54,12 +54,9 @@ def test_build_processor_chain_for_stdlib_integration() -> None:
     processors = _build_structlog_processor_chain(
         uses_stdlib_integration=True,
         component_name="client",
-        enable_jobmon_context=True,
         telemetry_logger_prefixes=["jobmon."],
         extra_processors=[],
         include_store_for_otlp=True,
-        include_add_log_level=True,
-        include_forward_to_handlers=False,
         include_wrap_for_formatter=True,
     )
 
@@ -81,18 +78,16 @@ def test_build_processor_chain_for_direct_rendering() -> None:
     processors = _build_structlog_processor_chain(
         uses_stdlib_integration=False,
         component_name=None,
-        enable_jobmon_context=True,
         telemetry_logger_prefixes=["jobmon."],
         extra_processors=[],
         include_store_for_otlp=True,
-        include_add_log_level=False,
-        include_forward_to_handlers=True,
         include_wrap_for_formatter=False,
-        ensure_logger_name_on_direct=True,
     )
 
     assert _ensure_logger_name in processors
     assert structlog.stdlib.filter_by_level not in processors
     assert structlog.stdlib.add_logger_name not in processors
-    assert processors[-2] is _store_event_dict_for_otlp
+    # For direct rendering: OTLP store, then add_log_level, then forward to handlers
+    assert processors[-3] is _store_event_dict_for_otlp
+    assert processors[-2] is structlog.stdlib.add_log_level
     assert processors[-1] is _forward_event_to_logging_handlers

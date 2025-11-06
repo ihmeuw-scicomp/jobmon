@@ -8,7 +8,7 @@ console output, without requiring explicit key registries.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, Sequence
+from typing import Any, Dict, Iterable, Iterator, Mapping, Sequence
 
 import structlog
 
@@ -19,6 +19,55 @@ if not hasattr(structlog, "contextvars") or not hasattr(
     raise RuntimeError(
         "structlog.contextvars must provide get_contextvars() for Jobmon telemetry"
     )
+
+
+_TELEMETRY_PREFIX = "telemetry_"
+
+
+def _normalize_context_metadata(
+    metadata: Mapping[str, Any], *, allow_non_jobmon_keys: bool
+) -> Dict[str, Any]:
+    """Filter ``None`` values and apply telemetry prefixing rules."""
+    normalized: Dict[str, Any] = {}
+
+    for raw_key, value in metadata.items():
+        if value is None:
+            continue
+
+        key = _normalize_context_key(
+            raw_key, allow_non_jobmon_keys=allow_non_jobmon_keys
+        )
+        if key:
+            normalized[key] = value
+
+    return normalized
+
+
+def _normalize_context_keys(
+    keys: Iterable[str], *, allow_non_jobmon_keys: bool
+) -> Sequence[str]:
+    """Apply telemetry prefixing rules to context keys."""
+    normalized: list[str] = []
+
+    for raw_key in keys:
+        if not raw_key:
+            continue
+
+        key = _normalize_context_key(
+            raw_key, allow_non_jobmon_keys=allow_non_jobmon_keys
+        )
+        if key:
+            normalized.append(key)
+
+    return tuple(normalized)
+
+
+def _normalize_context_key(key: str, *, allow_non_jobmon_keys: bool) -> str:
+    """Return a context key that honours telemetry prefixing rules."""
+    if allow_non_jobmon_keys or key.startswith(_TELEMETRY_PREFIX):
+        return key
+
+    return f"{_TELEMETRY_PREFIX}{key}"
 
 
 def get_jobmon_context() -> Dict[str, Any]:
@@ -43,20 +92,14 @@ def set_jobmon_context(*, allow_non_jobmon_keys: bool = False, **metadata: Any) 
     All keys are automatically prefixed with 'telemetry_' unless allow_non_jobmon_keys is True.
 
     Args:
-        allow_non_jobmon_keys: If True, bind keys as-is without adding telemetry_ prefix.
-                              Used for server-side context propagation and decorators.
+        allow_non_jobmon_keys: **INTERNAL USE ONLY**. If True, bind keys as-is without adding
+                              telemetry_ prefix. Used internally by the bind_context decorator
+                              and server middleware. External callers should not use this flag.
         **metadata: Key-value pairs to bind to context.
     """
-    if allow_non_jobmon_keys:
-        # Allow arbitrary keys without prefixing (for server context propagation)
-        filtered = {k: v for k, v in metadata.items() if v is not None}
-    else:
-        # Ensure all keys have telemetry_ prefix (for Jobmon telemetry)
-        filtered = {
-            (k if k.startswith("telemetry_") else f"telemetry_{k}"): v
-            for k, v in metadata.items()
-            if v is not None
-        }
+    filtered = _normalize_context_metadata(
+        metadata, allow_non_jobmon_keys=allow_non_jobmon_keys
+    )
 
     if not filtered:
         return
@@ -71,20 +114,16 @@ def unset_jobmon_context(*keys: str, allow_non_jobmon_keys: bool = False) -> Non
 
     Args:
         *keys: Keys to remove from context.
-        allow_non_jobmon_keys: If True, remove keys as-is without adding telemetry_ prefix.
-                              Used for server-side context propagation and decorators.
+        allow_non_jobmon_keys: **INTERNAL USE ONLY**. If True, remove keys as-is without adding
+                              telemetry_ prefix. Used internally by the bind_context decorator
+                              and server middleware. External callers should not use this flag.
     """
     if not keys:
         return
 
-    if allow_non_jobmon_keys:
-        # Remove arbitrary keys without prefixing
-        filtered: Sequence[str] = tuple(key for key in keys if key)
-    else:
-        # Ensure all keys have telemetry_ prefix
-        filtered = tuple(
-            k if k.startswith("telemetry_") else f"telemetry_{k}" for k in keys if k
-        )
+    filtered = _normalize_context_keys(
+        keys, allow_non_jobmon_keys=allow_non_jobmon_keys
+    )
 
     if not filtered:
         return
@@ -98,12 +137,7 @@ def bind_jobmon_context(**metadata: Any) -> Iterator[None]:
 
     All keys are automatically prefixed with 'telemetry_' if not already.
     """
-    # Ensure all keys have telemetry_ prefix
-    filtered = {
-        (k if k.startswith("telemetry_") else f"telemetry_{k}"): v
-        for k, v in metadata.items()
-        if v is not None
-    }
+    filtered = _normalize_context_metadata(metadata, allow_non_jobmon_keys=False)
 
     if not filtered:
         yield
@@ -120,11 +154,3 @@ def bind_jobmon_context(**metadata: Any) -> Iterator[None]:
         structlog.contextvars.unbind_contextvars(*filtered.keys())
         if previous:
             contextvars_module.bind_contextvars(**previous)
-
-
-def register_jobmon_metadata_keys(*keys: str) -> None:
-    """No-op for backward compatibility.
-
-    Metadata keys no longer need registration - any key with 'telemetry_' prefix
-    is automatically treated as Jobmon telemetry metadata.
-    """

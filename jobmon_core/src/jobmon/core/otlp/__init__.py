@@ -18,10 +18,7 @@ from .manager import (
     get_logger,
     get_shared_logger_provider,
     initialize_jobmon_otlp,
-    log_validation_results,
     otlp_flush_on_exit,
-    validate_and_log_otlp_config,
-    validate_logging_config_otlp,
     validate_otlp_exporter_config,
 )
 from .utils import add_span_details_processor, get_current_span_details
@@ -43,8 +40,5 @@ __all__ = [
     "get_current_span_details",
     "add_span_details_processor",
     "OpenTelemetryLogFormatter",
-    "log_validation_results",
-    "validate_and_log_otlp_config",
-    "validate_logging_config_otlp",
     "validate_otlp_exporter_config",
 ]

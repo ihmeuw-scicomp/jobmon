@@ -32,6 +32,8 @@ general structlog context:
   operations.
 * All telemetry fields use the ``telemetry_`` prefix for automatic namespacing.
   The prefix is added automatically by ``set_jobmon_context`` and ``@bind_context``.
+* Shared normalization helpers ensure the prefixing rules and ``None`` filtering
+  are applied consistently across ``set_jobmon_context`` and ``bind_jobmon_context``.
 
 Example usage::
 
@@ -83,12 +85,15 @@ The new ``_build_structlog_processor_chain`` helper centralises this assembly so
 identical ordering rules.  The builder takes explicit flags for OTLP capture,
 logger name enforcement, and forwarding shims, which makes it easier to reason
 about the direct-rendering path while keeping stdlib integrations unchanged.
+``configure_structlog`` now also accepts optional ``extra_processors`` so callers
+can append lightweight enrichment processors without reimplementing the base
+chain.  ``configure_structlog_with_otlp`` delegates to this entrypoint after
+resolving OTLP span processors, eliminating duplicate configuration code.
 
 ``prepend_jobmon_processors_to_existing_config`` supports host-controlled
-configurations by prepending missing processors.  Callers may now pass
-``telemetry_logger_prefixes`` to keep Jobmon metadata on additional namespaces.
-Ensures OTLP capture is available by injecting ``_store_event_dict_for_otlp``
-when the host configuration does not already include it.
+configurations by prepending missing processors. Telemetry metadata is isolated
+to ``jobmon.*`` logger namespaces. Ensures OTLP capture is available by injecting
+``_store_event_dict_for_otlp`` when the host configuration does not already include it.
 
 Two helper functions keep the layering accurate:
 
@@ -159,7 +164,7 @@ existing configuration::
    )
 
    if is_structlog_configured():
-       prepend_jobmon_processors_to_existing_config(["jobmon.", "myapp.telemetry"])
+       prepend_jobmon_processors_to_existing_config()
    else:
        configure_structlog(component_name="client")
 
@@ -235,8 +240,8 @@ Troubleshooting Tips
 ====================
 
 Host logs show Jobmon metadata
-    Ensure the isolation processor is present, ``enable_jobmon_context`` is
-    true, and the host loggers do not use Jobmon prefixes.
+    Ensure the isolation processor is present and the host loggers do not use
+    the ``jobmon.*`` namespace prefix.
 
 Telemetry not exported
     Confirm ``_store_event_dict_for_otlp`` is in the processor chain and an OTLP

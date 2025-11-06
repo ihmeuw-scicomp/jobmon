@@ -466,9 +466,6 @@ def _install_lifecycle_hooks() -> None:
 _install_lifecycle_hooks()
 
 
-_install_lifecycle_hooks()
-
-
 @contextmanager
 def otlp_flush_on_exit() -> Generator[Optional[JobmonOTLPManager], None, None]:
     """Context manager that guarantees OTLP flush when exiting."""
@@ -488,16 +485,23 @@ def register_otlp_shutdown_event(app: Any) -> None:
     if not OTLP_AVAILABLE:
         return
 
-    try:
-        on_event = getattr(app, "on_event")
-    except AttributeError:
+    add_event_handler = getattr(app, "add_event_handler", None)
+    if callable(add_event_handler):
+
+        async def _flush_otlp_on_shutdown() -> None:  # pragma: no cover - integration
+            _flush_otlp_once("fastapi-shutdown")
+
+        add_event_handler("shutdown", _flush_otlp_on_shutdown)
         return
 
-    @on_event("shutdown")
-    async def _flush_otlp_on_shutdown() -> (
-        None
-    ):  # pragma: no cover - exercised in integration
-        _flush_otlp_once("fastapi-shutdown")
+    on_event = getattr(app, "on_event", None)
+    if callable(on_event):
+
+        @on_event("shutdown")
+        async def _flush_otlp_on_shutdown() -> (
+            None
+        ):  # pragma: no cover - exercised in integration
+            _flush_otlp_once("fastapi-shutdown")
 
 
 def validate_otlp_exporter_config(config: Any, exporter_type: str = "log") -> list[str]:
@@ -604,78 +608,6 @@ def validate_otlp_exporter_config(config: Any, exporter_type: str = "log") -> li
                 issues.append(f"'{param}' must be a non-negative integer")
 
     return issues
-
-
-def validate_logging_config_otlp(config: Any) -> dict[str, list[str]]:
-    """Validate OTLP configuration in a logging config dictionary.
-
-    Args:
-        config: Full logging configuration dictionary
-
-    Returns:
-        Dictionary mapping handler names to lists of validation issues
-    """
-    validation_results = {}
-
-    handlers = config.get("handlers", {})
-    otlp_handler_classes = {
-        "jobmon.core.otlp.JobmonOTLPLoggingHandler",
-        "jobmon.core.otlp.JobmonOTLPStructlogHandler",
-        "jobmon.core.otlp.handlers.JobmonOTLPLoggingHandler",
-        "jobmon.core.otlp.handlers.JobmonOTLPStructlogHandler",
-    }
-
-    for handler_name, handler_config in handlers.items():
-        handler_class = handler_config.get("class", "")
-
-        if handler_class in otlp_handler_classes:
-            exporter_config = handler_config.get("exporter", {})
-            if exporter_config:
-                issues = validate_otlp_exporter_config(exporter_config, "log")
-                if issues:
-                    validation_results[handler_name] = issues
-
-    return validation_results
-
-
-def log_validation_results(
-    validation_results: dict[str, list[str]], logger: Optional[logging.Logger] = None
-) -> None:
-    """Log validation results using the provided logger.
-
-    Args:
-        validation_results: Dictionary mapping handler names to validation issues
-        logger: Logger to use. If None, uses default logger.
-    """
-    if logger is None:
-        logger = logging.getLogger(__name__)
-
-    if not validation_results:
-        logger.info("OTLP configuration validation passed - no issues found")
-        return
-
-    logger.error("OTLP configuration validation failed:")
-    for handler_name, issues in validation_results.items():
-        logger.error(f"Handler '{handler_name}' has {len(issues)} issue(s):")
-        for issue in issues:
-            logger.error(f"  - {issue}")
-
-
-def validate_and_log_otlp_config(
-    config: Any, logger: Optional[logging.Logger] = None
-) -> bool:
-    """Validate OTLP configuration and log results.
-
-    Args:
-        config: Full logging configuration dictionary
-        logger: Logger to use for validation results
-
-    Returns:
-        True if validation passed, False if issues were found
-    """
-    validation_results = validate_logging_config_otlp(config)
-    log_validation_results(validation_results, logger)
-    return len(validation_results) == 0
 
 
 def initialize_jobmon_otlp() -> JobmonOTLPManager:

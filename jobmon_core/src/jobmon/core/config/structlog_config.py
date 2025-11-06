@@ -255,16 +255,24 @@ def _build_structlog_processor_chain(
     *,
     uses_stdlib_integration: bool,
     component_name: Optional[str],
-    enable_jobmon_context: bool,
     telemetry_logger_prefixes: Optional[Sequence[str]],
     extra_processors: Iterable[Callable],
     include_store_for_otlp: bool,
-    include_add_log_level: Optional[bool] = None,
-    include_forward_to_handlers: Optional[bool] = None,
     include_wrap_for_formatter: bool,
-    ensure_logger_name_on_direct: bool = True,
+    include_telemetry_isolation: bool = True,
 ) -> List[Callable]:
-    """Compose the processor chain shared across Jobmon structlog setup paths."""
+    """Compose the processor chain shared across Jobmon structlog setup paths.
+
+    Args:
+        uses_stdlib_integration: If True, configures for stdlib logging integration.
+                                If False, configures for direct rendering (e.g., PrintLogger).
+        component_name: Optional component name to add to all logs.
+        telemetry_logger_prefixes: Logger name prefixes for telemetry isolation.
+        extra_processors: Additional processors to insert after telemetry isolation.
+        include_store_for_otlp: Whether to include OTLP event storage processor.
+        include_wrap_for_formatter: Whether to include ProcessorFormatter wrapper (for stdlib).
+        include_telemetry_isolation: Whether to include telemetry isolation processor.
+    """
     import structlog
 
     processors: List[Callable] = [structlog.contextvars.merge_contextvars]
@@ -272,21 +280,17 @@ def _build_structlog_processor_chain(
     if component_name:
         processors.append(_create_component_processor(component_name))
 
-    if include_add_log_level is None:
-        include_add_log_level = uses_stdlib_integration
-    if include_forward_to_handlers is None:
-        include_forward_to_handlers = not uses_stdlib_integration
-
     if uses_stdlib_integration:
+        # Standard library logging integration path
         processors.append(structlog.stdlib.filter_by_level)
         processors.append(structlog.stdlib.add_logger_name)
-        if include_add_log_level:
-            processors.append(structlog.stdlib.add_log_level)
-    elif ensure_logger_name_on_direct:
+        processors.append(structlog.stdlib.add_log_level)
+    else:
+        # Direct rendering path (e.g., PrintLogger)
         processors.append(_ensure_logger_name)
 
-    prefixes = list(telemetry_logger_prefixes or ["jobmon."])
-    if enable_jobmon_context:
+    if include_telemetry_isolation:
+        prefixes = list(telemetry_logger_prefixes or ["jobmon."])
         processors.append(create_telemetry_isolation_processor(prefixes))
 
     if include_store_for_otlp:
@@ -294,9 +298,9 @@ def _build_structlog_processor_chain(
 
     processors.extend(list(extra_processors))
 
-    if include_forward_to_handlers:
-        if not uses_stdlib_integration:
-            processors.append(structlog.stdlib.add_log_level)
+    if not uses_stdlib_integration:
+        # For direct rendering, add log level and forward to stdlib handlers for OTLP
+        processors.append(structlog.stdlib.add_log_level)
         processors.append(_forward_event_to_logging_handlers)
 
     if include_wrap_for_formatter:
@@ -358,9 +362,8 @@ def structlog_otlp_capture_enabled() -> Iterator[None]:
 
 def configure_structlog(
     component_name: Optional[str] = None,
-    extra_processors: Optional[List[Callable]] = None,
-    enable_jobmon_context: bool = True,
-    telemetry_logger_prefixes: Optional[List[str]] = None,
+    *,
+    extra_processors: Optional[Iterable[Callable]] = None,
 ) -> None:
     """Configure structlog for jobmon components.
 
@@ -368,8 +371,9 @@ def configure_structlog(
     1. Merge context variables (from bind_contextvars and @bind_context decorator)
     2. Add logger metadata (logger name, log level)
     3. Optionally add a component field to the event_dict
-    4. Optionally isolate Jobmon telemetry metadata to configured logger prefixes
+    4. Isolate Jobmon telemetry metadata to jobmon.* loggers
     5. Capture the raw event_dict for OTLP handlers
+    6. Optionally include extra processors supplied by the caller
 
     IMPORTANT: This must be called before using the @bind_context decorator
     or any structlog.contextvars.bind_contextvars() calls.
@@ -380,64 +384,28 @@ def configure_structlog(
     3. filter_by_level (stdlib)
     4. add_logger_name (stdlib)
     5. add_log_level (stdlib)
-    6. telemetry isolation processor (optional, controlled by enable_jobmon_context)
-    7. extra_processors (host processors, if provided)
-    8. _store_event_dict_for_otlp (Jobmon OTLP capture)
+    6. telemetry isolation processor
+    7. _store_event_dict_for_otlp (Jobmon OTLP capture)
+    8. Extra processors supplied via ``extra_processors`` (if any)
     9. ProcessorFormatter.wrap_for_formatter (stdlib - keeps stdlib handlers working)
-
-    COLLISION AVOIDANCE:
-    - Host processors in extra_processors run AFTER telemetry isolation
-    - This prevents telemetry metadata from leaking into host rendering
-    - Avoid duplicate processors (timestamps, exception formatting, etc.) in extra_processors
-    - Use unique event_dict keys to avoid overwrites
-    - Jobmon telemetry keys use the 'telemetry_' prefix: telemetry_workflow_run_id,
-      telemetry_task_instance_id, telemetry_array_id, etc. The prefix is added
-      automatically by set_jobmon_context() and @bind_context.
-    - Standard keys to avoid duplicating: timestamp, level, logger, event, exc_info
 
     Args:
         component_name: Component name to add to all logs (e.g., "distributor")
-        extra_processors: Additional processors to insert into the chain AFTER
-                         telemetry isolation. Avoid duplicate processors (timestamps,
-                         log levels).
-        enable_jobmon_context: If True, install telemetry isolation processor to isolate
-                              telemetry metadata (workflow_run_id, task_instance_id, etc.)
-                              to configured logger prefixes. Defaults to True for backward
-                              compatibility.
-        telemetry_logger_prefixes: List of logger name prefixes that should receive
-                                  telemetry metadata. Defaults to ["jobmon."]. Only used
-                                  when enable_jobmon_context=True.
+        extra_processors: Additional structlog processors to append after Jobmon's
+            defaults (e.g., custom formatting or telemetry processors)
 
     Example:
         >>> # Basic usage
         >>> configure_structlog(component_name="distributor")
-
-        >>> # With OTLP trace integration
-        >>> from jobmon.core.otlp import add_span_details_processor
-        >>> configure_structlog(
-        ...     component_name="distributor",
-        ...     extra_processors=[add_span_details_processor]
-        ... )
-
-        >>> # Disable jobmon context isolation (for host applications)
-        >>> configure_structlog(enable_jobmon_context=False)
-
-        >>> # Custom telemetry prefixes
-        >>> configure_structlog(
-        ...     telemetry_logger_prefixes=["myapp.telemetry", "jobmon."]
-        ... )
     """
     import structlog
 
     processors = _build_structlog_processor_chain(
         uses_stdlib_integration=True,
         component_name=component_name,
-        enable_jobmon_context=enable_jobmon_context,
-        telemetry_logger_prefixes=telemetry_logger_prefixes,
-        extra_processors=extra_processors or [],
+        telemetry_logger_prefixes=["jobmon."],
+        extra_processors=list(extra_processors or []),
         include_store_for_otlp=True,
-        include_add_log_level=True,
-        include_forward_to_handlers=False,
         include_wrap_for_formatter=True,
     )
 
@@ -524,7 +492,6 @@ def create_telemetry_isolation_processor(
 
 def configure_structlog_with_otlp(
     component_name: str,
-    enable_jobmon_context: bool = True,
 ) -> None:
     """Configure structlog with OTLP trace integration if enabled.
 
@@ -536,8 +503,6 @@ def configure_structlog_with_otlp(
 
     Args:
         component_name: Component name (e.g., "distributor", "worker")
-        enable_jobmon_context: If True, install jobmon_context_processor to isolate
-                              telemetry metadata to jobmon.* loggers only. Defaults to True.
 
     Example:
         >>> # In distributor CLI
@@ -545,26 +510,13 @@ def configure_structlog_with_otlp(
 
         >>> # In worker CLI
         >>> configure_structlog_with_otlp(component_name="worker")
-
-        >>> # Disable jobmon context isolation (for host applications)
-        >>> configure_structlog_with_otlp(
-        ...     component_name="distributor",
-        ...     enable_jobmon_context=False,
-        ... )
     """
+    # Check if OTLP tracing is enabled for this component
+    otlp_enabled = False
     try:
         from jobmon.core.configuration import JobmonConfig
 
         config = JobmonConfig()
-    except Exception:
-        # Config not available, use basic configuration
-        configure_structlog(
-            component_name=component_name, enable_jobmon_context=enable_jobmon_context
-        )
-        return
-
-    # Check if OTLP tracing is enabled for this component
-    try:
         telemetry_section = config.get_section_coerced("telemetry")
         tracing_config = telemetry_section.get("tracing", {})
 
@@ -574,32 +526,23 @@ def configure_structlog_with_otlp(
     except Exception:
         otlp_enabled = False
 
+    # Build processor list with optional OTLP trace processor
+    extra_processors: List[Callable] = []
     if otlp_enabled:
-        # OTLP tracing is enabled, add trace processors
         try:
             from jobmon.core.otlp import add_span_details_processor
 
-            configure_structlog(
-                component_name=component_name,
-                extra_processors=[add_span_details_processor],
-                enable_jobmon_context=enable_jobmon_context,
-            )
+            extra_processors = [add_span_details_processor]
         except ImportError:
-            # OTLP module not available, configure without it
-            configure_structlog(
-                component_name=component_name,
-                enable_jobmon_context=enable_jobmon_context,
-            )
-    else:
-        # OTLP not enabled, basic configuration
-        configure_structlog(
-            component_name=component_name, enable_jobmon_context=enable_jobmon_context
-        )
+            pass
+
+    configure_structlog(
+        component_name=component_name,
+        extra_processors=extra_processors,
+    )
 
 
-def prepend_jobmon_processors_to_existing_config(
-    telemetry_logger_prefixes: Optional[List[str]] = None,
-) -> None:
+def prepend_jobmon_processors_to_existing_config() -> None:
     """Prepend Jobmon processors to an existing structlog configuration.
 
     This is called when Jobmon is used as a library and the host application
@@ -612,10 +555,6 @@ def prepend_jobmon_processors_to_existing_config(
       add_logger_name, and telemetry isolation
     - Direct rendering (like FHS) adds merge_contextvars and telemetry isolation
     - Host processors remain untouched so final rendering is preserved
-
-    Args:
-        telemetry_logger_prefixes: Logger prefixes that should retain Jobmon telemetry
-            metadata. Defaults to ["jobmon."] to match configure_structlog().
     """
     import structlog
 
@@ -628,34 +567,34 @@ def prepend_jobmon_processors_to_existing_config(
     # Check if host app uses stdlib logging integration
     uses_stdlib_integration = _uses_stdlib_integration(logger_factory, wrapper_class)
 
-    prefixes = telemetry_logger_prefixes or ["jobmon."]
+    prefixes = ["jobmon."]
     prefixes_tuple = tuple(prefixes)
 
-    need_isolation = not _has_isolation_processor(existing_processors, prefixes_tuple)
-    need_store = not _processor_present(existing_processors, _store_event_dict_for_otlp)
-    need_forward = not uses_stdlib_integration and not _processor_present(
-        existing_processors, _forward_event_to_logging_handlers
-    )
-    ensure_named_direct = not uses_stdlib_integration and not _processor_present(
-        existing_processors, _ensure_logger_name
-    )
+    # Build list of Jobmon processors to prepend
+    jobmon_processors: List[Callable] = []
 
-    jobmon_processors = _build_structlog_processor_chain(
-        uses_stdlib_integration=uses_stdlib_integration,
-        component_name=None,
-        enable_jobmon_context=need_isolation,
-        telemetry_logger_prefixes=prefixes,
-        extra_processors=[],
-        include_store_for_otlp=need_store,
-        include_add_log_level=False,
-        include_forward_to_handlers=need_forward,
-        include_wrap_for_formatter=False,
-        ensure_logger_name_on_direct=ensure_named_direct,
-    )
+    # Always need context merging
+    jobmon_processors.append(structlog.contextvars.merge_contextvars)
 
+    # Add stdlib integration processors (but not add_log_level, host may have it)
+    if uses_stdlib_integration:
+        jobmon_processors.append(structlog.stdlib.filter_by_level)
+        jobmon_processors.append(structlog.stdlib.add_logger_name)
+    else:
+        # Direct rendering path
+        jobmon_processors.append(_ensure_logger_name)
+
+    # Add telemetry isolation
+    if not _has_isolation_processor(existing_processors, prefixes_tuple):
+        jobmon_processors.append(create_telemetry_isolation_processor(prefixes))
+
+    # Add OTLP capture
+    jobmon_processors.append(_store_event_dict_for_otlp)
+
+    # For direct rendering, add forwarding to stdlib handlers
     if not uses_stdlib_integration:
-        logger_factory = _wrap_print_logger_factory(logger_factory)
-        wrapper_class = _wrap_wrapper_class_for_otlp(wrapper_class)
+        jobmon_processors.append(structlog.stdlib.add_log_level)
+        jobmon_processors.append(_forward_event_to_logging_handlers)
 
     # Remove Jobmon processors from existing chain to avoid duplicates
     def _remove_processor(processors: List[Callable], processor: Callable) -> None:
@@ -667,6 +606,10 @@ def prepend_jobmon_processors_to_existing_config(
 
     for processor in jobmon_processors:
         _remove_processor(existing_processors, processor)
+
+    if not uses_stdlib_integration:
+        logger_factory = _wrap_print_logger_factory(logger_factory)
+        wrapper_class = _wrap_wrapper_class_for_otlp(wrapper_class)
 
     # Combine: Jobmon processors first (in correct order), then remaining host processors
     new_processors = jobmon_processors + existing_processors
