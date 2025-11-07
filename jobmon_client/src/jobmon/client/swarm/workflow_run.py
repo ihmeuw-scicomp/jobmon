@@ -590,12 +590,8 @@ class WorkflowRun:
                     logger.info("Failing after first failure, as requested")
                     break
 
-                # fail during test path
-                if self._n_executions >= self._val_fail_after_n_executions:
-                    raise WorkflowTestError(
-                        f"WorkflowRun asked to fail after {self._n_executions} "
-                        "executions. Failing now"
-                    )
+                # fail during test path (pre-command processing check)
+                self._check_fail_after_n_executions()
 
                 # process any commands that we can in the time allotted
                 time_till_next_heartbeat = self._workflow_run_heartbeat_interval - (
@@ -619,6 +615,11 @@ class WorkflowRun:
                 else:
                     time_since_last_full_sync += loop_elapsed
                     self.synchronize_state()
+
+                # fail during test path (post-synchronization check). This ensures
+                # tests that rely on fail-after hooks still raise even when
+                # all tasks complete within a single loop iteration.
+                self._check_fail_after_n_executions()
 
                 # if there is active tasks, loop continue
                 loop_continue, time_since_last_full_sync = (
@@ -929,6 +930,14 @@ class WorkflowRun:
         app_route = f"/workflow_run/{self.workflow_run_id}/terminate_task_instances"
         self.requester.send_request(app_route=app_route, message={}, request_type="put")
         self._terminated = True
+
+    def _check_fail_after_n_executions(self) -> None:
+        """Raise the test hook exception when the execution threshold is met."""
+        if self._n_executions >= self._val_fail_after_n_executions:
+            raise WorkflowTestError(
+                f"WorkflowRun asked to fail after {self._n_executions} "
+                "executions. Failing now"
+            )
 
     def _set_fail_after_n_executions(self, n: int) -> None:
         """For use during testing.
