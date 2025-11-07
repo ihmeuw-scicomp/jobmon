@@ -616,11 +616,7 @@ class WorkflowRun:
                 # fail during test path (post-synchronization check). This ensures
                 # tests that rely on fail-after hooks still raise even when
                 # all tasks complete within a single loop iteration.
-                if self._n_executions >= self._val_fail_after_n_executions:
-                    raise WorkflowTestError(
-                        f"WorkflowRun asked to fail after {self._n_executions} "
-                        "executions. Failing now"
-                    )
+                self._check_fail_after_n_executions()
 
                 # if there is active tasks, loop continue
                 loop_continue, time_since_last_full_sync = (
@@ -931,6 +927,14 @@ class WorkflowRun:
         app_route = f"/workflow_run/{self.workflow_run_id}/terminate_task_instances"
         self.requester.send_request(app_route=app_route, message={}, request_type="put")
         self._terminated = True
+
+    def _check_fail_after_n_executions(self) -> None:
+        """Raise the test hook exception when the execution threshold is met."""
+        if self._n_executions >= self._val_fail_after_n_executions:
+            raise WorkflowTestError(
+                f"WorkflowRun asked to fail after {self._n_executions} "
+                "executions. Failing now"
+            )
 
     def _set_fail_after_n_executions(self, n: int) -> None:
         """For use during testing.

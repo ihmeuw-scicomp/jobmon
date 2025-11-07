@@ -93,6 +93,7 @@ All notable changes to Jobmon will be documented in this file.
 - Improved isort configuration to correctly identify `jobmon` as first-party package, ensuring proper PEP 8 import order (stdlib → third-party → local).
 
 ### Fixed
+- Fixed workflow test hook race condition where `_fail_after_n_executions` check could be bypassed when tasks complete within a single loop iteration, causing flaky test failures in CI.
 - Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.
 - Fixed transaction anti-patterns with multiple commits, ensuring proper atomicity and error handling.
 - Fixed DNS cache variable scope bug that was causing NXDOMAIN crashes in production environments.
