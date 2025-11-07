@@ -206,8 +206,10 @@ def _wrap_wrapper_class_for_otlp(wrapper_class: Any) -> Any:
         if not log_name:
             log_name = kw.get("logger") or kw.get("name")
 
-        if log_name:
-            target_logger = logging.getLogger(log_name)
+        if not log_name:
+            return
+
+        target_logger = logging.getLogger(log_name)
         if not target_logger.isEnabledFor(level):
             return
 
