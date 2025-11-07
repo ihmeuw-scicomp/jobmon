@@ -177,16 +177,38 @@ def _wrap_wrapper_class_for_otlp(wrapper_class: Any) -> Any:
     if getattr(wrapper_class, "__jobmon_otlp_passthrough__", False):
         return wrapper_class
 
-    try:
-        from structlog._native import _nop  # type: ignore[attr-defined]
-    except Exception:  # pragma: no cover - structlog internals unavailable
-        return wrapper_class
+    # Detect filtered methods via structlog's _nop sentinel when available.
+    filtered_methods = set()
 
-    filtered_methods = {
-        name
-        for name in ("debug", "trace", "verbose")
-        if wrapper_class.__dict__.get(name) is _nop
-    }
+    _nop = None
+    for module in (
+        "structlog._native",
+        "structlog._log_levels",
+        "structlog._config",
+    ):
+        if _nop is not None:
+            break
+        try:
+            _nop = __import__(module, fromlist=["_nop"])._nop  # type: ignore[attr-defined]
+        except (ImportError, AttributeError):
+            continue
+
+    if _nop is not None:
+        filtered_methods = {
+            name
+            for name in ("debug", "trace", "verbose")
+            if name in wrapper_class.__dict__ and wrapper_class.__dict__[name] is _nop
+        }
+    else:
+        # Final fallback: inspect the method object name. Some structlog versions
+        # expose the sentinel as a regular function named "_nop" even if the import
+        # path changes. This keeps detection narrow without instantiating wrappers.
+        filtered_methods = {
+            name
+            for name in ("debug", "trace", "verbose")
+            if name in wrapper_class.__dict__
+            and getattr(wrapper_class.__dict__[name], "__name__", None) == "_nop"
+        }
 
     if not filtered_methods:
         return wrapper_class
