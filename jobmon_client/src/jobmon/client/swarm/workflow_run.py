@@ -36,6 +36,7 @@ from jobmon.core.exceptions import (
     TransitionError,
     WorkflowTestError,
 )
+from jobmon.core.logging import set_jobmon_context
 from jobmon.core.requester import Requester
 from jobmon.core.structlog_utils import bind_method_context
 
@@ -93,7 +94,7 @@ class WorkflowRun:
         """Initialization of the swarm WorkflowRun."""
         self.workflow_run_id = workflow_run_id
 
-        structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
+        set_jobmon_context(workflow_run_id=workflow_run_id)
 
         # state tracking
         self._active_states = [
@@ -589,13 +590,6 @@ class WorkflowRun:
                     logger.info("Failing after first failure, as requested")
                     break
 
-                # fail during test path
-                if self._n_executions >= self._val_fail_after_n_executions:
-                    raise WorkflowTestError(
-                        f"WorkflowRun asked to fail after {self._n_executions} "
-                        "executions. Failing now"
-                    )
-
                 # process any commands that we can in the time allotted
                 time_till_next_heartbeat = self._workflow_run_heartbeat_interval - (
                     iteration_start - self._last_heartbeat_time
@@ -618,6 +612,11 @@ class WorkflowRun:
                 else:
                     time_since_last_full_sync += loop_elapsed
                     self.synchronize_state()
+
+                # fail during test path (post-synchronization check). This ensures
+                # tests that rely on fail-after hooks still raise even when
+                # all tasks complete within a single loop iteration.
+                self._check_fail_after_n_executions()
 
                 # if there is active tasks, loop continue
                 loop_continue, time_since_last_full_sync = (
@@ -791,12 +790,19 @@ class WorkflowRun:
                     timeout, loop_start_pc
                 )
                 if not (elapsed_time < timeout or timeout == -1):
-                    logger.info("Stopping processing as timeout reached")
+                    logger.debug(
+                        (
+                            "Stopping task processing after loop timeout: "
+                            f"elapsed={elapsed_time} timeout={timeout}"
+                        )
+                    )
                     swarm_commands.close()
 
             except StopIteration:
                 # stop processing commands if we are out of commands
-                logger.info("Stopping command processing as there is no more work")
+                logger.debug(
+                    "Stopping task processing because command generator returned StopIteration"
+                )
                 keep_processing = False
 
         logger.debug(
@@ -869,8 +875,8 @@ class WorkflowRun:
             logger.info(
                 f"Workflow {percent_done}% complete "
                 f"({len(self.done_tasks)}/{len(self.tasks)} tasks)",
-                newly_completed=num_newly_completed,
-                percent_done=percent_done,
+                telemetry_newly_completed=num_newly_completed,
+                telemetry_percent_done=percent_done,
             )
 
         # if newly failed, report failures and check if we should error out
@@ -921,6 +927,14 @@ class WorkflowRun:
         app_route = f"/workflow_run/{self.workflow_run_id}/terminate_task_instances"
         self.requester.send_request(app_route=app_route, message={}, request_type="put")
         self._terminated = True
+
+    def _check_fail_after_n_executions(self) -> None:
+        """Raise the test hook exception when the execution threshold is met."""
+        if self._n_executions >= self._val_fail_after_n_executions:
+            raise WorkflowTestError(
+                f"WorkflowRun asked to fail after {self._n_executions} "
+                "executions. Failing now"
+            )
 
     def _set_fail_after_n_executions(self, n: int) -> None:
         """For use during testing.

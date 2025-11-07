@@ -11,6 +11,7 @@ from typing import Optional
 import structlog
 
 from jobmon.core.cli import CLI
+from jobmon.core.logging import set_jobmon_context
 from jobmon.core.task_generator import TaskGenerator
 
 logger = structlog.get_logger(__name__)
@@ -40,7 +41,7 @@ class WorkerNodeCLI(CLI):
         from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
 
         # Bind global context for this worker instance
-        structlog.contextvars.bind_contextvars(
+        set_jobmon_context(
             cluster_name=args.cluster_name,
             task_instance_id=args.task_instance_id,
         )
@@ -82,7 +83,7 @@ class WorkerNodeCLI(CLI):
         from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
 
         # Bind global context for this array worker instance
-        structlog.contextvars.bind_contextvars(
+        set_jobmon_context(
             cluster_name=args.cluster_name,
             array_id=args.array_id,
             batch_number=args.batch_number,

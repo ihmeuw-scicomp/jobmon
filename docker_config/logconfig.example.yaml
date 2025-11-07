@@ -17,7 +17,7 @@ handlers:
   console_structlog:
     class: logging.StreamHandler
     level: INFO
-    formatter: structlog_text
+    formatter: structlog_event_only
 
 # Logger configurations
 loggers:

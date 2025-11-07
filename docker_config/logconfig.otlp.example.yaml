@@ -19,14 +19,13 @@ handlers:
   console_structlog:
     class: logging.StreamHandler
     level: INFO
-    formatter: structlog_text
+    formatter: structlog_event_only
 
   # OTLP handler with inline configuration for JobmonOTLPLoggingHandler
   # Fixed: More aggressive flushing for client processes
   otlp:
     class: jobmon.core.otlp.JobmonOTLPLoggingHandler
     level: INFO
-    formatter: otlp_default
     exporter:
       module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
       class: OTLPLogExporter

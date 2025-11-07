@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
+from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.node_arg import NodeArg
 from jobmon.server.web.models.task import Task
@@ -60,7 +61,7 @@ def get_tool_versions(
 ) -> Any:
     """Get the Tool Version."""
     # check input variable
-    structlog.contextvars.bind_contextvars(tool_id=tool_id)
+    set_jobmon_context(tool_id=tool_id)
     logger.info(f"Getting available tool versions for tool_id {tool_id}")
     try:
         tool_id = int(tool_id)

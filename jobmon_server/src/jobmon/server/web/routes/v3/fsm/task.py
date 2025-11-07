@@ -17,6 +17,7 @@ from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 
 from jobmon.core import constants
+from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web.db import get_dialect_name
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.task import Task
@@ -42,7 +43,7 @@ async def bind_tasks_no_args(request: Request, db: Session = Depends(get_db)) ->
     tasks = all_data["tasks"]
     workflow_id = int(all_data["workflow_id"])
     mark_created = bool(all_data["mark_created"])
-    structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
+    set_jobmon_context(workflow_id=workflow_id)
     logger.info("Binding tasks")
     # receive from client the tasks in a format of:
     # {<hash>:[node_id(1), task_args_hash(2), array_id(3), task_resources_id(4), name(5),
@@ -326,7 +327,7 @@ def get_most_recent_ti_error(task_id: int, db: Session = Depends(get_db)) -> Any
     Return:
         error message
     """
-    structlog.contextvars.bind_contextvars(task_id=task_id)
+    set_jobmon_context(task_id=task_id)
     logger.info(f"Getting most recent ji error for ti {task_id}")
 
     select_stmt = (

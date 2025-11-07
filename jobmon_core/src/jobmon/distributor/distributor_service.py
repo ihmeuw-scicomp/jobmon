@@ -27,6 +27,7 @@ from jobmon.core.cluster_protocol import ClusterDistributor
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import DistributorInterruptedError
+from jobmon.core.logging import set_jobmon_context
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeTaskInstanceBatch
 from jobmon.core.structlog_utils import bind_context
@@ -124,7 +125,7 @@ class DistributorService:
 
     def set_workflow_run(self, workflow_run_id: int) -> None:
         """Set the workflow run for this distributor service."""
-        structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
+        set_jobmon_context(workflow_run_id=workflow_run_id)
         workflow_run = DistributorWorkflowRun(workflow_run_id, requester=self.requester)
         self.workflow_run = workflow_run
         self.workflow_run.transition_to_instantiated()

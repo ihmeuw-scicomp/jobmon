@@ -6,23 +6,6 @@ formatters:
   console_default:
     format: "%(levelname)s [%(name)s] %(message)s"
 
-  # OTLP formatter with tracing context (requires opentelemetry packages)
-  otlp_default:
-    '()': jobmon.core.otlp.JobmonOTLPFormatter
-    format: "%(asctime)s [%(levelname)s] [trace_id=%(trace_id)s, span_id=%(span_id)s, parent_span_id=%(parent_span_id)s] %(name)s: %(message)s"
-
-  # Structlog formatter for console output (custom class to avoid dictConfig issues)
-  structlog_text:
-    '()': jobmon.core.config.formatters.JobmonStructlogConsoleFormatter
-
-  # Structlog formatter for JSON output (custom class to avoid dictConfig issues)  
-  structlog_json:
-    '()': jobmon.core.config.formatters.JobmonStructlogJSONFormatter
-
   # Structlog formatter that shows only the event (traditional log style)
   structlog_event_only:
-    '()': jobmon.core.config.formatters.JobmonStructlogEventOnlyFormatter
-
-  # Basic JSON formatter (simple, no dependencies)
-  simple_json:
-    format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s"}' 
+    '()': jobmon.core.config.structlog_formatters.JobmonStructlogEventOnlyFormatter 

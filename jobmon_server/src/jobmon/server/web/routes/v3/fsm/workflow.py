@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
 from jobmon.core.configuration import JobmonConfig
+from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web.db import get_dialect_name
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.array import Array
@@ -45,7 +46,7 @@ def _add_workflow_attributes(
     workflow_id: int, workflow_attributes: Dict[str, str], session: Session
 ) -> None:
     # add attribute
-    structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
+    set_jobmon_context(workflow_id=workflow_id)
     logger.info(f"Add Attributes: {workflow_attributes}")
     wf_attributes_list = []
     with session.begin_nested():
@@ -81,7 +82,7 @@ async def bind_workflow(request: Request, db: Session = Depends(get_db)) -> Any:
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    structlog.contextvars.bind_contextvars(
+    set_jobmon_context(
         dag_id=dag_id,
         tool_version_id=tv_id,
         workflow_args_hash=str(whash),
@@ -154,7 +155,7 @@ async def get_matching_workflows_by_workflow_args(
             f"{str(e)} in request to {request.url.path}", status_code=400
         ) from e
 
-    structlog.contextvars.bind_contextvars(workflow_args_hash=str(workflow_args_hash))
+    set_jobmon_context(workflow_args_hash=str(workflow_args_hash))
     logger.info(f"Looking for wf with hash {workflow_args_hash}")
 
     select_stmt = (
@@ -229,7 +230,7 @@ async def update_workflow_attribute(
     workflow_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
     """Update the attributes for a given workflow."""
-    structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
+    set_jobmon_context(workflow_id=workflow_id)
     try:
         workflow_id = int(workflow_id)
     except Exception as e:
@@ -253,7 +254,7 @@ async def set_resume(
     workflow_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
     """Set resume on a workflow."""
-    structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
+    set_jobmon_context(workflow_id=workflow_id)
     try:
         data = cast(Dict, await request.json())
 
@@ -298,7 +299,7 @@ async def set_resume(
 @api_v3_router.get("/workflow/{workflow_id}/is_resumable")
 def workflow_is_resumable(workflow_id: int, db: Session = Depends(get_db)) -> Any:
     """Check if a workflow is in a resumable state."""
-    structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
+    set_jobmon_context(workflow_id=workflow_id)
 
     try:
         select_stmt = select(Workflow).where(Workflow.id == workflow_id)
@@ -322,7 +323,7 @@ async def get_max_concurrently_running(
     workflow_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
     """Return the maximum concurrency of this workflow."""
-    structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
+    set_jobmon_context(workflow_id=workflow_id)
     select_stmt = select(Workflow).where(Workflow.id == workflow_id)
     workflow = db.execute(select_stmt).scalars().one_or_none()
 
@@ -345,7 +346,7 @@ async def update_max_running(
 ) -> Any:
     """Update the number of tasks that can be running concurrently for a given workflow."""
     data = cast(Dict, await request.json())
-    structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
+    set_jobmon_context(workflow_id=workflow_id)
     logger.debug("Update workflow max concurrently running")
 
     try:
@@ -410,7 +411,7 @@ async def task_status_updates(
         request (Request): the request object.
         db (Session): the database session.
     """
-    structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
+    set_jobmon_context(workflow_id=workflow_id)
     data = cast(Dict, await request.json())
     logger.info(f"Get tasks by status for workflow {workflow_id}")
 
@@ -552,7 +553,7 @@ async def update_array_max_running(
 ) -> Any:
     """Update the number of tasks that can be running concurrently for a given Array."""
     data = cast(Dict, await request.json())
-    structlog.contextvars.bind_contextvars(workflow_id=workflow_id)
+    set_jobmon_context(workflow_id=workflow_id)
     logger.debug("Update array max concurrently running")
 
     try:

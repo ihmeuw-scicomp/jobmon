@@ -125,6 +125,47 @@ class TestJobmonOTLPManager:
             mock_get_instance.assert_called_once()
             mock_manager.initialize.assert_called_once()
 
+    def test_flush_and_shutdown(self):
+        """Test that flush_and_shutdown flushes and shuts down providers."""
+        from jobmon.core.otlp import JobmonOTLPManager
+
+        manager = JobmonOTLPManager.get_instance()
+        logger_provider = Mock()
+        logger_provider.force_flush = Mock()
+        logger_provider.shutdown = Mock()
+        tracer_provider = Mock()
+        tracer_provider.force_flush = Mock()
+        tracer_provider.shutdown = Mock()
+
+        manager.logger_provider = logger_provider
+        manager.tracer_provider = tracer_provider
+        manager._initialized = True
+
+        manager.flush_and_shutdown()
+
+        logger_provider.force_flush.assert_called_once()
+        logger_provider.shutdown.assert_called_once()
+        tracer_provider.force_flush.assert_called_once()
+        tracer_provider.shutdown.assert_called_once()
+
+        assert not manager._initialized
+        manager.logger_provider = None
+        manager.tracer_provider = None
+
+    def test_otlp_flush_on_exit_context_manager(self):
+        """Context manager should flush OTLP on exit."""
+        from jobmon.core.otlp import JobmonOTLPManager, otlp_flush_on_exit
+
+        manager = JobmonOTLPManager.get_instance()
+
+        with patch.object(
+            JobmonOTLPManager, "get_instance", return_value=manager
+        ), patch.object(manager, "flush_and_shutdown") as mock_flush:
+            with otlp_flush_on_exit() as ctx:
+                assert ctx is manager
+
+            mock_flush.assert_called_once()
+
 
 class TestOTLPHandlers:
     """Test the OTLP handlers that work with our configuration system."""
@@ -324,7 +365,7 @@ class TestJobmonOTLPFormatter:
         formatter = JobmonOTLPFormatter()
 
         with patch(
-            "jobmon.core.otlp.formatters.get_current_span_details",
+            "jobmon.core.otlp.utils.get_current_span_details",
             return_value=("span123", "trace456", "parent789"),
         ):
 

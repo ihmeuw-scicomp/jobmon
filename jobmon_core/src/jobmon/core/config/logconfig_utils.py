@@ -109,7 +109,6 @@ def load_logconfig_with_overrides(
 
     # Load default template-based configuration
     logconfig_data = load_logconfig_with_templates(default_template_path)
-
     # Apply section-based overrides
     try:
         # Get all section overrides for this component
@@ -223,9 +222,9 @@ def get_logconfig_examples() -> Dict[str, Dict[str, Any]]:
             "section_override_example": {
                 "handlers": {
                     "custom_otlp": {
-                        "class": "jobmon.core.otlp.JobmonOTLPLoggingHandler",
+                        "class": "jobmon.core.otlp.JobmonOTLPStructlogHandler",
                         "level": "DEBUG",
-                        "formatter": "otlp_default",
+                        "exporter": {},
                     }
                 },
                 "loggers": {

@@ -14,6 +14,7 @@ from starlette.responses import JSONResponse
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.constants import TaskStatus as TaskStatusConstants
+from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web._compat import add_time
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.array import Array
@@ -35,7 +36,7 @@ async def add_array(request: Request, db: Session = Depends(get_db)) -> Any:
     workflow_id = int(data["workflow_id"])
     task_template_version_id = int(data["task_template_version_id"])
 
-    structlog.contextvars.bind_contextvars(
+    set_jobmon_context(
         task_template_version_id=task_template_version_id,
         workflow_id=workflow_id,
     )
@@ -249,7 +250,7 @@ async def transition_array_to_launched(
     array_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
     """Transition TIs associated with an array_id and batch_num to launched."""
-    structlog.contextvars.bind_contextvars(array_id=array_id)
+    set_jobmon_context(array_id=array_id)
 
     data = cast(Dict, await request.json())
     batch_num = data["batch_number"]
@@ -375,7 +376,7 @@ async def transition_to_killed(
 
     Also mark parent Tasks with status=ERROR_FATAL if they're in a killable state.
     """
-    structlog.contextvars.bind_contextvars(array_id=array_id)
+    set_jobmon_context(array_id=array_id)
 
     data = cast(Dict, await request.json())
     batch_num = data["batch_number"]
@@ -564,7 +565,7 @@ async def get_array_max_concurrently_running(
     db: Session = Depends(get_db),
 ) -> Any:
     """Return the maximum concurrency of this array."""
-    structlog.contextvars.bind_contextvars(array_id=array_id)
+    set_jobmon_context(array_id=array_id)
 
     if array_id is not None:
         select_stmt = select(Array).where(Array.id == array_id)

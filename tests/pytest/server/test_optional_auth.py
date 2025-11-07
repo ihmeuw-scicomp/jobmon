@@ -186,7 +186,7 @@ class TestAPIConfiguration:
                 mock_config.return_value = mock_instance
 
                 # This should not raise an exception
-                app = get_app(versions=["v2"])  # Use v2 to avoid auth dependency issues
+                app = get_app(versions=["v3"])  # Use v3 with anonymous dependency
                 client = TestClient(app)
 
                 # Test that the API is accessible

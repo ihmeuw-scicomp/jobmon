@@ -6,7 +6,7 @@ import functools
 import inspect
 from typing import Any, Callable, Optional, TypeVar
 
-import structlog
+from jobmon.core.logging import set_jobmon_context, unset_jobmon_context
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -52,36 +52,42 @@ def bind_context(*param_names: str, **renames: str) -> Callable[[F], F]:
     """
 
     def decorator(func: F) -> F:
+        signature = inspect.signature(func)
+        positional_paths = tuple(param_names)
+        rename_items = tuple(renames.items())
+        extract_value = _extract_value
+        bind_context_fn = set_jobmon_context
+        unset_context_fn = unset_jobmon_context
+
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            # Get function signature to map args to parameter names
-            sig = inspect.signature(func)
-            bound_args = sig.bind(*args, **kwargs)
+            # Map args to parameter names using cached signature
+            bound_args = signature.bind(*args, **kwargs)
             bound_args.apply_defaults()
 
             # Collect values to bind
             context_data = {}
 
             # Process positional param_names (use original parameter name as key)
-            for param_name in param_names:
-                value = _extract_value(bound_args.arguments, param_name)
+            for param_name in positional_paths:
+                value = extract_value(bound_args.arguments, param_name)
                 if value is not None:
                     context_data[param_name] = value
 
             # Process renamed parameters (custom context key)
-            for context_key, param_path in renames.items():
-                value = _extract_value(bound_args.arguments, param_path)
+            for context_key, param_path in rename_items:
+                value = extract_value(bound_args.arguments, param_path)
                 if value is not None:
                     context_data[context_key] = value
 
             # Bind context and execute function
             if context_data:
-                structlog.contextvars.bind_contextvars(**context_data)
+                bind_context_fn(allow_non_jobmon_keys=True, **context_data)
                 try:
                     return func(*args, **kwargs)
                 finally:
                     # Clean up context
-                    structlog.contextvars.unbind_contextvars(*context_data.keys())
+                    unset_context_fn(*context_data.keys(), allow_non_jobmon_keys=True)
             else:
                 # No context to bind, just execute
                 return func(*args, **kwargs)

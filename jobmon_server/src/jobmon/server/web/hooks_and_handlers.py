@@ -10,6 +10,7 @@ from starlette.requests import ClientDisconnect
 from starlette.responses import Response
 from starlette.status import HTTP_404_NOT_FOUND
 
+from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
@@ -144,7 +145,8 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
         request_id = str(uuid.uuid4())[:8]
 
         # Bind request context
-        structlog.contextvars.bind_contextvars(
+        set_jobmon_context(
+            allow_non_jobmon_keys=True,
             path=request.url.path,
             method=request.method,
             request_id=request_id,
@@ -158,7 +160,8 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
             try:
                 context_data = json.loads(context_str)
             except json.JSONDecodeError:
-                structlog.contextvars.bind_contextvars(
+                set_jobmon_context(
+                    allow_non_jobmon_keys=True,
                     error="Invalid JSON in X-Server-Structlog-Context header",
                 )
 
@@ -184,13 +187,14 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
                     try:
                         context_data = json.loads(context_str)
                     except json.JSONDecodeError:
-                        structlog.contextvars.bind_contextvars(
+                        set_jobmon_context(
+                            allow_non_jobmon_keys=True,
                             error="Invalid JSON in server_structlog_context query param",
                         )
 
         # Step 3: Bind the context if found
         if context_data:
-            structlog.contextvars.bind_contextvars(**context_data)
+            set_jobmon_context(allow_non_jobmon_keys=True, **context_data)
 
         # Step 4: Proceed with the request
         response = await call_next(request)

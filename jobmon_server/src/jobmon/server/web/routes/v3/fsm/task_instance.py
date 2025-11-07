@@ -14,6 +14,7 @@ from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 
 from jobmon.core import constants
+from jobmon.core.logging import set_jobmon_context
 from jobmon.core.serializers import SerializeTaskInstanceBatch
 from jobmon.server.web._compat import add_time
 from jobmon.server.web.db.deps import get_db
@@ -188,7 +189,7 @@ async def log_running(
     task_instance_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
     """Log a task_instance as running."""
-    structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
+    set_jobmon_context(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
     logger.info(
@@ -326,7 +327,7 @@ async def log_ti_report_by(
         request: fastapi request object
         db: The database session.
     """
-    structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
+    set_jobmon_context(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
     logger.debug(
@@ -480,7 +481,7 @@ async def log_done(
     task_instance_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
     """Log a task_instance as done."""
-    structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
+    set_jobmon_context(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
     logger.info(
@@ -546,7 +547,7 @@ async def log_error_worker_node(
     task_instance_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
     """Log an error for a task instance."""
-    structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
+    set_jobmon_context(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
     try:
@@ -630,7 +631,7 @@ async def get_task_instance_error_log(
     Return:
         jsonified task_instance_error_log result set
     """
-    structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
+    set_jobmon_context(task_instance_id=task_instance_id)
     logger.info(f"Getting task instance error log for ti {task_instance_id}")
 
     select_stmt = (
@@ -655,7 +656,7 @@ def get_array_task_instance_id(
     Task instance IDs that are associated with the array are ordered, and selected by index.
     This route will be called once per array task instance worker node, so must be scalable.
     """
-    structlog.contextvars.bind_contextvars(array_id=array_id)
+    set_jobmon_context(array_id=array_id)
 
     select_stmt = select(TaskInstance.id).where(
         TaskInstance.array_id == array_id,
@@ -675,7 +676,7 @@ async def log_no_distributor_id(
     task_instance_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
     """Log a task_instance_id that did not get an distributor_id upon submission."""
-    structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
+    set_jobmon_context(task_instance_id=task_instance_id)
     logger.info(
         f"Logging ti {task_instance_id} did not get distributor id upon submission"
     )
@@ -737,7 +738,7 @@ async def log_distributor_id(
     task_instance_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
     """Log a task_instance's distributor id."""
-    structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
+    set_jobmon_context(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
     select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
@@ -832,7 +833,7 @@ async def log_known_error(
         request (Request): fastapi request object.
         db: The database session.
     """
-    structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
+    set_jobmon_context(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
     error_state = data["error_state"]
     error_message = data["error_message"]
@@ -893,7 +894,7 @@ async def log_unknown_error(
         request (Request): fastapi request object
         db: The database session.
     """
-    structlog.contextvars.bind_contextvars(task_instance_id=task_instance_id)
+    set_jobmon_context(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
     error_state = data["error_state"]
     error_message = data["error_message"]

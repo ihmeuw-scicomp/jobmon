@@ -489,24 +489,23 @@ class TestServerLoggingConfigIntegration:
         server_otlp_config = {
             "version": 1,
             "formatters": {
-                "structlog_json": {
+                "test_json": {
                     "()": "structlog.stdlib.ProcessorFormatter",
                     "processor": "structlog.processors.JSONRenderer",
                 },
-                "otlp_default": {
+                "test_otlp": {
                     "()": "jobmon.core.otlp.JobmonOTLPFormatter",
                 },
             },
             "handlers": {
                 "console_structlog": {
                     "class": "logging.StreamHandler",
-                    "formatter": "structlog_json",
+                    "formatter": "test_json",
                     "level": "INFO",
                 },
                 "otlp_structlog": {
                     "class": "jobmon.core.otlp.JobmonOTLPStructlogHandler",
                     "level": "INFO",
-                    "formatter": "structlog_json",
                     "exporter": {
                         "module": "opentelemetry.exporter.otlp.proto.grpc._log_exporter",
                         "class": "OTLPLogExporter",

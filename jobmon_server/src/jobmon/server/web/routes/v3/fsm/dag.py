@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 
+from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web.db import get_dialect_name
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.dag import Dag
@@ -35,7 +36,7 @@ async def add_dag(request: Request, db: Session = Depends(get_db)) -> Any:
 
     # add dag
     dag_hash = data.pop("dag_hash")
-    structlog.contextvars.bind_contextvars(dag_hash=str(dag_hash))
+    set_jobmon_context(dag_hash=str(dag_hash))
     logger.info(f"Add dag:{dag_hash}")
 
     try:
@@ -66,7 +67,7 @@ async def add_edges(
     dag_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
     """Add edges to the edge table."""
-    structlog.contextvars.bind_contextvars(dag_id=dag_id)
+    set_jobmon_context(dag_id=dag_id)
     logger.info(f"Add edges for dag {dag_id}")
     try:
         data = cast(Dict, await request.json())

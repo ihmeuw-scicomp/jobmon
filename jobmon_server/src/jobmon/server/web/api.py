@@ -46,6 +46,10 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     )
     app = add_hooks_and_handlers(app)
 
+    from jobmon.core.otlp.manager import register_otlp_shutdown_event
+
+    register_otlp_shutdown_event(app)
+
     # Configure remaining OTLP components
     try:
         telemetry_section = config.get_section_coerced("telemetry")
@@ -130,7 +134,7 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     app.add_middleware(SecurityHeadersMiddleware, csp=True)
 
     # Include routers with conditional authentication
-    versions = versions or (["auth", "v3", "v2"] if auth_enabled else ["v3", "v2"])
+    versions = versions or (["auth", "v3"] if auth_enabled else ["v3"])
     url_prefix = "/api"  # Adjust as necessary
     for version in versions:
         mod = import_module(f"jobmon.server.web.routes.{version}")

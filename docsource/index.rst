@@ -33,6 +33,7 @@ Table of Contents
 
     quickstart
     core_concepts
+    logging/index
     monitoring_debugging
     advanced_usage
     glossary

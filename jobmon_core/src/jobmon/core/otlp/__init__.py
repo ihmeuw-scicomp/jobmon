@@ -18,6 +18,8 @@ from .manager import (
     get_logger,
     get_shared_logger_provider,
     initialize_jobmon_otlp,
+    otlp_flush_on_exit,
+    validate_otlp_exporter_config,
 )
 from .utils import add_span_details_processor, get_current_span_details
 
@@ -34,7 +36,9 @@ __all__ = [
     "JobmonOTLPLoggingHandler",
     "JobmonOTLPStructlogHandler",
     "JobmonOTLPFormatter",
+    "otlp_flush_on_exit",
     "get_current_span_details",
     "add_span_details_processor",
     "OpenTelemetryLogFormatter",
+    "validate_otlp_exporter_config",
 ]

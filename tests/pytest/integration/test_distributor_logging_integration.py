@@ -206,6 +206,26 @@ loggers:
                     result = cli.main("test")
                     assert result == "success"
 
+    def test_distributor_cli_flushes_otlp_on_exit(self):
+        """Ensure distributor CLI flushes OTLP telemetry after execution."""
+        cli = DistributorCLI()
+
+        mock_args = MagicMock()
+        mock_args.func = MagicMock(return_value="ok")
+
+        with patch.object(cli, "parse_args", return_value=mock_args), patch(
+            "jobmon.core.otlp.manager.otlp_flush_on_exit"
+        ) as mock_flush_context:
+            mock_enter = mock_flush_context.return_value.__enter__
+            mock_exit = mock_flush_context.return_value.__exit__
+
+            result = cli.main("start")
+
+            assert result == "ok"
+            mock_flush_context.assert_called_once()
+            mock_enter.assert_called_once()
+            mock_exit.assert_called_once()
+
     def test_distributor_logging_with_section_override(self, tmp_path):
         """Test distributor logging with section-based configuration override."""
         # Create default template

@@ -1,9 +1,9 @@
 import os
 import sys
 import time
+from unittest.mock import patch
 
 import pytest
-from mock import patch
 
 from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.tool import Tool
@@ -310,8 +310,11 @@ def test_stopped_resume(tool):
     # start up the first task. patch so that it fails with a keyboard interrupt
     workflow1._fail_after_n_executions = 1
     with pytest.raises(KeyboardInterrupt):
-        with patch("jobmon.client.swarm.workflow_run.WorkflowTestError") as fail_error:
-            fail_error.side_effect = KeyboardInterrupt
+        with patch.object(
+            SwarmWorkflowRun,
+            "_check_fail_after_n_executions",
+            side_effect=KeyboardInterrupt,
+        ):
             # will ask if we want to exit. answer is 'y'
             with patch("builtins.input") as input_patch:
                 input_patch.return_value = "y"

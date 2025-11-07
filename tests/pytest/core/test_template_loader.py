@@ -26,9 +26,7 @@ class TestTemplateLoader:
         # Check expected formatters exist
         expected_formatters = [
             "console_default",
-            "otlp_default",
-            "structlog_text",
-            "structlog_json",
+            "structlog_event_only",
         ]
         for formatter_name in expected_formatters:
             assert formatter_name in formatters
@@ -54,7 +52,6 @@ class TestTemplateLoader:
         expected_handlers = [
             "console_default_template",
             "console_structlog_template",
-            "otlp_template",
             "otlp_structlog_template",
         ]
         for handler_name in expected_handlers:

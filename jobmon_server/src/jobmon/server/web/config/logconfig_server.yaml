@@ -42,7 +42,6 @@ loggers:
 #   otlp_server:
 #     class: jobmon.core.otlp.JobmonOTLPLoggingHandler
 #     level: INFO
-#     formatter: otlp_default
 #     exporter:
 #       module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
 #       class: OTLPLogExporter

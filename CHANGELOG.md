@@ -5,6 +5,8 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- Added unified OTLP manager with HTTP exporter support, shared logger providers, and automatic CLI shutdown flushing so all components forward structured telemetry reliably.
+- Added dedicated logging documentation set (architecture overview, operator guide, telemetry status) along with refreshed example configs covering OTLP transports.
 - Added `jobmon update_config` command to allow users to update configuration values in their defaults.yaml file using dot notation (e.g., `jobmon update_config http.retries_attempts 15`).
 - **Structured Logging with Context Binding and OTLP Integration**: Complete implementation of structured logging across all Jobmon components with automatic context binding, OTLP attribute extraction, and APM integration:
   - **Context Binding Decorator** (`@bind_context`): Automatically bind function/method parameters to log context with support for nested attribute extraction and automatic cleanup
@@ -60,6 +62,8 @@ All notable changes to Jobmon will be documented in this file.
 - JSON Compatibility Layer: Added backward compatibility for `downstream_node_ids` field - clients ≤ 3.4.23 receive quoted JSON strings, newer clients receive unquoted arrays
 
 ### Changed
+- Hardened structlog integration to detect `_nop`-filtered log levels, wrap `PrintLogger` factories with named proxies, and ensure telemetry processors execute even when hosts filter debug output.
+- Reworked client logging bootstrap to respect direct-render hosts by pruning non-Jobmon handlers, reattaching OTLP handlers as needed, and deferring to host-provided structlog configuration when present.
 - **BREAKING: Logging System Migration**: Completely replaced legacy logging system with new elegant architecture:
   - Client logging now uses `configure_client_logging()` instead of deprecated `JobmonLoggerConfig.attach_default_handler()`
   - Server logging automatically selects OTLP configuration based on `otlp.web_enabled` setting
@@ -89,6 +93,7 @@ All notable changes to Jobmon will be documented in this file.
 - Improved isort configuration to correctly identify `jobmon` as first-party package, ensuring proper PEP 8 import order (stdlib → third-party → local).
 
 ### Fixed
+- Fixed workflow test hook race condition where `_fail_after_n_executions` check could be bypassed when tasks complete within a single loop iteration, causing flaky test failures in CI.
 - Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.
 - Fixed transaction anti-patterns with multiple commits, ensuring proper atomicity and error handling.
 - Fixed DNS cache variable scope bug that was causing NXDOMAIN crashes in production environments.
@@ -107,6 +112,7 @@ All notable changes to Jobmon will be documented in this file.
 - Removed jobmon update_config CLI command
 
 ### Removed
+- Removed legacy V2 server REST route modules and regenerated GUI API schema to reflect the consolidated V3 surface area.
 - Removed legacy `JobmonLoggerConfig.attach_default_handler()` method and `ClientLogging().attach()` pattern
 - Removed monolithic OTLP configuration files in favor of modular package structure
 - Removed hardcoded logging configurations in favor of template-based system with user override support

@@ -16,11 +16,6 @@ handlers:
     stream: ext://sys.stdout
 
   # OTLP handler templates (use shared LoggerProvider)
-  otlp_template: &otlp_template
-    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
-    level: INFO
-    formatter: otlp_default
-
   otlp_structlog_template: &otlp_structlog_template
     class: jobmon.core.otlp.JobmonOTLPStructlogHandler
     level: DEBUG

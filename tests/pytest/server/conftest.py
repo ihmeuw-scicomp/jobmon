@@ -1,5 +1,23 @@
+import logging
+
 import pytest
+import structlog
 from sqlalchemy.orm import Session as SQLAlchemySession  # Alias to avoid conflict
+
+
+class StructlogJSONTestFormatter(logging.Formatter):
+    """Custom JSON formatter for tests using structlog."""
+
+    def __init__(self) -> None:
+        """Initialize JSON formatter with structlog."""
+        super().__init__()
+        self._structlog_formatter = structlog.stdlib.ProcessorFormatter(
+            processor=structlog.processors.JSONRenderer(), foreign_pre_chain=[]
+        )
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format using structlog JSON renderer."""
+        return self._structlog_formatter.format(record)
 
 
 @pytest.fixture(scope="function")
@@ -70,29 +88,12 @@ def json_log_file(tmp_path):
     import logging.config
 
     from jobmon.core.config.structlog_config import configure_structlog
-    from jobmon.core.config.template_loader import (
-        get_core_templates_path,
-        load_all_templates,
-    )
 
     def _setup_logging(loggers=None, filename_suffix="test"):
         if loggers is None:
             loggers = {"jobmon.server.web": "INFO"}
 
         log_file_path = tmp_path / f"{filename_suffix}.log"
-
-        # Load templates from the config directory
-        templates = load_all_templates(get_core_templates_path())
-
-        # Build handlers dict
-        handlers = {
-            "test_file_handler": {
-                "class": "logging.FileHandler",
-                "formatter": "structlog_json",
-                "filename": str(log_file_path),
-                "level": "INFO",
-            }
-        }
 
         # Build loggers dict with proper structure
         logger_configs = {}
@@ -106,13 +107,24 @@ def json_log_file(tmp_path):
         dict_config = {
             "version": 1,
             "disable_existing_loggers": False,
-            "formatters": templates["formatters"],
-            "handlers": handlers,
+            "formatters": {},
+            "handlers": {
+                "test_file_handler": {
+                    "class": "logging.FileHandler",
+                    "filename": str(log_file_path),
+                    "level": "INFO",
+                }
+            },
             "loggers": logger_configs,
         }
 
         # Apply the test logging configuration
         logging.config.dictConfig(dict_config)
+
+        # Manually set the JSON formatter on the handler (avoids dictConfig import issues)
+        for handler in logging.getLogger(list(loggers.keys())[0]).handlers:
+            if isinstance(handler, logging.FileHandler):
+                handler.setFormatter(StructlogJSONTestFormatter())
         configure_structlog(component_name="server")
         return log_file_path, None
 

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
 from jobmon.core.exceptions import InvalidStateTransition
+from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.workflow import Workflow
@@ -143,7 +144,7 @@ def reap_workflow_run(workflow_run_id: int, db: Session = Depends(get_db)) -> An
     checks tasks from a different WorkflowRun with the same workflow id. Avoid setting
     while waiting for a resume (when workflow is in suspended state).
     """
-    structlog.contextvars.bind_contextvars(workflow_run_id=workflow_run_id)
+    set_jobmon_context(workflow_run_id=workflow_run_id)
     logger.info(f"Reap wfr: {workflow_run_id}")
     # get the wfr
     query_filter = [
