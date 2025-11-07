@@ -82,12 +82,12 @@ def bind_context(*param_names: str, **renames: str) -> Callable[[F], F]:
 
             # Bind context and execute function
             if context_data:
-                bind_context_fn(allow_non_jobmon_keys=True, **context_data)
+                bind_context_fn(**context_data)
                 try:
                     return func(*args, **kwargs)
                 finally:
                     # Clean up context
-                    unset_context_fn(*context_data.keys(), allow_non_jobmon_keys=True)
+                    unset_context_fn(*context_data.keys())
             else:
                 # No context to bind, just execute
                 return func(*args, **kwargs)

@@ -15,6 +15,7 @@ from jobmon.core.logging.context import (
     set_jobmon_context,
     unset_jobmon_context,
 )
+from jobmon.core.structlog_utils import bind_context
 
 
 def setup_function() -> None:
@@ -88,6 +89,48 @@ def test_bind_jobmon_context_manager_resets_metadata() -> None:
         assert "telemetry_workflow_run_id" not in other
         assert "telemetry_task_instance_id" not in other
 
+    assert get_jobmon_context() == {}
+
+
+def test_bind_context_applies_telemetry_prefix() -> None:
+    captured: dict[str, dict[str, int]] = {}
+
+    @bind_context("workflow_run_id", "task_instance_id")
+    def decorated(workflow_run_id: int, task_instance_id: int) -> None:
+        captured["jobmon"] = get_jobmon_context()
+        captured["raw"] = structlog.contextvars.get_contextvars().copy()
+
+    decorated(321, 654)
+
+    jobmon_snapshot = captured["jobmon"]
+    raw_snapshot = captured["raw"]
+
+    assert jobmon_snapshot["telemetry_workflow_run_id"] == 321
+    assert jobmon_snapshot["telemetry_task_instance_id"] == 654
+
+    # Ensure non-prefixed keys were not bound
+    assert "workflow_run_id" not in raw_snapshot
+    assert "task_instance_id" not in raw_snapshot
+
+    # Context should be cleaned up after execution
+    assert get_jobmon_context() == {}
+    remaining = structlog.contextvars.get_contextvars()
+    assert "telemetry_workflow_run_id" not in remaining
+    assert "telemetry_task_instance_id" not in remaining
+
+
+def test_bind_context_handles_prefixed_keys_without_duplication() -> None:
+    snapshots: dict[str, dict[str, str]] = {}
+
+    @bind_context(telemetry_dataset="dataset_id")
+    def decorated(dataset_id: str) -> None:
+        snapshots["raw"] = structlog.contextvars.get_contextvars().copy()
+
+    decorated("demo")
+
+    raw = snapshots["raw"]
+    assert raw["telemetry_dataset"] == "demo"
+    assert "telemetry_telemetry_dataset" not in raw
     assert get_jobmon_context() == {}
 
 
