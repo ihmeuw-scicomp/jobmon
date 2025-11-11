@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import dayjs, { Dayjs } from 'dayjs'; // required for devtools typing
+import dayjs, { Dayjs } from 'dayjs';
+import { settingsToSearchParamsString } from '@jobmon_gui/utils/workflowSearchParams';
 
 export type WorkflowSearchSettings = {
     user: string;
@@ -82,29 +83,20 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                 clearDataRefresh: () => set({ ...get(), refreshData: false }),
                 getRefreshData: () => get().refreshData,
                 updateUrlSearchParams: () => {
-                    const currentSettings = get().settings;
-                    const date_submitted =
-                        dayjs(currentSettings?.date_submitted).format(
-                            'YYYY-MM-DD'
-                        ) || dayjs().format('YYYY-MM-DD');
-                    const date_submitted_end =
-                        dayjs(currentSettings?.date_submitted_end).format(
-                            'YYYY-MM-DD'
-                        ) || dayjs().format('YYYY-MM-DD');
+                    const searchString = settingsToSearchParamsString(
+                        get().settings
+                    );
+                    const currentHash = window.location.hash;
+                    const hashPath = currentHash.includes('?')
+                        ? currentHash.split('?')[0]
+                        : currentHash || '#/';
+                    const newHash = searchString
+                        ? `${hashPath}?${searchString}`
+                        : hashPath;
 
-                    const searchParams = new URLSearchParams({
-                        user: currentSettings.user,
-                        tool: currentSettings.tool,
-                        wf_name: currentSettings.wf_name,
-                        wf_args: currentSettings.wf_args,
-                        wf_attribute_key: currentSettings.wf_attribute_key,
-                        wf_attribute_value: currentSettings.wf_attribute_value,
-                        wf_id: currentSettings.wf_id,
-                        date_submitted: date_submitted,
-                        date_submitted_end: date_submitted_end,
-                        status: currentSettings.status,
-                    });
-                    location.hash = '?' + searchParams.toString();
+                    if (window.location.hash !== newHash) {
+                        window.location.hash = newHash;
+                    }
                 },
                 set: (newSettings: WorkflowSearchSettings) =>
                     set(() => ({ settings: newSettings })),

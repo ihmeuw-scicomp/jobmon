@@ -13,20 +13,26 @@ import dayjs from 'dayjs';
 import React, { useEffect } from 'react';
 import { useWorkflowSearchSettings } from '@jobmon_gui/stores/workflow_settings';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { settingsToSearchParamsString } from '@jobmon_gui/utils/workflowSearchParams';
 import Box from '@mui/material/Box';
 
 export default function WorkflowFilters() {
     const queryClient = useQueryClient();
     const workflowSettings = useWorkflowSearchSettings();
+    const location = useLocation();
+    const navigate = useNavigate();
 
     useEffect(() => {
-        workflowSettings.loadValuesFromSearchParams(
-            new URLSearchParams(window.location.search)
-        );
-    }, []);
+        const searchParams = new URLSearchParams(location.search);
+        workflowSettings.loadValuesFromSearchParams(searchParams);
+        workflowSettings.triggerDataRefresh();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.search]);
 
     const handleClear = () => {
         workflowSettings.clear();
+        navigate({ pathname: '/', search: '' }, { replace: false });
         workflowSettings.triggerDataRefresh();
         void queryClient.invalidateQueries({
             queryKey: ['workflow_overview', 'workflows'],
@@ -36,6 +42,18 @@ export default function WorkflowFilters() {
     const handleSubmit = event => {
         event.preventDefault();
         workflowSettings.applyPendingSettings();
+
+        const searchString = settingsToSearchParamsString(
+            workflowSettings.get()
+        );
+        navigate(
+            {
+                pathname: '/',
+                search: searchString ? `?${searchString}` : '',
+            },
+            { replace: false }
+        );
+
         workflowSettings.triggerDataRefresh();
         void queryClient.invalidateQueries({
             queryKey: ['workflow_overview', 'workflows'],
