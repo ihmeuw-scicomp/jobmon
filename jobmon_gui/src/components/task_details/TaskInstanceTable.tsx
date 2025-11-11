@@ -81,12 +81,14 @@ export default function TaskInstanceTable({taskId}: TaskInstanceTableProps) {
             Cell: ({cell, row}) => (
                 <Box
                     onClick={() => handleCellClick(row.index, 'stderr')}
-                    sx={{cursor: 'pointer'}}
+                    sx={{
+                        cursor: 'pointer',
+                        '&:hover': { textDecoration: 'underline' },
+                    }}
                 >
                     {cell.getValue()?.length > 30
                         ? '...' + cell.getValue().trim().slice(-30)
                         : cell.getValue()}
-                    <OpenInNewIcon/>
                 </Box>
             ),
         },
@@ -96,12 +98,14 @@ export default function TaskInstanceTable({taskId}: TaskInstanceTableProps) {
             Cell: ({cell, row}) => (
                 <Box
                     onClick={() => handleCellClick(row.index, 'stdout')}
-                    sx={{cursor: 'pointer'}}
+                    sx={{
+                        cursor: 'pointer',
+                        '&:hover': { textDecoration: 'underline' },
+                    }}
                 >
                     {cell.getValue()?.length > 30
                         ? '...' + cell.getValue().trim().slice(-30)
                         : cell.getValue()}
-                    <OpenInNewIcon/>
                 </Box>
             ),
         },
