@@ -14,15 +14,6 @@ api_v3_router = APIRouter(tags=[version], prefix=f"/{version}")
 api_v3_health_router = APIRouter(tags=[f"{version}-health"], prefix=f"/{version}")
 
 
-# Add explicit CORS preflight handler
-@api_v3_router.options("/{full_path:path}")
-async def options_handler(full_path: str) -> Response:
-    """Handle CORS preflight requests for all v3 endpoints."""
-    response = Response()
-    response.headers["Access-Control-Allow-Credentials"] = "true"
-    return response
-
-
 for r in ["fsm", "cli", "reaper"]:
     mod = import_module(f"jobmon.server.web.routes.{version}.{r}")
     router = getattr(mod, f"{r}_router")

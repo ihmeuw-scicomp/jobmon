@@ -121,6 +121,8 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
             CORSMiddleware,
             allow_origins=["*"],
             allow_credentials=False,
+            allow_methods=["*"],
+            allow_headers=["*"],
         )
 
     app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
