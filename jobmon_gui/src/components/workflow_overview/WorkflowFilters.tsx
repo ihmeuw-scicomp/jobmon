@@ -180,7 +180,7 @@ export default function WorkflowFilters() {
                                 value={workflowSettings.getPending().status}
                                 fullWidth={true}
                             >
-                                <MenuItem>{undefined}</MenuItem>
+                                <MenuItem value="">All</MenuItem>
                                 <MenuItem value="A">Aborted</MenuItem>
                                 <MenuItem value="D">Done</MenuItem>
                                 <MenuItem value="F">Failed</MenuItem>
