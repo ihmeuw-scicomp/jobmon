@@ -24,7 +24,7 @@ const defaultSettings = {
     wf_attribute_key: '',
     wf_attribute_value: '',
     wf_id: '',
-    date_submitted: dayjs().subtract(2, 'weeks'),
+    date_submitted: dayjs(),
     date_submitted_end: dayjs(),
     status: '',
 };
@@ -206,7 +206,7 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                         wf_id: searchParams.get('wf_id') || '',
                         date_submitted: searchParams.get('date_submitted')
                             ? dayjs(searchParams.get('date_submitted'))
-                            : dayjs().subtract(2, 'weeks'),
+                            : dayjs(),
                         date_submitted_end: searchParams.get(
                             'date_submitted_end'
                         )

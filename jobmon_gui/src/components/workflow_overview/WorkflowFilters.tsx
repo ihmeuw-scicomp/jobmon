@@ -138,7 +138,7 @@ export default function WorkflowFilters() {
                                             workflowSettings.getPending()
                                                 .date_submitted
                                         )
-                                        : dayjs().subtract(2, 'weeks')
+                                        : dayjs()
                                 }
                                 onChange={value =>
                                     handleInputChange(
