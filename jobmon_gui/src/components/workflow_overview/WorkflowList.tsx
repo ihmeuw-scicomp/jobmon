@@ -37,6 +37,7 @@ import advancedFormat from 'dayjs/plugin/advancedFormat';
 import timezone from 'dayjs/plugin/timezone';
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
+import { FilterValue } from '@jobmon_gui/stores/workflow_settings';
 
 type WorkflowType = {
     DONE: number;
@@ -105,42 +106,62 @@ export default function WorkflowList() {
         queryFn: async () => {
             workflowSettings.clearDataRefresh();
 
-            // Construct params, excluding empty values
-            const rawParams = {
-                user: workflowSettings.get().user,
-                tool: workflowSettings.get().tool,
-                wf_name: workflowSettings.get().wf_name,
-                wf_args: workflowSettings.get().wf_args,
-                wf_attribute_key: workflowSettings.get().wf_attribute_key,
-                wf_attribute_value: workflowSettings.get().wf_attribute_value,
-                wf_id: workflowSettings.get().wf_id,
-                date_submitted: workflowSettings.get().date_submitted
-                    ? dayjs(workflowSettings.get().date_submitted).format(
-                        'YYYY-MM-DD'
-                    )
-                    : undefined,
-                date_submitted_end: workflowSettings.get().date_submitted_end
-                    ? dayjs(workflowSettings.get().date_submitted_end)
-                        .add(1, 'day')
-                        .format('YYYY-MM-DD')
-                    : undefined,
-                status: workflowSettings.get().status,
+            const settings = workflowSettings.get();
+            const urlParams = new URLSearchParams();
+
+            const addFilterParam = (
+                key: string,
+                value: string | FilterValue,
+            ) => {
+                if (typeof value === 'string') {
+                    if (value) urlParams.append(key, value);
+                } else if (
+                    value &&
+                    typeof value === 'object' &&
+                    ('include' in value || 'exclude' in value)
+                ) {
+                    if (value.include?.length) {
+                        urlParams.append(key, value.include.join(','));
+                    }
+                    value.exclude?.forEach(excluded => {
+                        urlParams.append(`${key}!`, excluded);
+                    });
+                }
             };
 
-            // Filter out keys with undefined or empty string values
-            const filteredParams = Object.fromEntries(
-                Object.entries(rawParams).filter(
-                    ([_, value]) => value != null && value !== ''
-                )
-            );
+            addFilterParam('user', settings.user);
+            addFilterParam('tool', settings.tool);
+            addFilterParam('status', settings.status);
 
-            // Create URLSearchParams from filteredParams
-            const params = new URLSearchParams(filteredParams);
+            if (settings.wf_name) urlParams.append('wf_name', settings.wf_name);
+            if (settings.wf_args) urlParams.append('wf_args', settings.wf_args);
+            if (settings.wf_attribute_key)
+                urlParams.append('wf_attribute_key', settings.wf_attribute_key);
+            if (settings.wf_attribute_value)
+                urlParams.append(
+                    'wf_attribute_value',
+                    settings.wf_attribute_value
+                );
+            if (settings.wf_id) urlParams.append('wf_id', settings.wf_id);
+            if (settings.date_submitted) {
+                urlParams.append(
+                    'date_submitted',
+                    dayjs(settings.date_submitted).format('YYYY-MM-DD')
+                );
+            }
+            if (settings.date_submitted_end) {
+                urlParams.append(
+                    'date_submitted_end',
+                    dayjs(settings.date_submitted_end)
+                        .add(1, 'day')
+                        .format('YYYY-MM-DD')
+                );
+            }
 
             return axios
                 .get<WorkflowsQueryResponse>(workflow_overview_url, {
                     ...jobmonAxiosConfig,
-                    params: params,
+                    params: urlParams,
                 })
                 .then(response => {
                     return response.data?.workflows;

@@ -402,6 +402,31 @@ class WorkflowRepository:
 
         return return_dic
 
+    def _add_multi_value_filter(
+        self,
+        value: Optional[str],
+        column: str,
+        param_name: str,
+        where_clauses: list,
+        substitution_dict: dict,
+    ) -> None:
+        """Add a filter that supports comma-separated values with OR logic."""
+        if not value:
+            return
+
+        value_list = [v.strip() for v in value.split(",") if v.strip()]
+        if not value_list:
+            return
+
+        if len(value_list) == 1:
+            where_clauses.append(f"{column} = :{param_name}")
+            substitution_dict[param_name] = value_list[0]
+        else:
+            placeholders = ",".join([f":{param_name}_{i}" for i in range(len(value_list))])
+            where_clauses.append(f"{column} IN ({placeholders})")
+            for i, v in enumerate(value_list):
+                substitution_dict[f"{param_name}_{i}"] = v
+
     def get_workflow_overview(
         self,
         user: Optional[str] = None,
@@ -418,12 +443,17 @@ class WorkflowRepository:
         """Fetch associated workflows and workflow runs by username."""
         where_clauses = []
         substitution_dict = {}
-        if user:
-            where_clauses.append("workflow_run.user = :user")
-            substitution_dict["user"] = user
-        if tool:
-            where_clauses.append("tool.name = :tool")
-            substitution_dict["tool"] = tool
+
+        self._add_multi_value_filter(
+            user, "workflow_run.user", "user", where_clauses, substitution_dict
+        )
+        self._add_multi_value_filter(
+            tool, "tool.name", "tool", where_clauses, substitution_dict
+        )
+        self._add_multi_value_filter(
+            status, "workflow.status", "status", where_clauses, substitution_dict
+        )
+
         if wf_name:
             where_clauses.append("workflow.name = :wf_name")
             substitution_dict["wf_name"] = wf_name
@@ -445,9 +475,6 @@ class WorkflowRepository:
         if date_submitted_end:
             where_clauses.append("workflow.created_date <= :date_submitted_end")
             substitution_dict["date_submitted_end"] = date_submitted_end
-        if status:
-            where_clauses.append("workflow.status = :status")
-            substitution_dict["status"] = status
 
         if where_clauses:
             inner_where_clause = " WHERE " + (" AND ".join(where_clauses))

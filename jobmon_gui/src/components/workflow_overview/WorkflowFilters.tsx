@@ -14,7 +14,10 @@ import React, { useEffect } from 'react';
 import { useWorkflowSearchSettings } from '@jobmon_gui/stores/workflow_settings';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { settingsToSearchParamsString } from '@jobmon_gui/utils/workflowSearchParams';
+import {
+    settingsToSearchParamsString,
+    filterValueToDisplayString,
+} from '@jobmon_gui/utils/workflowSearchParams';
 import Box from '@mui/material/Box';
 
 export default function WorkflowFilters() {
@@ -72,7 +75,9 @@ export default function WorkflowFilters() {
                         <TextField
                             label="Username"
                             fullWidth={true}
-                            value={workflowSettings.getPending().user}
+                            value={filterValueToDisplayString(
+                                workflowSettings.getPending().user
+                            )}
                             onChange={e =>
                                 handleInputChange('user', e.target.value)
                             }
@@ -122,7 +127,9 @@ export default function WorkflowFilters() {
                         <TextField
                             label="Tool"
                             fullWidth={true}
-                            value={workflowSettings.getPending().tool}
+                            value={filterValueToDisplayString(
+                                workflowSettings.getPending().tool
+                            )}
                             onChange={e =>
                                 handleInputChange('tool', e.target.value)
                             }
@@ -195,7 +202,9 @@ export default function WorkflowFilters() {
                                 onChange={e =>
                                     handleInputChange('status', e.target.value)
                                 }
-                                value={workflowSettings.getPending().status}
+                                value={filterValueToDisplayString(
+                                    workflowSettings.getPending().status
+                                )}
                                 fullWidth={true}
                             >
                                 <MenuItem value="">All</MenuItem>

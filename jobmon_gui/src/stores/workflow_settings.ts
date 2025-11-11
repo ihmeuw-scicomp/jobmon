@@ -1,11 +1,19 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import dayjs, { Dayjs } from 'dayjs';
-import { settingsToSearchParamsString } from '@jobmon_gui/utils/workflowSearchParams';
+import {
+    settingsToSearchParamsString,
+    parseUrlFilterParam,
+} from '@jobmon_gui/utils/workflowSearchParams';
+
+export type FilterValue = {
+    include?: string[];
+    exclude?: string[];
+};
 
 export type WorkflowSearchSettings = {
-    user: string;
-    tool: string;
+    user: string | FilterValue;
+    tool: string | FilterValue;
     wf_name: string;
     wf_args: string;
     wf_attribute_key: string;
@@ -13,7 +21,7 @@ export type WorkflowSearchSettings = {
     wf_id: string;
     date_submitted: Dayjs;
     date_submitted_end: Dayjs;
-    status: string;
+    status: string | FilterValue;
 };
 
 const defaultSettings = {
@@ -195,8 +203,8 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                 getPending: () => get().pendingSettings,
                 loadValuesFromSearchParams: (searchParams: URLSearchParams) => {
                     const loadedSettings = {
-                        user: searchParams.get('user') || '',
-                        tool: searchParams.get('tool') || '',
+                        user: parseUrlFilterParam(searchParams, 'user'),
+                        tool: parseUrlFilterParam(searchParams, 'tool'),
                         wf_name: searchParams.get('wf_name') || '',
                         wf_args: searchParams.get('wf_args') || '',
                         wf_attribute_key:
@@ -212,7 +220,7 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                         )
                             ? dayjs(searchParams.get('date_submitted_end'))
                             : dayjs(),
-                        status: searchParams.get('status') || '',
+                        status: parseUrlFilterParam(searchParams, 'status'),
                     };
                     set({
                         settings: loadedSettings,
