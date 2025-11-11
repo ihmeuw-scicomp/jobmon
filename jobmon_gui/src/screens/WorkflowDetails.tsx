@@ -23,6 +23,7 @@ import {
 } from '@jobmon_gui/components/common/AppBreadcrumbs';
 import TabPanel from '@jobmon_gui/components/common/TabPanel';
 import WorkflowDAG from '@jobmon_gui/components/workflow_details/WorkflowDAG.tsx';
+import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilterPersistence';
 
 function WorkflowDetails() {
     const { workflowId } = useParams();
@@ -41,11 +42,10 @@ function WorkflowDetails() {
     const location = useLocation();
 
     const handleHomeClick = () => {
-        const searchParams = new URLSearchParams(location.search);
-        const search = searchParams.toString();
+        const search = getWorkflowFiltersForNavigation(location.search);
         navigate({
             pathname: '/',
-            search: search ? `?${search}` : '',
+            search: search || '',
         });
     };
 
