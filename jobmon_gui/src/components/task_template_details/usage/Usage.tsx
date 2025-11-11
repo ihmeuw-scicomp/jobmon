@@ -123,68 +123,89 @@ export default function Usage({
     // Add new state for resource zones toggle
     const [showResourceZones, setShowResourceZones] = useState(false);
 
+    // Helper function to parse requested resources from JSON string
+    const parseRequestedResources = (
+        requestedResourcesJson: string | null | undefined
+    ): { runtime?: number; memory?: number } => {
+        if (!requestedResourcesJson) return {};
+        try {
+            const parsed = JSON.parse(requestedResourcesJson);
+            const runtime = Number(parsed.runtime);
+            const memory = Number(parsed.memory);
+            return {
+                runtime: !isNaN(runtime) && runtime > 0 ? runtime : undefined,
+                memory: !isNaN(memory) && memory > 0 ? memory : undefined,
+            };
+        } catch {
+            return {};
+        }
+    };
+
+    // Helper function to format date for CSV
+    const formatDateForCSV = (date: string | null | undefined): string => {
+        if (!date) return '';
+        try {
+            return new Date(date).toISOString();
+        } catch {
+            return String(date);
+        }
+    };
+
     // CSV download function
     const downloadCSV = () => {
         if (!rawTaskNodesFromApi || rawTaskNodesFromApi.length === 0) {
             return;
         }
 
+        // Define CSV column order
+        const csvColumns = [
+            'task_id',
+            'task_name',
+            'status',
+            'task_status_date',
+            'task_command',
+            'task_num_attempts',
+            'task_max_attempts',
+            'runtime_seconds',
+            'memory_gib',
+            'memory_bytes',
+            'attempt_number',
+            'requested_runtime_seconds',
+            'requested_memory_gib',
+            'node_id',
+            'requested_resources_json',
+        ] as const;
+
         // Process all raw data (not filtered)
         const csvData = rawTaskNodesFromApi.map(item => {
             const runtime = typeof item.r === 'number' ? item.r : null;
             const memoryBytes = typeof item.m === 'number' ? item.m : null;
             const memoryGiB = memoryBytes !== null ? bytes_to_gib(memoryBytes) : null;
-
-            // Extract requested resources
-            let requestedRuntime: number | undefined;
-            let requestedMemory: number | undefined;
-            try {
-                const reqRes = item.requested_resources
-                    ? JSON.parse(item.requested_resources)
-                    : {};
-                const reqRuntimeVal = Number(reqRes.runtime);
-                const reqMemoryVal = Number(reqRes.memory);
-                requestedRuntime =
-                    !isNaN(reqRuntimeVal) && reqRuntimeVal > 0
-                        ? reqRuntimeVal
-                        : undefined;
-                requestedMemory =
-                    !isNaN(reqMemoryVal) && reqMemoryVal > 0
-                        ? reqMemoryVal
-                        : undefined;
-            } catch {
-                // Skip invalid JSON, leave as undefined
-            }
+            const requestedResources = parseRequestedResources(
+                item.requested_resources
+            );
 
             return {
                 task_id: item.task_id,
                 task_name: item.task_name || '',
+                status: item.status || 'UNKNOWN',
+                task_status_date: formatDateForCSV(item.task_status_date),
+                task_command: item.task_command || '',
+                task_num_attempts: item.task_num_attempts ?? null,
+                task_max_attempts: item.task_max_attempts ?? null,
                 runtime_seconds: runtime,
                 memory_gib: memoryGiB,
                 memory_bytes: memoryBytes,
-                status: item.status || 'UNKNOWN',
                 attempt_number: item.attempt_number_of_instance || 1,
-                requested_runtime_seconds: requestedRuntime,
-                requested_memory_gib: requestedMemory,
+                requested_runtime_seconds: requestedResources.runtime,
+                requested_memory_gib: requestedResources.memory,
                 node_id: item.node_id,
-                requested_resources_json: item.requested_resources || ''
+                requested_resources_json: item.requested_resources || '',
             };
         });
 
         // Create CSV content
-        const headers = [
-            'task_id',
-            'task_name',
-            'runtime_seconds',
-            'memory_gib',
-            'memory_bytes',
-            'status',
-            'attempt_number',
-            'requested_runtime_seconds',
-            'requested_memory_gib',
-            'node_id',
-            'requested_resources_json'
-        ];
+        const headers = csvColumns;
 
         const csvContent = [
             headers.join(','),

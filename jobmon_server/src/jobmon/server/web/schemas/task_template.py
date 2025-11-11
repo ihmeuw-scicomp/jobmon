@@ -29,6 +29,10 @@ class TaskResourceDetailItem(BaseModel):
     requested_resources: Optional[str] = None  # Raw JSON string from DB
     attempt_number_of_instance: Optional[int] = None  # Added field
     status: Optional[str] = None  # Added field: Will hold 'D', 'F', etc.
+    task_status_date: Optional[datetime] = None
+    task_command: Optional[str] = None
+    task_num_attempts: Optional[int] = None
+    task_max_attempts: Optional[int] = None
     model_config = ConfigDict(populate_by_name=True)
 
 
@@ -41,6 +45,10 @@ class TaskResourceVizItem(BaseModel):
     requested_resources: Optional[str] = None
     attempt_number_of_instance: Optional[int] = None
     status: Optional[str] = None
+    task_status_date: Optional[datetime] = None
+    task_command: Optional[str] = None
+    task_num_attempts: Optional[int] = None
+    task_max_attempts: Optional[int] = None
 
 
 class TaskTemplateResourceUsageResponse(BaseModel):

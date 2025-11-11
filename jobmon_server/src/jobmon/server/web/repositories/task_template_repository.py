@@ -87,6 +87,10 @@ class TaskTemplateRepository:
                 requested_resources=row_data["requested_resources"],
                 attempt_number_of_instance=row_data.get("attempt_number_of_instance"),
                 status=row_data.get("status_orig"),
+                task_status_date=row_data.get("task_status_date"),
+                task_command=row_data.get("task_command"),
+                task_num_attempts=row_data.get("task_num_attempts"),
+                task_max_attempts=row_data.get("task_max_attempts"),
             )
         except Exception as e:
             logger.error(
@@ -125,18 +129,27 @@ class TaskTemplateRepository:
         )
 
         if not node_args:
-            # no node_args filtering - use original optimized query
+            # No node_args filtering - use optimized single query
             query = (
                 select(
+                    # TaskInstance resource usage fields
                     TaskInstance.wallclock,
                     TaskInstance.maxrss,
+                    TaskInstance.status.label("status_col"),
+                    # Node and Task identifiers
                     Node.id.label("node_id_col"),
                     Task.id.label("task_id_col"),
                     Task.name.label("task_name_col"),
-                    TaskInstance.id.label("task_instance_id_col"),
+                    # Task metadata fields
+                    Task.status_date.label("task_status_date_col"),
+                    Task.command.label("task_command_col"),
+                    Task.num_attempts.label("task_num_attempts_col"),
+                    Task.max_attempts.label("task_max_attempts_col"),
+                    # Requested resources and attempt number
                     TaskResources.requested_resources.label("requested_resources_col"),
                     attempt_number_col,
-                    TaskInstance.status.label("status_col"),
+                    # TaskInstance.id (not used but kept for consistency)
+                    TaskInstance.id.label("task_instance_id_col"),
                 )
                 .select_from(TaskTemplateVersion)
                 .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
@@ -150,15 +163,21 @@ class TaskTemplateRepository:
 
             result = []
             for row in rows:
+                # Map query results to row_data dictionary
+                # Column order matches select() statement above
                 row_data = {
-                    "r_orig": row[0],
-                    "m_orig": row[1],
-                    "node_id": row[2],
-                    "task_id": row[3],
-                    "task_name": row[4],
-                    "requested_resources": row[6],
-                    "attempt_number_of_instance": row[7],
-                    "status_orig": row[8],
+                    "r_orig": row[0],  # wallclock
+                    "m_orig": row[1],  # maxrss
+                    "node_id": row[3],  # node_id_col
+                    "task_id": row[4],  # task_id_col
+                    "task_name": row[5],  # task_name_col
+                    "requested_resources": row[10],  # requested_resources_col
+                    "attempt_number_of_instance": row[11],  # attempt_number_col
+                    "status_orig": row[2],  # status_col (from TaskInstance)
+                    "task_status_date": row[6],  # task_status_date_col
+                    "task_command": row[7],  # task_command_col
+                    "task_num_attempts": row[8],  # task_num_attempts_col
+                    "task_max_attempts": row[9],  # task_max_attempts_col
                 }
                 item = self._convert_to_task_resource_detail_item(row_data)
                 if item:
@@ -195,6 +214,10 @@ class TaskTemplateRepository:
                 TaskResources.requested_resources,
                 attempt_number_col,
                 TaskInstance.status,
+                Task.status_date.label("task_status_date"),
+                Task.command.label("task_command"),
+                Task.num_attempts.label("task_num_attempts"),
+                Task.max_attempts.label("task_max_attempts"),
             )
             .select_from(TaskTemplateVersion)
             .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
@@ -232,6 +255,10 @@ class TaskTemplateRepository:
             base_query.c.requested_resources,
             base_query.c.attempt_number_of_instance,
             base_query.c.status,
+            base_query.c.task_status_date,
+            base_query.c.task_command,
+            base_query.c.task_num_attempts,
+            base_query.c.task_max_attempts,
         ).select_from(base_query)
 
         for subquery in node_arg_subqueries:
@@ -241,15 +268,21 @@ class TaskTemplateRepository:
 
         result = []
         for row in rows:
+            # Map query results to row_data dictionary
+            # Column order matches final_query select() statement above
             row_data = {
-                "r_orig": row[0],
-                "m_orig": row[1],
-                "node_id": row[2],
-                "task_id": row[3],
-                "task_name": row[4],
-                "requested_resources": row[5],
-                "attempt_number_of_instance": row[6],
-                "status_orig": row[7],
+                "r_orig": row[0],  # wallclock
+                "m_orig": row[1],  # maxrss
+                "node_id": row[2],  # node_id
+                "task_id": row[3],  # task_id
+                "task_name": row[4],  # task_name
+                "requested_resources": row[5],  # requested_resources
+                "attempt_number_of_instance": row[6],  # attempt_number_of_instance
+                "status_orig": row[7],  # status
+                "task_status_date": row[8],  # task_status_date
+                "task_command": row[9],  # task_command
+                "task_num_attempts": row[10],  # task_num_attempts
+                "task_max_attempts": row[11],  # task_max_attempts
             }
             item = self._convert_to_task_resource_detail_item(row_data)
             if item:
@@ -408,6 +441,10 @@ class TaskTemplateRepository:
                         requested_resources=detail_item.requested_resources,
                         attempt_number_of_instance=detail_item.attempt_number_of_instance,
                         status=detail_item.status,
+                        task_status_date=detail_item.task_status_date,
+                        task_command=detail_item.task_command,
+                        task_num_attempts=detail_item.task_num_attempts,
+                        task_max_attempts=detail_item.task_max_attempts,
                     )
                 )
 
