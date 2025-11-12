@@ -422,7 +422,9 @@ class WorkflowRepository:
             where_clauses.append(f"{column} = :{param_name}")
             substitution_dict[param_name] = value_list[0]
         else:
-            placeholders = ",".join([f":{param_name}_{i}" for i in range(len(value_list))])
+            placeholders = ",".join(
+                [f":{param_name}_{i}" for i in range(len(value_list))]
+            )
             where_clauses.append(f"{column} IN ({placeholders})")
             for i, v in enumerate(value_list):
                 substitution_dict[f"{param_name}_{i}"] = v

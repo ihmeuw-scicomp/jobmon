@@ -1,7 +1,7 @@
 from importlib import import_module
 
 from fastapi import APIRouter
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse
 from starlette.status import HTTP_200_OK
 
 from jobmon.server.web import routes
