@@ -443,8 +443,8 @@ class WorkflowRepository:
         status: Optional[str] = None,
     ) -> WorkflowOverviewResponse:
         """Fetch associated workflows and workflow runs by username."""
-        where_clauses = []
-        substitution_dict = {}
+        where_clauses: list[str] = []
+        substitution_dict: dict[str, Any] = {}
 
         self._add_multi_value_filter(
             user, "workflow_run.user", "user", where_clauses, substitution_dict
