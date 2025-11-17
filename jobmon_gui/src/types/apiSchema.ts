@@ -2221,6 +2221,14 @@ export interface components {
             attempt_number_of_instance?: number | null;
             /** Status */
             status?: string | null;
+            /** Task Status Date */
+            task_status_date?: string | null;
+            /** Task Command */
+            task_command?: string | null;
+            /** Task Num Attempts */
+            task_num_attempts?: number | null;
+            /** Task Max Attempts */
+            task_max_attempts?: number | null;
         };
         /**
          * TaskStatusResponse

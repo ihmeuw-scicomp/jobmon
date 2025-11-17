@@ -17,9 +17,10 @@ import ClusteredErrors from '@jobmon_gui/components/task_template_details/Cluste
 import TaskTable from '@jobmon_gui/components/task_template_details/TaskTable';
 import TaskTemplateHeader from '@jobmon_gui/components/task_template_details/TaskTemplateHeader';
 import Usage from '@jobmon_gui/components/task_template_details/usage/Usage';
-import { getTaskTemplateDetails } from '@jobmon_gui/queries/GetTaskTemplateDetails.ts';
+import { useTaskTemplateDetails } from '@jobmon_gui/queries/GetTaskTemplateDetails.ts';
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
+import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilterPersistence';
 
 export default function TaskTemplateDetails() {
     const { workflowId, taskTemplateId } = useParams();
@@ -27,7 +28,7 @@ export default function TaskTemplateDetails() {
 
     const [activeTab, setActiveTab] = useState(0);
 
-    const TaskTemplateDetails = getTaskTemplateDetails(
+    const TaskTemplateDetails = useTaskTemplateDetails(
         workflowId,
         taskTemplateId
     );
@@ -36,11 +37,10 @@ export default function TaskTemplateDetails() {
     const location = useLocation();
 
     const handleHomeClick = () => {
-        const searchParams = new URLSearchParams(location.search);
-        const search = searchParams.toString();
+        const search = getWorkflowFiltersForNavigation(location.search);
         navigate({
             pathname: '/',
-            search: search ? `?${search}` : '',
+            search: search || '',
         });
     };
 

@@ -8,6 +8,7 @@ import Box from '@mui/material/Box';
 import { CircularProgress, Tabs } from '@mui/material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Typography from '@mui/material/Typography';
+import CloseIcon from '@mui/icons-material/Close';
 import { useTaskTableStore } from '@jobmon_gui/stores/TaskTable.ts';
 import { useClusteredErrorsTableStore } from '@jobmon_gui/stores/ClusteredErrorsTable.ts';
 import List from '@mui/material/List';
@@ -23,6 +24,24 @@ import {
 } from '@jobmon_gui/components/common/AppBreadcrumbs';
 import TabPanel from '@jobmon_gui/components/common/TabPanel';
 import WorkflowDAG from '@jobmon_gui/components/workflow_details/WorkflowDAG.tsx';
+import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilterPersistence';
+
+// Color constant matching the fatal status color from CSS
+const FATAL_COLOR = '#d55e00';
+
+// Styles for the fatal indicator icon
+const fatalIconStyles = {
+    color: FATAL_COLOR,
+    fontSize: '1.2rem',
+    flexShrink: 0,
+};
+
+// Styles for the task template name container
+const taskTemplateNameContainerStyles = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 1,
+};
 
 function WorkflowDetails() {
     const { workflowId } = useParams();
@@ -41,11 +60,10 @@ function WorkflowDetails() {
     const location = useLocation();
 
     const handleHomeClick = () => {
-        const searchParams = new URLSearchParams(location.search);
-        const search = searchParams.toString();
+        const search = getWorkflowFiltersForNavigation(location.search);
         navigate({
             pathname: '/',
-            search: search ? `?${search}` : '',
+            search: search || '',
         });
     };
 
@@ -145,22 +163,17 @@ function WorkflowDetails() {
                                                 queryKey: [
                                                     'workflow_details',
                                                     'usage',
-                                                    wfTTStatus?.data[key][
-                                                        'task_template_version_id'
-                                                    ],
+                                                    taskTemplate.task_template_version_id,
                                                     workflowId,
                                                 ],
-                                                queryFn:
-                                                    getWorkflowUsageQueryFn,
+                                                queryFn: getWorkflowUsageQueryFn,
                                             });
                                             void queryClient.prefetchQuery({
                                                 queryKey: [
                                                     'workflow_details',
                                                     'clustered_errors',
                                                     workflowId,
-                                                    wfTTStatus?.data[key][
-                                                        'task_template_version_id'
-                                                    ],
+                                                    taskTemplate.task_template_version_id,
                                                 ],
                                                 queryFn: getClusteredErrorsFn,
                                             });
@@ -169,12 +182,9 @@ function WorkflowDetails() {
                                                     'workflow_details',
                                                     'tasks',
                                                     workflowId,
-                                                    wfTTStatus?.data[key][
-                                                        'name'
-                                                    ],
+                                                    taskTemplate.name,
                                                 ],
-                                                queryFn:
-                                                    getWorkflowTasksQueryFn,
+                                                queryFn: getWorkflowTasksQueryFn,
                                             });
                                         }}
                                         onClick={() => {
@@ -190,10 +200,16 @@ function WorkflowDetails() {
                                             );
                                         }}
                                     >
-                                        <Box className="div_floatleft">
+                                        <Box 
+                                            className="div_floatleft" 
+                                            sx={taskTemplateNameContainerStyles}
+                                        >
                                             <Typography className="tt-name">
-                                                {wfTTStatus?.data[key]['name']}
+                                                {taskTemplate.name}
                                             </Typography>
+                                            {taskTemplate.FATAL > 0 && (
+                                                <CloseIcon sx={fatalIconStyles} />
+                                            )}
                                         </Box>
                                         <Box className="div_floatright">
                                             <JobmonProgressBar

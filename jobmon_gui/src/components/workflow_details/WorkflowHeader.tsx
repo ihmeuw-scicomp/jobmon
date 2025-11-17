@@ -150,7 +150,7 @@ export default function WorkflowHeader({
             [template.tt_version_id]: status,
         }));
         // call the get_task_template_url post request with date {tool_version_id: template.tt_version_id, task_template_name: template.name}
-        // then use teh task_template_id to call getTaskTemplateDetails
+        // then use teh task_template_id to call useTaskTemplateDetails
         // then update the task status
         const tt_name = template.name;
         const url = task_table_url + wf_id;

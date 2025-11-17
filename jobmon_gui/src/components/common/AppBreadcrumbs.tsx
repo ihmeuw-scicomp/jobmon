@@ -36,14 +36,22 @@ export function AppBreadcrumbs({
                     );
                 }
 
+                const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+                    if (item.onClick) {
+                        e.preventDefault();
+                        item.onClick(e);
+                    }
+                };
+
                 return (
                     <Link
                         key={index}
-                        component={RouterLink}
-                        to={item.to || '#'}
+                        component={item.onClick ? 'a' : RouterLink}
+                        to={item.onClick ? undefined : (item.to || '#')}
+                        href={item.onClick ? '#' : undefined}
                         underline="hover"
                         color="inherit"
-                        onClick={item.onClick}
+                        onClick={handleClick}
                         onMouseEnter={item.onMouseEnter}
                         sx={{
                             cursor: 'pointer',

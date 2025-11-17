@@ -36,7 +36,7 @@ export const getTaskTemplateDetailsQueryFn = async ({
         });
 };
 
-export const getTaskTemplateDetails = (
+export const useTaskTemplateDetails = (
     workflowId: number | string,
     taskTemplateId: number | string
 ) => {

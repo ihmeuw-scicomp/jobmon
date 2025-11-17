@@ -16,6 +16,7 @@ import {
     AppBreadcrumbs,
     BreadcrumbItem,
 } from '@jobmon_gui/components/common/AppBreadcrumbs';
+import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilterPersistence';
 
 export default function TaskDetails() {
     const queryClient = useQueryClient();
@@ -32,11 +33,10 @@ export default function TaskDetails() {
     const location = useLocation();
 
     const handleHomeClick = () => {
-        const searchParams = new URLSearchParams(location.search);
-        const search = searchParams.toString();
+        const search = getWorkflowFiltersForNavigation(location.search);
         navigate({
             pathname: '/',
-            search: search ? `?${search}` : '',
+            search: search || '',
         });
     };
 

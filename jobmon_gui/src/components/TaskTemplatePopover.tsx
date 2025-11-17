@@ -35,12 +35,12 @@ const TaskTemplatePopover = React.forwardRef<
             <table id="tt-tasks">
                 <tbody>
                     <tr>
-                        <th className="scheduled">Scheduled:</th>
-                        <td>{data.SCHEDULED}</td>
-                    </tr>
-                    <tr>
                         <th className="pending">Pending:</th>
                         <td>{data.PENDING}</td>
+                    </tr>
+                    <tr>
+                        <th className="scheduled">Scheduled:</th>
+                        <td>{data.SCHEDULED}</td>
                     </tr>
                     <tr>
                         <th className="running">Running:</th>

@@ -60,6 +60,13 @@ All notable changes to Jobmon will be documented in this file.
 - **Performance Optimization**: Optimized array transition endpoints (`/api/v3/array/{array_id}/transition_to_launched` and `/api/v3/array/{array_id}/transition_to_killed`) with atomic Task and TaskInstance updates in single transactions.
 - **Performance Optimization**: Dramatically improved `/api/v3/get_task_template_details` endpoint performance by replacing complex 4-table JOIN  with 4 targeted queries and O(n) set intersection.
 - JSON Compatibility Layer: Added backward compatibility for `downstream_node_ids` field - clients ≤ 3.4.23 receive quoted JSON strings, newer clients receive unquoted arrays
+- Added an `all` option to the status filter on the home page of the Jobmon GUI.
+- Added search parameters to the GUI URL.
+- Allow advanced filtering on the Jobmon GUI.
+  - Added support for negation e.g. `?username!=svc_scicomp`
+  - Added support for multiple filter values e.g. `username=<user1>,<user2>`
+- Added additional task information to the resource usage CSV download in the GUI.
+- Show a red x next to a task template name on the workflow details page of the Jobmon GUI if any tasks are in fatal state in that task template.
 
 ### Changed
 - Hardened structlog integration to detect `_nop`-filtered log levels, wrap `PrintLogger` factories with named proxies, and ensure telemetry processors execute even when hosts filter debug output.
@@ -91,6 +98,9 @@ All notable changes to Jobmon will be documented in this file.
 - Optimized `/get_task_template_details` and `/task_template_resource_usage` routes.
 - Optimized `/task_template_dag` route to use less memory.
 - Improved isort configuration to correctly identify `jobmon` as first-party package, ensuring proper PEP 8 import order (stdlib → third-party → local).
+- Changed the default submitted date on the Jobmon GUI from 2 weeks to one day.
+- Changed order of status in workflow pop up so that pending is now before schedule in the GUI.
+- Changed the command column in the task details table the GUI. If you click the command a modal will pop up that shows the whole command.
 
 ### Fixed
 - Fixed workflow test hook race condition where `_fail_after_n_executions` check could be bypassed when tasks complete within a single loop iteration, causing flaky test failures in CI.

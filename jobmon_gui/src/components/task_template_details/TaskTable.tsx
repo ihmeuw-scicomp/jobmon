@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import '@jobmon_gui/styles/jobmon_gui.css';
@@ -12,6 +12,7 @@ import {
 import { Box, Button } from '@mui/material';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Typography from '@mui/material/Typography';
 import { type Row } from '@tanstack/react-table';
@@ -23,6 +24,8 @@ import { formatDayjsDate } from '@jobmon_gui/utils/DayTime.ts';
 import { getTaskDetailsQueryFn } from '@jobmon_gui/queries/GetTaskDetails.ts';
 import { getWorkflowTasksQueryFn } from '@jobmon_gui/queries/GetWorkflowTasks.ts';
 import { Task, TaskTableProps } from '@jobmon_gui/types/TaskTable.ts';
+import { JobmonModal } from '@jobmon_gui/components/JobmonModal.tsx';
+import { ScrollableCodeBlock } from '@jobmon_gui/components/ScrollableTextArea.tsx';
 
 export default function TaskTable({
     taskTemplateName,
@@ -33,6 +36,7 @@ export default function TaskTable({
     const columnHelper = createMRTColumnHelper<Task>();
     const location = useLocation();
     const taskTableStore = useTaskTableStore();
+    const [selectedCommand, setSelectedCommand] = useState<string>('');
     const tasks = useQuery({
         queryKey: ['workflow_details', 'tasks', workflowId, taskTemplateName],
         queryFn: getWorkflowTasksQueryFn,
@@ -40,6 +44,20 @@ export default function TaskTable({
         enabled: !!workflowId && !!taskTemplateName,
         refetchOnMount: true, // Refetch on mount to reflect task status upgrade
     });
+
+    const handleCommandClick = (command: string) => {
+        setSelectedCommand(command);
+    };
+
+    const handleCopyCommand = () => {
+        navigator.clipboard.writeText(selectedCommand).catch(err => {
+            console.error('Failed to copy command:', err);
+        });
+    };
+
+    const handleCloseModal = () => {
+        setSelectedCommand('');
+    };
 
     const columns = [
         columnHelper.accessor('task_id', {
@@ -90,8 +108,18 @@ export default function TaskTable({
         }),
         columnHelper.accessor('task_command', {
             header: 'Command',
-            enableClickToCopy: true,
             size: 200,
+            Cell: ({ cell }) => (
+                <Box
+                    onClick={() => handleCommandClick(cell.getValue() as string)}
+                    sx={{
+                        cursor: 'pointer',
+                        '&:hover': { textDecoration: 'underline' },
+                    }}
+                >
+                    {cell.getValue() as string}
+                </Box>
+            ),
         }),
         columnHelper.accessor('task_num_attempts', {
             header: 'Num Attempts',
@@ -233,6 +261,27 @@ export default function TaskTable({
             <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <MaterialReactTable table={table} />
             </LocalizationProvider>
+            <JobmonModal
+                title="Command"
+                open={!!selectedCommand}
+                onClose={handleCloseModal}
+                width="80%"
+            >
+                <ScrollableCodeBlock>
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                        {selectedCommand}
+                    </pre>
+                </ScrollableCodeBlock>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                    <Button
+                        variant="contained"
+                        startIcon={<ContentCopyIcon />}
+                        onClick={handleCopyCommand}
+                    >
+                        Copy
+                    </Button>
+                </Box>
+            </JobmonModal>
         </Box>
     );
 }
