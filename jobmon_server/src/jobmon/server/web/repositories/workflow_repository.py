@@ -409,8 +409,18 @@ class WorkflowRepository:
         param_name: str,
         where_clauses: list,
         substitution_dict: dict,
+        exclude: bool = False,
     ) -> None:
-        """Add a filter that supports comma-separated values with OR logic."""
+        """Add a filter that supports comma-separated values with IN/NOT IN logic.
+        
+        Args:
+            value: Comma-separated string of values to filter
+            column: SQL column name to filter on
+            param_name: Base name for substitution parameters
+            where_clauses: List to append WHERE clause strings to
+            substitution_dict: Dictionary to add parameter substitutions to
+            exclude: If True, use NOT IN logic; otherwise use IN logic
+        """
         if not value:
             return
 
@@ -418,16 +428,21 @@ class WorkflowRepository:
         if not value_list:
             return
 
+        suffix = "_exclude" if exclude else ""
+        operator = "NOT IN" if exclude else "IN"
+        equality_operator = "!=" if exclude else "="
+
         if len(value_list) == 1:
-            where_clauses.append(f"{column} = :{param_name}")
-            substitution_dict[param_name] = value_list[0]
+            param_key = f"{param_name}{suffix}"
+            where_clauses.append(f"{column} {equality_operator} :{param_key}")
+            substitution_dict[param_key] = value_list[0]
         else:
             placeholders = ",".join(
-                [f":{param_name}_{i}" for i in range(len(value_list))]
+                [f":{param_name}{suffix}_{i}" for i in range(len(value_list))]
             )
-            where_clauses.append(f"{column} IN ({placeholders})")
+            where_clauses.append(f"{column} {operator} ({placeholders})")
             for i, v in enumerate(value_list):
-                substitution_dict[f"{param_name}_{i}"] = v
+                substitution_dict[f"{param_name}{suffix}_{i}"] = v
 
     def get_workflow_overview(
         self,
@@ -441,6 +456,9 @@ class WorkflowRepository:
         date_submitted: Optional[str] = None,
         date_submitted_end: Optional[str] = None,
         status: Optional[str] = None,
+        user_exclude: Optional[str] = None,
+        tool_exclude: Optional[str] = None,
+        status_exclude: Optional[str] = None,
     ) -> WorkflowOverviewResponse:
         """Fetch associated workflows and workflow runs by username."""
         where_clauses: list[str] = []
@@ -454,6 +472,15 @@ class WorkflowRepository:
         )
         self._add_multi_value_filter(
             status, "workflow.status", "status", where_clauses, substitution_dict
+        )
+        self._add_multi_value_filter(
+            user_exclude, "workflow_run.user", "user", where_clauses, substitution_dict, exclude=True
+        )
+        self._add_multi_value_filter(
+            tool_exclude, "tool.name", "tool", where_clauses, substitution_dict, exclude=True
+        )
+        self._add_multi_value_filter(
+            status_exclude, "workflow.status", "status", where_clauses, substitution_dict, exclude=True
         )
 
         if wf_name:

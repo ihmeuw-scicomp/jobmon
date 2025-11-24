@@ -167,6 +167,11 @@ def get_workflow_status_viz(
     return JSONResponse(content=result, status_code=StatusCodes.OK)
 
 
+def _list_to_comma_separated(values: Optional[List[str]]) -> Optional[str]:
+    """Convert a list of strings to a comma-separated string, or None if empty."""
+    return ",".join(values) if values else None
+
+
 @api_v3_router.get("/workflow_overview_viz")
 def workflows_by_user_form(
     user: Optional[str] = Query(None),
@@ -179,6 +184,9 @@ def workflows_by_user_form(
     date_submitted: Optional[str] = Query(None),
     date_submitted_end: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    user_exclude: Optional[List[str]] = Query(None, alias="user!"),
+    tool_exclude: Optional[List[str]] = Query(None, alias="tool!"),
+    status_exclude: Optional[List[str]] = Query(None, alias="status!"),
     db: Session = Depends(get_db),
 ) -> WorkflowOverviewResponse:
     """Fetch associated workflows and workflow runs by username."""
@@ -194,6 +202,9 @@ def workflows_by_user_form(
         date_submitted=date_submitted,
         date_submitted_end=date_submitted_end,
         status=status,
+        user_exclude=_list_to_comma_separated(user_exclude),
+        tool_exclude=_list_to_comma_separated(tool_exclude),
+        status_exclude=_list_to_comma_separated(status_exclude),
     )
 
 

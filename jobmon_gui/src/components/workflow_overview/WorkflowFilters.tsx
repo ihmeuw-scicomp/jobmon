@@ -17,6 +17,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
     settingsToSearchParamsString,
     filterValueToDisplayString,
+    getSearchParamsFromLocation,
 } from '@jobmon_gui/utils/workflowSearchParams';
 import Box from '@mui/material/Box';
 
@@ -27,7 +28,7 @@ export default function WorkflowFilters() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        const searchParams = new URLSearchParams(location.search);
+        const searchParams = getSearchParamsFromLocation(location.search);
         workflowSettings.loadValuesFromSearchParams(searchParams);
         workflowSettings.triggerDataRefresh();
         // eslint-disable-next-line react-hooks/exhaustive-deps
