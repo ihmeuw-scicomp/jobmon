@@ -412,7 +412,7 @@ class WorkflowRepository:
         exclude: bool = False,
     ) -> None:
         """Add a filter that supports comma-separated values with IN/NOT IN logic.
-        
+
         Args:
             value: Comma-separated string of values to filter
             column: SQL column name to filter on
@@ -474,13 +474,28 @@ class WorkflowRepository:
             status, "workflow.status", "status", where_clauses, substitution_dict
         )
         self._add_multi_value_filter(
-            user_exclude, "workflow_run.user", "user", where_clauses, substitution_dict, exclude=True
+            user_exclude,
+            "workflow_run.user",
+            "user",
+            where_clauses,
+            substitution_dict,
+            exclude=True,
         )
         self._add_multi_value_filter(
-            tool_exclude, "tool.name", "tool", where_clauses, substitution_dict, exclude=True
+            tool_exclude,
+            "tool.name",
+            "tool",
+            where_clauses,
+            substitution_dict,
+            exclude=True,
         )
         self._add_multi_value_filter(
-            status_exclude, "workflow.status", "status", where_clauses, substitution_dict, exclude=True
+            status_exclude,
+            "workflow.status",
+            "status",
+            where_clauses,
+            substitution_dict,
+            exclude=True,
         )
 
         if wf_name:
