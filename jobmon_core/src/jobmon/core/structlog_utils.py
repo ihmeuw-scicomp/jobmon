@@ -59,38 +59,60 @@ def bind_context(*param_names: str, **renames: str) -> Callable[[F], F]:
         bind_context_fn = set_jobmon_context
         unset_context_fn = unset_jobmon_context
 
+        if inspect.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                bound_args = signature.bind(*args, **kwargs)
+                bound_args.apply_defaults()
+
+                context_data = {}
+                for param_name in positional_paths:
+                    value = extract_value(bound_args.arguments, param_name)
+                    if value is not None:
+                        context_data[param_name] = value
+
+                for context_key, param_path in rename_items:
+                    value = extract_value(bound_args.arguments, param_path)
+                    if value is not None:
+                        context_data[context_key] = value
+
+                if context_data:
+                    bind_context_fn(allow_non_jobmon_keys=True, **context_data)
+                    try:
+                        return await func(*args, **kwargs)
+                    finally:
+                        unset_context_fn(
+                            *context_data.keys(), allow_non_jobmon_keys=True
+                        )
+                return await func(*args, **kwargs)
+
+            return async_wrapper  # type: ignore
+
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
-            # Map args to parameter names using cached signature
             bound_args = signature.bind(*args, **kwargs)
             bound_args.apply_defaults()
 
-            # Collect values to bind
             context_data = {}
 
-            # Process positional param_names (use original parameter name as key)
             for param_name in positional_paths:
                 value = extract_value(bound_args.arguments, param_name)
                 if value is not None:
                     context_data[param_name] = value
 
-            # Process renamed parameters (custom context key)
             for context_key, param_path in rename_items:
                 value = extract_value(bound_args.arguments, param_path)
                 if value is not None:
                     context_data[context_key] = value
 
-            # Bind context and execute function
             if context_data:
                 bind_context_fn(allow_non_jobmon_keys=True, **context_data)
                 try:
                     return func(*args, **kwargs)
                 finally:
-                    # Clean up context
                     unset_context_fn(*context_data.keys(), allow_non_jobmon_keys=True)
-            else:
-                # No context to bind, just execute
-                return func(*args, **kwargs)
+            return func(*args, **kwargs)
 
         return wrapper  # type: ignore
 
