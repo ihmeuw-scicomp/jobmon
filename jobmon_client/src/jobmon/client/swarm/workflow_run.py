@@ -6,12 +6,12 @@ heartbeat management, and state synchronization with the Jobmon server.
 
 from __future__ import annotations
 
+import ast
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Standard library
 # ──────────────────────────────────────────────────────────────────────────────
 import asyncio
-import ast
-import contextlib
 import numbers
 import time
 from collections import deque
@@ -62,11 +62,13 @@ ACTIVE_TASK_STATUSES: tuple[str, ...] = (
 )
 
 # Workflow-run statuses indicating the server has already decided the run must stop.
-SERVER_STOP_STATUSES: frozenset[str] = frozenset({
-    WorkflowRunStatus.ERROR,
-    WorkflowRunStatus.TERMINATED,
-    WorkflowRunStatus.STOPPED,
-})
+SERVER_STOP_STATUSES: frozenset[str] = frozenset(
+    {
+        WorkflowRunStatus.ERROR,
+        WorkflowRunStatus.TERMINATED,
+        WorkflowRunStatus.STOPPED,
+    }
+)
 
 # Workflow-run statuses indicating a resume signal was received.
 TERMINATING_STATUSES: tuple[str, ...] = (
@@ -77,7 +79,10 @@ TERMINATING_STATUSES: tuple[str, ...] = (
 
 class SwarmCommand:
     def __init__(
-        self, func: Callable[..., Awaitable[None]], *args: list[SwarmTask], **kwargs: Any
+        self,
+        func: Callable[..., Awaitable[None]],
+        *args: list[SwarmTask],
+        **kwargs: Any,
     ) -> None:
         """A command to be run by the distributor service.
 
@@ -204,9 +209,8 @@ class WorkflowRun:
         """
         if self.status in SERVER_STOP_STATUSES:
             return False
-        return (
-            any(self._task_status_map[s] for s in ACTIVE_TASK_STATUSES)
-            or bool(self.ready_to_run)
+        return any(self._task_status_map[s] for s in ACTIVE_TASK_STATUSES) or bool(
+            self.ready_to_run
         )
 
     def _get_active_tasks_count(self) -> int:
@@ -617,8 +621,8 @@ class WorkflowRun:
                     await self.synchronize_state_async()
 
                 self._check_fail_after_n_executions()
-                loop_continue, time_since_last_full_sync = self._decide_run_loop_continue(
-                    time_since_last_full_sync
+                loop_continue, time_since_last_full_sync = (
+                    self._decide_run_loop_continue(time_since_last_full_sync)
                 )
                 # No observable work still queued, but tasks remain outstanding.
                 # Force an immediate full sync (historic behavior) before deciding to exit.
@@ -629,7 +633,9 @@ class WorkflowRun:
 
         except KeyboardInterrupt:
             logger.warning("Keyboard interrupt raised")
-            confirm = await asyncio.to_thread(input, "Are you sure you want to exit (y/n): ")
+            confirm = await asyncio.to_thread(
+                input, "Are you sure you want to exit (y/n): "
+            )
             confirm = confirm.lower().strip()
 
             if confirm == "y":
@@ -639,7 +645,9 @@ class WorkflowRun:
                 logger.info("Continuing jobmon...")
                 remaining = max(
                     0,
-                    int(seconds_until_timeout - (time.perf_counter() - swarm_start_time)),
+                    int(
+                        seconds_until_timeout - (time.perf_counter() - swarm_start_time)
+                    ),
                 )
                 await self._teardown_async()
                 teardown_needed = False
@@ -664,6 +672,12 @@ class WorkflowRun:
                 await self._update_status_async(WorkflowRunStatus.DONE)
             elif self.status in TERMINATING_STATUSES:
                 await self._update_status_async(WorkflowRunStatus.TERMINATED)
+            elif self.status in SERVER_STOP_STATUSES:
+                # Server already set a terminal status (ERROR/TERMINATED/STOPPED).
+                # Don't try to transition again - just log and accept it.
+                logger.info(
+                    f"Workflow run exited with server-set status: {self.status}"
+                )
             else:
                 await self._update_status_async(WorkflowRunStatus.ERROR)
         finally:
@@ -698,7 +712,9 @@ class WorkflowRun:
                 self._set_validated_task_resources(task)
                 self.ready_to_run.append(task)
 
-        logger.debug(f"Initial fringe set. ready_to_run_count: {len(self.ready_to_run)}")
+        logger.debug(
+            f"Initial fringe set. ready_to_run_count: {len(self.ready_to_run)}"
+        )
 
     def get_swarm_commands(self) -> Generator[SwarmCommand, None, None]:
         """Yield batched queue commands respecting workflow/array concurrency limits."""
@@ -847,7 +863,7 @@ class WorkflowRun:
         # Log any failures but don't raise - individual sync failures shouldn't
         # stop the workflow run
         for i, result in enumerate(results):
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 op_names = [
                     "triage",
                     "heartbeat",
@@ -973,8 +989,16 @@ class WorkflowRun:
             self._stop_event.set()
         if self._heartbeat_task:
             self._heartbeat_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
+            try:
                 await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass  # Expected when we cancel the task
+            except Exception as e:
+                # Log but don't raise - we don't want heartbeat errors to mask
+                # the original exception from the main workflow loop
+                logger.warning(
+                    "Heartbeat task failed during teardown", error=str(e), exc_info=e
+                )
             self._heartbeat_task = None
         await self._close_session()
         self._stop_event = None
@@ -1124,14 +1148,14 @@ class WorkflowRun:
         )
 
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 logger.warning(
                     "Failed to sync array concurrency",
                     error=str(result),
                     exc_info=result,
                 )
             else:
-                aid, max_running = result
+                aid, max_running = result  # type: tuple[int, int]
                 self.arrays[aid].max_concurrently_running = max_running
 
     @bind_method_context(workflow_run_id="workflow_run_id")

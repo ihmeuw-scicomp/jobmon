@@ -140,8 +140,11 @@ class MultiprocessDistributor(ClusterDistributor):
         # This avoids version mismatches when multiple jobmon installations exist
         # (e.g., conda base vs project .venv)
         bin_dir = os.path.dirname(sys.executable)
-        worker_node_entry_point = os.path.join(bin_dir, "worker_node_entry_point")
-        if not os.path.exists(worker_node_entry_point):
+        candidate_path = os.path.join(bin_dir, "worker_node_entry_point")
+        worker_node_entry_point: Optional[str]
+        if os.path.exists(candidate_path):
+            worker_node_entry_point = candidate_path
+        else:
             # Fall back to shutil.which if not found in same directory as Python
             worker_node_entry_point = shutil.which("worker_node_entry_point")
         if not worker_node_entry_point or not os.path.exists(worker_node_entry_point):
