@@ -1,4 +1,5 @@
 import ast
+import asyncio
 import logging
 import os
 import time
@@ -581,4 +582,4 @@ def test_build_swarm_from_workflow_id(tool, task_template):
     assert resume_swarm.ready_to_run[0] == st3
 
     # Run a full sync, test that no keyerrors are raised
-    resume_swarm._task_status_updates(full_sync=True)
+    asyncio.run(resume_swarm._task_status_updates_async(full_sync=True))

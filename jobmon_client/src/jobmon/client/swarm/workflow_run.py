@@ -832,11 +832,34 @@ class WorkflowRun:
         self._run_coroutine(self.synchronize_state_async(full_sync=full_sync))
 
     async def synchronize_state_async(self, full_sync: bool = False) -> None:
-        await self._set_status_for_triaging_async()
-        await self._log_heartbeat_async()
-        await self._task_status_updates_async(full_sync=full_sync)
-        await self._synchronize_max_concurrently_running_async()
-        await self._synchronize_array_max_concurrently_running_async()
+        # These operations are independent - run them in parallel for better throughput.
+        # Include heartbeat for cases where synchronize_state is called directly
+        # (not through the full _run_async loop with its background heartbeat task).
+        results = await asyncio.gather(
+            self._set_status_for_triaging_async(),
+            self._log_heartbeat_async(),
+            self._task_status_updates_async(full_sync=full_sync),
+            self._synchronize_max_concurrently_running_async(),
+            self._synchronize_array_max_concurrently_running_async(),
+            return_exceptions=True,
+        )
+
+        # Log any failures but don't raise - individual sync failures shouldn't
+        # stop the workflow run
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                op_names = [
+                    "triage",
+                    "heartbeat",
+                    "task_status_updates",
+                    "max_concurrently_running",
+                    "array_max_concurrently_running",
+                ]
+                logger.warning(
+                    f"Sync operation '{op_names[i]}' failed",
+                    error=str(result),
+                    exc_info=result,
+                )
 
         logger.debug(
             f"State synchronized. ready_to_run_count: {len(self.ready_to_run)}, "
@@ -902,19 +925,12 @@ class WorkflowRun:
         if num_newly_failed > 0:
             logger.warning(f"{num_newly_failed} newly failed tasks.")
 
-    def _set_status_for_triaging(self) -> None:
+    async def _set_status_for_triaging_async(self) -> None:
+        """Request server to triage overdue task instances."""
         logger.debug("Swarm requesting triage check for overdue task instances")
         app_route = f"/workflow_run/{self.workflow_run_id}/set_status_for_triaging"
-        self.requester.send_request(
-            app_route=app_route, message={}, request_type="post"
-        )
-        logger.debug("Triage check completed")
-
-    async def _set_status_for_triaging_async(self) -> None:
-        logger.debug("Swarm requesting triage check for overdue task instances (async)")
-        app_route = f"/workflow_run/{self.workflow_run_id}/set_status_for_triaging"
         await self._request_async(app_route=app_route, message={}, request_type="post")
-        logger.debug("Triage check completed (async)")
+        logger.debug("Triage check completed")
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -1025,14 +1041,8 @@ class WorkflowRun:
                 f"{self._status} to {desired_status}."
             )
 
-    def _terminate_task_instances(self) -> None:
-        """Terminate the workflow run."""
-        app_route = f"/workflow_run/{self.workflow_run_id}/terminate_task_instances"
-        self.requester.send_request(app_route=app_route, message={}, request_type="put")
-        self._terminated = True
-
     async def _terminate_task_instances_async(self) -> None:
-        """Async termination helper."""
+        """Signal the server to terminate all task instances for this workflow run."""
         app_route = f"/workflow_run/{self.workflow_run_id}/terminate_task_instances"
         await self._request_async(app_route=app_route, message={}, request_type="put")
         self._terminated = True
@@ -1063,30 +1073,9 @@ class WorkflowRun:
         )
         return response["time"]
 
-    def _task_status_updates(self, full_sync: bool = False) -> None:
-        """Update internal state of tasks to match the database.
-
-        If no tasks are specified, get all tasks.
-        """
-        if full_sync:
-            message = {}
-        else:
-            message = {"last_sync": str(self.last_sync)}
-
-        app_route = f"/workflow/{self.workflow_id}/task_status_updates"
-        _, response = self.requester.send_request(
-            app_route=app_route,
-            message=message,
-            request_type="post",
-        )
-        self._apply_task_status_updates(response)
-
     async def _task_status_updates_async(self, full_sync: bool = False) -> None:
-        if full_sync:
-            message = {}
-        else:
-            message = {"last_sync": str(self.last_sync)}
-
+        """Fetch task status changes from the server and update local state."""
+        message = {} if full_sync else {"last_sync": str(self.last_sync)}
         app_route = f"/workflow/{self.workflow_id}/task_status_updates"
         _, response = await self._request_async(
             app_route=app_route,
@@ -1108,39 +1097,42 @@ class WorkflowRun:
                     new_status_tasks.add(task)
         self._refresh_task_status_map(new_status_tasks)
 
-    def _synchronize_max_concurrently_running(self) -> None:
-        app_route = f"/workflow/{self.workflow_id}/get_max_concurrently_running"
-        _, response = self.requester.send_request(
-            app_route=app_route, message={}, request_type="get"
-        )
-        self.max_concurrently_running = response["max_concurrently_running"]
-
     async def _synchronize_max_concurrently_running_async(self) -> None:
+        """Refresh workflow-level max_concurrently_running from server."""
         app_route = f"/workflow/{self.workflow_id}/get_max_concurrently_running"
         _, response = await self._request_async(
             app_route=app_route, message={}, request_type="get"
         )
         self.max_concurrently_running = response["max_concurrently_running"]
 
-    def _synchronize_array_max_concurrently_running(self) -> None:
-        for aid, array in self.arrays.items():
-            app_route = f"/array/{aid}/get_array_max_concurrently_running"
-            _, response = self.requester.send_request(
-                app_route=app_route, message={}, request_type="get"
-            )
-            self.arrays[aid].max_concurrently_running = response[
-                "max_concurrently_running"
-            ]
-
     async def _synchronize_array_max_concurrently_running_async(self) -> None:
-        for aid, array in self.arrays.items():
+        """Refresh per-array max_concurrently_running limits from server."""
+        if not self.arrays:
+            return
+
+        async def fetch_array_concurrency(aid: int) -> tuple[int, int]:
             app_route = f"/array/{aid}/get_array_max_concurrently_running"
             _, response = await self._request_async(
                 app_route=app_route, message={}, request_type="get"
             )
-            self.arrays[aid].max_concurrently_running = response[
-                "max_concurrently_running"
-            ]
+            return aid, response["max_concurrently_running"]
+
+        # Fetch all array limits in parallel
+        results = await asyncio.gather(
+            *[fetch_array_concurrency(aid) for aid in self.arrays],
+            return_exceptions=True,
+        )
+
+        for result in results:
+            if isinstance(result, Exception):
+                logger.warning(
+                    "Failed to sync array concurrency",
+                    error=str(result),
+                    exc_info=result,
+                )
+            else:
+                aid, max_running = result
+                self.arrays[aid].max_concurrently_running = max_running
 
     @bind_method_context(workflow_run_id="workflow_run_id")
     async def queue_task_batch_async(self, tasks: list[SwarmTask]) -> None:

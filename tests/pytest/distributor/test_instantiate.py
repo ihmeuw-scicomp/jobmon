@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict
 
 import pytest
@@ -456,9 +457,13 @@ def test_dynamic_concurrency_limiting(tool, task_template):
     )
 
     concurrency_limit(workflow.workflow_id, 5)
-    # This checks the route on the server
-    swarm._synchronize_max_concurrently_running()
-    swarm.process_commands()
+
+    # Combine async calls to avoid event loop closure issues with cached session
+    async def sync_and_process() -> None:
+        await swarm._synchronize_max_concurrently_running_async()
+        await swarm.process_commands_async()
+
+    asyncio.run(sync_and_process())
     distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
     distributor_service.process_status(TaskInstanceStatus.QUEUED)
     distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)

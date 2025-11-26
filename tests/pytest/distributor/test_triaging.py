@@ -1,3 +1,4 @@
+import asyncio
 from unittest import mock
 
 import pytest
@@ -100,8 +101,8 @@ def test_set_status_for_triaging(tool, db_engine, task_template):
         )
         session.execute(running_stmt)
         session.commit()
-    # 2. call swarm._set_status_for_triaging()
-    swarm._set_status_for_triaging()
+    # 2. call swarm._set_status_for_triaging_async()
+    asyncio.run(swarm._set_status_for_triaging_async())
 
     # check the jobs to be Triaging
     with Session(bind=db_engine) as session:
