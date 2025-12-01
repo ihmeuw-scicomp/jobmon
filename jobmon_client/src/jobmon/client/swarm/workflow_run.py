@@ -30,6 +30,8 @@ import structlog
 from jobmon.client.array import Array
 from jobmon.client.swarm.swarm_array import SwarmArray
 from jobmon.client.swarm.swarm_task import SwarmTask
+from jobmon.client.swarm.workflow_run_impl.gateway import ServerGateway
+from jobmon.client.swarm.workflow_run_impl.state import StateUpdate, SwarmState
 from jobmon.client.task_resources import TaskResources
 from jobmon.core.cluster import Cluster
 from jobmon.core.configuration import JobmonConfig
@@ -112,6 +114,14 @@ class WorkflowRun:
     this is not enforced via any database constraints.
     """
 
+    # Feature flag for new gateway-based implementation (Phase 1 refactor)
+    # When True, HTTP communication uses the new ServerGateway class
+    USE_NEW_GATEWAY: bool = False
+
+    # Feature flag for new state container (Phase 2 refactor)
+    # When True, state management uses the new SwarmState class
+    USE_NEW_STATE: bool = False
+
     def __init__(
         self,
         workflow_run_id: int,
@@ -188,10 +198,64 @@ class WorkflowRun:
         self._stop_event: Optional[asyncio.Event] = None
         self._heartbeat_task: Optional[asyncio.Task[None]] = None
 
+        # New gateway for HTTP communication (initialized lazily after workflow_id is set)
+        self._gateway: Optional[ServerGateway] = None
+
+        # New state container (initialized lazily after workflow_id is set)
+        self._state: Optional[SwarmState] = None
+
     @property
     def status(self) -> Optional[str]:
         """Status of the workflow run."""
         return self._status
+
+    def _ensure_gateway(self) -> ServerGateway:
+        """Lazily initialize the gateway when needed.
+
+        The gateway requires workflow_id which is only available after
+        from_workflow() or from_workflow_id() is called.
+        """
+        if self._gateway is None:
+            if not hasattr(self, "workflow_id"):
+                raise RuntimeError(
+                    "Cannot create gateway before workflow_id is set. "
+                    "Call from_workflow() or from_workflow_id() first."
+                )
+            self._gateway = ServerGateway(
+                requester=self.requester,
+                workflow_id=self.workflow_id,
+                workflow_run_id=self.workflow_run_id,
+            )
+        return self._gateway
+
+    def _ensure_state(self) -> SwarmState:
+        """Lazily initialize the state container when needed.
+
+        The state requires workflow_id, dag_id which are only available after
+        from_workflow() or from_workflow_id() is called.
+        """
+        if self._state is None:
+            if not hasattr(self, "workflow_id"):
+                raise RuntimeError(
+                    "Cannot create state before workflow_id is set. "
+                    "Call from_workflow() or from_workflow_id() first."
+                )
+            self._state = SwarmState(
+                workflow_id=self.workflow_id,
+                workflow_run_id=self.workflow_run_id,
+                dag_id=self.dag_id,
+                max_concurrently_running=self.max_concurrently_running,
+                status=self._status,
+            )
+            # Copy existing state to the new container (with safe defaults)
+            self._state.last_sync = getattr(self, "last_sync", None)
+            self._state.num_previously_complete = getattr(
+                self, "num_previously_complete", 0
+            )
+            self._state.task_resources_cache = self._task_resources
+            # Note: tasks, arrays, and task_status_map are synced separately
+            # since they reference SwarmTask objects that need to be shared
+        return self._state
 
     @property
     def done_tasks(self) -> list[SwarmTask]:
@@ -215,6 +279,8 @@ class WorkflowRun:
 
     def _get_active_tasks_count(self) -> int:
         """Return the number of tasks currently in-flight."""
+        if self.USE_NEW_STATE and self._state is not None:
+            return self._state.get_active_task_count()
         return sum(len(self._task_status_map[s]) for s in ACTIVE_TASK_STATUSES)
 
     def _get_ready_to_run_count(self) -> int:
@@ -242,6 +308,8 @@ class WorkflowRun:
         return (self._get_active_tasks_count() + self._get_ready_to_run_count()) > 0
 
     def _all_tasks_final(self) -> bool:
+        if self.USE_NEW_STATE and self._state is not None:
+            return self._state.all_tasks_final()
         return len(self.tasks) == len(self._task_status_map[TaskStatus.DONE]) + len(
             self._task_status_map[TaskStatus.ERROR_FATAL]
         )
@@ -943,10 +1011,17 @@ class WorkflowRun:
 
     async def _set_status_for_triaging_async(self) -> None:
         """Request server to triage overdue task instances."""
-        logger.debug("Swarm requesting triage check for overdue task instances")
-        app_route = f"/workflow_run/{self.workflow_run_id}/set_status_for_triaging"
-        await self._request_async(app_route=app_route, message={}, request_type="post")
-        logger.debug("Triage check completed")
+        if self.USE_NEW_GATEWAY:
+            gateway = self._ensure_gateway()
+            gateway.set_session(await self._ensure_session())
+            await gateway.request_triage()
+        else:
+            logger.debug("Swarm requesting triage check for overdue task instances")
+            app_route = f"/workflow_run/{self.workflow_run_id}/set_status_for_triaging"
+            await self._request_async(
+                app_route=app_route, message={}, request_type="post"
+            )
+            logger.debug("Triage check completed")
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -1007,31 +1082,52 @@ class WorkflowRun:
         next_report_increment = (
             self._workflow_run_heartbeat_interval * self._heartbeat_report_by_buffer
         )
-        app_route = f"/workflow_run/{self.workflow_run_id}/log_heartbeat"
-        _, response = self.requester.send_request(
-            app_route=app_route,
-            message={
-                "status": self._status,
-                "next_report_increment": next_report_increment,
-            },
-            request_type="post",
-        )
-        self._apply_heartbeat_response(response)
+
+        if self.USE_NEW_GATEWAY:
+            gateway = self._ensure_gateway()
+            response = gateway.log_heartbeat_sync(
+                status=self._status,
+                next_report_increment=next_report_increment,
+            )
+            self._status = response.status
+            self._last_heartbeat_time = time.time()
+        else:
+            app_route = f"/workflow_run/{self.workflow_run_id}/log_heartbeat"
+            _, response = self.requester.send_request(
+                app_route=app_route,
+                message={
+                    "status": self._status,
+                    "next_report_increment": next_report_increment,
+                },
+                request_type="post",
+            )
+            self._apply_heartbeat_response(response)
 
     async def _log_heartbeat_async(self) -> None:
         next_report_increment = (
             self._workflow_run_heartbeat_interval * self._heartbeat_report_by_buffer
         )
-        app_route = f"/workflow_run/{self.workflow_run_id}/log_heartbeat"
-        _, response = await self._request_async(
-            app_route=app_route,
-            message={
-                "status": self._status,
-                "next_report_increment": next_report_increment,
-            },
-            request_type="post",
-        )
-        self._apply_heartbeat_response(response)
+
+        if self.USE_NEW_GATEWAY:
+            gateway = self._ensure_gateway()
+            gateway.set_session(await self._ensure_session())
+            response = await gateway.log_heartbeat(
+                status=self._status,
+                next_report_increment=next_report_increment,
+            )
+            self._status = response.status
+            self._last_heartbeat_time = time.time()
+        else:
+            app_route = f"/workflow_run/{self.workflow_run_id}/log_heartbeat"
+            _, response = await self._request_async(
+                app_route=app_route,
+                message={
+                    "status": self._status,
+                    "next_report_increment": next_report_increment,
+                },
+                request_type="post",
+            )
+            self._apply_heartbeat_response(response)
 
     def _apply_heartbeat_response(self, response: dict[str, Any]) -> None:
         self._status = response["status"]
@@ -1049,13 +1145,19 @@ class WorkflowRun:
 
     async def _update_status_async(self, status: str) -> None:
         """Async status update helper."""
-        app_route = f"/workflow_run/{self.workflow_run_id}/update_status"
-        _, response = await self._request_async(
-            app_route=app_route,
-            message={"status": status},
-            request_type="put",
-        )
-        self._validate_status_transition(status, response["status"])
+        if self.USE_NEW_GATEWAY:
+            gateway = self._ensure_gateway()
+            gateway.set_session(await self._ensure_session())
+            response = await gateway.update_status(status)
+            self._validate_status_transition(status, response.status)
+        else:
+            app_route = f"/workflow_run/{self.workflow_run_id}/update_status"
+            _, response = await self._request_async(
+                app_route=app_route,
+                message={"status": status},
+                request_type="put",
+            )
+            self._validate_status_transition(status, response["status"])
 
     def _validate_status_transition(self, desired_status: str, new_status: str) -> None:
         self._status = new_status
@@ -1067,8 +1169,15 @@ class WorkflowRun:
 
     async def _terminate_task_instances_async(self) -> None:
         """Signal the server to terminate all task instances for this workflow run."""
-        app_route = f"/workflow_run/{self.workflow_run_id}/terminate_task_instances"
-        await self._request_async(app_route=app_route, message={}, request_type="put")
+        if self.USE_NEW_GATEWAY:
+            gateway = self._ensure_gateway()
+            gateway.set_session(await self._ensure_session())
+            await gateway.terminate_task_instances()
+        else:
+            app_route = f"/workflow_run/{self.workflow_run_id}/terminate_task_instances"
+            await self._request_async(
+                app_route=app_route, message={}, request_type="put"
+            )
         self._terminated = True
 
     def _check_fail_after_n_executions(self) -> None:
@@ -1099,53 +1208,102 @@ class WorkflowRun:
 
     async def _task_status_updates_async(self, full_sync: bool = False) -> None:
         """Fetch task status changes from the server and update local state."""
-        message = {} if full_sync else {"last_sync": str(self.last_sync)}
-        app_route = f"/workflow/{self.workflow_id}/task_status_updates"
-        _, response = await self._request_async(
-            app_route=app_route,
-            message=message,
-            request_type="post",
-        )
-        self._apply_task_status_updates(response)
+        if self.USE_NEW_GATEWAY:
+            gateway = self._ensure_gateway()
+            gateway.set_session(await self._ensure_session())
+            since = None if full_sync else self.last_sync
+            response = await gateway.get_task_status_updates(since=since)
+            # Convert gateway response to the format expected by _apply_task_status_updates
+            self._apply_task_status_updates(
+                {"time": response.time, "tasks_by_status": response.tasks_by_status}
+            )
+        else:
+            message = {} if full_sync else {"last_sync": str(self.last_sync)}
+            app_route = f"/workflow/{self.workflow_id}/task_status_updates"
+            _, response = await self._request_async(
+                app_route=app_route,
+                message=message,
+                request_type="post",
+            )
+            self._apply_task_status_updates(response)
 
     def _apply_task_status_updates(self, response: dict[str, Any]) -> None:
         self.last_sync = response["time"]
 
-        new_status_tasks: set[SwarmTask] = set()
-        for current_status, task_ids in response["tasks_by_status"].items():
-            task_ids = set(task_ids).intersection(self.tasks)
-            for task_id in task_ids:
-                task = self.tasks[task_id]
-                if current_status != task.status:
-                    task.status = current_status
-                    new_status_tasks.add(task)
-        self._refresh_task_status_map(new_status_tasks)
+        if self.USE_NEW_STATE and self._state is not None:
+            # Use StateUpdate pattern
+            update = StateUpdate.from_task_status_response(
+                tasks_by_status=response["tasks_by_status"],
+                sync_time=response["time"],
+            )
+            # Filter to only tasks we know about
+            filtered_statuses = {
+                tid: status
+                for tid, status in update.task_statuses.items()
+                if tid in self.tasks
+            }
+            update = StateUpdate(
+                task_statuses=filtered_statuses,
+                sync_time=update.sync_time,
+            )
+            changed_tasks = self._state.apply_update(update)
+            # Also update the old state structures for backward compatibility
+            self._refresh_task_status_map(changed_tasks)
+        else:
+            new_status_tasks: set[SwarmTask] = set()
+            for current_status, task_ids in response["tasks_by_status"].items():
+                task_ids = set(task_ids).intersection(self.tasks)
+                for task_id in task_ids:
+                    task = self.tasks[task_id]
+                    if current_status != task.status:
+                        task.status = current_status
+                        new_status_tasks.add(task)
+            self._refresh_task_status_map(new_status_tasks)
 
     async def _synchronize_max_concurrently_running_async(self) -> None:
         """Refresh workflow-level max_concurrently_running from server."""
-        app_route = f"/workflow/{self.workflow_id}/get_max_concurrently_running"
-        _, response = await self._request_async(
-            app_route=app_route, message={}, request_type="get"
-        )
-        self.max_concurrently_running = response["max_concurrently_running"]
+        if self.USE_NEW_GATEWAY:
+            gateway = self._ensure_gateway()
+            gateway.set_session(await self._ensure_session())
+            self.max_concurrently_running = await gateway.get_workflow_concurrency()
+        else:
+            app_route = f"/workflow/{self.workflow_id}/get_max_concurrently_running"
+            _, response = await self._request_async(
+                app_route=app_route, message={}, request_type="get"
+            )
+            self.max_concurrently_running = response["max_concurrently_running"]
 
     async def _synchronize_array_max_concurrently_running_async(self) -> None:
         """Refresh per-array max_concurrently_running limits from server."""
         if not self.arrays:
             return
 
-        async def fetch_array_concurrency(aid: int) -> tuple[int, int]:
-            app_route = f"/array/{aid}/get_array_max_concurrently_running"
-            _, response = await self._request_async(
-                app_route=app_route, message={}, request_type="get"
-            )
-            return aid, response["max_concurrently_running"]
+        if self.USE_NEW_GATEWAY:
+            gateway = self._ensure_gateway()
+            gateway.set_session(await self._ensure_session())
 
-        # Fetch all array limits in parallel
-        results = await asyncio.gather(
-            *[fetch_array_concurrency(aid) for aid in self.arrays],
-            return_exceptions=True,
-        )
+            async def fetch_array_concurrency_gateway(aid: int) -> tuple[int, int]:
+                max_running = await gateway.get_array_concurrency(aid)
+                return aid, max_running
+
+            results = await asyncio.gather(
+                *[fetch_array_concurrency_gateway(aid) for aid in self.arrays],
+                return_exceptions=True,
+            )
+        else:
+
+            async def fetch_array_concurrency(aid: int) -> tuple[int, int]:
+                app_route = f"/array/{aid}/get_array_max_concurrently_running"
+                _, response = await self._request_async(
+                    app_route=app_route, message={}, request_type="get"
+                )
+                return aid, response["max_concurrently_running"]
+
+            # Fetch all array limits in parallel
+            results = await asyncio.gather(
+                *[fetch_array_concurrency(aid) for aid in self.arrays],
+                return_exceptions=True,
+            )
 
         for result in results:
             if isinstance(result, BaseException):
@@ -1171,19 +1329,32 @@ class WorkflowRun:
             batch_size=len(tasks),
         )
 
-        app_route = f"/array/{first_task.array_id}/queue_task_batch"
-        _, response = await self._request_async(
-            app_route=app_route,
-            message={
-                "task_ids": [task.task_id for task in tasks],
-                "task_resources_id": task_resources.id,
-                "workflow_run_id": self.workflow_run_id,
-                "cluster_id": first_task.cluster.id,
-            },
-            request_type="post",
-        )
+        if self.USE_NEW_GATEWAY:
+            gateway = self._ensure_gateway()
+            gateway.set_session(await self._ensure_session())
+            response = await gateway.queue_task_batch(
+                array_id=first_task.array_id,
+                task_ids=[task.task_id for task in tasks],
+                task_resources_id=task_resources.id,
+                cluster_id=first_task.cluster.id,
+            )
+            tasks_by_status = response.tasks_by_status
+        else:
+            app_route = f"/array/{first_task.array_id}/queue_task_batch"
+            _, response = await self._request_async(
+                app_route=app_route,
+                message={
+                    "task_ids": [task.task_id for task in tasks],
+                    "task_resources_id": task_resources.id,
+                    "workflow_run_id": self.workflow_run_id,
+                    "cluster_id": first_task.cluster.id,
+                },
+                request_type="post",
+            )
+            tasks_by_status = response["tasks_by_status"]
+
         updated_tasks = set()
-        for status, task_ids in response["tasks_by_status"].items():
+        for status, task_ids in tasks_by_status.items():
             for task_id in task_ids:
                 task = self.tasks[task_id]
                 task.status = status
