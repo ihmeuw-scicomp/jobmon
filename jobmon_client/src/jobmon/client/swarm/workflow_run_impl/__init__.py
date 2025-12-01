@@ -15,7 +15,8 @@ Components:
 """
 
 from jobmon.client.swarm.workflow_run_impl.gateway import ServerGateway
+from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
 from jobmon.client.swarm.workflow_run_impl.state import StateUpdate, SwarmState
 
-__all__ = ["ServerGateway", "StateUpdate", "SwarmState"]
+__all__ = ["HeartbeatService", "ServerGateway", "StateUpdate", "SwarmState"]
 

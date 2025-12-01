@@ -1,7 +1,7 @@
 """Tests for WorkflowRun feature flag integration.
 
-These tests verify that the USE_NEW_GATEWAY and USE_NEW_STATE flags correctly
-switch between the old and new implementations.
+These tests verify that the USE_NEW_GATEWAY, USE_NEW_STATE, and USE_NEW_HEARTBEAT
+flags correctly switch between the old and new implementations.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from jobmon.client.swarm.workflow_run_impl.gateway import (
     StatusUpdateResponse,
     TaskStatusUpdatesResponse,
 )
+from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
 from jobmon.client.swarm.workflow_run_impl.state import StateUpdate, SwarmState
 from jobmon.core.constants import TaskStatus
 
@@ -383,4 +384,182 @@ class TestStateInitialization:
         state = workflow_run._ensure_state()
 
         assert state.task_resources_cache[12345] is mock_resources
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Heartbeat Feature Flag Tests (Phase 3a)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestHeartbeatFeatureFlagOff:
+    """Tests with USE_NEW_HEARTBEAT = False (default)."""
+
+    def test_heartbeat_flag_default_is_false(self) -> None:
+        """Verify the default heartbeat flag value."""
+        assert WorkflowRun.USE_NEW_HEARTBEAT is False
+
+    def test_sync_heartbeat_uses_old_path_when_flag_off(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test sync heartbeat uses old implementation when flag is off."""
+        WorkflowRun.USE_NEW_HEARTBEAT = False
+        WorkflowRun.USE_NEW_GATEWAY = False
+        mock_requester.send_request.return_value = (200, {"status": "R"})
+
+        workflow_run._log_heartbeat()
+
+        # Should use the requester directly
+        mock_requester.send_request.assert_called_once()
+        call_kwargs = mock_requester.send_request.call_args.kwargs
+        assert "/log_heartbeat" in call_kwargs["app_route"]
+
+    @pytest.mark.asyncio
+    async def test_async_heartbeat_uses_old_path_when_flag_off(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test async heartbeat uses old implementation when flag is off."""
+        WorkflowRun.USE_NEW_HEARTBEAT = False
+        WorkflowRun.USE_NEW_GATEWAY = False
+        mock_requester.send_request_async.return_value = (200, {"status": "R"})
+
+        with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+            await workflow_run._log_heartbeat_async()
+
+        mock_requester.send_request_async.assert_called_once()
+
+
+class TestHeartbeatFeatureFlagOn:
+    """Tests with USE_NEW_HEARTBEAT = True."""
+
+    def test_sync_heartbeat_uses_service_when_flag_on(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test sync heartbeat uses HeartbeatService when flag is on."""
+        WorkflowRun.USE_NEW_HEARTBEAT = True
+        try:
+            mock_requester.send_request.return_value = (200, {"status": "R"})
+
+            workflow_run._log_heartbeat()
+
+            # Should have created and used the heartbeat service
+            assert workflow_run._heartbeat_service is not None
+            assert isinstance(workflow_run._heartbeat_service, HeartbeatService)
+            # The service should have called the gateway
+            mock_requester.send_request.assert_called_once()
+        finally:
+            WorkflowRun.USE_NEW_HEARTBEAT = False
+
+    def test_sync_heartbeat_updates_status_from_server(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test sync heartbeat updates status when server changes it."""
+        WorkflowRun.USE_NEW_HEARTBEAT = True
+        try:
+            workflow_run._status = "R"
+            # Server responds with a different status
+            mock_requester.send_request.return_value = (200, {"status": "H"})
+
+            workflow_run._log_heartbeat()
+
+            # Status should be updated
+            assert workflow_run._status == "H"
+        finally:
+            WorkflowRun.USE_NEW_HEARTBEAT = False
+
+    @pytest.mark.asyncio
+    async def test_async_heartbeat_uses_service_when_flag_on(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test async heartbeat uses HeartbeatService when flag is on."""
+        WorkflowRun.USE_NEW_HEARTBEAT = True
+        try:
+            mock_requester.send_request_async.return_value = (200, {"status": "R"})
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                await workflow_run._log_heartbeat_async()
+
+            assert workflow_run._heartbeat_service is not None
+            assert isinstance(workflow_run._heartbeat_service, HeartbeatService)
+            mock_requester.send_request_async.assert_called_once()
+        finally:
+            WorkflowRun.USE_NEW_HEARTBEAT = False
+
+    @pytest.mark.asyncio
+    async def test_async_heartbeat_updates_status_from_server(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test async heartbeat updates status when server changes it."""
+        WorkflowRun.USE_NEW_HEARTBEAT = True
+        try:
+            workflow_run._status = "R"
+            # Server responds with a different status
+            mock_requester.send_request_async.return_value = (200, {"status": "C"})
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                await workflow_run._log_heartbeat_async()
+
+            assert workflow_run._status == "C"
+        finally:
+            WorkflowRun.USE_NEW_HEARTBEAT = False
+
+
+class TestHeartbeatServiceInitialization:
+    """Tests for heartbeat service lazy initialization."""
+
+    def test_heartbeat_service_not_created_initially(
+        self, mock_requester: MagicMock
+    ) -> None:
+        """Test that heartbeat service is None initially."""
+        wfr = WorkflowRun(
+            workflow_run_id=100,
+            requester=mock_requester,
+        )
+        assert wfr._heartbeat_service is None
+
+    def test_ensure_heartbeat_service_creates_service(
+        self, workflow_run: WorkflowRun
+    ) -> None:
+        """Test that _ensure_heartbeat_service creates the service."""
+        assert workflow_run._heartbeat_service is None
+        service = workflow_run._ensure_heartbeat_service()
+        assert service is not None
+        assert isinstance(service, HeartbeatService)
+        assert service.interval == workflow_run._workflow_run_heartbeat_interval
+        assert service.current_status == workflow_run._status
+
+    def test_ensure_heartbeat_service_returns_same_instance(
+        self, workflow_run: WorkflowRun
+    ) -> None:
+        """Test that _ensure_heartbeat_service returns the same instance."""
+        service1 = workflow_run._ensure_heartbeat_service()
+        service2 = workflow_run._ensure_heartbeat_service()
+        assert service1 is service2
+
+    def test_ensure_heartbeat_service_requires_gateway(
+        self, workflow_run: WorkflowRun
+    ) -> None:
+        """Test that _ensure_heartbeat_service creates gateway if needed."""
+        assert workflow_run._gateway is None
+        workflow_run._ensure_heartbeat_service()
+        # Gateway should have been created as a dependency
+        assert workflow_run._gateway is not None
+
+    def test_heartbeat_service_uses_workflow_run_interval(
+        self, mock_requester: MagicMock
+    ) -> None:
+        """Test that service uses the workflow run's heartbeat interval."""
+        wfr = WorkflowRun(
+            workflow_run_id=100,
+            requester=mock_requester,
+            workflow_run_heartbeat_interval=45,
+            heartbeat_report_by_buffer=3.0,
+        )
+        wfr.workflow_id = 1
+        wfr.max_concurrently_running = 100
+        wfr.dag_id = 1
+
+        service = wfr._ensure_heartbeat_service()
+
+        assert service.interval == 45
+        assert service.next_report_increment == 135  # 45 * 3.0
 

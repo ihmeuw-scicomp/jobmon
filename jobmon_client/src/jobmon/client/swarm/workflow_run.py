@@ -31,6 +31,7 @@ from jobmon.client.array import Array
 from jobmon.client.swarm.swarm_array import SwarmArray
 from jobmon.client.swarm.swarm_task import SwarmTask
 from jobmon.client.swarm.workflow_run_impl.gateway import ServerGateway
+from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
 from jobmon.client.swarm.workflow_run_impl.state import StateUpdate, SwarmState
 from jobmon.client.task_resources import TaskResources
 from jobmon.core.cluster import Cluster
@@ -122,6 +123,10 @@ class WorkflowRun:
     # When True, state management uses the new SwarmState class
     USE_NEW_STATE: bool = False
 
+    # Feature flag for new heartbeat service (Phase 3a refactor)
+    # When True, heartbeat management uses the new HeartbeatService class
+    USE_NEW_HEARTBEAT: bool = False
+
     def __init__(
         self,
         workflow_run_id: int,
@@ -204,6 +209,9 @@ class WorkflowRun:
         # New state container (initialized lazily after workflow_id is set)
         self._state: Optional[SwarmState] = None
 
+        # New heartbeat service (initialized lazily after gateway is set)
+        self._heartbeat_service: Optional[HeartbeatService] = None
+
     @property
     def status(self) -> Optional[str]:
         """Status of the workflow run."""
@@ -256,6 +264,21 @@ class WorkflowRun:
             # Note: tasks, arrays, and task_status_map are synced separately
             # since they reference SwarmTask objects that need to be shared
         return self._state
+
+    def _ensure_heartbeat_service(self) -> HeartbeatService:
+        """Lazily initialize the heartbeat service when needed.
+
+        The heartbeat service requires the gateway to be available.
+        """
+        if self._heartbeat_service is None:
+            gateway = self._ensure_gateway()
+            self._heartbeat_service = HeartbeatService(
+                gateway=gateway,
+                interval=self._workflow_run_heartbeat_interval,
+                report_by_buffer=self._heartbeat_report_by_buffer,
+                initial_status=self._status,
+            )
+        return self._heartbeat_service
 
     @property
     def done_tasks(self) -> list[SwarmTask]:
@@ -754,6 +777,26 @@ class WorkflowRun:
 
     async def _heartbeat_loop(self) -> None:
         """Background task that ensures workflow-run heartbeats are logged."""
+        if self.USE_NEW_HEARTBEAT and self._stop_event is not None:
+            # Use the new HeartbeatService background loop
+            heartbeat = self._ensure_heartbeat_service()
+            # Ensure gateway has session for async operations
+            gateway = self._ensure_gateway()
+            gateway.set_session(await self._ensure_session())
+            try:
+                await heartbeat.run_background(self._stop_event)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Heartbeat loop error (new service)")
+                raise
+            finally:
+                # Sync back the status and time to WorkflowRun
+                self._status = heartbeat.current_status
+                self._last_heartbeat_time = heartbeat.last_heartbeat_time
+            return
+
+        # Legacy implementation
         heartbeat_tick = max(1.0, self._workflow_run_heartbeat_interval / 2)
         try:
             while self._stop_event and not self._stop_event.is_set():
@@ -1079,6 +1122,17 @@ class WorkflowRun:
         self._stop_event = None
 
     def _log_heartbeat(self) -> None:
+        if self.USE_NEW_HEARTBEAT:
+            heartbeat = self._ensure_heartbeat_service()
+            # Sync the service status with our current status
+            heartbeat.set_status(self._status)
+            update = heartbeat.tick_sync()
+            # Apply any status change from the server
+            if update.workflow_run_status:
+                self._status = update.workflow_run_status
+            self._last_heartbeat_time = heartbeat.last_heartbeat_time
+            return
+
         next_report_increment = (
             self._workflow_run_heartbeat_interval * self._heartbeat_report_by_buffer
         )
@@ -1104,6 +1158,20 @@ class WorkflowRun:
             self._apply_heartbeat_response(response)
 
     async def _log_heartbeat_async(self) -> None:
+        if self.USE_NEW_HEARTBEAT:
+            heartbeat = self._ensure_heartbeat_service()
+            # Ensure the gateway has a session for async operations
+            gateway = self._ensure_gateway()
+            gateway.set_session(await self._ensure_session())
+            # Sync the service status with our current status
+            heartbeat.set_status(self._status)
+            update = await heartbeat.tick()
+            # Apply any status change from the server
+            if update.workflow_run_status:
+                self._status = update.workflow_run_status
+            self._last_heartbeat_time = heartbeat.last_heartbeat_time
+            return
+
         next_report_increment = (
             self._workflow_run_heartbeat_interval * self._heartbeat_report_by_buffer
         )
