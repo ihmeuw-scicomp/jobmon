@@ -86,62 +86,6 @@ class TestSwarmWorkflowRunTimeout:
             # Verify the method was called
             mock_run.assert_called_once()
 
-    def test_fhs_scenario_zero_active_tasks_many_ready_to_run(self):
-        """Test FHS case: 0 active tasks but 13420 ready_to_run should return loop_continue true."""
-        from collections import deque
-
-        # Create a mock WorkflowRun
-        swarm = SwarmWorkflowRun(
-            workflow_run_id=1,
-            workflow_run_heartbeat_interval=30,
-            requester=Mock(),
-            status=WorkflowRunStatus.RUNNING,
-        )
-
-        # Set required attributes
-        swarm.max_concurrently_running = 10
-        swarm.arrays = {}
-        swarm.ready_to_run = deque(["task"] * 13420)  # Many ready-to-run tasks
-        swarm._last_heartbeat_time = time.time() - 5.0
-
-        # Mock the _task_status_map to simulate no active tasks
-        with patch.object(
-            swarm,
-            "_task_status_map",
-            {
-                TaskStatus.QUEUED: [],
-                TaskStatus.INSTANTIATING: [],
-                TaskStatus.LAUNCHED: [],
-                TaskStatus.RUNNING: [],
-                TaskStatus.DONE: [],
-                TaskStatus.ERROR_FATAL: [],
-            },
-        ):
-            # Mock tasks to simulate not all tasks done
-            with patch.object(swarm, "tasks", {"task1": Mock(), "task2": Mock()}):
-                # Test different time_since_last_full_sync values
-                test_values = [29.0, 30.0, 31.0]
-
-                for time_since_last_full_sync in test_values:
-                    print(
-                        f"Testing with time_since_last_full_sync = {time_since_last_full_sync}"
-                    )
-
-                    # Test the _decide_run_loop_continue method directly
-                    should_continue, updated_time = swarm._decide_run_loop_continue(
-                        time_since_last_full_sync
-                    )
-
-                    # Should continue because there are ready-to-run tasks
-                    assert (
-                        should_continue == True
-                    ), f"Should continue with time_since_last_full_sync={time_since_last_full_sync}"
-                    assert swarm._get_active_tasks_count() == 0
-                    assert swarm._get_ready_to_run_count() == 13420
-                    print(
-                        f"  Result: should_continue={should_continue}, updated_time={updated_time}"
-                    )
-
     def test_timeout_logic_directly(self):
         """Test timeout logic directly without complex mocking."""
         # Create a mock WorkflowRun

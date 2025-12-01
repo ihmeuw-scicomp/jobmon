@@ -299,60 +299,40 @@ def test_stopped_resume(tool):
     """test that a workflow with two task where the workflow is stopped with a
     keyboard interrupt mid stream. The workflow is resumed and
     the tasks then finishes successfully and the workflow runs to completion"""
+    from jobmon.client.swarm.workflow_run_impl.orchestrator import WorkflowRunOrchestrator
 
-    # Disable all new implementations for this test because it patches
-    # _check_fail_after_n_executions which is a method on WorkflowRun
-    # that the orchestrator doesn't use in the same way
-    original_orchestrator = SwarmWorkflowRun.USE_NEW_ORCHESTRATOR
-    original_gateway = SwarmWorkflowRun.USE_NEW_GATEWAY
-    original_state = SwarmWorkflowRun.USE_NEW_STATE
-    original_heartbeat = SwarmWorkflowRun.USE_NEW_HEARTBEAT
-    original_synchronizer = SwarmWorkflowRun.USE_NEW_SYNCHRONIZER
-    SwarmWorkflowRun.USE_NEW_ORCHESTRATOR = False
-    SwarmWorkflowRun.USE_NEW_GATEWAY = False
-    SwarmWorkflowRun.USE_NEW_STATE = False
-    SwarmWorkflowRun.USE_NEW_HEARTBEAT = False
-    SwarmWorkflowRun.USE_NEW_SYNCHRONIZER = False
+    workflow1 = tool.create_workflow(name="stopped_resume")
+    upstream_tasks = []
+    for phase in [1, 2, 3]:
+        task_template = get_task_template(tool, template_name=f"phase_{phase}")
+        task = task_template.create_task(arg="echo a", upstream_tasks=upstream_tasks)
+        workflow1.add_task(task)
+        upstream_tasks = [task]
 
-    try:
-        workflow1 = tool.create_workflow(name="stopped_resume")
-        upstream_tasks = []
-        for phase in [1, 2, 3]:
-            task_template = get_task_template(tool, template_name=f"phase_{phase}")
-            task = task_template.create_task(arg="echo a", upstream_tasks=upstream_tasks)
-            workflow1.add_task(task)
-            upstream_tasks = [task]
+    # Patch the orchestrator's _check_fail_after_n_executions to raise KeyboardInterrupt
+    # This simulates a user pressing Ctrl+C during workflow execution
+    with pytest.raises(KeyboardInterrupt):
+        with patch.object(
+            WorkflowRunOrchestrator,
+            "_check_fail_after_n_executions",
+            side_effect=KeyboardInterrupt,
+        ):
+            # will ask if we want to exit. answer is 'y'
+            with patch("builtins.input") as input_patch:
+                input_patch.return_value = "y"
+                workflow1.run()
 
-        # start up the first task. patch so that it fails with a keyboard interrupt
-        workflow1._fail_after_n_executions = 1
-        with pytest.raises(KeyboardInterrupt):
-            with patch.object(
-                SwarmWorkflowRun,
-                "_check_fail_after_n_executions",
-                side_effect=KeyboardInterrupt,
-            ):
-                # will ask if we want to exit. answer is 'y'
-                with patch("builtins.input") as input_patch:
-                    input_patch.return_value = "y"
-                    workflow1.run()
+    # now resume it
+    workflow1 = tool.create_workflow(
+        name="stopped_resume", workflow_args=workflow1.workflow_args
+    )
+    upstream_tasks = []
+    for phase in [1, 2, 3]:
+        task_template = get_task_template(tool, template_name=f"phase_{phase}")
+        task = task_template.create_task(arg="echo a", upstream_tasks=upstream_tasks)
+        workflow1.add_task(task)
+        upstream_tasks = [task]
 
-        # now resume it
-        workflow1 = tool.create_workflow(
-            name="stopped_resume", workflow_args=workflow1.workflow_args
-        )
-        upstream_tasks = []
-        for phase in [1, 2, 3]:
-            task_template = get_task_template(tool, template_name=f"phase_{phase}")
-            task = task_template.create_task(arg="echo a", upstream_tasks=upstream_tasks)
-            workflow1.add_task(task)
-            upstream_tasks = [task]
+    wfrs2 = workflow1.run(resume=True)
 
-        wfrs2 = workflow1.run(resume=True)
-
-        assert wfrs2 == WorkflowRunStatus.DONE
-    finally:
-        SwarmWorkflowRun.USE_NEW_ORCHESTRATOR = original_orchestrator
-        SwarmWorkflowRun.USE_NEW_GATEWAY = original_gateway
-        SwarmWorkflowRun.USE_NEW_STATE = original_state
-        SwarmWorkflowRun.USE_NEW_HEARTBEAT = original_heartbeat
-        SwarmWorkflowRun.USE_NEW_SYNCHRONIZER = original_synchronizer
+    assert wfrs2 == WorkflowRunStatus.DONE

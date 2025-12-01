@@ -468,33 +468,20 @@ def test_swarm_fails(tool):
     assert not swarm.active_tasks
 
 
-def test_swarm_terminate(tool):
-    """Test that when the workflow run terminates properly."""
+def test_swarm_terminate(db_engine, tool):
+    """Test that when the workflow run receives a COLD_RESUME signal, it terminates properly.
 
-    class MockSwarm(SwarmWorkflowRun):
-        # Disable all new implementations because this test overrides
-        # synchronize_state_async which the new implementations bypass
-        USE_NEW_ORCHESTRATOR = False
-        USE_NEW_GATEWAY = False
-        USE_NEW_STATE = False
-        USE_NEW_HEARTBEAT = False
-        USE_NEW_SYNCHRONIZER = False
-
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.sync_attempts = 0
-
-        async def synchronize_state_async(self, full_sync: bool = False) -> None:
-            await super().synchronize_state_async(full_sync)
-            self.sync_attempts += 1
-            if self.sync_attempts == 2:
-                await self._update_status_async(WorkflowRunStatus.COLD_RESUME)
+    This test simulates the server setting the workflow_run status to COLD_RESUME
+    (e.g., from another process requesting a resume). The swarm should detect this
+    during heartbeat/sync and terminate gracefully.
+    """
+    import threading
 
     workflow = tool.create_workflow(name="test_terminate")
 
     t1 = tool.active_task_templates["phase_1"].create_task(
         arg="sleep 1000", max_attempts=1
-    )  # Long sleep time
+    )  # Long sleep - will be terminated
     t2 = tool.active_task_templates["phase_2"].create_task(
         arg="sleep 2", upstream_tasks=[t1]
     )
@@ -505,19 +492,40 @@ def test_swarm_terminate(tool):
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # run the distributor
+    # Function to update the workflow_run status to COLD_RESUME after a delay
+    def trigger_cold_resume():
+        time.sleep(3)  # Wait for workflow to start running
+        with Session(bind=db_engine) as session:
+            # Update workflow_run status to COLD_RESUME
+            session.execute(
+                text(
+                    "UPDATE workflow_run SET status = :status WHERE id = :wfr_id"
+                ),
+                {"status": WorkflowRunStatus.COLD_RESUME, "wfr_id": wfr.workflow_run_id},
+            )
+            session.commit()
+            logger.info(f"Set workflow_run {wfr.workflow_run_id} to COLD_RESUME")
+
+    # Start background thread to trigger COLD_RESUME
+    trigger_thread = threading.Thread(target=trigger_cold_resume, daemon=True)
+    trigger_thread.start()
+
+    # Run the distributor and swarm
     with DistributorContext("sequential", wfr.workflow_run_id, 180) as distributor:
-        # swarm calls
-        swarm = MockSwarm(
+        swarm = SwarmWorkflowRun(
             workflow_run_id=wfr.workflow_run_id,
             requester=workflow.requester,
+            workflow_run_heartbeat_interval=1,  # Short interval to detect status change faster
         )
         swarm.from_workflow(workflow)
         swarm.run(distributor.alive)
 
+    trigger_thread.join(timeout=1)
+
+    # Workflow should have terminated due to COLD_RESUME
     assert swarm.status == WorkflowRunStatus.TERMINATED
     assert len(swarm.done_tasks) == 0
-    assert len(swarm.failed_tasks) == 1
+    assert len(swarm.failed_tasks) == 1  # t1 should be failed/terminated
     assert len(swarm.ready_to_run) == 0
 
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Optional
 
 import structlog
@@ -17,7 +17,6 @@ import structlog
 from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
 from jobmon.client.swarm.workflow_run_impl.services.scheduler import Scheduler
 from jobmon.client.swarm.workflow_run_impl.services.synchronizer import Synchronizer
-from jobmon.client.swarm.workflow_run_impl.state import StateUpdate
 from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 from jobmon.core.exceptions import (
     CallableReturnedInvalidObject,
@@ -290,7 +289,7 @@ class WorkflowRunOrchestrator:
         try:
             # Initialize
             logger.info(
-                f"Starting workflow run orchestrator",
+                "Starting workflow run orchestrator",
                 workflow_run_id=self._ctx.workflow_run_id,
             )
             await self._initialize()
@@ -364,6 +363,9 @@ class WorkflowRunOrchestrator:
             self._check_timeout(start_time)
             await self._check_distributor_alive(distributor_alive_callable)
 
+            # Check if heartbeat service detected a status change
+            self._sync_heartbeat_status()
+
             # Server already decided this run must stop
             if self._ctx.status in SERVER_STOP_STATUSES:
                 logger.warning(
@@ -376,7 +378,7 @@ class WorkflowRunOrchestrator:
             if self._ctx.status in TERMINATING_STATUSES:
                 if await self._handle_termination():
                     break
-                continue
+                # Fall through to normal sleep + sync logic below
 
             # Fail-fast mode: bail after first fatal task error
             self._check_fail_fast()
@@ -464,6 +466,23 @@ class WorkflowRunOrchestrator:
                     f"WorkflowRun asked to fail after {self._ctx.n_executions} "
                     "executions. Failing now"
                 )
+
+    def _sync_heartbeat_status(self) -> None:
+        """Sync context status with heartbeat service if it detected a change.
+
+        The heartbeat service runs in the background and may detect status
+        changes from the server (e.g., COLD_RESUME signal). This method
+        propagates those changes to the orchestrator context.
+        """
+        if self._heartbeat is not None:
+            heartbeat_status = self._heartbeat.current_status
+            if heartbeat_status != self._ctx.status:
+                logger.info(
+                    "Heartbeat detected status change",
+                    old_status=self._ctx.status,
+                    new_status=heartbeat_status,
+                )
+                self._ctx.status = heartbeat_status
 
     # ──────────────────────────────────────────────────────────────────────────
     # Scheduling
@@ -649,7 +668,11 @@ class WorkflowRunOrchestrator:
     # ──────────────────────────────────────────────────────────────────────────
 
     async def _handle_termination(self) -> bool:
-        """Handle resume signal. Returns True if we should exit the loop."""
+        """Handle resume signal. Returns True if we should exit the loop.
+
+        When tasks are still in-flight, this requests termination and returns
+        False to let the main loop handle the normal sleep + sync cycle.
+        """
         wait_states = (
             TaskStatus.INSTANTIATING,
             TaskStatus.LAUNCHED,

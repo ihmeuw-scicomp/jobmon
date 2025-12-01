@@ -45,7 +45,6 @@ from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 from jobmon.core.exceptions import (
     CallableReturnedInvalidObject,
-    DistributorNotAlive,
     EmptyWorkflowError,
     TransitionError,
     WorkflowTestError,
@@ -119,28 +118,11 @@ class WorkflowRun:
     Job may belong to one or more WorkflowRuns, but once the Job reaches a DONE
     state, it will no longer be added to a subsequent WorkflowRun. However,
     this is not enforced via any database constraints.
+
+    The WorkflowRun delegates execution to the WorkflowRunOrchestrator, which
+    coordinates all services (heartbeat, synchronization, scheduling) and
+    manages the main event loop.
     """
-
-    # Feature flag for new gateway-based implementation (Phase 1 refactor)
-    # When True, HTTP communication uses the new ServerGateway class
-    USE_NEW_GATEWAY: bool = True
-
-    # Feature flag for new state container (Phase 2 refactor)
-    # When True, state management uses the new SwarmState class
-    USE_NEW_STATE: bool = True
-
-    # Feature flag for new heartbeat service (Phase 3a refactor)
-    # When True, heartbeat management uses the new HeartbeatService class
-    USE_NEW_HEARTBEAT: bool = True
-
-    # Feature flag for new synchronizer service (Phase 3b refactor)
-    # When True, state synchronization uses the new Synchronizer class
-    USE_NEW_SYNCHRONIZER: bool = True
-
-    # Feature flag for new orchestrator (Phase 4 refactor)
-    # When True, the entire run loop delegates to WorkflowRunOrchestrator
-    # This flag implies USE_NEW_GATEWAY, USE_NEW_HEARTBEAT, and USE_NEW_SYNCHRONIZER
-    USE_NEW_ORCHESTRATOR: bool = True
 
     def __init__(
         self,
@@ -338,37 +320,14 @@ class WorkflowRun:
 
     def _get_active_tasks_count(self) -> int:
         """Return the number of tasks currently in-flight."""
-        if self.USE_NEW_STATE and self._state is not None:
-            return self._state.get_active_task_count()
         return sum(len(self._task_status_map[s]) for s in ACTIVE_TASK_STATUSES)
 
     def _get_ready_to_run_count(self) -> int:
         """Return the number of tasks ready to run."""
         return len(self.ready_to_run)
 
-    def _decide_run_loop_continue(
-        self, time_since_last_full_sync: float
-    ) -> tuple[bool, float]:
-        """Decide whether the run loop should continue based on task states."""
-        if self._has_active_or_ready_tasks():
-            logger.debug("Swarm has active or ready to run")
-            return True, time_since_last_full_sync
-
-        if self._all_tasks_final():
-            logger.debug("Swarm all tasks are done")
-            return False, time_since_last_full_sync
-
-        # Returning False tells the caller to perform a (possibly full) sync before
-        # re-evaluating whether work remains.
-        logger.debug("Swarm idle with outstanding tasks, requesting full sync")
-        return False, time_since_last_full_sync
-
-    def _has_active_or_ready_tasks(self) -> bool:
-        return (self._get_active_tasks_count() + self._get_ready_to_run_count()) > 0
-
     def _all_tasks_final(self) -> bool:
-        if self.USE_NEW_STATE and self._state is not None:
-            return self._state.all_tasks_final()
+        """Return True if all tasks are in a terminal state (DONE or ERROR_FATAL)."""
         return len(self.tasks) == len(self._task_status_map[TaskStatus.DONE]) + len(
             self._task_status_map[TaskStatus.ERROR_FATAL]
         )
@@ -666,158 +625,33 @@ class WorkflowRun:
         seconds_until_timeout: int,
         initialize: bool,
     ) -> None:
-        """Async workflow runner that manages scheduler and heartbeat loops."""
-        # Use the new orchestrator if the feature flag is enabled
-        if self.USE_NEW_ORCHESTRATOR and initialize:
+        """Async workflow runner that delegates to the orchestrator.
+
+        Args:
+            distributor_alive_callable: Callable that returns True if distributor is alive.
+            seconds_until_timeout: Maximum time to run before timing out.
+            initialize: If True, initialize the workflow run. If False, continue
+                from current state (deprecated - only for internal use).
+        """
+        if initialize:
+            # Primary path: delegate to orchestrator for full lifecycle management
             await self._run_with_orchestrator(
                 distributor_alive_callable=distributor_alive_callable,
                 seconds_until_timeout=seconds_until_timeout,
             )
-            return
-
-        self._stop_event = asyncio.Event()
-        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-        teardown_needed = True
-
-        try:
-            if initialize:
-                logger.info(f"Executing Workflow Run {self.workflow_run_id}")
-                self.set_initial_fringe()
-                await self._update_status_async(WorkflowRunStatus.RUNNING)
-
-            time_since_last_full_sync = 0.0
-            swarm_start_time = time.perf_counter()
-            loop_continue = True
-
-            while loop_continue:
-                iteration_start = time.perf_counter()
-                total_elapsed_time = time.perf_counter() - swarm_start_time
-                if total_elapsed_time >= seconds_until_timeout:
-                    raise RuntimeError(
-                        f"Not all tasks completed within the given workflow timeout length "
-                        f"({seconds_until_timeout} seconds). Submitted tasks will still run, "
-                        f"but the workflow will need to be restarted."
-                    )
-
-                if not distributor_alive_callable():
-                    raise DistributorNotAlive(
-                        "Distributor process unexpectedly stopped. Workflow will error."
-                    )
-
-                # Server already decided this run must stop — exit immediately.
-                if self.status in SERVER_STOP_STATUSES:
-                    logger.warning(
-                        "Workflow Run status set to %s by server, stopping scheduler",
-                        self.status,
-                    )
-                    break
-
-                # Resume signal received — wait for in-flight tasks to drain.
-                if self.status in TERMINATING_STATUSES:
-                    wait_states = (
-                        TaskStatus.INSTANTIATING,
-                        TaskStatus.LAUNCHED,
-                        TaskStatus.RUNNING,
-                    )
-                    if any(self._task_status_map[s] for s in wait_states):
-                        logger.warning(
-                            f"Workflow Run set to {self.status}. Waiting for tasks to stop"
-                        )
-                        await self._terminate_task_instances_async()
-                    else:
-                        break
-
-                # Optional fail-fast mode: bail after first fatal task error.
-                if self.fail_fast and self._task_status_map[TaskStatus.ERROR_FATAL]:
-                    logger.info("Failing after first failure, as requested")
-                    break
-
-                # Remaining time until we must re-sync with the server (heartbeat,
-                # state refresh, wedged DAG polling, etc.).
-                time_till_next_sync = max(
-                    0.0,
-                    self._workflow_run_heartbeat_interval
-                    - (time.time() - self._last_heartbeat_time),
-                )
-
-                if self.status == WorkflowRunStatus.RUNNING:
-                    await self.process_commands_async(timeout=time_till_next_sync)
-
-                loop_elapsed = time.perf_counter() - iteration_start
-                if loop_elapsed < time_till_next_sync:
-                    await asyncio.sleep(time_till_next_sync - loop_elapsed)
-                    loop_elapsed = time.perf_counter() - iteration_start
-
-                if time_since_last_full_sync > self.wedged_workflow_sync_interval:
-                    time_since_last_full_sync = 0.0
-                    await self.synchronize_state_async(full_sync=True)
-                else:
-                    time_since_last_full_sync += loop_elapsed
-                    await self.synchronize_state_async()
-
-                self._check_fail_after_n_executions()
-                loop_continue, time_since_last_full_sync = (
-                    self._decide_run_loop_continue(time_since_last_full_sync)
-                )
-                # No observable work still queued, but tasks remain outstanding.
-                # Force an immediate full sync (historic behavior) before deciding to exit.
-                if not loop_continue and not self._all_tasks_final():
-                    await self.synchronize_state_async(full_sync=True)
-                    time_since_last_full_sync = 0.0
-                    loop_continue = self._has_active_or_ready_tasks()
-
-        except KeyboardInterrupt:
-            logger.warning("Keyboard interrupt raised")
-            confirm = await asyncio.to_thread(
-                input, "Are you sure you want to exit (y/n): "
-            )
-            confirm = confirm.lower().strip()
-
-            if confirm == "y":
-                await self._update_status_async(WorkflowRunStatus.STOPPED)
-                raise
-            else:
-                logger.info("Continuing jobmon...")
-                remaining = max(
-                    0,
-                    int(
-                        seconds_until_timeout - (time.perf_counter() - swarm_start_time)
-                    ),
-                )
-                await self._teardown_async()
-                teardown_needed = False
-                await self._run_async(
-                    distributor_alive_callable=distributor_alive_callable,
-                    seconds_until_timeout=remaining,
-                    initialize=False,
-                )
-                return
-        except Exception as e:
-            logger.exception("Workflow run error", error=str(e))
-            try:
-                await self._update_status_async(WorkflowRunStatus.ERROR)
-            except TransitionError as trans:
-                logger.warning(
-                    "Failed to update workflow run status to ERROR", error=str(trans)
-                )
-            raise
         else:
-            if len(self.tasks) == len(self._task_status_map[TaskStatus.DONE]):
-                logger.info("All tasks are done")
-                await self._update_status_async(WorkflowRunStatus.DONE)
-            elif self.status in TERMINATING_STATUSES:
-                await self._update_status_async(WorkflowRunStatus.TERMINATED)
-            elif self.status in SERVER_STOP_STATUSES:
-                # Server already set a terminal status (ERROR/TERMINATED/STOPPED).
-                # Don't try to transition again - just log and accept it.
-                logger.info(
-                    f"Workflow run exited with server-set status: {self.status}"
-                )
-            else:
-                await self._update_status_async(WorkflowRunStatus.ERROR)
-        finally:
-            if teardown_needed:
-                await self._teardown_async()
+            # Deprecated path for backward compatibility
+            # The orchestrator handles its own resume after KeyboardInterrupt,
+            # so this path is only used by external code that explicitly passes
+            # initialize=False
+            logger.warning(
+                "Running with initialize=False is deprecated. "
+                "The orchestrator now handles resume internally."
+            )
+            await self._run_with_orchestrator(
+                distributor_alive_callable=distributor_alive_callable,
+                seconds_until_timeout=seconds_until_timeout,
+            )
 
     async def _run_with_orchestrator(
         self,
@@ -910,41 +744,28 @@ class WorkflowRun:
             await self._close_session()
 
     async def _heartbeat_loop(self) -> None:
-        """Background task that ensures workflow-run heartbeats are logged."""
-        if self.USE_NEW_HEARTBEAT and self._stop_event is not None:
-            # Use the new HeartbeatService background loop
-            heartbeat = self._ensure_heartbeat_service()
-            # Ensure gateway has session for async operations
-            gateway = self._ensure_gateway()
-            gateway.set_session(await self._ensure_session())
-            try:
-                await heartbeat.run_background(self._stop_event)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("Heartbeat loop error (new service)")
-                raise
-            finally:
-                # Sync back the status and time to WorkflowRun
-                self._status = heartbeat.current_status
-                self._last_heartbeat_time = heartbeat.last_heartbeat_time
+        """Background task that ensures workflow-run heartbeats are logged.
+
+        Note: This method is primarily used by tests and the legacy API.
+        The orchestrator uses HeartbeatService directly.
+        """
+        if self._stop_event is None:
             return
 
-        # Legacy implementation
-        heartbeat_tick = max(1.0, self._workflow_run_heartbeat_interval / 2)
+        heartbeat = self._ensure_heartbeat_service()
+        gateway = self._ensure_gateway()
+        gateway.set_session(await self._ensure_session())
         try:
-            while self._stop_event and not self._stop_event.is_set():
-                await asyncio.sleep(heartbeat_tick)
-                if (
-                    time.time() - self._last_heartbeat_time
-                    >= self._workflow_run_heartbeat_interval
-                ):
-                    await self._log_heartbeat_async()
+            await heartbeat.run_background(self._stop_event)
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("Heartbeat loop error")
             raise
+        finally:
+            # Sync back the status and time to WorkflowRun
+            self._status = heartbeat.current_status
+            self._last_heartbeat_time = heartbeat.last_heartbeat_time
 
     def set_initial_fringe(self) -> None:
         """Populate ready_to_run with tasks whose upstreams are satisfied."""
@@ -1093,97 +914,61 @@ class WorkflowRun:
         self._run_coroutine(self.synchronize_state_async(full_sync=full_sync))
 
     async def synchronize_state_async(self, full_sync: bool = False) -> None:
-        if self.USE_NEW_SYNCHRONIZER:
-            # Use the new Synchronizer service
-            synchronizer = self._ensure_synchronizer()
-            # Ensure gateway has session for async operations
-            gateway = self._ensure_gateway()
-            gateway.set_session(await self._ensure_session())
+        """Synchronize local state with the server.
 
-            # Run synchronizer and heartbeat in parallel
-            # (heartbeat is separate from synchronizer since it's also run in background)
-            results = await asyncio.gather(
-                synchronizer.tick(full_sync=full_sync, last_sync=self.last_sync),
-                self._log_heartbeat_async(),
-                return_exceptions=True,
-            )
+        Uses the Synchronizer service to fetch task status updates,
+        concurrency limits, and trigger triaging in parallel with heartbeat.
+        """
+        synchronizer = self._ensure_synchronizer()
+        gateway = self._ensure_gateway()
+        gateway.set_session(await self._ensure_session())
 
-            # Process sync result
-            if isinstance(results[0], StateUpdate):
-                update = results[0]
-                # Update last_sync time
-                if update.sync_time is not None:
-                    self.last_sync = update.sync_time
-
-                # Apply concurrency limit changes
-                if update.max_concurrently_running is not None:
-                    self.max_concurrently_running = update.max_concurrently_running
-
-                for array_id, limit in update.array_limits.items():
-                    if array_id in self.arrays:
-                        self.arrays[array_id].max_concurrently_running = limit
-
-                # Apply task status changes
-                if update.task_statuses:
-                    updated_tasks: set[SwarmTask] = set()
-                    for task_id, new_status in update.task_statuses.items():
-                        if task_id in self.tasks:
-                            task = self.tasks[task_id]
-                            if task.status != new_status:
-                                task.status = new_status
-                                updated_tasks.add(task)
-                    self._refresh_task_status_map(updated_tasks)
-            elif isinstance(results[0], BaseException):
-                logger.warning(
-                    "Synchronizer tick failed",
-                    error=str(results[0]),
-                    exc_info=results[0],
-                )
-
-            # Log heartbeat failures
-            if isinstance(results[1], BaseException):
-                logger.warning(
-                    "Heartbeat during sync failed",
-                    error=str(results[1]),
-                    exc_info=results[1],
-                )
-
-            logger.debug(
-                f"State synchronized (new). ready_to_run_count: {len(self.ready_to_run)}, "
-                f"active_tasks: {self.active_tasks}, "
-                f"full_sync: {full_sync}"
-            )
-            return
-
-        # Legacy implementation
-        # These operations are independent - run them in parallel for better throughput.
-        # Include heartbeat for cases where synchronize_state is called directly
-        # (not through the full _run_async loop with its background heartbeat task).
+        # Run synchronizer and heartbeat in parallel
         results = await asyncio.gather(
-            self._set_status_for_triaging_async(),
+            synchronizer.tick(full_sync=full_sync, last_sync=self.last_sync),
             self._log_heartbeat_async(),
-            self._task_status_updates_async(full_sync=full_sync),
-            self._synchronize_max_concurrently_running_async(),
-            self._synchronize_array_max_concurrently_running_async(),
             return_exceptions=True,
         )
 
-        # Log any failures but don't raise - individual sync failures shouldn't
-        # stop the workflow run
-        for i, result in enumerate(results):
-            if isinstance(result, BaseException):
-                op_names = [
-                    "triage",
-                    "heartbeat",
-                    "task_status_updates",
-                    "max_concurrently_running",
-                    "array_max_concurrently_running",
-                ]
-                logger.warning(
-                    f"Sync operation '{op_names[i]}' failed",
-                    error=str(result),
-                    exc_info=result,
-                )
+        # Process sync result
+        if isinstance(results[0], StateUpdate):
+            update = results[0]
+            # Update last_sync time
+            if update.sync_time is not None:
+                self.last_sync = update.sync_time
+
+            # Apply concurrency limit changes
+            if update.max_concurrently_running is not None:
+                self.max_concurrently_running = update.max_concurrently_running
+
+            for array_id, limit in update.array_limits.items():
+                if array_id in self.arrays:
+                    self.arrays[array_id].max_concurrently_running = limit
+
+            # Apply task status changes
+            if update.task_statuses:
+                updated_tasks: set[SwarmTask] = set()
+                for task_id, new_status in update.task_statuses.items():
+                    if task_id in self.tasks:
+                        task = self.tasks[task_id]
+                        if task.status != new_status:
+                            task.status = new_status
+                            updated_tasks.add(task)
+                self._refresh_task_status_map(updated_tasks)
+        elif isinstance(results[0], BaseException):
+            logger.warning(
+                "Synchronizer tick failed",
+                error=str(results[0]),
+                exc_info=results[0],
+            )
+
+        # Log heartbeat failures
+        if isinstance(results[1], BaseException):
+            logger.warning(
+                "Heartbeat during sync failed",
+                error=str(results[1]),
+                exc_info=results[1],
+            )
 
         logger.debug(
             f"State synchronized. ready_to_run_count: {len(self.ready_to_run)}, "
@@ -1251,17 +1036,9 @@ class WorkflowRun:
 
     async def _set_status_for_triaging_async(self) -> None:
         """Request server to triage overdue task instances."""
-        if self.USE_NEW_GATEWAY:
-            gateway = self._ensure_gateway()
-            gateway.set_session(await self._ensure_session())
-            await gateway.request_triage()
-        else:
-            logger.debug("Swarm requesting triage check for overdue task instances")
-            app_route = f"/workflow_run/{self.workflow_run_id}/set_status_for_triaging"
-            await self._request_async(
-                app_route=app_route, message={}, request_type="post"
-            )
-            logger.debug("Triage check completed")
+        gateway = self._ensure_gateway()
+        gateway.set_session(await self._ensure_session())
+        await gateway.request_triage()
 
     async def _ensure_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
@@ -1319,33 +1096,17 @@ class WorkflowRun:
         self._stop_event = None
 
     def _log_heartbeat(self) -> None:
-        # Check if workflow_id is set - new implementations require it
-        has_workflow_id = hasattr(self, "workflow_id")
+        """Log a synchronous heartbeat to the server.
 
-        if self.USE_NEW_HEARTBEAT and has_workflow_id:
-            heartbeat = self._ensure_heartbeat_service()
-            # Sync the service status with our current status
-            heartbeat.set_status(self._status)
-            update = heartbeat.tick_sync()
-            # Apply any status change from the server
-            if update.workflow_run_status:
-                self._status = update.workflow_run_status
-            self._last_heartbeat_time = heartbeat.last_heartbeat_time
-            return
-
-        next_report_increment = (
-            self._workflow_run_heartbeat_interval * self._heartbeat_report_by_buffer
-        )
-
-        if self.USE_NEW_GATEWAY and has_workflow_id:
-            gateway = self._ensure_gateway()
-            response = gateway.log_heartbeat_sync(
-                status=self._status,
-                next_report_increment=next_report_increment,
+        This method uses the HeartbeatService when workflow_id is set,
+        otherwise falls back to direct requester for early initialization.
+        """
+        # Check if workflow_id is set - HeartbeatService requires it
+        if not hasattr(self, "workflow_id"):
+            # Fall back to direct request during early initialization
+            next_report_increment = (
+                self._workflow_run_heartbeat_interval * self._heartbeat_report_by_buffer
             )
-            self._status = response.status
-            self._last_heartbeat_time = time.time()
-        else:
             app_route = f"/workflow_run/{self.workflow_run_id}/log_heartbeat"
             _, response = self.requester.send_request(
                 app_route=app_route,
@@ -1355,51 +1116,28 @@ class WorkflowRun:
                 },
                 request_type="post",
             )
-            self._apply_heartbeat_response(response)
-
-    async def _log_heartbeat_async(self) -> None:
-        if self.USE_NEW_HEARTBEAT:
-            heartbeat = self._ensure_heartbeat_service()
-            # Ensure the gateway has a session for async operations
-            gateway = self._ensure_gateway()
-            gateway.set_session(await self._ensure_session())
-            # Sync the service status with our current status
-            heartbeat.set_status(self._status)
-            update = await heartbeat.tick()
-            # Apply any status change from the server
-            if update.workflow_run_status:
-                self._status = update.workflow_run_status
-            self._last_heartbeat_time = heartbeat.last_heartbeat_time
+            self._status = response["status"]
+            self._last_heartbeat_time = time.time()
             return
 
-        next_report_increment = (
-            self._workflow_run_heartbeat_interval * self._heartbeat_report_by_buffer
-        )
+        # Use HeartbeatService for normal operation
+        heartbeat = self._ensure_heartbeat_service()
+        heartbeat.set_status(self._status)
+        update = heartbeat.tick_sync()
+        if update.workflow_run_status:
+            self._status = update.workflow_run_status
+        self._last_heartbeat_time = heartbeat.last_heartbeat_time
 
-        if self.USE_NEW_GATEWAY:
-            gateway = self._ensure_gateway()
-            gateway.set_session(await self._ensure_session())
-            response = await gateway.log_heartbeat(
-                status=self._status,
-                next_report_increment=next_report_increment,
-            )
-            self._status = response.status
-            self._last_heartbeat_time = time.time()
-        else:
-            app_route = f"/workflow_run/{self.workflow_run_id}/log_heartbeat"
-            _, response = await self._request_async(
-                app_route=app_route,
-                message={
-                    "status": self._status,
-                    "next_report_increment": next_report_increment,
-                },
-                request_type="post",
-            )
-            self._apply_heartbeat_response(response)
-
-    def _apply_heartbeat_response(self, response: dict[str, Any]) -> None:
-        self._status = response["status"]
-        self._last_heartbeat_time = time.time()
+    async def _log_heartbeat_async(self) -> None:
+        """Log an async heartbeat to the server using HeartbeatService."""
+        heartbeat = self._ensure_heartbeat_service()
+        gateway = self._ensure_gateway()
+        gateway.set_session(await self._ensure_session())
+        heartbeat.set_status(self._status)
+        update = await heartbeat.tick()
+        if update.workflow_run_status:
+            self._status = update.workflow_run_status
+        self._last_heartbeat_time = heartbeat.last_heartbeat_time
 
     def _update_status(self, status: str) -> None:
         """Update the status of the workflow_run with whatever status is passed."""
@@ -1412,20 +1150,11 @@ class WorkflowRun:
         self._validate_status_transition(status, response["status"])
 
     async def _update_status_async(self, status: str) -> None:
-        """Async status update helper."""
-        if self.USE_NEW_GATEWAY:
-            gateway = self._ensure_gateway()
-            gateway.set_session(await self._ensure_session())
-            response = await gateway.update_status(status)
-            self._validate_status_transition(status, response.status)
-        else:
-            app_route = f"/workflow_run/{self.workflow_run_id}/update_status"
-            _, response = await self._request_async(
-                app_route=app_route,
-                message={"status": status},
-                request_type="put",
-            )
-            self._validate_status_transition(status, response["status"])
+        """Async status update helper using ServerGateway."""
+        gateway = self._ensure_gateway()
+        gateway.set_session(await self._ensure_session())
+        response = await gateway.update_status(status)
+        self._validate_status_transition(status, response.status)
 
     def _validate_status_transition(self, desired_status: str, new_status: str) -> None:
         self._status = new_status
@@ -1437,15 +1166,9 @@ class WorkflowRun:
 
     async def _terminate_task_instances_async(self) -> None:
         """Signal the server to terminate all task instances for this workflow run."""
-        if self.USE_NEW_GATEWAY:
-            gateway = self._ensure_gateway()
-            gateway.set_session(await self._ensure_session())
-            await gateway.terminate_task_instances()
-        else:
-            app_route = f"/workflow_run/{self.workflow_run_id}/terminate_task_instances"
-            await self._request_async(
-                app_route=app_route, message={}, request_type="put"
-            )
+        gateway = self._ensure_gateway()
+        gateway.set_session(await self._ensure_session())
+        await gateway.terminate_task_instances()
         self._terminated = True
 
     def _check_fail_after_n_executions(self) -> None:
@@ -1476,102 +1199,50 @@ class WorkflowRun:
 
     async def _task_status_updates_async(self, full_sync: bool = False) -> None:
         """Fetch task status changes from the server and update local state."""
-        if self.USE_NEW_GATEWAY:
-            gateway = self._ensure_gateway()
-            gateway.set_session(await self._ensure_session())
-            since = None if full_sync else self.last_sync
-            response = await gateway.get_task_status_updates(since=since)
-            # Convert gateway response to the format expected by _apply_task_status_updates
-            self._apply_task_status_updates(
-                {"time": response.time, "tasks_by_status": response.tasks_by_status}
-            )
-        else:
-            message = {} if full_sync else {"last_sync": str(self.last_sync)}
-            app_route = f"/workflow/{self.workflow_id}/task_status_updates"
-            _, response = await self._request_async(
-                app_route=app_route,
-                message=message,
-                request_type="post",
-            )
-            self._apply_task_status_updates(response)
+        gateway = self._ensure_gateway()
+        gateway.set_session(await self._ensure_session())
+        since = None if full_sync else self.last_sync
+        response = await gateway.get_task_status_updates(since=since)
+        self._apply_task_status_updates(
+            {"time": response.time, "tasks_by_status": response.tasks_by_status}
+        )
 
     def _apply_task_status_updates(self, response: dict[str, Any]) -> None:
+        """Apply task status updates from server response."""
         self.last_sync = response["time"]
 
-        if self.USE_NEW_STATE and self._state is not None:
-            # Use StateUpdate pattern
-            update = StateUpdate.from_task_status_response(
-                tasks_by_status=response["tasks_by_status"],
-                sync_time=response["time"],
-            )
-            # Filter to only tasks we know about
-            filtered_statuses = {
-                tid: status
-                for tid, status in update.task_statuses.items()
-                if tid in self.tasks
-            }
-            update = StateUpdate(
-                task_statuses=filtered_statuses,
-                sync_time=update.sync_time,
-            )
-            changed_tasks = self._state.apply_update(update)
-            # Also update the old state structures for backward compatibility
-            self._refresh_task_status_map(changed_tasks)
-        else:
-            new_status_tasks: set[SwarmTask] = set()
-            for current_status, task_ids in response["tasks_by_status"].items():
-                task_ids = set(task_ids).intersection(self.tasks)
-                for task_id in task_ids:
-                    task = self.tasks[task_id]
-                    if current_status != task.status:
-                        task.status = current_status
-                        new_status_tasks.add(task)
-            self._refresh_task_status_map(new_status_tasks)
+        new_status_tasks: set[SwarmTask] = set()
+        for current_status, task_ids in response["tasks_by_status"].items():
+            task_ids = set(task_ids).intersection(self.tasks)
+            for task_id in task_ids:
+                task = self.tasks[task_id]
+                if current_status != task.status:
+                    task.status = current_status
+                    new_status_tasks.add(task)
+        self._refresh_task_status_map(new_status_tasks)
 
     async def _synchronize_max_concurrently_running_async(self) -> None:
         """Refresh workflow-level max_concurrently_running from server."""
-        if self.USE_NEW_GATEWAY:
-            gateway = self._ensure_gateway()
-            gateway.set_session(await self._ensure_session())
-            self.max_concurrently_running = await gateway.get_workflow_concurrency()
-        else:
-            app_route = f"/workflow/{self.workflow_id}/get_max_concurrently_running"
-            _, response = await self._request_async(
-                app_route=app_route, message={}, request_type="get"
-            )
-            self.max_concurrently_running = response["max_concurrently_running"]
+        gateway = self._ensure_gateway()
+        gateway.set_session(await self._ensure_session())
+        self.max_concurrently_running = await gateway.get_workflow_concurrency()
 
     async def _synchronize_array_max_concurrently_running_async(self) -> None:
         """Refresh per-array max_concurrently_running limits from server."""
         if not self.arrays:
             return
 
-        if self.USE_NEW_GATEWAY:
-            gateway = self._ensure_gateway()
-            gateway.set_session(await self._ensure_session())
+        gateway = self._ensure_gateway()
+        gateway.set_session(await self._ensure_session())
 
-            async def fetch_array_concurrency_gateway(aid: int) -> tuple[int, int]:
-                max_running = await gateway.get_array_concurrency(aid)
-                return aid, max_running
+        async def fetch_array_concurrency(aid: int) -> tuple[int, int]:
+            max_running = await gateway.get_array_concurrency(aid)
+            return aid, max_running
 
-            results = await asyncio.gather(
-                *[fetch_array_concurrency_gateway(aid) for aid in self.arrays],
-                return_exceptions=True,
-            )
-        else:
-
-            async def fetch_array_concurrency(aid: int) -> tuple[int, int]:
-                app_route = f"/array/{aid}/get_array_max_concurrently_running"
-                _, response = await self._request_async(
-                    app_route=app_route, message={}, request_type="get"
-                )
-                return aid, response["max_concurrently_running"]
-
-            # Fetch all array limits in parallel
-            results = await asyncio.gather(
-                *[fetch_array_concurrency(aid) for aid in self.arrays],
-                return_exceptions=True,
-            )
+        results = await asyncio.gather(
+            *[fetch_array_concurrency(aid) for aid in self.arrays],
+            return_exceptions=True,
+        )
 
         for result in results:
             if isinstance(result, BaseException):
@@ -1586,6 +1257,7 @@ class WorkflowRun:
 
     @bind_method_context(workflow_run_id="workflow_run_id")
     async def queue_task_batch_async(self, tasks: list[SwarmTask]) -> None:
+        """Queue a batch of tasks to the server using ServerGateway."""
         first_task = tasks[0]
         task_resources = first_task.current_task_resources
         if not task_resources.is_bound:
@@ -1597,32 +1269,17 @@ class WorkflowRun:
             batch_size=len(tasks),
         )
 
-        if self.USE_NEW_GATEWAY:
-            gateway = self._ensure_gateway()
-            gateway.set_session(await self._ensure_session())
-            response = await gateway.queue_task_batch(
-                array_id=first_task.array_id,
-                task_ids=[task.task_id for task in tasks],
-                task_resources_id=task_resources.id,
-                cluster_id=first_task.cluster.id,
-            )
-            tasks_by_status = response.tasks_by_status
-        else:
-            app_route = f"/array/{first_task.array_id}/queue_task_batch"
-            _, response = await self._request_async(
-                app_route=app_route,
-                message={
-                    "task_ids": [task.task_id for task in tasks],
-                    "task_resources_id": task_resources.id,
-                    "workflow_run_id": self.workflow_run_id,
-                    "cluster_id": first_task.cluster.id,
-                },
-                request_type="post",
-            )
-            tasks_by_status = response["tasks_by_status"]
+        gateway = self._ensure_gateway()
+        gateway.set_session(await self._ensure_session())
+        response = await gateway.queue_task_batch(
+            array_id=first_task.array_id,
+            task_ids=[task.task_id for task in tasks],
+            task_resources_id=task_resources.id,
+            cluster_id=first_task.cluster.id,
+        )
 
         updated_tasks = set()
-        for status, task_ids in tasks_by_status.items():
+        for status, task_ids in response.tasks_by_status.items():
             for task_id in task_ids:
                 task = self.tasks[task_id]
                 task.status = status
