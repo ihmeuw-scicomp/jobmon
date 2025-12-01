@@ -1319,7 +1319,10 @@ class WorkflowRun:
         self._stop_event = None
 
     def _log_heartbeat(self) -> None:
-        if self.USE_NEW_HEARTBEAT:
+        # Check if workflow_id is set - new implementations require it
+        has_workflow_id = hasattr(self, "workflow_id")
+
+        if self.USE_NEW_HEARTBEAT and has_workflow_id:
             heartbeat = self._ensure_heartbeat_service()
             # Sync the service status with our current status
             heartbeat.set_status(self._status)
@@ -1334,7 +1337,7 @@ class WorkflowRun:
             self._workflow_run_heartbeat_interval * self._heartbeat_report_by_buffer
         )
 
-        if self.USE_NEW_GATEWAY:
+        if self.USE_NEW_GATEWAY and has_workflow_id:
             gateway = self._ensure_gateway()
             response = gateway.log_heartbeat_sync(
                 status=self._status,

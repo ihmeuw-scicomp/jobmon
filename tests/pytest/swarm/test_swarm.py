@@ -472,6 +472,14 @@ def test_swarm_terminate(tool):
     """Test that when the workflow run terminates properly."""
 
     class MockSwarm(SwarmWorkflowRun):
+        # Disable all new implementations because this test overrides
+        # synchronize_state_async which the new implementations bypass
+        USE_NEW_ORCHESTRATOR = False
+        USE_NEW_GATEWAY = False
+        USE_NEW_STATE = False
+        USE_NEW_HEARTBEAT = False
+        USE_NEW_SYNCHRONIZER = False
+
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.sync_attempts = 0
