@@ -19,7 +19,9 @@ from jobmon.client.swarm.workflow_run_impl.gateway import (
     StatusUpdateResponse,
     TaskStatusUpdatesResponse,
 )
+from jobmon.client.swarm.workflow_run_impl.gateway import TaskStatusUpdatesResponse
 from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
+from jobmon.client.swarm.workflow_run_impl.services.synchronizer import Synchronizer
 from jobmon.client.swarm.workflow_run_impl.state import StateUpdate, SwarmState
 from jobmon.core.constants import TaskStatus
 
@@ -562,4 +564,190 @@ class TestHeartbeatServiceInitialization:
 
         assert service.interval == 45
         assert service.next_report_increment == 135  # 45 * 3.0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Synchronizer Feature Flag Tests (Phase 3b)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestSynchronizerFeatureFlagOff:
+    """Tests with USE_NEW_SYNCHRONIZER = False (default)."""
+
+    def test_synchronizer_flag_default_is_false(self) -> None:
+        """Verify the default synchronizer flag value."""
+        assert WorkflowRun.USE_NEW_SYNCHRONIZER is False
+
+    @pytest.mark.asyncio
+    async def test_sync_uses_old_path_when_flag_off(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test synchronize_state uses old implementation when flag is off."""
+        WorkflowRun.USE_NEW_SYNCHRONIZER = False
+        WorkflowRun.USE_NEW_GATEWAY = False
+        WorkflowRun.USE_NEW_HEARTBEAT = False
+
+        # Mock all the responses
+        mock_requester.send_request_async.return_value = (
+            200,
+            {"time": "2024-01-01T12:00:00", "tasks_by_status": {}},
+        )
+        mock_requester.send_request.return_value = (200, {"status": "R"})
+
+        with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+            await workflow_run.synchronize_state_async(full_sync=False)
+
+        # Should use the old requester path (multiple calls)
+        assert mock_requester.send_request_async.call_count >= 1
+
+
+class TestSynchronizerFeatureFlagOn:
+    """Tests with USE_NEW_SYNCHRONIZER = True."""
+
+    @pytest.mark.asyncio
+    async def test_sync_uses_synchronizer_when_flag_on(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test synchronize_state uses Synchronizer when flag is on."""
+        WorkflowRun.USE_NEW_SYNCHRONIZER = True
+        WorkflowRun.USE_NEW_HEARTBEAT = False
+        try:
+            # Mock all responses
+            from datetime import datetime
+
+            mock_requester.send_request_async.return_value = (
+                200,
+                {"time": datetime(2024, 1, 1, 12, 0, 0), "tasks_by_status": {}},
+            )
+            mock_requester.send_request.return_value = (200, {"status": "R"})
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                await workflow_run.synchronize_state_async(full_sync=False)
+
+            # Should have created synchronizer
+            assert workflow_run._synchronizer is not None
+            assert isinstance(workflow_run._synchronizer, Synchronizer)
+        finally:
+            WorkflowRun.USE_NEW_SYNCHRONIZER = False
+
+    @pytest.mark.asyncio
+    async def test_sync_updates_concurrency_limits(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test synchronize_state updates concurrency limits."""
+        WorkflowRun.USE_NEW_SYNCHRONIZER = True
+        WorkflowRun.USE_NEW_HEARTBEAT = False
+        try:
+            from datetime import datetime
+
+            # Add an array
+            from jobmon.client.swarm.swarm_array import SwarmArray
+
+            workflow_run.arrays[10] = SwarmArray(array_id=10, max_concurrently_running=50)
+
+            # Mock responses - workflow concurrency and array concurrency
+            call_count = [0]
+
+            def mock_response(app_route, message, request_type, **kwargs):
+                call_count[0] += 1
+                if "task_status_updates" in app_route:
+                    return (
+                        200,
+                        {"time": datetime(2024, 1, 1, 12, 0, 0), "tasks_by_status": {}},
+                    )
+                elif "get_max_concurrently_running" in app_route:
+                    return (200, {"max_concurrently_running": 200})
+                elif "get_array_max_concurrently_running" in app_route:
+                    return (200, {"max_concurrently_running": 75})
+                elif "log_heartbeat" in app_route:
+                    return (200, {"status": "R"})
+                elif "triaging" in app_route:
+                    return (200, {})
+                return (200, {})
+
+            mock_requester.send_request_async = AsyncMock(side_effect=mock_response)
+            mock_requester.send_request.return_value = (200, {"status": "R"})
+
+            original_workflow_limit = workflow_run.max_concurrently_running
+            original_array_limit = workflow_run.arrays[10].max_concurrently_running
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                await workflow_run.synchronize_state_async(full_sync=True)
+
+            # Limits should be updated
+            assert workflow_run.max_concurrently_running == 200
+            assert workflow_run.arrays[10].max_concurrently_running == 75
+        finally:
+            WorkflowRun.USE_NEW_SYNCHRONIZER = False
+
+
+class TestSynchronizerServiceInitialization:
+    """Tests for synchronizer service lazy initialization."""
+
+    def test_synchronizer_not_created_initially(
+        self, mock_requester: MagicMock
+    ) -> None:
+        """Test that synchronizer is None initially."""
+        wfr = WorkflowRun(
+            workflow_run_id=100,
+            requester=mock_requester,
+        )
+        assert wfr._synchronizer is None
+
+    def test_ensure_synchronizer_creates_service(
+        self, workflow_run: WorkflowRun
+    ) -> None:
+        """Test that _ensure_synchronizer creates the service."""
+        # Add some tasks and arrays
+        workflow_run.tasks = {1: MagicMock(task_id=1), 2: MagicMock(task_id=2)}
+        workflow_run.arrays = {10: MagicMock(array_id=10)}
+
+        assert workflow_run._synchronizer is None
+        service = workflow_run._ensure_synchronizer()
+        assert service is not None
+        assert isinstance(service, Synchronizer)
+        assert service.task_ids == {1, 2}
+        assert service.array_ids == {10}
+
+    def test_ensure_synchronizer_returns_same_instance(
+        self, workflow_run: WorkflowRun
+    ) -> None:
+        """Test that _ensure_synchronizer returns the same instance."""
+        workflow_run.tasks = {1: MagicMock(task_id=1)}
+        workflow_run.arrays = {}
+
+        service1 = workflow_run._ensure_synchronizer()
+        service2 = workflow_run._ensure_synchronizer()
+        assert service1 is service2
+
+    def test_ensure_synchronizer_updates_task_ids(
+        self, workflow_run: WorkflowRun
+    ) -> None:
+        """Test that _ensure_synchronizer updates task IDs."""
+        workflow_run.tasks = {1: MagicMock(task_id=1)}
+        workflow_run.arrays = {}
+
+        service = workflow_run._ensure_synchronizer()
+        assert service.task_ids == {1}
+
+        # Add more tasks
+        workflow_run.tasks[2] = MagicMock(task_id=2)
+        workflow_run.tasks[3] = MagicMock(task_id=3)
+
+        # Ensure again - should update task IDs
+        service2 = workflow_run._ensure_synchronizer()
+        assert service2 is service  # Same instance
+        assert service.task_ids == {1, 2, 3}  # Updated IDs
+
+    def test_ensure_synchronizer_requires_gateway(
+        self, workflow_run: WorkflowRun
+    ) -> None:
+        """Test that _ensure_synchronizer creates gateway if needed."""
+        workflow_run.tasks = {}
+        workflow_run.arrays = {}
+
+        assert workflow_run._gateway is None
+        workflow_run._ensure_synchronizer()
+        # Gateway should have been created as a dependency
+        assert workflow_run._gateway is not None
 

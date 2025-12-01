@@ -32,6 +32,7 @@ from jobmon.client.swarm.swarm_array import SwarmArray
 from jobmon.client.swarm.swarm_task import SwarmTask
 from jobmon.client.swarm.workflow_run_impl.gateway import ServerGateway
 from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
+from jobmon.client.swarm.workflow_run_impl.services.synchronizer import Synchronizer
 from jobmon.client.swarm.workflow_run_impl.state import StateUpdate, SwarmState
 from jobmon.client.task_resources import TaskResources
 from jobmon.core.cluster import Cluster
@@ -127,6 +128,10 @@ class WorkflowRun:
     # When True, heartbeat management uses the new HeartbeatService class
     USE_NEW_HEARTBEAT: bool = False
 
+    # Feature flag for new synchronizer service (Phase 3b refactor)
+    # When True, state synchronization uses the new Synchronizer class
+    USE_NEW_SYNCHRONIZER: bool = False
+
     def __init__(
         self,
         workflow_run_id: int,
@@ -212,6 +217,9 @@ class WorkflowRun:
         # New heartbeat service (initialized lazily after gateway is set)
         self._heartbeat_service: Optional[HeartbeatService] = None
 
+        # New synchronizer service (initialized lazily after gateway is set)
+        self._synchronizer: Optional[Synchronizer] = None
+
     @property
     def status(self) -> Optional[str]:
         """Status of the workflow run."""
@@ -279,6 +287,24 @@ class WorkflowRun:
                 initial_status=self._status,
             )
         return self._heartbeat_service
+
+    def _ensure_synchronizer(self) -> Synchronizer:
+        """Lazily initialize the synchronizer service when needed.
+
+        The synchronizer requires the gateway and task/array information.
+        """
+        if self._synchronizer is None:
+            gateway = self._ensure_gateway()
+            self._synchronizer = Synchronizer(
+                gateway=gateway,
+                task_ids=set(self.tasks.keys()),
+                array_ids=set(self.arrays.keys()),
+            )
+        else:
+            # Update task/array IDs in case they changed
+            self._synchronizer.update_task_ids(set(self.tasks.keys()))
+            self._synchronizer.update_array_ids(set(self.arrays.keys()))
+        return self._synchronizer
 
     @property
     def done_tasks(self) -> list[SwarmTask]:
@@ -959,6 +985,69 @@ class WorkflowRun:
         self._run_coroutine(self.synchronize_state_async(full_sync=full_sync))
 
     async def synchronize_state_async(self, full_sync: bool = False) -> None:
+        if self.USE_NEW_SYNCHRONIZER:
+            # Use the new Synchronizer service
+            synchronizer = self._ensure_synchronizer()
+            # Ensure gateway has session for async operations
+            gateway = self._ensure_gateway()
+            gateway.set_session(await self._ensure_session())
+
+            # Run synchronizer and heartbeat in parallel
+            # (heartbeat is separate from synchronizer since it's also run in background)
+            results = await asyncio.gather(
+                synchronizer.tick(full_sync=full_sync, last_sync=self.last_sync),
+                self._log_heartbeat_async(),
+                return_exceptions=True,
+            )
+
+            # Process sync result
+            if isinstance(results[0], StateUpdate):
+                update = results[0]
+                # Update last_sync time
+                if update.sync_time is not None:
+                    self.last_sync = update.sync_time
+
+                # Apply concurrency limit changes
+                if update.max_concurrently_running is not None:
+                    self.max_concurrently_running = update.max_concurrently_running
+
+                for array_id, limit in update.array_limits.items():
+                    if array_id in self.arrays:
+                        self.arrays[array_id].max_concurrently_running = limit
+
+                # Apply task status changes
+                if update.task_statuses:
+                    updated_tasks: set[SwarmTask] = set()
+                    for task_id, new_status in update.task_statuses.items():
+                        if task_id in self.tasks:
+                            task = self.tasks[task_id]
+                            if task.status != new_status:
+                                task.status = new_status
+                                updated_tasks.add(task)
+                    self._refresh_task_status_map(updated_tasks)
+            elif isinstance(results[0], BaseException):
+                logger.warning(
+                    "Synchronizer tick failed",
+                    error=str(results[0]),
+                    exc_info=results[0],
+                )
+
+            # Log heartbeat failures
+            if isinstance(results[1], BaseException):
+                logger.warning(
+                    "Heartbeat during sync failed",
+                    error=str(results[1]),
+                    exc_info=results[1],
+                )
+
+            logger.debug(
+                f"State synchronized (new). ready_to_run_count: {len(self.ready_to_run)}, "
+                f"active_tasks: {self.active_tasks}, "
+                f"full_sync: {full_sync}"
+            )
+            return
+
+        # Legacy implementation
         # These operations are independent - run them in parallel for better throughput.
         # Include heartbeat for cases where synchronize_state is called directly
         # (not through the full _run_async loop with its background heartbeat task).

@@ -9,8 +9,10 @@ of workflow run execution:
 """
 
 from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
+from jobmon.client.swarm.workflow_run_impl.services.synchronizer import Synchronizer
 
 __all__: list[str] = [
     "HeartbeatService",
+    "Synchronizer",
 ]
 
