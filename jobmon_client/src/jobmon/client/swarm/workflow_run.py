@@ -31,6 +31,11 @@ from jobmon.client.array import Array
 from jobmon.client.swarm.swarm_array import SwarmArray
 from jobmon.client.swarm.swarm_task import SwarmTask
 from jobmon.client.swarm.workflow_run_impl.gateway import ServerGateway
+from jobmon.client.swarm.workflow_run_impl.orchestrator import (
+    OrchestratorConfig,
+    WorkflowRunContext,
+    WorkflowRunOrchestrator,
+)
 from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
 from jobmon.client.swarm.workflow_run_impl.services.synchronizer import Synchronizer
 from jobmon.client.swarm.workflow_run_impl.state import StateUpdate, SwarmState
@@ -131,6 +136,11 @@ class WorkflowRun:
     # Feature flag for new synchronizer service (Phase 3b refactor)
     # When True, state synchronization uses the new Synchronizer class
     USE_NEW_SYNCHRONIZER: bool = False
+
+    # Feature flag for new orchestrator (Phase 4 refactor)
+    # When True, the entire run loop delegates to WorkflowRunOrchestrator
+    # This flag implies USE_NEW_GATEWAY, USE_NEW_HEARTBEAT, and USE_NEW_SYNCHRONIZER
+    USE_NEW_ORCHESTRATOR: bool = False
 
     def __init__(
         self,
@@ -657,6 +667,14 @@ class WorkflowRun:
         initialize: bool,
     ) -> None:
         """Async workflow runner that manages scheduler and heartbeat loops."""
+        # Use the new orchestrator if the feature flag is enabled
+        if self.USE_NEW_ORCHESTRATOR and initialize:
+            await self._run_with_orchestrator(
+                distributor_alive_callable=distributor_alive_callable,
+                seconds_until_timeout=seconds_until_timeout,
+            )
+            return
+
         self._stop_event = asyncio.Event()
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
         teardown_needed = True
@@ -800,6 +818,96 @@ class WorkflowRun:
         finally:
             if teardown_needed:
                 await self._teardown_async()
+
+    async def _run_with_orchestrator(
+        self,
+        distributor_alive_callable: Callable[..., bool],
+        seconds_until_timeout: int,
+    ) -> None:
+        """Run workflow using the new orchestrator.
+
+        This method delegates the entire run loop to WorkflowRunOrchestrator,
+        which coordinates all services (heartbeat, synchronization, scheduling).
+        """
+        # Ensure gateway is initialized
+        gateway = self._ensure_gateway()
+        gateway.set_session(await self._ensure_session())
+
+        # Create orchestrator context with references to our state
+        context = WorkflowRunContext(
+            workflow_id=self.workflow_id,
+            workflow_run_id=self.workflow_run_id,
+            gateway=gateway,
+            tasks=self.tasks,
+            arrays=self.arrays,
+            task_status_map=self._task_status_map,
+            ready_to_run=self.ready_to_run,
+            task_resources_cache=self._task_resources,
+            status=self._status,
+            max_concurrently_running=self.max_concurrently_running,
+            last_sync=getattr(self, "last_sync", None),
+            n_executions=self._n_executions,
+        )
+
+        # Create orchestrator configuration
+        config = OrchestratorConfig(
+            heartbeat_interval=self._workflow_run_heartbeat_interval,
+            heartbeat_report_by_buffer=self._heartbeat_report_by_buffer,
+            wedged_workflow_sync_interval=self.wedged_workflow_sync_interval,
+            fail_fast=self.fail_fast,
+            timeout=seconds_until_timeout,
+            fail_after_n_executions=(
+                self._val_fail_after_n_executions
+                if self._val_fail_after_n_executions < 1_000_000_000
+                else None
+            ),
+        )
+
+        # Create and run orchestrator
+        orchestrator = WorkflowRunOrchestrator(context, config)
+
+        try:
+            result = await orchestrator.run(distributor_alive_callable)
+
+            # Sync state back from context to WorkflowRun
+            self._status = context.status
+            self.max_concurrently_running = context.max_concurrently_running
+            self.last_sync = context.last_sync
+            self._n_executions = context.n_executions
+
+            # Update array concurrency limits
+            for array_id, array in context.arrays.items():
+                if array_id in self.arrays:
+                    self.arrays[array_id].max_concurrently_running = (
+                        array.max_concurrently_running
+                    )
+
+            logger.info(
+                f"Orchestrator completed: {result.done_count}/{result.total_tasks} done, "
+                f"{result.failed_count} failed, status={result.final_status}, "
+                f"elapsed={result.elapsed_time:.1f}s"
+            )
+        except KeyboardInterrupt:
+            # Handle keyboard interrupt specially - match legacy behavior
+            logger.warning("Keyboard interrupt raised (orchestrator)")
+            confirm = await asyncio.to_thread(
+                input, "Are you sure you want to exit (y/n): "
+            )
+            confirm = confirm.lower().strip()
+
+            if confirm == "y":
+                await self._update_status_async(WorkflowRunStatus.STOPPED)
+                raise
+            else:
+                logger.info("Continuing jobmon...")
+                # Re-run with same timeout (we don't know how much time elapsed)
+                await self._run_with_orchestrator(
+                    distributor_alive_callable=distributor_alive_callable,
+                    seconds_until_timeout=seconds_until_timeout,
+                )
+        finally:
+            # Ensure session is closed
+            await self._close_session()
 
     async def _heartbeat_loop(self) -> None:
         """Background task that ensures workflow-run heartbeats are logged."""

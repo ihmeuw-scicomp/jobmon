@@ -751,3 +751,463 @@ class TestSynchronizerServiceInitialization:
         # Gateway should have been created as a dependency
         assert workflow_run._gateway is not None
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 4: Orchestrator Feature Flag Tests
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestOrchestratorFeatureFlag:
+    """Tests for USE_NEW_ORCHESTRATOR feature flag."""
+
+    def test_flag_default_is_false(self) -> None:
+        """Verify the default flag value."""
+        assert WorkflowRun.USE_NEW_ORCHESTRATOR is False
+
+    @pytest.mark.asyncio
+    async def test_run_with_orchestrator_flag_off_uses_legacy(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test that flag off uses legacy implementation."""
+        WorkflowRun.USE_NEW_ORCHESTRATOR = False
+        try:
+            # Set up workflow as all done
+            mock_task = MagicMock()
+            mock_task.task_id = 1
+            mock_task.status = TaskStatus.DONE
+            workflow_run.tasks = {1: mock_task}
+            workflow_run._task_status_map[TaskStatus.DONE] = {mock_task}
+
+            # Make send_request_async return the status that matches what was requested
+            def match_status(*args, **kwargs):
+                message = kwargs.get("message", {})
+                status = message.get("status", "R")
+                return (200, {"status": status})
+
+            mock_requester.send_request_async.side_effect = match_status
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                with patch.object(workflow_run, "_heartbeat_loop", new_callable=AsyncMock):
+                    with patch.object(
+                        workflow_run, "synchronize_state_async", new_callable=AsyncMock
+                    ):
+                        # Should use legacy path
+                        await workflow_run._run_async(
+                            distributor_alive_callable=lambda: True,
+                            seconds_until_timeout=300,
+                            initialize=True,
+                        )
+
+            # Check that legacy status update was used
+            assert mock_requester.send_request_async.called
+        finally:
+            WorkflowRun.USE_NEW_ORCHESTRATOR = False
+
+    @pytest.mark.asyncio
+    async def test_run_with_orchestrator_flag_on_delegates(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test that flag on delegates to orchestrator."""
+        WorkflowRun.USE_NEW_ORCHESTRATOR = True
+        try:
+            # Set up workflow as all done
+            mock_task = MagicMock()
+            mock_task.task_id = 1
+            mock_task.status = TaskStatus.DONE
+            mock_task.all_upstreams_done = True
+            mock_task.num_upstreams_done = 0
+            mock_task.downstream_swarm_tasks = set()
+            workflow_run.tasks = {1: mock_task}
+            workflow_run._task_status_map[TaskStatus.DONE] = {mock_task}
+
+            # Mock the orchestrator's run method to avoid full execution
+            mock_result = MagicMock()
+            mock_result.done_count = 1
+            mock_result.total_tasks = 1
+            mock_result.failed_count = 0
+            mock_result.final_status = "D"
+            mock_result.elapsed_time = 0.1
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                with patch(
+                    "jobmon.client.swarm.workflow_run.WorkflowRunOrchestrator"
+                ) as mock_orch_class:
+                    mock_orch = MagicMock()
+                    mock_orch.run = AsyncMock(return_value=mock_result)
+                    mock_orch_class.return_value = mock_orch
+
+                    await workflow_run._run_async(
+                        distributor_alive_callable=lambda: True,
+                        seconds_until_timeout=300,
+                        initialize=True,
+                    )
+
+                    # Verify orchestrator was created and run
+                    mock_orch_class.assert_called_once()
+                    mock_orch.run.assert_called_once()
+        finally:
+            WorkflowRun.USE_NEW_ORCHESTRATOR = False
+
+    @pytest.mark.asyncio
+    async def test_run_with_orchestrator_syncs_state_back(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test that state is synced back from orchestrator context."""
+        WorkflowRun.USE_NEW_ORCHESTRATOR = True
+        try:
+            # Set up workflow
+            mock_task = MagicMock()
+            mock_task.task_id = 1
+            mock_task.status = TaskStatus.DONE
+            mock_task.all_upstreams_done = True
+            mock_task.num_upstreams_done = 0
+            mock_task.downstream_swarm_tasks = set()
+            workflow_run.tasks = {1: mock_task}
+            workflow_run._task_status_map[TaskStatus.DONE] = {mock_task}
+
+            mock_result = MagicMock()
+            mock_result.done_count = 1
+            mock_result.total_tasks = 1
+            mock_result.failed_count = 0
+            mock_result.final_status = "D"
+            mock_result.elapsed_time = 0.1
+
+            # Capture the context passed to orchestrator
+            captured_context = None
+
+            def capture_context(ctx, config):
+                nonlocal captured_context
+                captured_context = ctx
+                # Modify context to simulate orchestrator changes
+                ctx.status = "D"
+                ctx.max_concurrently_running = 200
+                ctx.n_executions = 5
+                mock_orch = MagicMock()
+                mock_orch.run = AsyncMock(return_value=mock_result)
+                return mock_orch
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                with patch(
+                    "jobmon.client.swarm.workflow_run.WorkflowRunOrchestrator",
+                    side_effect=capture_context,
+                ):
+                    await workflow_run._run_async(
+                        distributor_alive_callable=lambda: True,
+                        seconds_until_timeout=300,
+                        initialize=True,
+                    )
+
+            # Verify state was synced back
+            assert workflow_run._status == "D"
+            assert workflow_run.max_concurrently_running == 200
+            assert workflow_run._n_executions == 5
+        finally:
+            WorkflowRun.USE_NEW_ORCHESTRATOR = False
+
+    @pytest.mark.asyncio
+    async def test_run_with_orchestrator_not_used_for_resume(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test that orchestrator is not used when initialize=False (resume)."""
+        WorkflowRun.USE_NEW_ORCHESTRATOR = True
+        try:
+            # Set up workflow as all done
+            mock_task = MagicMock()
+            mock_task.task_id = 1
+            mock_task.status = TaskStatus.DONE
+            workflow_run.tasks = {1: mock_task}
+            workflow_run._task_status_map[TaskStatus.DONE] = {mock_task}
+            workflow_run._status = "R"  # Already running (resume case)
+
+            mock_requester.send_request_async.return_value = (200, {"status": "D"})
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                with patch.object(workflow_run, "_heartbeat_loop", new_callable=AsyncMock):
+                    with patch.object(
+                        workflow_run, "synchronize_state_async", new_callable=AsyncMock
+                    ):
+                        with patch(
+                            "jobmon.client.swarm.workflow_run.WorkflowRunOrchestrator"
+                        ) as mock_orch_class:
+                            # Should use legacy path for initialize=False
+                            await workflow_run._run_async(
+                                distributor_alive_callable=lambda: True,
+                                seconds_until_timeout=300,
+                                initialize=False,
+                            )
+
+                            # Orchestrator should NOT have been created
+                            mock_orch_class.assert_not_called()
+        finally:
+            WorkflowRun.USE_NEW_ORCHESTRATOR = False
+
+
+class TestOrchestratorContextCreation:
+    """Tests for WorkflowRunContext creation."""
+
+    @pytest.mark.asyncio
+    async def test_context_has_correct_workflow_ids(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test that context has correct workflow and run IDs."""
+        WorkflowRun.USE_NEW_ORCHESTRATOR = True
+        try:
+            mock_task = MagicMock()
+            mock_task.task_id = 1
+            mock_task.status = TaskStatus.DONE
+            mock_task.all_upstreams_done = True
+            mock_task.num_upstreams_done = 0
+            mock_task.downstream_swarm_tasks = set()
+            workflow_run.tasks = {1: mock_task}
+            workflow_run._task_status_map[TaskStatus.DONE] = {mock_task}
+
+            captured_context = None
+
+            def capture_context(ctx, config):
+                nonlocal captured_context
+                captured_context = ctx
+                mock_orch = MagicMock()
+                mock_result = MagicMock(
+                    done_count=1,
+                    total_tasks=1,
+                    failed_count=0,
+                    final_status="D",
+                    elapsed_time=0.1,
+                )
+                mock_orch.run = AsyncMock(return_value=mock_result)
+                return mock_orch
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                with patch(
+                    "jobmon.client.swarm.workflow_run.WorkflowRunOrchestrator",
+                    side_effect=capture_context,
+                ):
+                    await workflow_run._run_async(
+                        distributor_alive_callable=lambda: True,
+                        seconds_until_timeout=300,
+                        initialize=True,
+                    )
+
+            assert captured_context.workflow_id == workflow_run.workflow_id
+            assert captured_context.workflow_run_id == workflow_run.workflow_run_id
+        finally:
+            WorkflowRun.USE_NEW_ORCHESTRATOR = False
+
+    @pytest.mark.asyncio
+    async def test_context_shares_task_references(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test that context shares references to task/array dicts."""
+        WorkflowRun.USE_NEW_ORCHESTRATOR = True
+        try:
+            mock_task = MagicMock()
+            mock_task.task_id = 1
+            mock_task.status = TaskStatus.DONE
+            mock_task.all_upstreams_done = True
+            mock_task.num_upstreams_done = 0
+            mock_task.downstream_swarm_tasks = set()
+            workflow_run.tasks = {1: mock_task}
+            workflow_run._task_status_map[TaskStatus.DONE] = {mock_task}
+
+            mock_array = MagicMock()
+            mock_array.array_id = 10
+            workflow_run.arrays = {10: mock_array}
+
+            captured_context = None
+
+            def capture_context(ctx, config):
+                nonlocal captured_context
+                captured_context = ctx
+                mock_orch = MagicMock()
+                mock_result = MagicMock(
+                    done_count=1,
+                    total_tasks=1,
+                    failed_count=0,
+                    final_status="D",
+                    elapsed_time=0.1,
+                )
+                mock_orch.run = AsyncMock(return_value=mock_result)
+                return mock_orch
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                with patch(
+                    "jobmon.client.swarm.workflow_run.WorkflowRunOrchestrator",
+                    side_effect=capture_context,
+                ):
+                    await workflow_run._run_async(
+                        distributor_alive_callable=lambda: True,
+                        seconds_until_timeout=300,
+                        initialize=True,
+                    )
+
+            # Context should share the same dict references
+            assert captured_context.tasks is workflow_run.tasks
+            assert captured_context.arrays is workflow_run.arrays
+            assert captured_context.task_status_map is workflow_run._task_status_map
+            assert captured_context.ready_to_run is workflow_run.ready_to_run
+        finally:
+            WorkflowRun.USE_NEW_ORCHESTRATOR = False
+
+
+class TestOrchestratorConfigCreation:
+    """Tests for OrchestratorConfig creation."""
+
+    @pytest.mark.asyncio
+    async def test_config_has_correct_settings(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test that config has correct settings from WorkflowRun."""
+        WorkflowRun.USE_NEW_ORCHESTRATOR = True
+        try:
+            mock_task = MagicMock()
+            mock_task.task_id = 1
+            mock_task.status = TaskStatus.DONE
+            mock_task.all_upstreams_done = True
+            mock_task.num_upstreams_done = 0
+            mock_task.downstream_swarm_tasks = set()
+            workflow_run.tasks = {1: mock_task}
+            workflow_run._task_status_map[TaskStatus.DONE] = {mock_task}
+
+            # Set up specific config values
+            workflow_run._workflow_run_heartbeat_interval = 45
+            workflow_run._heartbeat_report_by_buffer = 2.5
+            workflow_run.wedged_workflow_sync_interval = 400
+            workflow_run.fail_fast = True
+
+            captured_config = None
+
+            def capture_config(ctx, config):
+                nonlocal captured_config
+                captured_config = config
+                mock_orch = MagicMock()
+                mock_result = MagicMock(
+                    done_count=1,
+                    total_tasks=1,
+                    failed_count=0,
+                    final_status="D",
+                    elapsed_time=0.1,
+                )
+                mock_orch.run = AsyncMock(return_value=mock_result)
+                return mock_orch
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                with patch(
+                    "jobmon.client.swarm.workflow_run.WorkflowRunOrchestrator",
+                    side_effect=capture_config,
+                ):
+                    await workflow_run._run_async(
+                        distributor_alive_callable=lambda: True,
+                        seconds_until_timeout=500,
+                        initialize=True,
+                    )
+
+            assert captured_config.heartbeat_interval == 45
+            assert captured_config.heartbeat_report_by_buffer == 2.5
+            assert captured_config.wedged_workflow_sync_interval == 400
+            assert captured_config.fail_fast is True
+            assert captured_config.timeout == 500
+        finally:
+            WorkflowRun.USE_NEW_ORCHESTRATOR = False
+
+    @pytest.mark.asyncio
+    async def test_config_fail_after_n_executions_conversion(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test that fail_after_n_executions is correctly converted."""
+        WorkflowRun.USE_NEW_ORCHESTRATOR = True
+        try:
+            mock_task = MagicMock()
+            mock_task.task_id = 1
+            mock_task.status = TaskStatus.DONE
+            mock_task.all_upstreams_done = True
+            mock_task.num_upstreams_done = 0
+            mock_task.downstream_swarm_tasks = set()
+            workflow_run.tasks = {1: mock_task}
+            workflow_run._task_status_map[TaskStatus.DONE] = {mock_task}
+
+            # Set a specific fail_after_n_executions value
+            workflow_run._val_fail_after_n_executions = 10
+
+            captured_config = None
+
+            def capture_config(ctx, config):
+                nonlocal captured_config
+                captured_config = config
+                mock_orch = MagicMock()
+                mock_result = MagicMock(
+                    done_count=1,
+                    total_tasks=1,
+                    failed_count=0,
+                    final_status="D",
+                    elapsed_time=0.1,
+                )
+                mock_orch.run = AsyncMock(return_value=mock_result)
+                return mock_orch
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                with patch(
+                    "jobmon.client.swarm.workflow_run.WorkflowRunOrchestrator",
+                    side_effect=capture_config,
+                ):
+                    await workflow_run._run_async(
+                        distributor_alive_callable=lambda: True,
+                        seconds_until_timeout=300,
+                        initialize=True,
+                    )
+
+            # Should be set to 10 since it's less than 1_000_000_000
+            assert captured_config.fail_after_n_executions == 10
+        finally:
+            WorkflowRun.USE_NEW_ORCHESTRATOR = False
+
+    @pytest.mark.asyncio
+    async def test_config_fail_after_n_executions_disabled(
+        self, workflow_run: WorkflowRun, mock_requester: MagicMock
+    ) -> None:
+        """Test that default fail_after_n_executions is converted to None."""
+        WorkflowRun.USE_NEW_ORCHESTRATOR = True
+        try:
+            mock_task = MagicMock()
+            mock_task.task_id = 1
+            mock_task.status = TaskStatus.DONE
+            mock_task.all_upstreams_done = True
+            mock_task.num_upstreams_done = 0
+            mock_task.downstream_swarm_tasks = set()
+            workflow_run.tasks = {1: mock_task}
+            workflow_run._task_status_map[TaskStatus.DONE] = {mock_task}
+
+            # Default value is 1_000_000_000 which should become None
+            workflow_run._val_fail_after_n_executions = 1_000_000_000
+
+            captured_config = None
+
+            def capture_config(ctx, config):
+                nonlocal captured_config
+                captured_config = config
+                mock_orch = MagicMock()
+                mock_result = MagicMock(
+                    done_count=1,
+                    total_tasks=1,
+                    failed_count=0,
+                    final_status="D",
+                    elapsed_time=0.1,
+                )
+                mock_orch.run = AsyncMock(return_value=mock_result)
+                return mock_orch
+
+            with patch.object(workflow_run, "_ensure_session", new_callable=AsyncMock):
+                with patch(
+                    "jobmon.client.swarm.workflow_run.WorkflowRunOrchestrator",
+                    side_effect=capture_config,
+                ):
+                    await workflow_run._run_async(
+                        distributor_alive_callable=lambda: True,
+                        seconds_until_timeout=300,
+                        initialize=True,
+                    )
+
+            # Should be None since default is 1_000_000_000
+            assert captured_config.fail_after_n_executions is None
+        finally:
+            WorkflowRun.USE_NEW_ORCHESTRATOR = False
+
