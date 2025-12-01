@@ -16,11 +16,13 @@ Components:
 
 from jobmon.client.swarm.workflow_run_impl.gateway import ServerGateway
 from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
+from jobmon.client.swarm.workflow_run_impl.services.scheduler import Scheduler
 from jobmon.client.swarm.workflow_run_impl.services.synchronizer import Synchronizer
 from jobmon.client.swarm.workflow_run_impl.state import StateUpdate, SwarmState
 
 __all__ = [
     "HeartbeatService",
+    "Scheduler",
     "ServerGateway",
     "StateUpdate",
     "SwarmState",
