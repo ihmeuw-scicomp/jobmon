@@ -56,11 +56,11 @@ def workflow_run(mock_requester: MagicMock) -> WorkflowRun:
 
 
 class TestFeatureFlagOff:
-    """Tests with USE_NEW_GATEWAY = False (default)."""
+    """Tests with USE_NEW_GATEWAY = False."""
 
-    def test_flag_default_is_false(self) -> None:
-        """Verify the default flag value."""
-        assert WorkflowRun.USE_NEW_GATEWAY is False
+    def test_flag_default_is_true(self) -> None:
+        """Verify the default flag value is now True (Phase 5)."""
+        assert WorkflowRun.USE_NEW_GATEWAY is True
 
     def test_sync_heartbeat_uses_old_path(
         self, workflow_run: WorkflowRun, mock_requester: MagicMock
@@ -249,11 +249,11 @@ class TestGatewayInitialization:
 
 
 class TestStateFeatureFlagOff:
-    """Tests with USE_NEW_STATE = False (default)."""
+    """Tests with USE_NEW_STATE = False."""
 
-    def test_state_flag_default_is_false(self) -> None:
-        """Verify the default state flag value."""
-        assert WorkflowRun.USE_NEW_STATE is False
+    def test_state_flag_default_is_true(self) -> None:
+        """Verify the default state flag value is now True (Phase 5)."""
+        assert WorkflowRun.USE_NEW_STATE is True
 
     def test_get_active_tasks_count_uses_old_path(
         self, workflow_run: WorkflowRun, mock_requester: MagicMock
@@ -394,11 +394,11 @@ class TestStateInitialization:
 
 
 class TestHeartbeatFeatureFlagOff:
-    """Tests with USE_NEW_HEARTBEAT = False (default)."""
+    """Tests with USE_NEW_HEARTBEAT = False."""
 
-    def test_heartbeat_flag_default_is_false(self) -> None:
-        """Verify the default heartbeat flag value."""
-        assert WorkflowRun.USE_NEW_HEARTBEAT is False
+    def test_heartbeat_flag_default_is_true(self) -> None:
+        """Verify the default heartbeat flag value is now True (Phase 5)."""
+        assert WorkflowRun.USE_NEW_HEARTBEAT is True
 
     def test_sync_heartbeat_uses_old_path_when_flag_off(
         self, workflow_run: WorkflowRun, mock_requester: MagicMock
@@ -572,11 +572,11 @@ class TestHeartbeatServiceInitialization:
 
 
 class TestSynchronizerFeatureFlagOff:
-    """Tests with USE_NEW_SYNCHRONIZER = False (default)."""
+    """Tests with USE_NEW_SYNCHRONIZER = False."""
 
-    def test_synchronizer_flag_default_is_false(self) -> None:
-        """Verify the default synchronizer flag value."""
-        assert WorkflowRun.USE_NEW_SYNCHRONIZER is False
+    def test_synchronizer_flag_default_is_true(self) -> None:
+        """Verify the default synchronizer flag value is now True (Phase 5)."""
+        assert WorkflowRun.USE_NEW_SYNCHRONIZER is True
 
     @pytest.mark.asyncio
     async def test_sync_uses_old_path_when_flag_off(
@@ -760,9 +760,9 @@ class TestSynchronizerServiceInitialization:
 class TestOrchestratorFeatureFlag:
     """Tests for USE_NEW_ORCHESTRATOR feature flag."""
 
-    def test_flag_default_is_false(self) -> None:
-        """Verify the default flag value."""
-        assert WorkflowRun.USE_NEW_ORCHESTRATOR is False
+    def test_flag_default_is_true(self) -> None:
+        """Verify the default flag value is now True (Phase 5)."""
+        assert WorkflowRun.USE_NEW_ORCHESTRATOR is True
 
     @pytest.mark.asyncio
     async def test_run_with_orchestrator_flag_off_uses_legacy(

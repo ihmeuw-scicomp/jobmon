@@ -123,24 +123,24 @@ class WorkflowRun:
 
     # Feature flag for new gateway-based implementation (Phase 1 refactor)
     # When True, HTTP communication uses the new ServerGateway class
-    USE_NEW_GATEWAY: bool = False
+    USE_NEW_GATEWAY: bool = True
 
     # Feature flag for new state container (Phase 2 refactor)
     # When True, state management uses the new SwarmState class
-    USE_NEW_STATE: bool = False
+    USE_NEW_STATE: bool = True
 
     # Feature flag for new heartbeat service (Phase 3a refactor)
     # When True, heartbeat management uses the new HeartbeatService class
-    USE_NEW_HEARTBEAT: bool = False
+    USE_NEW_HEARTBEAT: bool = True
 
     # Feature flag for new synchronizer service (Phase 3b refactor)
     # When True, state synchronization uses the new Synchronizer class
-    USE_NEW_SYNCHRONIZER: bool = False
+    USE_NEW_SYNCHRONIZER: bool = True
 
     # Feature flag for new orchestrator (Phase 4 refactor)
     # When True, the entire run loop delegates to WorkflowRunOrchestrator
     # This flag implies USE_NEW_GATEWAY, USE_NEW_HEARTBEAT, and USE_NEW_SYNCHRONIZER
-    USE_NEW_ORCHESTRATOR: bool = False
+    USE_NEW_ORCHESTRATOR: bool = True
 
     def __init__(
         self,
