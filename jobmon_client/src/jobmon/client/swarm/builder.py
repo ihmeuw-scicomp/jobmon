@@ -220,7 +220,7 @@ class SwarmBuilder:
         for array in workflow.arrays.values():
             swarm_array = SwarmArray(
                 array.array_id,
-                array.max_concurrently_running,
+                int(array.max_concurrently_running),
                 array_name=array.name,
             )
             state.add_array(swarm_array)

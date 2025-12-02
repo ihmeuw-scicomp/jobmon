@@ -565,9 +565,9 @@ class Workflow(object):
         logger.info("Adding Workflow metadata to database")
         self.bind()
 
-        config = JobmonConfig()
+        jobmon_config = JobmonConfig()
         try:
-            gui_url = config.get("http", "gui_url")
+            gui_url = jobmon_config.get("http", "gui_url")
         except ConfigError:
             gui_url = ""
 
@@ -625,6 +625,8 @@ class Workflow(object):
                 fail_fast=fail_fast,
                 fail_after_n_executions=self._fail_after_n_executions,
             )
+            # wfr.status is always set after create_workflow_run() and _update_status()
+            assert wfr.status is not None, "WorkflowRun status should be set after binding"
             result = run_workflow(
                 workflow=self,
                 workflow_run_id=wfr.workflow_run_id,

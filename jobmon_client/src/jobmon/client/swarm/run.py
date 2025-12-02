@@ -155,9 +155,9 @@ async def _run_workflow_async(
     )
     builder.build_from_workflow(workflow)
 
-    # Run with orchestrator (use _ensure_gateway() to create gateway if needed)
+    # Run with orchestrator (use _ensure_state() and _ensure_gateway() to get initialized objects)
     return await _run_orchestrator(
-        state=builder.state,
+        state=builder._ensure_state(),
         gateway=builder._ensure_gateway(),
         distributor_alive=distributor_alive,
         config=config,
@@ -203,9 +203,9 @@ async def _resume_workflow_run_async(
     )
     builder.build_from_workflow_id(workflow_id)
 
-    # Run with orchestrator (use _ensure_gateway() to get gateway)
+    # Run with orchestrator (use _ensure_state() and _ensure_gateway() to get initialized objects)
     return await _run_orchestrator(
-        state=builder.state,
+        state=builder._ensure_state(),
         gateway=builder._ensure_gateway(),
         distributor_alive=distributor_alive,
         config=config,
