@@ -70,7 +70,9 @@ class HeartbeatService:
         self._interval = interval
         self._report_by_buffer = report_by_buffer
         self._current_status = initial_status
-        self._last_heartbeat_time: float = 0.0
+        # Initialize to current time so the main loop doesn't spin without sleeping
+        # while waiting for the first heartbeat to be logged
+        self._last_heartbeat_time: float = time.time()
 
     @property
     def interval(self) -> float:
@@ -101,9 +103,7 @@ class HeartbeatService:
         self._current_status = status
 
     def time_since_last_heartbeat(self) -> float:
-        """Seconds since the last heartbeat was logged."""
-        if self._last_heartbeat_time == 0.0:
-            return float("inf")
+        """Seconds since the last heartbeat was logged (or since initialization)."""
         return time.time() - self._last_heartbeat_time
 
     def is_heartbeat_due(self) -> bool:

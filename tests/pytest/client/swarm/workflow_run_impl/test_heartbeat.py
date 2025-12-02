@@ -48,21 +48,25 @@ class TestHeartbeatServiceInit:
 
     def test_init_stores_parameters(self, mock_gateway):
         """Test that init stores all parameters correctly."""
+        before = time.time()
         service = HeartbeatService(
             gateway=mock_gateway,
             interval=45.0,
             report_by_buffer=2.0,
             initial_status="B",
         )
+        after = time.time()
 
         assert service.interval == 45.0
         assert service.current_status == "B"
         assert service.next_report_increment == 90.0  # 45 * 2
-        assert service.last_heartbeat_time == 0.0
+        # last_heartbeat_time is initialized to current time
+        assert before <= service.last_heartbeat_time <= after
 
-    def test_init_default_last_heartbeat_time(self, heartbeat_service):
-        """Test that last_heartbeat_time starts at 0."""
-        assert heartbeat_service.last_heartbeat_time == 0.0
+    def test_init_last_heartbeat_time_is_current_time(self, heartbeat_service):
+        """Test that last_heartbeat_time is initialized to current time."""
+        # Should be recent (within last second)
+        assert time.time() - heartbeat_service.last_heartbeat_time < 1.0
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -91,13 +95,15 @@ class TestHeartbeatServiceProperties:
         )
         assert service.next_report_increment == 60.0
 
-    def test_time_since_last_heartbeat_never_logged(self, heartbeat_service):
-        """Test time_since_last_heartbeat returns infinity if never logged."""
-        assert heartbeat_service.time_since_last_heartbeat() == float("inf")
+    def test_time_since_last_heartbeat_at_init(self, heartbeat_service):
+        """Test time_since_last_heartbeat returns ~0 at initialization."""
+        # Since last_heartbeat_time is initialized to current time,
+        # time_since_last_heartbeat should be very small
+        assert heartbeat_service.time_since_last_heartbeat() < 1.0
 
-    def test_time_since_last_heartbeat_after_tick(self, heartbeat_service):
-        """Test time_since_last_heartbeat after a tick."""
-        # Manually set last_heartbeat_time
+    def test_time_since_last_heartbeat_after_delay(self, heartbeat_service):
+        """Test time_since_last_heartbeat after some time passes."""
+        # Manually set last_heartbeat_time to 5 seconds ago
         heartbeat_service._last_heartbeat_time = time.time() - 5.0
         elapsed = heartbeat_service.time_since_last_heartbeat()
         assert 4.9 <= elapsed <= 5.5  # Allow some timing tolerance
@@ -136,9 +142,11 @@ class TestHeartbeatServiceStatus:
 class TestHeartbeatServiceIsDue:
     """Tests for is_heartbeat_due."""
 
-    def test_is_heartbeat_due_never_logged(self, heartbeat_service):
-        """Test is_heartbeat_due returns True if never logged."""
-        assert heartbeat_service.is_heartbeat_due() is True
+    def test_is_heartbeat_due_at_init(self, heartbeat_service):
+        """Test is_heartbeat_due returns False at init (time just started)."""
+        # Since last_heartbeat_time is initialized to current time,
+        # heartbeat is not due yet
+        assert heartbeat_service.is_heartbeat_due() is False
 
     def test_is_heartbeat_due_just_logged(self, heartbeat_service):
         """Test is_heartbeat_due returns False immediately after logging."""
@@ -412,7 +420,8 @@ class TestHeartbeatServiceResetTimer:
 
     def test_reset_timer_sets_time(self, heartbeat_service):
         """Test reset_timer sets last_heartbeat_time to now."""
-        assert heartbeat_service.last_heartbeat_time == 0.0
+        # Set to a time in the past
+        heartbeat_service._last_heartbeat_time = time.time() - 100.0
 
         before = time.time()
         heartbeat_service.reset_timer()
@@ -422,6 +431,8 @@ class TestHeartbeatServiceResetTimer:
 
     def test_reset_timer_affects_is_heartbeat_due(self, heartbeat_service):
         """Test reset_timer causes is_heartbeat_due to return False."""
+        # Make heartbeat overdue
+        heartbeat_service._last_heartbeat_time = time.time() - 100.0
         assert heartbeat_service.is_heartbeat_due() is True
 
         heartbeat_service.reset_timer()
