@@ -626,7 +626,9 @@ class Workflow(object):
                 fail_after_n_executions=self._fail_after_n_executions,
             )
             # wfr.status is always set after create_workflow_run() and _update_status()
-            assert wfr.status is not None, "WorkflowRun status should be set after binding"
+            assert (
+                wfr.status is not None
+            ), "WorkflowRun status should be set after binding"
             result = run_workflow(
                 workflow=self,
                 workflow_run_id=wfr.workflow_run_id,

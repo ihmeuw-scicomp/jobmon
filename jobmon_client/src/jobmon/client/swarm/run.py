@@ -17,13 +17,13 @@ import structlog
 
 from jobmon.client.swarm.builder import SwarmBuilder
 from jobmon.client.swarm.gateway import ServerGateway
-from jobmon.client.swarm.state import SwarmState
 from jobmon.client.swarm.orchestrator import (
     OrchestratorConfig,
     OrchestratorResult,
     WorkflowRunConfig,
     WorkflowRunOrchestrator,
 )
+from jobmon.client.swarm.state import SwarmState
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import WorkflowRunStatus
 from jobmon.core.exceptions import TransitionError
@@ -155,7 +155,7 @@ async def _run_workflow_async(
     )
     builder.build_from_workflow(workflow)
 
-    # Run with orchestrator (use _ensure_state() and _ensure_gateway() to get initialized objects)
+    # Run with orchestrator
     return await _run_orchestrator(
         state=builder._ensure_state(),
         gateway=builder._ensure_gateway(),
@@ -203,7 +203,7 @@ async def _resume_workflow_run_async(
     )
     builder.build_from_workflow_id(workflow_id)
 
-    # Run with orchestrator (use _ensure_state() and _ensure_gateway() to get initialized objects)
+    # Run with orchestrator
     return await _run_orchestrator(
         state=builder._ensure_state(),
         gateway=builder._ensure_gateway(),

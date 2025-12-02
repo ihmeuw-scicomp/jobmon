@@ -707,7 +707,9 @@ def resume_workflow_from_id(
         timeout=timeout,
     ) as distributor:
         # new_wfr.status is always set after create_workflow_run() and _update_status()
-        assert new_wfr.status is not None, "WorkflowRun status should be set after binding"
+        assert (
+            new_wfr.status is not None
+        ), "WorkflowRun status should be set after binding"
         result = resume_workflow_run(
             workflow_id=workflow_id,
             workflow_run_id=new_wfr.workflow_run_id,
