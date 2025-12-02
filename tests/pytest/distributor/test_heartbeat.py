@@ -7,8 +7,10 @@ from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.server.web.models import load_model
 from jobmon.server.web.models.task_instance import TaskInstance
-
-from tests.pytest.swarm.swarm_test_utils import create_test_context, prepare_and_queue_tasks
+from tests.pytest.swarm.swarm_test_utils import (
+    create_test_context,
+    prepare_and_queue_tasks,
+)
 
 load_model()
 

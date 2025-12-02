@@ -8,7 +8,17 @@ import numbers
 import re
 from http import HTTPStatus as StatusCodes
 from math import ceil
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import structlog
 

@@ -13,7 +13,6 @@ from jobmon.client.swarm.services.synchronizer import Synchronizer
 from jobmon.client.swarm.state import StateUpdate
 from jobmon.core.constants import TaskStatus
 
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Fixtures
 # ──────────────────────────────────────────────────────────────────────────────
@@ -155,7 +154,11 @@ class TestSynchronizerTaskUpdates:
 
         # Should call with since=None for full sync
         mock_gateway.get_task_status_updates.assert_called_once_with(since=None)
-        assert update.task_statuses == {1: TaskStatus.DONE, 2: TaskStatus.DONE, 3: TaskStatus.RUNNING}
+        assert update.task_statuses == {
+            1: TaskStatus.DONE,
+            2: TaskStatus.DONE,
+            3: TaskStatus.RUNNING,
+        }
         assert update.sync_time == sync_time
 
     @pytest.mark.asyncio
@@ -170,13 +173,17 @@ class TestSynchronizerTaskUpdates:
             )
         )
 
-        update = await synchronizer._get_task_updates(full_sync=False, last_sync=last_sync)
+        update = await synchronizer._get_task_updates(
+            full_sync=False, last_sync=last_sync
+        )
 
         mock_gateway.get_task_status_updates.assert_called_once_with(since=last_sync)
         assert update.task_statuses == {1: TaskStatus.DONE}
 
     @pytest.mark.asyncio
-    async def test_get_task_updates_filters_unknown_tasks(self, synchronizer, mock_gateway):
+    async def test_get_task_updates_filters_unknown_tasks(
+        self, synchronizer, mock_gateway
+    ):
         """Test that unknown task IDs are filtered out."""
         mock_gateway.get_task_status_updates = AsyncMock(
             return_value=TaskStatusUpdatesResponse(
@@ -205,7 +212,9 @@ class TestSynchronizerTaskUpdates:
             )
         )
 
-        update = await synchronizer.get_task_updates_only(full_sync=False, last_sync=sync_time)
+        update = await synchronizer.get_task_updates_only(
+            full_sync=False, last_sync=sync_time
+        )
 
         assert update.task_statuses == {3: TaskStatus.RUNNING}
 
@@ -231,6 +240,7 @@ class TestSynchronizerConcurrency:
     @pytest.mark.asyncio
     async def test_get_array_concurrency_limits(self, synchronizer, mock_gateway):
         """Test fetching array concurrency limits."""
+
         # Mock to return different values for different arrays
         async def get_array_limit(aid):
             return {10: 50, 20: 75}[aid]
@@ -257,7 +267,9 @@ class TestSynchronizerConcurrency:
         mock_gateway.get_array_concurrency.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_get_array_concurrency_handles_failure(self, synchronizer, mock_gateway):
+    async def test_get_array_concurrency_handles_failure(
+        self, synchronizer, mock_gateway
+    ):
         """Test that single array failure doesn't stop others."""
         call_count = [0]
 
@@ -492,9 +504,7 @@ class TestSynchronizerIntegration:
             )
         )
 
-        update2 = await synchronizer.tick(
-            full_sync=False, last_sync=update1.sync_time
-        )
+        update2 = await synchronizer.tick(full_sync=False, last_sync=update1.sync_time)
 
         # First tick shows running
         assert update1.task_statuses.get(1) == TaskStatus.RUNNING
@@ -524,4 +534,3 @@ class TestSynchronizerIntegration:
         update2 = await synchronizer.tick(full_sync=True, last_sync=None)
         # Now task 6 should be included
         assert 6 in update2.task_statuses
-

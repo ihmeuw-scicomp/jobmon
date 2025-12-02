@@ -6,14 +6,12 @@ from unittest.mock import patch
 
 import pytest
 
-from jobmon.client.swarm.gateway import ServerGateway
 from jobmon.client.tool import Tool
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
 from jobmon.core.exceptions import WorkflowAlreadyExists, WorkflowNotResumable
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
-
 from tests.pytest.swarm.swarm_test_utils import (
     create_test_context,
     prepare_and_queue_tasks,
@@ -212,6 +210,7 @@ def test_cold_resume(tool):
     # set workflow run to terminated
     async def terminate_task_instances():
         import aiohttp
+
         session = aiohttp.ClientSession()
         gateway.set_session(session)
         try:

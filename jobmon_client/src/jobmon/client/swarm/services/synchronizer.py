@@ -52,7 +52,7 @@ class Synchronizer:
         gateway: "ServerGateway",
         task_ids: set[int],
         array_ids: set[int],
-    ):
+    ) -> None:
         """Initialize the synchronizer.
 
         Args:
@@ -277,4 +277,3 @@ class Synchronizer:
                 combined = combined.merge(result)
 
         return combined
-

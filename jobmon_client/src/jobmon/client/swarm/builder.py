@@ -18,10 +18,10 @@ from typing import TYPE_CHECKING, Optional
 import structlog
 
 from jobmon.client.swarm.array import SwarmArray
-from jobmon.client.swarm.task import SwarmTask
 from jobmon.client.swarm.gateway import ServerGateway
 from jobmon.client.swarm.services.heartbeat import HeartbeatService
 from jobmon.client.swarm.state import SwarmState
+from jobmon.client.swarm.task import SwarmTask
 from jobmon.client.task_resources import TaskResources
 from jobmon.core.cluster import Cluster
 from jobmon.core.constants import WorkflowRunStatus
@@ -311,9 +311,7 @@ class SwarmBuilder:
 
         database_wf = resp["workflow"]
         if not database_wf:
-            raise EmptyWorkflowError(
-                f"No workflow found for workflow id {workflow_id}"
-            )
+            raise EmptyWorkflowError(f"No workflow found for workflow id {workflow_id}")
 
         wf_id, dag_id, max_concurrently_running = database_wf
 
@@ -325,9 +323,7 @@ class SwarmBuilder:
         # Now we can create SwarmState with the metadata
         self._ensure_state()
 
-        logger.info(
-            f"Fetched workflow metadata: workflow_id={wf_id}, dag_id={dag_id}"
-        )
+        logger.info(f"Fetched workflow metadata: workflow_id={wf_id}, dag_id={dag_id}")
 
     def _set_tasks_from_db(self, chunk_size: int = 500) -> None:
         """Fetch tasks that need to run from database in chunks.
@@ -367,9 +363,7 @@ class SwarmBuilder:
 
             # Process tasks
             for task_id_str, metadata in task_dict.items():
-                self._process_task_from_db(
-                    int(task_id_str), metadata, cluster_registry
-                )
+                self._process_task_from_db(int(task_id_str), metadata, cluster_registry)
 
         logger.info(f"All tasks fetched: {len(self._ensure_state().tasks)} total")
 
@@ -420,9 +414,7 @@ class SwarmBuilder:
 
         # Create queue and fallback queues
         queue = cluster.get_queue(queue_name)
-        fallback_queue_objs = [
-            cluster.get_queue(q) for q in fallback_queues_parsed
-        ]
+        fallback_queue_objs = [cluster.get_queue(q) for q in fallback_queues_parsed]
 
         # Create TaskResources
         task_resources = TaskResources(
@@ -494,12 +486,12 @@ class SwarmBuilder:
                 node_id, downstream_node_ids = values
                 task_id = int(task_id_str)
                 task_node_id_map[node_id] = task_id
-                task_edge_map[task_id] = set(downstream_node_ids) if downstream_node_ids else set()
+                task_edge_map[task_id] = (
+                    set(downstream_node_ids) if downstream_node_ids else set()
+                )
 
         # Build the dependency graph
-        logger.info(
-            "All edges fetched from the database, building dependency graph"
-        )
+        logger.info("All edges fetched from the database, building dependency graph")
 
         for task_id, swarm_task in state.tasks.items():
             downstream_node_ids = task_edge_map.get(task_id, set())
@@ -550,7 +542,11 @@ class SwarmBuilder:
     @property
     def max_concurrently_running(self) -> int:
         """Get max concurrently running limit."""
-        return self._state.max_concurrently_running if self._state else self._max_concurrently_running
+        return (
+            self._state.max_concurrently_running
+            if self._state
+            else self._max_concurrently_running
+        )
 
     @property
     def last_sync(self) -> Optional[datetime]:
@@ -566,4 +562,3 @@ class SwarmBuilder:
     def num_previously_complete(self) -> int:
         """Get count of tasks that were already complete."""
         return self._state.get_done_count() if self._state else 0
-

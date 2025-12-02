@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections import deque
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -15,7 +14,6 @@ from jobmon.client.swarm.services.scheduler import (
 )
 from jobmon.client.swarm.state import StateUpdate, SwarmState
 from jobmon.core.constants import TaskStatus
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -103,17 +101,20 @@ def create_swarm_state(
 @pytest.fixture
 def task_status_map():
     """Create empty task status map."""
-    return {status: set() for status in [
-        TaskStatus.REGISTERING,
-        TaskStatus.QUEUED,
-        TaskStatus.INSTANTIATING,
-        TaskStatus.LAUNCHED,
-        TaskStatus.RUNNING,
-        TaskStatus.DONE,
-        TaskStatus.ERROR_FATAL,
-        TaskStatus.ERROR_RECOVERABLE,
-        TaskStatus.ADJUSTING_RESOURCES,
-    ]}
+    return {
+        status: set()
+        for status in [
+            TaskStatus.REGISTERING,
+            TaskStatus.QUEUED,
+            TaskStatus.INSTANTIATING,
+            TaskStatus.LAUNCHED,
+            TaskStatus.RUNNING,
+            TaskStatus.DONE,
+            TaskStatus.ERROR_FATAL,
+            TaskStatus.ERROR_RECOVERABLE,
+            TaskStatus.ADJUSTING_RESOURCES,
+        ]
+    }
 
 
 @pytest.fixture
@@ -284,8 +285,7 @@ class TestSchedulerBatchGeneration:
         shared_resources = MagicMock(is_bound=True, id=1)
 
         tasks = [
-            create_mock_task(i, 10, task_resources=shared_resources)
-            for i in range(5)
+            create_mock_task(i, 10, task_resources=shared_resources) for i in range(5)
         ]
         for task in tasks:
             scheduler._state.ready_to_run.append(task)
@@ -332,7 +332,9 @@ class TestSchedulerBatchGeneration:
         # Should have 2 batches (different resources)
         assert len(batches) == 2
 
-    def test_generate_batches_respects_workflow_capacity(self, scheduler, task_status_map):
+    def test_generate_batches_respects_workflow_capacity(
+        self, scheduler, task_status_map
+    ):
         """Test that batch generation respects workflow capacity."""
         scheduler.max_concurrently_running = 3
 
@@ -354,11 +356,13 @@ class TestSchedulerBatchGeneration:
         total_scheduled = sum(len(b) for b in batches)
         assert total_scheduled == 2
 
-    def test_generate_batches_respects_array_capacity(self, mock_gateway, task_status_map):
+    def test_generate_batches_respects_array_capacity(
+        self, mock_gateway, task_status_map
+    ):
         """Test that batch generation respects array capacity."""
         # Create array with capacity of 5
         array = create_mock_array(10, max_concurrently_running=5)
-        
+
         # Add 3 already-active tasks in the array (consuming capacity)
         active_tasks = []
         for i in range(100, 103):
@@ -394,7 +398,9 @@ class TestSchedulerBatchGeneration:
         total_scheduled = sum(len(b) for b in batches)
         assert total_scheduled == 2
 
-    def test_generate_batches_puts_unscheduled_back(self, mock_gateway, task_status_map):
+    def test_generate_batches_puts_unscheduled_back(
+        self, mock_gateway, task_status_map
+    ):
         """Test that unscheduled tasks are put back in queue."""
         # Create array with capacity of 3
         array = create_mock_array(10, max_concurrently_running=3)
@@ -588,7 +594,9 @@ class TestSchedulerTick:
 
         async def slow_queue(**kwargs):
             await asyncio.sleep(0.05)
-            return QueueResponse(tasks_by_status={TaskStatus.QUEUED: kwargs["task_ids"]})
+            return QueueResponse(
+                tasks_by_status={TaskStatus.QUEUED: kwargs["task_ids"]}
+            )
 
         mock_gateway.queue_task_batch = AsyncMock(side_effect=slow_queue)
 
@@ -717,4 +725,3 @@ class TestSchedulerIntegration:
         await scheduler.tick()
         assert queued_count[0] == 6
         assert len(state.ready_to_run) == 0
-

@@ -15,14 +15,15 @@ from typing import TYPE_CHECKING, Callable, Optional
 import aiohttp
 import structlog
 
+from jobmon.client.swarm.builder import SwarmBuilder
 from jobmon.client.swarm.gateway import ServerGateway
+from jobmon.client.swarm.state import SwarmState
 from jobmon.client.swarm.orchestrator import (
     OrchestratorConfig,
     OrchestratorResult,
     WorkflowRunConfig,
     WorkflowRunOrchestrator,
 )
-from jobmon.client.swarm.builder import SwarmBuilder
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import WorkflowRunStatus
 from jobmon.core.exceptions import TransitionError
@@ -215,7 +216,7 @@ async def _resume_workflow_run_async(
 
 
 async def _run_orchestrator(
-    state,
+    state: SwarmState,
     gateway: ServerGateway,
     distributor_alive: Callable[..., bool],
     config: WorkflowRunConfig,
@@ -360,4 +361,3 @@ async def _run_orchestrator(
         # Cleanup
         if not session.closed:
             await session.close()
-

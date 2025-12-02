@@ -15,8 +15,8 @@ import structlog
 from jobmon.client.swarm.state import StateUpdate, SwarmState
 
 if TYPE_CHECKING:
-    from jobmon.client.swarm.task import SwarmTask
     from jobmon.client.swarm.gateway import ServerGateway
+    from jobmon.client.swarm.task import SwarmTask
 
 logger = structlog.get_logger(__name__)
 
@@ -54,7 +54,7 @@ class Scheduler:
         self,
         gateway: "ServerGateway",
         state: SwarmState,
-    ):
+    ) -> None:
         """Initialize the scheduler.
 
         Args:
@@ -89,9 +89,7 @@ class Scheduler:
 
         for batch in self._generate_batches():
             result = await self._queue_batch(batch)
-            combined = combined.merge(
-                StateUpdate(task_statuses=result.task_statuses)
-            )
+            combined = combined.merge(StateUpdate(task_statuses=result.task_statuses))
             batches_queued += 1
 
             # Check timeout
@@ -124,8 +122,7 @@ class Scheduler:
         # Use SwarmState to compute capacities
         workflow_capacity = self._state.get_available_capacity()
         array_capacities: dict[int, int] = {
-            aid: self._state.get_array_capacity(aid)
-            for aid in self._state.arrays
+            aid: self._state.get_array_capacity(aid) for aid in self._state.arrays
         }
 
         unscheduled: list["SwarmTask"] = []
@@ -233,5 +230,7 @@ class Scheduler:
 
     def has_work(self) -> bool:
         """Check if there are tasks ready to run with available capacity."""
-        return self._state.get_ready_to_run_count() > 0 and self._state.get_available_capacity() > 0
-
+        return (
+            self._state.get_ready_to_run_count() > 0
+            and self._state.get_available_capacity() > 0
+        )

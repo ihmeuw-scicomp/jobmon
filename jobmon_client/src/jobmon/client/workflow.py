@@ -19,7 +19,7 @@ import structlog
 
 from jobmon.client.array import Array
 from jobmon.client.dag import Dag
-from jobmon.client.swarm import run_workflow, WorkflowRunConfig
+from jobmon.client.swarm import WorkflowRunConfig, run_workflow
 from jobmon.client.task import Task
 from jobmon.client.task_resources import TaskResources
 from jobmon.client.tool_version import ToolVersion

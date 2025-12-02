@@ -6,7 +6,6 @@ from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
-
 from tests.pytest.swarm.swarm_test_utils import (
     create_test_context,
     prepare_and_queue_tasks,

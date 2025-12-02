@@ -12,8 +12,10 @@ from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.server.web._compat import subtract_time
 from jobmon.server.web.models import load_model
-
-from tests.pytest.swarm.swarm_test_utils import create_test_context, prepare_and_queue_tasks
+from tests.pytest.swarm.swarm_test_utils import (
+    create_test_context,
+    prepare_and_queue_tasks,
+)
 
 load_model()
 
@@ -103,6 +105,7 @@ def test_set_status_for_triaging(tool, db_engine, task_template):
     # 2. call gateway.request_triage()
     async def request_triage():
         import aiohttp
+
         session = aiohttp.ClientSession()
         gateway.set_session(session)
         try:

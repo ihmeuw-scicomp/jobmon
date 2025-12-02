@@ -27,11 +27,11 @@ For testing purposes, additional components can be imported directly:
     from jobmon.client.swarm.array import SwarmArray
 """
 
-from jobmon.client.swarm.run import resume_workflow_run, run_workflow
 from jobmon.client.swarm.orchestrator import (
     OrchestratorResult,
     WorkflowRunConfig,
 )
+from jobmon.client.swarm.run import resume_workflow_run, run_workflow
 
 __all__ = [
     "OrchestratorResult",

@@ -7,19 +7,17 @@ responses, without requiring a running server.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from jobmon.client.swarm.array import SwarmArray
-from jobmon.client.swarm.task import SwarmTask
 from jobmon.client.swarm.builder import SwarmBuilder
 from jobmon.client.swarm.state import SwarmState
+from jobmon.client.swarm.task import SwarmTask
 from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 from jobmon.core.exceptions import EmptyWorkflowError
 from jobmon.core.requester import Requester
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -502,8 +500,14 @@ class TestBuildFromWorkflowId:
                 },
             ),
             # Edge fetches
-            (200, {"downstream_tasks": {str(i): [i + 1000, []] for i in range(1, 501)}}),
-            (200, {"downstream_tasks": {str(i): [i + 1000, []] for i in range(501, 503)}}),
+            (
+                200,
+                {"downstream_tasks": {str(i): [i + 1000, []] for i in range(1, 501)}},
+            ),
+            (
+                200,
+                {"downstream_tasks": {str(i): [i + 1000, []] for i in range(501, 503)}},
+            ),
             (200, {"status": WorkflowRunStatus.BOUND}),  # status update
         ]
 
@@ -627,6 +631,3 @@ class TestEdgeCases:
         builder.build_from_workflow(workflow)
 
         assert builder.num_previously_complete == 1
-
-
-

@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import text, update
 from sqlalchemy.orm import Session
 
-from jobmon.client.swarm import run_workflow, WorkflowRunConfig
+from jobmon.client.swarm import WorkflowRunConfig, run_workflow
 from jobmon.client.swarm.builder import SwarmBuilder
 from jobmon.client.swarm.orchestrator import OrchestratorConfig, WorkflowRunOrchestrator
 from jobmon.client.workflow import DistributorContext
@@ -24,12 +24,11 @@ from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.worker_node.cli import WorkerNodeCLI
-
 from tests.pytest.swarm.swarm_test_utils import (
-    create_test_context,
     create_builder,
-    set_initial_fringe,
+    create_test_context,
     prepare_and_queue_tasks,
+    set_initial_fringe,
     synchronize_state,
 )
 
@@ -560,10 +559,11 @@ def test_swarm_terminate(db_engine, tool):
         with Session(bind=db_engine) as session:
             # Update workflow_run status to COLD_RESUME
             session.execute(
-                text(
-                    "UPDATE workflow_run SET status = :status WHERE id = :wfr_id"
-                ),
-                {"status": WorkflowRunStatus.COLD_RESUME, "wfr_id": wfr.workflow_run_id},
+                text("UPDATE workflow_run SET status = :status WHERE id = :wfr_id"),
+                {
+                    "status": WorkflowRunStatus.COLD_RESUME,
+                    "wfr_id": wfr.workflow_run_id,
+                },
             )
             session.commit()
             logger.info(f"Set workflow_run {wfr.workflow_run_id} to COLD_RESUME")
@@ -673,7 +673,10 @@ def test_build_swarm_from_workflow_id(tool, task_template):
 
     # Also test via builder with orchestrator for full integration
     state, gateway, orchestrator = create_test_context(
-        workflow, resume_wfr.workflow_run_id, requester, initial_status=resume_wfr.status
+        workflow,
+        resume_wfr.workflow_run_id,
+        requester,
+        initial_status=resume_wfr.status,
     )
 
     # Note: create_test_context builds from workflow (all tasks), not from workflow_id
@@ -695,4 +698,9 @@ def test_build_swarm_from_workflow_id(tool, task_template):
     assert resume_builder.state.ready_to_run[0].task_id == t3.task_id
 
     # Run a full sync, test that no keyerrors are raised
-    synchronize_state(resume_builder.state, resume_builder._ensure_gateway(), resume_orchestrator, full_sync=True)
+    synchronize_state(
+        resume_builder.state,
+        resume_builder._ensure_gateway(),
+        resume_orchestrator,
+        full_sync=True,
+    )

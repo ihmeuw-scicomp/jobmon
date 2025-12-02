@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -56,7 +56,7 @@ class HeartbeatService:
         interval: float,
         report_by_buffer: float,
         initial_status: str,
-    ):
+    ) -> None:
         """Initialize the heartbeat service.
 
         Args:
@@ -228,4 +228,3 @@ class HeartbeatService:
         Useful when a heartbeat is logged externally (e.g., during sync).
         """
         self._last_heartbeat_time = time.time()
-

@@ -134,7 +134,11 @@ class ServerGateway:
 
     async def close(self) -> None:
         """Close the session if we own it."""
-        if self._owns_session and self._session is not None and not self._session.closed:
+        if (
+            self._owns_session
+            and self._session is not None
+            and not self._session.closed
+        ):
             await self._session.close()
         self._session = None
         self._owns_session = False
@@ -478,4 +482,3 @@ class ServerGateway:
             request_type="get",
         )
         return response["time"]
-

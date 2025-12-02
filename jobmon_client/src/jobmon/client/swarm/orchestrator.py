@@ -18,8 +18,8 @@ from jobmon.client.swarm.services.scheduler import Scheduler
 from jobmon.client.swarm.services.synchronizer import Synchronizer
 from jobmon.client.swarm.state import (
     SERVER_STOP_STATUSES,
-    SwarmState,
     TERMINATING_STATUSES,
+    SwarmState,
 )
 from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 from jobmon.core.exceptions import (
@@ -30,8 +30,8 @@ from jobmon.core.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from jobmon.client.swarm.task import SwarmTask
     from jobmon.client.swarm.gateway import ServerGateway
+    from jobmon.client.swarm.task import SwarmTask
 
 logger = structlog.get_logger(__name__)
 
@@ -130,7 +130,7 @@ class WorkflowRunConfig:
     fail_after_n_executions: int = 1_000_000_000
 
     @classmethod
-    def from_defaults(cls) -> "WorkflowRunConfig":
+    def from_defaults(cls: type["WorkflowRunConfig"]) -> "WorkflowRunConfig":
         """Create config with all defaults from JobmonConfig.
 
         Returns:
@@ -193,7 +193,7 @@ class WorkflowRunOrchestrator:
         state: SwarmState,
         gateway: "ServerGateway",
         config: OrchestratorConfig,
-    ):
+    ) -> None:
         """Initialize the orchestrator.
 
         Args:
@@ -709,9 +709,7 @@ class WorkflowRunOrchestrator:
         task_final_statuses = {
             task_id: task.status for task_id, task in self._state.tasks.items()
         }
-        done_task_ids = frozenset(
-            task.task_id for task in self._state.get_done_tasks()
-        )
+        done_task_ids = frozenset(task.task_id for task in self._state.get_done_tasks())
         failed_task_ids = frozenset(
             task.task_id for task in self._state.get_failed_tasks()
         )
@@ -758,4 +756,3 @@ class WorkflowRunOrchestrator:
             self._heartbeat_task = None
 
         self._stop_event = None
-

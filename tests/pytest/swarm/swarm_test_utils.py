@@ -87,7 +87,9 @@ def create_builder(
     return builder
 
 
-def set_initial_fringe(state: SwarmState, orchestrator: WorkflowRunOrchestrator) -> None:
+def set_initial_fringe(
+    state: SwarmState, orchestrator: WorkflowRunOrchestrator
+) -> None:
     """Populate ready_to_run with tasks whose upstreams are satisfied.
 
     Uses the Orchestrator's _set_initial_fringe() method.
@@ -259,6 +261,7 @@ def set_adjusted_task_resources(
 # ──────────────────────────────────────────────────────────────────────────────
 # Convenience aliases for simpler test patterns
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def build_and_prepare(
     workflow: "Workflow",

@@ -7,18 +7,15 @@ a running server or full workflow setup.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from unittest.mock import MagicMock
 
 import pytest
 
 from jobmon.client.swarm.state import (
-    ACTIVE_TASK_STATUSES,
     StateUpdate,
     SwarmState,
 )
 from jobmon.core.constants import TaskStatus
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Mock SwarmTask for testing
@@ -420,9 +417,7 @@ class TestSwarmStateMutations:
         result = state_with_tasks.update_task_status(999, TaskStatus.DONE)
         assert result is False
 
-    def test_update_task_status_same_status(
-        self, state_with_tasks: SwarmState
-    ) -> None:
+    def test_update_task_status_same_status(self, state_with_tasks: SwarmState) -> None:
         """Test updating to same status."""
         result = state_with_tasks.update_task_status(
             1, TaskStatus.REGISTERING
@@ -563,6 +558,3 @@ class TestSwarmStateInitializationHelpers:
 
         assert task2.num_upstreams_done == 1
         assert task3.num_upstreams_done == 1
-
-
-

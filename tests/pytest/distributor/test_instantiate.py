@@ -6,20 +6,15 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from jobmon.client.status_commands import concurrency_limit
-from jobmon.client.swarm.builder import SwarmBuilder
-from jobmon.client.swarm.orchestrator import OrchestratorConfig, WorkflowRunOrchestrator
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 from jobmon.server.web.models import load_model
-
 from tests.pytest.swarm.swarm_test_utils import (
     create_test_context,
     prepare_and_queue_tasks,
-    queue_tasks,
-    set_initial_fringe,
 )
 
 load_model()
@@ -456,6 +451,7 @@ def test_dynamic_concurrency_limiting(tool, task_template):
     # Sync concurrency and queue more tasks
     async def sync_and_process() -> None:
         import aiohttp
+
         from jobmon.client.swarm.services.synchronizer import Synchronizer
 
         # Create synchronizer

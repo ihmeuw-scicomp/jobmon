@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from jobmon.client.api import Tool
-from jobmon.client.swarm import run_workflow, WorkflowRunConfig
+from jobmon.client.swarm import run_workflow
 from jobmon.client.workflow import DistributorContext
 from jobmon.core.requester import Requester
 

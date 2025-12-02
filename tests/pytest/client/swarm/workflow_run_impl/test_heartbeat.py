@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from jobmon.client.swarm.gateway import HeartbeatResponse
 from jobmon.client.swarm.services.heartbeat import HeartbeatService
 from jobmon.client.swarm.state import StateUpdate
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -189,7 +188,9 @@ class TestHeartbeatServiceTick:
         self, heartbeat_service, mock_gateway
     ):
         """Test tick returns empty StateUpdate when status doesn't change."""
-        mock_gateway.log_heartbeat = AsyncMock(return_value=HeartbeatResponse(status="R"))
+        mock_gateway.log_heartbeat = AsyncMock(
+            return_value=HeartbeatResponse(status="R")
+        )
 
         update = await heartbeat_service.tick()
 
@@ -201,7 +202,9 @@ class TestHeartbeatServiceTick:
         self, heartbeat_service, mock_gateway
     ):
         """Test tick returns StateUpdate with new status when server changes it."""
-        mock_gateway.log_heartbeat = AsyncMock(return_value=HeartbeatResponse(status="C"))
+        mock_gateway.log_heartbeat = AsyncMock(
+            return_value=HeartbeatResponse(status="C")
+        )
 
         update = await heartbeat_service.tick()
 
@@ -213,7 +216,9 @@ class TestHeartbeatServiceTick:
         self, heartbeat_service, mock_gateway
     ):
         """Test tick updates internal status when server changes it."""
-        mock_gateway.log_heartbeat = AsyncMock(return_value=HeartbeatResponse(status="H"))
+        mock_gateway.log_heartbeat = AsyncMock(
+            return_value=HeartbeatResponse(status="H")
+        )
 
         await heartbeat_service.tick()
 
@@ -223,7 +228,9 @@ class TestHeartbeatServiceTick:
     async def test_tick_uses_current_status(self, heartbeat_service, mock_gateway):
         """Test tick uses the current status set by set_status."""
         heartbeat_service.set_status("C")
-        mock_gateway.log_heartbeat = AsyncMock(return_value=HeartbeatResponse(status="C"))
+        mock_gateway.log_heartbeat = AsyncMock(
+            return_value=HeartbeatResponse(status="C")
+        )
 
         await heartbeat_service.tick()
 
@@ -441,25 +448,33 @@ class TestHeartbeatServiceIntegration:
         )
 
         # First heartbeat - no change
-        mock_gateway.log_heartbeat = AsyncMock(return_value=HeartbeatResponse(status="R"))
+        mock_gateway.log_heartbeat = AsyncMock(
+            return_value=HeartbeatResponse(status="R")
+        )
         update1 = await service.tick()
         assert update1.workflow_run_status is None
         assert service.current_status == "R"
 
         # Second heartbeat - server pauses
-        mock_gateway.log_heartbeat = AsyncMock(return_value=HeartbeatResponse(status="H"))
+        mock_gateway.log_heartbeat = AsyncMock(
+            return_value=HeartbeatResponse(status="H")
+        )
         update2 = await service.tick()
         assert update2.workflow_run_status == "H"
         assert service.current_status == "H"
 
         # Third heartbeat - still paused
-        mock_gateway.log_heartbeat = AsyncMock(return_value=HeartbeatResponse(status="H"))
+        mock_gateway.log_heartbeat = AsyncMock(
+            return_value=HeartbeatResponse(status="H")
+        )
         update3 = await service.tick()
         assert update3.workflow_run_status is None
         assert service.current_status == "H"
 
         # Fourth heartbeat - resumed
-        mock_gateway.log_heartbeat = AsyncMock(return_value=HeartbeatResponse(status="R"))
+        mock_gateway.log_heartbeat = AsyncMock(
+            return_value=HeartbeatResponse(status="R")
+        )
         update4 = await service.tick()
         assert update4.workflow_run_status == "R"
         assert service.current_status == "R"
@@ -476,4 +491,3 @@ class TestHeartbeatServiceIntegration:
 
         # Each tick should have a later timestamp
         assert times[0] <= times[1] <= times[2]
-

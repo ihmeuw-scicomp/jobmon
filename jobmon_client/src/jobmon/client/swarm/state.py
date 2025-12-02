@@ -85,13 +85,13 @@ class StateUpdate:
     sync_time: Optional[datetime] = None
 
     @classmethod
-    def empty(cls) -> "StateUpdate":
+    def empty(cls: type["StateUpdate"]) -> "StateUpdate":
         """Create an empty update (no changes)."""
         return cls()
 
     @classmethod
     def from_task_status_response(
-        cls,
+        cls: type["StateUpdate"],
         tasks_by_status: dict[str, list[int]],
         sync_time: Optional[datetime] = None,
     ) -> "StateUpdate":
@@ -148,7 +148,7 @@ class StateUpdate:
         )
 
     def __bool__(self) -> bool:
-        """Allow truthiness check: `if update:`"""
+        """Allow truthiness check: `if update:`."""
         return not self.is_empty()
 
 
@@ -334,9 +334,7 @@ class SwarmState:
 
         array = self.arrays[array_id]
         active_in_array = sum(
-            1
-            for task in self._get_active_tasks()
-            if task.array_id == array_id
+            1 for task in self._get_active_tasks() if task.array_id == array_id
         )
         return max(0, array.max_concurrently_running - active_in_array)
 
@@ -430,7 +428,9 @@ class SwarmState:
 
         return True
 
-    def propagate_completions(self, completed_tasks: set["SwarmTask"]) -> list["SwarmTask"]:
+    def propagate_completions(
+        self, completed_tasks: set["SwarmTask"]
+    ) -> list["SwarmTask"]:
         """Update downstream dependency counts for completed tasks.
 
         Args:
@@ -475,9 +475,7 @@ class SwarmState:
     # Resource Caching
     # ──────────────────────────────────────────────────────────────────────────
 
-    def get_cached_resources(
-        self, resource_hash: int
-    ) -> Optional["TaskResources"]:
+    def get_cached_resources(self, resource_hash: int) -> Optional["TaskResources"]:
         """Get cached TaskResources by hash.
 
         Args:
@@ -516,4 +514,3 @@ class SwarmState:
         for task in self._task_status_map[TaskStatus.DONE]:
             for downstream in task.downstream_swarm_tasks:
                 downstream.num_upstreams_done += 1
-

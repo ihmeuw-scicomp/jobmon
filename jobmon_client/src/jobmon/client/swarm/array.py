@@ -46,4 +46,3 @@ class SwarmArray:
     def __lt__(self, other: SwarmArray) -> bool:
         """Check if one hash is less than the has of another DistributorArray."""
         return hash(self) < hash(other)
-

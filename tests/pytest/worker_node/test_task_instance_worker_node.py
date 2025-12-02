@@ -20,7 +20,6 @@ from jobmon.server.web.models import load_model
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
 from jobmon.worker_node.worker_node_task_instance import WorkerNodeTaskInstance
-
 from tests.pytest.swarm.swarm_test_utils import (
     create_test_context,
     prepare_and_queue_tasks,
@@ -265,7 +264,9 @@ def test_limited_error_log(tool, db_engine):
     wfr._update_status(WorkflowRunStatus.BOUND)
 
     # create task instances using new utilities
-    state, gateway, orchestrator = create_test_context(wf, wfr.workflow_run_id, wf.requester)
+    state, gateway, orchestrator = create_test_context(
+        wf, wfr.workflow_run_id, wf.requester
+    )
     prepare_and_queue_tasks(state, gateway, orchestrator)
 
     distributor_service = DistributorService(
@@ -345,7 +346,9 @@ def test_worker_node_add_attributes(tool, db_engine):
     wfr._update_status(WorkflowRunStatus.BOUND)
 
     # create task instances using new utilities
-    state, gateway, orchestrator = create_test_context(wf, wfr.workflow_run_id, wf.requester)
+    state, gateway, orchestrator = create_test_context(
+        wf, wfr.workflow_run_id, wf.requester
+    )
     prepare_and_queue_tasks(state, gateway, orchestrator)
 
     cluster = Cluster.get_cluster("multiprocess")

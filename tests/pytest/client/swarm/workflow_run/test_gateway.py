@@ -7,7 +7,6 @@ responses, without requiring a running server.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
@@ -23,7 +22,6 @@ from jobmon.client.swarm.gateway import (
     WorkflowMetadata,
 )
 from jobmon.core.requester import Requester
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Fixtures
@@ -317,7 +315,9 @@ class TestWorkflowSetup:
         """Test workflow metadata fetch."""
         mock_requester.send_request_async.return_value = (
             200,
-            {"workflow": [100, 50, 1000]},  # workflow_id, dag_id, max_concurrently_running
+            {
+                "workflow": [100, 50, 1000]
+            },  # workflow_id, dag_id, max_concurrently_running
         )
 
         metadata = await gateway.get_workflow_metadata()
@@ -493,4 +493,3 @@ class TestSessionManagement:
             await gateway.log_heartbeat("R", 30.0)
 
             mock_session_class.assert_called_once()
-

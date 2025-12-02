@@ -349,7 +349,9 @@ def test_workflow_tasks(db_engine, tool, client_env, cli):
     assert len(df.STATUS.unique()) == 1
 
     # execute the tasks
-    with DistributorContext("sequential", client_wfr.workflow_run_id, 180) as distributor:
+    with DistributorContext(
+        "sequential", client_wfr.workflow_run_id, 180
+    ) as distributor:
         run_workflow(
             workflow=workflow,
             workflow_run_id=client_wfr.workflow_run_id,
@@ -694,7 +696,9 @@ def test_update_task_status(db_engine, client_env, cli):
     client_wfr3._update_status(WorkflowRunStatus.BOUND)
 
     # run the distributor
-    with DistributorContext("sequential", client_wfr3.workflow_run_id, 180) as distributor:
+    with DistributorContext(
+        "sequential", client_wfr3.workflow_run_id, 180
+    ) as distributor:
         result = run_workflow(
             workflow=wf3,
             workflow_run_id=client_wfr3.workflow_run_id,

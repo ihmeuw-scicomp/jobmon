@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections import deque
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -22,14 +21,15 @@ from jobmon.client.swarm.orchestrator import (
     WorkflowRunOrchestrator,
 )
 from jobmon.client.swarm.state import (
-    ACTIVE_TASK_STATUSES,
-    SERVER_STOP_STATUSES,
     StateUpdate,
     SwarmState,
-    TERMINATING_STATUSES,
 )
 from jobmon.core.constants import TaskStatus, WorkflowRunStatus
-from jobmon.core.exceptions import DistributorNotAlive, TransitionError, WorkflowTestError
+from jobmon.core.exceptions import (
+    DistributorNotAlive,
+    TransitionError,
+    WorkflowTestError,
+)
 
 
 def create_state_with_tasks(
@@ -377,9 +377,13 @@ class TestWorkflowRunConfig:
 class TestOrchestratorInit:
     """Tests for WorkflowRunOrchestrator initialization."""
 
-    def test_init_stores_state_and_gateway(self, basic_state, mock_gateway, default_config):
+    def test_init_stores_state_and_gateway(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test that init stores state, gateway and config."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
 
         assert orchestrator._state is basic_state
         assert orchestrator._gateway is mock_gateway
@@ -387,7 +391,9 @@ class TestOrchestratorInit:
 
     def test_services_not_initialized(self, basic_state, mock_gateway, default_config):
         """Test that services are not initialized until needed."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
 
         assert orchestrator._heartbeat is None
         assert orchestrator._synchronizer is None
@@ -402,35 +408,51 @@ class TestOrchestratorInit:
 class TestServiceInitialization:
     """Tests for service lazy initialization."""
 
-    def test_ensure_heartbeat_creates_service(self, basic_state, mock_gateway, default_config):
+    def test_ensure_heartbeat_creates_service(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test that _ensure_heartbeat creates HeartbeatService."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         heartbeat = orchestrator._ensure_heartbeat()
 
         assert heartbeat is not None
         assert heartbeat.interval == default_config.heartbeat_interval
         assert orchestrator._heartbeat is heartbeat
 
-    def test_ensure_heartbeat_returns_same_instance(self, basic_state, mock_gateway, default_config):
+    def test_ensure_heartbeat_returns_same_instance(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test that _ensure_heartbeat returns same instance on multiple calls."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         heartbeat1 = orchestrator._ensure_heartbeat()
         heartbeat2 = orchestrator._ensure_heartbeat()
 
         assert heartbeat1 is heartbeat2
 
-    def test_ensure_synchronizer_creates_service(self, basic_state, mock_gateway, default_config):
+    def test_ensure_synchronizer_creates_service(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test that _ensure_synchronizer creates Synchronizer."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         synchronizer = orchestrator._ensure_synchronizer()
 
         assert synchronizer is not None
         assert synchronizer.task_ids == {1}
         assert synchronizer.array_ids == {1}
 
-    def test_ensure_scheduler_creates_service(self, basic_state, mock_gateway, default_config):
+    def test_ensure_scheduler_creates_service(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test that _ensure_scheduler creates Scheduler."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         scheduler = orchestrator._ensure_scheduler()
 
         assert scheduler is not None
@@ -449,7 +471,9 @@ class TestSetInitialFringe:
         self, pending_state, mock_gateway, default_config
     ):
         """Test that registering tasks with upstreams done are added to ready_to_run."""
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
         orchestrator._set_initial_fringe()
 
         assert len(pending_state.ready_to_run) == 2
@@ -519,7 +543,9 @@ class TestConstraintChecks:
 
     def test_check_timeout_no_timeout(self, basic_state, mock_gateway, default_config):
         """Test _check_timeout with no timeout."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         # Should not raise
         orchestrator._check_timeout(time.perf_counter())
 
@@ -535,21 +561,31 @@ class TestConstraintChecks:
             orchestrator._check_timeout(start_time)
 
     @pytest.mark.asyncio
-    async def test_check_distributor_alive_true(self, basic_state, mock_gateway, default_config):
+    async def test_check_distributor_alive_true(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test _check_distributor_alive when alive."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         # Should not raise
         await orchestrator._check_distributor_alive(lambda: True)
 
     @pytest.mark.asyncio
-    async def test_check_distributor_alive_false(self, basic_state, mock_gateway, default_config):
+    async def test_check_distributor_alive_false(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test _check_distributor_alive when not alive."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
 
         with pytest.raises(DistributorNotAlive):
             await orchestrator._check_distributor_alive(lambda: False)
 
-    def test_check_fail_fast_no_failures(self, basic_state, mock_gateway, default_config):
+    def test_check_fail_fast_no_failures(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test _check_fail_fast with no failures."""
         config = OrchestratorConfig(fail_fast=True)
         orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, config)
@@ -570,13 +606,17 @@ class TestConstraintChecks:
         with pytest.raises(RuntimeError, match="Fail-fast"):
             orchestrator._check_fail_fast()
 
-    def test_check_fail_fast_disabled(self, basic_state, mock_gateway, mock_task, default_config):
+    def test_check_fail_fast_disabled(
+        self, basic_state, mock_gateway, mock_task, default_config
+    ):
         """Test _check_fail_fast when disabled."""
         failed = mock_task(2, status=TaskStatus.ERROR_FATAL)
         basic_state.tasks[2] = failed
         basic_state._task_status_map[TaskStatus.ERROR_FATAL].add(failed)
 
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         # Should not raise
         orchestrator._check_fail_fast()
 
@@ -584,7 +624,9 @@ class TestConstraintChecks:
         self, basic_state, mock_gateway, default_config
     ):
         """Test _check_fail_after_n_executions when disabled."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         # Should not raise
         orchestrator._check_fail_after_n_executions()
 
@@ -621,7 +663,9 @@ class TestShouldContinue:
     def test_should_continue_all_done(self, basic_state, mock_gateway, default_config):
         """Test _should_continue when all tasks done."""
         basic_state.status = WorkflowRunStatus.RUNNING
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
 
         assert orchestrator._should_continue() is False
 
@@ -630,15 +674,21 @@ class TestShouldContinue:
     ):
         """Test _should_continue with server stop status."""
         pending_state.status = WorkflowRunStatus.ERROR
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
 
         assert orchestrator._should_continue() is False
 
-    def test_should_continue_with_work(self, pending_state, mock_gateway, default_config):
+    def test_should_continue_with_work(
+        self, pending_state, mock_gateway, default_config
+    ):
         """Test _should_continue with pending work."""
         pending_state.status = WorkflowRunStatus.RUNNING
         pending_state.ready_to_run.append(list(pending_state.tasks.values())[0])
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
 
         assert orchestrator._should_continue() is True
 
@@ -652,25 +702,31 @@ class TestUpdateStatus:
     """Tests for _update_status."""
 
     @pytest.mark.asyncio
-    async def test_update_status_success(self, basic_state, mock_gateway, default_config):
+    async def test_update_status_success(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test _update_status successful transition."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         await orchestrator._update_status(WorkflowRunStatus.RUNNING)
 
         assert basic_state.status == WorkflowRunStatus.RUNNING
-        mock_gateway.update_status.assert_called_once_with(
-            WorkflowRunStatus.RUNNING
-        )
+        mock_gateway.update_status.assert_called_once_with(WorkflowRunStatus.RUNNING)
 
     @pytest.mark.asyncio
-    async def test_update_status_transition_error(self, basic_state, mock_gateway, default_config):
+    async def test_update_status_transition_error(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test _update_status with transition error."""
         # Gateway returns different status than requested
         mock_gateway.update_status = AsyncMock(
             return_value=StatusUpdateResponse(status=WorkflowRunStatus.ERROR)
         )
 
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
 
         with pytest.raises(TransitionError):
             await orchestrator._update_status(WorkflowRunStatus.RUNNING)
@@ -684,9 +740,7 @@ class TestUpdateStatus:
 class TestApplyStatusUpdates:
     """Tests for state.apply_update() + _process_changed_tasks()."""
 
-    def test_apply_status_updates_moves_task(
-        self, pending_state, default_config
-    ):
+    def test_apply_status_updates_moves_task(self, pending_state, default_config):
         """Test that status updates move tasks between buckets."""
         task = list(pending_state.tasks.values())[0]
         task_id = task.task_id
@@ -700,18 +754,14 @@ class TestApplyStatusUpdates:
         assert task not in pending_state._task_status_map[TaskStatus.REGISTERING]
         assert task in changed
 
-    def test_apply_status_updates_unknown_task(
-        self, pending_state, default_config
-    ):
+    def test_apply_status_updates_unknown_task(self, pending_state, default_config):
         """Test that unknown task IDs are ignored."""
         # Use state.apply_update() - should not raise
         update = StateUpdate(task_statuses={999: TaskStatus.DONE})
         changed = pending_state.apply_update(update)
         assert len(changed) == 0
 
-    def test_apply_status_updates_same_status(
-        self, pending_state, default_config
-    ):
+    def test_apply_status_updates_same_status(self, pending_state, default_config):
         """Test that same status updates are no-op."""
         task = list(pending_state.tasks.values())[0]
         task_id = task.task_id
@@ -745,7 +795,9 @@ class TestProcessChangedTasks:
         task = list(pending_state.tasks.values())[0]
         task.status = TaskStatus.DONE
 
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
         orchestrator._process_changed_tasks({task})
 
         assert orchestrator._n_executions == 1
@@ -755,7 +807,9 @@ class TestProcessChangedTasks:
     ):
         """Test that done tasks propagate to downstream tasks."""
         upstream = list(pending_state.tasks.values())[0]
-        downstream = mock_task(3, status=TaskStatus.REGISTERING, all_upstreams_done=False)
+        downstream = mock_task(
+            3, status=TaskStatus.REGISTERING, all_upstreams_done=False
+        )
         downstream.num_upstreams = 1
 
         upstream.downstream_swarm_tasks.add(downstream)
@@ -764,7 +818,9 @@ class TestProcessChangedTasks:
         pending_state.tasks[3] = downstream
         pending_state._task_status_map[TaskStatus.REGISTERING].add(downstream)
 
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
         orchestrator._process_changed_tasks({upstream})
 
         assert downstream.num_upstreams_done == 1
@@ -774,14 +830,18 @@ class TestProcessChangedTasks:
     ):
         """Test that done tasks enqueue ready downstream tasks."""
         upstream = list(pending_state.tasks.values())[0]
-        downstream = mock_task(3, status=TaskStatus.REGISTERING, all_upstreams_done=False)
+        downstream = mock_task(
+            3, status=TaskStatus.REGISTERING, all_upstreams_done=False
+        )
         downstream.num_upstreams = 1
 
         # Make downstream become ready when upstream completes
         def check_all_upstreams():
             return downstream.num_upstreams_done >= downstream.num_upstreams
 
-        type(downstream).all_upstreams_done = property(lambda self: check_all_upstreams())
+        type(downstream).all_upstreams_done = property(
+            lambda self: check_all_upstreams()
+        )
 
         upstream.downstream_swarm_tasks.add(downstream)
         upstream.status = TaskStatus.DONE
@@ -789,7 +849,9 @@ class TestProcessChangedTasks:
         pending_state.tasks[3] = downstream
         pending_state._task_status_map[TaskStatus.REGISTERING].add(downstream)
 
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
         orchestrator._process_changed_tasks({upstream})
 
         assert downstream in pending_state.ready_to_run
@@ -805,7 +867,9 @@ class TestProcessChangedTasks:
         other_task = list(pending_state.tasks.values())[1]
         pending_state.ready_to_run.append(other_task)
 
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
         orchestrator._process_changed_tasks({task})
 
         # Task should be at front
@@ -826,7 +890,9 @@ class TestTerminationHandling:
     ):
         """Test _handle_termination with no active tasks returns True."""
         basic_state.status = WorkflowRunStatus.COLD_RESUME
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
 
         result = await orchestrator._handle_termination()
 
@@ -842,7 +908,9 @@ class TestTerminationHandling:
         pending_state._task_status_map[TaskStatus.RUNNING].add(running)
         pending_state.status = WorkflowRunStatus.COLD_RESUME
 
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
 
         result = await orchestrator._handle_termination()
 
@@ -904,9 +972,9 @@ class TestFullRun:
             status=WorkflowRunStatus.BOUND,
         )
 
-        result = await WorkflowRunOrchestrator(
-            state, mock_gateway, default_config
-        ).run(lambda: True)
+        result = await WorkflowRunOrchestrator(state, mock_gateway, default_config).run(
+            lambda: True
+        )
 
         # Should be ERROR status since not all tasks done
         assert result.final_status == WorkflowRunStatus.ERROR
@@ -946,9 +1014,9 @@ class TestFullRun:
         # Simulate resume scenario with previously completed tasks
         state.num_previously_complete = 5
 
-        result = await WorkflowRunOrchestrator(
-            state, mock_gateway, default_config
-        ).run(lambda: True)
+        result = await WorkflowRunOrchestrator(state, mock_gateway, default_config).run(
+            lambda: True
+        )
 
         assert result.num_previously_complete == 5
         # Calculate newly completed (in this case, task was already done)
@@ -956,9 +1024,13 @@ class TestFullRun:
         assert newly_completed == -4  # 1 - 5 = -4 (no new completions)
 
     @pytest.mark.asyncio
-    async def test_run_transitions_to_running(self, basic_state, mock_gateway, default_config):
+    async def test_run_transitions_to_running(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test that run transitions status to RUNNING."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         await orchestrator.run(lambda: True)
 
         # Check that update_status was called with RUNNING first
@@ -974,7 +1046,9 @@ class TestFullRun:
         task = list(pending_state.tasks.values())[0]
         pending_state.ready_to_run.append(task)
 
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
 
         with pytest.raises(DistributorNotAlive):
             await orchestrator.run(lambda: False)
@@ -988,7 +1062,9 @@ class TestFullRun:
         async def raise_interrupt():
             raise KeyboardInterrupt()
 
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
 
         # Patch _main_loop to raise KeyboardInterrupt
         with patch.object(orchestrator, "_main_loop", side_effect=KeyboardInterrupt):
@@ -1005,9 +1081,13 @@ class TestTeardown:
     """Tests for _teardown."""
 
     @pytest.mark.asyncio
-    async def test_teardown_cancels_heartbeat_task(self, basic_state, mock_gateway, default_config):
+    async def test_teardown_cancels_heartbeat_task(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test that _teardown cancels heartbeat task."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         orchestrator._stop_event = asyncio.Event()
         orchestrator._heartbeat_task = asyncio.create_task(asyncio.sleep(100))
 
@@ -1017,9 +1097,13 @@ class TestTeardown:
         assert orchestrator._stop_event is None
 
     @pytest.mark.asyncio
-    async def test_teardown_sets_stop_event(self, basic_state, mock_gateway, default_config):
+    async def test_teardown_sets_stop_event(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test that _teardown sets stop event."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         stop_event = asyncio.Event()
         orchestrator._stop_event = stop_event
 
@@ -1038,9 +1122,13 @@ class TestErrorHandling:
     """Tests for error handling."""
 
     @pytest.mark.asyncio
-    async def test_handle_error_updates_status(self, basic_state, mock_gateway, default_config):
+    async def test_handle_error_updates_status(
+        self, basic_state, mock_gateway, default_config
+    ):
         """Test that _handle_error updates status to ERROR."""
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         await orchestrator._handle_error()
 
         mock_gateway.update_status.assert_called_with(WorkflowRunStatus.ERROR)
@@ -1050,11 +1138,11 @@ class TestErrorHandling:
         self, basic_state, mock_gateway, default_config
     ):
         """Test that _handle_error catches TransitionError."""
-        mock_gateway.update_status = AsyncMock(
-            side_effect=TransitionError("Test")
-        )
+        mock_gateway.update_status = AsyncMock(side_effect=TransitionError("Test"))
 
-        orchestrator = WorkflowRunOrchestrator(basic_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            basic_state, mock_gateway, default_config
+        )
         # Should not raise
         await orchestrator._handle_error()
 
@@ -1202,7 +1290,9 @@ class TestSyncOperations:
     """Tests for synchronization operations."""
 
     @pytest.mark.asyncio
-    async def test_do_sync_updates_last_sync(self, pending_state, mock_gateway, default_config):
+    async def test_do_sync_updates_last_sync(
+        self, pending_state, mock_gateway, default_config
+    ):
         """Test that _do_sync updates last_sync time."""
         mock_gateway.get_task_status_updates = AsyncMock(
             return_value=TaskStatusUpdatesResponse(
@@ -1211,7 +1301,9 @@ class TestSyncOperations:
             )
         )
 
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
         await orchestrator._do_sync(full_sync=False)
 
         assert pending_state.last_sync == "2024-01-01T12:00:00"
@@ -1223,7 +1315,9 @@ class TestSyncOperations:
         """Test that _do_sync updates max_concurrently_running."""
         mock_gateway.get_workflow_concurrency = AsyncMock(return_value=200)
 
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
         await orchestrator._do_sync(full_sync=False)
 
         assert pending_state.max_concurrently_running == 200
@@ -1235,9 +1329,10 @@ class TestSyncOperations:
         """Test that _do_sync updates array concurrency limits."""
         mock_gateway.get_array_concurrency = AsyncMock(return_value=75)
 
-        orchestrator = WorkflowRunOrchestrator(pending_state, mock_gateway, default_config)
+        orchestrator = WorkflowRunOrchestrator(
+            pending_state, mock_gateway, default_config
+        )
         await orchestrator._do_sync(full_sync=False)
 
         array = list(pending_state.arrays.values())[0]
         assert array.max_concurrently_running == 75
-
