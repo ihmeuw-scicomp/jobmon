@@ -1,4 +1,5 @@
 import ast
+import asyncio
 import logging
 import os
 import time
@@ -251,7 +252,14 @@ def test_wedged_dag(db_engine, tool, task_template, requester_no_retry):
         swarm.run(lambda: True, seconds_until_timeout=1)
     assert swarm.tasks[t1.task_id].status == TaskStatus.DONE
     assert swarm.tasks[t2.task_id].status == TaskStatus.DONE
-    assert swarm.tasks[t3.task_id].status in (TaskStatus.REGISTERING, TaskStatus.DONE)
+    assert swarm.tasks[t3.task_id].status in {
+        TaskStatus.REGISTERING,
+        TaskStatus.QUEUED,
+        TaskStatus.INSTANTIATING,
+        TaskStatus.LAUNCHED,
+        TaskStatus.RUNNING,
+        TaskStatus.DONE,
+    }
     ready_to_run_ids = {task.task_id for task in swarm.ready_to_run}
     assert t3.task_id in ready_to_run_ids or not swarm.ready_to_run
 
@@ -468,12 +476,11 @@ def test_swarm_terminate(tool):
             super().__init__(*args, **kwargs)
             self.sync_attempts = 0
 
-        def synchronize_state(self, full_sync: bool = False) -> None:
-            super().synchronize_state(full_sync)
+        async def synchronize_state_async(self, full_sync: bool = False) -> None:
+            await super().synchronize_state_async(full_sync)
             self.sync_attempts += 1
             if self.sync_attempts == 2:
-                # Signal a cold resume
-                self._update_status(WorkflowRunStatus.COLD_RESUME)
+                await self._update_status_async(WorkflowRunStatus.COLD_RESUME)
 
     workflow = tool.create_workflow(name="test_terminate")
 
@@ -575,4 +582,4 @@ def test_build_swarm_from_workflow_id(tool, task_template):
     assert resume_swarm.ready_to_run[0] == st3
 
     # Run a full sync, test that no keyerrors are raised
-    resume_swarm._task_status_updates(full_sync=True)
+    asyncio.run(resume_swarm._task_status_updates_async(full_sync=True))

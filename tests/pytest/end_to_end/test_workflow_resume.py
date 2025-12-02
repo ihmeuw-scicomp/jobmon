@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 import time
@@ -201,7 +202,7 @@ def test_cold_resume(tool):
     assert swarm.status == WorkflowRunStatus.COLD_RESUME
 
     # set workflow run to terminated
-    swarm._terminate_task_instances()
+    asyncio.run(swarm._terminate_task_instances_async())
 
     distributor_service.refresh_status_from_db(TaskInstanceStatus.KILL_SELF)
     distributor_service.process_status(TaskInstanceStatus.KILL_SELF)

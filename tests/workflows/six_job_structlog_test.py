@@ -15,19 +15,6 @@ from jobmon.client.logging import configure_client_logging
 
 
 THIS_DIR = Path(__file__).resolve().parent
-REPO_ROOT = THIS_DIR.parent
-
-
-def _set_default_config_paths() -> None:
-    """Ensure Jobmon uses the local docker config overrides."""
-
-    config_file = REPO_ROOT / "config" / "jobmonconfig.local.yaml"
-    logconfig_file = REPO_ROOT / "config" / "logconfig.otlp.yaml"
-
-    os.environ.setdefault("JOBMON__CONFIG_FILE", str(config_file))
-    os.environ.setdefault(
-        "JOBMON__LOGGING__CLIENT_LOGCONFIG_FILE", str(logconfig_file)
-    )
 
 
 def _configure_structlog_like_fhs() -> None:
@@ -59,7 +46,6 @@ def _get_task_template(tool: Tool, template_name: str):  # pragma: no cover - sh
 def six_job_structlog_test(cluster_name: str, wf_id_file: str | None = None) -> None:
     """Run the six job workflow under a direct-render structlog configuration."""
 
-    _set_default_config_paths()
     _configure_structlog_like_fhs()
 
     configure_client_logging()

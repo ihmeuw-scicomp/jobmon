@@ -109,13 +109,8 @@ class JobmonConfig:
         s_val = value.strip()
         lower_s_val = s_val.lower()
 
-        # Boolean conversion (consistent with get_boolean)
-        if lower_s_val in ("t", "true", "1", "yes"):
-            return True
-        if lower_s_val in ("f", "false", "0", "no"):
-            return False
-
-        # Try numeric conversion first
+        # Try numeric conversion first - numbers like "1" and "0" should remain
+        # numeric, not be converted to booleans
         try:
             # Try int first, then float
             if "." not in s_val:
@@ -124,6 +119,13 @@ class JobmonConfig:
                 return float(s_val)
         except ValueError:
             pass
+
+        # Boolean conversion for explicit boolean strings only
+        # (excludes "1" and "0" which are handled above as integers)
+        if lower_s_val in ("t", "true", "yes"):
+            return True
+        if lower_s_val in ("f", "false", "no"):
+            return False
 
         # Try JSON, then Python literal, fall back to raw string
         for parser in (json.loads, ast.literal_eval):
@@ -252,6 +254,9 @@ class JobmonConfig:
 
         if isinstance(coerced_val, bool):
             return coerced_val
+        # Also accept integers 0 and 1 as boolean values
+        elif isinstance(coerced_val, int) and coerced_val in (0, 1):
+            return bool(coerced_val)
         else:
             raise ConfigError(
                 f'Failed to convert value to bool. Please check "{key}" key in "{section}" '
