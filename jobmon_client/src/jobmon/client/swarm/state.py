@@ -13,11 +13,11 @@ from typing import TYPE_CHECKING, Optional
 
 import structlog
 
-from jobmon.core.constants import TaskStatus
+from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 
 if TYPE_CHECKING:
-    from jobmon.client.swarm.swarm_array import SwarmArray
-    from jobmon.client.swarm.swarm_task import SwarmTask
+    from jobmon.client.swarm.array import SwarmArray
+    from jobmon.client.swarm.task import SwarmTask
     from jobmon.client.task_resources import TaskResources
 
 logger = structlog.get_logger(__name__)
@@ -33,6 +33,21 @@ ACTIVE_TASK_STATUSES: tuple[str, ...] = (
     TaskStatus.INSTANTIATING,
     TaskStatus.LAUNCHED,
     TaskStatus.RUNNING,
+)
+
+# Workflow-run statuses indicating the server has already decided the run must stop.
+SERVER_STOP_STATUSES: frozenset[str] = frozenset(
+    {
+        WorkflowRunStatus.ERROR,
+        WorkflowRunStatus.TERMINATED,
+        WorkflowRunStatus.STOPPED,
+    }
+)
+
+# Workflow-run statuses indicating a resume signal was received.
+TERMINATING_STATUSES: tuple[str, ...] = (
+    WorkflowRunStatus.COLD_RESUME,
+    WorkflowRunStatus.HOT_RESUME,
 )
 
 

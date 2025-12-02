@@ -1,13 +1,14 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.server.web.models import load_model
 from jobmon.server.web.models.task_instance import TaskInstance
+
+from tests.pytest.swarm.swarm_test_utils import create_test_context, prepare_and_queue_tasks
 
 load_model()
 
@@ -27,12 +28,10 @@ def test_heartbeat_on_launched(tool, db_engine, task_template):
     wfr = WorkflowRunFactory(workflow.workflow_id).create_workflow_run()
 
     # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # launch the task then log a heartbeat
     distributor_service = DistributorService(

@@ -6,13 +6,21 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from jobmon.client.status_commands import concurrency_limit
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.swarm.builder import SwarmBuilder
+from jobmon.client.swarm.orchestrator import OrchestratorConfig, WorkflowRunOrchestrator
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
 from jobmon.server.web.models import load_model
+
+from tests.pytest.swarm.swarm_test_utils import (
+    create_test_context,
+    prepare_and_queue_tasks,
+    queue_tasks,
+    set_initial_fringe,
+)
 
 load_model()
 
@@ -35,12 +43,10 @@ def test_instantiate_job(tool, db_engine, task_template):
     wfr = factory.create_workflow_run()
 
     # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # test that we can launch via the normal job pathway
     distributor_service = DistributorService(
@@ -129,12 +135,10 @@ def test_instantiate_array(tool, db_engine, task_template):
     wfr = factory.create_workflow_run()
 
     # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # test that we can launch via the normal job pathway
     distributor_service = DistributorService(
@@ -227,12 +231,10 @@ def test_job_submit_raises_error(db_engine, tool):
     wfr = factory.create_workflow_run()
 
     # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # test that we can launch via the normal job pathway
     distributor_service = DistributorService(
@@ -282,12 +284,10 @@ def test_array_submit_raises_error(db_engine, tool):
     wfr = factory.create_workflow_run()
 
     # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # test that we can launch via the normal job pathway
     distributor_service = DistributorService(
@@ -332,12 +332,10 @@ def test_workflow_concurrency_limiting(tool, task_template):
     factory = WorkflowRunFactory(workflow.workflow_id)
     wfr = factory.create_workflow_run()
 
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # test that we can launch via the normal job pathway
     distributor_service = DistributorService(
@@ -386,12 +384,10 @@ def test_array_concurrency(tool, array_template, wf_limit, array_limit, expected
     factory = WorkflowRunFactory(workflow.workflow_id)
     wfr = factory.create_workflow_run()
 
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     distributor_service = DistributorService(
         MultiprocessDistributor("multiprocess", parallelism=3),
@@ -434,12 +430,11 @@ def test_dynamic_concurrency_limiting(tool, task_template):
 
     # Start with limit of 2. Adjust up to 5 and try again
     # queue the tasks
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
+
     distributor_service = DistributorService(
         MultiprocessDistributor("multiprocess", parallelism=2),
         requester=workflow.requester,
@@ -458,10 +453,29 @@ def test_dynamic_concurrency_limiting(tool, task_template):
 
     concurrency_limit(workflow.workflow_id, 5)
 
-    # Combine async calls to avoid event loop closure issues with cached session
+    # Sync concurrency and queue more tasks
     async def sync_and_process() -> None:
-        await swarm._synchronize_max_concurrently_running_async()
-        await swarm.process_commands_async()
+        import aiohttp
+        from jobmon.client.swarm.services.synchronizer import Synchronizer
+
+        # Create synchronizer
+        synchronizer = Synchronizer(
+            gateway=gateway,
+            task_ids=set(state.tasks.keys()),
+            array_ids=set(state.arrays.keys()),
+        )
+        # Set up session
+        session = aiohttp.ClientSession()
+        gateway.set_session(session)
+        try:
+            # Fetch new concurrency limit
+            update = await synchronizer.get_concurrency_limits_only()
+            state.apply_update(update)
+
+            # Queue more tasks
+            await orchestrator._do_scheduling(timeout=-1)
+        finally:
+            await session.close()
 
     asyncio.run(sync_and_process())
     distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)

@@ -1,11 +1,18 @@
+import glob
 import time
 
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
+
+from tests.pytest.swarm.swarm_test_utils import (
+    create_test_context,
+    prepare_and_queue_tasks,
+    queue_tasks,
+    synchronize_state,
+)
 
 
 def test_sequential_logging(tool, task_template, tmp_path):
@@ -33,12 +40,10 @@ def test_sequential_logging(tool, task_template, tmp_path):
     wfr._update_status(WorkflowRunStatus.BOUND)
 
     # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # test that we can launch via the normal job pathway
     distributor_service = DistributorService(
@@ -53,11 +58,14 @@ def test_sequential_logging(tool, task_template, tmp_path):
     distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
     distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
 
-    with open(tmp_path / "stdout_task.o1") as f:
+    # Find the stdout file (task instance ID varies in parallel tests)
+    stdout_files = glob.glob(str(tmp_path / "stdout_task.o*"))
+    assert len(stdout_files) == 1, f"Expected 1 stdout file, found {stdout_files}"
+    with open(stdout_files[0]) as f:
         assert "hello world\n" in f.readlines()
 
-    swarm.synchronize_state()
-    swarm.process_commands()
+    synchronize_state(state, gateway, orchestrator)
+    queue_tasks(state, gateway, orchestrator)
 
     distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
     distributor_service.process_status(TaskInstanceStatus.QUEUED)
@@ -65,7 +73,10 @@ def test_sequential_logging(tool, task_template, tmp_path):
     distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
     distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
 
-    with open(tmp_path / "stderr_task.e2") as f:
+    # Find the stderr file
+    stderr_files = glob.glob(str(tmp_path / "stderr_task.e*"))
+    assert len(stderr_files) == 1, f"Expected 1 stderr file, found {stderr_files}"
+    with open(stderr_files[0]) as f:
         assert "not found" in f.readline().rstrip()
 
 
@@ -96,12 +107,10 @@ def test_multiprocess_logging(tool, task_template, tmp_path):
     wfr._update_status(WorkflowRunStatus.BOUND)
 
     # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # test that we can launch via the normal job pathway
     distributor_service = DistributorService(
@@ -117,6 +126,7 @@ def test_multiprocess_logging(tool, task_template, tmp_path):
     distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
     distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
 
+    # Wait for task to complete using original waiting logic
     counter = 0
     while distributor_service.cluster_interface.get_submitted_or_running():
         time.sleep(1)
@@ -124,11 +134,14 @@ def test_multiprocess_logging(tool, task_template, tmp_path):
         if counter > 10:
             break
 
-    with open(tmp_path / "stdout_task.o1_0") as f:
+    # Find the stdout file (multiprocess uses {name}.o{ti_id}_{step_id} format)
+    stdout_files = glob.glob(str(tmp_path / "stdout_task.o*"))
+    assert len(stdout_files) == 1, f"Expected 1 stdout file, found {stdout_files}"
+    with open(stdout_files[0]) as f:
         assert "hello world\n" in f.readlines()
 
-    swarm.synchronize_state()
-    swarm.process_commands()
+    synchronize_state(state, gateway, orchestrator)
+    queue_tasks(state, gateway, orchestrator)
 
     distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
     distributor_service.process_status(TaskInstanceStatus.QUEUED)
@@ -136,6 +149,7 @@ def test_multiprocess_logging(tool, task_template, tmp_path):
     distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
     distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
 
+    # Wait for task to complete
     counter = 0
     while distributor_service.cluster_interface.get_submitted_or_running():
         time.sleep(1)
@@ -143,10 +157,13 @@ def test_multiprocess_logging(tool, task_template, tmp_path):
         if counter > 10:
             break
 
-    with open(tmp_path / "stderr_task.e2_0") as f:
-        assert "not found" in f.readline().rstrip()
-
     distributor_service.cluster_interface.stop()
+
+    # Find the stderr file
+    stderr_files = glob.glob(str(tmp_path / "stderr_task.e*"))
+    assert len(stderr_files) == 1, f"Expected 1 stderr file, found {stderr_files}"
+    with open(stderr_files[0]) as f:
+        assert "not found" in f.readline().rstrip()
 
 
 def test_dummy_executor_with_bad_log_path(tool, task_template, tmp_path):

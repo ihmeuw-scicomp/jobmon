@@ -2,9 +2,13 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import WorkflowRunStatus
+from tests.pytest.swarm.swarm_test_utils import (
+    create_test_context,
+    set_adjusted_task_resources,
+    set_validated_task_resources,
+)
 
 
 @pytest.mark.parametrize(
@@ -40,21 +44,20 @@ def test_swarmtask_resources_integration(scales, tool, task_template, db_engine)
     wfr._update_status(WorkflowRunStatus.INSTANTIATED)
     wfr._update_status(WorkflowRunStatus.LAUNCHED)
 
-    # swarm calls
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id,
-        requester=workflow.requester,
+    # Build swarm state
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
+
     # Check swarmtask resources
-    swarmtask = swarm.tasks[task.task_id]
+    swarmtask = state.tasks[task.task_id]
     initial_resources = swarmtask.current_task_resources
     assert initial_resources.requested_resources == {
         "cores": 8,
     }
 
     # Queue the task. TRs should then be validated
-    swarm._set_validated_task_resources(swarmtask)
+    set_validated_task_resources(orchestrator, swarmtask)
     # No change in resource values, so type id stays the same
     assert id(swarmtask.current_task_resources) == id(initial_resources)
 
@@ -69,7 +72,7 @@ def test_swarmtask_resources_integration(scales, tool, task_template, db_engine)
         session.commit()
 
     # Call adjust.
-    swarm._set_adjusted_task_resources(swarmtask)
+    set_adjusted_task_resources(orchestrator, swarmtask)
     scaled_params = swarmtask.current_task_resources
     assert id(scaled_params) != id(initial_resources)
     assert scaled_params.requested_resources == {
@@ -77,7 +80,7 @@ def test_swarmtask_resources_integration(scales, tool, task_template, db_engine)
     }
 
     # Call adjust a second time.
-    swarm._set_adjusted_task_resources(swarmtask)
+    set_adjusted_task_resources(orchestrator, swarmtask)
     scaled_params = swarmtask.current_task_resources
     assert id(scaled_params) != id(initial_resources)
     assert scaled_params.requested_resources == {
@@ -113,21 +116,20 @@ def test_swarmtask_resources_integration_no_scales(
     wfr._update_status(WorkflowRunStatus.INSTANTIATED)
     wfr._update_status(WorkflowRunStatus.LAUNCHED)
 
-    # swarm calls
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id,
-        requester=workflow.requester,
+    # Build swarm state
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
+
     # Check swarmtask resources
-    swarmtask = swarm.tasks[task.task_id]
+    swarmtask = state.tasks[task.task_id]
     initial_resources = swarmtask.current_task_resources
     assert initial_resources.requested_resources == {
         "cores": 8,
     }
 
     # Queue the task. TRs should then be validated
-    swarm._set_validated_task_resources(swarmtask)
+    set_validated_task_resources(orchestrator, swarmtask)
     # No change in resource values, so type id stays the same
     assert id(swarmtask.current_task_resources) == id(initial_resources)
 
@@ -142,7 +144,7 @@ def test_swarmtask_resources_integration_no_scales(
         session.commit()
 
     # Call adjust.
-    swarm._set_adjusted_task_resources(swarmtask)
+    set_adjusted_task_resources(orchestrator, swarmtask)
     scaled_params = swarmtask.current_task_resources
     assert id(scaled_params) == id(initial_resources)
     assert scaled_params.requested_resources == {
@@ -150,7 +152,7 @@ def test_swarmtask_resources_integration_no_scales(
     }
 
     # Call adjust a second time.
-    swarm._set_adjusted_task_resources(swarmtask)
+    set_adjusted_task_resources(orchestrator, swarmtask)
     scaled_params = swarmtask.current_task_resources
     assert id(scaled_params) == id(initial_resources)
     assert scaled_params.requested_resources == {

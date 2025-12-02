@@ -8,12 +8,12 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock
 
 import pytest
 
-from jobmon.client.swarm.workflow_run_impl.gateway import QueueResponse
-from jobmon.client.swarm.workflow_run_impl.services.scheduler import (
+from jobmon.client.swarm.gateway import QueueResponse
+from jobmon.client.swarm.services.scheduler import (
     BatchResult,
     Scheduler,
 )
-from jobmon.client.swarm.workflow_run_impl.state import StateUpdate
+from jobmon.client.swarm.state import StateUpdate, SwarmState
 from jobmon.core.constants import TaskStatus
 
 
@@ -29,6 +29,8 @@ def mock_gateway():
     gateway.queue_task_batch = AsyncMock(
         return_value=QueueResponse(tasks_by_status={TaskStatus.QUEUED: [1]})
     )
+    # Mock _ensure_session as AsyncMock for bind_async to work
+    gateway._ensure_session = AsyncMock(return_value=MagicMock())
     return gateway
 
 
@@ -76,6 +78,28 @@ def create_mock_array(array_id: int, max_concurrently_running: int = 100) -> Mag
     return array
 
 
+def create_swarm_state(
+    tasks: dict = None,
+    arrays: dict = None,
+    task_status_map: dict = None,
+    max_concurrently_running: int = 100,
+) -> SwarmState:
+    """Create a SwarmState for testing."""
+    state = SwarmState(
+        workflow_id=1,
+        workflow_run_id=10,
+        dag_id=1,
+        max_concurrently_running=max_concurrently_running,
+    )
+    if tasks:
+        state.tasks = tasks
+    if arrays:
+        state.arrays = arrays
+    if task_status_map:
+        state._task_status_map = task_status_map
+    return state
+
+
 @pytest.fixture
 def task_status_map():
     """Create empty task status map."""
@@ -95,17 +119,17 @@ def task_status_map():
 @pytest.fixture
 def scheduler(mock_gateway, task_status_map):
     """Create a Scheduler with default settings."""
-    tasks = {}
     arrays = {10: create_mock_array(10)}
-    ready_to_run = deque()
+    state = create_swarm_state(
+        tasks={},
+        arrays=arrays,
+        task_status_map=task_status_map,
+        max_concurrently_running=100,
+    )
 
     return Scheduler(
         gateway=mock_gateway,
-        tasks=tasks,
-        arrays=arrays,
-        task_status_map=task_status_map,
-        ready_to_run=ready_to_run,
-        max_concurrently_running=100,
+        state=state,
     )
 
 
@@ -121,20 +145,21 @@ class TestSchedulerInit:
         """Test that init stores all parameters correctly."""
         tasks = {1: MagicMock()}
         arrays = {10: create_mock_array(10)}
-        ready_to_run = deque([MagicMock()])
-
-        sched = Scheduler(
-            gateway=mock_gateway,
+        state = create_swarm_state(
             tasks=tasks,
             arrays=arrays,
             task_status_map=task_status_map,
-            ready_to_run=ready_to_run,
             max_concurrently_running=50,
         )
 
+        sched = Scheduler(
+            gateway=mock_gateway,
+            state=state,
+        )
+
         assert sched.max_concurrently_running == 50
-        assert sched._tasks is tasks
-        assert sched._arrays is arrays
+        assert sched._state.tasks is tasks
+        assert sched._state.arrays is arrays
 
     def test_max_concurrently_running_property(self, scheduler):
         """Test max_concurrently_running property getter and setter."""
@@ -145,53 +170,54 @@ class TestSchedulerInit:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Test Capacity Calculations
+# Test Capacity Calculations (via SwarmState)
 # ──────────────────────────────────────────────────────────────────────────────
 
 
 class TestSchedulerCapacity:
-    """Tests for capacity calculations."""
+    """Tests for capacity calculations (delegated to SwarmState)."""
 
     def test_get_active_task_count_empty(self, scheduler):
         """Test active task count when no active tasks."""
-        assert scheduler.get_active_task_count() == 0
+        # Capacity methods are now on SwarmState
+        assert scheduler._state.get_active_task_count() == 0
 
-    def test_get_active_task_count_with_tasks(self, scheduler, task_status_map):
+    def test_get_active_task_count_with_tasks(self, scheduler):
         """Test active task count with active tasks."""
         task1 = create_mock_task(1, 10, TaskStatus.QUEUED)
         task2 = create_mock_task(2, 10, TaskStatus.RUNNING)
         task3 = create_mock_task(3, 10, TaskStatus.DONE)
 
-        task_status_map[TaskStatus.QUEUED].add(task1)
-        task_status_map[TaskStatus.RUNNING].add(task2)
-        task_status_map[TaskStatus.DONE].add(task3)
+        scheduler._state._task_status_map[TaskStatus.QUEUED].add(task1)
+        scheduler._state._task_status_map[TaskStatus.RUNNING].add(task2)
+        scheduler._state._task_status_map[TaskStatus.DONE].add(task3)
 
-        assert scheduler.get_active_task_count() == 2  # QUEUED + RUNNING
+        assert scheduler._state.get_active_task_count() == 2  # QUEUED + RUNNING
 
-    def test_get_available_capacity(self, scheduler, task_status_map):
+    def test_get_available_capacity(self, scheduler):
         """Test available capacity calculation."""
-        scheduler.max_concurrently_running = 10
+        scheduler._state.max_concurrently_running = 10
 
         # Add 3 active tasks
         for i in range(3):
             task = create_mock_task(i, 10, TaskStatus.RUNNING)
-            task_status_map[TaskStatus.RUNNING].add(task)
+            scheduler._state._task_status_map[TaskStatus.RUNNING].add(task)
 
-        assert scheduler.get_available_capacity() == 7
+        assert scheduler._state.get_available_capacity() == 7
 
-    def test_get_array_capacity(self, scheduler, task_status_map):
+    def test_get_array_capacity(self, scheduler):
         """Test array capacity calculation."""
-        array = scheduler._arrays[10]
+        array = scheduler._state.arrays[10]
         array.max_concurrently_running = 5
 
         # Add 2 active tasks in the array
         task1 = create_mock_task(1, 10, TaskStatus.RUNNING)
         task2 = create_mock_task(2, 10, TaskStatus.QUEUED)
         array.tasks = {task1, task2}
-        task_status_map[TaskStatus.RUNNING].add(task1)
-        task_status_map[TaskStatus.QUEUED].add(task2)
+        scheduler._state._task_status_map[TaskStatus.RUNNING].add(task1)
+        scheduler._state._task_status_map[TaskStatus.QUEUED].add(task2)
 
-        assert scheduler.get_array_capacity(10) == 3
+        assert scheduler._state.get_array_capacity(10) == 3
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -209,7 +235,7 @@ class TestSchedulerHasWork:
     def test_has_work_with_capacity(self, scheduler):
         """Test has_work returns True when queue has tasks and capacity available."""
         task = create_mock_task(1, 10)
-        scheduler._ready_to_run.append(task)
+        scheduler._state.ready_to_run.append(task)
         scheduler.max_concurrently_running = 10
 
         assert scheduler.has_work() is True
@@ -217,7 +243,7 @@ class TestSchedulerHasWork:
     def test_has_work_no_capacity(self, scheduler, task_status_map):
         """Test has_work returns False when no capacity."""
         task = create_mock_task(1, 10)
-        scheduler._ready_to_run.append(task)
+        scheduler._state.ready_to_run.append(task)
         scheduler.max_concurrently_running = 2
 
         # Fill up capacity
@@ -244,8 +270,8 @@ class TestSchedulerBatchGeneration:
     def test_generate_batches_single_task(self, scheduler):
         """Test batch generation with single task."""
         task = create_mock_task(1, 10)
-        scheduler._ready_to_run.append(task)
-        scheduler._tasks[1] = task
+        scheduler._state.ready_to_run.append(task)
+        scheduler._state.tasks[1] = task
 
         batches = list(scheduler._generate_batches())
 
@@ -262,8 +288,8 @@ class TestSchedulerBatchGeneration:
             for i in range(5)
         ]
         for task in tasks:
-            scheduler._ready_to_run.append(task)
-            scheduler._tasks[task.task_id] = task
+            scheduler._state.ready_to_run.append(task)
+            scheduler._state.tasks[task.task_id] = task
 
         batches = list(scheduler._generate_batches())
 
@@ -273,15 +299,15 @@ class TestSchedulerBatchGeneration:
 
     def test_generate_batches_separates_different_arrays(self, scheduler):
         """Test that tasks from different arrays go to different batches."""
-        scheduler._arrays[20] = create_mock_array(20)
+        scheduler._state.arrays[20] = create_mock_array(20)
 
         task1 = create_mock_task(1, 10)
         task2 = create_mock_task(2, 20)
 
-        scheduler._ready_to_run.append(task1)
-        scheduler._ready_to_run.append(task2)
-        scheduler._tasks[1] = task1
-        scheduler._tasks[2] = task2
+        scheduler._state.ready_to_run.append(task1)
+        scheduler._state.ready_to_run.append(task2)
+        scheduler._state.tasks[1] = task1
+        scheduler._state.tasks[2] = task2
 
         batches = list(scheduler._generate_batches())
 
@@ -296,10 +322,10 @@ class TestSchedulerBatchGeneration:
         task1 = create_mock_task(1, 10, task_resources=resources1)
         task2 = create_mock_task(2, 10, task_resources=resources2)
 
-        scheduler._ready_to_run.append(task1)
-        scheduler._ready_to_run.append(task2)
-        scheduler._tasks[1] = task1
-        scheduler._tasks[2] = task2
+        scheduler._state.ready_to_run.append(task1)
+        scheduler._state.ready_to_run.append(task2)
+        scheduler._state.tasks[1] = task1
+        scheduler._state.tasks[2] = task2
 
         batches = list(scheduler._generate_batches())
 
@@ -313,14 +339,14 @@ class TestSchedulerBatchGeneration:
         # Add one running task
         running_task = create_mock_task(100, 10, TaskStatus.RUNNING)
         task_status_map[TaskStatus.RUNNING].add(running_task)
-        scheduler._arrays[10].tasks.add(running_task)
+        scheduler._state.arrays[10].tasks.add(running_task)
 
         # Add 5 tasks to queue
         shared_resources = MagicMock(is_bound=True, id=1)
         for i in range(5):
             task = create_mock_task(i, 10, task_resources=shared_resources)
-            scheduler._ready_to_run.append(task)
-            scheduler._tasks[i] = task
+            scheduler._state.ready_to_run.append(task)
+            scheduler._state.tasks[i] = task
 
         batches = list(scheduler._generate_batches())
 
@@ -345,23 +371,23 @@ class TestSchedulerBatchGeneration:
 
         # Add 5 tasks to queue
         tasks = {}
-        ready_to_run = deque()
         shared_resources = MagicMock(is_bound=True, id=1)
         for i in range(5):
             task = create_mock_task(i, 10, task_resources=shared_resources)
-            ready_to_run.append(task)
             tasks[i] = task
             array.tasks.add(task)
 
-        scheduler = Scheduler(
-            gateway=mock_gateway,
+        state = create_swarm_state(
             tasks=tasks,
             arrays={10: array},
             task_status_map=task_status_map,
-            ready_to_run=ready_to_run,
             max_concurrently_running=100,
         )
+        # Add tasks to ready_to_run queue
+        for task in tasks.values():
+            state.ready_to_run.append(task)
 
+        scheduler = Scheduler(gateway=mock_gateway, state=state)
         batches = list(scheduler._generate_batches())
 
         # Should only schedule 2 tasks (array capacity = 5 - 3 active = 2)
@@ -383,29 +409,29 @@ class TestSchedulerBatchGeneration:
 
         # Add 3 tasks to queue
         tasks = {}
-        ready_to_run = deque()
         shared_resources = MagicMock(is_bound=True, id=1)
         for i in range(3):
             task = create_mock_task(i, 10, task_resources=shared_resources)
-            ready_to_run.append(task)
             tasks[i] = task
             array.tasks.add(task)
 
-        scheduler = Scheduler(
-            gateway=mock_gateway,
+        state = create_swarm_state(
             tasks=tasks,
             arrays={10: array},
             task_status_map=task_status_map,
-            ready_to_run=ready_to_run,
             max_concurrently_running=100,
         )
+        # Add tasks to ready_to_run queue
+        for task in tasks.values():
+            state.ready_to_run.append(task)
 
+        scheduler = Scheduler(gateway=mock_gateway, state=state)
         batches = list(scheduler._generate_batches())
 
         # Should have scheduled 1 task, 2 back in queue
         assert len(batches) == 1
         assert len(batches[0]) == 1
-        assert len(ready_to_run) == 2
+        assert len(state.ready_to_run) == 2
 
     def test_generate_batches_max_batch_size(self, scheduler):
         """Test that batches respect MAX_BATCH_SIZE."""
@@ -413,8 +439,8 @@ class TestSchedulerBatchGeneration:
         shared_resources = MagicMock(is_bound=True, id=1)
         for i in range(600):
             task = create_mock_task(i, 10, task_resources=shared_resources)
-            scheduler._ready_to_run.append(task)
-            scheduler._tasks[i] = task
+            scheduler._state.ready_to_run.append(task)
+            scheduler._state.tasks[i] = task
 
         batches = list(scheduler._generate_batches())
 
@@ -455,6 +481,7 @@ class TestSchedulerQueueBatch:
         """Test _queue_batch binds resources if not already bound."""
         task = create_mock_task(1, 10)
         task.current_task_resources.is_bound = False
+        task.current_task_resources.bind_async = AsyncMock()
 
         mock_gateway.queue_task_batch = AsyncMock(
             return_value=QueueResponse(tasks_by_status={TaskStatus.QUEUED: [1]})
@@ -462,7 +489,7 @@ class TestSchedulerQueueBatch:
 
         await scheduler._queue_batch([task])
 
-        task.current_task_resources.bind.assert_called_once()
+        task.current_task_resources.bind_async.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_queue_batch_returns_status_updates(self, scheduler, mock_gateway):
@@ -508,8 +535,8 @@ class TestSchedulerTick:
     async def test_tick_schedules_tasks(self, scheduler, mock_gateway):
         """Test tick schedules ready tasks."""
         task = create_mock_task(1, 10)
-        scheduler._ready_to_run.append(task)
-        scheduler._tasks[1] = task
+        scheduler._state.ready_to_run.append(task)
+        scheduler._state.tasks[1] = task
 
         mock_gateway.queue_task_batch = AsyncMock(
             return_value=QueueResponse(tasks_by_status={TaskStatus.QUEUED: [1]})
@@ -523,14 +550,14 @@ class TestSchedulerTick:
     @pytest.mark.asyncio
     async def test_tick_merges_multiple_batches(self, scheduler, mock_gateway):
         """Test tick merges results from multiple batches."""
-        scheduler._arrays[20] = create_mock_array(20)
+        scheduler._state.arrays[20] = create_mock_array(20)
 
         task1 = create_mock_task(1, 10)
         task2 = create_mock_task(2, 20)
-        scheduler._ready_to_run.append(task1)
-        scheduler._ready_to_run.append(task2)
-        scheduler._tasks[1] = task1
-        scheduler._tasks[2] = task2
+        scheduler._state.ready_to_run.append(task1)
+        scheduler._state.ready_to_run.append(task2)
+        scheduler._state.tasks[1] = task1
+        scheduler._state.tasks[2] = task2
 
         call_count = [0]
 
@@ -549,15 +576,15 @@ class TestSchedulerTick:
     async def test_tick_respects_timeout(self, scheduler, mock_gateway):
         """Test tick stops when timeout is reached."""
         # Add many tasks across different arrays so we get multiple batches
-        scheduler._arrays[20] = create_mock_array(20)
-        scheduler._arrays[30] = create_mock_array(30)
+        scheduler._state.arrays[20] = create_mock_array(20)
+        scheduler._state.arrays[30] = create_mock_array(30)
 
         for i in range(30):
             # Distribute across arrays to force multiple batches
             array_id = 10 + (i % 3) * 10
             task = create_mock_task(i, array_id)
-            scheduler._ready_to_run.append(task)
-            scheduler._tasks[i] = task
+            scheduler._state.ready_to_run.append(task)
+            scheduler._state.tasks[i] = task
 
         async def slow_queue(**kwargs):
             await asyncio.sleep(0.05)
@@ -615,22 +642,20 @@ class TestSchedulerIntegration:
         # Setup
         tasks = {}
         arrays = {10: create_mock_array(10, max_concurrently_running=100)}
-        ready_to_run = deque()
-
-        scheduler = Scheduler(
-            gateway=mock_gateway,
+        state = create_swarm_state(
             tasks=tasks,
             arrays=arrays,
             task_status_map=task_status_map,
-            ready_to_run=ready_to_run,
             max_concurrently_running=3,  # Workflow limit of 3
         )
+
+        scheduler = Scheduler(gateway=mock_gateway, state=state)
 
         # Add 5 tasks
         shared_resources = MagicMock(is_bound=True, id=1)
         for i in range(5):
             task = create_mock_task(i, 10, task_resources=shared_resources)
-            ready_to_run.append(task)
+            state.ready_to_run.append(task)
             tasks[i] = task
 
         queued_task_ids = []
@@ -647,29 +672,27 @@ class TestSchedulerIntegration:
         # Verify results - should have scheduled 3 tasks (workflow capacity)
         assert len(queued_task_ids) == 3
         # 2 tasks should remain in queue (5 - 3 scheduled)
-        assert len(ready_to_run) == 2
+        assert len(state.ready_to_run) == 2
 
     @pytest.mark.asyncio
     async def test_multiple_ticks_drain_queue(self, mock_gateway, task_status_map):
         """Test that multiple ticks eventually drain the queue when capacity allows."""
         tasks = {}
         arrays = {10: create_mock_array(10, max_concurrently_running=100)}
-        ready_to_run = deque()
-
-        scheduler = Scheduler(
-            gateway=mock_gateway,
+        state = create_swarm_state(
             tasks=tasks,
             arrays=arrays,
             task_status_map=task_status_map,
-            ready_to_run=ready_to_run,
             max_concurrently_running=2,  # Workflow limit of 2
         )
+
+        scheduler = Scheduler(gateway=mock_gateway, state=state)
 
         # Add 6 tasks
         shared_resources = MagicMock(is_bound=True, id=1)
         for i in range(6):
             task = create_mock_task(i, 10, task_resources=shared_resources)
-            ready_to_run.append(task)
+            state.ready_to_run.append(task)
             tasks[i] = task
 
         queued_count = [0]
@@ -683,15 +706,15 @@ class TestSchedulerIntegration:
         # First tick - should schedule 2 (workflow limit)
         await scheduler.tick()
         assert queued_count[0] == 2
-        assert len(ready_to_run) == 4
+        assert len(state.ready_to_run) == 4
 
         # Second tick - capacity is still available (no active tasks in status map)
         await scheduler.tick()
         assert queued_count[0] == 4
-        assert len(ready_to_run) == 2
+        assert len(state.ready_to_run) == 2
 
         # Third tick
         await scheduler.tick()
         assert queued_count[0] == 6
-        assert len(ready_to_run) == 0
+        assert len(state.ready_to_run) == 0
 

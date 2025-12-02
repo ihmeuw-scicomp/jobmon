@@ -12,10 +12,10 @@ from typing import TYPE_CHECKING, Optional
 
 import structlog
 
-from jobmon.client.swarm.workflow_run_impl.state import StateUpdate
+from jobmon.client.swarm.state import StateUpdate
 
 if TYPE_CHECKING:
-    from jobmon.client.swarm.workflow_run_impl.gateway import ServerGateway
+    from jobmon.client.swarm.gateway import ServerGateway
 
 logger = structlog.get_logger(__name__)
 

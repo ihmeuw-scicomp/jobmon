@@ -1,8 +1,14 @@
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.swarm.builder import SwarmBuilder
+from jobmon.client.swarm.orchestrator import OrchestratorConfig, WorkflowRunOrchestrator
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.dummy.dummy_distributor import DummyDistributor
+
+from tests.pytest.swarm.swarm_test_utils import (
+    create_test_context,
+    prepare_and_queue_tasks,
+)
 
 
 def test_queued(tool, task_template):
@@ -21,16 +27,14 @@ def test_queued(tool, task_template):
     factory = WorkflowRunFactory(workflow.workflow_id)
     wfr = factory.create_workflow_run()
 
-    # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    # create task instances using builder
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    assert swarm.max_concurrently_running == 10
+    assert state.max_concurrently_running == 10
 
     # create a batch
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # test that we can launch via the normal job pathway
     distributor_service = DistributorService(

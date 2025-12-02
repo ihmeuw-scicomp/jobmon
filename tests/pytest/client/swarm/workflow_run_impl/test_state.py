@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from jobmon.client.swarm.workflow_run_impl.state import (
+from jobmon.client.swarm.state import (
     ACTIVE_TASK_STATUSES,
     StateUpdate,
     SwarmState,
@@ -563,4 +563,6 @@ class TestSwarmStateInitializationHelpers:
 
         assert task2.num_upstreams_done == 1
         assert task3.num_upstreams_done == 1
+
+
 

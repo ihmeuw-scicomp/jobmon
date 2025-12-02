@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING, Optional
 
 import structlog
 
-from jobmon.client.swarm.workflow_run_impl.state import StateUpdate
+from jobmon.client.swarm.state import StateUpdate
 
 if TYPE_CHECKING:
-    from jobmon.client.swarm.workflow_run_impl.gateway import ServerGateway
+    from jobmon.client.swarm.gateway import ServerGateway
 
 logger = structlog.get_logger(__name__)
 
@@ -110,6 +110,30 @@ class HeartbeatService:
         """Check if a heartbeat is due based on the interval."""
         return self.time_since_last_heartbeat() >= self._interval
 
+    def _handle_heartbeat_response(self, response_status: str) -> StateUpdate:
+        """Process heartbeat response and return any status change.
+
+        Args:
+            response_status: Status returned by the server.
+
+        Returns:
+            StateUpdate with workflow_run_status if status changed,
+            otherwise an empty StateUpdate.
+        """
+        self._last_heartbeat_time = time.time()
+
+        # Check if server indicated a status change
+        if response_status != self._current_status:
+            logger.info(
+                "Heartbeat received status change",
+                old_status=self._current_status,
+                new_status=response_status,
+            )
+            self._current_status = response_status
+            return StateUpdate(workflow_run_status=response_status)
+
+        return StateUpdate.empty()
+
     async def tick(self) -> StateUpdate:
         """Log a heartbeat and return any status change.
 
@@ -124,19 +148,7 @@ class HeartbeatService:
             status=self._current_status,
             next_report_increment=self.next_report_increment,
         )
-        self._last_heartbeat_time = time.time()
-
-        # Check if server indicated a status change
-        if response.status != self._current_status:
-            logger.info(
-                "Heartbeat received status change",
-                old_status=self._current_status,
-                new_status=response.status,
-            )
-            self._current_status = response.status
-            return StateUpdate(workflow_run_status=response.status)
-
-        return StateUpdate.empty()
+        return self._handle_heartbeat_response(response.status)
 
     def tick_sync(self) -> StateUpdate:
         """Synchronous version of tick for non-async contexts.
@@ -152,19 +164,7 @@ class HeartbeatService:
             status=self._current_status,
             next_report_increment=self.next_report_increment,
         )
-        self._last_heartbeat_time = time.time()
-
-        # Check if server indicated a status change
-        if response.status != self._current_status:
-            logger.info(
-                "Heartbeat received status change (sync)",
-                old_status=self._current_status,
-                new_status=response.status,
-            )
-            self._current_status = response.status
-            return StateUpdate(workflow_run_status=response.status)
-
-        return StateUpdate.empty()
+        return self._handle_heartbeat_response(response.status)
 
     async def run_background(self, stop_event: asyncio.Event) -> None:
         """Background task that logs heartbeats periodically.

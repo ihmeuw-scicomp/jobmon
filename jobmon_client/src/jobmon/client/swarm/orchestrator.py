@@ -8,15 +8,19 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Optional
 
 import structlog
 
-from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
-from jobmon.client.swarm.workflow_run_impl.services.scheduler import Scheduler
-from jobmon.client.swarm.workflow_run_impl.services.synchronizer import Synchronizer
+from jobmon.client.swarm.services.heartbeat import HeartbeatService
+from jobmon.client.swarm.services.scheduler import Scheduler
+from jobmon.client.swarm.services.synchronizer import Synchronizer
+from jobmon.client.swarm.state import (
+    SERVER_STOP_STATUSES,
+    SwarmState,
+    TERMINATING_STATUSES,
+)
 from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 from jobmon.core.exceptions import (
     CallableReturnedInvalidObject,
@@ -26,40 +30,10 @@ from jobmon.core.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from jobmon.client.swarm.swarm_array import SwarmArray
-    from jobmon.client.swarm.swarm_task import SwarmTask
-    from jobmon.client.swarm.workflow_run_impl.gateway import ServerGateway
-    from jobmon.client.task_resources import TaskResources
+    from jobmon.client.swarm.task import SwarmTask
+    from jobmon.client.swarm.gateway import ServerGateway
 
 logger = structlog.get_logger(__name__)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Constants
-# ──────────────────────────────────────────────────────────────────────────────
-
-# Task statuses representing "in-flight" work (used for capacity calculations).
-ACTIVE_TASK_STATUSES: tuple[str, ...] = (
-    TaskStatus.QUEUED,
-    TaskStatus.INSTANTIATING,
-    TaskStatus.LAUNCHED,
-    TaskStatus.RUNNING,
-)
-
-# Workflow-run statuses indicating the server has already decided the run must stop.
-SERVER_STOP_STATUSES: frozenset[str] = frozenset(
-    {
-        WorkflowRunStatus.ERROR,
-        WorkflowRunStatus.TERMINATED,
-        WorkflowRunStatus.STOPPED,
-    }
-)
-
-# Workflow-run statuses indicating a resume signal was received.
-TERMINATING_STATUSES: tuple[str, ...] = (
-    WorkflowRunStatus.COLD_RESUME,
-    WorkflowRunStatus.HOT_RESUME,
-)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -69,17 +43,104 @@ TERMINATING_STATUSES: tuple[str, ...] = (
 
 @dataclass
 class OrchestratorResult:
-    """Result of orchestrator execution."""
+    """Complete result of orchestrator execution.
 
+    Contains all information needed by callers after execution,
+    eliminating the need to access mutable state post-run.
+
+    Attributes:
+        final_status: Final workflow run status (e.g., "D" for DONE).
+        done_count: Number of tasks that completed successfully.
+        failed_count: Number of tasks that failed fatally.
+        total_tasks: Total number of tasks in the workflow.
+        elapsed_time: Total execution time in seconds.
+        num_previously_complete: Number of tasks already complete before this run
+            (useful for resume tracking).
+        task_final_statuses: Mapping of task_id -> final status string.
+            Enables callers to get task results without accessing mutable state.
+        done_task_ids: Immutable set of task IDs that completed successfully.
+        failed_task_ids: Immutable set of task IDs that failed fatally.
+    """
+
+    # Workflow run outcome
     final_status: str
+    elapsed_time: float
+
+    # Task counts
+    total_tasks: int
     done_count: int
     failed_count: int
-    total_tasks: int
-    elapsed_time: float
+    num_previously_complete: int
+
+    # Task-level results
+    task_final_statuses: dict[int, str]
+    done_task_ids: frozenset[int]
+    failed_task_ids: frozenset[int]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Configuration
+# WorkflowRun Configuration
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class WorkflowRunConfig:
+    """Configuration for WorkflowRun execution.
+
+    Consolidates all configuration parameters into a single object
+    for cleaner construction and easier defaults management.
+
+    This is the user-facing configuration class. It maps to OrchestratorConfig
+    internally but provides a simpler interface.
+
+    Attributes:
+        heartbeat_interval: Interval in seconds between heartbeat logs.
+            If None, uses default from JobmonConfig.
+        heartbeat_report_by_buffer: Multiplier for heartbeat report_by time.
+            If None, uses default from JobmonConfig.
+        fail_fast: If True, stop workflow on first task failure.
+        wedged_workflow_sync_interval: Seconds between full state syncs
+            to detect "wedged" workflows.
+        fail_after_n_executions: Test hook - fail after N task executions.
+            Default is effectively disabled (1 billion).
+
+    Example:
+        # Simple usage with defaults
+        config = WorkflowRunConfig()
+
+        # Custom configuration
+        config = WorkflowRunConfig(
+            fail_fast=True,
+            heartbeat_interval=60,
+        )
+
+        # Use with run_workflow()
+        result = run_workflow(workflow, workflow_run_id, distributor.alive, config=config)
+    """
+
+    # Heartbeat settings (None = use JobmonConfig defaults)
+    heartbeat_interval: Optional[int] = None
+    heartbeat_report_by_buffer: Optional[float] = None
+
+    # Flow control
+    fail_fast: bool = False
+    wedged_workflow_sync_interval: int = 600
+
+    # Test hooks (internal use only)
+    fail_after_n_executions: int = 1_000_000_000
+
+    @classmethod
+    def from_defaults(cls) -> "WorkflowRunConfig":
+        """Create config with all defaults from JobmonConfig.
+
+        Returns:
+            WorkflowRunConfig with default values.
+        """
+        return cls()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Orchestrator Configuration (Internal)
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -103,67 +164,6 @@ class OrchestratorConfig:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Context
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-@dataclass
-class WorkflowRunContext:
-    """Context holding all state and references needed by the orchestrator.
-
-    This context provides access to the workflow run state, allowing the
-    orchestrator to work with either SwarmState or WorkflowRun's legacy state.
-    """
-
-    # Identity
-    workflow_id: int
-    workflow_run_id: int
-
-    # Gateway for server communication
-    gateway: "ServerGateway"
-
-    # State references (mutable)
-    tasks: dict[int, "SwarmTask"]
-    arrays: dict[int, "SwarmArray"]
-    task_status_map: dict[str, set["SwarmTask"]]
-    ready_to_run: deque["SwarmTask"]
-
-    # Task resources cache
-    task_resources_cache: dict[int, "TaskResources"]
-
-    # Mutable state values (these will be updated by orchestrator)
-    status: str = WorkflowRunStatus.BOUND
-    max_concurrently_running: int = 10000
-
-    # Sync tracking
-    last_sync: Optional[str] = None
-
-    # Execution counter for test hooks
-    n_executions: int = 0
-
-    # Helper properties
-    def get_active_task_count(self) -> int:
-        """Count of tasks currently in-flight."""
-        return sum(len(self.task_status_map[s]) for s in ACTIVE_TASK_STATUSES)
-
-    def get_done_count(self) -> int:
-        """Count of completed tasks."""
-        return len(self.task_status_map[TaskStatus.DONE])
-
-    def get_failed_count(self) -> int:
-        """Count of failed tasks."""
-        return len(self.task_status_map[TaskStatus.ERROR_FATAL])
-
-    def all_tasks_final(self) -> bool:
-        """Check if all tasks are in terminal state."""
-        return len(self.tasks) == self.get_done_count() + self.get_failed_count()
-
-    def has_pending_work(self) -> bool:
-        """Check if there's in-flight or ready-to-run work."""
-        return self.get_active_task_count() > 0 or len(self.ready_to_run) > 0
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 # Orchestrator
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -184,25 +184,29 @@ class WorkflowRunOrchestrator:
     - Error handling with proper cleanup
 
     Usage:
-        ctx = WorkflowRunContext(...)
-        config = OrchestratorConfig(...)
-        orchestrator = WorkflowRunOrchestrator(ctx, config)
+        orchestrator = WorkflowRunOrchestrator(state, gateway, config)
         result = await orchestrator.run(distributor_alive_callable)
     """
 
     def __init__(
         self,
-        context: WorkflowRunContext,
+        state: SwarmState,
+        gateway: "ServerGateway",
         config: OrchestratorConfig,
     ):
         """Initialize the orchestrator.
 
         Args:
-            context: WorkflowRunContext with all state references.
+            state: SwarmState containing all workflow run state.
+            gateway: ServerGateway for server communication.
             config: OrchestratorConfig with settings.
         """
-        self._ctx = context
+        self._state = state
+        self._gateway = gateway
         self._config = config
+
+        # Test hook counter (tracks completed task executions)
+        self._n_executions = 0
 
         # Services (lazily initialized)
         self._heartbeat: Optional[HeartbeatService] = None
@@ -221,10 +225,10 @@ class WorkflowRunOrchestrator:
         """Lazily initialize the heartbeat service."""
         if self._heartbeat is None:
             self._heartbeat = HeartbeatService(
-                gateway=self._ctx.gateway,
+                gateway=self._gateway,
                 interval=self._config.heartbeat_interval,
                 report_by_buffer=self._config.heartbeat_report_by_buffer,
-                initial_status=self._ctx.status,
+                initial_status=self._state.status,
             )
         return self._heartbeat
 
@@ -232,30 +236,24 @@ class WorkflowRunOrchestrator:
         """Lazily initialize the synchronizer service."""
         if self._synchronizer is None:
             self._synchronizer = Synchronizer(
-                gateway=self._ctx.gateway,
-                task_ids=set(self._ctx.tasks.keys()),
-                array_ids=set(self._ctx.arrays.keys()),
+                gateway=self._gateway,
+                task_ids=set(self._state.tasks.keys()),
+                array_ids=set(self._state.arrays.keys()),
             )
         else:
             # Keep task/array IDs in sync
-            self._synchronizer.update_task_ids(set(self._ctx.tasks.keys()))
-            self._synchronizer.update_array_ids(set(self._ctx.arrays.keys()))
+            self._synchronizer.update_task_ids(set(self._state.tasks.keys()))
+            self._synchronizer.update_array_ids(set(self._state.arrays.keys()))
         return self._synchronizer
 
     def _ensure_scheduler(self) -> Scheduler:
         """Lazily initialize the scheduler service."""
         if self._scheduler is None:
             self._scheduler = Scheduler(
-                gateway=self._ctx.gateway,
-                tasks=self._ctx.tasks,
-                arrays=self._ctx.arrays,
-                task_status_map=self._ctx.task_status_map,
-                ready_to_run=self._ctx.ready_to_run,
-                max_concurrently_running=self._ctx.max_concurrently_running,
+                gateway=self._gateway,
+                state=self._state,
             )
-        else:
-            # Keep max_concurrently_running in sync
-            self._scheduler.max_concurrently_running = self._ctx.max_concurrently_running
+        # Scheduler reads from state directly, no need to sync values
         return self._scheduler
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -290,7 +288,7 @@ class WorkflowRunOrchestrator:
             # Initialize
             logger.info(
                 "Starting workflow run orchestrator",
-                workflow_run_id=self._ctx.workflow_run_id,
+                workflow_run_id=self._state.workflow_run_id,
             )
             await self._initialize()
 
@@ -321,27 +319,31 @@ class WorkflowRunOrchestrator:
     async def _initialize(self) -> None:
         """Set up initial state and transition to RUNNING."""
         logger.info(
-            f"Executing Workflow Run {self._ctx.workflow_run_id}",
-            workflow_run_id=self._ctx.workflow_run_id,
+            f"Executing Workflow Run {self._state.workflow_run_id}",
+            workflow_run_id=self._state.workflow_run_id,
         )
         self._set_initial_fringe()
-        await self._update_status(WorkflowRunStatus.RUNNING)
+        # Only transition to RUNNING if not already running
+        if self._state.status != WorkflowRunStatus.RUNNING:
+            await self._update_status(WorkflowRunStatus.RUNNING)
 
     def _set_initial_fringe(self) -> None:
         """Populate ready_to_run with tasks whose upstreams are satisfied."""
+        state = self._state
+
         # Tasks in ADJUSTING_RESOURCES status need resource adjustment
-        for task in list(self._ctx.task_status_map[TaskStatus.ADJUSTING_RESOURCES]):
+        for task in list(state.get_tasks_by_status(TaskStatus.ADJUSTING_RESOURCES)):
             self._set_adjusted_task_resources(task)
-            self._ctx.ready_to_run.append(task)
+            state.enqueue_task(task)
 
         # Tasks in REGISTERING status with all upstreams done are ready
-        for task in list(self._ctx.task_status_map[TaskStatus.REGISTERING]):
+        for task in list(state.get_tasks_by_status(TaskStatus.REGISTERING)):
             if task.all_upstreams_done:
                 self._set_validated_task_resources(task)
-                self._ctx.ready_to_run.append(task)
+                state.enqueue_task(task)
 
         logger.debug(
-            f"Initial fringe set. ready_to_run_count: {len(self._ctx.ready_to_run)}"
+            f"Initial fringe set. ready_to_run_count: {state.get_ready_to_run_count()}"
         )
 
     # ──────────────────────────────────────────────────────────────────────────
@@ -367,15 +369,15 @@ class WorkflowRunOrchestrator:
             self._sync_heartbeat_status()
 
             # Server already decided this run must stop
-            if self._ctx.status in SERVER_STOP_STATUSES:
+            if self._state.status in SERVER_STOP_STATUSES:
                 logger.warning(
                     "Workflow Run status set to %s by server, stopping scheduler",
-                    self._ctx.status,
+                    self._state.status,
                 )
                 break
 
             # Resume signal received — wait for in-flight tasks to drain
-            if self._ctx.status in TERMINATING_STATUSES:
+            if self._state.status in TERMINATING_STATUSES:
                 if await self._handle_termination():
                     break
                 # Fall through to normal sleep + sync logic below
@@ -391,7 +393,7 @@ class WorkflowRunOrchestrator:
             )
 
             # Do scheduling work if running
-            if self._ctx.status == WorkflowRunStatus.RUNNING:
+            if self._state.status == WorkflowRunStatus.RUNNING:
                 await self._do_scheduling(timeout=time_till_next_sync)
 
             # Sleep if we finished early
@@ -415,17 +417,17 @@ class WorkflowRunOrchestrator:
             if not self._should_continue():
                 # No observable work still queued, but tasks remain outstanding
                 # Force an immediate full sync before deciding to exit
-                if not self._ctx.all_tasks_final():
+                if not self._state.all_tasks_final():
                     await self._do_sync(full_sync=True)
                     time_since_last_full_sync = 0.0
 
     def _should_continue(self) -> bool:
         """Determine if the main loop should continue."""
-        if self._ctx.status in SERVER_STOP_STATUSES:
+        if self._state.status in SERVER_STOP_STATUSES:
             return False
-        if self._ctx.all_tasks_final():
+        if self._state.all_tasks_final():
             return False
-        return self._ctx.has_pending_work()
+        return self._state.has_pending_work()
 
     # ──────────────────────────────────────────────────────────────────────────
     # Constraint Checks
@@ -454,16 +456,16 @@ class WorkflowRunOrchestrator:
 
     def _check_fail_fast(self) -> None:
         """Check fail-fast condition."""
-        if self._config.fail_fast and self._ctx.get_failed_count() > 0:
+        if self._config.fail_fast and self._state.get_failed_count() > 0:
             logger.info("Failing after first failure, as requested")
             raise RuntimeError("Fail-fast: stopping after first task failure")
 
     def _check_fail_after_n_executions(self) -> None:
         """Test hook: fail after N task executions."""
         if self._config.fail_after_n_executions is not None:
-            if self._ctx.n_executions >= self._config.fail_after_n_executions:
+            if self._n_executions >= self._config.fail_after_n_executions:
                 raise WorkflowTestError(
-                    f"WorkflowRun asked to fail after {self._ctx.n_executions} "
+                    f"WorkflowRun asked to fail after {self._n_executions} "
                     "executions. Failing now"
                 )
 
@@ -476,13 +478,13 @@ class WorkflowRunOrchestrator:
         """
         if self._heartbeat is not None:
             heartbeat_status = self._heartbeat.current_status
-            if heartbeat_status != self._ctx.status:
+            if heartbeat_status != self._state.status:
                 logger.info(
                     "Heartbeat detected status change",
-                    old_status=self._ctx.status,
+                    old_status=self._state.status,
                     new_status=heartbeat_status,
                 )
-                self._ctx.status = heartbeat_status
+                self._state.status = heartbeat_status
 
     # ──────────────────────────────────────────────────────────────────────────
     # Scheduling
@@ -493,9 +495,11 @@ class WorkflowRunOrchestrator:
         scheduler = self._ensure_scheduler()
         update = await scheduler.tick(timeout=timeout)
 
-        # Apply status updates and propagate completions
+        # Apply status updates atomically via SwarmState
         if update.task_statuses:
-            self._apply_status_updates(update.task_statuses)
+            changed_tasks = self._state.apply_update(update)
+            if changed_tasks:
+                self._process_changed_tasks(changed_tasks)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Synchronization
@@ -506,86 +510,58 @@ class WorkflowRunOrchestrator:
         synchronizer = self._ensure_synchronizer()
         update = await synchronizer.tick(
             full_sync=full_sync,
-            last_sync=self._ctx.last_sync,
+            last_sync=self._state.last_sync,
         )
 
-        # Apply sync updates
-        if update.sync_time is not None:
-            self._ctx.last_sync = update.sync_time
+        # Apply all updates atomically via SwarmState
+        changed_tasks = self._state.apply_update(update)
 
-        if update.max_concurrently_running is not None:
-            self._ctx.max_concurrently_running = update.max_concurrently_running
-            # Keep scheduler in sync
-            if self._scheduler is not None:
-                self._scheduler.max_concurrently_running = update.max_concurrently_running
-
-        for array_id, limit in update.array_limits.items():
-            if array_id in self._ctx.arrays:
-                self._ctx.arrays[array_id].max_concurrently_running = limit
-
-        # Apply task status updates and propagate
-        if update.task_statuses:
-            self._apply_status_updates(update.task_statuses)
+        # Process changed tasks (propagate completions, set resources)
+        if changed_tasks:
+            self._process_changed_tasks(changed_tasks)
 
         logger.debug(
-            f"State synchronized. ready_to_run_count: {len(self._ctx.ready_to_run)}, "
-            f"active_tasks: {self._ctx.get_active_task_count()}, "
+            f"State synchronized. ready_to_run_count: {self._state.get_ready_to_run_count()}, "
+            f"active_tasks: {self._state.get_active_task_count()}, "
             f"full_sync: {full_sync}"
         )
 
-    def _apply_status_updates(self, task_statuses: dict[int, str]) -> None:
-        """Apply task status updates and propagate downstream readiness.
+    def _process_changed_tasks(self, changed_tasks: set["SwarmTask"]) -> None:
+        """Process tasks whose status changed.
 
-        This handles:
-        - Moving tasks between status buckets
-        - Propagating completions to downstream tasks
+        This handles post-update operations that can't be done in SwarmState:
+        - Propagating completions to downstream tasks and enqueuing newly-ready
         - Setting validated/adjusted resources for newly-ready tasks
-        - Enqueuing newly-ready tasks
+        - Updating test hook counters
+        - Logging progress
+
+        Note: Status bucket updates are handled by SwarmState.apply_update()
         """
-        changed_tasks: set["SwarmTask"] = set()
-
-        # Update task statuses
-        for task_id, new_status in task_statuses.items():
-            task = self._ctx.tasks.get(task_id)
-            if task is not None and task.status != new_status:
-                # Remove from old bucket
-                self._ctx.task_status_map[task.status].discard(task)
-                # Update and add to new bucket
-                task.status = new_status
-                self._ctx.task_status_map[new_status].add(task)
-                changed_tasks.add(task)
-
-        # Process changed tasks
-        self._refresh_task_status_map(changed_tasks)
-
-    def _refresh_task_status_map(self, updated_tasks: set["SwarmTask"]) -> None:
-        """Re-bucket tasks whose statuses changed and propagate downstream readiness."""
         num_newly_completed = 0
         num_newly_failed = 0
 
-        for task in updated_tasks:
+        for task in changed_tasks:
             if task.status == TaskStatus.DONE:
                 num_newly_completed += 1
-                self._ctx.n_executions += 1  # Test hook counter
+                self._n_executions += 1  # Test hook counter
 
-                # Check if there are downstreams that can run
-                for downstream in task.downstream_swarm_tasks:
-                    downstream.num_upstreams_done += 1
-                    if downstream.all_upstreams_done:
-                        self._set_validated_task_resources(downstream)
-                        self._ctx.ready_to_run.append(downstream)
+                # Propagate completion to downstream tasks
+                newly_ready = self._state.propagate_completions({task})
+                for downstream in newly_ready:
+                    self._set_validated_task_resources(downstream)
+                    self._state.enqueue_task(downstream)
 
             elif task.status == TaskStatus.ERROR_FATAL:
                 num_newly_failed += 1
 
             elif task.status == TaskStatus.REGISTERING and task.all_upstreams_done:
                 self._set_validated_task_resources(task)
-                self._ctx.ready_to_run.append(task)
+                self._state.enqueue_task(task)
 
             elif task.status == TaskStatus.ADJUSTING_RESOURCES:
                 self._set_adjusted_task_resources(task)
                 # Put at front of queue since we already tried it once
-                self._ctx.ready_to_run.appendleft(task)
+                self._state.enqueue_task(task, front=True)
 
             else:
                 logger.debug(
@@ -595,9 +571,9 @@ class WorkflowRunOrchestrator:
 
         # Log progress
         if num_newly_completed > 0:
-            total_tasks = len(self._ctx.tasks)
-            done_count = self._ctx.get_done_count()
-            percent_done = round((done_count / total_tasks) * 100, 2) if total_tasks > 0 else 0
+            total_tasks = len(self._state.tasks)
+            done_count = self._state.get_done_count()
+            percent_done = self._state.get_percent_done()
             logger.info(
                 f"Workflow {percent_done}% complete ({done_count}/{total_tasks} tasks)",
                 telemetry_newly_completed=num_newly_completed,
@@ -636,15 +612,11 @@ class WorkflowRunOrchestrator:
         # Coerce resources to valid values
         validated_task_resources = task_resources.coerce_resources()
 
-        # Check cache
+        # Use SwarmState cache
         validated_resource_hash = hash(validated_task_resources)
-        cached = self._ctx.task_resources_cache.get(validated_resource_hash)
-        if cached is not None:
-            validated_task_resources = cached
-        else:
-            self._ctx.task_resources_cache[validated_resource_hash] = validated_task_resources
-
-        task.current_task_resources = validated_task_resources
+        task.current_task_resources = self._state.cache_resources(
+            validated_resource_hash, validated_task_resources
+        )
 
     def _set_adjusted_task_resources(self, task: "SwarmTask") -> None:
         """Adjust the swarm task's resources after a failure."""
@@ -653,15 +625,11 @@ class WorkflowRunOrchestrator:
             fallback_queues=task.fallback_queues,
         )
 
-        # Check cache
+        # Use SwarmState cache
         resource_hash = hash(task_resources)
-        cached = self._ctx.task_resources_cache.get(resource_hash)
-        if cached is not None:
-            task_resources = cached
-        else:
-            self._ctx.task_resources_cache[resource_hash] = task_resources
-
-        task.current_task_resources = task_resources
+        task.current_task_resources = self._state.cache_resources(
+            resource_hash, task_resources
+        )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Termination Handling
@@ -678,11 +646,11 @@ class WorkflowRunOrchestrator:
             TaskStatus.LAUNCHED,
             TaskStatus.RUNNING,
         )
-        if any(self._ctx.task_status_map[s] for s in wait_states):
+        if any(self._state._task_status_map[s] for s in wait_states):
             logger.warning(
-                f"Workflow Run set to {self._ctx.status}. Waiting for tasks to stop"
+                f"Workflow Run set to {self._state.status}. Waiting for tasks to stop"
             )
-            await self._ctx.gateway.terminate_task_instances()
+            await self._gateway.terminate_task_instances()
             return False
         return True
 
@@ -692,16 +660,16 @@ class WorkflowRunOrchestrator:
 
     async def _update_status(self, status: str) -> None:
         """Update workflow run status on server and locally."""
-        response = await self._ctx.gateway.update_status(status)
+        response = await self._gateway.update_status(status)
         new_status = response.status
 
         if new_status != status:
             raise TransitionError(
-                f"Cannot transition WFR {self._ctx.workflow_run_id} from current status "
-                f"{self._ctx.status} to {status}."
+                f"Cannot transition WFR {self._state.workflow_run_id} from current status "
+                f"{self._state.status} to {status}."
             )
 
-        self._ctx.status = new_status
+        self._state.status = new_status
 
         # Keep heartbeat service in sync
         if self._heartbeat is not None:
@@ -712,32 +680,52 @@ class WorkflowRunOrchestrator:
     # ──────────────────────────────────────────────────────────────────────────
 
     async def _finalize(self, start_time: float) -> OrchestratorResult:
-        """Determine final status and update server."""
+        """Determine final status and update server.
+
+        Returns:
+            OrchestratorResult with complete execution results including
+            task-level statuses for post-run queries.
+        """
         elapsed = time.perf_counter() - start_time
-        done_count = self._ctx.get_done_count()
-        failed_count = self._ctx.get_failed_count()
-        total_tasks = len(self._ctx.tasks)
+        done_count = self._state.get_done_count()
+        failed_count = self._state.get_failed_count()
+        total_tasks = len(self._state.tasks)
 
         # Determine final status
         if total_tasks == done_count:
             logger.info("All tasks are done")
             await self._update_status(WorkflowRunStatus.DONE)
-        elif self._ctx.status in TERMINATING_STATUSES:
+        elif self._state.status in TERMINATING_STATUSES:
             await self._update_status(WorkflowRunStatus.TERMINATED)
-        elif self._ctx.status in SERVER_STOP_STATUSES:
+        elif self._state.status in SERVER_STOP_STATUSES:
             # Server already set a terminal status - don't try to transition
             logger.info(
-                f"Workflow run exited with server-set status: {self._ctx.status}"
+                f"Workflow run exited with server-set status: {self._state.status}"
             )
         else:
             await self._update_status(WorkflowRunStatus.ERROR)
 
+        # Build task-level results
+        task_final_statuses = {
+            task_id: task.status for task_id, task in self._state.tasks.items()
+        }
+        done_task_ids = frozenset(
+            task.task_id for task in self._state.get_done_tasks()
+        )
+        failed_task_ids = frozenset(
+            task.task_id for task in self._state.get_failed_tasks()
+        )
+
         return OrchestratorResult(
-            final_status=self._ctx.status,
+            final_status=self._state.status,
+            elapsed_time=elapsed,
+            total_tasks=total_tasks,
             done_count=done_count,
             failed_count=failed_count,
-            total_tasks=total_tasks,
-            elapsed_time=elapsed,
+            num_previously_complete=self._state.num_previously_complete,
+            task_final_statuses=task_final_statuses,
+            done_task_ids=done_task_ids,
+            failed_task_ids=failed_task_ids,
         )
 
     async def _handle_error(self) -> None:

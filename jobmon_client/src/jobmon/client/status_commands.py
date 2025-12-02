@@ -8,7 +8,7 @@ import pandas as pd
 import structlog
 
 from jobmon.client.logging import configure_client_logging
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.swarm import resume_workflow_run
 from jobmon.client.workflow import DistributorContext
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import (
@@ -697,28 +697,28 @@ def resume_workflow_from_id(
     factory.reset_task_statuses(reset_if_running=reset_if_running)
     # Create the client workflow run
     new_wfr = factory.create_workflow_run()
+    # Transition to BOUND state before running (all metadata is already bound)
+    new_wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # Create swarm
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=new_wfr.workflow_run_id, status=new_wfr.status
-    )
-    swarm.from_workflow_id(workflow_id)
-
+    # Run workflow using factory function
     with DistributorContext(
         workflow_run_id=new_wfr.workflow_run_id,
         cluster_name=cluster_name,
         timeout=timeout,
     ) as distributor:
-        swarm.run(
-            distributor_alive_callable=distributor.alive,
-            seconds_until_timeout=seconds_until_timeout,
+        result = resume_workflow_run(
+            workflow_id=workflow_id,
+            workflow_run_id=new_wfr.workflow_run_id,
+            distributor_alive=distributor.alive,
+            status=new_wfr.status,
+            timeout=seconds_until_timeout,
         )
 
-    # Check on the swarm status - raise an error if != "D"
-    if swarm.status == WorkflowRunStatus.DONE:
+    # Check on the result status - raise an error if != "D"
+    if result.final_status == WorkflowRunStatus.DONE:
         print(f"Workflow {workflow_id} has successfully resumed to completion.")
     else:
         raise WorkflowRunStateError(
-            f"Workflow run {swarm.workflow_run_id}, associated with workflow {workflow_id}",
-            f"failed with status {swarm.status}",
+            f"Workflow run {new_wfr.workflow_run_id}, associated with workflow {workflow_id}",
+            f"failed with status {result.final_status}",
         )

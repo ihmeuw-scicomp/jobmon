@@ -19,7 +19,7 @@ import structlog
 
 from jobmon.client.array import Array
 from jobmon.client.dag import Dag
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.swarm import run_workflow, WorkflowRunConfig
 from jobmon.client.task import Task
 from jobmon.client.task_resources import TaskResources
 from jobmon.client.tool_version import ToolVersion
@@ -620,43 +620,43 @@ class Workflow(object):
         with DistributorContext(
             cluster_name, wfr.workflow_run_id, distributor_startup_timeout
         ) as distributor:
-            # set up swarm and initial DAG
-            swarm = SwarmWorkflowRun(
-                workflow_run_id=wfr.workflow_run_id,
-                fail_after_n_executions=self._fail_after_n_executions,
-                requester=self.requester,
+            # Run workflow using factory function
+            config = WorkflowRunConfig(
                 fail_fast=fail_fast,
-                status=wfr.status,
+                fail_after_n_executions=self._fail_after_n_executions,
             )
-            swarm.from_workflow(self)
-            self._num_previously_completed = swarm.num_previously_complete
+            result = run_workflow(
+                workflow=self,
+                workflow_run_id=wfr.workflow_run_id,
+                distributor_alive=distributor.alive,
+                status=wfr.status,
+                config=config,
+                timeout=seconds_until_timeout,
+                requester=self.requester,
+            )
 
-            try:
-                swarm.run(distributor.alive, seconds_until_timeout)
-            except Exception as e:
-                logger.warning(f"Error running workflow: {e}")
-            finally:
-                # figure out doneness
-                num_new_completed = (
-                    len(swarm.done_tasks) - swarm.num_previously_complete
+            # Extract results
+            self._num_previously_completed = result.num_previously_complete
+            num_new_completed = result.done_count - result.num_previously_complete
+
+            # Update workflow tasks with final status from result
+            for task in self.tasks.values():
+                task.final_status = result.task_final_statuses[task.task_id]
+
+            # Log completion
+            if result.final_status != WorkflowRunStatus.DONE:
+                logger.info(
+                    f"WorkflowRun execution ended, num failed {result.failed_count}"
                 )
-                if swarm.status != WorkflowRunStatus.DONE:
-                    logger.info(
-                        f"WorkflowRun execution ended, num failed {len(swarm.failed_tasks)}"
-                    )
-                else:
-                    logger.info(
-                        f"WorkflowRun execute finished successfully, {num_new_completed} tasks"
-                    )
-
-                # update workflow tasks with final status
-                for task in self.tasks.values():
-                    task.final_status = swarm.tasks[task.task_id].status
-                self._num_newly_completed = num_new_completed
+            else:
+                logger.info(
+                    f"WorkflowRun execute finished successfully, {num_new_completed} tasks"
+                )
+            self._num_newly_completed = num_new_completed
 
         self.last_workflow_run_id = wfr.workflow_run_id
 
-        return swarm.status
+        return result.final_status
 
     def _configure_component_logging(self) -> None:
         """Configure component logging for client workflow operations."""

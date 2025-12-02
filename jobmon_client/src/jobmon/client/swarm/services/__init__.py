@@ -8,9 +8,9 @@ of workflow run execution:
 - Scheduler: Task batching and queueing
 """
 
-from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
-from jobmon.client.swarm.workflow_run_impl.services.scheduler import Scheduler
-from jobmon.client.swarm.workflow_run_impl.services.synchronizer import Synchronizer
+from jobmon.client.swarm.services.heartbeat import HeartbeatService
+from jobmon.client.swarm.services.scheduler import Scheduler
+from jobmon.client.swarm.services.synchronizer import Synchronizer
 
 __all__: list[str] = [
     "HeartbeatService",

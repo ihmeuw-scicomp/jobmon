@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from jobmon.client.swarm.workflow_run_impl.gateway import TaskStatusUpdatesResponse
-from jobmon.client.swarm.workflow_run_impl.services.synchronizer import Synchronizer
-from jobmon.client.swarm.workflow_run_impl.state import StateUpdate
+from jobmon.client.swarm.gateway import TaskStatusUpdatesResponse
+from jobmon.client.swarm.services.synchronizer import Synchronizer
+from jobmon.client.swarm.state import StateUpdate
 from jobmon.core.constants import TaskStatus
 
 

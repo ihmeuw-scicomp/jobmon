@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from jobmon.client.swarm.workflow_run_impl.gateway import HeartbeatResponse
-from jobmon.client.swarm.workflow_run_impl.services.heartbeat import HeartbeatService
-from jobmon.client.swarm.workflow_run_impl.state import StateUpdate
+from jobmon.client.swarm.gateway import HeartbeatResponse
+from jobmon.client.swarm.services.heartbeat import HeartbeatService
+from jobmon.client.swarm.state import StateUpdate
 
 
 # ──────────────────────────────────────────────────────────────────────────────

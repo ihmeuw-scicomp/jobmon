@@ -6,13 +6,14 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from jobmon.client.api import Tool
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.server.web._compat import subtract_time
 from jobmon.server.web.models import load_model
+
+from tests.pytest.swarm.swarm_test_utils import create_test_context, prepare_and_queue_tasks
 
 load_model()
 
@@ -56,13 +57,10 @@ def test_set_status_for_triaging(tool, db_engine, task_template):
     wfr = factory.create_workflow_run()
 
     # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id,
-        requester=workflow.requester,
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     distributor = MultiprocessDistributor("multiprocess", 5)
     distributor.start()
@@ -101,8 +99,18 @@ def test_set_status_for_triaging(tool, db_engine, task_template):
         )
         session.execute(running_stmt)
         session.commit()
-    # 2. call swarm._set_status_for_triaging_async()
-    asyncio.run(swarm._set_status_for_triaging_async())
+
+    # 2. call gateway.request_triage()
+    async def request_triage():
+        import aiohttp
+        session = aiohttp.ClientSession()
+        gateway.set_session(session)
+        try:
+            await gateway.request_triage()
+        finally:
+            await session.close()
+
+    asyncio.run(request_triage())
 
     # check the jobs to be Triaging
     with Session(bind=db_engine) as session:
@@ -156,13 +164,10 @@ def test_triaging_to_specific_error(
     wfr = factory.create_workflow_run()
 
     # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id,
-        requester=workflow.requester,
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     distributor = MultiprocessDistributor("multiprocess", 5)
     distributor.start()

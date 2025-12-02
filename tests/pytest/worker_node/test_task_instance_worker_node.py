@@ -8,7 +8,6 @@ from unittest.mock import patch
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.cluster import Cluster
 from jobmon.core.configuration import JobmonConfig
@@ -21,6 +20,12 @@ from jobmon.server.web.models import load_model
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
 from jobmon.worker_node.worker_node_task_instance import WorkerNodeTaskInstance
+
+from tests.pytest.swarm.swarm_test_utils import (
+    create_test_context,
+    prepare_and_queue_tasks,
+    synchronize_state,
+)
 
 load_model()
 
@@ -51,8 +56,7 @@ class DoNothingArrayDistributor(MultiprocessDistributor):
 
 
 def test_task_instance(db_engine, tool):
-    """should try to log a report by date after being set to the U or K state
-    and fail"""
+    """Test that worker node can run a task instance to completion."""
 
     workflow = tool.create_workflow(name="test_ti_kill_self_state")
     task_a = tool.active_task_templates["simple_template"].create_task(arg="echo 1")
@@ -63,13 +67,11 @@ def test_task_instance(db_engine, tool):
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    # create task instances using new utilities
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # test that we can launch via the normal job pathway
     distributor_service = DistributorService(
@@ -116,13 +118,11 @@ def test_array_task_instance(
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    # create task instances using new utilities
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # test that we can launch via the normal job pathway
     distributor_service = DistributorService(
@@ -173,13 +173,11 @@ def test_ti_kill_self_state(db_engine, tool):
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    # create task instances using new utilities
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # test that we can launch via the normal job pathway
     distributor_service = DistributorService(
@@ -266,14 +264,9 @@ def test_limited_error_log(tool, db_engine):
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id,
-        requester=wf.requester,
-    )
-    swarm.from_workflow(wf)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    # create task instances using new utilities
+    state, gateway, orchestrator = create_test_context(wf, wfr.workflow_run_id, wf.requester)
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     distributor_service = DistributorService(
         SequentialDistributor("sequential"), requester=wf.requester, raise_on_error=True
@@ -351,14 +344,9 @@ def test_worker_node_add_attributes(tool, db_engine):
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id,
-        requester=wf.requester,
-    )
-    swarm.from_workflow(wf)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    # create task instances using new utilities
+    state, gateway, orchestrator = create_test_context(wf, wfr.workflow_run_id, wf.requester)
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     cluster = Cluster.get_cluster("multiprocess")
     cluster_interface = cluster.get_distributor()
@@ -372,9 +360,13 @@ def test_worker_node_add_attributes(tool, db_engine):
     distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
     distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
 
-    while swarm.active_tasks:
+    # Wait for tasks to complete by polling state
+    max_wait = 60
+    waited = 0
+    while state.get_active_task_count() > 0 and waited < max_wait:
         time.sleep(1)
-        swarm.synchronize_state()
+        waited += 1
+        synchronize_state(state, gateway, orchestrator, full_sync=True)
     cluster_interface.stop()
 
     # check db

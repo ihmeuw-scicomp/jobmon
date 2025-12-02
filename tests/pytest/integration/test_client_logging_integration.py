@@ -180,7 +180,7 @@ root:
             with patch.object(workflow, "bind"), patch.object(
                 workflow, "_bind_tasks"
             ), patch.object(workflow, "validate"), patch(
-                "jobmon.client.workflow.SwarmWorkflowRun"
+                "jobmon.client.workflow.run_workflow"
             ), patch(
                 "jobmon.client.workflow.WorkflowRunFactory"
             ), patch(

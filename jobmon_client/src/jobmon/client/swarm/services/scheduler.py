@@ -7,18 +7,16 @@ with compatible resources and queueing them to the server.
 from __future__ import annotations
 
 import time
-from collections import deque
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Generator, Optional
+from typing import TYPE_CHECKING, Generator
 
 import structlog
 
-from jobmon.client.swarm.workflow_run_impl.state import StateUpdate
-from jobmon.core.constants import TaskStatus
+from jobmon.client.swarm.state import StateUpdate, SwarmState
 
 if TYPE_CHECKING:
-    from jobmon.client.swarm.swarm_task import SwarmTask
-    from jobmon.client.swarm.workflow_run_impl.gateway import ServerGateway
+    from jobmon.client.swarm.task import SwarmTask
+    from jobmon.client.swarm.gateway import ServerGateway
 
 logger = structlog.get_logger(__name__)
 
@@ -42,14 +40,7 @@ class Scheduler:
     - Returning state updates from queue responses
 
     Usage:
-        scheduler = Scheduler(
-            gateway=gateway,
-            tasks=tasks,
-            arrays=arrays,
-            task_status_map=task_status_map,
-            ready_to_run=ready_to_run,
-            max_concurrently_running=100,
-        )
+        scheduler = Scheduler(gateway=gateway, state=state)
 
         # Single scheduling tick
         update = await scheduler.tick(timeout=30.0)
@@ -62,66 +53,26 @@ class Scheduler:
     def __init__(
         self,
         gateway: "ServerGateway",
-        tasks: dict[int, "SwarmTask"],
-        arrays: dict[int, "SwarmArray"],
-        task_status_map: dict[str, set["SwarmTask"]],
-        ready_to_run: deque["SwarmTask"],
-        max_concurrently_running: int,
+        state: SwarmState,
     ):
         """Initialize the scheduler.
 
         Args:
             gateway: ServerGateway for server communication.
-            tasks: Dictionary of task_id -> SwarmTask.
-            arrays: Dictionary of array_id -> SwarmArray.
-            task_status_map: Status -> set of tasks mapping.
-            ready_to_run: Queue of tasks ready to be scheduled.
-            max_concurrently_running: Workflow-level concurrency limit.
+            state: SwarmState containing all task/array state (single source of truth).
         """
         self._gateway = gateway
-        self._tasks = tasks
-        self._arrays = arrays
-        self._task_status_map = task_status_map
-        self._ready_to_run = ready_to_run
-        self._max_concurrently_running = max_concurrently_running
+        self._state = state
 
     @property
     def max_concurrently_running(self) -> int:
-        """Workflow-level concurrency limit."""
-        return self._max_concurrently_running
+        """Workflow-level concurrency limit (delegated to state)."""
+        return self._state.max_concurrently_running
 
     @max_concurrently_running.setter
     def max_concurrently_running(self, value: int) -> None:
-        """Update workflow-level concurrency limit."""
-        self._max_concurrently_running = value
-
-    def get_active_task_count(self) -> int:
-        """Count of tasks currently in-flight."""
-        active_statuses = (
-            TaskStatus.QUEUED,
-            TaskStatus.INSTANTIATING,
-            TaskStatus.LAUNCHED,
-            TaskStatus.RUNNING,
-        )
-        return sum(len(self._task_status_map[s]) for s in active_statuses)
-
-    def get_available_capacity(self) -> int:
-        """How many more tasks can be queued at workflow level."""
-        return self._max_concurrently_running - self.get_active_task_count()
-
-    def get_array_capacity(self, array_id: int) -> int:
-        """How many more tasks can be queued for this array."""
-        array = self._arrays[array_id]
-        active_statuses = (
-            TaskStatus.QUEUED,
-            TaskStatus.INSTANTIATING,
-            TaskStatus.LAUNCHED,
-            TaskStatus.RUNNING,
-        )
-        active_in_array = sum(
-            len(self._task_status_map[s] & array.tasks) for s in active_statuses
-        )
-        return array.max_concurrently_running - active_in_array
+        """Update workflow-level concurrency limit (delegated to state)."""
+        self._state.max_concurrently_running = value
 
     async def tick(self, timeout: float = -1) -> StateUpdate:
         """One scheduling iteration: batch tasks, queue them, return state changes.
@@ -133,7 +84,7 @@ class Scheduler:
             StateUpdate containing task status changes from queued batches.
         """
         combined = StateUpdate.empty()
-        start_time = time.time()
+        start_time = time.perf_counter()
         batches_queued = 0
 
         for batch in self._generate_batches():
@@ -144,10 +95,10 @@ class Scheduler:
             batches_queued += 1
 
             # Check timeout
-            if timeout > 0 and (time.time() - start_time) >= timeout:
+            if timeout > 0 and (time.perf_counter() - start_time) >= timeout:
                 logger.debug(
                     "Scheduler tick timeout reached",
-                    elapsed=time.time() - start_time,
+                    elapsed=time.perf_counter() - start_time,
                     timeout=timeout,
                     batches_queued=batches_queued,
                 )
@@ -156,8 +107,8 @@ class Scheduler:
         logger.debug(
             "Scheduler tick complete",
             batches_queued=batches_queued,
-            elapsed=time.time() - start_time,
-            ready_to_run_remaining=len(self._ready_to_run),
+            elapsed=time.perf_counter() - start_time,
+            ready_to_run_remaining=self._state.get_ready_to_run_count(),
         )
 
         return combined
@@ -170,28 +121,21 @@ class Scheduler:
         - Have the same task resources (for efficient queueing)
         - Respect workflow and array concurrency limits
         """
-        # Compute current capacities
-        active_tasks: set["SwarmTask"] = set()
-        active_statuses = (
-            TaskStatus.QUEUED,
-            TaskStatus.INSTANTIATING,
-            TaskStatus.LAUNCHED,
-            TaskStatus.RUNNING,
-        )
-        for status in active_statuses:
-            active_tasks |= self._task_status_map[status]
-
-        workflow_capacity = self._max_concurrently_running - len(active_tasks)
+        # Use SwarmState to compute capacities
+        workflow_capacity = self._state.get_available_capacity()
         array_capacities: dict[int, int] = {
-            aid: arr.max_concurrently_running - len(active_tasks & arr.tasks)
-            for aid, arr in self._arrays.items()
+            aid: self._state.get_array_capacity(aid)
+            for aid in self._state.arrays
         }
 
         unscheduled: list["SwarmTask"] = []
 
         try:
-            while self._ready_to_run and workflow_capacity > 0:
-                next_task = self._ready_to_run.popleft()
+            while self._state.ready_to_run and workflow_capacity > 0:
+                next_task = self._state.dequeue_task()
+                if next_task is None:
+                    break
+
                 array_id = next_task.array_id
                 task_resources = next_task.current_task_resources
 
@@ -206,8 +150,10 @@ class Scheduler:
                 array_capacities[array_id] -= 1
 
                 # Try to add compatible tasks to batch
-                for _ in range(len(self._ready_to_run)):
-                    candidate = self._ready_to_run.popleft()
+                for _ in range(self._state.get_ready_to_run_count()):
+                    candidate = self._state.dequeue_task()
+                    if candidate is None:
+                        break
 
                     # Check if this candidate can be added to the current batch
                     can_add = (
@@ -224,9 +170,10 @@ class Scheduler:
                         array_capacities[candidate.array_id] -= 1
                     else:
                         # Put it back in the queue
-                        self._ready_to_run.append(candidate)
+                        self._state.enqueue_task(candidate)
 
-                array_name = self._arrays[array_id].array_name if array_id in self._arrays else None
+                array = self._state.arrays.get(array_id)
+                array_name = array.array_name if array else None
                 logger.debug(
                     f"Created batch of {len(current_batch)} tasks",
                     array_id=array_id,
@@ -238,7 +185,8 @@ class Scheduler:
 
         finally:
             # Put unscheduled tasks back at the front of the queue
-            self._ready_to_run.extendleft(unscheduled)
+            for task in reversed(unscheduled):
+                self._state.enqueue_task(task, front=True)
 
     async def _queue_batch(self, tasks: list["SwarmTask"]) -> BatchResult:
         """Queue a batch of tasks to the server.
@@ -254,7 +202,8 @@ class Scheduler:
 
         # Ensure resources are bound (has an ID from the server)
         if not task_resources.is_bound:
-            task_resources.bind()
+            session = await self._gateway._ensure_session()
+            await task_resources.bind_async(session)
 
         logger.debug(
             f"Queueing {len(tasks)} tasks to server",
@@ -284,7 +233,5 @@ class Scheduler:
 
     def has_work(self) -> bool:
         """Check if there are tasks ready to run with available capacity."""
-        if not self._ready_to_run:
-            return False
-        return self.get_available_capacity() > 0
+        return self._state.get_ready_to_run_count() > 0 and self._state.get_available_capacity() > 0
 

@@ -91,3 +91,4 @@ class SwarmTask(object):
     def __lt__(self, other: SwarmTask) -> bool:
         """Check if one hash is less than the has of another Task."""
         return hash(self) < hash(other)
+
