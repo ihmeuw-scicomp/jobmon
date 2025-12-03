@@ -50,36 +50,31 @@ def template_constructor(loader: TemplateLoader, node: ScalarNode) -> Any:
 
 
 def load_all_templates(config_root: str) -> Dict[str, Any]:
-    """Load all template files from the templates directory."""
+    """Load all template files from the templates directory.
+
+    Note: Core templates have been removed in favor of programmatic generation.
+    This function now primarily supports user-provided templates via !include.
+    """
     templates = {}
 
-    # Try to load templates from config_root first, fall back to core templates
+    # Try to load templates from config_root first
     if config_root:
         templates_dir = os.path.join(config_root, "templates")
-    else:
-        templates_dir = None
+        if os.path.exists(templates_dir):
+            # Load all template files from user's templates directory
+            template_files = ["formatters.yaml", "handlers.yaml"]
 
-    # If config_root templates directory doesn't exist, fall back to core templates
-    if not templates_dir or not os.path.exists(templates_dir):
-        templates_dir = get_core_templates_path()
-
-    if not os.path.exists(templates_dir):
-        return {}
-
-    # Load all template files
-    template_files = ["formatters.yaml", "handlers.yaml"]
-
-    for template_file in template_files:
-        template_path = os.path.join(templates_dir, template_file)
-        if os.path.exists(template_path):
-            try:
-                with open(template_path, "r") as f:
-                    template_data = yaml.load(f, Loader=TemplateLoader)
-                    if template_data:
-                        templates.update(template_data)
-            except Exception:
-                # Skip malformed templates, but could log for debugging
-                pass
+            for template_file in template_files:
+                template_path = os.path.join(templates_dir, template_file)
+                if os.path.exists(template_path):
+                    try:
+                        with open(template_path, "r") as f:
+                            template_data = yaml.load(f, Loader=TemplateLoader)
+                            if template_data:
+                                templates.update(template_data)
+                    except Exception:
+                        # Skip malformed templates
+                        pass
 
     return templates
 
@@ -116,16 +111,3 @@ def load_logconfig_with_templates(config_path: str) -> Dict[str, Any]:
 def load_yaml_with_templates(file_path: str) -> Dict[str, Any]:
     """Convenience function to load any YAML file with template support."""
     return load_logconfig_with_templates(file_path)
-
-
-def get_core_templates_path() -> str:
-    """Get the absolute path to core templates using package resources."""
-    try:
-        import jobmon.core.config.templates
-
-        return os.path.dirname(jobmon.core.config.templates.__file__)
-    except ImportError as e:
-        raise ImportError(
-            f"Failed to import jobmon.core.config.templates module. "
-            f"This suggests a broken jobmon installation: {e}"
-        )

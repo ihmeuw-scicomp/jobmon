@@ -1,14 +1,15 @@
 """Jobmon server web configuration package.
 
-This package contains server-specific logging configurations that
-use shared templates from jobmon.core.config.templates.
+This package contains server-specific configuration for the jobmon web server.
 
-Server configs:
-  - logconfig_server.yaml: Server logging with structlog (OTLP disabled)
-  - server_otlp_example.yaml: Example server OTLP configuration
+Logging Configuration:
+Server logging is now configured programmatically via generate_component_logconfig()
+in jobmon.core.config.logconfig_utils. Users can override defaults via:
+1. File override: Set logging.server_logconfig_file in jobmonconfig.yaml
+2. Section override: Set logging.server.* sections in jobmonconfig.yaml
 
-These configurations are automatically selected by the server's
-configure_logging() function based on the otlp.web_enabled setting.
+The configure_server_logging() function in jobmon.server.web.logging handles
+the logging initialization with support for user overrides.
 """
 
 # Re-export functions from the parent config module for backward compatibility

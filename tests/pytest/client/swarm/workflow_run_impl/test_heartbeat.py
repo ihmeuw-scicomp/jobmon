@@ -380,39 +380,54 @@ class TestHeartbeatServiceRunBackground:
 
     @pytest.mark.asyncio
     async def test_run_background_continues_on_heartbeat_failure(self, mock_gateway):
-        """Test run_background continues running if heartbeat fails."""
+        """Test run_background continues running if heartbeat fails.
+
+        This test verifies that the heartbeat loop continues after a failure.
+        We use polling instead of fixed sleeps to be resilient to CI timing variability.
+        """
         service = HeartbeatService(
             gateway=mock_gateway,
-            interval=0.2,  # 200ms, tick_interval = 0.1s
+            interval=0.1,  # 100ms interval
             report_by_buffer=1.5,
             initial_status="R",
         )
 
-        # First call fails, subsequent calls succeed
-        mock_gateway.log_heartbeat = AsyncMock(
-            side_effect=[
-                Exception("Network error"),
-                HeartbeatResponse(status="R"),
-                HeartbeatResponse(status="R"),
-                HeartbeatResponse(status="R"),
-            ]
-        )
+        # Track call count manually
+        call_count = 0
+        first_call_failed = False
+
+        async def mock_heartbeat(*args, **kwargs):
+            nonlocal call_count, first_call_failed
+            call_count += 1
+            if call_count == 1:
+                first_call_failed = True
+                raise Exception("Network error")
+            return HeartbeatResponse(status="R")
+
+        mock_gateway.log_heartbeat = mock_heartbeat
 
         stop_event = asyncio.Event()
         task = asyncio.create_task(service.run_background(stop_event))
 
-        # Wait for multiple heartbeat attempts
-        # With interval=0.2s, tick_interval=0.1s, we need enough time for:
-        # - First heartbeat due at ~0.2s (fails)
-        # - Second heartbeat due at ~0.3s (since timer wasn't updated on failure)
-        # Add extra margin for CI timing variability
-        await asyncio.sleep(1.0)
+        # Poll for the expected condition instead of fixed sleep
+        # This is more resilient to CI timing variability with parallel workers
+        max_wait = 10.0  # Maximum wait time
+        poll_interval = 0.1
+        elapsed = 0.0
+
+        while elapsed < max_wait:
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+            # Exit early once we have enough calls
+            if call_count >= 2:
+                break
 
         stop_event.set()
         await asyncio.wait_for(task, timeout=2.0)
 
-        # Should have made multiple calls despite first failure
-        assert mock_gateway.log_heartbeat.call_count >= 2
+        # Verify first call failed and we continued with more calls
+        assert first_call_failed, "First call should have raised an exception"
+        assert call_count >= 2, f"Expected at least 2 calls after {elapsed}s, got {call_count}"
 
 
 # ──────────────────────────────────────────────────────────────────────────────

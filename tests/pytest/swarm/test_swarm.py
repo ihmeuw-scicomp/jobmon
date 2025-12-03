@@ -555,7 +555,9 @@ def test_swarm_terminate(db_engine, tool):
 
     # Function to update the workflow_run status to COLD_RESUME after a delay
     def trigger_cold_resume():
-        time.sleep(3)  # Wait for workflow to start running
+        # Wait for workflow to start running
+        # Use a longer delay to be resilient to parallel test execution (CI with many workers)
+        time.sleep(8)
         with Session(bind=db_engine) as session:
             # Update workflow_run status to COLD_RESUME
             session.execute(
