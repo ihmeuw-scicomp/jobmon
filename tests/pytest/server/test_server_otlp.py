@@ -471,15 +471,16 @@ class TestServerLoggingConfigIntegration:
             mock_config_class.return_value = mock_config
 
             with patch(
-                "jobmon.core.config.logconfig_utils.configure_logging_with_overrides"
-            ) as mock_configure:
-                # Should configure with basic config
+                "jobmon.core.config.logconfig_utils.logging.config.dictConfig"
+            ) as mock_dictconfig:
+                # Should configure with programmatic config
                 configure_component_logging("server")
 
-                # Should have called configure_logging_with_overrides
-                mock_configure.assert_called_once()
-                args, kwargs = mock_configure.call_args
-                assert "logconfig_server.yaml" in kwargs["default_template_path"]
+                # Should have called logging.config.dictConfig
+                mock_dictconfig.assert_called_once()
+                config_arg = mock_dictconfig.call_args[0][0]
+                # Programmatic config should have server logger namespace
+                assert "jobmon.server.web" in config_arg.get("loggers", {})
 
     def test_server_template_integration_with_otlp(self):
         """Test that server OTLP handlers work with template system."""
@@ -529,10 +530,14 @@ class TestServerLoggingConfigIntegration:
         server_logger = logging.getLogger("jobmon.server.web")
         assert len(server_logger.handlers) == 2
 
-        # Find the OTLP handler
+        # Find the OTLP handler (now consolidated as JobmonOTLPLoggingHandler)
         otlp_handler = None
         for handler in server_logger.handlers:
-            if "JobmonOTLPStructlogHandler" in str(type(handler)):
+            handler_type_name = str(type(handler))
+            if (
+                "JobmonOTLPLoggingHandler" in handler_type_name
+                or "JobmonOTLPStructlogHandler" in handler_type_name
+            ):
                 otlp_handler = handler
                 break
 

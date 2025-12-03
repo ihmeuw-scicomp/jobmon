@@ -1,27 +1,15 @@
-"""Tests for jobmon core template loading functionality."""
+"""Tests for jobmon core logging configuration functionality."""
 
 import os
 import tempfile
 
-import pytest
 
+class TestProgrammaticConfigGeneration:
+    """Test the programmatic logging configuration generation."""
 
-class TestTemplateLoader:
-    """Test the core template loading functionality."""
-
-    def test_load_shared_formatters(self):
-        """Test loading shared formatter templates."""
-        # Get the core config directory
-        from jobmon.core.config import template_loader
-        from jobmon.core.config.template_loader import load_all_templates
-
-        config_root = os.path.dirname(template_loader.__file__)
-
-        templates = load_all_templates(config_root)
-
-        # Should have loaded formatters
-        assert "formatters" in templates
-        formatters = templates["formatters"]
+    def test_shared_formatters_defined(self):
+        """Test that shared formatters are correctly defined."""
+        from jobmon.core.config.logconfig_utils import SHARED_FORMATTERS
 
         # Check expected formatters exist
         expected_formatters = [
@@ -29,82 +17,88 @@ class TestTemplateLoader:
             "structlog_event_only",
         ]
         for formatter_name in expected_formatters:
-            assert formatter_name in formatters
+            assert formatter_name in SHARED_FORMATTERS
 
         # Check console_default has expected structure
-        console_formatter = formatters["console_default"]
+        console_formatter = SHARED_FORMATTERS["console_default"]
         assert "format" in console_formatter
         assert "levelname" in console_formatter["format"]
 
-    def test_load_shared_handlers(self):
-        """Test loading shared handler templates."""
-        import jobmon.core.config.template_loader as template_loader
-        from jobmon.core.config.template_loader import load_all_templates
+    def test_shared_handlers_generated(self):
+        """Test that shared handlers are correctly generated."""
+        from jobmon.core.config.logconfig_utils import _get_shared_handlers
 
-        config_root = os.path.dirname(template_loader.__file__)
-        templates = load_all_templates(config_root)
+        handlers = _get_shared_handlers()
 
-        # Should have loaded handlers section
-        assert "handlers" in templates
-        handlers = templates["handlers"]
-
-        # Should have loaded expected handlers (new simplified templates)
+        # Should have expected handlers
         expected_handlers = [
-            "console_default_template",
-            "console_structlog_template",
-            "otlp_structlog_template",
+            "console",
+            "otlp_structlog",
         ]
         for handler_name in expected_handlers:
             assert handler_name in handlers
 
-        # Check console_structlog_template structure
-        console_handler = handlers["console_structlog_template"]
+        # Check console handler structure
+        console_handler = handlers["console"]
         assert "class" in console_handler
         assert console_handler["class"] == "logging.StreamHandler"
         assert "formatter" in console_handler
         assert console_handler["formatter"] == "structlog_event_only"
 
-        # Check otlp_structlog_template structure
-        otlp_structlog_handler = handlers["otlp_structlog_template"]
-        assert "class" in otlp_structlog_handler
-        assert (
-            otlp_structlog_handler["class"]
-            == "jobmon.core.otlp.JobmonOTLPStructlogHandler"
-        )
-        # Simplified handler uses shared LoggerProvider (empty exporter dict)
-        assert "exporter" in otlp_structlog_handler
+        # Check otlp handler structure
+        otlp_handler = handlers["otlp_structlog"]
+        assert "class" in otlp_handler
+        assert otlp_handler["class"] == "jobmon.core.otlp.JobmonOTLPLoggingHandler"
+        # Handler uses shared LoggerProvider (empty exporter dict)
+        assert "exporter" in otlp_handler
 
-    def test_template_directive_resolution(self):
-        """Test that !template directives resolve correctly."""
+
+class TestTemplateLoader:
+    """Test the YAML template loading functionality (for custom user configs)."""
+
+    def test_yaml_config_loading(self):
+        """Test that YAML config files load correctly."""
         from jobmon.core.config.template_loader import load_logconfig_with_templates
 
-        # Create a temporary config file with template references
+        # Create a temporary config file with inline formatters (modern style)
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            # Write YAML directly with proper !template directive syntax
             f.write(
                 """
 version: 1
-formatters: !template formatters
+formatters:
+  console_default:
+    format: "%(levelname)s [%(name)s] %(message)s"
+  custom:
+    format: "CUSTOM: %(message)s"
 handlers:
   console:
     class: logging.StreamHandler
     formatter: console_default
+loggers:
+  jobmon.test:
+    handlers: [console]
+    level: INFO
 """
             )
             temp_file = f.name
 
         try:
-            # Load the config with template resolution
+            # Load the config
             config = load_logconfig_with_templates(temp_file)
 
-            # Check that template was resolved
+            # Check that config was loaded correctly
             assert "formatters" in config
             assert isinstance(config["formatters"], dict)
             assert "console_default" in config["formatters"]
+            assert "custom" in config["formatters"]
 
-            # Check handler still works
+            # Check handlers
             assert "handlers" in config
             assert "console" in config["handlers"]
+
+            # Check loggers
+            assert "loggers" in config
+            assert "jobmon.test" in config["loggers"]
 
         finally:
             os.unlink(temp_file)
@@ -177,61 +171,36 @@ formatters: !template non_existent_formatters
 
 
 class TestTemplateIntegration:
-    """Test template integration with actual config files."""
+    """Test template integration with programmatic config generation."""
 
-    def test_client_config_loads_templates(self):
-        """Test that client config successfully loads templates."""
-        from jobmon.core.config.template_loader import load_logconfig_with_templates
+    def test_client_config_generated_programmatically(self):
+        """Test that client config is generated programmatically."""
+        from jobmon.core.config.logconfig_utils import generate_component_logconfig
 
-        # Find client config file
-        try:
-            import jobmon.client.config
+        # Generate client config
+        config = generate_component_logconfig("client")
 
-            client_config_dir = os.path.dirname(jobmon.client.config.__file__)
-            client_config_path = os.path.join(
-                client_config_dir, "logconfig_client.yaml"
-            )
+        # Should have basic logging config structure
+        assert "version" in config
+        assert config["version"] == 1
+        assert "formatters" in config
+        assert isinstance(config["formatters"], dict)
+        assert "loggers" in config
+        assert "jobmon.client" in config["loggers"]
 
-            if os.path.exists(client_config_path):
-                # Load client config with templates
-                config = load_logconfig_with_templates(client_config_path)
+    def test_server_config_generated_programmatically(self):
+        """Test that server config is generated programmatically."""
+        from jobmon.core.config.logconfig_utils import generate_component_logconfig
 
-                # Should have basic logging config structure
-                assert "version" in config
-                assert config["version"] == 1
+        # Generate server config
+        config = generate_component_logconfig("server")
 
-                if "formatters" in config:
-                    assert isinstance(config["formatters"], dict)
+        # Should have basic logging config structure
+        assert "version" in config
+        assert config["version"] == 1
+        assert "formatters" in config
+        assert isinstance(config["formatters"], dict)
+        assert "loggers" in config
+        assert "jobmon.server.web" in config["loggers"]
 
-        except ImportError:
-            pytest.skip("Client config not available")
-
-    def test_server_config_loads_templates(self):
-        """Test that server config successfully loads templates."""
-        from jobmon.core.config.template_loader import load_logconfig_with_templates
-
-        # Find server config file
-        try:
-            import jobmon.server.web.config
-
-            server_config_dir = os.path.dirname(jobmon.server.web.config.__file__)
-            server_config_path = os.path.join(
-                server_config_dir, "logconfig_server.yaml"
-            )
-
-            if os.path.exists(server_config_path):
-                # Load server config with templates
-                config = load_logconfig_with_templates(server_config_path)
-
-                # Should have basic logging config structure
-                assert "version" in config
-                assert config["version"] == 1
-
-                if "formatters" in config:
-                    assert isinstance(config["formatters"], dict)
-
-        except ImportError:
-            pytest.skip("Server config not available")
-
-    # Note: Requester OTLP config test removed as requester logging
-    # is now handled by the general client configuration
+    # Note: YAML logconfig files have been removed in favor of programmatic generation

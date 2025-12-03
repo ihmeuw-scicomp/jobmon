@@ -12,116 +12,104 @@ import yaml
 class TestCrossComponentConsistency:
     """Test consistency of logging configuration across components."""
 
-    def test_template_consistency_across_components(self):
-        """Test that shared templates are consistent across all components."""
-        # Get the core config directory (where templates are stored)
-        from jobmon.core.config import template_loader
-        from jobmon.core.config.template_loader import load_all_templates
+    def test_programmatic_config_consistency_across_components(self):
+        """Test that programmatic configs are consistent across all components."""
+        from jobmon.core.config.logconfig_utils import generate_component_logconfig
 
-        config_root = os.path.dirname(template_loader.__file__)
+        # Generate configs for all components
+        client_config = generate_component_logconfig("client")
+        server_config = generate_component_logconfig("server")
+        distributor_config = generate_component_logconfig("distributor")
+        worker_config = generate_component_logconfig("worker")
 
-        templates = load_all_templates(config_root)
+        # Test that all configs have consistent base structure
+        for config_name, config in [
+            ("client", client_config),
+            ("server", server_config),
+            ("distributor", distributor_config),
+            ("worker", worker_config),
+        ]:
+            assert "formatters" in config, f"{config_name} should have formatters"
+            assert "handlers" in config, f"{config_name} should have handlers"
+            assert "loggers" in config, f"{config_name} should have loggers"
+            assert config["version"] == 1, f"{config_name} should have version 1"
 
-        # Test that core shared templates are available
-        assert "formatters" in templates
-        assert "handlers" in templates
+        # Test that formatters are consistent across configs
+        for config in [client_config, server_config, distributor_config, worker_config]:
+            formatters = config["formatters"]
+            # All configs should have console_default formatter
+            assert "console_default" in formatters
+            assert isinstance(formatters["console_default"]["format"], str)
+            assert "%(message)s" in formatters["console_default"]["format"]
 
-        # Test template consistency - formatters should have same structure
-        formatters = templates["formatters"]
+        # Test that OTLP handlers are available in all configs
+        for config in [client_config, server_config, distributor_config, worker_config]:
+            handlers = config["handlers"]
+            otlp_handlers = [name for name in handlers if "otlp" in name.lower()]
+            assert len(otlp_handlers) > 0, "Should have at least one OTLP handler"
 
-        # All formatters should have consistent structure
-        for formatter_name, formatter_config in formatters.items():
-            if "format" in formatter_config:
-                # Format strings should be valid
-                assert isinstance(formatter_config["format"], str)
-                assert "%(message)s" in formatter_config["format"]
+            # Check that OTLP handlers use the shared handler class
+            for handler_name in otlp_handlers:
+                handler_config = handlers[handler_name]
+                assert (
+                    handler_config["class"]
+                    == "jobmon.core.otlp.JobmonOTLPLoggingHandler"
+                )
 
-        # Test that OTLP handler templates exist and have consistent structure
-        handlers = templates["handlers"]
-        otlp_handlers = [name for name in handlers if "otlp" in name.lower()]
-        assert len(otlp_handlers) > 0, "Should have at least one OTLP handler template"
+    def test_component_configs_generated_successfully(self):
+        """Test that all component configurations are generated programmatically."""
+        from jobmon.core.config.logconfig_utils import generate_component_logconfig
 
-        # Check that OTLP handlers have consistent exporter configuration
-        for handler_name in otlp_handlers:
-            handler_config = handlers[handler_name]
-            if "exporter" in handler_config:
-                exporter = handler_config["exporter"]
-                # New simplified templates use empty dict for shared LoggerProvider
-                # Legacy templates had full exporter config
-                if exporter:  # Non-empty exporter dict
-                    assert "class" in exporter
-                    assert exporter["class"] == "OTLPLogExporter"
-                    assert "endpoint" in exporter
+        # Test client config generation
+        client_config = generate_component_logconfig("client")
+        assert "version" in client_config
+        assert client_config["version"] == 1
+        assert "loggers" in client_config
+        assert "jobmon.client" in client_config["loggers"]
 
-    def test_component_configs_load_successfully(self):
-        """Test that all component configurations load without errors."""
-        from jobmon.core.config.template_loader import load_logconfig_with_templates
+        # Test server config generation
+        server_config = generate_component_logconfig("server")
+        assert "version" in server_config
+        assert server_config["version"] == 1
+        assert "loggers" in server_config
+        assert "jobmon.server.web" in server_config["loggers"]
 
-        # Test client config loading
-        try:
-            import jobmon.client.config
+        # Test distributor config generation
+        distributor_config = generate_component_logconfig("distributor")
+        assert "version" in distributor_config
+        assert "loggers" in distributor_config
+        assert "jobmon.distributor" in distributor_config["loggers"]
 
-            client_config_dir = os.path.dirname(jobmon.client.config.__file__)
-            client_config_path = os.path.join(
-                client_config_dir, "logconfig_client.yaml"
-            )
+        # Test worker config generation
+        worker_config = generate_component_logconfig("worker")
+        assert "version" in worker_config
+        assert "loggers" in worker_config
+        assert "jobmon.worker_node" in worker_config["loggers"]
 
-            if os.path.exists(client_config_path):
-                client_config = load_logconfig_with_templates(client_config_path)
-                assert "version" in client_config
-                assert client_config["version"] == 1
-        except (ImportError, FileNotFoundError):
-            pass  # Config may not exist in test environment
+    def test_otlp_handler_consistency(self):
+        """Test that OTLP handlers use consistent settings across components."""
+        from jobmon.core.config.logconfig_utils import generate_component_logconfig
 
-        # Test server config loading
-        try:
-            import jobmon.server.web.config
+        # Check OTLP handler consistency in programmatically generated configs
+        for component in ["client", "server", "distributor", "worker"]:
+            config = generate_component_logconfig(component)
+            handlers = config["handlers"]
 
-            server_config_dir = os.path.dirname(jobmon.server.web.config.__file__)
-            server_config_path = os.path.join(
-                server_config_dir, "logconfig_server.yaml"
-            )
-
-            if os.path.exists(server_config_path):
-                server_config = load_logconfig_with_templates(server_config_path)
-                assert "version" in server_config
-                assert server_config["version"] == 1
-        except (ImportError, FileNotFoundError):
-            pass  # Config may not exist in test environment
-
-        # Note: Requester logging is now handled by client configuration
-        # No separate requester config file needed
-
-    def test_otlp_exporter_consistency(self):
-        """Test that OTLP exporters use consistent settings across components."""
-        from jobmon.core.config import template_loader
-        from jobmon.core.config.template_loader import load_all_templates
-
-        config_root = os.path.dirname(template_loader.__file__)
-        templates = load_all_templates(config_root)
-
-        if "handlers" in templates:
-            handlers = templates["handlers"]
             otlp_handlers = [name for name in handlers if "otlp" in name.lower()]
 
             for handler_name in otlp_handlers:
                 handler_config = handlers[handler_name]
-                if "exporter" in handler_config:
-                    exporter = handler_config["exporter"]
 
-                    # New simplified templates use empty dict for shared LoggerProvider
-                    # Legacy templates had full exporter config
-                    if exporter:  # Non-empty exporter dict
-                        # Should have consistent OTLP structure
-                        assert "module" in exporter
-                        assert "class" in exporter
-                        assert "endpoint" in exporter
-                        assert exporter["class"] == "OTLPLogExporter"
+                # All OTLP handlers should use the JobmonOTLPLoggingHandler class
+                assert (
+                    handler_config["class"]
+                    == "jobmon.core.otlp.JobmonOTLPLoggingHandler"
+                ), f"OTLP handler {handler_name} in {component} should use JobmonOTLPLoggingHandler"
 
-                        # Should have reasonable batch settings
-                        if "max_export_batch_size" in exporter:
-                            assert isinstance(exporter["max_export_batch_size"], int)
-                            assert exporter["max_export_batch_size"] > 0
+                # All OTLP handlers should have an exporter config (empty dict for shared provider)
+                assert (
+                    "exporter" in handler_config
+                ), f"OTLP handler {handler_name} in {component} should have exporter config"
 
 
 class TestEndToEndLoggingScenarios:

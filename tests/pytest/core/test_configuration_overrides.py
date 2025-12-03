@@ -244,65 +244,42 @@ class TestConfigurationOverrides:
         assert "jobmon" in merged["loggers"]
         assert merged["loggers"]["jobmon"]["level"] == "INFO"
 
-    def test_override_with_template_references(self):
-        """Test that overrides work with template references."""
-        from jobmon.core.config.logconfig_utils import load_logconfig_with_overrides
-        from jobmon.core.configuration import JobmonConfig
+    def test_override_with_programmatic_base(self):
+        """Test that overrides work with programmatic base configuration."""
+        from jobmon.core.config.logconfig_utils import (
+            generate_component_logconfig,
+            merge_logconfig_sections,
+        )
 
-        # Create a default template with template references
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            # Write YAML directly with proper !template directive syntax
-            f.write(
-                """
-version: 1
-formatters: !template formatters
-handlers:
-  console:
-    class: logging.StreamHandler
-    formatter: console_default
-"""
-            )
-            default_file_path = f.name
+        # Generate programmatic base config
+        base_config = generate_component_logconfig("client")
 
-        try:
-            # Mock JobmonConfig with section overrides
-            mock_config = Mock(spec=JobmonConfig)
-            mock_config.get.return_value = ""  # No file override
-            mock_config.get_section_coerced.return_value = {
-                "client": {
-                    "handlers": {
-                        "custom_handler": {
-                            "class": "logging.FileHandler",
-                            "filename": "/tmp/test.log",
-                            "formatter": "console_default",  # Reference template formatter
-                        }
-                    }
+        # Section overrides to merge
+        section_overrides = {
+            "handlers": {
+                "custom_handler": {
+                    "class": "logging.FileHandler",
+                    "filename": "/tmp/test.log",
+                    "formatter": "console_default",
                 }
             }
+        }
 
-            # Load config with overrides
-            config = load_logconfig_with_overrides(
-                default_template_path=default_file_path,
-                config_section="client",
-                config=mock_config,
-            )
+        # Merge overrides with base config
+        config = merge_logconfig_sections(base_config, section_overrides)
 
-            # Should have resolved template and merged overrides
-            assert "formatters" in config
-            assert isinstance(config["formatters"], dict)
+        # Should have formatters from programmatic base
+        assert "formatters" in config
+        assert isinstance(config["formatters"], dict)
+        assert "console_default" in config["formatters"]
 
-            # Should have both default and custom handlers
-            assert "handlers" in config
-            assert "console" in config["handlers"]
-            assert "custom_handler" in config["handlers"]
+        # Should have both default and custom handlers
+        assert "handlers" in config
+        assert "console" in config["handlers"]
+        assert "custom_handler" in config["handlers"]
 
-            # Custom handler should reference the template formatter
-            assert (
-                config["handlers"]["custom_handler"]["formatter"] == "console_default"
-            )
-
-        finally:
-            os.unlink(default_file_path)
+        # Custom handler should reference the formatter from base config
+        assert config["handlers"]["custom_handler"]["formatter"] == "console_default"
 
 
 class TestEnvironmentVariableOverrides:

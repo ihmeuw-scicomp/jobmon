@@ -3,8 +3,8 @@
 This module provides the standard logging configuration used by
 workflow.run(configure_logging=True).
 
-The module supports both legacy dict-based configs and new template-based
-configurations. Requester logs are automatically captured by OTLP when
+Configuration is generated programmatically with support for user overrides
+via JobmonConfig. Requester logs are automatically captured by OTLP when
 enabled (handled by the Requester class itself).
 """
 
@@ -12,16 +12,16 @@ from __future__ import annotations
 
 import logging
 import logging.config
-import os
 import sys
 import threading
 from typing import Any, Dict, Iterable, List, Optional
 
 from jobmon.core.config.logconfig_utils import (
-    configure_logging_with_overrides,
-    load_logconfig_with_overrides,
+    generate_component_logconfig,
+    merge_logconfig_sections,
 )
 from jobmon.core.config.structlog_config import _uses_stdlib_integration
+from jobmon.core.configuration import JobmonConfig
 
 # Lazy configuration state
 _structlog_configured_lock = threading.Lock()
@@ -97,19 +97,18 @@ def ensure_structlog_configured() -> None:
 
 
 def configure_client_logging() -> None:
-    """Configure client logging with template and user override support.
+    """Configure client logging with programmatic generation and user override support.
 
     This is the primary interface for configuring client logging. It supports:
-    1. Default template-based configuration
-    2. User file overrides via logging.client_logconfig_file
-    3. User section overrides via logging.client.*
-    4. Environment variable overrides
+    1. User file overrides via logging.client_logconfig_file
+    2. User section overrides via logging.client.*
+    3. Environment variable overrides
+    4. Programmatic base configuration
 
     Configuration precedence:
-    1. Custom file (logging.client_logconfig_file)
-    2. Section overrides (logging.client.formatters/handlers/loggers)
-    3. Default template (logconfig_client.yaml)
-    4. Basic fallback configuration
+    1. Custom file (logging.client_logconfig_file) - complete replacement
+    2. Section overrides (logging.client.*) - merged with base
+    3. Programmatic base: generate_component_logconfig("client")
 
     Adapts to host application logging architecture:
     - If host uses direct rendering (like FHS): sets up minimal stdlib handlers
@@ -123,10 +122,6 @@ def configure_client_logging() -> None:
     # Ensure structlog is configured first (lazy initialization)
     ensure_structlog_configured()
 
-    # Get default template path
-    current_dir = os.path.dirname(__file__)
-    default_template_path = os.path.join(current_dir, "config/logconfig_client.yaml")
-
     # Check host app's logging architecture
     current_config = structlog.get_config()
     logger_factory = current_config.get("logger_factory")
@@ -137,18 +132,68 @@ def configure_client_logging() -> None:
 
     host_uses_stdlib = _uses_stdlib_integration(logger_factory, wrapper_class)
 
+    # Load configuration with override support
+    logconfig_data = _load_client_logconfig_with_overrides()
+
     if host_uses_stdlib:
-        configure_logging_with_overrides(
-            default_template_path=default_template_path,
-            config_section="client",
-            fallback_config=default_config,
-        )
+        # Standard stdlib integration - apply config as-is
+        try:
+            logging.config.dictConfig(logconfig_data)
+        except Exception:
+            # Fallback to basic config
+            logging.config.dictConfig(default_config)
     else:
+        # Direct rendering - strip non-OTLP handlers
         _configure_client_logging_for_direct_rendering(
-            default_template_path=default_template_path,
+            logconfig_data=logconfig_data,
             logger_factory=logger_factory,
             wrapper_class=wrapper_class,
         )
+
+
+def _load_client_logconfig_with_overrides() -> Dict[str, Any]:
+    """Load client logconfig with file and section override support.
+
+    Returns:
+        Logconfig dictionary ready for logging.config.dictConfig()
+    """
+    from jobmon.core.config.template_loader import load_logconfig_with_templates
+
+    try:
+        config = JobmonConfig()
+
+        # Check for file-based override first (highest precedence)
+        try:
+            import os
+
+            custom_file = config.get("logging", "client_logconfig_file")
+            if custom_file and os.path.exists(custom_file):
+                logconfig_from_file = load_logconfig_with_templates(custom_file)
+                logconfig_from_file["disable_existing_loggers"] = True
+                return logconfig_from_file
+        except Exception:
+            pass  # No file override, continue
+
+        # Generate programmatic base configuration
+        logconfig_data = generate_component_logconfig("client")
+
+        # Apply section-based overrides if present
+        try:
+            section_overrides = config.get_section_coerced("logging")
+            component_overrides = section_overrides.get("client", {})
+
+            if component_overrides:
+                logconfig_data = merge_logconfig_sections(
+                    logconfig_data, component_overrides
+                )
+        except Exception:
+            pass  # No section overrides, use base config
+
+        return logconfig_data
+
+    except Exception:
+        # Return programmatic base if all else fails
+        return generate_component_logconfig("client")
 
 
 def _remove_non_jobmon_handlers(logconfig: Dict) -> List[str]:
@@ -184,16 +229,15 @@ def _remove_non_jobmon_handlers(logconfig: Dict) -> List[str]:
 
 def _configure_client_logging_for_direct_rendering(
     *,
-    default_template_path: str,
+    logconfig_data: Dict[str, Any],
     logger_factory: Any,
     wrapper_class: Any,
 ) -> None:
-    """Configure logging for direct-rendering hosts while preserving telemetry."""
-    logconfig_data = load_logconfig_with_overrides(
-        default_template_path=default_template_path,
-        config_section="client",
-    )
+    """Configure logging for direct-rendering hosts while preserving telemetry.
 
+    In direct rendering mode, the host application handles console output.
+    We strip console handlers and only keep OTLP handlers for telemetry.
+    """
     jobmon_logger_names = _remove_non_jobmon_handlers(logconfig_data)
 
     logging.config.dictConfig(logconfig_data)
@@ -211,7 +255,7 @@ def _ensure_jobmon_otlp_handlers(
     attached: List[str] = []
 
     try:
-        from jobmon.core.otlp import JobmonOTLPStructlogHandler
+        from jobmon.core.otlp import JobmonOTLPLoggingHandler
     except Exception:
         return attached
 
@@ -232,7 +276,7 @@ def _ensure_jobmon_otlp_handlers(
             continue
 
         try:
-            handler = JobmonOTLPStructlogHandler()
+            handler = JobmonOTLPLoggingHandler()
         except Exception:
             continue
 

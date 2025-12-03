@@ -18,8 +18,14 @@ from .utils import JobmonOTLPFormatter
 class JobmonOTLPLoggingHandler(logging.Handler):
     """Universal OTLP logging handler with lazy initialization and attribute extraction.
 
-    This handler extracts attributes from structlog's thread-local event_dict and
-    supports flexible configuration patterns:
+    This handler works with both stdlib logging and structlog. It extracts structured
+    attributes from structlog's thread-local event_dict when available, enabling
+    rich OTLP exports with queryable fields.
+
+    Note: JobmonOTLPStructlogHandler is an alias for this class (kept for backward
+    compatibility). Both names can be used interchangeably in configuration.
+
+    Supports flexible configuration patterns:
 
     1. Inline dict configuration (server pattern):
         handlers:
@@ -245,13 +251,7 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             pass
 
 
-class JobmonOTLPStructlogHandler(JobmonOTLPLoggingHandler):
-    """OTLP logging handler for structlog.
-
-    Identical to JobmonOTLPLoggingHandler - uses the same custom handler that
-    extracts attributes from thread-local event_dict. This class exists for
-    clarity in configuration (to indicate structlog support) but functionally
-    is the same as the parent class.
-    """
-
-    pass  # No need to override anything
+# Backward compatibility alias - both handlers are identical
+# The handler extracts attributes from structlog's thread-local event_dict
+# regardless of whether it's configured as "structlog" or regular logging
+JobmonOTLPStructlogHandler = JobmonOTLPLoggingHandler

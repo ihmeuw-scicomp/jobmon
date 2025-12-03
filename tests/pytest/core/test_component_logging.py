@@ -58,19 +58,20 @@ loggers:
             # Clean up
             test_logger.handlers.clear()
 
-    def test_configure_component_logging_no_template(self, tmp_path):
-        """Test component logging fails silently when no template exists."""
-        # Mock the component template path resolution to return empty string (no template)
-        with patch(
-            "jobmon.core.config.logconfig_utils._get_component_template_path",
-            return_value="",
-        ):
-            # This should not raise an exception
-            configure_component_logging("nonexistent")
+    def test_configure_component_logging_generates_programmatic_config(self, tmp_path):
+        """Test component logging generates config for known components even without template file."""
+        # Clear any existing handlers
+        test_logger = logging.getLogger("jobmon.distributor")
+        test_logger.handlers.clear()
 
-            # Should not configure any loggers
-            test_logger = logging.getLogger("jobmon.nonexistent")
-            assert len(test_logger.handlers) == 0
+        # Configure should work via programmatic generation (no template file needed)
+        configure_component_logging("distributor")
+
+        # Should have configured the logger programmatically
+        assert len(test_logger.handlers) > 0
+
+        # Clean up
+        test_logger.handlers.clear()
 
     def test_configure_component_logging_with_file_override(self, tmp_path):
         """Test component logging with file override."""

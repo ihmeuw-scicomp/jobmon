@@ -1,16 +1,20 @@
 # Local development logconfig for jobmon with OTLP ENABLED
-# Fixed: Using proper template system and inline exporter config
-# Sends to production OTLP collector
+# Example config with inline exporter configuration
+# Sends to local OTLP collector
 
 version: 1
 disable_existing_loggers: false
 
-# Use shared formatters from core templates
-formatters: !template formatters
+# Shared formatters (inlined for simplicity)
+formatters:
+  console_default:
+    format: "%(levelname)s [%(name)s] %(message)s"
+  structlog_event_only:
+    '()': jobmon.core.config.structlog_formatters.JobmonStructlogEventOnlyFormatter
 
 # Local development handlers with working OTLP configuration
 handlers:
-  # Simple console handlers (inlined - no templates needed)
+  # Simple console handlers
   console_default:
     class: logging.StreamHandler
     level: INFO
@@ -21,8 +25,8 @@ handlers:
     level: INFO
     formatter: structlog_event_only
 
-  # OTLP handler with inline configuration for JobmonOTLPLoggingHandler
-  # Fixed: More aggressive flushing for client processes
+  # OTLP handler with inline exporter configuration
+  # More aggressive batching for client processes
   otlp:
     class: jobmon.core.otlp.JobmonOTLPLoggingHandler
     level: INFO
@@ -32,16 +36,14 @@ handlers:
       endpoint: http://localhost:4317
       timeout: 30
       insecure: true
-      # More aggressive batching for client processes
-      max_export_batch_size: 4  # Reduced from 8 for faster flushing
-      export_timeout_millis: 2000  # Reduced from 5000
-      schedule_delay_millis: 500   # Reduced from 1000 for faster batching
-      max_queue_size: 1024  # Reduced from 2048
+      max_export_batch_size: 4
+      export_timeout_millis: 2000
+      schedule_delay_millis: 500
+      max_queue_size: 1024
 
-  # OTLP handler with structlog formatting
-  # Fixed: More aggressive flushing for client processes
+  # Alias for structlog loggers (same handler)
   otlp_structlog:
-    class: jobmon.core.otlp.JobmonOTLPStructlogHandler
+    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
     level: INFO
     exporter:
       module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
@@ -49,11 +51,10 @@ handlers:
       endpoint: http://localhost:4317
       timeout: 30
       insecure: true
-      # More aggressive batching for client processes
-      max_export_batch_size: 4  # Reduced from 8 for faster flushing
-      export_timeout_millis: 2000  # Reduced from 5000
-      schedule_delay_millis: 500   # Reduced from 1000 for faster batching
-      max_queue_size: 1024  # Reduced from 2048
+      max_export_batch_size: 4
+      export_timeout_millis: 2000
+      schedule_delay_millis: 500
+      max_queue_size: 1024
 
 # Local development logger configurations WITH OTLP ENABLED
 loggers:

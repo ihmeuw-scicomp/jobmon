@@ -394,6 +394,7 @@ class TestHeartbeatServiceRunBackground:
                 Exception("Network error"),
                 HeartbeatResponse(status="R"),
                 HeartbeatResponse(status="R"),
+                HeartbeatResponse(status="R"),
             ]
         )
 
@@ -401,7 +402,11 @@ class TestHeartbeatServiceRunBackground:
         task = asyncio.create_task(service.run_background(stop_event))
 
         # Wait for multiple heartbeat attempts
-        await asyncio.sleep(0.6)
+        # With interval=0.2s, tick_interval=0.1s, we need enough time for:
+        # - First heartbeat due at ~0.2s (fails)
+        # - Second heartbeat due at ~0.3s (since timer wasn't updated on failure)
+        # Add extra margin for CI timing variability
+        await asyncio.sleep(1.0)
 
         stop_event.set()
         await asyncio.wait_for(task, timeout=2.0)

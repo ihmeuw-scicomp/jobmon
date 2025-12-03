@@ -3,16 +3,23 @@
 This module provides the standard logging configuration used by
 server startup and API initialization.
 
-The module supports both legacy dict-based configs and new template-based
-configurations. Server logs are automatically captured by OTLP when
+Configuration is generated programmatically with support for user overrides
+via JobmonConfig. Server logs are automatically captured by OTLP when
 enabled (handled by the server configuration overrides).
 """
 
 from __future__ import annotations
 
+import logging.config
 import os
 import sys
-from typing import Dict
+from typing import Any, Dict
+
+from jobmon.core.config.logconfig_utils import (
+    generate_component_logconfig,
+    merge_logconfig_sections,
+)
+from jobmon.core.configuration import JobmonConfig
 
 # Legacy default configuration - used as fallback only
 _DEFAULT_LOG_FORMAT = (
@@ -41,19 +48,18 @@ _server_logging_configured = False
 
 
 def configure_server_logging() -> None:
-    """Configure server logging with template and user override support.
+    """Configure server logging with programmatic generation and user override support.
 
     This is the primary interface for configuring server logging. It supports:
-    1. Default template-based configuration
-    2. User file overrides via logging.server_logconfig_file
-    3. User section overrides via logging.server.*
-    4. Environment variable overrides
+    1. User file overrides via logging.server_logconfig_file
+    2. User section overrides via logging.server.*
+    3. Environment variable overrides
+    4. Programmatic base configuration
 
     Configuration precedence:
-    1. Custom file (logging.server_logconfig_file)
-    2. Section overrides (logging.server.formatters/handlers/loggers)
-    3. Default template (logconfig_server.yaml)
-    4. Basic fallback configuration
+    1. Custom file (logging.server_logconfig_file) - complete replacement
+    2. Section overrides (logging.server.*) - merged with base
+    3. Programmatic base: generate_component_logconfig("server")
 
     Note: Server OTLP is handled separately by the server OTLP manager.
     """
@@ -63,18 +69,15 @@ def configure_server_logging() -> None:
     if _server_logging_configured:
         return
 
-    from jobmon.core.config.logconfig_utils import configure_logging_with_overrides
+    # Load configuration with override support
+    logconfig_data = _load_server_logconfig_with_overrides()
 
-    # Get default template path
-    current_dir = os.path.dirname(__file__)
-    default_template_path = os.path.join(current_dir, "config/logconfig_server.yaml")
-
-    # Configure Python stdlib logging with override support
-    configure_logging_with_overrides(
-        default_template_path=default_template_path,
-        config_section="server",
-        fallback_config=default_config,
-    )
+    # Configure Python stdlib logging
+    try:
+        logging.config.dictConfig(logconfig_data)
+    except Exception:
+        # Fallback to basic config
+        logging.config.dictConfig(default_config)
 
     # Configure structlog to integrate with stdlib loggers
     # This must come AFTER stdlib logging is configured
@@ -83,3 +86,46 @@ def configure_server_logging() -> None:
     configure_structlog(component_name="server")
 
     _server_logging_configured = True
+
+
+def _load_server_logconfig_with_overrides() -> Dict[str, Any]:
+    """Load server logconfig with file and section override support.
+
+    Returns:
+        Logconfig dictionary ready for logging.config.dictConfig()
+    """
+    from jobmon.core.config.template_loader import load_logconfig_with_templates
+
+    try:
+        config = JobmonConfig()
+
+        # Check for file-based override first (highest precedence)
+        try:
+            custom_file = config.get("logging", "server_logconfig_file")
+            if custom_file and os.path.exists(custom_file):
+                logconfig_from_file = load_logconfig_with_templates(custom_file)
+                logconfig_from_file["disable_existing_loggers"] = True
+                return logconfig_from_file
+        except Exception:
+            pass  # No file override, continue
+
+        # Generate programmatic base configuration
+        logconfig_data = generate_component_logconfig("server")
+
+        # Apply section-based overrides if present
+        try:
+            section_overrides = config.get_section_coerced("logging")
+            component_overrides = section_overrides.get("server", {})
+
+            if component_overrides:
+                logconfig_data = merge_logconfig_sections(
+                    logconfig_data, component_overrides
+                )
+        except Exception:
+            pass  # No section overrides, use base config
+
+        return logconfig_data
+
+    except Exception:
+        # Return programmatic base if all else fails
+        return generate_component_logconfig("server")

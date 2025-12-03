@@ -30,59 +30,38 @@ class TestClientLoggingIntegration:
                 # Verify that component logging was configured for client
                 mock_configure.assert_called_once_with("client")
 
-    def test_client_logging_with_template(self, tmp_path):
-        """Test client logging with default template."""
-        # Create a temporary client template file
-        template_content = """
-version: 1
-disable_existing_loggers: false
+    def test_client_logging_with_programmatic_config(self, tmp_path):
+        """Test client logging uses programmatic configuration as base."""
+        import logging
 
-formatters:
-  simple:
-    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        # Clear any existing handlers on the client logger
+        client_logger = logging.getLogger("jobmon.client")
+        client_logger.handlers.clear()
 
-handlers:
-  console:
-    class: logging.StreamHandler
-    level: INFO
-    formatter: simple
+        with patch("jobmon.core.configuration.JobmonConfig") as mock_config_class:
+            mock_config = MagicMock()
+            # No file overrides
+            mock_config.get.return_value = ""
+            mock_config.get_section_coerced.return_value = {}
+            mock_config_class.return_value = mock_config
 
-loggers:
-  jobmon.client:
-    handlers: [console]
-    level: INFO
-    propagate: false
+            from jobmon.core.config.logconfig_utils import (
+                configure_component_logging,
+            )
 
-root:
-  handlers: [console]
-  level: WARNING
-"""
-        template_file = tmp_path / "logconfig_client.yaml"
-        template_file.write_text(template_content.strip())
+            # Test component logging configuration
+            configure_component_logging("client")
 
-        with patch(
-            "jobmon.core.config.logconfig_utils._get_component_template_path",
-            return_value=str(template_file),
-        ):
-            with patch(
-                "jobmon.core.config.logconfig_utils.configure_logging_with_overrides"
-            ) as mock_configure:
-                from jobmon.core.config.logconfig_utils import (
-                    configure_component_logging,
-                )
+            # Verify logger was configured (handlers were added)
+            assert len(client_logger.handlers) > 0
 
-                # Test component logging configuration
-                configure_component_logging("client")
-
-                # Verify template was used
-                mock_configure.assert_called_once_with(
-                    default_template_path=str(template_file),
-                    config_section="client",
-                    fallback_config=None,
-                )
+            # Clean up
+            client_logger.handlers.clear()
 
     def test_client_logging_with_file_override(self, tmp_path):
         """Test client logging with file override."""
+        import logging
+
         # Create custom config file
         custom_config = tmp_path / "custom_client_config.yaml"
         custom_config.write_text(
@@ -111,28 +90,32 @@ root:
 """
         )
 
+        # Clear any existing handlers on the client logger
+        client_logger = logging.getLogger("jobmon.client")
+        client_logger.handlers.clear()
+
         # Mock configuration to use custom file
         mock_config = MagicMock()
         mock_config.get.side_effect = lambda section, key: {
             ("logging", "client_logconfig_file"): str(custom_config)
-        }.get((section, key))
+        }.get((section, key), "")
+        mock_config.get_section_coerced.return_value = {}
 
         with patch(
             "jobmon.core.config.logconfig_utils.JobmonConfig", return_value=mock_config
         ):
-            with patch(
-                "jobmon.core.config.logconfig_utils.configure_logging_with_overrides"
-            ) as mock_configure:
-                from jobmon.core.config.logconfig_utils import (
-                    configure_component_logging,
-                )
+            from jobmon.core.config.logconfig_utils import (
+                configure_component_logging,
+            )
 
-                configure_component_logging("client")
+            configure_component_logging("client")
 
-                # Verify file override was used
-                mock_configure.assert_called_once()
-                call_args = mock_configure.call_args
-                assert call_args[1]["config_section"] == "client"
+            # Verify file override was applied (logger has handlers and DEBUG level)
+            assert len(client_logger.handlers) > 0
+            assert client_logger.level == logging.DEBUG
+
+            # Clean up
+            client_logger.handlers.clear()
 
     def test_client_logging_failure_does_not_crash(self):
         """Test that client logging failures don't crash client operations."""
