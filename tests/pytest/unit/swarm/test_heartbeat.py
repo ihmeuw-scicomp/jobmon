@@ -427,7 +427,9 @@ class TestHeartbeatServiceRunBackground:
 
         # Verify first call failed and we continued with more calls
         assert first_call_failed, "First call should have raised an exception"
-        assert call_count >= 2, f"Expected at least 2 calls after {elapsed}s, got {call_count}"
+        assert (
+            call_count >= 2
+        ), f"Expected at least 2 calls after {elapsed}s, got {call_count}"
 
 
 # ──────────────────────────────────────────────────────────────────────────────

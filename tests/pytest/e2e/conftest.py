@@ -7,4 +7,3 @@ E2E tests in this directory:
 
 Run with: pytest tests/pytest/e2e/ -v
 """
-

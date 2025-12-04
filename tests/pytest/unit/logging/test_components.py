@@ -16,8 +16,6 @@ Test Categories:
 import logging
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from .conftest import (
     ComponentConfig,
     clear_logger_handlers,
@@ -96,7 +94,9 @@ class TestLoggingWithConfiguration:
         """Test {component.name} logging with file-based configuration override."""
         # Create override config file
         override_file = tmp_path / f"override_{component.name}.yaml"
-        override_file.write_text(override_content.format(logger_name=component.logger_name))
+        override_file.write_text(
+            override_content.format(logger_name=component.logger_name)
+        )
 
         # Create default template
         template_content = f"""
@@ -161,7 +161,9 @@ loggers:
         """Test {component.name} logging with section-based configuration override."""
         # Create default template
         template_file = tmp_path / f"logconfig_{component.name}.yaml"
-        template_file.write_text(template_content.format(logger_name=component.logger_name))
+        template_file.write_text(
+            template_content.format(logger_name=component.logger_name)
+        )
 
         # Clear existing handlers
         component_logger = clear_logger_handlers(component.logger_name)
@@ -175,9 +177,7 @@ loggers:
             mock_config.get.side_effect = Exception("No file override")
             # Section override - set DEBUG level
             mock_config.get_section_coerced.return_value = {
-                component.name: {
-                    "loggers": {component.logger_name: {"level": "DEBUG"}}
-                }
+                component.name: {"loggers": {component.logger_name: {"level": "DEBUG"}}}
             }
             mock_config_class.return_value = mock_config
 
@@ -281,5 +281,3 @@ class TestLoggingConsistency:
                 from jobmon.core.cli import CLI
 
                 assert isinstance(cli, CLI)
-
-

@@ -7,4 +7,3 @@ Integration tests in this directory:
 
 Run with: pytest tests/pytest/integration/ --tb=short
 """
-

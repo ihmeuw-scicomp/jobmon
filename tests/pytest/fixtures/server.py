@@ -24,7 +24,6 @@ import uvicorn
 
 from jobmon.core.requester import Requester
 
-
 # Global API prefix
 _api_prefix = "/api/v3"
 
@@ -32,7 +31,7 @@ _api_prefix = "/api/v3"
 @pytest.fixture(scope="session")
 def api_prefix():
     """Return the API route prefix.
-    
+
     Returns:
         str: The API prefix (/api/v3)
     """
@@ -41,15 +40,15 @@ def api_prefix():
 
 class WebServerProcess:
     """Context manager that runs the Jobmon web server in a subprocess.
-    
+
     Creates an isolated web server process for testing. Each test session
     gets its own server on a unique port (based on PID).
-    
+
     Usage:
         with WebServerProcess() as web:
             url = f"http://{web.web_host}:{web.web_port}/api/v3/health"
             response = requests.get(url)
-            
+
     Attributes:
         web_host: Server hostname (127.0.0.1)
         web_port: Server port (10000 + PID % 30000)
@@ -58,7 +57,7 @@ class WebServerProcess:
 
     def __init__(self) -> None:
         """Initialize the web server process configuration.
-        
+
         Uses localhost and a PID-based port to avoid conflicts.
         """
         # Always use localhost for test server to avoid DNS/network issues
@@ -68,7 +67,7 @@ class WebServerProcess:
 
     def _run_server_with_handler(self) -> None:
         """Run the server with signal handlers.
-        
+
         Separate method for pickle compatibility with multiprocessing.
         Sets up SIGTERM handler for graceful shutdown.
         """
@@ -92,13 +91,13 @@ class WebServerProcess:
 
     def __enter__(self) -> "WebServerProcess":
         """Start the web service process.
-        
+
         Spawns the server process and waits for it to be ready
         (responds to health check).
-        
+
         Returns:
             WebServerProcess: Self for context manager usage
-            
+
         Raises:
             TimeoutError: If server doesn't respond within 30 seconds
         """
@@ -112,7 +111,7 @@ class WebServerProcess:
         status = 404
         count = 0
         max_tries = 10
-        
+
         while status != 200 and count < max_tries:
             try:
                 count += 1
@@ -131,7 +130,7 @@ class WebServerProcess:
                     ) from e
             # Sleep outside try block
             sleep(3)
-            
+
         return self
 
     def __exit__(
@@ -141,7 +140,7 @@ class WebServerProcess:
         exc_traceback: Optional[TracebackType],
     ) -> None:
         """Terminate the web service process.
-        
+
         Sends SIGTERM and waits for graceful shutdown.
         """
         self.p1.terminate()
@@ -151,13 +150,13 @@ class WebServerProcess:
 @pytest.fixture(scope="session")
 def web_server_process(db_engine):
     """Start the Jobmon web server in a separate process.
-    
+
     Session-scoped: server starts once and is shared by all tests.
     Depends on db_engine to ensure database is initialized first.
-    
+
     Args:
         db_engine: The database engine fixture
-        
+
     Yields:
         dict: Server connection info {"JOBMON_HOST": str, "JOBMON_PORT": str}
     """
@@ -168,16 +167,16 @@ def web_server_process(db_engine):
 @pytest.fixture(scope="function")
 def client_env(web_server_process, monkeypatch):
     """Configure client to connect to the local test server.
-    
+
     Sets JOBMON__HTTP__SERVICE_URL environment variable and creates
     a requester instance that uses the test configuration.
-    
+
     Function-scoped because monkeypatch is function-scoped.
-    
+
     Args:
         web_server_process: The server connection info
         monkeypatch: pytest monkeypatch fixture
-        
+
     Yields:
         str: The full service URL (e.g., http://127.0.0.1:12345/api/v3)
     """
@@ -192,14 +191,13 @@ def client_env(web_server_process, monkeypatch):
 @pytest.fixture(scope="function")
 def requester_no_retry(client_env):
     """Create a requester with no retry logic.
-    
+
     Useful for tests that need to verify error handling without retries.
-    
+
     Args:
         client_env: The client environment URL
-        
+
     Returns:
         Requester: A requester instance with retries_timeout=0
     """
     return Requester(client_env, retries_timeout=0)
-

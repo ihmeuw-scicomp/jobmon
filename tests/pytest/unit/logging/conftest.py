@@ -71,7 +71,9 @@ def component(request) -> ComponentConfig:
     return request.param
 
 
-@pytest.fixture(params=[c for c in COMPONENTS if c.has_otlp_flush], ids=lambda c: c.name)
+@pytest.fixture(
+    params=[c for c in COMPONENTS if c.has_otlp_flush], ids=lambda c: c.name
+)
 def component_with_otlp_flush(request) -> ComponentConfig:
     """Parameterized fixture for components that flush OTLP on exit.
 
@@ -168,4 +170,3 @@ loggers:
     level: DEBUG
     propagate: false
 """
-

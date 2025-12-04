@@ -14,16 +14,15 @@ import os
 import pathlib
 import tempfile
 
-import pytest
-
 # =============================================================================
 # PYTEST CONFIGURATION HOOK
 # =============================================================================
 # This MUST stay in conftest.py - it's a pytest hook that runs before collection
 
+
 def pytest_configure(config):
     """Configure pytest - set up environment variables before any imports happen.
-    
+
     IMPORTANT for pytest-xdist:
     - Main process sets up placeholder environment for test collection
     - Each worker process inherits environment but needs its OWN database
@@ -32,7 +31,7 @@ def pytest_configure(config):
     """
     worker_id = os.environ.get("PYTEST_XDIST_WORKER")
     is_worker = worker_id is not None
-    
+
     # Workers ALWAYS need setup, even if they inherited env vars from main process
     # The key insight: workers inherit the main process's environment, but the
     # main process's database is NOT initialized (it's just a placeholder).
@@ -41,24 +40,28 @@ def pytest_configure(config):
         # Reset any cached config from main process
         try:
             import jobmon.server.web.config as config_module
+
             config_module._jobmon_config = None
         except ImportError:
             pass
         try:
             import jobmon.server.web.db.engine as engine_module
+
             engine_module._engine = None
             engine_module._SessionMaker = None
         except ImportError:
             pass
-    
+
     # Set up environment: either first time (main) or reset for worker
     if not os.environ.get("JOBMON__DB__SQLALCHEMY_DATABASE_URI") or is_worker:
         # Create unique temp directory for this process
         tmp_dir = tempfile.mkdtemp()
-        
+
         if is_worker:
             # Worker: use worker-specific database name
-            temp_sqlite_file = pathlib.Path(tmp_dir, f"tests_{worker_id}.sqlite").resolve()
+            temp_sqlite_file = pathlib.Path(
+                tmp_dir, f"tests_{worker_id}.sqlite"
+            ).resolve()
         else:
             # Main process: placeholder for test collection
             temp_sqlite_file = pathlib.Path(tmp_dir, "temp_collection.sqlite").resolve()
@@ -88,23 +91,21 @@ def pytest_configure(config):
 # Pytest automatically discovers fixtures in conftest.py and its imports.
 
 from tests.pytest.fixtures.database import (
-    setup_test_environment,
     db_engine,
+    setup_test_environment,
 )
-
 from tests.pytest.fixtures.server import (
     WebServerProcess,
     api_prefix,
-    web_server_process,
     client_env,
     requester_no_retry,
+    web_server_process,
 )
-
+from tests.pytest.fixtures.workflows import _get_task_template as get_task_template
 from tests.pytest.fixtures.workflows import (
-    tool,
-    task_template,
     array_template,
-    _get_task_template as get_task_template,
+    task_template,
+    tool,
 )
 
 # Re-export for backwards compatibility with any code that imports from conftest
