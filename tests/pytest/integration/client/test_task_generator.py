@@ -44,7 +44,7 @@ def test_simple_task(client_env, monkeypatch: pytest.fixture) -> None:
     # Verify command
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
-        f" --module_name tests.pytest.worker_node.test_task_generator"
+        f" --module_name tests.pytest.integration.client.test_task_generator"
         " --func_name simple_function"
         " foo='1'"
         " bar='b a z'"
@@ -192,7 +192,7 @@ def test_list_args(client_env, monkeypatch: pytest.fixture) -> None:
     # Verify command
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
-        f" --module_name tests.pytest.worker_node.test_task_generator"
+        f" --module_name tests.pytest.integration.client.test_task_generator"
         " --func_name list_function"
         " foo='[a,b b]'"
         " bar='[c\"]'"
@@ -246,7 +246,7 @@ def test_naming_args(
     # Verify command
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
-        f" --module_name tests.pytest.worker_node.test_task_generator"
+        f" --module_name tests.pytest.integration.client.test_task_generator"
         " --func_name simple_function"
         " foo='1'"
         " bar='baz'"
@@ -872,7 +872,7 @@ def test_simple_task_array(client_env, monkeypatch: pytest.fixture) -> None:
         # Verify command
         expected_command = (
             f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
-            f" --module_name tests.pytest.worker_node.test_task_generator"
+            f" --module_name tests.pytest.integration.client.test_task_generator"
             " --func_name simple_function"
             f" foo='{i}'"
             " bar='baz'"
@@ -948,7 +948,7 @@ def test_array_list_arg(client_env, monkeypatch: pytest.fixture) -> None:
         # Verify command
         expected_command = (
             f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
-            f" --module_name tests.pytest.worker_node.test_task_generator"
+            f" --module_name tests.pytest.integration.client.test_task_generator"
             " --func_name simple_function"
             f" foo='{i}'"
             " bar='[a,b]'"
@@ -1150,7 +1150,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
     # Verify command
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
-        f" --module_name tests.pytest.worker_node.test_task_generator"
+        f" --module_name tests.pytest.integration.client.test_task_generator"
         " --func_name simple_function"
         " yr='2020-2021'"
         " v='[1.0, 2.0]'"
@@ -1175,7 +1175,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
     # Verify command
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
-        f" --module_name tests.pytest.worker_node.test_task_generator"
+        f" --module_name tests.pytest.integration.client.test_task_generator"
         " --func_name simple_function"
         " yr='2020-2021'"
         " v='[1.0, 2.0]'"
@@ -1202,7 +1202,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
     # Verify command
     expected_command1 = (
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
-        f" --module_name tests.pytest.worker_node.test_task_generator"
+        f" --module_name tests.pytest.integration.client.test_task_generator"
         " --func_name simple_function"
         " yr='2020-2021'"
         " v='[1.0, 2.0]'"
@@ -1215,7 +1215,7 @@ def test_fhs_task(client_env, monkeypatch) -> None:
     # Verify command
     expected_command2 = (
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
-        f" --module_name tests.pytest.worker_node.test_task_generator"
+        f" --module_name tests.pytest.integration.client.test_task_generator"
         " --func_name simple_function"
         " yr='2020-2021'"
         " v='[1.0, 2.0]'"
@@ -1445,7 +1445,7 @@ def test_naming_func(client_env, monkeypatch: pytest.fixture) -> None:
     # Verify command
     expected_command = (
         f"{task_generator.TASK_RUNNER_NAME} {task_generator.TASK_RUNNER_SUB_COMMAND}"
-        f" --module_name tests.pytest.worker_node.test_task_generator"
+        f" --module_name tests.pytest.integration.client.test_task_generator"
         " --func_name simple_function"
         " foo='1'"
         " bar='baz'"
