@@ -282,3 +282,4 @@ class TestLoggingConsistency:
 
                 assert isinstance(cli, CLI)
 
+
