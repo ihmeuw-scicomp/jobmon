@@ -26,21 +26,51 @@ _api_prefix = "/api/v3"
 
 
 def pytest_configure(config):
-    """Configure pytest - set up environment variables before any imports happen."""
-    # Only set up database config during test collection/execution
-    # This ensures environment variables are available when modules are imported
-    if not os.environ.get("JOBMON__DB__SQLALCHEMY_DATABASE_URI"):
-        # Set a temporary database URI for test collection/imports
-        # This will be updated later in setup_test_environment with proper worker isolation
+    """Configure pytest - set up environment variables before any imports happen.
+    
+    IMPORTANT for pytest-xdist:
+    - Main process sets up placeholder environment for test collection
+    - Each worker process inherits environment but needs its OWN database
+    - Workers are identified by PYTEST_XDIST_WORKER env var (gw0, gw1, etc.)
+    - Each worker creates a unique database in setup_test_environment fixture
+    """
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER")
+    is_worker = worker_id is not None
+    
+    # Workers ALWAYS need setup, even if they inherited env vars from main process
+    # The key insight: workers inherit the main process's environment, but the
+    # main process's database is NOT initialized (it's just a placeholder).
+    # Each worker must create and initialize its own database.
+    if is_worker:
+        # Reset any cached config from main process
+        try:
+            import jobmon.server.web.config as config_module
+            config_module._jobmon_config = None
+        except ImportError:
+            pass
+        try:
+            import jobmon.server.web.db.engine as engine_module
+            engine_module._engine = None
+            engine_module._SessionMaker = None
+        except ImportError:
+            pass
+    
+    # Set up environment: either first time (main) or reset for worker
+    if not os.environ.get("JOBMON__DB__SQLALCHEMY_DATABASE_URI") or is_worker:
+        # Create unique temp directory for this process
         tmp_dir = tempfile.mkdtemp()
-        temp_sqlite_file = pathlib.Path(tmp_dir, "temp_collection.sqlite").resolve()
+        
+        if is_worker:
+            # Worker: use worker-specific database name
+            temp_sqlite_file = pathlib.Path(tmp_dir, f"tests_{worker_id}.sqlite").resolve()
+        else:
+            # Main process: placeholder for test collection
+            temp_sqlite_file = pathlib.Path(tmp_dir, "temp_collection.sqlite").resolve()
 
         # Set minimal environment variables needed for module imports
         test_vars = {
-            # Temporary database URI for collection - will be updated in session fixture
             "JOBMON__DB__SQLALCHEMY_DATABASE_URI": f"sqlite:////{temp_sqlite_file}",
             "JOBMON__DB__SQLALCHEMY_CONNECT_ARGS": "{}",  # No SSL for SQLite
-            "JOBMON__DB__NEEDS_WORKER_SETUP": "true",  # Flag to update URI in session fixture
             # Essential test settings
             "JOBMON__AUTH__ENABLED": "false",
             "JOBMON__HTTP__ROUTE_PREFIX": "/api/v3",
@@ -52,47 +82,37 @@ def pytest_configure(config):
             "JOBMON__HEARTBEAT__WORKFLOW_RUN_INTERVAL": "1",
             "JOBMON__HEARTBEAT__TASK_INSTANCE_INTERVAL": "1",
         }
-
         os.environ.update(test_vars)
 
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_environment():
-    """Set up test environment with per-worker databases - runs automatically."""
-    # Now worker ID should be properly set by pytest-xdist
+    """Set up test environment - runs automatically at session start.
+    
+    Database URI and singletons are already configured in pytest_configure.
+    This fixture ensures singletons are clean for the session and provides
+    the database path for other fixtures.
+    """
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
-
-    # Set up unique database for this worker if needed
-    if os.environ.get("JOBMON__DB__NEEDS_WORKER_SETUP"):
-        # Create unique database per worker (different from temp collection DB)
-        tmp_dir = tempfile.mkdtemp()
-        sqlite_file = pathlib.Path(tmp_dir, f"tests_{worker_id}.sqlite").resolve()
-
-        # Update the database URI now that we have the correct worker ID
-        os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"] = f"sqlite:////{sqlite_file}"
-
-        # Clean up the setup flag
-        del os.environ["JOBMON__DB__NEEDS_WORKER_SETUP"]
-    else:
-        # Database URI was already set (non-xdist run or already configured)
-        db_uri = os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"]
-        sqlite_file = pathlib.Path(db_uri[11:])  # Remove 'sqlite:////' prefix
+    db_uri = os.environ["JOBMON__DB__SQLALCHEMY_DATABASE_URI"]
+    
+    # Extract SQLite file path from URI (remove 'sqlite:////' prefix)
+    sqlite_file = pathlib.Path(db_uri[11:])
 
     print(f"Worker {worker_id}: Setting up test environment")
     print(f"Worker {worker_id}: SQLite file at {sqlite_file}")
 
-    # Reset singletons for clean test state - important after URI change
+    # Reset singletons for clean test state (may have been set in pytest_configure,
+    # but we reset again here to ensure clean state at fixture resolution time)
     import jobmon.server.web.config as config_module
-
     config_module._jobmon_config = None
 
     import jobmon.server.web.db.engine as engine_module
-
     engine_module._engine = None
     engine_module._SessionMaker = None
 
     print(f"Worker {worker_id}: Environment setup complete")
-    yield sqlite_file  # This becomes the fixture value
+    yield sqlite_file
     print(f"Worker {worker_id}: Environment teardown")
 
 
@@ -103,19 +123,30 @@ def api_prefix():
 
 @pytest.fixture(scope="session")
 def db_engine(setup_test_environment) -> Engine:
+    """Initialize and return the database engine.
+    
+    CRITICAL: Reset singletons before initialization to prevent stale
+    references from earlier fixture resolution or other workers.
+    """
     from jobmon.server.web.config import get_jobmon_config
     from jobmon.server.web.db import init_db
+    import jobmon.server.web.db.engine as engine_module
+    import jobmon.server.web.config as config_module
 
     worker_id = os.environ.get("PYTEST_XDIST_WORKER", "main")
+    
+    # CRITICAL: Reset singletons to prevent stale references
+    # This is necessary because fixtures might run in unexpected order
+    # with pytest-xdist, and singletons could be initialized with wrong values
+    config_module._jobmon_config = None
+    engine_module._engine = None
+    engine_module._SessionMaker = None
+    
     config = get_jobmon_config()
-
-    # Verify configuration
     db_uri = config.get("db", "sqlalchemy_database_uri")
-    print(f"Worker {worker_id}: Database URI from config: {db_uri}")
     assert "sqlite" in db_uri, f"Expected SQLite URI but got: {db_uri}"
 
     # Initialize database - each worker has its own, so no race conditions
-    print(f"Worker {worker_id}: Initializing database")
     init_db()
 
     # Create and return engine

@@ -7,18 +7,18 @@ The goal is to understand test coverage, identify overlaps, and plan for reorgan
 
 | Directory | Test Files | Test Count | Focus Area |
 |-----------|-----------|------------|------------|
-| `core/` | 11 | 43 | Core utilities, configuration, OTLP, logging |
+| `core/` | 6 | ~20 | Configuration, utilities, requester, cluster |
 | `plugins/` | 2 | 2 | Distributor plugins |
 | `distributor/` | 5 | 12 | Task distribution logic |
 | `workflow_reaper/` | 3 | 10 | Workflow cleanup |
 | `swarm/` | 3 | 14 | Swarm-specific tests |
-| `end_to_end/` | 4 | 15 | Full workflow tests |
-| `integration/` | 5 | 39 | Cross-component logging integration |
+| `end_to_end/` | 2 | 12 | Full workflow tests |
 | `cli/` | 3 | 44 | CLI commands and routes |
 | `worker_node/` | 2 | 59 | Task execution, generators |
-| `server/` | 9 | 99 | Server routes, database, logging |
-| `client/` | 21 | ~355 | Client-side logic (swarm, workflow_run_impl) |
-| **Total** | **68** | **~739** | |
+| `server/` | 8 | ~90 | Server routes, database (logging moved) |
+| `client/` | 19 | ~335 | Client-side logic (logging moved) |
+| `logging/` | 15 | ~150 | **ALL logging tests consolidated** |
+| **Total** | **68** | **~748** | |
 
 ---
 
@@ -865,17 +865,11 @@ The goal is to understand test coverage, identify overlaps, and plan for reorgan
 | `test_representation.py` | 1 | __repr__ method tests |
 | `test_tool_version.py` | 1 | Tool version template loading |
 
-### Subdirectory: `swarm/workflow_run/`
-
-| File | Tests | Description |
-|------|-------|-------------|
-| `test_gateway.py` | ~40 | ServerGateway HTTP communication tests |
-| `test_builder.py` | ~10 | SwarmBuilder construction tests |
-
 ### Subdirectory: `swarm/workflow_run_impl/`
 
 | File | Tests | Description |
 |------|-------|-------------|
+| `test_builder.py` | ~18 | SwarmBuilder construction tests |
 | `test_synchronizer.py` | ~25 | Synchronizer unit tests (triage, task updates, concurrency) |
 | `test_gateway.py` | ~30 | Gateway response dataclasses and async method tests |
 | `test_orchestrator.py` | ~60 | WorkflowRunOrchestrator unit tests (config, init, run, teardown) |
@@ -883,32 +877,44 @@ The goal is to understand test coverage, identify overlaps, and plan for reorgan
 | `test_heartbeat.py` | ~25 | HeartbeatService unit tests (tick, background loop) |
 | `test_state.py` | ~35 | SwarmState and StateUpdate unit tests |
 
-**Notes**: The `client/swarm/` tests are pure unit tests with extensive mocking, testing the new swarm architecture components in isolation.
+**Notes**: The `client/swarm/` tests are pure unit tests with extensive mocking, testing the new swarm architecture components in isolation. (The `workflow_run/` directory was removed - `test_builder.py` consolidated here.)
 
 ---
 
 ## Analysis and Findings
 
-### 🔴 Critical Issues Found
+### ✅ Issues Fixed (Phase 1 Complete)
 
-#### 1. **Duplicate Test File (HIGH PRIORITY)**
+#### 1. **Duplicate Test File** - FIXED ✅
 ```
-tests/pytest/client/swarm/workflow_run/test_gateway.py
-tests/pytest/client/swarm/workflow_run_impl/test_gateway.py
+tests/pytest/client/swarm/workflow_run/test_gateway.py  ← DELETED
+tests/pytest/client/swarm/workflow_run_impl/test_gateway.py  ← KEPT
 ```
-These files are **100% identical** (same MD5 hash: `166fbf5a4bf84d909101df4879ce195d`).
-This means ~40 tests are running twice unnecessarily.
+~40 duplicate tests removed.
 
-**Action**: Delete `workflow_run/test_gateway.py` and keep only `workflow_run_impl/test_gateway.py`
-
-#### 2. **Confusing Directory Structure**
+#### 2. **Directory Structure** - FIXED ✅
 ```
-client/swarm/workflow_run/       (2 test files)
-client/swarm/workflow_run_impl/  (6 test files)
+client/swarm/workflow_run/       ← DELETED (directory removed)
+client/swarm/workflow_run_impl/  ← Now contains all swarm tests (7 files)
 ```
-Both directories test the same swarm architecture but have overlapping purposes.
+`test_builder.py` moved to `workflow_run_impl/`.
 
-**Action**: Consolidate into a single `client/swarm/` directory or clarify naming.
+#### 3. **Session-Scoped Fixtures** - FIXED ✅
+```python
+# conftest.py - fixtures now session-scoped:
+@pytest.fixture(scope="session")
+def client_env(...)   # Was function-scoped
+
+@pytest.fixture(scope="session")  
+def tool(...)         # Was function-scoped
+
+@pytest.fixture(scope="session")
+def task_template(...)  # Was function-scoped
+
+@pytest.fixture(scope="session")
+def array_template(...)  # Was function-scoped
+```
+Estimated speedup: ~12.5 seconds across test suite.
 
 ---
 
@@ -979,27 +985,45 @@ Both directories test the same swarm architecture but have overlapping purposes.
 
 ### 🎯 Recommended Actions
 
-#### Immediate (Quick Wins)
+#### ✅ Immediate (Quick Wins) - COMPLETED
 
-1. **Delete duplicate file**:
-   ```bash
-   rm tests/pytest/client/swarm/workflow_run/test_gateway.py
-   ```
+1. ~~**Delete duplicate file**~~ ✅ Done
+2. ~~**Session-scope tool/task_template fixtures**~~ ✅ Done
+3. ~~**Merge `workflow_run/` into `workflow_run_impl/`**~~ ✅ Done
 
-2. **Session-scope tool/task_template fixtures** in `conftest.py`:
-   ```python
-   @pytest.fixture(scope="session")
-   def tool(...):
-       ...
-   ```
+#### ✅ Short-term (Consolidation) - Phase 2 COMPLETED
 
-#### Short-term (Consolidation)
+4. ~~**Create logging test base class**~~ ✅ Done - Created `logging/` directory with ALL logging tests
 
-3. **Merge `workflow_run/` into `workflow_run_impl/`**:
-   - Move `test_builder.py` to `workflow_run_impl/`
-   - Delete empty `workflow_run/` directory
+**New `logging/` directory structure:**
+```
+tests/pytest/logging/
+├── __init__.py
+├── conftest.py                  # Component configurations and shared fixtures
+├── test_components.py           # 30 parameterized CLI/config tests (4 components)
+├── test_component_logging.py    # Core component logging utility tests
+├── test_logconfig_overrides.py  # Configuration override system tests
+├── test_otlp.py                 # Core OTLP manager/handler tests
+├── test_structlog_context.py    # Structlog context/telemetry isolation
+├── test_structlog_detection.py  # Structlog integration detection
+├── test_cross_component.py      # Cross-component logging scenarios
+├── test_client_logging.py       # Client-specific logging integration
+├── test_server_logging.py       # Server logging configuration
+├── test_server_otlp.py          # Server OTLP integration
+├── test_output_capture.py       # Stdout/stderr capture (e2e)
+└── test_scheduler.py            # Scheduler logging
+```
 
-4. **Create logging test base class** for component tests:
+**Files removed from other directories:**
+- `core/`: test_otlp.py, test_jobmon_context.py, test_structlog_detection.py, test_component_logging.py, test_configuration_overrides.py
+- `integration/`: ALL files (directory deleted)
+- `client/`: test_client_logging.py
+- `server/`: test_server_otlp.py (test_server_logging.py trimmed to request-handling tests only)
+- `end_to_end/`: test_logging.py, test_scheduler_logging.py
+
+**Result:** Single authoritative location for all logging tests (~150 tests in 15 files).
+
+#### Medium-term (Further Consolidation) - Phase 3:
    ```python
    class ComponentLoggingTestBase:
        component_name: str
@@ -1030,17 +1054,24 @@ Both directories test the same swarm architecture but have overlapping purposes.
 
 ### 📈 Metrics Summary
 
-| Metric | Value |
-|--------|-------|
-| Total test files | ~69 |
-| Total tests | ~692 |
-| Duplicate tests (to remove) | ~40 |
-| Tests using `client_env` | 178 |
-| Async tests | 106 |
-| Logging-related tests | ~100 |
-| Swarm architecture tests | ~283 |
+| Metric | Before | After Phase 1 |
+|--------|--------|---------------|
+| Total test files | ~69 | ~67 |
+| Total tests | ~739 | ~699 |
+| Duplicate tests | ~40 | 0 ✅ |
+| Swarm directories | 3 | 2 |
+| Tests using `client_env` | 178 | 178 (now session-scoped) |
+| Async tests | 106 | 106 |
+| Logging-related tests | ~100 | ~100 |
+| Swarm architecture tests | ~283 | ~243 |
+
+**Phase 1 Impact:**
+- Removed ~40 duplicate test runs
+- Consolidated swarm tests into single directory
+- Session-scoped fixtures for ~12s speedup
 
 ---
 
 *Last updated: December 2024*
+*Phase 1 completed: December 2024*
 

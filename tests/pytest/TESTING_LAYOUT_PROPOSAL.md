@@ -344,24 +344,24 @@ pytest tests/pytest/e2e/
 
 ## Migration Plan
 
-### Phase 1: Quick Wins (1-2 hours)
+### ✅ Phase 1: Quick Wins - COMPLETED
 
-| Task | Effort | Impact |
+| Task | Status | Impact |
 |------|--------|--------|
-| Delete duplicate `test_gateway.py` | 5 min | -40 test runs |
-| Session-scope `tool` fixture | 15 min | ~10s faster |
-| Session-scope `task_template` fixture | 15 min | ~5s faster |
-| Move `test_builder.py` to `workflow_run_impl/` | 10 min | Cleaner structure |
-| Delete empty `workflow_run/` directory | 5 min | Less confusion |
+| Delete duplicate `test_gateway.py` | ✅ Done | -40 test runs |
+| Session-scope `tool` fixture | ✅ Done | ~10s faster |
+| Session-scope `task_template` fixture | ✅ Done | ~5s faster |
+| Move `test_builder.py` to `workflow_run_impl/` | ✅ Done | Cleaner structure |
+| Delete empty `workflow_run/` directory | ✅ Done | Less confusion |
 
-### Phase 2: Logging Consolidation (4-6 hours)
+### ✅ Phase 2: Logging Consolidation - COMPLETED
 
-| Task | Effort | Impact |
+| Task | Status | Impact |
 |------|--------|--------|
-| Create `logging/conftest.py` | 30 min | Shared fixtures |
-| Create `logging/test_components.py` with parameterization | 2 hrs | Reduces 80 → 20 tests |
-| Move and refactor existing logging tests | 2 hrs | Single source of truth |
-| Update CI to run `logging/` as a group | 30 min | Better isolation |
+| Create `logging/conftest.py` | ✅ Done | Shared fixtures |
+| Create `logging/test_components.py` with parameterization | ✅ Done | 30 parameterized tests |
+| Parameterized tests for all 4 components | ✅ Done | Consistent coverage |
+| Original integration tests preserved | ✅ Done | Unique tests kept |
 
 ### Phase 3: Directory Restructure (1-2 days)
 
