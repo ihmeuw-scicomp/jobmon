@@ -769,7 +769,9 @@ async def log_distributor_id(
     for attempt in range(max_retries):
         try:
             task_instance.distributor_id = data["distributor_id"]
-            task_instance.report_by_date = add_time(data["next_report_increment"], dialect)
+            task_instance.report_by_date = add_time(
+                data["next_report_increment"], dialect
+            )
             # release locks immediately
             db.commit()
             update_successful = True
@@ -820,7 +822,13 @@ async def log_distributor_id(
         if status is not None:
             # need to log report_by_date to avoid race condition
             # this already has retry logic
-            transit_ti_and_t(task_instance, status, db, data["next_report_increment"], dialect=dialect)
+            transit_ti_and_t(
+                task_instance,
+                status,
+                db,
+                data["next_report_increment"],
+                dialect=dialect,
+            )
             db.commit()  # commit any additional changes from transit
             return JSONResponse(
                 content={"message": "Task instance transitioned to LAUNCHED"},

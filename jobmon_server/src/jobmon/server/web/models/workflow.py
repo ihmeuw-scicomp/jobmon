@@ -125,7 +125,9 @@ class Workflow(Base):
         ]
 
         if not any(linked_wfr) and self.ready_to_link:
-            workflow_run.heartbeat(next_report_increment, dialect, WorkflowRunStatus.LINKING)
+            workflow_run.heartbeat(
+                next_report_increment, dialect, WorkflowRunStatus.LINKING
+            )
             current_wfr = [(workflow_run.id, workflow_run.status)]
         # active workflow run, don't bind.
         elif not any(linked_wfr) and not self.ready_to_link:

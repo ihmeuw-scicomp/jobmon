@@ -70,7 +70,9 @@ async def add_workflow_run(request: Request, db: Session = Depends(get_db)) -> A
     # Any other actively linking workflows will return the incorrect workflow run id
 
     dialect = get_dialect(request)
-    active_workflow_run = workflow.link_workflow_run(workflow_run, next_heartbeat, dialect)
+    active_workflow_run = workflow.link_workflow_run(
+        workflow_run, next_heartbeat, dialect
+    )
     db.flush()
 
     try:
@@ -424,7 +426,8 @@ async def set_status_for_triaging(
                         TaskInstance.report_by_date <= update_time,
                         # Exclude recently changed status tasks (likely retries)
                         # use 2 jobmon heartbeat interval as a buffer
-                        TaskInstance.status_date <= subtract_time(hb_buffer * 2, get_dialect(request)),
+                        TaskInstance.status_date
+                        <= subtract_time(hb_buffer * 2, get_dialect(request)),
                     )
                 )
                 .values(

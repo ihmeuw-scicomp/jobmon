@@ -2,7 +2,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from importlib import import_module
-from typing import List, Optional
+from typing import AsyncIterator, List, Optional
 
 # Additional imports for middlewares and dependencies
 from fastapi import Depends, FastAPI
@@ -27,8 +27,8 @@ log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def app_lifespan(app: FastAPI):
-    """Combined lifespan for all application resources.
+async def app_lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Manage combined lifespan for all application resources.
 
     Manages:
     - Database engine lifecycle (creation on startup, disposal on shutdown)

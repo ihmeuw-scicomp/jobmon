@@ -68,7 +68,9 @@ def load_metadata(session_maker: sessionmaker[Session] | None = None) -> None:
         from jobmon.server.web.db.engine import create_engine_from_config
 
         engine, _, _ = create_engine_from_config()
-        session_maker = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+        session_maker = sessionmaker(
+            bind=engine, autoflush=False, expire_on_commit=False
+        )
 
     with session_maker() as session:
         with session.begin():

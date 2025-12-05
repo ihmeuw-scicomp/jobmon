@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -94,8 +94,8 @@ def create_engine_from_config() -> tuple[Engine, str, Dict[str, Any]]:
 
 
 @asynccontextmanager
-async def db_lifespan(app: "FastAPI"):
-    """FastAPI lifespan context manager for database engine lifecycle.
+async def db_lifespan(app: "FastAPI") -> AsyncIterator[None]:
+    """Manage database engine lifecycle via FastAPI lifespan.
 
     Creates the database engine and sessionmaker on startup, stores them
     in app.state, and properly disposes of the engine on shutdown.

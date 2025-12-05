@@ -193,7 +193,8 @@ def test_triaging_to_specific_error(
             update(TaskInstance)
             .where(TaskInstance.task_id.in_([tis[x].task_id for x in range(len(tis))]))
             .values(
-                report_by_date=subtract_time(500, dialect), status=TaskInstanceStatus.TRIAGING
+                report_by_date=subtract_time(500, dialect),
+                status=TaskInstanceStatus.TRIAGING,
             )
         )
         session.execute(update_stmt)
