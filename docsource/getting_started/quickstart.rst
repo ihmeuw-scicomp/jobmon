@@ -66,8 +66,8 @@ Let's create a simple workflow that runs a few commands.
          workflow.add_tasks([task1, task2])
          
          # 7. Run the workflow
-         result = workflow.run()
-         print(f"Workflow completed with status: {result.final_status}")
+         status = workflow.run()
+         print(f"Workflow completed with status: {status}")
 
    .. group-tab:: R
 

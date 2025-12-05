@@ -76,6 +76,7 @@ Sections
    testing
    continuous_integration
    deployments-brief
+   logging_architecture
 
 See Also
 ========

@@ -4,219 +4,145 @@ Logging Guide
 
 Jobmon ships with a :mod:`structlog`-based logging stack that captures
 telemetry metadata by default while keeping host applications in control of
-console rendering.  This guide focuses on day-to-day behaviour, integration
-patterns, and configuration options.
+console rendering.
 
-For the detailed architectural blueprint refer to :doc:`architecture`.
+For implementation details, see :doc:`/developers_guide/logging_architecture`.
 
-Core Principles
-===============
+Key Behaviors
+=============
 
-* **Automatic telemetry** – workflow metadata is collected as soon as Jobmon
-  binds context; no explicit initialisation is required.
-* **Explicit console output** – ``workflow.run()`` is silent unless you
-  request logging (for example ``workflow.run(configure_logging=True)`` or by
-  wiring up custom handlers).
-* **Metadata isolation** – telemetry fields stay on loggers that belong to the
-  Jobmon namespace (``jobmon.*`` by default) so the host application's output
-  is not polluted.
-* **Direct-rendering friendly** – when hosts render events themselves (for
-  example via ``structlog.PrintLoggerFactory``), Jobmon mirrors the structured
-  event into stdlib handlers so OTLP exporters still see the full payload.
-* **Safe integration** – host :mod:`structlog` configuration remains in
-  control; Jobmon only prepends the processors it requires.
+* **Silent by default** – ``workflow.run()`` produces no console output unless 
+  you explicitly enable logging.
+* **Easy to enable** – Use ``workflow.run(configure_logging=True)`` to enable
+  console output with sensible defaults.
+* **OTLP telemetry** – When configured, workflow metadata is automatically
+  exported to your telemetry backend.
+* **Host-friendly** – If your application already configures structlog, Jobmon
+  integrates without disrupting your setup.
 
-All telemetry metadata uses the ``telemetry_`` prefix for automatic namespacing,
-including identifiers such as ``telemetry_workflow_run_id``, ``telemetry_task_instance_id``,
-``telemetry_array_id`` and ``telemetry_tool_version_id``. The prefix is added automatically
-by ``set_jobmon_context`` and ``@bind_context``, and stripped when exporting to OTLP.
+Quick Start
+===========
 
-Quick Start – Host Applications
-===============================
+Enable Console Logging
+----------------------
 
-The logging stack is designed to co-operate with existing host configuration.
-
-FHS-style Application
----------------------
+The simplest way to see Jobmon logs:
 
 .. code-block:: python
 
-   import logging
+   from jobmon.client.api import Tool
+
+   tool = Tool("my_tool")
+   wf = tool.create_workflow("my_workflow")
+   # ... add tasks ...
+   
+   wf.run(configure_logging=True)  # Enables console output
+
+Without ``configure_logging=True``, the workflow runs silently (telemetry is
+still captured if OTLP is configured).
+
+Host Application Integration
+----------------------------
+
+If your application already configures structlog, Jobmon adapts automatically:
+
+.. code-block:: python
+
    import structlog
 
-   # Host logging configuration
+   # Your application's structlog configuration
    structlog.configure(
-       processors=[my_metadata_stamper, my_fhs_renderer],
+       processors=[my_custom_processor, my_renderer],
        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
    )
 
    from jobmon.client.api import Tool
-
+   
    wf = Tool("my_tool").create_workflow("my_workflow")
-   wf.bind()
+   wf.run()  # Jobmon adapts to your structlog config
 
-   wf.run()                       # Silent – telemetry captured only
-   wf.run(configure_logging=True) # Console output rendered by host processors + OTLP
+Jobmon prepends its processors to your chain but leaves your renderer in
+control, so logs appear in your preferred format.
 
-What you see:
+Configuration
+=============
 
-* Application logs are unchanged.
-* Jobmon console output only appears when explicitly enabled and uses your
-  renderer.
-* Telemetry is captured and exported whenever OTLP logging is enabled—even for
-  direct-rendering hosts—because Jobmon forwards structured events to the OTLP
-  handler on your behalf.
+Enable OTLP Log Export
+----------------------
 
-Lazy Configuration
-------------------
-
-Jobmon defers structlog setup until the first workflow operation.  Whether the
-host configures structlog before or after importing Jobmon, the behaviour is
-identical.
-
-.. code-block:: python
-
-   structlog.configure(processors=[...])
-   import jobmon.client
-   workflow.run()  # ✅ adapts to host config
-
-   import jobmon.client
-   structlog.configure(processors=[...])
-   workflow.run()  # ✅ still adapts
-
-Quick Start – Jobmon Developers
-===============================
-
-Bind telemetry context with the helpers provided in
-``jobmon.core.structlog_utils`` or ``jobmon.core.logging``.
-
-.. code-block:: python
-
-   from jobmon.core.structlog_utils import bind_context
-
-   @bind_context("workflow_run_id", "task_instance_id")
-   def launch_task(workflow_run_id: int, task_instance_id: int):
-       logger = structlog.get_logger(__name__)
-       logger.info("Launching task")
-
-Manual control:
-
-.. code-block:: python
-
-   from jobmon.core.logging import set_jobmon_context, unset_jobmon_context
-
-   set_jobmon_context(workflow_run_id=123, task_instance_id=456)
-   try:
-       logger = structlog.get_logger(__name__)
-       logger.info("Processing task")
-   finally:
-       unset_jobmon_context("workflow_run_id", "task_instance_id")
-
-Telemetry & Console Behaviour
-=============================
-
-* ``set_jobmon_context()`` stores metadata in structlog's context variables with
-  automatic ``telemetry_`` prefixing.
-* Both ``set_jobmon_context`` and ``bind_jobmon_context`` share the same
-  normalization rules, so ``None`` values are dropped automatically and keys are
-  always prefixed consistently.
-* ``create_telemetry_isolation_processor()`` injects metadata into loggers whose
-  names start with configured prefixes (``["jobmon."]`` by default) and removes
-  the metadata for other namespaces.
-* ``_prune_event_dict_for_console()`` strips all keys starting with ``telemetry_``
-  from console output while preserving them for OTLP exports.
-* OTLP handlers strip the ``telemetry_`` prefix before export for backward compatibility.
-* ``_store_event_dict_for_otlp`` copies the event dictionary to thread-local
-  storage when OTLP handlers are active.
-* Console logging is disabled by default; enable via
-  ``workflow.run(configure_logging=True)`` or custom log configuration.
-
-Configuration Examples
-======================
-
-Enable OTLP Telemetry
----------------------
+Configure OTLP log export in your ``jobmonconfig.yaml``:
 
 .. code-block:: yaml
 
    telemetry:
+     deployment_environment: prod
+     
      logging:
        enabled: true
-       log_exporter: otlp_http
+       log_exporter: http_log
+       
        exporters:
-         otlp_http:
-           endpoint: "https://otelcol.example.com"
+         http_log:
+           module: opentelemetry.exporter.otlp.proto.http._log_exporter
+           class: OTLPLogExporter
+           endpoint: "https://otelcol.example.com/v1/logs"
            timeout: 30
 
-Custom Console Logging
-----------------------
+Custom Logconfig File
+---------------------
+
+For advanced customization, provide your own logconfig file:
 
 .. code-block:: yaml
 
+   # In jobmonconfig.yaml
    logging:
      client_logconfig_file: "/path/to/custom_logging.yaml"
 
+Example custom logconfig:
+
 .. code-block:: yaml
 
+   # custom_logging.yaml
    version: 1
-   handlers:
-     custom_console:
-       class: logging.StreamHandler
-       formatter: custom_format
+   disable_existing_loggers: false
+   
    formatters:
-     custom_format:
-       format: "%(asctime)s [%(name)s] %(message)s"
+     structlog_event_only:
+       '()': jobmon.core.config.structlog_formatters.JobmonStructlogEventOnlyFormatter
+   
+   handlers:
+     console:
+       class: logging.StreamHandler
+       level: INFO
+       formatter: structlog_event_only
+     
+     otlp:
+       class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+       level: INFO
+       exporter: {}  # Uses telemetry.logging.exporters config
+   
    loggers:
      jobmon.client:
-       handlers: [custom_console]
-       level: DEBUG
-
-Configure Component Name
--------------------------
-
-.. code-block:: python
-
-   from jobmon.core.config.structlog_config import configure_structlog
-
-   configure_structlog(component_name="client")
-
-Add custom processors without rebuilding the Jobmon defaults::
-
-   from jobmon.core.config.structlog_config import configure_structlog
-
-   configure_structlog(
-       component_name="client",
-       extra_processors=[my_custom_processor],
-   )
+       handlers: [console, otlp]
+       level: INFO
+       propagate: false
 
 FAQ
 ===
 
+Why don't I see any Jobmon logs?
+    Console logging is disabled by default. Use 
+    ``workflow.run(configure_logging=True)`` to enable it.
+
 Why are Jobmon logs formatted like my application logs?
-    Jobmon prepends its processors but leaves your renderer at the end of
-    the chain, so your format applies to every log entry.
-
-Can I surface ``workflow_run_id`` in host logs?
-    Not by default. Fields with the ``telemetry_`` prefix are automatically
-    stripped from console output to keep telemetry separate from user-facing logs.
-    Configure your host renderer to show keys with the ``telemetry_`` prefix if needed.
-
-Does Jobmon slow down logging?
-    Typical overhead is ~3 microseconds per log call (context merge + isolation
-    + OTLP capture when enabled).
+    Jobmon integrates with your existing structlog configuration, so your
+    formatter controls the output style.
 
 Can I use Jobmon without OTLP?
-    Yes.  Telemetry capture runs regardless of the exporter; if no OTLP handler
-    is present the extra processing is skipped.
+    Yes. OTLP is optional. Without it configured, Jobmon just doesn't export
+    telemetry—everything else works normally.
 
-Testing & Support
-=================
-
-Unit tests cover context binding, metadata isolation, custom prefixes, and
-integration with FHS-style renderers (per
-``tests/pytest/core/test_jobmon_context.py``).
-
-Integration suites verify stdlib versus direct rendering hosts, OTLP export, and
-lazy configuration paths.  For additional help open an issue in the Jobmon
-repository or continue with :doc:`architecture` for implementation details.
-
+My OTLP logs are missing workflow metadata
+    Ensure ``telemetry.logging.enabled: true`` in your jobmonconfig and that
+    the OTLP handler is properly configured on ``jobmon.*`` loggers.
