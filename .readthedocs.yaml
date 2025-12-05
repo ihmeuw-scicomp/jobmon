@@ -4,13 +4,17 @@
 
 version: 2
 
+versions:
+  only:
+    - release/*
+
 build:
   os: ubuntu-22.04
   tools:
     python: "3.10"
 
 sphinx:
-   configuration: docsource/conf.py
+  configuration: docsource/conf.py
 
 python:
   install:
