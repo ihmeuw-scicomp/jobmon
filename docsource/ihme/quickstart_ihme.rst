@@ -16,30 +16,24 @@ Before you begin, ensure you have:
 Environment Setup
 =================
 
-Load the Jobmon Module
-----------------------
+Install Jobmon with IHME Configuration
+--------------------------------------
 
-On the IHME cluster, Jobmon is available as a module:
+The easiest way to install Jobmon at IHME is with the IHME installer package,
+which automatically configures the server URL and other IHME-specific settings:
 
 .. code-block:: bash
 
-   module load jobmon
+   pip install jobmon_installer_ihme
 
-Or activate your conda environment with Jobmon installed.
+This installs:
 
-Configuration
--------------
-
-Your ``~/.jobmon.yaml`` should be configured for IHME:
-
-.. code-block:: yaml
-
-   http:
-     service_url: "http://jobmon-service.ihme.washington.edu"
+- ``jobmon_client`` - the Jobmon client library
+- IHME-specific configuration (server URL, etc.)
 
 .. note::
-   Contact Scientific Computing for the current server URL if the above 
-   doesn't work.
+   If you're using a shared conda environment that already has Jobmon installed,
+   you may not need to install it yourself. Check with your team.
 
 Running Your First Workflow
 ===========================
@@ -60,8 +54,7 @@ Running Your First Workflow
 
    .. code-block:: bash
 
-      module load jobmon
-      # Or: conda activate your_env
+      conda activate your_env  # Environment with jobmon_installer_ihme installed
 
 4. **Run your workflow**:
 
@@ -132,9 +125,12 @@ CLI Commands
 Getting Help at IHME
 ====================
 
-- **Slack**: ``#jobmon`` channel
+- **Slack**: ``#jobmon-users`` channel
+- **GUI**: https://jobmon-gui.ihme.washington.edu
 - **Documentation**: https://jobmon.readthedocs.io
 - **Office Hours**: Check IHME intranet for schedule
+
+For more help, see :doc:`support`.
 
 Next Steps
 ==========

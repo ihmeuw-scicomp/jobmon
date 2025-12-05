@@ -12,7 +12,7 @@ Slack
 
 The primary channel for Jobmon support is Slack:
 
-- **Channel**: ``#jobmon-users`` (or ask your team for the current channel)
+- **Channel**: ``#jobmon-users``
 - **Response time**: Usually within a few hours during business hours
 
 When asking for help, please include:
@@ -90,5 +90,5 @@ If you find a bug in Jobmon:
    - Steps to reproduce
    - Expected behavior
    - Actual behavior
-   - Jobmon version (``python -c "import jobmon.client; print(jobmon.client.__version__)"``
+   - Jobmon version (``python -c "import jobmon.client; print(jobmon.client.__version__)"``)
 
