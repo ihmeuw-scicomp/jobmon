@@ -71,26 +71,30 @@ With options:
 
 .. code-block:: python
 
-   result = workflow.run(
-       resume=True,          # Resume if workflow exists
-       fail_fast=True,       # Stop on first failure
-       configure_logging=True # Enable console logging
+   status = workflow.run(
+       resume=True,               # Resume if workflow exists
+       fail_fast=True,            # Stop on first failure
+       seconds_until_timeout=7200 # 2 hour timeout
    )
 
 Checking Results
 ----------------
 
+The ``run()`` method returns a status string:
+
 .. code-block:: python
 
    from jobmon.core.constants import WorkflowRunStatus
    
-   result = workflow.run()
+   status = workflow.run()
    
-   if result.final_status == WorkflowRunStatus.DONE:
-       print(f"Success! {result.done_count} tasks completed")
-   else:
-       print(f"Failed: {result.failed_count} tasks failed")
-       print(f"Failed task IDs: {result.failed_task_ids}")
+   if status == WorkflowRunStatus.DONE:
+       print("Workflow completed successfully!")
+   elif status == WorkflowRunStatus.ERROR:
+       print("Workflow failed - check task statuses")
+   
+   # Use CLI or GUI to inspect failures:
+   # jobmon workflow_tasks -w <workflow_id> -s FATAL
 
 Resuming Workflows
 ==================

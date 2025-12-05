@@ -135,10 +135,11 @@ After running a workflow:
 
 .. code-block:: python
 
-   # Get resource usage
+   # Get resource usage for a completed task
    usage = task.resource_usage()
-   print(f"Memory used: {usage['maxrss']}")
-   print(f"Runtime: {usage['runtime']}")
+   print(f"Memory used: {usage['memory']} bytes")
+   print(f"Runtime: {usage['runtime']} seconds")
+   print(f"Attempts: {usage['num_attempts']}")
 
 See Also
 ========

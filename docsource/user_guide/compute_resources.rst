@@ -41,10 +41,13 @@ Resources can be set at multiple levels:
 .. code-block:: python
 
    # Set defaults at tool level
-   tool.set_default_compute_resources({
-       "queue": "all.q",
-       "project": "proj_scicomp"
-   })
+   tool.set_default_compute_resources_from_dict(
+       cluster_name="slurm",
+       compute_resources={
+           "queue": "all.q",
+           "project": "proj_scicomp"
+       }
+   )
    
    # Override at task level
    task = template.create_task(
