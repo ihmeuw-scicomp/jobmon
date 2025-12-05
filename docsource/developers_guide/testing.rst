@@ -32,13 +32,13 @@ Run a specific test file:
 
 .. code-block:: bash
 
-   nox -r -s tests -- tests/pytest/client/test_workflow.py
+   nox -r -s tests -- tests/integration/client/test_workflow.py
 
 Run a single test:
 
 .. code-block:: bash
 
-   nox -r -s tests -- tests/pytest/client/test_workflow.py::test_workflow_bind
+   nox -r -s tests -- tests/integration/client/test_workflow.py::test_workflow_bind
 
 Test Database Setup
 ===================
@@ -50,7 +50,7 @@ Tests use SQLite databases created automatically:
 * The ``db_engine`` fixture creates and migrates the database
 * The ``db_session`` fixture provides a transactional session per test
 
-Key fixtures are defined in ``tests/pytest/fixtures/``:
+Key fixtures are defined in ``tests/fixtures/``:
 
 * ``database.py`` - Database engine and session fixtures
 * ``server.py`` - Web server process and client connection fixtures
@@ -59,24 +59,33 @@ Key fixtures are defined in ``tests/pytest/fixtures/``:
 Test Organization
 =================
 
-Tests are organized by component:
+Tests are organized by test type:
 
-Unit tests:
+Unit tests (``tests/unit/``):
 
-* ``tests/pytest/client/`` - Client library tests
-* ``tests/pytest/server/`` - Server API tests
-* ``tests/pytest/distributor/`` - Distributor tests
-* ``tests/pytest/swarm/`` - Swarm component tests
-* ``tests/pytest/worker_node/`` - Worker node tests
-* ``tests/pytest/workflow_reaper/`` - Reaper tests
+* ``tests/unit/core/`` - Configuration, utilities, templates
+* ``tests/unit/client/`` - Client library unit tests
+* ``tests/unit/server/`` - Server logic unit tests
+* ``tests/unit/swarm/`` - Swarm component unit tests (mocked)
+* ``tests/unit/logging/`` - All logging configuration tests
 
-Integration tests (end-to-end):
+Integration tests (``tests/integration/``):
 
-* ``tests/pytest/end_to_end/`` - Full workflow execution tests
+* ``tests/integration/client/`` - Workflow/task binding, arrays
+* ``tests/integration/server/`` - Database operations, routes
+* ``tests/integration/distributor/`` - Task instantiation, triaging
+* ``tests/integration/swarm/`` - Swarm execution integration
+* ``tests/integration/reaper/`` - Workflow cleanup
+* ``tests/integration/cli/`` - CLI command tests
+
+End-to-end tests (``tests/e2e/``):
+
+* Full workflow execution tests with real distributors
 
 .. note::
-   Integration tests exercise the full workflow from client through server to
-   completion. They require more setup but verify system behavior end-to-end.
+   Unit tests run without a server and are fast (~16 seconds).
+   Integration tests require a server and database.
+   E2E tests exercise complete workflow execution.
 
 Other Test Commands
 ===================

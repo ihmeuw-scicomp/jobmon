@@ -50,6 +50,13 @@ docsource/autoapi/
 # ignore .env
 .env
 node_modules/*
+
+# Ignore local dev config files (contain sensitive endpoints)
+# Keep example files, ignore actual configs
+dev/config/jobmonconfig.local.yaml
+dev/config/logconfig.otlp.yaml
+
+# Legacy location (kept for backwards compatibility during transition)
 docker_config/jobmonconfig.local.yaml
 docker_config/logconfig.otlp.yaml
 

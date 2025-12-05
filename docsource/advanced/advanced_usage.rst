@@ -300,7 +300,7 @@ users need to add a resume parameter to the run() function to resume their Workf
 That's it. If you don't set "resume=True", Jobmon will raise an error saying that the user is
 trying to create a Workflow that already exists.
 
-For more examples, take a look at the `resume tests <https://github.com/ihmeuw-scicomp/jobmon/blob/release/3.2/tests/pytest/end_to_end/test_workflow_resume.py>`_.
+For more examples, take a look at the `resume tests <https://github.com/ihmeuw-scicomp/jobmon/blob/release/3.2/tests/e2e/test_workflow_resume.py>`_.
 
 .. note::
 

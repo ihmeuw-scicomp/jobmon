@@ -10,7 +10,7 @@ import nox
 from nox.sessions import Session
 
 src_locations = ["jobmon_client/src", "jobmon_core/src", "jobmon_server/src"]
-test_locations = ["tests/pytest"]
+test_locations = ["tests"]
 
 
 @nox.session(venv_backend="venv")
