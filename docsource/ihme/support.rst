@@ -12,7 +12,7 @@ Slack
 
 The primary channel for Jobmon support is Slack:
 
-- **Channel**: ``#jobmon`` (or ask your team for the current channel)
+- **Channel**: ``#jobmon-users`` (or ask your team for the current channel)
 - **Response time**: Usually within a few hours during business hours
 
 When asking for help, please include:

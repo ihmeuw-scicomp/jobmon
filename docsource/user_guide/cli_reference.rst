@@ -7,7 +7,7 @@ checking statuses, and performing self-service operations.
 
 .. note::
    This is a summary reference. For detailed examples, see 
-   :doc:`/monitoring_debugging` and :doc:`/advanced/advanced_usage`.
+   :doc:`/advanced/monitoring_debugging` and :doc:`/advanced/advanced_usage`.
 
 Usage
 =====
@@ -211,6 +211,6 @@ See Also
 ========
 
 - :doc:`monitoring` - Monitoring overview
-- :doc:`/monitoring_debugging` - Detailed monitoring guide
+- :doc:`/advanced/monitoring_debugging` - Detailed monitoring guide
 - :doc:`/advanced/advanced_usage` - Advanced CLI usage
 

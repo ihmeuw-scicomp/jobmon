@@ -58,6 +58,8 @@ Table of Contents
 
    advanced/index
    advanced/advanced_usage
+   advanced/task_generator
+   advanced/monitoring_debugging
    advanced/troubleshooting
    advanced/performance
    advanced/migration

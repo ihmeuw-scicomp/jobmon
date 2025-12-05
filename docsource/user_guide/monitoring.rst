@@ -7,7 +7,7 @@ command-line tools, and programmatic access.
 
 .. note::
    This page summarizes monitoring options. For detailed database queries 
-   and status information, see :doc:`/monitoring_debugging`.
+   and status information, see :doc:`/advanced/monitoring_debugging`.
 
 Graphical User Interface (GUI)
 ==============================
@@ -162,12 +162,12 @@ Task Statuses
    * - ERROR_FATAL
      - Task failed and exhausted all retries
 
-For complete status documentation, see :doc:`/monitoring_debugging`.
+For complete status documentation, see :doc:`/advanced/monitoring_debugging`.
 
 See Also
 ========
 
-- :doc:`/monitoring_debugging` - Complete monitoring reference
+- :doc:`/advanced/monitoring_debugging` - Complete monitoring reference
 - :doc:`/advanced/troubleshooting` - Debugging failed workflows
 - :doc:`cli_reference` - Full CLI command reference
 

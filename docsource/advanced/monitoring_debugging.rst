@@ -1,5 +1,3 @@
-:orphan:
-
 ************************
 Monitoring and Debugging
 ************************
@@ -214,7 +212,9 @@ you can query the Jobmon database.
 
 You can view the Jobmon database connection information here: `<https://jobmon-gui.ihme.washington.edu/#/jobmon_at_ihme>`_
 
-.. include:: database-ihme.rst
+.. note::
+   Database connection information often differs between releases. For your
+   particular release, check the GUI or contact your administrator.
 
 .. note::
     Jobmon has a persistent database. This means any time the client side of Jobmon is updated
