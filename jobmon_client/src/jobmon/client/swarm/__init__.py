@@ -1,6 +1,6 @@
 """Swarm package for executing workflow runs.
 
-This package provides the primary API for executing workflows:
+This package provides the primary API for executing workflows::
 
     from jobmon.client.swarm import run_workflow, resume_workflow_run, WorkflowRunConfig
 
@@ -19,7 +19,7 @@ This package provides the primary API for executing workflows:
         distributor_alive=distributor.alive,
     )
 
-For testing purposes, additional components can be imported directly:
+For testing purposes, additional components can be imported directly::
 
     from jobmon.client.swarm.builder import SwarmBuilder
     from jobmon.client.swarm.state import SwarmState

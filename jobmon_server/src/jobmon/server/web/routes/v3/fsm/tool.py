@@ -95,19 +95,20 @@ def get_tool_resource_usage(
     We limit this to one week time spans to not overwhelm the database.
 
     Args:
-        tool_name (str): Name of the tool.
-        start_date (str): The start date in 'YYYY-MM-DD' format (query parameter).
-        end_date (str): The end date in 'YYYY-MM-DD' format (query parameter).
+        tool_name: Name of the tool.
+        start_date: The start date in 'YYYY-MM-DD' format (query parameter).
+        end_date: The end date in 'YYYY-MM-DD' format (query parameter).
 
     Returns:
-        List[Dict[str, Any]]: A list of dictionaries containing TaskInstance ID,
-        node argument value, TaskInstance maxrss, TaskInstance wallclock, and
-        requested resources.
+        A list of dictionaries containing TaskInstance ID, node argument value,
+        TaskInstance maxrss, TaskInstance wallclock, and requested resources.
 
-    Example Call:
+    Example Call::
+
         /tool/large_wf_tool/tool_resource_usage?start_date=2024-07-11&end_date=2024-07-18
 
-    Example Response:
+    Example Response::
+
         [
             {
                 "node_arg_val": "--provenance True",

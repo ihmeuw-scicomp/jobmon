@@ -1,7 +1,8 @@
 """Shared structlog configuration for all jobmon components.
 
 This module provides structlog configuration that enables:
-1. Context variable merging (required for @bind_context decorator)
+
+1. Context variable merging (required for ``@bind_context`` decorator)
 2. Basic stdlib metadata decoration (logger name, level) while deferring
    rendering/formatting to the host application
 3. Optional Jobmon telemetry isolation and OTLP capture
@@ -401,24 +402,26 @@ def configure_structlog(
     """Configure structlog for jobmon components.
 
     This function sets up structlog with processors that:
-    1. Merge context variables (from bind_contextvars and @bind_context decorator)
+
+    1. Merge context variables (from bind_contextvars and ``@bind_context`` decorator)
     2. Add logger metadata (logger name, log level)
     3. Optionally add a component field to the event_dict
     4. Isolate Jobmon telemetry metadata to jobmon.* loggers
     5. Capture the raw event_dict for OTLP handlers
     6. Optionally include extra processors supplied by the caller
 
-    IMPORTANT: This must be called before using the @bind_context decorator
-    or any structlog.contextvars.bind_contextvars() calls.
+    IMPORTANT: This must be called before using the ``@bind_context`` decorator
+    or any ``structlog.contextvars.bind_contextvars()`` calls.
 
     PROCESSOR CHAIN ORDER (after configuration):
+
     1. merge_contextvars (Jobmon context)
     2. component processor (optional, when component_name is provided)
     3. filter_by_level (stdlib)
     4. add_logger_name (stdlib)
     5. add_log_level (stdlib)
     6. telemetry isolation processor
-    7. _store_event_dict_for_otlp (Jobmon OTLP capture)
+    7. ``_store_event_dict_for_otlp`` (Jobmon OTLP capture)
     8. Extra processors supplied via ``extra_processors`` (if any)
     9. ProcessorFormatter.wrap_for_formatter (stdlib - keeps stdlib handlers working)
 
@@ -427,9 +430,10 @@ def configure_structlog(
         extra_processors: Additional structlog processors to append after Jobmon's
             defaults (e.g., custom formatting or telemetry processors)
 
-    Example:
-        >>> # Basic usage
-        >>> configure_structlog(component_name="distributor")
+    Example::
+
+        # Basic usage
+        configure_structlog(component_name="distributor")
     """
     import structlog
 
@@ -584,9 +588,10 @@ def prepend_jobmon_processors_to_existing_config() -> None:
     while preserving the host application's final rendering.
 
     Adapts to the host app's logging architecture:
-    - Stdlib integration adds merge_contextvars, filter_by_level,
-      add_logger_name, and telemetry isolation
-    - Direct rendering (like FHS) adds merge_contextvars and telemetry isolation
+
+    - Stdlib integration adds ``merge_contextvars``, ``filter_by_level``,
+      ``add_logger_name``, and telemetry isolation
+    - Direct rendering (like FHS) adds ``merge_contextvars`` and telemetry isolation
     - Host processors remain untouched so final rendering is preserved
     """
     import structlog

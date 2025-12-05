@@ -1,3 +1,5 @@
+:orphan:
+
 **********
 Quickstart
 **********
@@ -62,7 +64,7 @@ For more about the objects go to :doc:`Core Concepts <core_concepts>`.
     .. group-tab:: R
 
         .. literalinclude:: ./quickstart_health_example.R
-           :language: python
+           :language: r
 
 
 Constructing a Workflow and adding a few Tasks is simple:

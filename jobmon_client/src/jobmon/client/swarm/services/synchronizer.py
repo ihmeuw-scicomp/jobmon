@@ -24,6 +24,7 @@ class Synchronizer:
     """Keeps local workflow run state aligned with the server.
 
     The Synchronizer is responsible for:
+
     - Requesting server to triage overdue task instances
     - Fetching task status updates (full or incremental)
     - Synchronizing workflow-level concurrency limits
@@ -31,7 +32,8 @@ class Synchronizer:
 
     All operations are performed in parallel for better throughput.
 
-    Usage:
+    Example::
+
         sync = Synchronizer(
             gateway=gateway,
             task_ids=set(tasks.keys()),

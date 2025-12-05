@@ -22,37 +22,37 @@ Metallb Deploy
    * - Build Parameters
      - There are no build parameters in this pipeline.
 
+Jobmon UGE Pipelines (Deprecated)
+*********************************
+
+.. warning::
+    The UGE plugin and its CI pipelines are deprecated and no longer in active use.
+    The sections below are preserved for historical reference only.
+
 Jobmon UGE PR Opened
-********************
+^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 25 75
 
    * - Overview
-     - | This pipeline is automatically kicked off when a PR is opened in the Jobmon UGE Plugin.
-       | It runs the test suite, lints, typechecks and builds the docs.
-       | A developer is not allowed to merge their PR unless this build passes.
+     - | This pipeline was automatically kicked off when a PR was opened in the Jobmon UGE Plugin.
+       | It ran the test suite, lints, typechecks and built the docs.
    * - Jenkinsfile Path
      - Scicomp/jobmon_uge/ci/pr_opened.Jenkinsfile
    * - Jenkins URL
      - https://jenkins.scicomp.ihme.washington.edu/job/scicomp/job/jobmon_uge_pr_opened/
-   * - Build Parameters
-     - There are no build parameters in this pipeline.
 
 Jobmon UGE PR Merged
-********************
+^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 25 75
 
    * - Overview
-     - | This pipeline is automatically kicked off when a PR is merged in the Jobmon UGE Plugin.
-       | It runs the test suite, lints, typechecks and builds the docs on the branch the PR was just merged to.
+     - | This pipeline was automatically kicked off when a PR was merged in the Jobmon UGE Plugin.
    * - Jenkinsfile Path
      - Scicomp/jobmon_uge/ci/pr_merged.Jenkinsfile
    * - Jenkins URL
      - https://jenkins.scicomp.ihme.washington.edu/job/scicomp/job/jobmon_uge_pr_merged/
-   * - Build Parameters
-     - * BRANCH_TO_BUILD - A drop down menu of different branches that are built.
-       * DEPLOY_TO_PYPI - Whether or not the pipeline should deploy this version of Jobmon to pypi.
 
 Jonmon Slurm PR Opened
 **********************

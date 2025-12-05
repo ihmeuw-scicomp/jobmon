@@ -111,7 +111,8 @@ class MultiprocessDistributor(ClusterDistributor):
     """Executes tasks locally in parallel.
 
     It uses the multiprocessing Python library and queues to parallelize the execution of
-    tasks. The subprocessing pattern looks like this:
+    tasks. The subprocessing pattern looks like this::
+
         LocalExec
         --> consumer1
         ----> subconsumer1

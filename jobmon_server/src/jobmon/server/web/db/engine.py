@@ -100,7 +100,8 @@ async def db_lifespan(app: "FastAPI") -> AsyncIterator[None]:
     Creates the database engine and sessionmaker on startup, stores them
     in app.state, and properly disposes of the engine on shutdown.
 
-    Usage:
+    Usage::
+
         app = FastAPI(lifespan=db_lifespan)
 
         # In route handlers:

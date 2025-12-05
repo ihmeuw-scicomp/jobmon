@@ -400,13 +400,22 @@ async def _run_orchestrator(
                 raise
             else:
                 logger.info("Continuing jobmon...")
-                # Re-run orchestrator (recursive call, preserve start_time)
+                # Calculate remaining time before recursive call
+                elapsed = time.perf_counter() - start_time
+                remaining_timeout = max(0, timeout - int(elapsed))
+                if remaining_timeout == 0:
+                    raise RuntimeError(
+                        f"Workflow timeout ({timeout} seconds) already exceeded. "
+                        f"Cannot continue."
+                    )
+                # Re-run orchestrator with remaining timeout
+                # (preserve start_time for result calculation)
                 return await _run_orchestrator(
                     state=state,
                     gateway=gateway,
                     distributor_alive=distributor_alive,
                     config=config,
-                    timeout=timeout,
+                    timeout=remaining_timeout,
                     heartbeat_interval=heartbeat_interval,
                     heartbeat_report_by_buffer=heartbeat_report_by_buffer,
                     start_time=start_time,

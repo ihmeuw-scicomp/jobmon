@@ -22,6 +22,9 @@ from jobmon.core.serializers import SerializeClientTool
 
 logger = structlog.get_logger(__name__)
 
+# Default tool name includes username for uniqueness
+_DEFAULT_TOOL_NAME = f"unknown-{getpass.getuser()}"
+
 
 class InvalidToolError(Exception):
     """Exception for Tools that do not exist in the DB."""
@@ -39,7 +42,7 @@ class Tool:
 
     def __init__(
         self,
-        name: str = f"unknown-{getpass.getuser()}",
+        name: str = _DEFAULT_TOOL_NAME,
         active_tool_version_id: Union[str, int] = "latest",
         requester: Optional[Requester] = None,
     ) -> None:

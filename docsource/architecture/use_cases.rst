@@ -62,10 +62,10 @@ System Roles
 
 - Python Control Script
 - R Control Script
-- UGE Distributor (it starts jobs)
+- Slurm Distributor (it starts jobs)
 - cgroups (it kills jobs)
 - OOM Killer (it also kills jobs if cgroups failes)
-- Cluster Distributor (Broadly UGE, Azure, SLURM)
+- Cluster Distributor (Slurm, Azure, or other backends)
 - The Gremlin (a synthetic System Role, it causes hardware to fail)
 
 Domain Objects
@@ -230,14 +230,13 @@ Technically-minded Observers can use the CLI. Distant Observers will only use th
 Jobmon Distributor Use Cases
 ============================
 
-Jobmon submits a Job to the Distributors (Slurm, UGE, single Linux)
--------------------------------------------------------------------
+Jobmon submits a Job to the Distributors (Slurm, local)
+-------------------------------------------------------
 
-- For Slurm, use the Slurm rest API. It could also use the Slurm CLI but currently it does not.
+- For Slurm, use the Slurm REST API. It could also use the Slurm CLI but currently it does not.
   Using the CLI forces certain Jobmon Deployment units to be deployed on Slurm submit hosts.
-  Posting to the Slurm Rest API removes that restriction.
-- For UGE, use the command line (CLI)
-- Multiprocessing and Sequential Distributor use internal APIs
+  Posting to the Slurm REST API removes that restriction.
+- Multiprocessing and Sequential Distributors use internal APIs for local execution
 
 Slurm Use Cases
 ===============
@@ -272,7 +271,6 @@ Slurm Job finishes, with or without error
 
 Cgroups kills a Slurm Job for excess Resource Usage
 ---------------------------------------------------
-This used to happen pre-Buster on UGE, but no longer
 
 - TaskInstance Heartbeat timeouts
 

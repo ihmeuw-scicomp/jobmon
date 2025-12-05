@@ -11,7 +11,7 @@ import threading
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Generator, Optional, Tuple, Type
 
-from . import OTLP_AVAILABLE
+from ._compat import OTLP_AVAILABLE
 
 if OTLP_AVAILABLE:
 
@@ -674,7 +674,8 @@ def create_log_exporter(**kwargs: Any) -> Optional[Any]:
     Returns:
         Pre-configured OTLP log exporter, or None if unavailable
 
-    Example:
+    Example::
+
         exporter = create_log_exporter(
             endpoint="otelcol.dev.aks:443",
             max_batch_size=8

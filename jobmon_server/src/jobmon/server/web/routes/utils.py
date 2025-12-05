@@ -14,6 +14,8 @@ logger = structlog.get_logger(__name__)
 
 
 class User(TypedDict):
+    """User information from OIDC authentication."""
+
     sub: str
     email: str
     preferred_username: str
@@ -32,10 +34,7 @@ class User(TypedDict):
 
 
 def to_user_dict(data: Mapping[str, Any]) -> User:
-    """to_user_dict.
-
-    Converts dict to User TypedDict.
-    """
+    """Convert a dict to User TypedDict."""
     return User(
         sub=data["sub"],
         email=data["email"],
@@ -56,7 +55,7 @@ def to_user_dict(data: Mapping[str, Any]) -> User:
 
 
 def get_user(request: Request) -> User:
-    """get_user.
+    """Get the user from the session.
 
     A shared function to get the user from the session.
     Make it a method to mock in testing.
@@ -71,19 +70,13 @@ def get_user(request: Request) -> User:
 
 
 def get_request_username(request: Request) -> str:
-    """get_request_username.
-
-    Returns the username part of the email address from the request.
-    """
+    """Return the username part of the email address from the request."""
     email = get_user(request)["email"]
     return email.split("@")[0]
 
 
 def user_in_group(request: Request, group: str) -> bool:
-    """user_in_group.
-
-    Check is a user is a member of the specified group.
-    """
+    """Check if a user is a member of the specified group."""
     user = get_user(request)
     groups: List[str] = user["groups"]
     logger.info(f"{groups}")
@@ -93,10 +86,10 @@ def user_in_group(request: Request, group: str) -> bool:
 
 
 def is_super_user(user: User) -> bool:
-    """is_super_user.
+    """Check if a user is a member of the superuser group.
 
     Checks if a user is a member of the superuser group defined in the
-    OIDC__ADMIN_GROUP configuration option.
+    ``OIDC__ADMIN_GROUP`` configuration option.
     """
     admin_group = _CONFIG.get("oidc", "admin_group")
     return admin_group in user["groups"]

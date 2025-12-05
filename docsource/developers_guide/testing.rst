@@ -67,23 +67,24 @@ Integration tests are in:
     The Jobmon PR Jenkins pipeline runs the whole Jobmon test suite. A developer is not allowed
     to merge their PR until there has been a successful pipeline build i.e. all tests are passing.
 
-UGE Plugin
-**********
-The UGE plugin is also split in to unit tests and integration tests (end-to-end).
+UGE Plugin (Deprecated)
+***********************
 
-Unit tests are in the following folders:
+.. warning::
+    The UGE plugin is deprecated and no longer actively maintained. It remains 
+    in the codebase for historical reference but is not part of active development.
+
+The UGE plugin was split into unit tests and integration tests (end-to-end).
+
+Unit tests were in the following folders:
 
 * jobmon_uge/tests/distributor
 * jobmon_uge/tests/queue
 * jobmon_uge/tests/worker_node
 
-Integration tests are in the following folders:
+Integration tests were in the following folders:
 
 * jobmon_uge/tests/integration
-
-.. note::
-    The Jobmon UGE PR Jenkins pipeline runs the whole Jobmon test suite. A developer is not allowed
-    to merge their PR until there has been a successful pipeline build i.e. all tests are passing.
 
 Slurm Plugin
 ************

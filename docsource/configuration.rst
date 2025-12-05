@@ -1,6 +1,8 @@
-==========================
+:orphan:
+
+============================
 Jobmon Configuration System
-==========================
+============================
 
 This guide covers the configuration system for jobmon, including template-based logging configurations and user override capabilities.
 

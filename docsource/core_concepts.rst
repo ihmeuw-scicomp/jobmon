@@ -1,5 +1,6 @@
+:orphan:
 
-.. _jobmon-core-label:
+.. Note: Labels removed from this legacy file to avoid duplicates with user_guide/core_concepts.rst
 
 *************
 Core Concepts
@@ -8,16 +9,12 @@ Core Concepts
 These objects are introduced "bottom-up," so each new concept should build on those described
 before.
 
-.. _jobmon-task-label:
-
 Task
 #####
 A Task is an *intention* to run a job on the cluster.
 It is a command that will be run. The Task includes the complete
 Linux command string to be executed.
 
-
-.. _jobmon-ti-label:
 
 Task Instance
 *************
@@ -34,7 +31,6 @@ They are introduced in order below, and then tied
 together with an example.
 
 
-.. _jobmon-node-label:
 
 Node
 ####
@@ -51,7 +47,6 @@ Tasks are very visible in the Jobmon API Nodes are not. However, nodes are descr
 for completion.
 
 
-.. _jobmon-dag-label:
 
 Directed Acyclic Graph (DAG)
 ############################
@@ -66,7 +61,6 @@ The DAG is composed  of Tasks with specific node arguments and
 :ref:`jobmon-edge-label` (the upstream/downstream relationship between two Nodes).
 
 
-.. _jobmon-edge-label:
 
 Edge
 #####
@@ -83,12 +77,11 @@ the Nodes are the same, the Node-args are the same, but the Task-Args are differ
 point to a different input directory) and the so the Tasks are different.
 
 
-.. _jobmon-task-template-label:
 
 Task Template
 ##############
 TaskTemplates generate groups of Tasks using a common pattern.
-The user's conntrol script defines a command template that
+The user's control script defines a command template that
 individual Nodes will fill in with varying arguments.
 A Task Template can be used in different Workflows and is
 associated with a given Tool. TaskTemplates can also be versioned, meaning you can iterate
@@ -97,7 +90,6 @@ if the underlying methods change in a way that the user wants to recognize as di
 before.
 
 
-.. _jobmon-workflow-label:
 
 Workflow
 ########
@@ -126,7 +118,6 @@ Add Task-args to a Node and you have a Task; and Task Args to a DAG and you have
 a Workflow.
 
 
-.. _jobmon-wf-arg-label:
 
 WorkflowArgs
 ************
@@ -145,7 +136,6 @@ to use Jobmon, and workflow_attributes are not passed to your jobs. They are int
 track information for a given run and can be utilized for profiling and resource
 prediction.
 
-.. _jobmon-wfrun-label:
 
 WorkflowRun
 ************
@@ -160,7 +150,6 @@ state, it will no longer be added to a subsequent WorkflowRun, and therefore the
 Workflow Run will not create any Task Instances for that Task. (If a user wants it to
 be rerun, then it must be reset to a REGISTERED ("G"), or other non-DONE state)
 
-.. _jobmon-tool-label:
 
 Tool
 ####
@@ -170,7 +159,6 @@ Tasks/TaskTemplates over time, but the
 concept of the Tool will remain to categorize them within the broader IHME pipeline.
 
 
-.. _cluster-name-label:
 
 Cluster Name
 ############
@@ -186,7 +174,6 @@ Jobmon will use the standard hierarchy precedence:
 Due to the order of operations in binding objects, cluster name *must* be set on the tool - otherwise, you may get an
 exception like this back: ```jobmon.core.exceptions.InvalidResponse: Unexpected status code 404 from POST request through route /cluster.```
 
-.. _jobmon-task-attribute-label:
 
 TaskAttribute
 *************
@@ -228,34 +215,22 @@ requested resources, for example:
     tool_resources:
       # example_tool_name matches the name of a Tool defined in the python script
       example_tool_name:
-          # buster corresponds to a cluster in the Jobmon database
-          buster:
+          # The cluster name must match a cluster in the Jobmon database
+          slurm:
             cores: 1
             memory: "1G"
-            runtime: (60 * 60 * 24 * 7)
-            queue: "null.q"
-          # slurm corresponds to a cluster in the Jobmon database
-          slurm:
-            cores: 2
-            memory: "2G"
-            runtime: (60 * 60 * 24)
-            queue: "null.q"
+            runtime: 604800  # 7 days in seconds
+            queue: "all.q"
     # task_template_resources is a hardcoded Jobmon key
     task_template_resources:
       # example_task_template_name matches the name of a TaskTemplate defined in the python script
       example_task_template_name:
-        # buster corresponds to a cluster in the Jobmon database
-        buster:
-          num_cores: 1
-          m_mem_free: "3G"
-          max_runtime_seconds: (60 * 60 * 4)
-          queue: "null.q"
-        # slurm corresponds to a cluster in the Jobmon database
+        # The cluster name must match a cluster in the Jobmon database
         slurm:
           cores: 2
           memory: "4G"
-          runtime: (60 * 60 * 24)
-          queue: "null.q"
+          runtime: 86400  # 24 hours in seconds
+          queue: "all.q"
 
 Users can specify the YAML file on a TaskTemplate by passing the file path to the YAML to the
 keyword argument "yaml_file" in the "get_task_template()" method.
@@ -283,12 +258,10 @@ have successfully run and are in DONE state. Users can set upstream dependencies
 list of Tasks to the keyword parameter "upstream_tasks" in the "create_task()" method.
 
 
-.. _jobmon-arguments-label:
 
 Arguments
 #########
 
-.. _jobmon-node-args-label:
 
 node_args
 *********
@@ -302,7 +275,6 @@ op_args
     the task. Generally these are things like the task executable location or the verbosity of
     the script.
 
-.. _jobmon-task-args-label:
 
 task_args
 *********

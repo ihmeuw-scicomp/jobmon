@@ -47,34 +47,28 @@ class OrchestratorResult:
 
     Contains all information needed by callers after execution,
     eliminating the need to access mutable state post-run.
-
-    Attributes:
-        final_status: Final workflow run status (e.g., "D" for DONE).
-        done_count: Number of tasks that completed successfully.
-        failed_count: Number of tasks that failed fatally.
-        total_tasks: Total number of tasks in the workflow.
-        elapsed_time: Total execution time in seconds.
-        num_previously_complete: Number of tasks already complete before this run
-            (useful for resume tracking).
-        task_final_statuses: Mapping of task_id -> final status string.
-            Enables callers to get task results without accessing mutable state.
-        done_task_ids: Immutable set of task IDs that completed successfully.
-        failed_task_ids: Immutable set of task IDs that failed fatally.
     """
 
-    # Workflow run outcome
+    #: Final workflow run status (e.g., "D" for DONE).
     final_status: str
+    #: Total execution time in seconds.
     elapsed_time: float
 
-    # Task counts
+    #: Total number of tasks in the workflow.
     total_tasks: int
+    #: Number of tasks that completed successfully.
     done_count: int
+    #: Number of tasks that failed fatally.
     failed_count: int
+    #: Number of tasks already complete before this run (useful for resume tracking).
     num_previously_complete: int
 
-    # Task-level results
+    #: Mapping of task_id -> final status string. Enables callers to get task
+    #: results without accessing mutable state.
     task_final_statuses: dict[int, str]
+    #: Immutable set of task IDs that completed successfully.
     done_task_ids: frozenset[int]
+    #: Immutable set of task IDs that failed fatally.
     failed_task_ids: frozenset[int]
 
 
@@ -93,18 +87,8 @@ class WorkflowRunConfig:
     This is the user-facing configuration class. It maps to OrchestratorConfig
     internally but provides a simpler interface.
 
-    Attributes:
-        heartbeat_interval: Interval in seconds between heartbeat logs.
-            If None, uses default from JobmonConfig.
-        heartbeat_report_by_buffer: Multiplier for heartbeat report_by time.
-            If None, uses default from JobmonConfig.
-        fail_fast: If True, stop workflow on first task failure.
-        wedged_workflow_sync_interval: Seconds between full state syncs
-            to detect "wedged" workflows.
-        fail_after_n_executions: Test hook - fail after N task executions.
-            Default is effectively disabled (1 billion).
+    Example::
 
-    Example:
         # Simple usage with defaults
         config = WorkflowRunConfig()
 
@@ -118,15 +102,17 @@ class WorkflowRunConfig:
         result = run_workflow(workflow, workflow_run_id, distributor.alive, config=config)
     """
 
-    # Heartbeat settings (None = use JobmonConfig defaults)
+    #: Interval in seconds between heartbeat logs. If None, uses default from JobmonConfig.
     heartbeat_interval: Optional[int] = None
+    #: Multiplier for heartbeat report_by time. If None, uses default from JobmonConfig.
     heartbeat_report_by_buffer: Optional[float] = None
 
-    # Flow control
+    #: If True, stop workflow on first task failure.
     fail_fast: bool = False
+    #: Seconds between full state syncs to detect "wedged" workflows.
     wedged_workflow_sync_interval: int = 600
 
-    # Test hooks (internal use only)
+    #: Test hook - fail after N task executions. Default is effectively disabled (1 billion).
     fail_after_n_executions: int = 1_000_000_000
 
     @classmethod

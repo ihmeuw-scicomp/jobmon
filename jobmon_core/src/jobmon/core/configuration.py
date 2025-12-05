@@ -34,13 +34,14 @@ class JobmonConfig:
 
         Args:
             filepath: where to read defaults from.
-            dict_config: dictionary of values to override
+            dict_config: Dictionary of values to override.
 
         Config file priority:
-            1. user specified file passed in
-            2. environment variable JOBMON__CONFIG_FILE (backdoor for testing):q!
-            3. config file from installer
-            4. default config file in core
+
+        1. user specified file passed in
+        2. environment variable ``JOBMON__CONFIG_FILE`` (backdoor for testing)
+        3. config file from installer
+        4. default config file in core
         """
         if filepath:
             self._filepath = filepath
@@ -312,7 +313,7 @@ class JobmonConfig:
 
 
 class ConfigCLI(CLI):
-    """CLI for `jobmon_config."""
+    """CLI for ``jobmon_config`` command."""
 
     def __init__(self) -> None:
         """Initialization of client CLI."""

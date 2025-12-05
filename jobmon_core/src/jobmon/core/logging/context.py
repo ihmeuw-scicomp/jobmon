@@ -1,6 +1,6 @@
 """Telemetry context helpers for Jobmon structlog instrumentation.
 
-All Jobmon telemetry metadata is namespaced with the 'telemetry_' prefix.
+All Jobmon telemetry metadata is namespaced with the ``telemetry_`` prefix.
 This clearly indicates data that is exported to OTLP but stripped from
 console output, without requiring explicit key registries.
 """
@@ -73,7 +73,7 @@ def _normalize_context_key(key: str, *, allow_non_jobmon_keys: bool) -> str:
 def get_jobmon_context() -> Dict[str, Any]:
     """Return a copy of all active Jobmon telemetry metadata.
 
-    Returns all context variables with the 'telemetry_' prefix.
+    Returns all context variables with the ``telemetry_`` prefix.
     """
     ctx = structlog.contextvars.get_contextvars()
     return {k: v for k, v in ctx.items() if k.startswith("telemetry_")}
@@ -89,12 +89,14 @@ def clear_jobmon_context() -> None:
 def set_jobmon_context(*, allow_non_jobmon_keys: bool = False, **metadata: Any) -> None:
     """Bind telemetry metadata to the current structlog context.
 
-    All keys are automatically prefixed with 'telemetry_' unless allow_non_jobmon_keys is True.
+    All keys are automatically prefixed with ``telemetry_`` unless
+    allow_non_jobmon_keys is True.
 
     Args:
-        allow_non_jobmon_keys: **INTERNAL USE ONLY**. If True, bind keys as-is without adding
-                              telemetry_ prefix. Used internally by the bind_context decorator
-                              and server middleware. External callers should not use this flag.
+        allow_non_jobmon_keys: **INTERNAL USE ONLY**. If True, bind keys as-is
+            without adding ``telemetry_`` prefix. Used internally by the
+            bind_context decorator and server middleware. External callers
+            should not use this flag.
         **metadata: Key-value pairs to bind to context.
     """
     filtered = _normalize_context_metadata(
@@ -110,13 +112,15 @@ def set_jobmon_context(*, allow_non_jobmon_keys: bool = False, **metadata: Any) 
 def unset_jobmon_context(*keys: str, allow_non_jobmon_keys: bool = False) -> None:
     """Remove telemetry metadata keys from the current context.
 
-    Keys are automatically prefixed with 'telemetry_' unless allow_non_jobmon_keys is True.
+    Keys are automatically prefixed with ``telemetry_`` unless
+    allow_non_jobmon_keys is True.
 
     Args:
         *keys: Keys to remove from context.
-        allow_non_jobmon_keys: **INTERNAL USE ONLY**. If True, remove keys as-is without adding
-                              telemetry_ prefix. Used internally by the bind_context decorator
-                              and server middleware. External callers should not use this flag.
+        allow_non_jobmon_keys: **INTERNAL USE ONLY**. If True, remove keys as-is
+            without adding ``telemetry_`` prefix. Used internally by the
+            bind_context decorator and server middleware. External callers
+            should not use this flag.
     """
     if not keys:
         return
@@ -135,7 +139,7 @@ def unset_jobmon_context(*keys: str, allow_non_jobmon_keys: bool = False) -> Non
 def bind_jobmon_context(**metadata: Any) -> Iterator[None]:
     """Context manager that binds Jobmon telemetry metadata temporarily.
 
-    All keys are automatically prefixed with 'telemetry_' if not already.
+    All keys are automatically prefixed with ``telemetry_`` if not already.
     """
     filtered = _normalize_context_metadata(metadata, allow_non_jobmon_keys=False)
 
