@@ -10,8 +10,9 @@ These are the main public API for the swarm package.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import time
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import aiohttp
 import structlog
@@ -39,6 +40,40 @@ if TYPE_CHECKING:
     from jobmon.client.workflow import Workflow
 
 logger = structlog.get_logger(__name__)
+
+
+def _run_async_in_thread(
+    coro_func: Callable, *args: Any, **kwargs: Any
+) -> OrchestratorResult:
+    """Run an async function in a separate thread with its own event loop.
+
+    This is used when called from within an already-running event loop
+    (e.g., Jupyter notebooks, IPython, or async frameworks).
+
+    Args:
+        coro_func: The async function to call.
+        *args: Positional arguments for coro_func.
+        **kwargs: Keyword arguments for coro_func.
+
+    Returns:
+        The result from the async function.
+    """
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(asyncio.run, coro_func(*args, **kwargs))
+        return future.result()
+
+
+def _is_event_loop_running() -> bool:
+    """Check if there's currently a running asyncio event loop.
+
+    Returns:
+        True if an event loop is running, False otherwise.
+    """
+    try:
+        asyncio.get_running_loop()
+        return True
+    except RuntimeError:
+        return False
 
 
 def _build_result_from_state(
@@ -95,6 +130,9 @@ def run_workflow(
     2. Runs the orchestrator to completion
     3. Returns complete execution results
 
+    This function handles being called from both synchronous code and from
+    within an already-running event loop (e.g., Jupyter notebooks, IPython).
+
     Args:
         workflow: The Workflow object to execute.
         workflow_run_id: The workflow run ID (from WorkflowRunFactory).
@@ -111,8 +149,11 @@ def run_workflow(
         RuntimeError: If timeout exceeded.
         DistributorNotAlive: If distributor dies during execution.
     """
-    return asyncio.run(
-        _run_workflow_async(
+    if _is_event_loop_running():
+        # Called from within a running event loop (e.g., Jupyter notebook)
+        # Run in a separate thread with its own event loop
+        return _run_async_in_thread(
+            _run_workflow_async,
             workflow=workflow,
             workflow_run_id=workflow_run_id,
             distributor_alive=distributor_alive,
@@ -121,7 +162,19 @@ def run_workflow(
             timeout=timeout,
             requester=requester,
         )
-    )
+    else:
+        # No running event loop, use asyncio.run() directly
+        return asyncio.run(
+            _run_workflow_async(
+                workflow=workflow,
+                workflow_run_id=workflow_run_id,
+                distributor_alive=distributor_alive,
+                status=status,
+                config=config,
+                timeout=timeout,
+                requester=requester,
+            )
+        )
 
 
 def resume_workflow_run(
@@ -137,6 +190,9 @@ def resume_workflow_run(
 
     Used for resume scenarios where we need to reconstruct the workflow
     state from the database and continue execution.
+
+    This function handles being called from both synchronous code and from
+    within an already-running event loop (e.g., Jupyter notebooks, IPython).
 
     Args:
         workflow_id: The workflow to resume.
@@ -154,8 +210,11 @@ def resume_workflow_run(
         RuntimeError: If timeout exceeded.
         DistributorNotAlive: If distributor dies during execution.
     """
-    return asyncio.run(
-        _resume_workflow_run_async(
+    if _is_event_loop_running():
+        # Called from within a running event loop (e.g., Jupyter notebook)
+        # Run in a separate thread with its own event loop
+        return _run_async_in_thread(
+            _resume_workflow_run_async,
             workflow_id=workflow_id,
             workflow_run_id=workflow_run_id,
             distributor_alive=distributor_alive,
@@ -164,7 +223,19 @@ def resume_workflow_run(
             timeout=timeout,
             requester=requester,
         )
-    )
+    else:
+        # No running event loop, use asyncio.run() directly
+        return asyncio.run(
+            _resume_workflow_run_async(
+                workflow_id=workflow_id,
+                workflow_run_id=workflow_run_id,
+                distributor_alive=distributor_alive,
+                status=status,
+                config=config,
+                timeout=timeout,
+                requester=requester,
+            )
+        )
 
 
 async def _run_workflow_async(
