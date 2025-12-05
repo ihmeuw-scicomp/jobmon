@@ -456,6 +456,31 @@ class TestSwarmStateMutations:
         assert task3.num_upstreams_done == 1
         assert task3 not in newly_ready  # Still waiting for task2
 
+    def test_propagate_completions_skips_non_registering_tasks(
+        self, state: SwarmState
+    ) -> None:
+        """Test that tasks not in REGISTERING status are not returned as ready.
+
+        This is a defensive check: if a downstream task is somehow already DONE
+        (e.g., from a previous run) or in another non-REGISTERING state, it should
+        not be returned as "newly ready" even if all its upstreams are done.
+        """
+        # Create DAG: task1 -> task2, but task2 is already DONE
+        task1 = MockSwarmTask(1, status=TaskStatus.DONE)
+        task2 = MockSwarmTask(2, status=TaskStatus.DONE)  # Already completed
+        task2.num_upstreams = 1
+        task1.downstream_swarm_tasks.add(task2)
+
+        state.add_task(task1)  # type: ignore
+        state.add_task(task2)  # type: ignore
+
+        newly_ready = state.propagate_completions({task1})  # type: ignore
+
+        # The dependency count should still be updated
+        assert task2.num_upstreams_done == 1
+        # But task2 should NOT be returned as ready (it's already DONE)
+        assert task2 not in newly_ready
+
 
 class TestSwarmStateQueue:
     """Tests for ready_to_run queue operations."""

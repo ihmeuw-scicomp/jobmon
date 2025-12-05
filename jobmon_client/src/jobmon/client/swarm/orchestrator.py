@@ -536,9 +536,19 @@ class WorkflowRunOrchestrator:
         - Logging progress
 
         Note: Status bucket updates are handled by SwarmState.apply_update()
+
+        Note: We track tasks enqueued via propagation to avoid double-enqueuing.
+        If an upstream task A (DONE) and downstream task B (REGISTERING) are both
+        in changed_tasks, B could be enqueued twice: once via propagate_completions
+        when A is processed, and again when B is processed directly (since it has
+        REGISTERING status and all_upstreams_done). We prevent this by tracking
+        tasks enqueued via propagation.
         """
         num_newly_completed = 0
         num_newly_failed = 0
+
+        # Track tasks enqueued via propagation to prevent double-enqueuing
+        enqueued_via_propagation: set["SwarmTask"] = set()
 
         for task in changed_tasks:
             if task.status == TaskStatus.DONE:
@@ -550,13 +560,16 @@ class WorkflowRunOrchestrator:
                 for downstream in newly_ready:
                     self._set_validated_task_resources(downstream)
                     self._state.enqueue_task(downstream)
+                    enqueued_via_propagation.add(downstream)
 
             elif task.status == TaskStatus.ERROR_FATAL:
                 num_newly_failed += 1
 
             elif task.status == TaskStatus.REGISTERING and task.all_upstreams_done:
-                self._set_validated_task_resources(task)
-                self._state.enqueue_task(task)
+                # Skip if already enqueued via propagation from an upstream DONE task
+                if task not in enqueued_via_propagation:
+                    self._set_validated_task_resources(task)
+                    self._state.enqueue_task(task)
 
             elif task.status == TaskStatus.ADJUSTING_RESOURCES:
                 self._set_adjusted_task_resources(task)
