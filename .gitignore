@@ -36,6 +36,8 @@ jobmon_server/jobmon.db
 
 # ignore auto generated docs
 docsource/api
+docsource/_build/
+docsource/autoapi/
 
 # ignore ide settings
 .idea/
