@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import time
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import aiohttp
 import structlog
@@ -37,7 +37,9 @@ if TYPE_CHECKING:
 logger = structlog.get_logger(__name__)
 
 
-def _run_async_in_thread(coro_func: Callable, *args, **kwargs) -> OrchestratorResult:
+def _run_async_in_thread(
+    coro_func: Callable, *args: Any, **kwargs: Any
+) -> OrchestratorResult:
     """Run an async function in a separate thread with its own event loop.
 
     This is used when called from within an already-running event loop

@@ -136,4 +136,3 @@ class TestNestedEventLoopScenario:
         # Run the simulated Jupyter cell
         result = asyncio.run(simulate_jupyter_cell())
         assert result == {"status": "done", "count": 5}
-
