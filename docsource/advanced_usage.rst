@@ -341,8 +341,8 @@ That mode will do as much work as possible before Jobmon and exits with an error
 This is the correct mode if your code is well debugged.
 You can fix what is probably a data error and resume from where it stopped.
 
-In “fail-fast” mode, Jobmon will stop launching jobs as soon as one job fails
-(but it won’t kill jobs that are currently running).
+In "fail-fast" mode, Jobmon will stop launching jobs as soon as one job fails
+(but it won't kill jobs that are currently running).
 This mode is suitable if your code is not well-debugged.
 A failure probably means you have a bug and therefore need to fix it,
 and start again from the beginning.
@@ -359,6 +359,132 @@ For example::
 
     # This line makes the workflow fail fast
     wfr_status = workflow.run(fail_fast=True)
+
+
+Workflow Run Results and Exception Handling
+###########################################
+
+When you call ``workflow.run()``, Jobmon returns an ``OrchestratorResult`` object containing
+detailed information about the workflow execution. In certain critical failure scenarios,
+Jobmon will raise exceptions instead.
+
+Understanding Workflow Run Results
+**********************************
+
+The ``OrchestratorResult`` object contains:
+
+* ``final_status``: Final workflow run status (e.g., "D" for DONE, "E" for ERROR)
+* ``done_count``: Number of tasks that completed successfully
+* ``failed_count``: Number of tasks that failed fatally
+* ``total_tasks``: Total number of tasks in the workflow
+* ``elapsed_time``: Total execution time in seconds
+* ``task_final_statuses``: Dictionary mapping task_id to final status
+* ``done_task_ids``: Set of task IDs that completed successfully
+* ``failed_task_ids``: Set of task IDs that failed
+
+**Checking Results:**
+
+.. code-block:: python
+
+    from jobmon.client.tool import Tool
+    from jobmon.core.constants import WorkflowRunStatus
+
+    tool = Tool(name="my_tool")
+    workflow = tool.create_workflow(name="my_workflow", workflow_args="example")
+    # ... add tasks ...
+
+    result = workflow.run()
+
+    if result.final_status == WorkflowRunStatus.DONE:
+        print(f"Success! {result.done_count} tasks completed")
+    elif result.final_status == WorkflowRunStatus.ERROR:
+        print(f"Workflow failed: {result.failed_count} tasks failed")
+        print(f"Failed task IDs: {result.failed_task_ids}")
+    elif result.final_status == WorkflowRunStatus.TERMINATED:
+        print("Workflow was terminated (resume signal received)")
+
+When Exceptions Are Raised
+**************************
+
+Jobmon raises exceptions for critical infrastructure failures that require immediate attention:
+
+.. list-table:: Exceptions vs Results
+   :widths: 25 35 40
+   :header-rows: 1
+
+   * - Scenario
+     - Behavior
+     - User Action
+   * - **DistributorNotAlive**
+     - Exception raised
+     - Distributor process died - check logs, restart workflow
+   * - **DistributorInterruptedError**
+     - Exception raised
+     - Distributor received interrupt signal (SIGTERM/SIGINT)
+   * - **RuntimeError (timeout)**
+     - Exception raised
+     - Workflow exceeded timeout - increase timeout and resume
+   * - **KeyboardInterrupt**
+     - Exception raised (if user confirms)
+     - User intentionally stopped workflow
+   * - All tasks complete
+     - Returns result with status DONE
+     - Success!
+   * - Tasks failed (no fail-fast)
+     - Returns result with status ERROR
+     - Check ``failed_task_ids``, fix issues, resume
+   * - Fail-fast triggered
+     - Returns result with status ERROR
+     - First task failed - debug and restart
+   * - Resume signal received
+     - Returns result with status TERMINATED
+     - Workflow was signaled to resume elsewhere
+
+**Complete Exception Handling Example:**
+
+.. code-block:: python
+
+    from jobmon.client.tool import Tool
+    from jobmon.core.constants import WorkflowRunStatus
+    from jobmon.core.exceptions import DistributorNotAlive
+
+    tool = Tool(name="my_tool")
+    workflow = tool.create_workflow(name="my_workflow", workflow_args="example")
+    # ... add tasks ...
+
+    try:
+        result = workflow.run(timeout=7200)  # 2 hour timeout
+
+        # Check the result status
+        if result.final_status == WorkflowRunStatus.DONE:
+            print(f"Success! {result.done_count}/{result.total_tasks} tasks completed")
+            print(f"Elapsed time: {result.elapsed_time:.1f} seconds")
+
+        elif result.final_status == WorkflowRunStatus.ERROR:
+            print(f"Workflow failed: {result.failed_count} tasks failed")
+            # You can inspect individual task failures
+            for task_id in result.failed_task_ids:
+                print(f"  Task {task_id} failed with status: {result.task_final_statuses[task_id]}")
+            # Resume to retry failed tasks
+            # workflow.run(resume=True)
+
+        elif result.final_status == WorkflowRunStatus.TERMINATED:
+            print("Workflow was terminated - a resume was requested elsewhere")
+
+    except DistributorNotAlive:
+        print("CRITICAL: Distributor process died unexpectedly!")
+        print("Check distributor logs and restart the workflow")
+
+    except RuntimeError as e:
+        if "timeout" in str(e).lower():
+            print(f"Workflow timed out after {7200} seconds")
+            print("Submitted tasks will continue running on the cluster")
+            print("Increase timeout and resume to wait for completion")
+        else:
+            raise  # Unexpected RuntimeError
+
+    except KeyboardInterrupt:
+        print("Workflow stopped by user")
 
 
 Fallback Queues

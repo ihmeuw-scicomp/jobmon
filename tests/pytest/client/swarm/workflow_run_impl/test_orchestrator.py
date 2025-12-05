@@ -875,6 +875,71 @@ class TestProcessChangedTasks:
         # Task should be at front
         assert pending_state.ready_to_run[0] is task
 
+    def test_no_double_enqueue_when_upstream_done_and_downstream_registering_in_same_batch(
+        self, mock_gateway, mock_task, mock_array, default_config
+    ):
+        """Test that downstream task is not enqueued twice when both upstream and downstream change in same batch.
+
+        Regression test for bug: If upstream task A (DONE) and downstream task B (REGISTERING)
+        are both in changed_tasks, B could be enqueued twice:
+        1. Via propagate_completions when A is processed
+        2. Again when B is processed directly (since it has REGISTERING status and all_upstreams_done)
+
+        The fix tracks tasks enqueued via propagation to prevent double-enqueuing.
+        """
+        # Create upstream task (will transition to DONE)
+        upstream = mock_task(1, status=TaskStatus.DONE)
+
+        # Create downstream task that depends on upstream
+        downstream = mock_task(
+            2, status=TaskStatus.REGISTERING, all_upstreams_done=False
+        )
+        downstream.num_upstreams = 1
+        downstream.num_upstreams_done = 0
+
+        # Set up dependency relationship
+        upstream.downstream_swarm_tasks = {downstream}
+
+        # Make downstream become ready when upstream completes
+        def check_all_upstreams():
+            return downstream.num_upstreams_done >= downstream.num_upstreams
+
+        type(downstream).all_upstreams_done = property(
+            lambda self: check_all_upstreams()
+        )
+
+        array = mock_array(1)
+
+        state = create_state_with_tasks(
+            tasks={1: upstream, 2: downstream},
+            arrays={1: array},
+            task_status_map={
+                TaskStatus.REGISTERING: {downstream},
+                TaskStatus.QUEUED: set(),
+                TaskStatus.INSTANTIATING: set(),
+                TaskStatus.LAUNCHED: set(),
+                TaskStatus.RUNNING: set(),
+                TaskStatus.DONE: {upstream},
+                TaskStatus.ADJUSTING_RESOURCES: set(),
+                TaskStatus.ERROR_FATAL: set(),
+            },
+        )
+
+        orchestrator = WorkflowRunOrchestrator(state, mock_gateway, default_config)
+
+        # Process both tasks in the same changed_tasks set
+        # This simulates the scenario where both status changes arrive in the same sync batch
+        changed_tasks = {upstream, downstream}
+        orchestrator._process_changed_tasks(changed_tasks)
+
+        # The downstream task should appear exactly once in ready_to_run
+        # Before the fix, it could appear twice
+        downstream_count = sum(1 for t in state.ready_to_run if t is downstream)
+        assert downstream_count == 1, (
+            f"Expected downstream task to be enqueued exactly once, "
+            f"but found {downstream_count} times in ready_to_run"
+        )
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Test Termination Handling

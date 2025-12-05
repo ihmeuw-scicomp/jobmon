@@ -26,7 +26,12 @@ from jobmon.client.swarm.orchestrator import (
 from jobmon.client.swarm.state import SwarmState
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.constants import WorkflowRunStatus
-from jobmon.core.exceptions import TransitionError
+from jobmon.core.exceptions import (
+    DistributorInterruptedError,
+    DistributorNotAlive,
+    TransitionError,
+    WorkflowTestError,
+)
 from jobmon.core.requester import Requester
 
 if TYPE_CHECKING:
@@ -105,6 +110,10 @@ def resume_workflow_run(
 
     Returns:
         OrchestratorResult with complete execution results.
+
+    Raises:
+        RuntimeError: If timeout exceeded.
+        DistributorNotAlive: If distributor dies during execution.
     """
     return asyncio.run(
         _resume_workflow_run_async(
@@ -328,6 +337,13 @@ async def _run_orchestrator(
                 done_task_ids=done_task_ids,
                 failed_task_ids=failed_task_ids,
             )
+
+        except (DistributorNotAlive, DistributorInterruptedError, WorkflowTestError):
+            # Critical exceptions must propagate to callers
+            # - DistributorNotAlive: Distributor died unexpectedly (documented in docstring)
+            # - DistributorInterruptedError: Distributor received interrupt signal
+            # - WorkflowTestError: Test infrastructure error that should fail tests
+            raise
 
         except Exception as e:
             # On other errors (fail-fast, etc.), construct result from state

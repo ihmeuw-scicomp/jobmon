@@ -437,14 +437,21 @@ class SwarmState:
             completed_tasks: Tasks that just completed.
 
         Returns:
-            List of tasks that became ready to run.
+            List of tasks that became ready to run (only REGISTERING tasks).
         """
         newly_ready: list["SwarmTask"] = []
 
         for task in completed_tasks:
             for downstream in task.downstream_swarm_tasks:
                 downstream.num_upstreams_done += 1
-                if downstream.all_upstreams_done:
+                # Only return tasks that are in REGISTERING status and have all
+                # upstreams done. Tasks in other states (e.g., already DONE from
+                # a previous run, or in an intermediate state) should not be
+                # enqueued.
+                if (
+                    downstream.status == TaskStatus.REGISTERING
+                    and downstream.all_upstreams_done
+                ):
                     newly_ready.append(downstream)
 
         return newly_ready
