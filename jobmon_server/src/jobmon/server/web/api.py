@@ -1,4 +1,6 @@
+import logging
 import os
+from contextlib import asynccontextmanager
 from importlib import import_module
 from typing import List, Optional
 
@@ -12,6 +14,7 @@ from starlette.responses import HTMLResponse
 from starlette.staticfiles import StaticFiles
 
 from jobmon.core.configuration import JobmonConfig
+from jobmon.server.web.db import db_lifespan
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
 from jobmon.server.web.routes.utils import (
@@ -20,13 +23,30 @@ from jobmon.server.web.routes.utils import (
     is_auth_enabled,
 )
 
+log = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def app_lifespan(app: FastAPI):
+    """Combined lifespan for all application resources.
+
+    Manages:
+    - Database engine lifecycle (creation on startup, disposal on shutdown)
+    - OTLP graceful shutdown
+    """
+    # Use the database lifespan as the primary context manager
+    async with db_lifespan(app):
+        yield
+
+    # OTLP shutdown is handled by the shutdown event registered in get_app
+    # No additional cleanup needed here
+
 
 def get_app(versions: Optional[List[str]] = None) -> FastAPI:
     """Get a FastAPI app based on the config. If no config is provided, defaults are used.
 
     Args:
         versions: The versions of the API to include.
-        log_config_file: Path to the logging configuration file.
     """
     config = JobmonConfig()
 
@@ -35,7 +55,7 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
 
     configure_server_logging()
 
-    # Initialize the FastAPI app
+    # Initialize the FastAPI app with lifespan for database management
     app_title = "jobmon"
     openapi_url = "/api/openapi.json"
 
@@ -43,6 +63,7 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         title=app_title,
         openapi_url=openapi_url,
         docs_url=None,
+        lifespan=app_lifespan,
     )
     app = add_hooks_and_handlers(app)
 

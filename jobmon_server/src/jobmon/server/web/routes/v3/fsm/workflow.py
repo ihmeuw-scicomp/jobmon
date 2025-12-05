@@ -16,8 +16,7 @@ from starlette.responses import JSONResponse
 
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.logging import set_jobmon_context
-from jobmon.server.web.db import get_dialect_name
-from jobmon.server.web.db.deps import get_db
+from jobmon.server.web.db import get_db, get_dialect
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.dag import Dag
 from jobmon.server.web.models.edge import Edge
@@ -39,7 +38,6 @@ from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 from jobmon.server.web.utils.json_compat import normalize_node_ids
 
 logger = structlog.get_logger(__name__)
-DIALECT = get_dialect_name()
 
 
 def _add_workflow_attributes(
@@ -63,7 +61,11 @@ def _add_workflow_attributes(
 
 
 @api_v3_router.post("/workflow")
-async def bind_workflow(request: Request, db: Session = Depends(get_db)) -> Any:
+async def bind_workflow(
+    request: Request,
+    db: Session = Depends(get_db),
+    dialect: str = Depends(get_dialect),
+) -> Any:
     """Bind a workflow to the database."""
     try:
         data = cast(Dict, await request.json())
@@ -131,7 +133,7 @@ async def bind_workflow(request: Request, db: Session = Depends(get_db)) -> Any:
             if workflow_attributes:
                 for name, val in workflow_attributes.items():
                     if workflow and workflow.id:
-                        _upsert_wf_attribute(workflow.id, name, val, db)
+                        _upsert_wf_attribute(workflow.id, name, val, db, dialect)
         newly_created = False
 
     content = {
@@ -194,11 +196,20 @@ def _add_or_get_wf_attribute_type(name: str, session: Session) -> Optional[int]:
 
 
 def _upsert_wf_attribute(
-    workflow_id: int, name: str, value: str, session: Session
+    workflow_id: int, name: str, value: str, session: Session, dialect: str
 ) -> None:
+    """Upsert a workflow attribute.
+
+    Args:
+        workflow_id: The workflow ID
+        name: The attribute name
+        value: The attribute value
+        session: The database session
+        dialect: The database dialect (mysql, sqlite)
+    """
     with session.begin_nested():
         wf_attrib_id = _add_or_get_wf_attribute_type(name, session)
-        if DIALECT == "mysql":
+        if dialect == "mysql":
             insert_vals1 = mysql_insert(WorkflowAttribute).values(
                 workflow_id=workflow_id,
                 workflow_attribute_type_id=wf_attrib_id,
@@ -207,7 +218,7 @@ def _upsert_wf_attribute(
             upsert_stmt = insert_vals1.on_duplicate_key_update(
                 value=insert_vals1.inserted.value
             )
-        elif DIALECT == "sqlite":
+        elif dialect == "sqlite":
             insert_vals2: sqlalchemy.dialects.sqlite.dml.Insert = sqlite_insert(
                 WorkflowAttribute
             ).values(
@@ -220,14 +231,17 @@ def _upsert_wf_attribute(
                 set_=dict(value=value),
             )
         else:
-            raise ServerError(f"Unsupported SQL dialect '{DIALECT}'")
+            raise ServerError(f"Unsupported SQL dialect '{dialect}'")
         session.execute(upsert_stmt)
         session.flush()
 
 
 @api_v3_router.put("/workflow/{workflow_id}/workflow_attributes")
 async def update_workflow_attribute(
-    workflow_id: int, request: Request, db: Session = Depends(get_db)
+    workflow_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    dialect: str = Depends(get_dialect),
 ) -> Any:
     """Update the attributes for a given workflow."""
     set_jobmon_context(workflow_id=workflow_id)
@@ -244,7 +258,7 @@ async def update_workflow_attribute(
     attributes = data["workflow_attributes"]
     if attributes:
         for name, val in attributes.items():
-            _upsert_wf_attribute(workflow_id, name, val, db)
+            _upsert_wf_attribute(workflow_id, name, val, db, dialect)
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
 

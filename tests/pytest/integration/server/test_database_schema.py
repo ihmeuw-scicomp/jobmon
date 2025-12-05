@@ -36,6 +36,5 @@ class TestDatabase:
 
     def test_supported_dialect(self, db_engine):
         """Test that the dialect detection returns a supported dialect."""
-        from jobmon.server.web.db import get_dialect_name
-
-        assert get_dialect_name() in {"mysql", "sqlite", "postgresql"}
+        dialect = db_engine.dialect.name.lower()
+        assert dialect in {"mysql", "sqlite", "postgresql"}

@@ -16,7 +16,7 @@ from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.constants import TaskStatus as TaskStatusConstants
 from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web._compat import add_time
-from jobmon.server.web.db.deps import get_db
+from jobmon.server.web.db.deps import get_db, get_dialect
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -296,6 +296,7 @@ async def transition_array_to_launched(
             db.execute(update_task_stmt)
 
             # 2) Transition TaskInstances to LAUNCHED in the same transaction
+            dialect = get_dialect(request)
             update_ti_stmt = (
                 update(TaskInstance)
                 .where(
@@ -308,7 +309,7 @@ async def transition_array_to_launched(
                     status=TaskInstanceStatus.LAUNCHED,
                     submitted_date=func.now(),
                     status_date=func.now(),
-                    report_by_date=add_time(next_report),
+                    report_by_date=add_time(next_report, dialect),
                 )
                 .execution_options(synchronize_session=False)
             )

@@ -14,10 +14,13 @@ import os
 import pathlib
 import tempfile
 
+
 # =============================================================================
 # PYTEST CONFIGURATION HOOK
 # =============================================================================
 # This MUST stay in conftest.py - it's a pytest hook that runs before collection
+
+
 
 
 def pytest_configure(config):
@@ -27,30 +30,10 @@ def pytest_configure(config):
     - Main process sets up placeholder environment for test collection
     - Each worker process inherits environment but needs its OWN database
     - Workers are identified by PYTEST_XDIST_WORKER env var (gw0, gw1, etc.)
-    - Each worker creates a unique database in setup_test_environment fixture
+    - Each worker creates a unique database in the db_engine fixture
     """
     worker_id = os.environ.get("PYTEST_XDIST_WORKER")
     is_worker = worker_id is not None
-
-    # Workers ALWAYS need setup, even if they inherited env vars from main process
-    # The key insight: workers inherit the main process's environment, but the
-    # main process's database is NOT initialized (it's just a placeholder).
-    # Each worker must create and initialize its own database.
-    if is_worker:
-        # Reset any cached config from main process
-        try:
-            import jobmon.server.web.config as config_module
-
-            config_module._jobmon_config = None
-        except ImportError:
-            pass
-        try:
-            import jobmon.server.web.db.engine as engine_module
-
-            engine_module._engine = None
-            engine_module._SessionMaker = None
-        except ImportError:
-            pass
 
     # Set up environment: either first time (main) or reset for worker
     if not os.environ.get("JOBMON__DB__SQLALCHEMY_DATABASE_URI") or is_worker:
@@ -92,6 +75,7 @@ def pytest_configure(config):
 
 from tests.pytest.fixtures.database import (
     db_engine,
+    dbsession,
     setup_test_environment,
 )
 from tests.pytest.fixtures.server import (
@@ -113,6 +97,7 @@ __all__ = [
     # Database
     "setup_test_environment",
     "db_engine",
+    "dbsession",
     # Server
     "WebServerProcess",
     "api_prefix",

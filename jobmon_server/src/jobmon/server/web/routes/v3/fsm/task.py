@@ -18,8 +18,7 @@ from starlette.responses import JSONResponse
 
 from jobmon.core import constants
 from jobmon.core.logging import set_jobmon_context
-from jobmon.server.web.db import get_dialect_name
-from jobmon.server.web.db.deps import get_db
+from jobmon.server.web.db import get_db, get_dialect
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_arg import TaskArg
 from jobmon.server.web.models.task_attribute import TaskAttribute
@@ -33,7 +32,6 @@ from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
-DIALECT = get_dialect_name()
 
 
 @api_v3_router.put("/task/bind_tasks_no_args")
@@ -163,7 +161,11 @@ async def bind_tasks_no_args(request: Request, db: Session = Depends(get_db)) ->
 
 
 @api_v3_router.put("/task/bind_task_args")
-async def bind_task_args(request: Request, db: Session = Depends(get_db)) -> Any:
+async def bind_task_args(
+    request: Request,
+    db: Session = Depends(get_db),
+    dialect: str = Depends(get_dialect),
+) -> Any:
     """Add task args and associated task ids to the database."""
     all_data = cast(Dict, await request.json())
     task_args = all_data["task_args"]
@@ -174,11 +176,11 @@ async def bind_task_args(request: Request, db: Session = Depends(get_db)) -> Any
             for task_id, arg_id, value in task_args
         ]
         try:
-            if DIALECT == "mysql":
+            if dialect == "mysql":
                 arg_insert_stmt = (
                     insert(TaskArg).values(task_arg_values).prefix_with("IGNORE")
                 )
-            elif DIALECT == "sqlite":
+            elif dialect == "sqlite":
                 arg_insert_stmt = (
                     sqlite_insert(TaskArg)
                     .values(task_arg_values)
@@ -186,7 +188,7 @@ async def bind_task_args(request: Request, db: Session = Depends(get_db)) -> Any
                 )
             else:
                 raise ServerError(
-                    f"invalid sql dialect. Only (mysql, sqlite) are supported. Got {DIALECT}"
+                    f"invalid sql dialect. Only (mysql, sqlite) are supported. Got {dialect}"
                 )
             db.execute(arg_insert_stmt)
 
@@ -202,7 +204,11 @@ async def bind_task_args(request: Request, db: Session = Depends(get_db)) -> Any
 
 
 @api_v3_router.put("/task/bind_task_attributes")
-async def bind_task_attributes(request: Request, db: Session = Depends(get_db)) -> Any:
+async def bind_task_attributes(
+    request: Request,
+    db: Session = Depends(get_db),
+    dialect: str = Depends(get_dialect),
+) -> Any:
     """Add task attributes and associated attribute types to the database."""
     all_data = cast(Dict, await request.json())
     attributes = all_data["task_attributes"]
@@ -230,7 +236,7 @@ async def bind_task_attributes(request: Request, db: Session = Depends(get_db)) 
             try:
                 # Declare the variable with the Union type
                 stmt_to_execute: Union[MySQLInsert, SQLiteInsert, None] = None
-                if DIALECT == "mysql":
+                if dialect == "mysql":
                     mysql_stmt: MySQLInsert = mysql_insert(TaskAttribute).values(
                         insert_values
                     )
@@ -238,7 +244,7 @@ async def bind_task_attributes(request: Request, db: Session = Depends(get_db)) 
                         value=mysql_stmt.inserted.value
                     )
                     stmt_to_execute = mysql_stmt
-                elif DIALECT == "sqlite":
+                elif dialect == "sqlite":
                     sqlite_stmt: SQLiteInsert = sqlite_insert(TaskAttribute).values(
                         insert_values
                     )
@@ -253,7 +259,7 @@ async def bind_task_attributes(request: Request, db: Session = Depends(get_db)) 
                 else:
                     raise ServerError(
                         f"invalid sql dialect. Only (mysql, sqlite) are supported. "
-                        f"Got {DIALECT}"
+                        f"Got {dialect}"
                     )
                 if stmt_to_execute is not None:
                     db.execute(stmt_to_execute)

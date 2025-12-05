@@ -164,6 +164,7 @@ def test_wedged_dag(db_engine, tool, task_template, requester_no_retry):
                         f"task instance is {self.wedged_task_id}, entering"
                         " first if statement"
                     )
+                    dialect = db_engine.dialect.name.lower()
                     task_inst_stmt = (
                         update(TaskInstance)
                         .where(TaskInstance.id == args.task_instance_id)
@@ -172,7 +173,7 @@ def test_wedged_dag(db_engine, tool, task_template, requester_no_retry):
                     task_stmt = (
                         update(Task)
                         .where(Task.id == task_id)
-                        .values(status="D", status_date=subtract_time(600))
+                        .values(status="D", status_date=subtract_time(600, dialect))
                     )
 
                     session.execute(task_inst_stmt)

@@ -109,9 +109,15 @@ class Workflow(Base):
             return True
 
     def link_workflow_run(
-        self, workflow_run: WorkflowRun, next_report_increment: float
+        self, workflow_run: WorkflowRun, next_report_increment: float, dialect: str
     ) -> Tuple:
-        """Link a workflow run to this workflow."""
+        """Link a workflow run to this workflow.
+
+        Args:
+            workflow_run: The workflow run to link
+            next_report_increment: Number of seconds until next expected heartbeat
+            dialect: The database dialect (mysql, sqlite)
+        """
         # bind_to_logger(workflow_id=self.id)
         logger.info(f"Linking WorkflowRun {workflow_run.id} to Workflow")
         linked_wfr = [
@@ -119,7 +125,7 @@ class Workflow(Base):
         ]
 
         if not any(linked_wfr) and self.ready_to_link:
-            workflow_run.heartbeat(next_report_increment, WorkflowRunStatus.LINKING)
+            workflow_run.heartbeat(next_report_increment, dialect, WorkflowRunStatus.LINKING)
             current_wfr = [(workflow_run.id, workflow_run.status)]
         # active workflow run, don't bind.
         elif not any(linked_wfr) and not self.ready_to_link:

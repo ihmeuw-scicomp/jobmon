@@ -75,15 +75,16 @@ def test_set_status_for_triaging(tool, db_engine, task_template):
 
     # turn the 3 task instances in different testing paths
     # 1. stage the report_by_date, along with respective status
+    dialect = db_engine.dialect.name.lower()
     with Session(bind=db_engine) as session:
         launched_stmt = (
             update(TaskInstance)
             .where(TaskInstance.task_id.in_([tis[0].task_id, tis[2].task_id]))
             .values(
-                report_by_date=subtract_time(500),
+                report_by_date=subtract_time(500, dialect),
                 status=TaskInstanceStatus.LAUNCHED,
                 status_date=subtract_time(
-                    3600
+                    3600, dialect
                 ),  # 1 hour ago - much older than heartbeat interval
             )
         )
@@ -92,10 +93,10 @@ def test_set_status_for_triaging(tool, db_engine, task_template):
             update(TaskInstance)
             .where(TaskInstance.task_id == tis[1].task_id)
             .values(
-                report_by_date=subtract_time(500),
+                report_by_date=subtract_time(500, dialect),
                 status=TaskInstanceStatus.RUNNING,
                 status_date=subtract_time(
-                    3600
+                    3600, dialect
                 ),  # 1 hour ago - much older than heartbeat interval
             )
         )
@@ -186,12 +187,13 @@ def test_triaging_to_specific_error(
     distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
 
     # stage all the task instances as triaging
+    dialect = db_engine.dialect.name.lower()
     with Session(bind=db_engine) as session:
         update_stmt = (
             update(TaskInstance)
             .where(TaskInstance.task_id.in_([tis[x].task_id for x in range(len(tis))]))
             .values(
-                report_by_date=subtract_time(500), status=TaskInstanceStatus.TRIAGING
+                report_by_date=subtract_time(500, dialect), status=TaskInstanceStatus.TRIAGING
             )
         )
         session.execute(update_stmt)

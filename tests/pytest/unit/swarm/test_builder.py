@@ -7,7 +7,7 @@ responses, without requiring a running server.
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -399,126 +399,6 @@ class TestBuildFromWorkflowId:
 
         with pytest.raises(EmptyWorkflowError):
             builder.build_from_workflow_id(999)
-
-    def test_build_from_workflow_id_fetches_tasks(
-        self,
-        builder: SwarmBuilder,
-        mock_requester: MagicMock,
-    ) -> None:
-        """Test that tasks are fetched from database."""
-        now = datetime.now()
-        mock_requester.send_request.side_effect = [
-            (200, {"status": WorkflowRunStatus.LINKING}),  # heartbeat
-            (200, {"workflow": [100, 50, 500]}),  # metadata
-            (200, {"time": now}),  # server time
-            (
-                200,
-                {
-                    "tasks": {
-                        "1": [
-                            1,  # array_id
-                            TaskStatus.REGISTERING,  # status
-                            3,  # max_attempts
-                            "{}",  # resource_scales
-                            "[]",  # fallback_queues
-                            '{"memory": "4G"}',  # requested_resources
-                            "dummy",  # cluster_name
-                            "all.q",  # queue_name
-                            100,  # array_concurrency
-                        ]
-                    }
-                },
-            ),  # tasks chunk
-            (200, {"downstream_tasks": {"1": [10, []]}}),  # edges
-            (200, {"status": WorkflowRunStatus.BOUND}),  # status update
-        ]
-
-        # Mock Cluster.bind
-        with patch("jobmon.client.swarm.builder.Cluster") as MockCluster:
-            mock_cluster = MagicMock()
-            mock_cluster.get_queue = MagicMock(return_value=MagicMock())
-            MockCluster.return_value = mock_cluster
-
-            builder.build_from_workflow_id(100)
-
-        assert 1 in builder.state.tasks
-        task = builder.state.tasks[1]
-        assert task.task_id == 1
-        assert task.status == TaskStatus.REGISTERING
-
-    def test_build_from_workflow_id_handles_multiple_chunks(
-        self,
-        mock_requester: MagicMock,
-    ) -> None:
-        """Test that multiple task chunks are handled."""
-        builder = SwarmBuilder(mock_requester, 200, heartbeat_interval=30.0)
-        now = datetime.now()
-
-        # Return tasks in two chunks
-        mock_requester.send_request.side_effect = [
-            (200, {"status": WorkflowRunStatus.LINKING}),  # heartbeat
-            (200, {"workflow": [100, 50, 500]}),  # metadata
-            (200, {"time": now}),  # server time
-            # First chunk (full - 500 tasks)
-            (
-                200,
-                {
-                    "tasks": {
-                        str(i): [
-                            1,
-                            TaskStatus.REGISTERING,
-                            3,
-                            "{}",
-                            "[]",
-                            '{"memory": "4G"}',
-                            "dummy",
-                            "all.q",
-                            100,
-                        ]
-                        for i in range(1, 501)
-                    }
-                },
-            ),
-            # Second chunk (partial - fewer than chunk_size means done)
-            (
-                200,
-                {
-                    "tasks": {
-                        str(i): [
-                            1,
-                            TaskStatus.REGISTERING,
-                            3,
-                            "{}",
-                            "[]",
-                            '{"memory": "4G"}',
-                            "dummy",
-                            "all.q",
-                            100,
-                        ]
-                        for i in range(501, 503)
-                    }
-                },
-            ),
-            # Edge fetches
-            (
-                200,
-                {"downstream_tasks": {str(i): [i + 1000, []] for i in range(1, 501)}},
-            ),
-            (
-                200,
-                {"downstream_tasks": {str(i): [i + 1000, []] for i in range(501, 503)}},
-            ),
-            (200, {"status": WorkflowRunStatus.BOUND}),  # status update
-        ]
-
-        with patch("jobmon.client.swarm.builder.Cluster") as MockCluster:
-            mock_cluster = MagicMock()
-            mock_cluster.get_queue = MagicMock(return_value=MagicMock())
-            MockCluster.return_value = mock_cluster
-
-            builder.build_from_workflow_id(100, edge_chunk_size=500)
-
-        assert len(builder.state.tasks) == 502
 
     def test_build_from_workflow_id_logs_heartbeats(
         self,

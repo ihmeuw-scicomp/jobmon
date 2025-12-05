@@ -1,113 +1,120 @@
 """Tests for jobmon.server.web.db.deps module."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock
 
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from jobmon.server.web.db.deps import DB, _session_scope, get_db
-
-
-class TestSessionScope:
-    """Test the _session_scope context manager."""
-
-    def test_session_scope_success(self, db_engine):
-        """Test that session_scope properly commits and closes on success."""
-        # Setup
-        with patch(
-            "jobmon.server.web.db.deps.get_sessionmaker"
-        ) as mock_get_sessionmaker:
-            mock_session = Mock(spec=Session)
-            mock_sessionmaker = Mock()
-            mock_sessionmaker.return_value = mock_session
-            mock_get_sessionmaker.return_value = mock_sessionmaker
-
-            # Execute
-            with _session_scope() as session:
-                assert session is mock_session
-                # Simulate some database operation
-
-            # Verify
-            mock_session.commit.assert_called_once()
-            mock_session.close.assert_called_once()
-            mock_session.rollback.assert_not_called()
-
-    def test_session_scope_exception_rollback(self, db_engine):
-        """Test that session_scope properly rolls back on exception."""
-        with patch(
-            "jobmon.server.web.db.deps.get_sessionmaker"
-        ) as mock_get_sessionmaker:
-            mock_session = Mock(spec=Session)
-            mock_sessionmaker = Mock()
-            mock_sessionmaker.return_value = mock_session
-            mock_get_sessionmaker.return_value = mock_sessionmaker
-
-            # Execute with exception
-            with pytest.raises(ValueError):
-                with _session_scope() as session:
-                    assert session is mock_session
-                    raise ValueError("Test exception")
-
-            # Verify
-            mock_session.rollback.assert_called_once()
-            mock_session.close.assert_called_once()
-            mock_session.commit.assert_not_called()
-
-    def test_session_scope_commit_exception_still_closes(self, db_engine):
-        """Test that session is closed even if commit fails."""
-        with patch(
-            "jobmon.server.web.db.deps.get_sessionmaker"
-        ) as mock_get_sessionmaker:
-            mock_session = Mock(spec=Session)
-            mock_session.commit.side_effect = SQLAlchemyError("Commit failed")
-            mock_sessionmaker = Mock()
-            mock_sessionmaker.return_value = mock_session
-            mock_get_sessionmaker.return_value = mock_sessionmaker
-
-            # Execute - should raise the commit exception
-            with pytest.raises(SQLAlchemyError):
-                with _session_scope() as session:
-                    pass
-
-            # Verify session is still closed even after commit failure
-            mock_session.rollback.assert_called_once()
-            mock_session.close.assert_called_once()
+from jobmon.server.web.db.deps import DB, get_db, get_dialect
 
 
 class TestGetDb:
     """Test the get_db FastAPI dependency function."""
 
-    def test_get_db_yields_session(self, db_engine):
-        """Test that get_db yields a session from the context manager."""
-        with patch("jobmon.server.web.db.deps._session_scope") as mock_session_scope:
-            mock_session = Mock(spec=Session)
-            mock_session_scope.return_value.__enter__.return_value = mock_session
-            mock_session_scope.return_value.__exit__.return_value = None
+    def test_get_db_yields_session(self):
+        """Test that get_db yields a session from app.state.db_sessionmaker."""
+        # Create mock request with app.state
+        mock_session = Mock(spec=Session)
+        mock_sessionmaker = Mock(return_value=mock_session)
 
-            # Execute
-            generator = get_db()
-            session = next(generator)
+        mock_request = MagicMock()
+        mock_request.app.state.db_sessionmaker = mock_sessionmaker
 
-            # Verify
-            assert session is mock_session
-            mock_session_scope.assert_called_once()
+        # Execute
+        generator = get_db(mock_request)
+        session = next(generator)
 
-            # Test that the generator is exhausted (only yields once)
-            with pytest.raises(StopIteration):
+        # Verify
+        assert session is mock_session
+        mock_sessionmaker.assert_called_once()
+
+    def test_get_db_commits_on_success(self):
+        """Test that get_db commits the session on successful completion."""
+        mock_session = Mock(spec=Session)
+        mock_sessionmaker = Mock(return_value=mock_session)
+
+        mock_request = MagicMock()
+        mock_request.app.state.db_sessionmaker = mock_sessionmaker
+
+        # Execute - exhaust the generator
+        generator = get_db(mock_request)
+        next(generator)
+        try:
+            next(generator)
+        except StopIteration:
+            pass
+
+        # Verify commit was called
+        mock_session.commit.assert_called_once()
+        mock_session.close.assert_called_once()
+
+    def test_get_db_rollback_on_exception(self):
+        """Test that get_db rolls back the session on exception."""
+        mock_session = Mock(spec=Session)
+        mock_sessionmaker = Mock(return_value=mock_session)
+
+        mock_request = MagicMock()
+        mock_request.app.state.db_sessionmaker = mock_sessionmaker
+
+        # Execute with exception
+        generator = get_db(mock_request)
+        next(generator)
+
+        # Throw exception into generator
+        with pytest.raises(ValueError):
+            generator.throw(ValueError("Test exception"))
+
+        # Verify rollback was called
+        mock_session.rollback.assert_called_once()
+        mock_session.close.assert_called_once()
+        mock_session.commit.assert_not_called()
+
+    def test_get_db_closes_on_commit_failure(self):
+        """Test that session is closed even if commit fails."""
+        mock_session = Mock(spec=Session)
+        mock_session.commit.side_effect = SQLAlchemyError("Commit failed")
+        mock_sessionmaker = Mock(return_value=mock_session)
+
+        mock_request = MagicMock()
+        mock_request.app.state.db_sessionmaker = mock_sessionmaker
+
+        # Execute
+        generator = get_db(mock_request)
+        next(generator)
+
+        # Try to complete normally - commit should fail
+        with pytest.raises(SQLAlchemyError):
+            try:
                 next(generator)
+            except StopIteration:
+                pass
 
-    def test_get_db_exception_propagation(self, db_engine):
-        """Test that exceptions from session_scope are properly propagated."""
-        with patch("jobmon.server.web.db.deps._session_scope") as mock_session_scope:
-            mock_session_scope.side_effect = SQLAlchemyError("Connection failed")
+        # Verify session is still closed even after commit failure
+        mock_session.rollback.assert_called_once()
+        mock_session.close.assert_called_once()
 
-            # Execute
-            generator = get_db()
 
-            # Verify exception is propagated
-            with pytest.raises(SQLAlchemyError):
-                next(generator)
+class TestGetDialect:
+    """Test the get_dialect FastAPI dependency function."""
+
+    def test_get_dialect_returns_dialect_from_app_state(self):
+        """Test that get_dialect returns the dialect from app.state."""
+        mock_request = MagicMock()
+        mock_request.app.state.db_dialect = "mysql"
+
+        result = get_dialect(mock_request)
+
+        assert result == "mysql"
+
+    def test_get_dialect_sqlite(self):
+        """Test that get_dialect works for sqlite."""
+        mock_request = MagicMock()
+        mock_request.app.state.db_dialect = "sqlite"
+
+        result = get_dialect(mock_request)
+
+        assert result == "sqlite"
 
 
 class TestDbDependency:
@@ -115,7 +122,6 @@ class TestDbDependency:
 
     def test_db_is_fastapi_dependency(self):
         """Test that DB is properly configured as a FastAPI Depends."""
-
         # The DB should be a Depends instance
         assert hasattr(DB, "dependency")
         # The dependency should be the get_db function
@@ -209,6 +215,32 @@ class TestIntegrationWithFastAPI:
         data = response.json()
         assert data["detail"] == "Test exception"
 
+    def test_dialect_dependency_in_route(self, web_server_in_memory):
+        """Test that the dialect dependency works in actual routes."""
+        from fastapi import APIRouter, Depends
+
+        from jobmon.server.web.db import get_dialect
+
+        client, engine = web_server_in_memory
+
+        test_router = APIRouter()
+
+        @test_router.get("/test-dialect")
+        def test_dialect_endpoint(dialect: str = Depends(get_dialect)):
+            """Test endpoint that uses the dialect dependency."""
+            return {"dialect": dialect}
+
+        # Add the test router to the app
+        client.app.include_router(test_router)
+
+        # Make request to test endpoint
+        response = client.get("/test-dialect")
+
+        # Verify the response
+        assert response.status_code == 200
+        data = response.json()
+        assert data["dialect"] == "sqlite"  # Test database is SQLite
+
 
 class TestSessionLifecycle:
     """Test complete session lifecycle with real database."""
@@ -226,26 +258,3 @@ class TestSessionLifecycle:
 
         # Should not raise any exceptions
         assert True  # If we get here, the session is working
-
-    def test_get_db_with_real_sessionmaker(self, db_engine):
-        """Test get_db using the actual sessionmaker (not mocked)."""
-        # This test uses the real get_sessionmaker function
-        generator = get_db()
-
-        try:
-            session = next(generator)
-
-            # Verify we get a real Session
-            assert isinstance(session, Session)
-
-            # Verify the session is usable
-            assert session.is_active
-
-        except StopIteration:
-            pytest.fail("get_db should yield a session")
-        finally:
-            # Clean up the generator
-            try:
-                next(generator)
-            except StopIteration:
-                pass  # Expected

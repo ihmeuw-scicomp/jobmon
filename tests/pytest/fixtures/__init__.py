@@ -18,6 +18,7 @@ Or import all fixtures:
 # Re-export all fixtures for convenient importing
 from tests.pytest.fixtures.database import (
     db_engine,
+    dbsession,
     setup_test_environment,
 )
 from tests.pytest.fixtures.server import (
@@ -38,6 +39,7 @@ __all__ = [
     # Database
     "setup_test_environment",
     "db_engine",
+    "dbsession",
     # Server
     "WebServerProcess",
     "web_server_process",

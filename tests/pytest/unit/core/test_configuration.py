@@ -418,12 +418,16 @@ def test_empty_pool_configuration_engine_compatibility(tmp_path, monkeypatch):
 
         try:
             # This should not raise a TypeError about NoneType not being iterable
-            from jobmon.server.web.db.engine import get_engine
+            from jobmon.server.web.db.engine import create_engine_from_config
 
-            engine = get_engine()
+            engine, dialect, _ = create_engine_from_config()
 
             # Verify we can create the engine successfully
             assert engine is not None
+            assert dialect in ("sqlite", "mysql", "postgresql")
+
+            # Clean up the engine
+            engine.dispose()
 
         except Exception as e:
             pytest.fail(f"Empty pool config test case {i} failed: {e}")

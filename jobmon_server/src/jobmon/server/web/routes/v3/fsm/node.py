@@ -11,24 +11,27 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
-from jobmon.server.web.db import get_dialect_name
-from jobmon.server.web.db.deps import get_db
+from jobmon.server.web.db import get_db, get_dialect
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.node_arg import NodeArg
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import ServerError
 
 logger = structlog.get_logger(__name__)
-DIALECT = get_dialect_name()
 
 
 @api_v3_router.post("/nodes")
-async def add_nodes(request: Request, db: Session = Depends(get_db)) -> Any:
+async def add_nodes(
+    request: Request,
+    db: Session = Depends(get_db),
+    dialect: str = Depends(get_dialect),
+) -> Any:
     """Add a chunk of nodes to the database.
 
     Args:
         request: The request object.
         db: The database session.
+        dialect: The database dialect (mysql, sqlite, etc.)
     """
     data = cast(Dict, await request.json())
     # Extract node and node_args
@@ -44,12 +47,12 @@ async def add_nodes(request: Request, db: Session = Depends(get_db)) -> Any:
             for ttv, arghash in node_keys
         ]
     )
-    if DIALECT == "mysql":
+    if dialect == "mysql":
         node_insert_stmt = node_insert_stmt.prefix_with("IGNORE")
-    elif DIALECT == "sqlite":
+    elif dialect == "sqlite":
         node_insert_stmt = node_insert_stmt.prefix_with("OR IGNORE")
     else:
-        raise ServerError(f"Unsupported SQL dialect '{DIALECT}'")
+        raise ServerError(f"Unsupported SQL dialect '{dialect}'")
 
     # Retry logic for deadlock handling
     max_retries = 5
@@ -101,7 +104,7 @@ async def add_nodes(request: Request, db: Session = Depends(get_db)) -> Any:
             node_args_list.append({"node_id": node_id, "arg_id": arg_id, "val": val})
 
     # Bulk insert again with raw SQL. Pass the same session.
-    _insert_node_args(node_args_list, db)
+    _insert_node_args(node_args_list, db, dialect)
 
     # return result
     return_nodes = {
@@ -111,14 +114,21 @@ async def add_nodes(request: Request, db: Session = Depends(get_db)) -> Any:
     return resp
 
 
-def _insert_node_args(node_args_list: list, db: Session) -> None:
+def _insert_node_args(node_args_list: list, db: Session, dialect: str) -> None:
+    """Insert node arguments with dialect-specific syntax.
+
+    Args:
+        node_args_list: List of node argument dicts to insert
+        db: Database session
+        dialect: Database dialect name
+    """
     if node_args_list:
         node_arg_insert_stmt = insert(NodeArg).values(node_args_list)
-        if DIALECT == "mysql":
+        if dialect == "mysql":
             node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("IGNORE")
-        elif DIALECT == "sqlite":
+        elif dialect == "sqlite":
             node_arg_insert_stmt = node_arg_insert_stmt.prefix_with("OR IGNORE")
         else:
-            raise ServerError(f"Unsupported SQL dialect '{DIALECT}'")
+            raise ServerError(f"Unsupported SQL dialect '{dialect}'")
 
         db.execute(node_arg_insert_stmt)

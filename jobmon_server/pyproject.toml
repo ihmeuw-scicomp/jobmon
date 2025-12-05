@@ -31,7 +31,6 @@ dependencies = [
     'httpx',
     'authlib',
     'itsdangerous',
-    'dnspython',
     'pydantic',
 ]
 dynamic = ["version"]

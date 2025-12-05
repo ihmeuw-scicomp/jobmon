@@ -1,8 +1,14 @@
+"""Server integration test fixtures.
+
+These fixtures provide in-memory web server testing capabilities
+and logging utilities for server tests.
+"""
+
 import logging
 
 import pytest
 import structlog
-from sqlalchemy.orm import Session as SQLAlchemySession  # Alias to avoid conflict
+from sqlalchemy.orm import sessionmaker
 
 
 class StructlogJSONTestFormatter(logging.Formatter):
@@ -22,16 +28,31 @@ class StructlogJSONTestFormatter(logging.Formatter):
 
 @pytest.fixture(scope="function")
 def web_server_in_memory(db_engine):
-    """This sets up the JSM/JQS using the test_client which is a
-    fake server
-    """
-    # The create_app call sets up database connections
+    """Create an in-memory FastAPI test client with database configured.
 
+    This fixture creates a FastAPI TestClient with the database engine,
+    sessionmaker, and dialect properly configured in app.state, matching
+    what the db_lifespan would do in production.
+
+    Args:
+        db_engine: The database engine fixture from database.py
+
+    Yields:
+        Tuple[TestClient, Engine]: The test client and database engine
+    """
     from fastapi.testclient import TestClient
 
     from jobmon.server.web.api import get_app
 
     app = get_app(versions=["v3"])
+
+    # Set up app.state to match what db_lifespan does in production
+    app.state.db_engine = db_engine
+    app.state.db_dialect = db_engine.dialect.name.lower()
+    app.state.db_sessionmaker = sessionmaker(
+        bind=db_engine, autoflush=False, autocommit=False
+    )
+
     client = TestClient(app)
     yield client, db_engine
 
@@ -57,9 +78,9 @@ def json_log_file(tmp_path):
             # ... run code that logs ...
 
         # Custom logger and level
-        def test_dns_logging(json_log_file):
+        def test_db_logging(json_log_file):
             log_file_path = json_log_file(
-                loggers={"jobmon.server.web.db.dns": "DEBUG"}
+                loggers={"jobmon.server.web.db": "DEBUG"}
             )
 
         # Multiple loggers with different levels
@@ -196,17 +217,3 @@ def requester_in_memory(monkeypatch, web_server_in_memory, api_prefix):
     monkeypatch.setattr(requests, "post", post_in_mem)
     monkeypatch.setattr(requests, "put", put_in_mem)
     monkeypatch.setattr(requester, "get_content", get_test_content)
-
-
-@pytest.fixture
-def dbsession(db_engine):  # db_engine comes from your root conftest.py
-    """Provides a transactional SQLAlchemy Session for tests."""
-    connection = db_engine.connect()
-    transaction = connection.begin()
-    session = SQLAlchemySession(bind=connection)
-    try:
-        yield session  # Provide the session to the test
-    finally:
-        session.close()
-        transaction.rollback()  # Roll back any changes made during the test
-        connection.close()
