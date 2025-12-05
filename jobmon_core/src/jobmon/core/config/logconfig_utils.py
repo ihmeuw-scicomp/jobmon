@@ -2,6 +2,9 @@
 
 This module provides functions to load template-based logconfigs and apply
 user-specified overrides from JobmonConfig.
+
+The primary configuration is generated programmatically via generate_component_logconfig(),
+with support for file-based and section-based overrides from JobmonConfig.
 """
 
 import logging.config
@@ -10,6 +13,115 @@ from typing import Any, Dict, Optional
 
 from jobmon.core.config.template_loader import load_logconfig_with_templates
 from jobmon.core.configuration import JobmonConfig
+
+# =============================================================================
+# Shared Configuration Constants
+# =============================================================================
+
+# Shared formatters used by all components (inlined for simplicity)
+SHARED_FORMATTERS: Dict[str, Any] = {
+    "console_default": {"format": "%(levelname)s [%(name)s] %(message)s"},
+    "structlog_event_only": {
+        "()": "jobmon.core.config.structlog_formatters.JobmonStructlogEventOnlyFormatter"
+    },
+}
+
+
+def _get_shared_handlers(
+    console_level: str = "INFO", otlp_level: str = "DEBUG"
+) -> Dict[str, Any]:
+    """Get shared handler configurations.
+
+    Args:
+        console_level: Log level for console handler
+        otlp_level: Log level for OTLP handler
+
+    Returns:
+        Handler configuration dictionary
+    """
+    return {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": console_level,
+            "formatter": "structlog_event_only",
+            "stream": "ext://sys.stdout",
+        },
+        "otlp_structlog": {
+            "class": "jobmon.core.otlp.JobmonOTLPLoggingHandler",
+            "level": otlp_level,
+            "exporter": {},  # Empty dict triggers shared LoggerProvider usage
+        },
+    }
+
+
+# =============================================================================
+# Programmatic Configuration Generator
+# =============================================================================
+
+
+def generate_component_logconfig(
+    component: str,
+    log_level: str = "INFO",
+    console_level: str = "INFO",
+    otlp_level: str = "DEBUG",
+    disable_existing_loggers: bool = False,
+    include_core_logger: bool = True,
+) -> Dict[str, Any]:
+    """Generate a logconfig dictionary for a jobmon component.
+
+    This is the single source of truth for component logging configuration.
+    All component logconfigs share the same structure, differing only in
+    the logger namespace and optional settings.
+
+    Args:
+        component: Component name ('client', 'distributor', 'worker', 'server')
+        log_level: Log level for the component's primary logger
+        console_level: Log level for console handler
+        otlp_level: Log level for OTLP handler
+        disable_existing_loggers: Whether to disable existing loggers
+        include_core_logger: Whether to include a jobmon.core logger
+
+    Returns:
+        Complete logconfig dictionary ready for logging.config.dictConfig()
+
+    Example:
+        >>> config = generate_component_logconfig("distributor", log_level="DEBUG")
+        >>> logging.config.dictConfig(config)
+    """
+    # Map component name to logger namespace
+    logger_namespace_map = {
+        "client": "jobmon.client",
+        "distributor": "jobmon.distributor",
+        "worker": "jobmon.worker_node",
+        "server": "jobmon.server.web",
+    }
+
+    logger_namespace = logger_namespace_map.get(component, f"jobmon.{component}")
+
+    # Build loggers section
+    loggers: Dict[str, Any] = {
+        logger_namespace: {
+            "handlers": ["console"],  # OTLP added via overrides
+            "level": log_level,
+            "propagate": False,
+        },
+    }
+
+    # Add jobmon.core logger for components that need it
+    if include_core_logger and component != "server":
+        loggers["jobmon.core"] = {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        }
+
+    return {
+        "version": 1,
+        "disable_existing_loggers": disable_existing_loggers,
+        "formatters": SHARED_FORMATTERS.copy(),
+        "handlers": _get_shared_handlers(console_level, otlp_level),
+        "loggers": loggers,
+    }
 
 
 def merge_logconfig_sections(
@@ -222,7 +334,7 @@ def get_logconfig_examples() -> Dict[str, Dict[str, Any]]:
             "section_override_example": {
                 "handlers": {
                     "custom_otlp": {
-                        "class": "jobmon.core.otlp.JobmonOTLPStructlogHandler",
+                        "class": "jobmon.core.otlp.JobmonOTLPLoggingHandler",
                         "level": "DEBUG",
                         "exporter": {},
                     }
@@ -245,39 +357,50 @@ def get_logconfig_examples() -> Dict[str, Dict[str, Any]]:
 
 
 def configure_component_logging(component_name: str) -> None:
-    """Configure logging for jobmon components using existing override system.
+    """Configure logging for jobmon components.
 
-    This function integrates seamlessly with the existing logging infrastructure
-    and follows the same patterns as configure_client_logging().
+    Uses programmatic configuration as the base, with support for file-based
+    and section-based overrides from JobmonConfig.
 
-    Configuration precedence (handled by existing load_logconfig_with_overrides):
-    1. File override: logging.{component}_logconfig_file
-    2. Template: logconfig_{component}.yaml
-    3. Section override: logging.{component}.*
-    4. No logging: if no configuration found
+    Configuration precedence:
+    1. File override: logging.{component}_logconfig_file (complete replacement)
+    2. Section override: logging.{component}.* (merged with base)
+    3. Programmatic base: generate_component_logconfig()
 
     Args:
-        component_name: Component name ('distributor', 'worker', 'server')
+        component_name: Component name ('client', 'distributor', 'worker', 'server')
     """
     try:
-        # Get default template path from component's local package
-        # (follows client/server pattern)
-        default_template_path = _get_component_template_path(component_name)
+        config = JobmonConfig()
 
-        # Check if component template exists
-        if not default_template_path or not os.path.exists(default_template_path):
-            # No template = no logging available for this component
-            return
+        # Check for file-based override first (highest precedence)
+        file_override_key = f"{component_name}_logconfig_file"
+        try:
+            custom_file = config.get("logging", file_override_key)
+            if custom_file and os.path.exists(custom_file):
+                logconfig_from_file = load_logconfig_with_templates(custom_file)
+                logconfig_from_file["disable_existing_loggers"] = True
+                logging.config.dictConfig(logconfig_from_file)
+                return
+        except Exception:
+            pass  # No file override, continue
 
-        # Use existing override system (same pattern as client)
-        configure_logging_with_overrides(
-            default_template_path=default_template_path,
-            config_section=component_name,
-            fallback_config=None,  # No fallback - fail silently if problems
-        )
+        # Generate programmatic base configuration
+        logconfig_data = generate_component_logconfig(component_name)
 
-        # Note: Resource attributes are set once during OTLP initialization
-        # Generic "jobmon" service with process-level attributes is sufficient
+        # Apply section-based overrides if present
+        try:
+            section_overrides = config.get_section_coerced("logging")
+            component_overrides = section_overrides.get(component_name, {})
+
+            if component_overrides:
+                logconfig_data = merge_logconfig_sections(
+                    logconfig_data, component_overrides
+                )
+        except Exception:
+            pass  # No section overrides, use base config
+
+        logging.config.dictConfig(logconfig_data)
 
     except Exception:
         # Fail silently - component starts with no logging

@@ -17,7 +17,7 @@ from jobmon.core import constants
 from jobmon.core.logging import set_jobmon_context
 from jobmon.core.serializers import SerializeTaskInstanceBatch
 from jobmon.server.web._compat import add_time
-from jobmon.server.web.db.deps import get_db
+from jobmon.server.web.db.deps import get_db, get_dialect
 from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -93,11 +93,20 @@ def transit_ti_and_t(
     db: Session,
     report_by_date: Optional[float] = None,
     log_message: Optional[str] = None,
+    dialect: Optional[str] = None,
 ) -> None:
     """Transit the task_instance and task to the new status.
 
     Update task_instance and task in a single transation or to avoid inconsistent state.
     If unable to obtain logs for both, update none.
+
+    Args:
+        task_instance: The TaskInstance to update
+        status_dict: Dictionary with status transition info
+        db: Database session
+        report_by_date: Optional seconds to add for report_by_date
+        log_message: Optional message to log on success
+        dialect: Database dialect (mysql, sqlite) - required if report_by_date is set
     """
     new_ti_status = status_dict["new_ti_status"]
     new_t_status = status_dict["new_t_status"]
@@ -130,8 +139,8 @@ def transit_ti_and_t(
                 "status": new_ti_status,
                 "status_date": func.now(),
             }
-            if report_by_date is not None:
-                ti_values["report_by_date"] = add_time(report_by_date)
+            if report_by_date is not None and dialect is not None:
+                ti_values["report_by_date"] = add_time(report_by_date, dialect)
 
             update_stmt = (
                 update(TaskInstance)
@@ -218,6 +227,7 @@ async def log_running(
             task_instance.process_group_id = data["process_group_id"]
 
             # Handle state transition
+            dialect = get_dialect(request)
             status = get_transit_status(
                 task_instance, constants.TaskInstanceStatus.RUNNING
             )
@@ -231,6 +241,7 @@ async def log_running(
                         f"Task instance {task_instance_id} "
                         f"transitioned to RUNNING in database"
                     ),
+                    dialect=dialect,
                 )
             else:
                 if task_instance.status == constants.TaskInstanceStatus.RUNNING:
@@ -247,6 +258,7 @@ async def log_running(
                             status,
                             db,
                             data["next_report_increment"],
+                            dialect=dialect,
                         )
                 elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
                     status = get_transit_status(
@@ -258,6 +270,7 @@ async def log_running(
                             status,
                             db,
                             data["next_report_increment"],
+                            dialect=dialect,
                         )
                 else:
                     logger.error(
@@ -336,9 +349,10 @@ async def log_ti_report_by(
     )
     # Retry logic for row lock contention
     max_retries = 5
+    dialect = get_dialect(request)
     for attempt in range(max_retries):
         try:
-            vals = {"report_by_date": add_time(data["next_report_increment"])}
+            vals = {"report_by_date": add_time(data["next_report_increment"], dialect)}
             for optional_val in ["distributor_id", "stderr", "stdout"]:
                 val = data.get(optional_val, None)
                 if data is not None:
@@ -364,6 +378,7 @@ async def log_ti_report_by(
                         status,
                         db,
                         data["next_report_increment"],
+                        dialect=dialect,
                     )
                     logger.info(
                         "Heartbeat triggered transition from TRIAGING to RUNNING",
@@ -432,13 +447,14 @@ async def log_ti_report_by_batch(
         max_retries = 5
         for attempt in range(max_retries):
             try:
+                dialect = get_dialect(request)
                 update_stmt = (
                     update(TaskInstance)
                     .where(
                         TaskInstance.id.in_(tis),
                         TaskInstance.status == constants.TaskInstanceStatus.LAUNCHED,
                     )
-                    .values(report_by_date=add_time(next_report_increment))
+                    .values(report_by_date=add_time(next_report_increment, dialect))
                 )
 
                 db.execute(update_stmt)
@@ -749,10 +765,13 @@ async def log_distributor_id(
     max_retries = 5
     update_successful = False
 
+    dialect = get_dialect(request)
     for attempt in range(max_retries):
         try:
             task_instance.distributor_id = data["distributor_id"]
-            task_instance.report_by_date = add_time(data["next_report_increment"])
+            task_instance.report_by_date = add_time(
+                data["next_report_increment"], dialect
+            )
             # release locks immediately
             db.commit()
             update_successful = True
@@ -803,7 +822,13 @@ async def log_distributor_id(
         if status is not None:
             # need to log report_by_date to avoid race condition
             # this already has retry logic
-            transit_ti_and_t(task_instance, status, db, data["next_report_increment"])
+            transit_ti_and_t(
+                task_instance,
+                status,
+                db,
+                data["next_report_increment"],
+                dialect=dialect,
+            )
             db.commit()  # commit any additional changes from transit
             return JSONResponse(
                 content={"message": "Task instance transitioned to LAUNCHED"},

@@ -1,0 +1,47 @@
+tool_resources:
+  sequential:
+    num_cores: 2
+    m_mem_free: "2G"
+    max_runtime_seconds: (60 * 60 * 24)
+    queue: "null.q"
+tool_scales:
+  sequential:
+    memory: 0.1
+    runtime: 0.1
+task_template_resources:
+  simple_function:
+    sequential:
+      num_cores: 1
+      m_mem_free: "3G"
+      max_runtime_seconds: (60 * 60 * 4)
+      queue: "null.q"
+  preprocess:
+    sequential:
+      num_cores: 1
+      m_mem_free: "3G"
+      max_runtime_seconds: (60 * 60 * 4)
+      queue: "null.q"
+    ihme_slurm:
+      num_cores: 2
+      m_mem_free: "4G"
+      max_runtime_seconds: (60 * 60 * 24)
+      queue: "null.q"
+  model:
+    sequential:
+      num_cores: 3
+      m_mem_free: "2G"
+      max_runtime_seconds: (60 * 60 * 24)
+      queue: "null.q"
+task_template_scales:
+  simple_function:
+    sequential:
+      memory: 0.2
+      runtime: 0.3
+  preprocess:
+    sequential:
+      memory: 0.2
+      runtime: 0.3
+  model:
+    sequential:
+      memory: 0.4
+      runtime: 0.6

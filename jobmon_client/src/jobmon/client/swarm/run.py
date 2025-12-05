@@ -10,6 +10,7 @@ These are the main public API for the swarm package.
 from __future__ import annotations
 
 import asyncio
+import time
 from typing import TYPE_CHECKING, Callable, Optional
 
 import aiohttp
@@ -25,7 +26,7 @@ from jobmon.client.swarm.orchestrator import (
 )
 from jobmon.client.swarm.state import SwarmState
 from jobmon.core.configuration import JobmonConfig
-from jobmon.core.constants import WorkflowRunStatus
+from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 from jobmon.core.exceptions import (
     DistributorInterruptedError,
     DistributorNotAlive,
@@ -38,6 +39,44 @@ if TYPE_CHECKING:
     from jobmon.client.workflow import Workflow
 
 logger = structlog.get_logger(__name__)
+
+
+def _build_result_from_state(
+    state: SwarmState, start_time: float
+) -> OrchestratorResult:
+    """Build an OrchestratorResult from current state when orchestrator exits early.
+
+    This is used when the orchestrator encounters an error but we still want to
+    return meaningful results to the caller (e.g., for fail-fast scenarios).
+
+    Args:
+        state: The current SwarmState.
+        start_time: When execution started (from time.perf_counter()).
+
+    Returns:
+        OrchestratorResult with current state snapshot.
+    """
+    elapsed = time.perf_counter() - start_time
+
+    task_final_statuses = {task.task_id: task.status for task in state.tasks.values()}
+    done_task_ids = frozenset(
+        t.task_id for t in state.get_tasks_by_status(TaskStatus.DONE)
+    )
+    failed_task_ids = frozenset(
+        t.task_id for t in state.get_tasks_by_status(TaskStatus.ERROR_FATAL)
+    )
+
+    return OrchestratorResult(
+        final_status=state.status,
+        elapsed_time=elapsed,
+        total_tasks=len(state.tasks),
+        done_count=len(done_task_ids),
+        failed_count=len(failed_task_ids),
+        num_previously_complete=state.num_previously_complete,
+        task_final_statuses=task_final_statuses,
+        done_task_ids=done_task_ids,
+        failed_task_ids=failed_task_ids,
+    )
 
 
 def run_workflow(
@@ -238,10 +277,6 @@ async def _run_orchestrator(
 
     This is the common execution path for both new runs and resumes.
     """
-    import time
-
-    from jobmon.core.constants import TaskStatus
-
     if start_time is None:
         start_time = time.perf_counter()
 
@@ -313,30 +348,7 @@ async def _run_orchestrator(
 
             # For fail-fast and other RuntimeErrors, construct result from state
             logger.warning(f"Workflow run RuntimeError: {e}")
-            elapsed = time.perf_counter() - start_time
-
-            # Gather task final statuses from state
-            task_final_statuses = {
-                task.task_id: task.status for task in state.tasks.values()
-            }
-            done_task_ids = frozenset(
-                t.task_id for t in state.get_tasks_by_status(TaskStatus.DONE)
-            )
-            failed_task_ids = frozenset(
-                t.task_id for t in state.get_tasks_by_status(TaskStatus.ERROR_FATAL)
-            )
-
-            return OrchestratorResult(
-                final_status=state.status,
-                elapsed_time=elapsed,
-                total_tasks=len(state.tasks),
-                done_count=len(done_task_ids),
-                failed_count=len(failed_task_ids),
-                num_previously_complete=state.num_previously_complete,
-                task_final_statuses=task_final_statuses,
-                done_task_ids=done_task_ids,
-                failed_task_ids=failed_task_ids,
-            )
+            return _build_result_from_state(state, start_time)
 
         except (DistributorNotAlive, DistributorInterruptedError, WorkflowTestError):
             # Critical exceptions must propagate to callers
@@ -346,32 +358,9 @@ async def _run_orchestrator(
             raise
 
         except Exception as e:
-            # On other errors (fail-fast, etc.), construct result from state
+            # On other errors, construct result from state
             logger.warning(f"Workflow run error: {e}")
-            elapsed = time.perf_counter() - start_time
-
-            # Gather task final statuses from state
-            task_final_statuses = {
-                task.task_id: task.status for task in state.tasks.values()
-            }
-            done_task_ids = frozenset(
-                t.task_id for t in state.get_tasks_by_status(TaskStatus.DONE)
-            )
-            failed_task_ids = frozenset(
-                t.task_id for t in state.get_tasks_by_status(TaskStatus.ERROR_FATAL)
-            )
-
-            return OrchestratorResult(
-                final_status=state.status,
-                elapsed_time=elapsed,
-                total_tasks=len(state.tasks),
-                done_count=len(done_task_ids),
-                failed_count=len(failed_task_ids),
-                num_previously_complete=state.num_previously_complete,
-                task_final_statuses=task_final_statuses,
-                done_task_ids=done_task_ids,
-                failed_task_ids=failed_task_ids,
-            )
+            return _build_result_from_state(state, start_time)
 
     finally:
         # Cleanup

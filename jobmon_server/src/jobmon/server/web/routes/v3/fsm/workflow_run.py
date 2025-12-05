@@ -15,7 +15,7 @@ from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web._compat import subtract_time
 from jobmon.server.web.config import get_jobmon_config
-from jobmon.server.web.db.deps import get_db
+from jobmon.server.web.db.deps import get_db, get_dialect
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
@@ -69,7 +69,10 @@ async def add_workflow_run(request: Request, db: Session = Depends(get_db)) -> A
     # Transition to linking state, with_for_update claims a lock on the workflow
     # Any other actively linking workflows will return the incorrect workflow run id
 
-    active_workflow_run = workflow.link_workflow_run(workflow_run, next_heartbeat)
+    dialect = get_dialect(request)
+    active_workflow_run = workflow.link_workflow_run(
+        workflow_run, next_heartbeat, dialect
+    )
     db.flush()
 
     try:
@@ -194,7 +197,8 @@ async def log_workflow_run_heartbeat(
     workflow_run = db.execute(select_stmt).scalars().one()
 
     try:
-        workflow_run.heartbeat(next_report_increment, status)
+        dialect = get_dialect(request)
+        workflow_run.heartbeat(next_report_increment, dialect, status)
         logger.debug(f"wfr {workflow_run_id} heartbeat confirmed")
     except InvalidStateTransition as e:
         logger.debug(f"wfr {workflow_run_id} heartbeat rolled back, reason: {e}")
@@ -422,7 +426,8 @@ async def set_status_for_triaging(
                         TaskInstance.report_by_date <= update_time,
                         # Exclude recently changed status tasks (likely retries)
                         # use 2 jobmon heartbeat interval as a buffer
-                        TaskInstance.status_date <= subtract_time(hb_buffer * 2),
+                        TaskInstance.status_date
+                        <= subtract_time(hb_buffer * 2, get_dialect(request)),
                     )
                 )
                 .values(

@@ -12,16 +12,13 @@ from sqlalchemy.sql import func
 from starlette.responses import JSONResponse
 
 from jobmon.core.logging import set_jobmon_context
-from jobmon.server.web.db import get_dialect_name
-from jobmon.server.web.db.deps import get_db
+from jobmon.server.web.db import get_db, get_dialect
 from jobmon.server.web.models.dag import Dag
 from jobmon.server.web.models.edge import Edge
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
-# new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
-DIALECT = get_dialect_name()
 
 
 @api_v3_router.post("/dag")
@@ -64,7 +61,10 @@ async def add_dag(request: Request, db: Session = Depends(get_db)) -> Any:
 
 @api_v3_router.post("/dag/{dag_id}/edges")
 async def add_edges(
-    dag_id: int, request: Request, db: Session = Depends(get_db)
+    dag_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    dialect: str = Depends(get_dialect),
 ) -> Any:
     """Add edges to the edge table."""
     set_jobmon_context(dag_id=dag_id)
@@ -87,12 +87,12 @@ async def add_edges(
     # Bulk insert the nodes and node args with raw SQL, for performance. Ignore duplicate
     # keys
     insert_stmt = insert(Edge).values(edges_to_add)
-    if DIALECT == "mysql":
+    if dialect == "mysql":
         insert_stmt = insert_stmt.prefix_with("IGNORE")
-    elif DIALECT == "sqlite":
+    elif dialect == "sqlite":
         insert_stmt = insert_stmt.prefix_with("OR IGNORE")
     else:
-        raise ServerError(f"Unsupported SQL dialect '{DIALECT}'")
+        raise ServerError(f"Unsupported SQL dialect '{dialect}'")
     db.execute(insert_stmt)
 
     if mark_created:

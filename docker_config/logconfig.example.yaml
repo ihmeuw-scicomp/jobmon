@@ -4,8 +4,12 @@
 version: 1
 disable_existing_loggers: false
 
-# Use shared formatters from core templates (consistent with other configs)
-formatters: !template formatters
+# Shared formatters (inlined for simplicity)
+formatters:
+  console_default:
+    format: "%(levelname)s [%(name)s] %(message)s"
+  structlog_event_only:
+    '()': jobmon.core.config.structlog_formatters.JobmonStructlogEventOnlyFormatter
 
 # Basic handlers for local development  
 handlers:

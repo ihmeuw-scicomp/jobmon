@@ -1539,7 +1539,6 @@ source = { editable = "jobmon_server" }
 dependencies = [
     { name = "alembic" },
     { name = "authlib" },
-    { name = "dnspython" },
     { name = "fastapi", extra = ["standard"] },
     { name = "fastapi-plugins" },
     { name = "httpx" },
@@ -1577,7 +1576,6 @@ otlp = [
 requires-dist = [
     { name = "alembic" },
     { name = "authlib" },
-    { name = "dnspython" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.103.2" },
     { name = "fastapi-plugins", specifier = ">=0.12.0" },
     { name = "httpx" },

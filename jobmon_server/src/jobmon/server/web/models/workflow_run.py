@@ -136,11 +136,18 @@ class WorkflowRun(Base):
     def heartbeat(
         self,
         next_report_increment: float,
+        dialect: str,
         transition_status: str = WorkflowRunStatus.RUNNING,
     ) -> None:
-        """Register a heartbeat for the Workflow Run to show it is still alive."""
+        """Register a heartbeat for the Workflow Run to show it is still alive.
+
+        Args:
+            next_report_increment: Number of seconds until next expected heartbeat
+            dialect: The database dialect (mysql, sqlite)
+            transition_status: The status to transition to
+        """
         self.transition(transition_status)
-        self.heartbeat_date = add_time(next_report_increment)
+        self.heartbeat_date = add_time(next_report_increment, dialect)
 
     def reap(self) -> None:
         """Transition dead workflow runs to a terminal state."""

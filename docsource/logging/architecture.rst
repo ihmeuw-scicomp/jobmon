@@ -182,7 +182,7 @@ Default client configuration (``jobmon_client/src/jobmon/client/config/logconfig
        class: logging.StreamHandler
        formatter: structlog_event_only
      otlp_structlog:
-       class: jobmon.core.otlp.JobmonOTLPStructlogHandler
+       class: jobmon.core.otlp.JobmonOTLPLoggingHandler
        exporter: {}
 
    loggers:
@@ -196,7 +196,7 @@ Local development configuration with OTLP enabled
    handlers:
      console_structlog: {...}
      otlp_structlog:
-       class: jobmon.core.otlp.JobmonOTLPStructlogHandler
+       class: jobmon.core.otlp.JobmonOTLPLoggingHandler
        exporter: {}
      otlp:
        class: jobmon.core.otlp.JobmonOTLPLoggingHandler

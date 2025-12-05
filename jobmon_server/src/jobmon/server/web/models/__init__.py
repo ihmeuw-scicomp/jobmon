@@ -7,7 +7,7 @@ from typing import Any
 
 import structlog
 from sqlalchemy import CheckConstraint, String, event, func
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 
 logger = structlog.get_logger(__name__)
@@ -46,10 +46,13 @@ def load_model() -> None:
         import_module(f"{__name__}.{module_name}")
 
 
-def load_metadata() -> None:
-    """Load metadata into a database."""
+def load_metadata(session_maker: sessionmaker[Session] | None = None) -> None:
+    """Load metadata into a database.
+
+    Args:
+        session_maker: Optional sessionmaker. If not provided, creates one from config.
+    """
     # load metadata
-    from jobmon.server.web.db import get_sessionmaker
     from jobmon.server.web.models.arg_type import add_arg_types
     from jobmon.server.web.models.cluster import add_clusters
     from jobmon.server.web.models.cluster_type import add_cluster_types
@@ -60,8 +63,16 @@ def load_metadata() -> None:
     from jobmon.server.web.models.workflow_run_status import add_workflow_run_statuses
     from jobmon.server.web.models.workflow_status import add_workflow_statuses
 
-    SessionMaker = get_sessionmaker()
-    with SessionMaker() as session:
+    if session_maker is None:
+        # Create sessionmaker from config for standalone usage (migrations, etc.)
+        from jobmon.server.web.db.engine import create_engine_from_config
+
+        engine, _, _ = create_engine_from_config()
+        session_maker = sessionmaker(
+            bind=engine, autoflush=False, expire_on_commit=False
+        )
+
+    with session_maker() as session:
         with session.begin():
             metadata_loaders = [
                 add_arg_types,

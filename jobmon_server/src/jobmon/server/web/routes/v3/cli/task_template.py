@@ -8,8 +8,7 @@ from fastapi import Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
-from jobmon.server.web.db import get_dialect_name
-from jobmon.server.web.db.deps import get_db
+from jobmon.server.web.db import get_db, get_dialect
 from jobmon.server.web.repositories.task_template_repository import (
     TaskTemplateRepository,
 )
@@ -22,7 +21,6 @@ from jobmon.server.web.schemas.task_template import (
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
-DIALECT = get_dialect_name()
 
 
 @api_v3_router.get("/get_task_template_details")
@@ -177,11 +175,15 @@ async def get_task_template_resource_usage(
 
 
 @api_v3_router.get("/workflow_tt_status_viz/{workflow_id}")
-def get_workflow_tt_status_viz(workflow_id: int, db: Session = Depends(get_db)) -> Any:
+def get_workflow_tt_status_viz(
+    workflow_id: int,
+    db: Session = Depends(get_db),
+    dialect: str = Depends(get_dialect),
+) -> Any:
     """Get the status of the workflows for GUI."""
     tt_repo = TaskTemplateRepository(db)
     result_dict = tt_repo.get_workflow_tt_status_viz(
-        workflow_id=workflow_id, dialect=DIALECT
+        workflow_id=workflow_id, dialect=dialect
     )
 
     # Convert Pydantic models back to serializable dict format for JSONResponse
