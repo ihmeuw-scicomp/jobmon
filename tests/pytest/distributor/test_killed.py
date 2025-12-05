@@ -1,13 +1,16 @@
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
 from jobmon.server.web.models import load_model
 from jobmon.server.web.models.task_instance import TaskInstance
+from tests.pytest.swarm.swarm_test_utils import (
+    create_test_context,
+    prepare_and_queue_tasks,
+)
 
 load_model()
 
@@ -27,12 +30,10 @@ def test_transition_to_killed(tool, db_engine, task_template):
 
     # 2) Create a WorkflowRun and produce TaskInstances
     wfr = WorkflowRunFactory(workflow.workflow_id).create_workflow_run()
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id, requester=workflow.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # 3) Start a DistributorService to queue/instantiate tasks
     distributor_service = DistributorService(

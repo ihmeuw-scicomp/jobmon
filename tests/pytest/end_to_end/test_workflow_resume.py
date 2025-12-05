@@ -6,13 +6,17 @@ from unittest.mock import patch
 
 import pytest
 
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
 from jobmon.client.tool import Tool
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
 from jobmon.core.exceptions import WorkflowAlreadyExists, WorkflowNotResumable
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.multiprocess.multiproc_distributor import MultiprocessDistributor
+from tests.pytest.swarm.swarm_test_utils import (
+    create_test_context,
+    prepare_and_queue_tasks,
+    synchronize_state,
+)
 
 
 @pytest.fixture
@@ -155,12 +159,10 @@ def test_cold_resume(tool):
     wfr1._update_status(WorkflowRunStatus.BOUND)
 
     # create task instances
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr1.workflow_run_id, requester=workflow1.requester
+    state, gateway, orchestrator = create_test_context(
+        workflow1, wfr1.workflow_run_id, workflow1.requester
     )
-    swarm.from_workflow(workflow1)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # run first 3 tasks
     distributor_service = DistributorService(
@@ -170,7 +172,11 @@ def test_cold_resume(tool):
     )
     distributor_service.set_workflow_run(wfr1.workflow_run_id)
     distributor_service.workflow_run.transition_to_launched()
-    swarm._update_status(WorkflowRunStatus.RUNNING)
+
+    # Update state status
+    state.status = WorkflowRunStatus.RUNNING
+    gateway.update_status_sync(WorkflowRunStatus.RUNNING)
+
     distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
     distributor_service.process_status(TaskInstanceStatus.QUEUED)
     distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
@@ -178,12 +184,12 @@ def test_cold_resume(tool):
     distributor_service.cluster_interface.start()
 
     i = 0
-    while len(swarm.done_tasks) < 3 and i < 20:
-        swarm.synchronize_state()
+    while state.get_done_count() < 3 and i < 20:
+        synchronize_state(state, gateway, orchestrator, full_sync=True)
         i += 1
         time.sleep(1)
     distributor_service.cluster_interface.stop()
-    assert len(swarm.done_tasks) == 3
+    assert state.get_done_count() == 3
 
     # create new workflow run, causing the old one to reset. resume timeout is
     # 1 second meaning this workflow run will not actually be created
@@ -198,15 +204,26 @@ def test_cold_resume(tool):
         fact2.set_workflow_resume(resume_timeout=1)
 
     # test if resume signal is received
-    swarm.synchronize_state()
-    assert swarm.status == WorkflowRunStatus.COLD_RESUME
+    synchronize_state(state, gateway, orchestrator, full_sync=True)
+    assert state.status == WorkflowRunStatus.COLD_RESUME
 
     # set workflow run to terminated
-    asyncio.run(swarm._terminate_task_instances_async())
+    async def terminate_task_instances():
+        import aiohttp
+
+        session = aiohttp.ClientSession()
+        gateway.set_session(session)
+        try:
+            await gateway.terminate_task_instances()
+        finally:
+            await session.close()
+
+    asyncio.run(terminate_task_instances())
 
     distributor_service.refresh_status_from_db(TaskInstanceStatus.KILL_SELF)
     distributor_service.process_status(TaskInstanceStatus.KILL_SELF)
-    swarm._update_status(WorkflowRunStatus.TERMINATED)
+    gateway.update_status_sync(WorkflowRunStatus.TERMINATED)
+    state.status = WorkflowRunStatus.TERMINATED
 
     # now resume it till done
     # prepare first workflow
@@ -245,15 +262,15 @@ def test_hot_resume(tool, task_template):
     )
     distributor_service.set_workflow_run(wfr1.workflow_run_id)
     distributor_service.workflow_run.transition_to_launched()
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr1.workflow_run_id, requester=workflow1.requester
+
+    state, gateway, orchestrator = create_test_context(
+        workflow1, wfr1.workflow_run_id, workflow1.requester
     )
-    swarm.from_workflow(workflow1)
-    swarm._update_status(WorkflowRunStatus.RUNNING)
+    state.status = WorkflowRunStatus.RUNNING
+    gateway.update_status_sync(WorkflowRunStatus.RUNNING)
 
     # create task instances
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
     distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
     distributor_service.process_status(TaskInstanceStatus.QUEUED)
     distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
@@ -261,12 +278,12 @@ def test_hot_resume(tool, task_template):
     distributor_service.cluster_interface.start()
 
     i = 0
-    while len(swarm.done_tasks) < 3 and i < 20:
-        swarm.synchronize_state()
+    while state.get_done_count() < 3 and i < 20:
+        synchronize_state(state, gateway, orchestrator, full_sync=True)
         i += 1
         time.sleep(1)
     distributor_service.cluster_interface.stop()
-    assert len(swarm.done_tasks) == 3
+    assert state.get_done_count() == 3
 
     # now make another workflow and set a hot resume with a quick timeout
     workflow2 = tool.create_workflow(
@@ -285,11 +302,12 @@ def test_hot_resume(tool, task_template):
         fact2.set_workflow_resume(reset_running_jobs=False, resume_timeout=1)
 
     # test if resume signal is received
-    swarm.synchronize_state()
-    assert swarm.status == WorkflowRunStatus.HOT_RESUME
+    synchronize_state(state, gateway, orchestrator, full_sync=True)
+    assert state.status == WorkflowRunStatus.HOT_RESUME
 
     # set workflow run to terminated
-    swarm._update_status(WorkflowRunStatus.TERMINATED)
+    gateway.update_status_sync(WorkflowRunStatus.TERMINATED)
+    state.status = WorkflowRunStatus.TERMINATED
 
     workflow_run_status = workflow2.run(resume=True)
     assert workflow_run_status == WorkflowRunStatus.DONE
@@ -299,6 +317,7 @@ def test_stopped_resume(tool):
     """test that a workflow with two task where the workflow is stopped with a
     keyboard interrupt mid stream. The workflow is resumed and
     the tasks then finishes successfully and the workflow runs to completion"""
+    from jobmon.client.swarm.orchestrator import WorkflowRunOrchestrator
 
     workflow1 = tool.create_workflow(name="stopped_resume")
     upstream_tasks = []
@@ -308,11 +327,11 @@ def test_stopped_resume(tool):
         workflow1.add_task(task)
         upstream_tasks = [task]
 
-    # start up the first task. patch so that it fails with a keyboard interrupt
-    workflow1._fail_after_n_executions = 1
+    # Patch the orchestrator's _check_fail_after_n_executions to raise KeyboardInterrupt
+    # This simulates a user pressing Ctrl+C during workflow execution
     with pytest.raises(KeyboardInterrupt):
         with patch.object(
-            SwarmWorkflowRun,
+            WorkflowRunOrchestrator,
             "_check_fail_after_n_executions",
             side_effect=KeyboardInterrupt,
         ):

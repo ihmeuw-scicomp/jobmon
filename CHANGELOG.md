@@ -5,6 +5,19 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **WorkflowRun Refactor - New API**: Complete refactoring of the workflow run execution system with a cleaner, more testable architecture:
+  - New `run_workflow()` and `resume_workflow_run()` factory functions as the recommended API for executing workflows
+  - New `WorkflowRunConfig` dataclass consolidating all execution configuration (heartbeat interval, fail_fast, concurrency limits, etc.)
+  - New `OrchestratorResult` dataclass providing complete execution results including task-level final statuses, counts, and timing
+  - Results are now immutable snapshots instead of requiring mutable state access post-execution
+- **WorkflowRun Refactor - Internal Services**: Modular service architecture replacing monolithic WorkflowRun class:
+  - `ServerGateway`: Centralized HTTP communication with the Jobmon server
+  - `SwarmState`: Consolidated workflow run state management with atomic updates
+  - `HeartbeatService`: Background heartbeat management with proper status change detection
+  - `Synchronizer`: State synchronization between client and server (task statuses, concurrency limits)
+  - `Scheduler`: Task batching and queueing with capacity-aware scheduling
+  - `SwarmBuilder`: State initialization from workflow objects or database
+  - `WorkflowRunOrchestrator`: Thin coordinator managing the main execution loop
 - Added unified OTLP manager with HTTP exporter support, shared logger providers, and automatic CLI shutdown flushing so all components forward structured telemetry reliably.
 - Added dedicated logging documentation set (architecture overview, operator guide, telemetry status) along with refreshed example configs covering OTLP transports.
 - Added `jobmon update_config` command to allow users to update configuration values in their defaults.yaml file using dot notation (e.g., `jobmon update_config http.retries_attempts 15`).
@@ -69,6 +82,10 @@ All notable changes to Jobmon will be documented in this file.
 - Show a red x next to a task template name on the workflow details page of the Jobmon GUI if any tasks are in fatal state in that task template.
 
 ### Changed
+- **WorkflowRun Refactor - API Changes**: 
+  - `WorkflowRun.run()` now returns `OrchestratorResult` instead of `None`, providing explicit execution results
+  - Callers should use `result.task_final_statuses[task_id]` instead of `swarm.tasks[task_id].status` post-execution
+  - `WorkflowRun` class is preserved for backward compatibility but marked as deprecated in favor of factory functions
 - Hardened structlog integration to detect `_nop`-filtered log levels, wrap `PrintLogger` factories with named proxies, and ensure telemetry processors execute even when hosts filter debug output.
 - Reworked client logging bootstrap to respect direct-render hosts by pruning non-Jobmon handlers, reattaching OTLP handlers as needed, and deferring to host-provided structlog configuration when present.
 - **BREAKING: Logging System Migration**: Completely replaced legacy logging system with new elegant architecture:
@@ -103,6 +120,7 @@ All notable changes to Jobmon will be documented in this file.
 - Changed the command column in the task details table the GUI. If you click the command a modal will pop up that shows the whole command.
 
 ### Fixed
+- Fixed WorkflowRun orchestrator main loop spinning without rate limiting, causing server spam with sync requests every few milliseconds instead of waiting for heartbeat intervals. The `HeartbeatService` now initializes `_last_heartbeat_time` to the current time instead of 0, ensuring proper sleep/sync pacing.
 - Fixed workflow test hook race condition where `_fail_after_n_executions` check could be bypassed when tasks complete within a single loop iteration, causing flaky test failures in CI.
 - Fixed critical database session leaks in workflow routes that could cause connection pool exhaustion in production.
 - Fixed transaction anti-patterns with multiple commits, ensuring proper atomicity and error handling.
@@ -117,11 +135,15 @@ All notable changes to Jobmon will be documented in this file.
 - Fixed datetime serialization in workflow overview API to handle both datetime objects and string formats for cross-database compatibility (PostgreSQL vs SQLite).
 
 ### Deprecated
+- `WorkflowRun` class is deprecated in favor of `run_workflow()` and `resume_workflow_run()` factory functions
+- Direct access to `WorkflowRun` internal state (`.tasks`, `.done_tasks`, `.failed_tasks`) is deprecated; use `OrchestratorResult` from `run()` instead
 - Legacy logging classes `JobmonLoggerConfig` and `ClientLogging` are deprecated in favor of new `configure_client_logging()` function
 - Direct import of OTLP classes from `jobmon.core.otlp` and `jobmon.server.web.otlp` module roots (use specific submodules)
 - Removed jobmon update_config CLI command
 
 ### Removed
+- Removed legacy `WorkflowRun` internal methods replaced by service classes: `process_commands()`, `process_commands_async()`, `synchronize_state()`, `synchronize_state_async()`, `set_initial_fringe()`, `queue_task_batch_async()`, `_set_validated_task_resources()`, `_set_adjusted_task_resources()`, `get_swarm_commands()`, `SwarmCommand` class
+- Removed `WorkflowRun` feature flags (`USE_NEW_GATEWAY`, `USE_NEW_STATE`, `USE_NEW_HEARTBEAT`, `USE_NEW_SYNCHRONIZER`, `USE_NEW_ORCHESTRATOR`) after migration completed
 - Removed legacy V2 server REST route modules and regenerated GUI API schema to reflect the consolidated V3 surface area.
 - Removed legacy `JobmonLoggerConfig.attach_default_handler()` method and `ClientLogging().attach()` pattern
 - Removed monolithic OTLP configuration files in favor of modular package structure

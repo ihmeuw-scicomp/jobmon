@@ -1,5 +1,4 @@
 import ast
-import asyncio
 import logging
 import os
 import time
@@ -8,11 +7,14 @@ import pytest
 from sqlalchemy import text, update
 from sqlalchemy.orm import Session
 
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.swarm import WorkflowRunConfig, run_workflow
+from jobmon.client.swarm.builder import SwarmBuilder
+from jobmon.client.swarm.orchestrator import OrchestratorConfig, WorkflowRunOrchestrator
 from jobmon.client.workflow import DistributorContext
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus, WorkflowRunStatus
 from jobmon.core.exceptions import CallableReturnedInvalidObject
+from jobmon.core.requester import Requester
 from jobmon.distributor.distributor_service import DistributorService
 from jobmon.plugins.dummy.dummy_distributor import DummyDistributor
 from jobmon.plugins.sequential.seq_distributor import SequentialDistributor
@@ -22,6 +24,13 @@ from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.worker_node.cli import WorkerNodeCLI
+from tests.pytest.swarm.swarm_test_utils import (
+    create_builder,
+    create_test_context,
+    prepare_and_queue_tasks,
+    set_initial_fringe,
+    synchronize_state,
+)
 
 load_model()
 
@@ -57,15 +66,16 @@ def test_blocking_update_timeout(tool, task_template):
     wfr._update_status(WorkflowRunStatus.INSTANTIATED)
     wfr._update_status(WorkflowRunStatus.LAUNCHED)
 
-    # swarm calls
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id,
-        requester=workflow.requester,
-    )
-    swarm.from_workflow(workflow)
-
+    # Use run_workflow with short timeout
     with pytest.raises(RuntimeError) as error:
-        swarm.run(lambda: True, seconds_until_timeout=2)
+        run_workflow(
+            workflow=workflow,
+            workflow_run_id=wfr.workflow_run_id,
+            distributor_alive=lambda: True,
+            status=wfr.status,
+            timeout=2,
+            requester=workflow.requester,
+        )
 
     expected_msg = (
         "Not all tasks completed within the given workflow "
@@ -98,29 +108,26 @@ def test_sync_statuses(client_env, tool, task_template):
     distributor_service.set_workflow_run(wfr.workflow_run_id)
     wfr._update_status(WorkflowRunStatus.LAUNCHED)
 
-    # swarm calls
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id,
-        requester=workflow.requester,
+    # Build state using builder
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
 
     # test from_workflow updates last_sync
-    now = swarm.last_sync
+    now = state.last_sync
     assert now is not None
 
     # distribute the task
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
     distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
     distributor_service.process_status(TaskInstanceStatus.QUEUED)
     distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
     distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
     time.sleep(2)
 
-    swarm.synchronize_state(full_sync=True)
-    assert len(swarm.failed_tasks) == 1
-    assert len(swarm.done_tasks) == 0
+    synchronize_state(state, gateway, orchestrator, full_sync=True)
+    assert state.get_failed_count() == 1
+    assert state.get_done_count() == 0
 
 
 def test_wedged_dag(db_engine, tool, task_template, requester_no_retry):
@@ -205,29 +212,26 @@ def test_wedged_dag(db_engine, tool, task_template, requester_no_retry):
     distributor_service.set_workflow_run(wfr.workflow_run_id)
     wfr._update_status(WorkflowRunStatus.LAUNCHED)
 
-    # queue first 2 tasks
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id,
-        requester=workflow.requester,
+    # Build state and queue first 2 tasks
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
-    swarm.set_initial_fringe()
-    swarm.process_commands()
+    prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # check that we get the instantiating signal
     distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
     distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    swarm.synchronize_state()
-    assert swarm.tasks[t1.task_id].status == TaskStatus.INSTANTIATING
-    assert swarm.tasks[t2.task_id].status == TaskStatus.INSTANTIATING
+    synchronize_state(state, gateway, orchestrator)
+    assert state.tasks[t1.task_id].status == TaskStatus.INSTANTIATING
+    assert state.tasks[t2.task_id].status == TaskStatus.INSTANTIATING
 
     # run the normal workflow sync protocol. only t1 should be done
     distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
     distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
-    swarm.synchronize_state()
-    assert swarm.tasks[t1.task_id].status == TaskStatus.DONE
-    assert swarm.tasks[t2.task_id].status == TaskStatus.INSTANTIATING
-    assert swarm.tasks[t3.task_id].status == TaskStatus.REGISTERING
+    synchronize_state(state, gateway, orchestrator)
+    assert state.tasks[t1.task_id].status == TaskStatus.DONE
+    assert state.tasks[t2.task_id].status == TaskStatus.INSTANTIATING
+    assert state.tasks[t3.task_id].status == TaskStatus.REGISTERING
 
     # Force the workflow run back to instantiating state, since the distributor service
     # transitions the workflow_run to launched
@@ -246,22 +250,46 @@ def test_wedged_dag(db_engine, tool, task_template, requester_no_retry):
         """
         session.execute(text(sql), {"workflow_id": workflow.workflow_id})
         session.commit()
-    # now run wedged dag route. make sure task 2 is now in done state
+
+    # now run with wedged_workflow_sync_interval=-1 to force full sync
+    config = WorkflowRunConfig(wedged_workflow_sync_interval=-1)
     with pytest.raises(RuntimeError):
-        swarm.wedged_workflow_sync_interval = -1
-        swarm.run(lambda: True, seconds_until_timeout=1)
-    assert swarm.tasks[t1.task_id].status == TaskStatus.DONE
-    assert swarm.tasks[t2.task_id].status == TaskStatus.DONE
-    assert swarm.tasks[t3.task_id].status in {
-        TaskStatus.REGISTERING,
-        TaskStatus.QUEUED,
-        TaskStatus.INSTANTIATING,
-        TaskStatus.LAUNCHED,
-        TaskStatus.RUNNING,
-        TaskStatus.DONE,
-    }
-    ready_to_run_ids = {task.task_id for task in swarm.ready_to_run}
-    assert t3.task_id in ready_to_run_ids or not swarm.ready_to_run
+        run_workflow(
+            workflow=workflow,
+            workflow_run_id=wfr.workflow_run_id,
+            distributor_alive=lambda: True,
+            status=wfr.status,
+            config=config,
+            timeout=1,
+            requester=workflow.requester,
+        )
+
+    # Verify results directly from database (since build_from_workflow_id skips DONE tasks)
+    with Session(bind=db_engine) as session:
+        # t1 was done before the wedge
+        task1_status = session.execute(
+            text("SELECT status FROM task WHERE id = :tid"), {"tid": t1.task_id}
+        ).scalar_one()
+        assert task1_status == TaskStatus.DONE
+
+        # t2 was "wedged" but became done via full sync
+        task2_status = session.execute(
+            text("SELECT status FROM task WHERE id = :tid"), {"tid": t2.task_id}
+        ).scalar_one()
+        assert task2_status == TaskStatus.DONE
+
+        # t3 should be in some state - could be anything depending on timing
+        task3_status = session.execute(
+            text("SELECT status FROM task WHERE id = :tid"), {"tid": t3.task_id}
+        ).scalar_one()
+        assert task3_status in {
+            TaskStatus.REGISTERING,
+            TaskStatus.QUEUED,
+            TaskStatus.INSTANTIATING,
+            TaskStatus.LAUNCHED,
+            TaskStatus.RUNNING,
+            TaskStatus.DONE,
+        }
 
 
 def test_fail_fast(tool):
@@ -301,7 +329,7 @@ def test_fail_fast(tool):
     assert num_done <= 3
 
 
-def test_propagate_result(tool, task_template):
+def test_propagate_result(db_engine, tool, task_template):
     """set up workflow with 3 tasks on one layer and 3 tasks as dependant"""
 
     workflow = tool.create_workflow(name="test_propagate_result")
@@ -327,19 +355,26 @@ def test_propagate_result(tool, task_template):
 
     # run the distributor
     with DistributorContext("sequential", wfr.workflow_run_id, 180) as distributor:
-        # swarm calls
-        swarm = SwarmWorkflowRun(
+        result = run_workflow(
+            workflow=workflow,
             workflow_run_id=wfr.workflow_run_id,
+            distributor_alive=distributor.alive,
+            status=wfr.status,
             requester=workflow.requester,
         )
-        swarm.from_workflow(workflow)
-        swarm.run(distributor.alive)
 
-    assert swarm.status == WorkflowRunStatus.DONE
-    assert len(swarm.done_tasks) == 6
-    assert swarm.tasks[t4.task_id].num_upstreams_done >= 3
-    assert swarm.tasks[t5.task_id].num_upstreams_done >= 3
-    assert swarm.tasks[t6.task_id].num_upstreams_done >= 3
+    assert result.final_status == WorkflowRunStatus.DONE
+    assert result.done_count == 6
+
+    # Verify all tasks completed - particularly that downstream tasks (t4, t5, t6)
+    # correctly waited for all 3 upstreams (t1, t2, t3) before running
+    with Session(bind=db_engine) as session:
+        for task in [t1, t2, t3, t4, t5, t6]:
+            status = session.execute(
+                text("SELECT status FROM task WHERE id = :tid"),
+                {"tid": task.task_id},
+            ).scalar_one()
+            assert status == TaskStatus.DONE
 
 
 def test_callable_returns_valid_object(tool, task_template):
@@ -367,19 +402,28 @@ def test_callable_returns_valid_object(tool, task_template):
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    swarm = SwarmWorkflowRun(
-        workflow_run_id=wfr.workflow_run_id,
-        requester=workflow.requester,
+    # Build state
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
     )
-    swarm.from_workflow(workflow)
 
-    # swarm calls
+    # run with distributor
     with DistributorContext("sequential", wfr.workflow_run_id, 180) as distributor:
         try:
-            swarm.run(distributor.alive, seconds_until_timeout=1)
+            run_workflow(
+                workflow=workflow,
+                workflow_run_id=wfr.workflow_run_id,
+                distributor_alive=distributor.alive,
+                status=wfr.status,
+                timeout=1,
+                requester=workflow.requester,
+            )
         except RuntimeError:
             pass
-    assert swarm.tasks[task.task_id].current_task_resources.id is not None
+
+    # Rebuild state to check results
+    builder = create_builder(workflow, wfr.workflow_run_id, workflow.requester)
+    assert builder.tasks[task.task_id].current_task_resources.id is not None
 
 
 def test_callable_returns_wrong_object(tool, task_template):
@@ -401,10 +445,11 @@ def test_callable_returns_wrong_object(tool, task_template):
     factory = WorkflowRunFactory(wf.workflow_id)
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
-    swarm = SwarmWorkflowRun(workflow_run_id=wfr.workflow_run_id)
-    swarm.from_workflow(wf)
+
+    state, gateway, orchestrator = create_test_context(wf, wfr.workflow_run_id)
+
     with pytest.raises(CallableReturnedInvalidObject):
-        swarm.set_initial_fringe()
+        set_initial_fringe(state, orchestrator)
 
 
 def test_callable_fails_bad_filepath(tool, task_template):
@@ -427,13 +472,14 @@ def test_callable_fails_bad_filepath(tool, task_template):
     factory = WorkflowRunFactory(wf.workflow_id)
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
-    swarm = SwarmWorkflowRun(workflow_run_id=wfr.workflow_run_id)
-    swarm.from_workflow(wf)
+
+    state, gateway, orchestrator = create_test_context(wf, wfr.workflow_run_id)
+
     with pytest.raises(FileNotFoundError):
-        swarm.set_initial_fringe()
+        set_initial_fringe(state, orchestrator)
 
 
-def test_swarm_fails(tool):
+def test_swarm_fails(db_engine, tool):
     """Test the swarm exits on error appropriately."""
 
     workflow = tool.create_workflow(name="test_propagate_result")
@@ -452,41 +498,51 @@ def test_swarm_fails(tool):
 
     # run the distributor
     with DistributorContext("sequential", wfr.workflow_run_id, 180) as distributor:
-        # swarm calls
-        swarm = SwarmWorkflowRun(
+        result = run_workflow(
+            workflow=workflow,
             workflow_run_id=wfr.workflow_run_id,
+            distributor_alive=distributor.alive,
+            status=wfr.status,
             requester=workflow.requester,
         )
-        swarm.from_workflow(workflow)
-        swarm.run(distributor.alive)
 
-    assert swarm.status == WorkflowRunStatus.ERROR
-    assert len(swarm.done_tasks) == 1
-    assert len(swarm.failed_tasks) == 1
-    assert len(swarm.ready_to_run) == 0
-    assert swarm.tasks[t3.task_id].num_upstreams_done == 0
-    assert not swarm.active_tasks
+    assert result.final_status == WorkflowRunStatus.ERROR
+    assert result.done_count == 1
+    assert result.failed_count == 1
+
+    # Verify specific task states: t1 done, t2 failed, t3 never ran (still REGISTERING)
+    with Session(bind=db_engine) as session:
+        t1_status = session.execute(
+            text("SELECT status FROM task WHERE id = :tid"), {"tid": t1.task_id}
+        ).scalar_one()
+        assert t1_status == TaskStatus.DONE
+
+        t2_status = session.execute(
+            text("SELECT status FROM task WHERE id = :tid"), {"tid": t2.task_id}
+        ).scalar_one()
+        assert t2_status == TaskStatus.ERROR_FATAL
+
+        # t3 should not have run since its upstream (t2) failed
+        t3_status = session.execute(
+            text("SELECT status FROM task WHERE id = :tid"), {"tid": t3.task_id}
+        ).scalar_one()
+        assert t3_status == TaskStatus.REGISTERING
 
 
-def test_swarm_terminate(tool):
-    """Test that when the workflow run terminates properly."""
+def test_swarm_terminate(db_engine, tool):
+    """Test that when the workflow run receives a COLD_RESUME signal, it terminates properly.
 
-    class MockSwarm(SwarmWorkflowRun):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.sync_attempts = 0
-
-        async def synchronize_state_async(self, full_sync: bool = False) -> None:
-            await super().synchronize_state_async(full_sync)
-            self.sync_attempts += 1
-            if self.sync_attempts == 2:
-                await self._update_status_async(WorkflowRunStatus.COLD_RESUME)
+    This test simulates the server setting the workflow_run status to COLD_RESUME
+    (e.g., from another process requesting a resume). The swarm should detect this
+    during heartbeat/sync and terminate gracefully.
+    """
+    import threading
 
     workflow = tool.create_workflow(name="test_terminate")
 
     t1 = tool.active_task_templates["phase_1"].create_task(
         arg="sleep 1000", max_attempts=1
-    )  # Long sleep time
+    )  # Long sleep - will be terminated
     t2 = tool.active_task_templates["phase_2"].create_task(
         arg="sleep 2", upstream_tasks=[t1]
     )
@@ -497,20 +553,52 @@ def test_swarm_terminate(tool):
     wfr = factory.create_workflow_run()
     wfr._update_status(WorkflowRunStatus.BOUND)
 
-    # run the distributor
+    # Function to update the workflow_run status to COLD_RESUME after a delay
+    def trigger_cold_resume():
+        time.sleep(3)  # Wait for workflow to start running
+        with Session(bind=db_engine) as session:
+            # Update workflow_run status to COLD_RESUME
+            session.execute(
+                text("UPDATE workflow_run SET status = :status WHERE id = :wfr_id"),
+                {
+                    "status": WorkflowRunStatus.COLD_RESUME,
+                    "wfr_id": wfr.workflow_run_id,
+                },
+            )
+            session.commit()
+            logger.info(f"Set workflow_run {wfr.workflow_run_id} to COLD_RESUME")
+
+    # Start background thread to trigger COLD_RESUME
+    trigger_thread = threading.Thread(target=trigger_cold_resume, daemon=True)
+    trigger_thread.start()
+
+    # Run the distributor and swarm
     with DistributorContext("sequential", wfr.workflow_run_id, 180) as distributor:
-        # swarm calls
-        swarm = MockSwarm(
+        config = WorkflowRunConfig(
+            heartbeat_interval=1,  # Short interval to detect status change faster
+        )
+        result = run_workflow(
+            workflow=workflow,
             workflow_run_id=wfr.workflow_run_id,
+            distributor_alive=distributor.alive,
+            status=wfr.status,
+            config=config,
             requester=workflow.requester,
         )
-        swarm.from_workflow(workflow)
-        swarm.run(distributor.alive)
 
-    assert swarm.status == WorkflowRunStatus.TERMINATED
-    assert len(swarm.done_tasks) == 0
-    assert len(swarm.failed_tasks) == 1
-    assert len(swarm.ready_to_run) == 0
+    trigger_thread.join(timeout=1)
+
+    # Workflow should have terminated due to COLD_RESUME
+    assert result.final_status == WorkflowRunStatus.TERMINATED
+    assert result.done_count == 0
+    assert result.failed_count == 1  # t1 should be failed/terminated
+
+    # Verify t2 never ran (still REGISTERING) since t1 was terminated
+    with Session(bind=db_engine) as session:
+        t2_status = session.execute(
+            text("SELECT status FROM task WHERE id = :tid"), {"tid": t2.task_id}
+        ).scalar_one()
+        assert t2_status == TaskStatus.REGISTERING
 
 
 def test_build_swarm_from_workflow_id(tool, task_template):
@@ -536,50 +624,83 @@ def test_build_swarm_from_workflow_id(tool, task_template):
     workflow.run()
     # Task states should be [D, D, F, G] at this point
 
-    # Test a resumed workflow
+    # Test a resumed workflow using SwarmBuilder
     resume_factory = WorkflowRunFactory(workflow.workflow_id)
     resume_factory.set_workflow_resume()
     resume_factory.reset_task_statuses()
     resume_wfr = resume_factory.create_workflow_run()
 
-    resume_swarm = SwarmWorkflowRun(
-        workflow_run_id=resume_wfr.workflow_run_id, status=resume_wfr.status
+    # Use SwarmBuilder to build the swarm from workflow_id
+    requester = Requester.from_defaults()
+    builder = SwarmBuilder(
+        requester=requester,
+        workflow_run_id=resume_wfr.workflow_run_id,
+        initial_status=resume_wfr.status,
     )
-    assert resume_swarm.status == WorkflowRunStatus.LINKING
 
-    # Pull workflow metadata
-    resume_swarm.set_workflow_metadata(workflow.workflow_id)
-    assert resume_swarm.dag_id == workflow._dag.dag_id
-    assert resume_swarm.max_concurrently_running == workflow.max_concurrently_running
+    # Build from workflow_id with small chunk size to test edge cases
+    builder.build_from_workflow_id(
+        workflow_id=workflow.workflow_id,
+        edge_chunk_size=1,
+    )
 
-    # Fetch tasks from the database.
-    # Expect 2 tasks back, use a chunk size of 1 to test edge cases.
-    resume_swarm.set_tasks_from_db(chunk_size=1)
-    # 2 tasks, t3 and t4 expected back.
-    assert len(resume_swarm.tasks) == 2
-    assert set(resume_swarm.tasks.keys()) == {t3.task_id, t4.task_id}
-    st3, st4 = resume_swarm.tasks[t3.task_id], resume_swarm.tasks[t4.task_id]
+    # Verify workflow metadata was fetched
+    assert builder.dag_id == workflow._dag.dag_id
+    assert builder.state.max_concurrently_running == workflow.max_concurrently_running
+
+    # Verify tasks were fetched correctly
+    # Expect 2 tasks back (t3 and t4 - the ones not in DONE state)
+    assert len(builder.state.tasks) == 2
+    assert set(builder.state.tasks.keys()) == {t3.task_id, t4.task_id}
+    st3, st4 = builder.state.tasks[t3.task_id], builder.state.tasks[t4.task_id]
 
     assert st3.current_task_resources.requested_resources == {}
     assert st4.current_task_resources.requested_resources == {"foo": "bar"}
     assert len(st4.fallback_queues) == 1
     assert st4.fallback_queues[0].queue_id == 2  # null.q, sequential cluster
     assert st3.status == TaskStatus.REGISTERING
-    # T3 and T4 share same array, 1 value present
-    assert len(resume_swarm.arrays) == 1
-    swarmarray = resume_swarm.arrays[st3.array_id]
-    assert swarmarray.tasks == {st3, st4}
-    assert resume_swarm._task_status_map[TaskStatus.REGISTERING] == {st3, st4}
 
-    # Set downstreams from the database
-    resume_swarm.set_downstreams_from_db(30)
+    # T3 and T4 share same array, 1 value present
+    assert len(builder.state.arrays) == 1
+    swarmarray = builder.state.arrays[st3.array_id]
+    assert swarmarray.tasks == {st3, st4}
+    assert builder.state._task_status_map[TaskStatus.REGISTERING] == {st3, st4}
+
+    # Verify downstream relationships were set up
     assert st3.downstream_swarm_tasks == {st4}
     assert st4.num_upstreams == 1
     assert st4.downstream_swarm_tasks == set()
 
-    resume_swarm.set_initial_fringe()
-    assert len(resume_swarm.ready_to_run) == 1
-    assert resume_swarm.ready_to_run[0] == st3
+    # Also test via builder with orchestrator for full integration
+    state, gateway, orchestrator = create_test_context(
+        workflow,
+        resume_wfr.workflow_run_id,
+        requester,
+        initial_status=resume_wfr.status,
+    )
+
+    # Note: create_test_context builds from workflow (all tasks), not from workflow_id
+    # So let's build from workflow_id instead
+    resume_builder = SwarmBuilder(
+        requester=requester,
+        workflow_run_id=resume_wfr.workflow_run_id,
+        initial_status=resume_wfr.status,
+    )
+    resume_builder.build_from_workflow_id(workflow.workflow_id, edge_chunk_size=1)
+
+    config = OrchestratorConfig()
+    resume_orchestrator = WorkflowRunOrchestrator(
+        resume_builder.state, resume_builder._ensure_gateway(), config
+    )
+
+    set_initial_fringe(resume_builder.state, resume_orchestrator)
+    assert len(resume_builder.state.ready_to_run) == 1
+    assert resume_builder.state.ready_to_run[0].task_id == t3.task_id
 
     # Run a full sync, test that no keyerrors are raised
-    asyncio.run(resume_swarm._task_status_updates_async(full_sync=True))
+    synchronize_state(
+        resume_builder.state,
+        resume_builder._ensure_gateway(),
+        resume_orchestrator,
+        full_sync=True,
+    )

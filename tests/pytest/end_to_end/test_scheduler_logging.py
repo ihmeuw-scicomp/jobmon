@@ -3,7 +3,7 @@ import logging
 import pytest
 
 from jobmon.client.api import Tool
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.swarm import run_workflow
 from jobmon.client.workflow import DistributorContext
 from jobmon.core.requester import Requester
 
@@ -27,6 +27,7 @@ def test_scheduler_logging(client_env, caplog):
     workflow = t.create_workflow()
     workflow.add_tasks([t1])
     workflow.bind()
+    workflow._bind_tasks()
     wfr = workflow._create_workflow_run()
     requester = Requester(client_env)
 
@@ -34,11 +35,12 @@ def test_scheduler_logging(client_env, caplog):
         assert "Starting Distributor Process" in caplog.text
         caplog.clear()
 
-        swarm = SwarmWorkflowRun(
-            workflow_run_id=wfr.workflow_run_id, requester=requester
+        result = run_workflow(
+            workflow=workflow,
+            workflow_run_id=wfr.workflow_run_id,
+            distributor_alive=distributor.alive,
+            requester=requester,
         )
-        swarm.from_workflow(workflow)
-        swarm.run(distributor.alive)
 
     assert "1 newly completed tasks. 100.0 percent done." in caplog.text
     caplog.clear()

@@ -28,6 +28,7 @@ class Array:
     """
 
     compute_resources_callable: Callable[..., Any] | None
+    max_concurrently_running: int
 
     def __init__(
         self,

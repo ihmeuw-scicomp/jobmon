@@ -30,7 +30,7 @@ from jobmon.client.status_commands import (
     workflow_status,
     workflow_tasks,
 )
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.swarm import run_workflow
 from jobmon.client.workflow import DistributorContext
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskStatus, WorkflowRunStatus, WorkflowStatus
@@ -339,9 +339,6 @@ def test_workflow_tasks(db_engine, tool, client_env, cli):
     factory = WorkflowRunFactory(workflow.workflow_id)
     client_wfr = factory.create_workflow_run()
     client_wfr._update_status(WorkflowRunStatus.BOUND)
-    wfr = SwarmWorkflowRun(
-        workflow_run_id=client_wfr.workflow_run_id, requester=workflow.requester
-    )
 
     # we should get 2 tasks back in pending state
     command_str = f"workflow_tasks -w {workflow.workflow_id}"
@@ -352,14 +349,16 @@ def test_workflow_tasks(db_engine, tool, client_env, cli):
     assert len(df.STATUS.unique()) == 1
 
     # execute the tasks
-    with DistributorContext("sequential", wfr.workflow_run_id, 180) as distributor:
-        # swarm calls
-        swarm = SwarmWorkflowRun(
-            workflow_run_id=wfr.workflow_run_id,
+    with DistributorContext(
+        "sequential", client_wfr.workflow_run_id, 180
+    ) as distributor:
+        run_workflow(
+            workflow=workflow,
+            workflow_run_id=client_wfr.workflow_run_id,
+            distributor_alive=distributor.alive,
+            status=client_wfr.status,
             requester=workflow.requester,
         )
-        swarm.from_workflow(workflow)
-        swarm.run(distributor.alive)
 
     # we should get 0 tasks in pending
     command_str = f"workflow_tasks -w {workflow.workflow_id} -s PENDING"
@@ -696,21 +695,19 @@ def test_update_task_status(db_engine, client_env, cli):
     client_wfr3 = factory.create_workflow_run()
     client_wfr3._update_status(WorkflowRunStatus.BOUND)
 
-    wfr3 = SwarmWorkflowRun(
-        workflow_run_id=client_wfr3.workflow_run_id, requester=wf3.requester
-    )
     # run the distributor
-    with DistributorContext("sequential", wfr3.workflow_run_id, 180) as distributor:
-        # swarm calls
-        swarm = SwarmWorkflowRun(
-            workflow_run_id=wfr3.workflow_run_id,
+    with DistributorContext(
+        "sequential", client_wfr3.workflow_run_id, 180
+    ) as distributor:
+        result = run_workflow(
+            workflow=wf3,
+            workflow_run_id=client_wfr3.workflow_run_id,
+            distributor_alive=distributor.alive,
+            status=client_wfr3.status,
             requester=wf3.requester,
         )
-        swarm.from_workflow(wf3)
-        assert len(swarm.done_tasks) == 3
-        swarm.run(distributor.alive)
 
-    assert len(swarm.done_tasks) == 5
+    assert result.done_count == 5
 
 
 def test_400_cli_route(db_engine, client_env):

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Optional, Set
+from typing import TYPE_CHECKING, Optional, Set
 
 import structlog
 
-from jobmon.client.swarm.swarm_task import SwarmTask
+if TYPE_CHECKING:
+    from jobmon.client.swarm.task import SwarmTask
 
 logger = structlog.get_logger(__name__)
 
@@ -21,10 +22,10 @@ class SwarmArray:
         """Initialization of the SwarmArray."""
         self.array_id = array_id
         self.array_name = array_name or f"array_{array_id}"
-        self.tasks: Set[SwarmTask] = set()
+        self.tasks: Set["SwarmTask"] = set()
         self.max_concurrently_running = max_concurrently_running
 
-    def add_task(self, task: SwarmTask) -> None:
+    def add_task(self, task: "SwarmTask") -> None:
         if task.array_id != self.array_id:
             raise ValueError(
                 f"array_id mismatch. SwarmTask={task.array_id}. Array={self.array_id}."
