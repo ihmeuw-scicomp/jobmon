@@ -93,10 +93,25 @@ Configuration
 
 Jobmon needs to know how to connect to the server and which cluster to use.
 
+Environment Variables
+---------------------
+
+The simplest way to configure Jobmon is with environment variables:
+
+.. code-block:: bash
+
+   export JOBMON__HTTP__SERVICE_URL="http://jobmon-server.example.com:5000"
+
 Configuration File
 ------------------
 
-Create a configuration file at ``~/.jobmon.yaml``:
+For persistent configuration, create a YAML file and point to it:
+
+.. code-block:: bash
+
+   export JOBMON__CONFIG_FILE="/path/to/your/jobmonconfig.yaml"
+
+Example configuration file:
 
 .. code-block:: yaml
 
@@ -107,18 +122,10 @@ Create a configuration file at ``~/.jobmon.yaml``:
    distributor:
      cluster_name: "slurm"
 
-Environment Variables
----------------------
-
-Alternatively, use environment variables:
-
-.. code-block:: bash
-
-   export JOBMON__HTTP__SERVICE_URL="http://jobmon-server.example.com:5000"
-
 .. note::
-   Contact your system administrator for the correct server URL and 
-   cluster configuration for your organization.
+   At IHME, the ``jobmon_installer_ihme`` package automatically configures
+   the server URL. Contact your system administrator for the correct 
+   configuration for your organization.
 
 Development Setup
 =================

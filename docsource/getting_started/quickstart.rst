@@ -227,7 +227,8 @@ Here's a workflow that processes data for multiple locations:
    
    # Add all tasks and run
    workflow.add_tasks(process_tasks + [agg_task])
-   result = workflow.run()
+   status = workflow.run()
+   print(f"Workflow completed with status: {status}")
 
 What's Next?
 ============
