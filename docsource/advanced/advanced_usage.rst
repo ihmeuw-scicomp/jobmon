@@ -712,7 +712,7 @@ downstream tasks depend on these jobs.
                         for rei in self.rei_ids:
                             task = self.loc_agg_tt.create_task(
                                 compute_resources={"cores": 20, "memory": "40Gb", "runtime": "540s"},
-                                cluster_name="slurm,
+                                cluster_name="slurm",
                                 max_attempts=11,
                                 name='loc_agg_{}_{}_{}_{}'.format(measure, year, sex, rei),
                                 python=self.python,
@@ -783,7 +783,7 @@ downstream tasks depend on these jobs.
                             if is_aggregate:
                                 task.add_upstream(
                                     self.cleanup_jobs_by_command['cleanup_{}_{}_{}'
-                                                                 .format(measure, loc, year)]
+                                                                 .format(measure, loc, year)])
                             else:
                                 task.add_upstream(
                                     self.most_detailed_jobs_by_command['most_detailed_{}_{}'
