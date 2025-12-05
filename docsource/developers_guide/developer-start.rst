@@ -2,7 +2,7 @@ General
 *******
 
 This section explains what you need to do as a Jobmon coder, plus gives a brief introduction to the major
-technologies. More detailed notes on technologies and design are in the Architecture & Deisgn section.
+technologies. More detailed notes on technologies and design are in the Architecture & Design section.
 
 ******************************
 Working on the Jobmon Codebase
@@ -60,12 +60,10 @@ Code must pass linting and typechecking before it can be merged.
 Pull Requests
 *************
 
-When the above unit tests, formatting checks, and typing checks all pass, you can submit a pull request on Stash. Add
-all members of the Scicomp team to the created pull request.
+When the above unit tests, formatting checks, and typing checks all pass, you can submit a pull request on GitHub. Add
+members of the Scicomp team as reviewers.
 
-Creating a pull request should start an automatic build, which runs the above mentioned tests and checks on a
-the scicomp Jenkins server
-`<https://jenkins.scicomp.ihme.washington.edu>`_
+Creating a pull request will start an automatic build, which runs the tests and checks via the CI pipeline.
 
-If all the tests pass, you will see a green check mark on the builds page in your PR.
+If all the tests pass, you will see a green check mark on the PR.
 

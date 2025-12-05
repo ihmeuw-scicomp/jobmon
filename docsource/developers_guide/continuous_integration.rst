@@ -54,7 +54,7 @@ Jobmon UGE PR Merged
    * - Jenkins URL
      - https://jenkins.scicomp.ihme.washington.edu/job/scicomp/job/jobmon_uge_pr_merged/
 
-Jonmon Slurm PR Opened
+Jobmon Slurm PR Opened
 **********************
 .. list-table::
    :widths: 25 75
@@ -134,7 +134,7 @@ Jobmon Deploy Server
      - * JOBMON_VERSION - The version of Jobmon to deploy (git tag) e.g. 3.0.3.
        * K8S_NAMESPACE - Kubernetes Namespace to deploy to e.g jobmon-prod-3-0-3.
        * K8S_REAPER_NAMESPACE - Kubernetes Namespace to deploy to e.g. jobmon-reapers.
-       * METALLB_IP_POOL - Name of the MetalLB IP Pool you wish to get IPs from: https://stash.ihme.washington.edu/projects/ID/repos/metallb-scicomp/browse/k8s/scicomp-cluster-metallb.yml
+       * METALLB_IP_POOL - Name of the MetalLB IP Pool you wish to get IPs from (see metallb-scicomp repository)
        * RANCHER_DB_SECRET - Name of rancher secret to use for database variables.
        * USE_LOGSTASH - Whether to forward event logs to Logstash or not.
        * RANCHER_SLACK_SECRET - Name of rancher secret to use for Slack variables.
