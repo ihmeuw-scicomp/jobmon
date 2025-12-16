@@ -193,7 +193,7 @@ Default client configuration (``jobmon_client/src/jobmon/client/config/logconfig
        propagate: false
 
 Local development configuration with OTLP enabled
-(``docker_config/logconfig.otlp.yaml``)::
+(``dev/config/logconfig.otlp.yaml``)::
 
    handlers:
      console_structlog: {...}
@@ -227,8 +227,8 @@ unavailable, preventing unnecessary thread-local state in minimalist deployments
 Testing Strategy
 ================
 
-Unit tests in ``tests/pytest/core/test_jobmon_context.py`` and
-``tests/pytest/client/test_client_logging.py`` cover:
+Unit tests in ``tests/unit/core/test_jobmon_context.py`` and
+``tests/unit/client/test_client_logging.py`` cover:
 
 * Telemetry isolation for Jobmon vs host namespaces
 * Context manager cleanup

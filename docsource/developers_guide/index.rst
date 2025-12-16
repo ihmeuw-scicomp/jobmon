@@ -40,7 +40,7 @@ Quick Commands
    nox -s tests -- tests/
    
    # Run specific test file
-   nox -s tests -- tests/pytest/client/test_workflow.py
+   nox -s tests -- tests/integration/client/test_workflow.py
    
    # Lint and format
    nox -s lint
