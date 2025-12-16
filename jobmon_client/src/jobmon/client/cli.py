@@ -234,6 +234,7 @@ class ClientCLI(CLI):
             reset_if_running=args.reset_running_jobs,
             timeout=args.timeout,
             seconds_until_timeout=args.seconds_until_timeout,
+            increase_resource=not args.use_original_resources,
         )
 
     @staticmethod
@@ -634,6 +635,15 @@ class ClientCLI(CLI):
             required=False,
             default=36000,
             type=int,
+        )
+        workflow_resume_parser.add_argument(
+            "--use-original-resources",
+            help=(
+                "Use original resources instead of automatically increasing "
+                "resources for tasks that failed with resource errors"
+            ),
+            required=False,
+            action="store_true",
         )
 
     def _add_update_config_subparser(self) -> None:

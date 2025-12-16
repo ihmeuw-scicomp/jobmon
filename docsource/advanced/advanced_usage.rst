@@ -268,13 +268,23 @@ Examples:
    # Resume with cold restart and extended execution timeout
    jobmon workflow_resume -w 12345 -c slurm --reset-running-jobs --seconds-until-timeout 21600
 
-The "workflow_resume" CLI has three optional flags:
+   # Resume with automatic resource increase for failed tasks
+   jobmon workflow_resume -w 12345 -c slurm --increase-resource
+
+   # Resume with both resource increase and cold restart
+   jobmon workflow_resume -w 12345 -c slurm --increase-resource --reset-running-jobs
+
+The "workflow_resume" CLI has four optional flags:
 
 * ``--reset-running-jobs`` - Whether to kill currently running jobs or let them finish. Setting this flag means that it
   will be a cold resume i.e. currently running jobs are also terminated and rerun. Default is set to False.
 * ``--timeout`` or ``-t`` - Timeout in seconds to wait for workflow to become resumable. This controls how long Jobmon waits for the workflow to reach a resumable state before giving up. Default is 180 seconds.
 * ``--seconds-until-timeout`` - Timeout in seconds for workflow execution after resume. This controls how long the workflow can run after resuming before timing out. If not all tasks complete within this time, the workflow will error but submitted tasks will continue running. Default is 36000 seconds (10 hours).
+* ``--increase-resource`` - When set, automatically increase resources for tasks that failed due to resource errors. This will identify tasks in ERROR_RECOVERABLE or ERROR_FATAL status whose latest task instance is in RESOURCE_ERROR status, update their resources using the defined resource scales, and set their status to ERROR_RECOVERABLE for retry. Default is False.
 
+.. note::
+
+   **Resource Increase Behavior**: When using the ``--increase-resource`` flag, Jobmon will automatically identify tasks that failed due to resource constraints (memory, runtime, etc.) and increase their resources according to the ``resource_scales`` defined when the tasks were created. This is particularly useful for workflows where tasks may fail due to insufficient resources and you want to retry them with higher resource allocations without manual intervention.
 
 .. note::
 

@@ -20,6 +20,7 @@ All notable changes to Jobmon will be documented in this file.
   - `WorkflowRunOrchestrator`: Thin coordinator managing the main execution loop
 - Added unified OTLP manager with HTTP exporter support, shared logger providers, and automatic CLI shutdown flushing so all components forward structured telemetry reliably.
 - Added dedicated logging documentation set (architecture overview, operator guide, telemetry status) along with refreshed example configs covering OTLP transports.
+- The `jobmon workflow_resume` command now automatically increases resources for tasks that failed due to resource errors by default. This feature identifies tasks in ERROR_RECOVERABLE or ERROR_FATAL status whose latest task instance is in RESOURCE_ERROR status, updates their resources using the defined resource scales, and sets their status to ERROR_RECOVERABLE for retry. Use `--use-original-resources` to skip this behavior and keep original resource values.
 - Added `jobmon update_config` command to allow users to update configuration values in their defaults.yaml file using dot notation (e.g., `jobmon update_config http.retries_attempts 15`).
 - **Structured Logging with Context Binding and OTLP Integration**: Complete implementation of structured logging across all Jobmon components with automatic context binding, OTLP attribute extraction, and APM integration:
   - **Context Binding Decorator** (`@bind_context`): Automatically bind function/method parameters to log context with support for nested attribute extraction and automatic cleanup

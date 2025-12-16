@@ -680,6 +680,7 @@ def resume_workflow_from_id(
     log: bool = True,
     timeout: int = 180,
     seconds_until_timeout: int = 36000,
+    increase_resource: bool = True,
 ) -> None:
     """Given a workflow ID, resume the workflow.
 
@@ -689,6 +690,13 @@ def resume_workflow_from_id(
         configure_client_logging()
 
     factory = WorkflowRunFactory(workflow_id=workflow_id)
+
+    # Optionally increase resources for failed tasks with latest TI in RESOURCE_ERROR
+    if increase_resource:
+        app_route = f"/workflow/{workflow_id}/increase_resources"
+        factory.requester.send_request(
+            app_route=app_route, message={}, request_type="post"
+        )
 
     # Signal for a resume - move existing workflow runs to C or H resume depending on the input
     factory.set_workflow_resume(
