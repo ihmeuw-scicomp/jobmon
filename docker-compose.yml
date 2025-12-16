@@ -11,7 +11,7 @@ services:
     volumes:
       - ./jobmon_core:/app/jobmon_core:ro
       - ./jobmon_server:/app/jobmon_server  # Remove :ro to allow database creation
-      - ./docker_config:/app/config:ro  # Mount local config directory
+      - ./dev/config:/app/config:ro  # Mount local config directory
     environment:
       # Jobmon Configuration
       - JOBMON__CONFIG_FILE=/app/config/jobmonconfig.local.yaml
@@ -41,8 +41,8 @@ services:
     volumes:
       - ./jobmon_core:/app/jobmon_core:ro
       - ./jobmon_client:/app/jobmon_client:ro
-      - ./docker_config:/app/config:ro  # Mount local config directory
-      - ./tests/workflows:/app/test_scripts  # Volume for test workflow scripts
+      - ./dev/config:/app/config:ro  # Mount local config directory
+      - ./dev/workflows:/app/test_scripts  # Volume for test workflow scripts
     environment:
       # Jobmon Configuration
       - JOBMON__CONFIG_FILE=/app/config/jobmonconfig.local.yaml
