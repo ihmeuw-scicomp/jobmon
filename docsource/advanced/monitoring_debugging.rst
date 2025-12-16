@@ -212,7 +212,9 @@ you can query the Jobmon database.
 
 You can view the Jobmon database connection information here: `<https://jobmon-gui.ihme.washington.edu/#/jobmon_at_ihme>`_
 
-.. include:: database-ihme.rst
+.. note::
+   Database connection information often differs between releases. For your
+   particular release, check the GUI or contact your administrator.
 
 .. note::
     Jobmon has a persistent database. This means any time the client side of Jobmon is updated
@@ -266,14 +268,19 @@ arg_type
     The different types of arguments (NODE_ARG, TASK_ARG, OP_ARG). For more information on
     argument types see, :ref:`jobmon-arguments-label`.
 
+array
+*****
+    Groups of tasks that are submitted together as Slurm job arrays. Contains the array name,
+    associated task template version, workflow, and concurrency settings.
+
 cluster
 *******
-    A list of cluster's that Jobmon is able to run jobs on, including Slurm and Buster.
+    A list of clusters that Jobmon is able to run jobs on (e.g., Slurm).
 
 cluster_type
 ************
     A list of cluster types that Jobmon can run jobs on. Currently includes dummy, sequential,
-    multiprocess, UGE and Slurm.
+    multiprocess, and Slurm.
 
 dag
 ***
@@ -333,7 +340,7 @@ task_instance_error_log
 
 task_instance_status
 ********************
-    Meta-data table that defines the ten states of Task Instance. For more information see
+    Meta-data table that defines the fourteen states of Task Instance. For more information see
     status section below.
 
 task_resources
@@ -350,7 +357,7 @@ task_resources_type
 
 task_status
 ***********
-    Meta-data table that defines the eight states of Task. For more information, see the status
+    Meta-data table that defines the nine states of Task. For more information, see the status
     section below.
 
 task_template
@@ -395,7 +402,8 @@ workflow_run
 
 workflow_run_status
 *******************
-    Meta-data table that defines the thirteen states of Workflow Run.
+    Meta-data table that defines the thirteen states of Workflow Run. For more information see
+    the status section below.
 
 workflow_status
 ***************
@@ -466,14 +474,17 @@ WorkflowRun Statuses
      - ERROR
      - WorkflowRun did not complete successfully, either some Tasks failed or (rarely) an internal Jobmon error.
    * - G
-     - REGISTERING
-     - WorkflowRun has been validated.
+     - REGISTERED
+     - WorkflowRun has been validated and registered.
    * - H
      - HOT_RESUME
      - WorkflowRun was set to hot-resume while tasks are still running, they will continue running.
    * - I
      - INSTANTIATED
      - Scheduler is instantiating a WorkflowRun on the distributor.
+   * - L
+     - LINKING
+     - WorkflowRun is linking tasks to the workflow.
    * - O
      - LAUNCHED
      - Instantiation complete. Distributor is controlling Tasks or waiting for scheduling loop.
@@ -509,14 +520,17 @@ Task Statuses
      - ERROR_FATAL
      - Task errored out and has used all of the attempts, therefore has failed for this WorkflowRun. It can be resumed in a new WorkflowRun.
    * - G
-     - REGISTERED
-     - Task is bound to the database.
+     - REGISTERING
+     - Task is being registered and bound to the database.
    * - I
-     - INSTANTIATED
-     - Task is created within Jobmon.
+     - INSTANTIATING
+     - Task is being instantiated within Jobmon.
+   * - O
+     - LAUNCHED
+     - Task has been launched and is waiting to run.
    * - Q
-     - QUEUED_FOR_INSTANTIATION
-     - Task's dependencies have successfully completed, task can be run when the scheduler is ready.
+     - QUEUED
+     - Task's dependencies have successfully completed, task is queued for instantiation.
    * - R
      - RUNNING
      - Task is running on the specified distributor.
@@ -566,6 +580,9 @@ TaskInstance Statuses
    * - W
      - NO_DISTRIBUTOR_ID
      - TaskInstance submission within Jobmon failed – did not receive a distributor_id from the cluster.
+   * - X
+     - NO_HEARTBEAT
+     - TaskInstance stopped sending heartbeat signals and is presumed dead.
    * - Z
      - RESOURCE_ERROR
      - TaskInstance died because of insufficient resource request, e.g. insufficient memory or runtime.

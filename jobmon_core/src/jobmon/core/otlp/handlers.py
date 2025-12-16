@@ -11,7 +11,7 @@ from jobmon.core.config.structlog_config import (
     enable_structlog_otlp_capture,
 )
 
-from . import OTLP_AVAILABLE
+from ._compat import OTLP_AVAILABLE
 from .utils import JobmonOTLPFormatter
 
 
@@ -19,15 +19,16 @@ class JobmonOTLPLoggingHandler(logging.Handler):
     """Universal OTLP logging handler with lazy initialization and attribute extraction.
 
     This handler works with both stdlib logging and structlog. It extracts structured
-    attributes from structlog's thread-local event_dict when available, enabling
+    attributes from structlog's thread-local ``event_dict`` when available, enabling
     rich OTLP exports with queryable fields.
 
-    Note: JobmonOTLPStructlogHandler is an alias for this class (kept for backward
+    Note: ``JobmonOTLPStructlogHandler`` is an alias for this class (kept for backward
     compatibility). Both names can be used interchangeably in configuration.
 
     Supports flexible configuration patterns:
 
-    1. Inline dict configuration (server pattern):
+    1. Inline dict configuration (server pattern)::
+
         handlers:
           otlp_logs:
             class: jobmon.core.otlp.JobmonOTLPLoggingHandler
@@ -39,10 +40,12 @@ class JobmonOTLPLoggingHandler(logging.Handler):
               options: [["grpc.max_send_message_length", 16777216]]
               max_export_batch_size: 8
 
-    2. Pre-configured exporter instance:
+    2. Pre-configured exporter instance::
+
         handler = JobmonOTLPLoggingHandler(exporter=my_exporter)
 
-    3. Direct use with logger_provider (for testing):
+    3. Direct use with logger_provider (for testing)::
+
         handler = JobmonOTLPLoggingHandler(logger_provider=my_provider)
     """
 

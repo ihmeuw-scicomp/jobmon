@@ -2,14 +2,8 @@
 
 from __future__ import annotations
 
-try:
-    # Actually test if the required OpenTelemetry modules are available
-    import opentelemetry.trace  # noqa: F401
-
-    OTLP_AVAILABLE = True
-except ImportError:
-    OTLP_AVAILABLE = False
-
+# Import OTLP_AVAILABLE from isolated module to avoid cyclic imports
+from ._compat import OTLP_AVAILABLE
 from .formatters import JobmonOTLPFormatter
 from .handlers import JobmonOTLPLoggingHandler, JobmonOTLPStructlogHandler
 from .manager import (

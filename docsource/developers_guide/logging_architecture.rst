@@ -120,6 +120,7 @@ Two pathways exist:
   only the OTLP handler definitions.  Combined with
   ``_forward_event_to_logging_handlers`` this preserves host-controlled console
   rendering while keeping OTLP telemetry flowing.
+
 Direct-rendering Forwarding Shim
 ================================
 
@@ -132,6 +133,7 @@ include stack traces and error types.
 
 This processor is only installed once (``_processor_present`` guards it) and is
 ignored when the logger has no handlers, keeping the hot path inexpensive.
+
 * **Stdlib integration** – ``configure_client_logging`` delegates to the
   template-based configuration system (``logconfig_client.yaml``) which defines
   console and OTLP handlers.  Overrides can be provided through JobmonConfig

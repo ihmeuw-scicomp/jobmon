@@ -77,13 +77,14 @@ class TaskRepository:
         """Update the status of tasks with business logic.
 
         Description:
-            - When task_ids='all', it updates all tasks in the workflow with
-            recursive=False. This improves performance.
-            - When recursive=True, it updates the tasks and it's dependencies all
-            the way up or down the DAG.
-            - When recursive=False, it updates only the tasks in the task_ids list.
-            - When workflow_status is None, it gets the workflow status from the db.
-            - After updating the tasks, it checks the workflow status and updates it.
+
+        - When ``task_ids='all'``, it updates all tasks in the workflow with
+          ``recursive=False``. This improves performance.
+        - When ``recursive=True``, it updates the tasks and its dependencies all
+          the way up or down the DAG.
+        - When ``recursive=False``, it updates only the tasks in the task_ids list.
+        - When ``workflow_status`` is None, it gets the workflow status from the db.
+        - After updating the tasks, it checks the workflow status and updates it.
         """
         # Get all task IDs if task_ids is "all"
         if task_ids == "all":

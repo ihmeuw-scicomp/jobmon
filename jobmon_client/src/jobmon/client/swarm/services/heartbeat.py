@@ -25,11 +25,13 @@ class HeartbeatService:
     """Background heartbeat management for workflow runs.
 
     The HeartbeatService is responsible for:
+
     - Logging periodic heartbeats to the server
     - Tracking the current workflow run status
     - Detecting status changes from heartbeat responses (e.g., pause signals)
 
-    Usage:
+    Example::
+
         heartbeat = HeartbeatService(
             gateway=gateway,
             interval=30.0,

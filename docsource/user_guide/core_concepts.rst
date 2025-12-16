@@ -88,7 +88,7 @@ point to a different input directory) and the so the Tasks are different.
 Task Template
 ##############
 TaskTemplates generate groups of Tasks using a common pattern.
-The user's conntrol script defines a command template that
+The user's control script defines a command template that
 individual Nodes will fill in with varying arguments.
 A Task Template can be used in different Workflows and is
 associated with a given Tool. TaskTemplates can also be versioned, meaning you can iterate
@@ -228,34 +228,22 @@ requested resources, for example:
     tool_resources:
       # example_tool_name matches the name of a Tool defined in the python script
       example_tool_name:
-          # buster corresponds to a cluster in the Jobmon database
-          buster:
+          # The cluster name must match a cluster in the Jobmon database
+          slurm:
             cores: 1
             memory: "1G"
-            runtime: (60 * 60 * 24 * 7)
-            queue: "null.q"
-          # slurm corresponds to a cluster in the Jobmon database
-          slurm:
-            cores: 2
-            memory: "2G"
-            runtime: (60 * 60 * 24)
-            queue: "null.q"
+            runtime: 604800  # 7 days in seconds
+            queue: "all.q"
     # task_template_resources is a hardcoded Jobmon key
     task_template_resources:
       # example_task_template_name matches the name of a TaskTemplate defined in the python script
       example_task_template_name:
-        # buster corresponds to a cluster in the Jobmon database
-        buster:
-          num_cores: 1
-          m_mem_free: "3G"
-          max_runtime_seconds: (60 * 60 * 4)
-          queue: "null.q"
-        # slurm corresponds to a cluster in the Jobmon database
+        # The cluster name must match a cluster in the Jobmon database
         slurm:
           cores: 2
           memory: "4G"
-          runtime: (60 * 60 * 24)
-          queue: "null.q"
+          runtime: 86400  # 24 hours in seconds
+          queue: "all.q"
 
 Users can specify the YAML file on a TaskTemplate by passing the file path to the YAML to the
 keyword argument "yaml_file" in the "get_task_template()" method.

@@ -17,7 +17,7 @@ Most of the network plumbing is provided by Flask and the tiangolo image. That i
 
 - NGINX
 - gunicorn
-- Python 3.8
+- Python 3.9+
 - Flask
 
 For HTTP requests to the server, the client and worker_node both use the class jobmon.core.requester
@@ -54,12 +54,11 @@ sequential, and multiprocessor distributors.
 
 Each plugin is a repository:
 
-* Slurm
-* UGE
+* Slurm (primary production plugin)
 
 The entire deployment of the assembly at IHME is controlled by a final repository – jobmon_IHME-TAD.
 TAD stands for "Test and Deploy." The repo contains version, test, and config information to create an
-installation containing the correct versions of jobmon-core, jobmon_slurm, and (until recently) jobmon_uge.
+installation containing the correct versions of jobmon-core and jobmon_slurm.
 The resulting assembly is automatically deployed to kubernetes and smoke-tested.
 
 Any other installation should have a similar repository. A future release will include a skeletal TAD repository.

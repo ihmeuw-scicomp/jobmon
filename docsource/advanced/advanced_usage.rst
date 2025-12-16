@@ -4,7 +4,7 @@ Advanced Usage
 
 Arrays
 ######
-Jobs are launched on the Slurm cluster are launched as Job Arrays (or Array Jobs on UGE).
+Jobs are launched on the Slurm cluster as Job Arrays.
 The effect is that Jobmon uses one sbatch command to launch all the jobs in one TaskTemplate,
 rather than one sbatch command to launch a single job. This allows Jobmon to launch jobs
 faster. In a comparison load test, 3.0.5 took 1045.10 seconds (17.418 minutes) to submit
@@ -15,13 +15,15 @@ Usage
 *****
 .. tabs::
 
-    .. group-tab:: python
-        .. literalinclude:: ./create_tasks_example.py
-               :language: python
+    .. group-tab:: Python
+
+        .. literalinclude:: ../create_tasks_example.py
+           :language: python
 
     .. group-tab:: R
-        .. literalinclude:: ./create_tasks_example.R
-               :language: R
+
+        .. literalinclude:: ../create_tasks_example.R
+           :language: r
 
 
 Array Inference
@@ -149,9 +151,9 @@ For example::
     )
 
     retry_task = retry_tt.create_task(
-                        arg="sleep 110"
+                        arg="sleep 110",
                         name="retry_task",
-                        # job should succeed on second try. The runtime will 135 seconds on the retry
+                        # job should succeed on second try. The runtime will be 135 seconds on the retry
                         max_attempts=2,
                         compute_resources={
                             'cores': 1,
@@ -201,7 +203,7 @@ For example::
     )
 
     retry_task = retry_tt.create_task(
-                        arg="sleep 110"
+                        arg="sleep 110",
                         name="retry_task",
                         # job should succeed on third try. The runtime will be 120 seconds on the retry
                         max_attempts=3,
@@ -312,7 +314,7 @@ For more examples, take a look at the `resume tests <https://github.com/ihmeuw-s
     Resuming a previously stopped Workflow will create a new
     :term:`WorkflowRun`. This is generally an internal detail that you won't
     need to worry about, but the concept may be helpful in debugging failures.
-    (SEE DEBUGGING TODO).
+    See :doc:`/advanced/troubleshooting` for debugging guidance.
 
 As soon as you change any of the values of your WorkflowArgs or modify its Tasks,
 you'll cause a new Workflow entry to be created in the Jobmon
@@ -507,7 +509,7 @@ To set fallback queues, simply pass a list of queues to the  create_task() metho
 
     workflow = tool.create_workflow(name="test_fallback_queue", workflow_args="fallback")
     fallback_task = fallback_tt.create_task(
-                        arg="sleep 110"
+                        arg="sleep 110",
                         name="fallback_task",
                         compute_resources={
                             'cores': 1,
@@ -710,7 +712,7 @@ downstream tasks depend on these jobs.
                         for rei in self.rei_ids:
                             task = self.loc_agg_tt.create_task(
                                 compute_resources={"cores": 20, "memory": "40Gb", "runtime": "540s"},
-                                cluster_name="slurm,
+                                cluster_name="slurm",
                                 max_attempts=11,
                                 name='loc_agg_{}_{}_{}_{}'.format(measure, year, sex, rei),
                                 python=self.python,
@@ -781,7 +783,7 @@ downstream tasks depend on these jobs.
                             if is_aggregate:
                                 task.add_upstream(
                                     self.cleanup_jobs_by_command['cleanup_{}_{}_{}'
-                                                                 .format(measure, loc, year)]
+                                                                 .format(measure, loc, year)])
                             else:
                                 task.add_upstream(
                                     self.most_detailed_jobs_by_command['most_detailed_{}_{}'
@@ -954,24 +956,14 @@ TaskTemplate Resource Prediction to YAML
        your_task_template_1:
             slurm:
               cores: 1
-              memory: "400B"
+              memory: "400M"
               runtime: 10
-              queue: "all.q"
-            buster:
-              num_cores: 1
-              m_mem_free: "400B"
-              max_runtime_seconds: 10
               queue: "all.q"
         your_task_template_2:
             slurm:
               cores: 1
-              memory: "600B"
+              memory: "600M"
               runtime: 20
-              queue: "long.q"
-            buster:
-              num_cores: 1
-              m_mem_free: "600B"
-              max_runtime_seconds: 20
               queue: "long.q"
 
 update_config

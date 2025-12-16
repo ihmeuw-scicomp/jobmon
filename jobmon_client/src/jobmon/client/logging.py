@@ -100,17 +100,20 @@ def configure_client_logging() -> None:
     """Configure client logging with programmatic generation and user override support.
 
     This is the primary interface for configuring client logging. It supports:
-    1. User file overrides via logging.client_logconfig_file
-    2. User section overrides via logging.client.*
+
+    1. User file overrides via ``logging.client_logconfig_file``
+    2. User section overrides via ``logging.client.*``
     3. Environment variable overrides
     4. Programmatic base configuration
 
     Configuration precedence:
-    1. Custom file (logging.client_logconfig_file) - complete replacement
-    2. Section overrides (logging.client.*) - merged with base
-    3. Programmatic base: generate_component_logconfig("client")
+
+    1. Custom file (``logging.client_logconfig_file``) - complete replacement
+    2. Section overrides (``logging.client.*``) - merged with base
+    3. Programmatic base: ``generate_component_logconfig("client")``
 
     Adapts to host application logging architecture:
+
     - If host uses direct rendering (like FHS): sets up minimal stdlib handlers
       that pass through formatted output without double-processing
     - If host uses stdlib integration: sets up full Jobmon logging configuration

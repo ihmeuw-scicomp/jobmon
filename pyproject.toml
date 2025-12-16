@@ -45,6 +45,19 @@ dev = [
     "nox",
     "pre-commit"
 ]
+docs = [
+    "jobmon_client",
+    "jobmon_core[otlp]",
+    "jobmon_server[otlp]",
+    # Sphinx 7.x supports Python 3.9+, Sphinx 8.0-8.1 requires 3.10+, 8.2+ requires 3.11+
+    # Using 7.x for broader Python compatibility with requires-python>=3.8
+    "sphinx>=7.4,<8",
+    "sphinx-rtd-theme>=2,<3",
+    "sphinx-autoapi>=3",
+    "sphinx-autodoc-typehints>=2",
+    "sphinx-tabs>=3",
+    "sphinxcontrib-jquery>=4",
+]
 
 [tool.uv.sources]
 jobmon_client = { workspace = true }

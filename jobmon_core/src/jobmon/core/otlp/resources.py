@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 from jobmon.core import __version__
 from jobmon.core.configuration import JobmonConfig
 
-from . import OTLP_AVAILABLE
+from ._compat import OTLP_AVAILABLE
 
 if OTLP_AVAILABLE:
     from opentelemetry.sdk import resources

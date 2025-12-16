@@ -84,6 +84,62 @@ def typecheck(session: Session) -> None:
 
 
 @nox.session(venv_backend="venv")
+def docs(session: Session) -> None:
+    """Build the Sphinx documentation."""
+    session.install("uv")
+    # Install docs dependencies which include Sphinx and all required extensions
+    session.run("uv", "sync", "--active", "--group", "docs")
+
+    # Build output directory
+    build_dir = session.posargs[0] if session.posargs else "docsource/_build/html"
+
+    session.log(f"Building documentation to {build_dir}...")
+    session.run(
+        "sphinx-build",
+        "-b", "html",
+        "docsource",
+        build_dir,
+    )
+    session.log(f"Documentation built successfully. Open {build_dir}/index.html to view.")
+
+
+@nox.session(venv_backend="venv")
+def docs_clean(session: Session) -> None:
+    """Clean Sphinx documentation build artifacts."""
+    import shutil
+    
+    dirs_to_clean = [
+        "docsource/_build",
+        "docsource/autoapi",  # Auto-generated API docs
+    ]
+    
+    for dir_path in dirs_to_clean:
+        path = Path(dir_path)
+        if path.exists():
+            session.log(f"Removing {path}...")
+            shutil.rmtree(path)
+    
+    session.log("Documentation build artifacts cleaned.")
+
+
+@nox.session(venv_backend="venv")
+def docs_serve(session: Session) -> None:
+    """Build and serve the documentation with live reload."""
+    session.install("uv")
+    session.run("uv", "sync", "--active", "--group", "docs")
+    session.run("uv", "pip", "install", "sphinx-autobuild")
+
+    session.log("Starting documentation server with live reload...")
+    session.run(
+        "sphinx-autobuild",
+        "docsource",
+        "docsource/_build/html",
+        "--port", "8000",
+        "--open-browser",
+    )
+
+
+@nox.session(venv_backend="venv")
 def schema_diagram(session: Session) -> None:
     session.install("uv")
     # This session specifically installs jobmon_server.

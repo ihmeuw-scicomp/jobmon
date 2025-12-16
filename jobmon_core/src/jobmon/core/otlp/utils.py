@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional, Tuple
 
-from . import OTLP_AVAILABLE
+from ._compat import OTLP_AVAILABLE
 
 if OTLP_AVAILABLE:
     from opentelemetry import trace

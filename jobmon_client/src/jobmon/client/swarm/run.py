@@ -348,8 +348,12 @@ async def _run_orchestrator(
 
     This is the common execution path for both new runs and resumes.
     """
+    # Track when THIS call started (for timeout calculation on Ctrl+C recovery)
+    call_start_time = time.perf_counter()
+
+    # Preserve original start_time for result elapsed time calculation
     if start_time is None:
-        start_time = time.perf_counter()
+        start_time = call_start_time
 
     # Create HTTP session
     session = aiohttp.ClientSession()
@@ -400,13 +404,24 @@ async def _run_orchestrator(
                 raise
             else:
                 logger.info("Continuing jobmon...")
-                # Re-run orchestrator (recursive call, preserve start_time)
+                # Calculate remaining time based on THIS call's elapsed time
+                # (not total elapsed from original start_time, since timeout
+                # is already reduced in recursive calls)
+                call_elapsed = time.perf_counter() - call_start_time
+                remaining_timeout = max(0, timeout - int(call_elapsed))
+                if remaining_timeout == 0:
+                    raise RuntimeError(
+                        f"Workflow timeout ({timeout} seconds) already exceeded. "
+                        f"Cannot continue."
+                    )
+                # Re-run orchestrator with remaining timeout
+                # (preserve start_time for result calculation)
                 return await _run_orchestrator(
                     state=state,
                     gateway=gateway,
                     distributor_alive=distributor_alive,
                     config=config,
-                    timeout=timeout,
+                    timeout=remaining_timeout,
                     heartbeat_interval=heartbeat_interval,
                     heartbeat_report_by_buffer=heartbeat_report_by_buffer,
                     start_time=start_time,

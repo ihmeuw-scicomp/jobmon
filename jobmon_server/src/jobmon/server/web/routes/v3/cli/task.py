@@ -91,6 +91,7 @@ def validate_workflow_for_update(task_ids: List[int], session: Session) -> str:
     """Validate workflow status for task updates.
 
     Validates that:
+
     - All tasks belong to the same workflow
     - The workflow status allows updates (FAILED, DONE, ABORTED, HALTED) OR
     - All downstream tasks are in valid states (G, I, Q) for non-terminal workflows
@@ -191,13 +192,14 @@ async def update_task_statuses(request: Request, db: Session = Depends(get_db)) 
     """Update the status of the tasks.
 
     Description:
-        - When workflow_id='all', it updates all tasks in the workflow with
-        recursive=False. This improves performance.
-        - When recursive=True, it updates the tasks and its dependencies all
-        the way up or down the DAG.
-        - When recursive=False, it updates only the tasks in the task_ids list.
-        - Validates workflow status before proceeding with updates.
-        - After updating the tasks, it checks the workflow status and updates it.
+
+    - When ``workflow_id='all'``, it updates all tasks in the workflow with
+      ``recursive=False``. This improves performance.
+    - When ``recursive=True``, it updates the tasks and its dependencies all
+      the way up or down the DAG.
+    - When ``recursive=False``, it updates only the tasks in the task_ids list.
+    - Validates workflow status before proceeding with updates.
+    - After updating the tasks, it checks the workflow status and updates it.
     """
 
     def add_cors_headers(response: JSONResponse) -> JSONResponse:

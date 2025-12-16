@@ -1,6 +1,6 @@
-==========================
+============================
 Jobmon Configuration System
-==========================
+============================
 
 This guide covers the configuration system for jobmon, including template-based logging configurations and user override capabilities.
 
@@ -314,7 +314,7 @@ Example 1: Add File Logging to Client
 
 .. code-block:: yaml
 
-   # ~/.jobmon.yaml
+   # jobmonconfig.yaml (set JOBMON__CONFIG_FILE to point to this file)
    logging:
      client:
        formatters:
