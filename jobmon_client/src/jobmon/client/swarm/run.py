@@ -34,6 +34,7 @@ from jobmon.core.exceptions import (
     TransitionError,
     WorkflowTestError,
 )
+from jobmon.core.logging import set_jobmon_context, unset_jobmon_context
 from jobmon.core.requester import Requester
 
 if TYPE_CHECKING:
@@ -355,6 +356,12 @@ async def _run_orchestrator(
     if start_time is None:
         start_time = call_start_time
 
+    # Bind workflow context for structured logging - all logs will include these IDs
+    set_jobmon_context(
+        workflow_run_id=state.workflow_run_id,
+        workflow_id=state.workflow_id,
+    )
+
     # Create HTTP session
     session = aiohttp.ClientSession()
     gateway.set_session(session)
@@ -452,3 +459,5 @@ async def _run_orchestrator(
         # Cleanup
         if not session.closed:
             await session.close()
+        # Unbind workflow context
+        unset_jobmon_context("workflow_run_id", "workflow_id")
