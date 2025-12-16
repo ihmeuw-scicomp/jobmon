@@ -31,3 +31,4 @@ export function getWorkflowFiltersForNavigation(
     return currentSearch || getSavedWorkflowFilters() || '';
 }
 
+

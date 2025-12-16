@@ -103,3 +103,20 @@ export function filterValueToDisplayString(
     return '';
 }
 
+/**
+ * Extract query string from location, handling HashRouter where
+ * query params may be in the hash fragment (e.g., #/?user!=svc_fhs)
+ */
+export function getSearchParamsFromLocation(
+    locationSearch: string
+): URLSearchParams {
+    let searchString = locationSearch;
+    if (!searchString && window.location.hash.includes('?')) {
+        const hashParts = window.location.hash.split('?');
+        if (hashParts.length > 1) {
+            searchString = '?' + hashParts[1];
+        }
+    }
+    return new URLSearchParams(searchString);
+}
+
