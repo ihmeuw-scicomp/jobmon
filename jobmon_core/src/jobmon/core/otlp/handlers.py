@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import warnings
 from typing import Any, Dict, Optional, Union
 
 from jobmon.core.config.structlog_config import (
@@ -216,37 +215,35 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             if event_dict and "request_id" in event_dict:
                 attributes["jobmon.request_id"] = event_dict["request_id"]
 
-            # Create OTLP log record
-            from opentelemetry.sdk._logs import LogRecord as OTLPLogRecord
+            # Create OTLP log record (using public API from 1.39+)
+            from opentelemetry._logs import LogRecord as OTLPLogRecord
 
             severity_map = self._get_severity_map()
             severity_number = severity_map.get(
                 record.levelname, severity_map.get("INFO", 0)
             )
-            # Suppress deprecation warning for OTLPLogRecord (will be replaced in 1.39.0)
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=DeprecationWarning)
-                otlp_record = OTLPLogRecord(  # type: ignore[deprecated]
-                    timestamp=int(record.created * 1e9),
-                    severity_text=record.levelname,
-                    severity_number=severity_number,
-                    body=message,
-                    resource=self._logger_provider.resource,
-                    attributes=attributes,
-                )
 
-            # Set trace context (defaults to 0 per OTLP spec)
-            otlp_record.trace_id = trace_id_int
-            otlp_record.span_id = span_id_int
-            otlp_record.trace_flags = TraceFlags(0)
-
-            # Update trace flags from current span if available
+            # Determine trace flags from current span if available
+            trace_flags = TraceFlags(0)
             if trace_id_int and span_id_int:
                 span = get_current_span()
                 if span:
                     ctx = span.get_span_context()
                     if ctx and ctx.is_valid:
-                        otlp_record.trace_flags = ctx.trace_flags
+                        trace_flags = ctx.trace_flags
+
+            # Create log record with trace context (SDK 1.39+ API)
+            # Note: resource is attached automatically by the LoggerProvider
+            otlp_record = OTLPLogRecord(
+                timestamp=int(record.created * 1e9),
+                severity_text=record.levelname,
+                severity_number=severity_number,
+                body=message,
+                attributes=attributes,
+                trace_id=trace_id_int,
+                span_id=span_id_int,
+                trace_flags=trace_flags,
+            )
 
             self._logger.emit(otlp_record)
         except Exception:

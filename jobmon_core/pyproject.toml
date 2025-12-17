@@ -36,9 +36,8 @@ worker_node_entry_point = "jobmon.worker_node.cli:run"
 [project.optional-dependencies]
 otlp = [
     'opentelemetry-api',
-    'opentelemetry-sdk<1.34.0',  # Pin to avoid LogRecord removal warning 1.39.0
+    'opentelemetry-sdk>=1.39.1',  # Updated to 1.39.1 with new LogRecord API
     'opentelemetry-instrumentation',
-    'opentelemetry-instrumentation-fastapi',
     'opentelemetry-instrumentation-requests',
     'opentelemetry-exporter-otlp'
 ]

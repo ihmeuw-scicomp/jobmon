@@ -40,10 +40,7 @@ jobmon_server = "jobmon.server.cli:main"
 
 [project.optional-dependencies]
 otlp = [
-    'jobmon_core[otlp]',
-    'opentelemetry-api',
-    'opentelemetry-sdk',
-    'opentelemetry-exporter-otlp',
+    'jobmon_core[otlp]',  # Brings in opentelemetry-api, sdk>=1.39.1, exporter-otlp
     'opentelemetry-instrumentation-fastapi',
     'opentelemetry-instrumentation-sqlalchemy',
 ]
