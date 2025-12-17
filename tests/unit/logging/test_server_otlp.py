@@ -153,20 +153,27 @@ class TestServerOTLPManager:
             mock_sqlalchemy.assert_called_once()
             mock_sqlalchemy_instance.instrument.assert_called_once()
 
-            # Test SQLAlchemy engine instrumentation
+            # Test SQLAlchemy engine instrumentation - now uses EngineTracer directly
+            # instead of SQLAlchemyInstrumentor.instrument() to bypass the
+            # class-level is_instrumented_by_opentelemetry flag
             mock_engine = Mock()
-            ServerOTLPManager.instrument_engine(mock_engine)
+            with patch(
+                "opentelemetry.instrumentation.sqlalchemy.engine.EngineTracer"
+            ) as mock_tracer_class, patch(
+                "opentelemetry.metrics.get_meter"
+            ) as mock_get_meter:
+                mock_meter = Mock()
+                mock_get_meter.return_value = mock_meter
+                mock_counter = Mock()
+                mock_meter.create_up_down_counter.return_value = mock_counter
 
-            # Per-engine instrumentation should ALWAYS be called, even after
-            # global instrumentation. This is necessary because engine.py
-            # imports create_engine before global instrumentation patches it.
-            assert mock_sqlalchemy.call_count == 2
-            # Both global and per-engine instrumentation should have been called
-            assert mock_sqlalchemy_instance.instrument.call_count == 2
-            # Verify per-engine call included the engine parameter
-            mock_sqlalchemy_instance.instrument.assert_called_with(
-                engine=mock_engine, enable_commenter=True, skip_dep_check=True
-            )
+                result = ServerOTLPManager.instrument_engine(mock_engine)
+
+                # Should create an EngineTracer directly
+                mock_tracer_class.assert_called_once()
+                call_kwargs = mock_tracer_class.call_args[1]
+                assert call_kwargs["engine"] == mock_engine
+                assert call_kwargs["enable_commenter"] is True
 
     @patch("jobmon.server.web.otlp.manager.OTLP_AVAILABLE", False)
     def test_instrumentations_without_otlp(self):

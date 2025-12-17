@@ -76,6 +76,7 @@ def create_engine_from_config() -> tuple[Engine, str, Dict[str, Any]]:
     log.info("Created SQLAlchemy database engine (dialect=%s)", dialect_name)
 
     # Instrument the engine with OpenTelemetry if enabled
+    engine_tracer = None
     try:
         telemetry_section = cfg.get_section_coerced("telemetry")
         tracing_config = telemetry_section.get("tracing", {})
@@ -83,13 +84,22 @@ def create_engine_from_config() -> tuple[Engine, str, Dict[str, Any]]:
         if use_otel:
             from jobmon.server.web.otlp import ServerOTLPManager
 
-            ServerOTLPManager.instrument_engine(engine)
-            log.debug("Instrumented database engine with OpenTelemetry")
+            # Store the EngineTracer to prevent garbage collection - its event
+            # listeners are bound methods that would become invalid if GC'd
+            engine_tracer = ServerOTLPManager.instrument_engine(engine)
+            if engine_tracer:
+                log.debug("Instrumented database engine with OpenTelemetry")
+            else:
+                log.warning("OpenTelemetry engine instrumentation returned None")
     except Exception as e:
         # Don't fail engine creation if instrumentation fails
         log.warning("Failed to instrument database engine with OpenTelemetry: %s", e)
 
-    config_info = {"connect_args": connect_args, "pool_kwargs": pool_kwargs}
+    config_info = {
+        "connect_args": connect_args,
+        "pool_kwargs": pool_kwargs,
+        "engine_tracer": engine_tracer,  # Keep reference to prevent GC
+    }
     return engine, dialect_name, config_info
 
 
@@ -110,13 +120,17 @@ async def db_lifespan(app: "FastAPI") -> AsyncIterator[None]:
             ...
     """
     # Startup: create engine and sessionmaker
-    engine, dialect_name, _ = create_engine_from_config()
+    engine, dialect_name, config_info = create_engine_from_config()
 
     app.state.db_engine = engine
     app.state.db_dialect = dialect_name
     app.state.db_sessionmaker = sessionmaker(
         bind=engine, autoflush=False, autocommit=False
     )
+    # Store config_info which includes engine_tracer - this keeps the
+    # EngineTracer alive for the lifetime of the app, preventing its
+    # event listeners from being garbage collected
+    app.state.db_config_info = config_info
 
     log.info("Database engine initialized (dialect=%s)", dialect_name)
 

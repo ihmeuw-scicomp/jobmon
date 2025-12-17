@@ -128,40 +128,78 @@ class ServerOTLPManager:
             pass
 
     @classmethod
-    def instrument_engine(cls: Type[ServerOTLPManager], engine: Any) -> None:
+    def instrument_engine(cls: Type[ServerOTLPManager], engine: Any) -> Any:
         """Instrument a specific SQLAlchemy engine with OpenTelemetry.
 
-        This ALWAYS instruments the provided engine, even if global instrumentation
-        was already performed. This is necessary because Python's import semantics
-        mean that modules which import `create_engine` before global instrumentation
-        runs will have a reference to the original, unpatched function.
+        This directly creates an EngineTracer for the engine, bypassing the
+        SQLAlchemyInstrumentor class. This is necessary because:
 
-        The SQLAlchemyInstrumentor handles duplicate instrumentation gracefully -
-        it checks if the engine is already instrumented before adding listeners.
+        1. SQLAlchemyInstrumentor uses a class-level `is_instrumented_by_opentelemetry`
+           flag that prevents `_instrument()` from running if global instrumentation
+           was already performed.
+        2. Our engine.py imports `create_engine` BEFORE `instrument_sqlalchemy()` patches
+           it, so engines are created with the unpatched function.
+        3. The EngineTracer attaches event listeners for query tracing that wouldn't
+           otherwise be present.
+
+        Returns:
+            The EngineTracer instance (kept alive to prevent garbage collection
+            of event listeners), or None if instrumentation failed.
         """
         if not OTLP_AVAILABLE:
-            return
+            return None
 
         try:
-            from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+            from opentelemetry import trace
+            from opentelemetry.instrumentation.sqlalchemy import __version__
+            from opentelemetry.instrumentation.sqlalchemy.engine import EngineTracer
+            from opentelemetry.metrics import get_meter
+            from opentelemetry.semconv.metrics import MetricInstruments
 
-            # Always instrument the specific engine. SQLAlchemyInstrumentor internally
-            # tracks which engines have been instrumented and won't double-instrument.
-            # This is necessary because:
-            # 1. engine.py imports create_engine BEFORE instrument_sqlalchemy() patches it
-            # 2. So engines created in engine.py use the unpatched create_engine
-            # 3. Per-engine instrumentation is the only way to instrument them
-            SQLAlchemyInstrumentor().instrument(
-                engine=engine, enable_commenter=True, skip_dep_check=True
+            # Get tracer from global provider (set up by JobmonOTLPManager.initialize())
+            tracer = trace.get_tracer(
+                "opentelemetry.instrumentation.sqlalchemy",
+                __version__,
+                schema_url="https://opentelemetry.io/schemas/1.11.0",
+            )
+
+            # Get meter for connection pool metrics
+            meter = get_meter(
+                "opentelemetry.instrumentation.sqlalchemy",
+                __version__,
+                schema_url="https://opentelemetry.io/schemas/1.11.0",
+            )
+
+            connections_usage = meter.create_up_down_counter(
+                name=MetricInstruments.DB_CLIENT_CONNECTIONS_USAGE,
+                unit="connections",
+                description="Number of connections in state described by state attribute.",
+            )
+
+            # Create EngineTracer directly - this attaches event listeners for
+            # before_cursor_execute, after_cursor_execute, handle_error, etc.
+            engine_tracer = EngineTracer(
+                tracer=tracer,
+                engine=engine,
+                connections_usage=connections_usage,
+                enable_commenter=True,
+                commenter_options={},
+                enable_attribute_commenter=False,
             )
 
             logger = logging.getLogger(__name__)
-            logger.debug("Instrumented SQLAlchemy engine with OpenTelemetry")
+            logger.debug(
+                "Instrumented SQLAlchemy engine with OpenTelemetry EngineTracer"
+            )
+
+            return engine_tracer
+
         except ImportError:
-            pass
+            return None
         except Exception as e:
             logger = logging.getLogger(__name__)
             logger.warning(f"Failed to instrument SQLAlchemy engine: {e}")
+            return None
 
 
 # Singleton instance for server use
