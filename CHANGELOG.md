@@ -36,6 +36,7 @@ All notable changes to Jobmon will be documented in this file.
 
 ### Fixed
 - Fixed WorkflowRun orchestrator main loop spinning without rate limiting, causing server spam with sync requests every few milliseconds instead of waiting for heartbeat intervals. The `HeartbeatService` now initializes `_last_heartbeat_time` to the current time instead of 0, ensuring proper sleep/sync pacing.
+- Fixed DEBUG logs leaking to OTLP telemetry when host applications use direct-rendering mode with structlog. The `_forward_event_to_logging_handlers` processor now checks `isEnabledFor(level)` before forwarding logs, respecting the configured logger levels (e.g., `jobmon.core` at WARNING).
 - Fixed `asyncio.run()` from within running event loop by adding proper nested event loop handling
 - Fixed nox color flag conflict in pre-commit hooks
 - Added defensive checks and improved exception handling in swarm operations

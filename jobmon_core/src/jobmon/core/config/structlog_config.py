@@ -89,7 +89,13 @@ def _forward_event_to_logging_handlers(
     log_name = getattr(logger, "name", event_dict.get("logger", "jobmon.client"))
     level = logging._nameToLevel.get(method_name.upper(), logging.INFO)
 
-    target_logger = logging.getLogger(log_name)
+    # Check if this log level is enabled on the original logger BEFORE walking up.
+    # This respects the configured level hierarchy properly.
+    original_logger = logging.getLogger(log_name)
+    if not original_logger.isEnabledFor(level):
+        return _prune_event_dict_for_console(event_dict)
+
+    target_logger = original_logger
 
     if not target_logger.handlers:
         parent_name = log_name
