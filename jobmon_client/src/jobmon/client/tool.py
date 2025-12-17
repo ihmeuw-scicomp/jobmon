@@ -57,6 +57,11 @@ class Tool:
                 workflows to.
             requester: communicate with the FastApi services.
         """
+        # Ensure structlog is configured before any logging happens
+        from jobmon.client.logging import ensure_structlog_configured
+
+        ensure_structlog_configured()
+
         if requester is None:
             requester = Requester.from_defaults()
         self.requester = requester
