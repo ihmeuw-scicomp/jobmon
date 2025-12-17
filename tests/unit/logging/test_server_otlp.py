@@ -157,11 +157,15 @@ class TestServerOTLPManager:
             mock_engine = Mock()
             ServerOTLPManager.instrument_engine(mock_engine)
 
-            # Should not be called again since already instrumented globally
-            assert mock_sqlalchemy.call_count == 1
-            # Only the global instrumentation should have been called
-            mock_sqlalchemy_instance.instrument.assert_called_once_with(
-                enable_commenter=True, skip_dep_check=True
+            # Per-engine instrumentation should ALWAYS be called, even after
+            # global instrumentation. This is necessary because engine.py
+            # imports create_engine before global instrumentation patches it.
+            assert mock_sqlalchemy.call_count == 2
+            # Both global and per-engine instrumentation should have been called
+            assert mock_sqlalchemy_instance.instrument.call_count == 2
+            # Verify per-engine call included the engine parameter
+            mock_sqlalchemy_instance.instrument.assert_called_with(
+                engine=mock_engine, enable_commenter=True, skip_dep_check=True
             )
 
     @patch("jobmon.server.web.otlp.manager.OTLP_AVAILABLE", False)

@@ -129,22 +129,39 @@ class ServerOTLPManager:
 
     @classmethod
     def instrument_engine(cls: Type[ServerOTLPManager], engine: Any) -> None:
-        """Instrument a specific SQLAlchemy engine - server-specific implementation."""
+        """Instrument a specific SQLAlchemy engine with OpenTelemetry.
+
+        This ALWAYS instruments the provided engine, even if global instrumentation
+        was already performed. This is necessary because Python's import semantics
+        mean that modules which import `create_engine` before global instrumentation
+        runs will have a reference to the original, unpatched function.
+
+        The SQLAlchemyInstrumentor handles duplicate instrumentation gracefully -
+        it checks if the engine is already instrumented before adding listeners.
+        """
         if not OTLP_AVAILABLE:
             return
 
         try:
             from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
-            manager = get_server_otlp_manager()
-            # If already instrumented globally, skip per-engine
-            if not manager._sqlalchemy_instrumented:
-                SQLAlchemyInstrumentor().instrument(
-                    engine=engine, enable_commenter=True, skip_dep_check=True
-                )
-                manager._sqlalchemy_instrumented = True
+            # Always instrument the specific engine. SQLAlchemyInstrumentor internally
+            # tracks which engines have been instrumented and won't double-instrument.
+            # This is necessary because:
+            # 1. engine.py imports create_engine BEFORE instrument_sqlalchemy() patches it
+            # 2. So engines created in engine.py use the unpatched create_engine
+            # 3. Per-engine instrumentation is the only way to instrument them
+            SQLAlchemyInstrumentor().instrument(
+                engine=engine, enable_commenter=True, skip_dep_check=True
+            )
+
+            logger = logging.getLogger(__name__)
+            logger.debug("Instrumented SQLAlchemy engine with OpenTelemetry")
         except ImportError:
             pass
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to instrument SQLAlchemy engine: {e}")
 
 
 # Singleton instance for server use
