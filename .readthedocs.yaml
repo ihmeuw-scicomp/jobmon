@@ -4,10 +4,6 @@
 
 version: 2
 
-versions:
-  only:
-    - release/*
-
 build:
   os: ubuntu-22.04
   tools:
