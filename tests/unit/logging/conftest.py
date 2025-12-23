@@ -25,6 +25,8 @@ class ComponentConfig:
 
 
 # Component configurations - the source of truth for all component tests
+# Note: Server is excluded - it uses Click-based CLI without the legacy argparse
+# infrastructure. Server admin commands don't need the same logging patterns.
 COMPONENTS = [
     ComponentConfig(
         name="client",
@@ -33,14 +35,6 @@ COMPONENTS = [
         has_otlp_flush=False,
         cli_run_method=None,
         cli_main_args="version",
-    ),
-    ComponentConfig(
-        name="server",
-        cli_class_path="jobmon.server.cli.ServerCLI",
-        logger_name="jobmon.server.web",
-        has_otlp_flush=False,
-        cli_run_method=None,  # Server CLI doesn't have a run_server method
-        cli_main_args="test",
     ),
     ComponentConfig(
         name="distributor",

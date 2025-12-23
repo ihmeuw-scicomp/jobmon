@@ -1,11 +1,36 @@
-"""Client command line interface for workflow/task status and concurrency limiting."""
+"""Client command line interface for workflow/task status and concurrency limiting.
+
+.. deprecated:: 2.3.0
+    This module is deprecated. The new Click-based CLI is in jobmon.client.cli.main.
+    This module is kept for backward compatibility and will be removed in version 3.0.
+"""
 
 import argparse
 import json
+import warnings
 from typing import Any, Optional
 
 from jobmon.client.status_commands import get_task_dependencies
 from jobmon.core.cli import CLI
+
+# Note: The new Click-based CLI main function is at jobmon.client.cli.main
+# This module preserves the legacy argparse-based interface for backward compatibility
+
+_DEPRECATION_WARNING_EMITTED = False
+
+
+def _emit_deprecation_warning() -> None:
+    """Emit deprecation warning once per session."""
+    global _DEPRECATION_WARNING_EMITTED
+    if not _DEPRECATION_WARNING_EMITTED:
+        warnings.warn(
+            "ClientCLI (argparse-based) is deprecated and will be removed in version 3.0. "
+            "Use the new Click-based CLI: 'from jobmon.client.cli import cli, main'. "
+            "See documentation for the new command structure.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        _DEPRECATION_WARNING_EMITTED = True
 
 
 class _HelpAction(argparse._HelpAction):
@@ -37,10 +62,15 @@ class _HelpAction(argparse._HelpAction):
 
 
 class ClientCLI(CLI):
-    """Client command line interface for workflow/task status and concurrency limiting."""
+    """Client command line interface for workflow/task status and concurrency limiting.
+
+    .. deprecated:: 2.3.0
+        Use the new Click-based CLI instead: ``from jobmon.client.cli import cli, main``
+    """
 
     def __init__(self) -> None:
         """Initialization of client CLI."""
+        _emit_deprecation_warning()
         # Enable automatic component logging for client CLI
         super().__init__(component_name="client")
 

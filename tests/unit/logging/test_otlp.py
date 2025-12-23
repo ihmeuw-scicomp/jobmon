@@ -521,20 +521,24 @@ class TestOTLPConfigurationOverrides:
             assert create_log_exporter() is None
 
         with patch("jobmon.core.otlp.manager.OTLP_AVAILABLE", True):
-            with patch(
-                "opentelemetry.exporter.otlp.proto.grpc._log_exporter.OTLPLogExporter"
-            ) as mock_exporter:
-                mock_instance = Mock()
-                mock_exporter.return_value = mock_instance
+            # Patch importlib.import_module since _normalize_exporter_config
+            # dynamically imports the module
+            mock_exporter_class = Mock()
+            mock_instance = Mock()
+            mock_exporter_class.return_value = mock_instance
 
+            mock_module = Mock()
+            mock_module.OTLPLogExporter = mock_exporter_class
+
+            with patch("importlib.import_module", return_value=mock_module):
                 # Should create exporter with default config
                 result = create_log_exporter()
                 assert result is mock_instance
 
                 # Should pass through custom config
                 result = create_log_exporter(endpoint="http://custom:4317", timeout=30)
-                mock_exporter.assert_called_with(
-                    insecure=True, endpoint="http://custom:4317", timeout=30  # Default
+                mock_exporter_class.assert_called_with(
+                    insecure=True, endpoint="http://custom:4317", timeout=30
                 )
 
 

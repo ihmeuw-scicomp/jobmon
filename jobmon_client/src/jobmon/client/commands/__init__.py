@@ -1,23 +1,16 @@
-"""Commands to check for workflow and task status (from CLI).
+"""Commands for workflow and task operations.
 
-This module re-exports functions from the new modular command structure
-for backward compatibility. New code should import directly from:
-- jobmon.client.commands.workflow
-- jobmon.client.commands.task
-- jobmon.client.commands.resources
-- jobmon.client.commands.config
-- jobmon.client.commands.validation
+This module provides the backend logic for CLI commands, organized by domain:
+- workflow: Workflow status, tasks, reset, resume, concurrency
+- task: Task status, updates, dependencies
+- resources: Resource usage and YAML generation
+- config: Configuration management
 """
-
-# Re-export all public functions from the new modular structure
-# for backward compatibility
 
 from jobmon.client.commands.config import (
     update_config_value,
 )
 from jobmon.client.commands.resources import (
-    _create_yaml,
-    _get_yaml_data,
     create_resource_yaml,
     task_template_resources,
 )
@@ -27,7 +20,6 @@ from jobmon.client.commands.task import (
     task_status,
     update_task_status,
 )
-from jobmon.client.commands.validation import chunk_ids as _chunk_ids
 from jobmon.client.commands.validation import (
     validate_username,
     validate_workflow,
@@ -57,12 +49,9 @@ __all__ = [
     # Resource commands
     "task_template_resources",
     "create_resource_yaml",
-    "_get_yaml_data",
-    "_create_yaml",
     # Config commands
     "update_config_value",
     # Validation helpers
     "validate_username",
     "validate_workflow",
-    "_chunk_ids",
 ]
