@@ -60,24 +60,99 @@ def get_new_task_status(task_instance: TaskInstance, new_state: str) -> tuple[st
         return current_task_status, current_task_status
 
 
-def get_transit_status(task_instance: TaskInstance, new_ti_status: str) -> dict | None:
-    """Get the valid status to transit to. (TaskInstanceStatus, TaskStatus)."""
+def validate_transition(task_instance: TaskInstance, new_ti_status: str) -> dict | None:
+    """Validate and return the status transition info for a TaskInstance.
+
+    Checks if a TaskInstance can transition to the new status by validating:
+    1. The transition is timely (not a race condition)
+    2. The TaskInstance transition is in valid_transitions
+    3. The corresponding Task transition is in valid_transitions
+       (unless Task is already terminal, in which case TI can go to ERROR_FATAL)
+
+    Args:
+        task_instance: The TaskInstance to validate transition for
+        new_ti_status: The desired new TaskInstance status
+
+    Returns:
+        A dict with transition info if valid, None if transition is not allowed
+    """
+    ti_id = task_instance.id
+    current_ti_status = task_instance.status
+    current_task_status = task_instance.task.status
+
+    # Terminal Task states - Task has reached final outcome
+    terminal_task_states = [constants.TaskStatus.DONE, constants.TaskStatus.ERROR_FATAL]
+
+    # Check 1: Is this a timely transition (not caused by race condition)?
     if not task_instance._is_timely_transition(new_ti_status):
+        logger.warning(
+            "Untimely transition rejected",
+            task_instance_id=ti_id,
+            current_ti_status=current_ti_status,
+            requested_ti_status=new_ti_status,
+        )
         return None
 
-    if (task_instance.status, new_ti_status) not in task_instance.valid_transitions:
+    # Check 2: Is the TaskInstance transition valid?
+    if (current_ti_status, new_ti_status) not in task_instance.valid_transitions:
+        logger.warning(
+            "Invalid TaskInstance transition",
+            task_instance_id=ti_id,
+            current_ti_status=current_ti_status,
+            requested_ti_status=new_ti_status,
+        )
         return None
 
+    # Special case: If Task is already in a terminal state, allow orphaned TIs
+    # to transition to ERROR_FATAL without changing Task status.
+    # This handles cases like:
+    # - Another TI succeeded (Task=DONE) but this TI is stuck in NO_HEARTBEAT
+    # - Another TI hit max_attempts (Task=ERROR_FATAL) but this TI is still processing
+    if current_task_status in terminal_task_states:
+        if (
+            new_ti_status in task_instance.error_states
+            or new_ti_status == constants.TaskInstanceStatus.ERROR_FATAL
+        ):
+            logger.info(
+                "Task already terminal, allowing orphaned TI to transition to error",
+                task_instance_id=ti_id,
+                current_task_status=current_task_status,
+                current_ti_status=current_ti_status,
+                requested_ti_status=new_ti_status,
+            )
+            # Return with no Task status change needed
+            return {
+                "new_ti_status": constants.TaskInstanceStatus.ERROR_FATAL,
+                "new_t_status": current_task_status,  # Keep current
+                "final_t_status": current_task_status,  # Keep current
+            }
+
+    # Check 3: Get the corresponding Task status transitions
     new_task_status, final_task_status = get_new_task_status(
         task_instance, new_ti_status
     )
     if new_task_status is None:
+        logger.warning(
+            "Could not determine new Task status",
+            task_instance_id=ti_id,
+            requested_ti_status=new_ti_status,
+        )
         return None
 
+    # Check 4: Is the Task transition valid?
     if (
-        task_instance.task.status,
+        current_task_status,
         new_task_status,
     ) not in task_instance.task.valid_transitions:
+        logger.warning(
+            "Invalid Task transition - Task may have already transitioned",
+            task_instance_id=ti_id,
+            task_id=task_instance.task.id,
+            current_task_status=current_task_status,
+            requested_task_status=new_task_status,
+            current_ti_status=current_ti_status,
+            requested_ti_status=new_ti_status,
+        )
         return None
 
     return {
@@ -228,7 +303,7 @@ async def log_running(
 
             # Handle state transition
             dialect = get_dialect(request)
-            status = get_transit_status(
+            status = validate_transition(
                 task_instance, constants.TaskInstanceStatus.RUNNING
             )
             if status is not None:
@@ -249,7 +324,10 @@ async def log_running(
                         f"Unable to transition to running from {task_instance.status}"
                     )
                 elif task_instance.status == constants.TaskInstanceStatus.KILL_SELF:
-                    status = get_transit_status(
+                    # KILL_SELF means workflow resume requested termination.
+                    # Transition to ERROR_FATAL. This is safe because the workflow
+                    # won't be resumable until all KILL_SELF TIs are cleaned up.
+                    status = validate_transition(
                         task_instance, constants.TaskInstanceStatus.ERROR_FATAL
                     )
                     if status is not None:
@@ -261,7 +339,7 @@ async def log_running(
                             dialect=dialect,
                         )
                 elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
-                    status = get_transit_status(
+                    status = validate_transition(
                         task_instance, constants.TaskInstanceStatus.ERROR
                     )
                     if status is not None:
@@ -369,7 +447,7 @@ async def log_ti_report_by(
 
             # Handle possible state transition
             if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
-                status = get_transit_status(
+                status = validate_transition(
                     task_instance, constants.TaskInstanceStatus.RUNNING
                 )
                 if status is not None:
@@ -526,7 +604,7 @@ async def log_done(
                 setattr(task_instance, field, val)
 
         # Attempt transition
-        status = get_transit_status(task_instance, constants.TaskInstanceStatus.DONE)
+        status = validate_transition(task_instance, constants.TaskInstanceStatus.DONE)
         if status is not None:
             # log_done doesn't provide next_report_increment
             transit_ti_and_t(
@@ -574,7 +652,7 @@ async def log_error_worker_node(
         # ti that tries to log error should not in T unles there was a race condition
         # we need to transition to R first
         if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
-            all_status = get_transit_status(
+            all_status = validate_transition(
                 task_instance, constants.TaskInstanceStatus.RUNNING
             )
             if all_status is not None:
@@ -602,7 +680,7 @@ async def log_error_worker_node(
         error_state = data["error_state"]
         error_description = data["error_description"]
 
-        status = get_transit_status(task_instance, error_state)
+        status = validate_transition(task_instance, error_state)
         if status is not None:
             # Error transitions don't need next_report_increment
             transit_ti_and_t(task_instance, status, db)
@@ -816,7 +894,7 @@ async def log_distributor_id(
         )
     else:
         # Only try to transition if not in final state (distributor_id already updated above)
-        status = get_transit_status(
+        status = validate_transition(
             task_instance, constants.TaskInstanceStatus.LAUNCHED
         )
         if status is not None:
@@ -1176,7 +1254,7 @@ def _update_task_instance_state(
             )
             response += msg
         else:
-            status = get_transit_status(task_instance, status_id)
+            status = validate_transition(task_instance, status_id)
             if status is not None:
                 transit_ti_and_t(task_instance, status, db)
             else:
@@ -1218,18 +1296,49 @@ def _log_error(
         current_status=ti.status,
     )
 
+    # Check if already in target state (idempotent - no error log needed)
+    if ti.status == error_state:
+        logger.info(
+            "Task instance already in error state, skipping duplicate log",
+            task_instance_id=ti.id,
+            error_state=error_state,
+        )
+        resp = JSONResponse(
+            content={"message": "Already in error state"},
+            status_code=StatusCodes.OK,
+        )
+        return resp
+
+    # Validate transition BEFORE creating error log
+    # This prevents duplicate error logs when transition is invalid
+    status = validate_transition(ti, error_state)
+    if status is None:
+        logger.warning(
+            "Invalid error transition, not creating error log",
+            task_instance_id=ti.id,
+            current_status=ti.status,
+            requested_status=error_state,
+            task_status=ti.task.status,
+        )
+        resp = JSONResponse(
+            content={
+                "message": f"Invalid transition from {ti.status} to {error_state}"
+            },
+            status_code=StatusCodes.OK,
+        )
+        return resp
+
     # Retry logic for database operations
     max_retries = 5
 
     for attempt in range(max_retries):
         try:
+            # Create error log only after confirming transition is valid
             error = TaskInstanceErrorLog(task_instance_id=ti.id, description=error_msg)
             session.add(error)
-            if request is not None:
-                msg = _update_task_instance_state(ti, error_state, request, session)
-            else:
-                msg = ""
-            session.commit()
+
+            # Perform the transition
+            transit_ti_and_t(ti, status, session)
 
             logger.info(
                 "Task instance transitioned to error state",
@@ -1237,7 +1346,7 @@ def _log_error(
                 error_state=error_state,
             )
 
-            resp = JSONResponse(content={"message": msg}, status_code=StatusCodes.OK)
+            resp = JSONResponse(content={"message": ""}, status_code=StatusCodes.OK)
             return resp  # Success - exit the function
         except OperationalError as e:
             logger.warning(

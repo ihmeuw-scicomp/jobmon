@@ -227,6 +227,7 @@ def resume_workflow_from_id(
     timeout: int = 180,
     seconds_until_timeout: int = 36000,
     increase_resource: bool = True,
+    force_cleanup: bool = False,
 ) -> None:
     """Resume a workflow from its ID.
 
@@ -241,6 +242,7 @@ def resume_workflow_from_id(
         timeout: Timeout for distributor heartbeat and waiting for resume
         seconds_until_timeout: Overall execution timeout
         increase_resource: Whether to increase resources for failed tasks
+        force_cleanup: Force cleanup of stuck KILL_SELF task instances
     """
     if log:
         configure_client_logging()
@@ -258,8 +260,12 @@ def resume_workflow_from_id(
     factory.set_workflow_resume(
         reset_running_jobs=reset_if_running,
         resume_timeout=timeout,
+        force_cleanup=force_cleanup,
     )
-    factory.reset_task_statuses(reset_if_running=reset_if_running)
+    factory.reset_task_statuses(
+        reset_if_running=reset_if_running,
+        force_cleanup=force_cleanup,
+    )
     # Create the client workflow run
     new_wfr = factory.create_workflow_run()
     # Transition to BOUND state before running (all metadata is already bound)

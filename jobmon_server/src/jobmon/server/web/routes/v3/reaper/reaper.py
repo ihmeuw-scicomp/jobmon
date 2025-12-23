@@ -5,14 +5,17 @@ from typing import Any, Union
 
 import structlog
 from fastapi import Depends, Query, Request
-from sqlalchemy import case, func, select, text, update
+from sqlalchemy import case, func, insert, select, text, update
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
+from jobmon.core import constants
 from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.task import Task
+from jobmon.server.web.models.task_instance import TaskInstance
+from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_run_status import WorkflowRunStatus
@@ -166,6 +169,120 @@ def reap_workflow_run(workflow_run_id: int, db: Session = Depends(get_db)) -> An
         target_wfr_status = WorkflowRunStatus.ABORTED
         target_wf_status = WorkflowStatus.ABORTED
     if wfr_status in [WorkflowRunStatus.COLD_RESUME, WorkflowRunStatus.HOT_RESUME]:
+        # Terminate task instances that the old distributor never cleaned up
+        # (ungraceful shutdown case - distributor died before calling terminate_task_instances)
+        #
+        # QUEUED/INSTANTIATED: No job in cluster, no worker will run → ERROR_FATAL directly
+        # LAUNCHED/RUNNING: Job in cluster, worker will detect KILL_SELF and clean up
+
+        # 1) Set QUEUED/INSTANTIATED directly to ERROR_FATAL (no worker to clean them up)
+        ti_states_to_error_fatal = [
+            constants.TaskInstanceStatus.QUEUED,
+            constants.TaskInstanceStatus.INSTANTIATED,
+        ]
+
+        insert_error_fatal_log = insert(TaskInstanceErrorLog).from_select(
+            ["task_instance_id", "description", "error_time"],
+            select(
+                TaskInstance.id,
+                (
+                    "Reaper: Workflow resume cleanup. Setting to ERROR_FATAL from status: "
+                    + TaskInstance.status
+                    + " (no worker to clean up)"
+                ),
+                func.now(),
+            ).where(
+                TaskInstance.workflow_run_id == wfr_id,
+                TaskInstance.status.in_(ti_states_to_error_fatal),
+            ),
+        )
+        db.execute(insert_error_fatal_log)
+
+        update_to_error_fatal = (
+            update(TaskInstance)
+            .where(
+                TaskInstance.workflow_run_id == wfr_id,
+                TaskInstance.status.in_(ti_states_to_error_fatal),
+            )
+            .values(
+                status=constants.TaskInstanceStatus.ERROR_FATAL,
+                status_date=func.now(),
+            )
+        )
+        result_error_fatal = db.execute(update_to_error_fatal)
+
+        # 2) Set LAUNCHED (and RUNNING for COLD_RESUME) to KILL_SELF
+        if wfr_status == WorkflowRunStatus.HOT_RESUME:
+            ti_states_to_kill_self = [
+                constants.TaskInstanceStatus.LAUNCHED,
+            ]
+        else:  # COLD_RESUME
+            ti_states_to_kill_self = [
+                constants.TaskInstanceStatus.LAUNCHED,
+                constants.TaskInstanceStatus.RUNNING,
+            ]
+
+        insert_kill_self_log = insert(TaskInstanceErrorLog).from_select(
+            ["task_instance_id", "description", "error_time"],
+            select(
+                TaskInstance.id,
+                (
+                    "Reaper: Workflow resume cleanup. Setting to KILL_SELF from status: "
+                    + TaskInstance.status
+                ),
+                func.now(),
+            ).where(
+                TaskInstance.workflow_run_id == wfr_id,
+                TaskInstance.status.in_(ti_states_to_kill_self),
+            ),
+        )
+        db.execute(insert_kill_self_log)
+
+        update_to_kill_self = (
+            update(TaskInstance)
+            .where(
+                TaskInstance.workflow_run_id == wfr_id,
+                TaskInstance.status.in_(ti_states_to_kill_self),
+            )
+            .values(
+                status=constants.TaskInstanceStatus.KILL_SELF,
+                status_date=func.now(),
+            )
+        )
+        result_kill_self = db.execute(update_to_kill_self)
+
+        logger.info(
+            "Reaper terminated task instances",
+            workflow_run_id=wfr_id,
+            num_error_fatal=result_error_fatal.rowcount,
+            num_kill_self=result_kill_self.rowcount,
+            resume_type=wfr_status,
+        )
+
+        # 3) Check if there are any KILL_SELF TIs remaining - if so, don't transition
+        # WFR to TERMINATED yet. Keep it in resume state until workers clean up.
+        kill_self_count = db.execute(
+            select(func.count(TaskInstance.id)).where(
+                TaskInstance.workflow_run_id == wfr_id,
+                TaskInstance.status == constants.TaskInstanceStatus.KILL_SELF,
+            )
+        ).scalar()
+
+        if kill_self_count is not None and kill_self_count > 0:
+            logger.info(
+                "Reaper waiting for KILL_SELF task instances to be cleaned up",
+                workflow_run_id=wfr_id,
+                kill_self_remaining=kill_self_count,
+            )
+            # Don't transition WFR yet - return early
+            db.commit()
+            resp = JSONResponse(
+                content={"status": wfr_status, "kill_self_remaining": kill_self_count},
+                status_code=StatusCodes.OK,
+            )
+            return resp
+
+        # All TIs cleaned up - proceed to transition WFR to TERMINATED
         logger.debug(f"Transitioning wfr {wfr_id} to TERMINATED")
         target_wfr_status = WorkflowRunStatus.TERMINATED
         target_wf_status = WorkflowStatus.HALTED

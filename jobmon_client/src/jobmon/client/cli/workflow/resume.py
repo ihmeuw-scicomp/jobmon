@@ -45,6 +45,12 @@ import click
     default=False,
     help="Don't auto-increase resources for tasks that failed with resource errors.",
 )
+@click.option(
+    "--force-cleanup",
+    is_flag=True,
+    default=False,
+    help="Force cleanup of stuck KILL_SELF task instances before resuming.",
+)
 def resume(
     workflow_id: int,
     cluster: str,
@@ -52,6 +58,7 @@ def resume(
     timeout: int,
     execution_timeout: int,
     keep_resources: bool,
+    force_cleanup: bool,
 ) -> None:
     r"""Resume a failed workflow.
 
@@ -82,4 +89,5 @@ def resume(
         timeout=timeout,
         seconds_until_timeout=execution_timeout,
         increase_resource=not keep_resources,
+        force_cleanup=force_cleanup,
     )

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 import sqlalchemy
 import structlog
 from fastapi import Depends, HTTPException, Request
-from sqlalchemy import func, select, update
+from sqlalchemy import func, insert, select, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError, NoResultFound
@@ -317,7 +317,12 @@ async def set_resume(
 
 @api_v3_router.get("/workflow/{workflow_id}/is_resumable")
 def workflow_is_resumable(workflow_id: int, db: Session = Depends(get_db)) -> Any:
-    """Check if a workflow is in a resumable state."""
+    """Check if a workflow is in a resumable state.
+
+    Returns:
+        workflow_is_resumable: True if workflow can be resumed
+        pending_kill_self: Number of KILL_SELF task instances waiting for cleanup
+    """
     set_jobmon_context(workflow_id=workflow_id)
 
     try:
@@ -329,12 +334,102 @@ def workflow_is_resumable(workflow_id: int, db: Session = Depends(get_db)) -> An
             detail=f"Workflow with ID {workflow_id} not found in database.",
         )
 
-    logger.info(f"Workflow is resumable: {workflow.is_resumable}")
+    # Check for pending KILL_SELF task instances across all workflow runs
+    kill_self_count = (
+        db.execute(
+            select(func.count(TaskInstance.id))
+            .join(WorkflowRun, TaskInstance.workflow_run_id == WorkflowRun.id)
+            .where(
+                WorkflowRun.workflow_id == workflow_id,
+                TaskInstance.status == TaskInstanceStatus.KILL_SELF,
+            )
+        ).scalar()
+        or 0
+    )
+
+    logger.info(
+        "Workflow resumable check",
+        workflow_id=workflow_id,
+        is_resumable=workflow.is_resumable,
+        pending_kill_self=kill_self_count,
+    )
     resp = JSONResponse(
-        content={"workflow_is_resumable": workflow.is_resumable},
+        content={
+            "workflow_is_resumable": workflow.is_resumable,
+            "pending_kill_self": kill_self_count,
+        },
         status_code=StatusCodes.OK,
     )
     return resp
+
+
+@api_v3_router.post("/workflow/{workflow_id}/force_cleanup_kill_self")
+def force_cleanup_kill_self(workflow_id: int, db: Session = Depends(get_db)) -> Any:
+    """Force cleanup of stuck KILL_SELF task instances.
+
+    Use this when jobs have been externally terminated (e.g., scancel, node failure)
+    and the workflow is stuck waiting for cleanup that will never happen.
+
+    This transitions all KILL_SELF task instances to ERROR_FATAL directly.
+    """
+    set_jobmon_context(workflow_id=workflow_id)
+
+    # Find all KILL_SELF task instances for this workflow
+    kill_self_query = (
+        select(TaskInstance.id)
+        .join(WorkflowRun, TaskInstance.workflow_run_id == WorkflowRun.id)
+        .where(
+            WorkflowRun.workflow_id == workflow_id,
+            TaskInstance.status == TaskInstanceStatus.KILL_SELF,
+        )
+    )
+    kill_self_ids = [row[0] for row in db.execute(kill_self_query).all()]
+
+    if not kill_self_ids:
+        logger.info("No KILL_SELF task instances to clean up", workflow_id=workflow_id)
+        return JSONResponse(
+            content={"num_cleaned_up": 0},
+            status_code=StatusCodes.OK,
+        )
+
+    # Log the forced cleanup
+    from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
+
+    insert_error_log = insert(TaskInstanceErrorLog).from_select(
+        ["task_instance_id", "description", "error_time"],
+        select(
+            TaskInstance.id,
+            sqlalchemy.literal(
+                "Force cleanup: User requested resume while KILL_SELF pending. "
+                "Jobs may have been externally terminated (scancel, node failure)."
+            ),
+            func.now(),
+        ).where(TaskInstance.id.in_(kill_self_ids)),
+    )
+    db.execute(insert_error_log)
+
+    # Transition KILL_SELF → ERROR_FATAL
+    update_stmt = (
+        update(TaskInstance)
+        .where(TaskInstance.id.in_(kill_self_ids))
+        .values(
+            status=TaskInstanceStatus.ERROR_FATAL,
+            status_date=func.now(),
+        )
+    )
+    result = db.execute(update_stmt)
+    db.commit()
+
+    logger.info(
+        "Forced cleanup of KILL_SELF task instances",
+        workflow_id=workflow_id,
+        num_cleaned_up=result.rowcount,
+    )
+
+    return JSONResponse(
+        content={"num_cleaned_up": result.rowcount},
+        status_code=StatusCodes.OK,
+    )
 
 
 @api_v3_router.get("/workflow/{workflow_id}/get_max_concurrently_running")

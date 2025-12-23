@@ -375,7 +375,9 @@ async def transition_to_killed(
 ) -> Any:
     """Transition TIs from KILL_SELF to ERROR_FATAL.
 
-    Also mark parent Tasks with status=ERROR_FATAL if they're in a killable state.
+    Also marks parent Tasks as ERROR_FATAL if they're in a killable state.
+    This is safe because the workflow won't be resumable until all KILL_SELF
+    TIs are cleaned up (no race condition with new workflow runs).
     """
     set_jobmon_context(array_id=array_id)
 
@@ -388,7 +390,7 @@ async def transition_to_killed(
         array_batch_num=batch_num,
     )
 
-    # We'll define "killable" Task states. Adjust as appropriate.
+    # Define "killable" Task states
     killable_task_states = (
         TaskStatusConstants.LAUNCHED,
         TaskStatusConstants.RUNNING,
@@ -413,13 +415,20 @@ async def transition_to_killed(
             task_ids = [row[0] for row in results]
             task_instance_ids = [row[1] for row in results]
 
-            # Now define task_condition with the fetched task_ids
+            if not task_instance_ids:
+                logger.info(
+                    "No KILL_SELF task instances found in batch",
+                    array_id=array_id,
+                    array_batch_num=batch_num,
+                )
+                return JSONResponse(content={}, status_code=StatusCodes.OK)
+
+            # 1) Transition Tasks to ERROR_FATAL (only if in killable states)
             task_condition = and_(
                 Task.array_id == array_id,
                 Task.id.in_(task_ids),
                 Task.status.in_(killable_task_states),
             )
-            # 1) Transition Tasks to ERROR_FATAL (UPDATE automatically locks rows)
             update_task_stmt = (
                 update(Task)
                 .where(task_condition)
@@ -428,7 +437,7 @@ async def transition_to_killed(
             )
             db.execute(update_task_stmt)
 
-            # 2) Transition TaskInstances to ERROR_FATAL in the same transaction
+            # 2) Transition TaskInstances to ERROR_FATAL
             update_ti_stmt = (
                 update(TaskInstance)
                 .where(
@@ -445,7 +454,7 @@ async def transition_to_killed(
             )
             db.execute(update_ti_stmt)
 
-            # 3) Atomic commit - both updates succeed or both fail
+            # 3) Atomic commit
             db.commit()
 
             # Log each killed task instance (info level - state transition)
@@ -461,7 +470,7 @@ async def transition_to_killed(
                 "Batch successfully transitioned from KILL_SELF to ERROR_FATAL",
                 array_id=array_id,
                 array_batch_num=batch_num,
-                num_tasks=len(task_instance_ids),
+                num_task_instances=len(task_instance_ids),
             )
             return JSONResponse(content={}, status_code=StatusCodes.OK)
 
