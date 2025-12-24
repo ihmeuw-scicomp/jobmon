@@ -65,10 +65,11 @@ jobmon_core = { workspace = true }
 jobmon_server = { workspace = true }
 
 [tool.pytest.ini_options]
-testpaths = ["tests/pytest"]
+testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.isort]
 profile = "black"
