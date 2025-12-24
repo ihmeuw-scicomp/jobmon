@@ -73,12 +73,12 @@ class WorkflowRunFactory:
 
         Args:
             resume_timeout: Maximum time to wait in seconds
-            force_cleanup: If True and timeout is reached with pending KILL_SELF
-                          task instances, force cleanup and proceed
+            force_cleanup: If True and KILL_SELF task instances are detected,
+                          clean them up immediately instead of waiting for workers
         """
         wait_start = time.time()
         pending_kill_self = 0
-        warned_about_kill_self = False
+        did_force_cleanup = False
 
         while not self.workflow_is_resumable:
             elapsed = time.time() - wait_start
@@ -92,48 +92,59 @@ class WorkflowRunFactory:
             self.workflow_is_resumable = bool(response.get("workflow_is_resumable"))
             pending_kill_self = response.get("pending_kill_self", 0)
 
-            # Warn user about pending KILL_SELF task instances
-            if pending_kill_self > 0 and not warned_about_kill_self:
-                logger.warning(
-                    f"Waiting for {pending_kill_self} task instance(s) in KILL_SELF "
-                    f"state to be cleaned up by workers. If these jobs were externally "
-                    f"terminated (scancel, node failure), use force_cleanup=True or "
-                    f"call force_cleanup_kill_self() to proceed."
-                )
-                warned_about_kill_self = True
+            # Handle KILL_SELF task instances
+            if pending_kill_self > 0:
+                if force_cleanup:
+                    # Force cleanup immediately - don't wait for workers
+                    logger.warning(
+                        f"Force cleaning up {pending_kill_self} KILL_SELF task instance(s). "
+                        f"These will be transitioned to ERROR_FATAL."
+                    )
+                    self.force_cleanup_kill_self()
+                    did_force_cleanup = True
+                    # Reset timeout to give reaper time to mark workflow as resumable
+                    wait_start = time.time()
+                    logger.info(
+                        "Force cleanup complete. Waiting for workflow to become resumable..."
+                    )
+                    continue
+                else:
+                    logger.warning(
+                        f"Waiting for {pending_kill_self} task instance(s) in KILL_SELF "
+                        f"state to be cleaned up by workers. If these jobs were externally "
+                        f"terminated (scancel, node failure), use force_cleanup=True."
+                    )
 
+            # Log progress
             if pending_kill_self > 0:
                 logger.info(
                     f"Waiting for resume. {pending_kill_self} KILL_SELF task(s) pending. "
                     f"Timeout in {round(remaining, 1)}s"
                 )
+            elif did_force_cleanup:
+                logger.info(
+                    f"Waiting for reaper to finalize workflow. "
+                    f"Timeout in {round(remaining, 1)}s"
+                )
             else:
                 logger.info(f"Waiting for resume. Timeout in {round(remaining, 1)}s")
 
+            # Check timeout
             if elapsed > resume_timeout:
-                if force_cleanup and pending_kill_self > 0:
-                    logger.warning(
-                        f"Timeout reached with {pending_kill_self} KILL_SELF task(s). "
-                        f"Force cleanup enabled - cleaning up stuck task instances."
+                msg = (
+                    "workflow_run timed out waiting for previous "
+                    "workflow_run to exit."
+                )
+                if pending_kill_self > 0:
+                    msg += (
+                        f" {pending_kill_self} task instance(s) stuck in KILL_SELF "
+                        f"state. Jobs may have been externally terminated. "
+                        f"Use force_cleanup=True to force cleanup."
                     )
-                    self.force_cleanup_kill_self()
-                    # Re-check resumability after cleanup
-                    continue
-                else:
-                    msg = (
-                        "workflow_run timed out waiting for previous "
-                        "workflow_run to exit."
-                    )
-                    if pending_kill_self > 0:
-                        msg += (
-                            f" {pending_kill_self} task instance(s) stuck in KILL_SELF "
-                            f"state. Jobs may have been externally terminated. "
-                            f"Use force_cleanup=True to force cleanup."
-                        )
-                    raise WorkflowNotResumable(msg)
-            else:
-                sleep_time = round(float(resume_timeout) / 10.0, 1)
-                time.sleep(sleep_time)
+                raise WorkflowNotResumable(msg)
+
+            sleep_time = round(float(resume_timeout) / 10.0, 1)
+            time.sleep(sleep_time)
 
     def force_cleanup_kill_self(self) -> int:
         """Force cleanup of stuck KILL_SELF task instances.
