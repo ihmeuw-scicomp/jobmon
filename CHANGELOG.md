@@ -3,7 +3,47 @@
 All notable changes to Jobmon will be documented in this file.
 
 
-## [Unreleased] - 3.6.0
+## [Unreleased]
+### Added
+- **CLI Refactor - Click Migration**: Complete migration from argparse to Click framework with hierarchical command structure:
+  - New hierarchical commands: `jobmon workflow status/tasks/reset/resume/concurrency/logs`, `jobmon workflow resources usage/yaml`, `jobmon task status/update/dependencies`, `jobmon config show/set`
+  - Server CLI reorganized: `jobmon-server db init/upgrade/terminate`, `jobmon-server reaper start`
+  - Proper logging configuration for both client and server CLIs using shared infrastructure
+  - Comprehensive unit tests for new CLI structure
+- **Force Cleanup for Stuck Task Instances**: New `--force-cleanup` flag in `jobmon workflow resume` command to manually cleanup stuck `KILL_SELF` task instances when jobs have been externally terminated (e.g., via `scancel` or node failure)
+
+### Changed
+- **CLI Entry Points**: Server CLI entry point renamed from `jobmon_server` to `jobmon-server` (hyphenated)
+- Refactored `status_commands.py` monolith into domain-focused modules: `commands/workflow.py`, `commands/task.py`, `commands/resources.py`, `commands/config.py`, `commands/validation.py`
+
+### Fixed
+- **Workflow Resume Cleanup**: Fixed multiple critical issues with workflow resume and task instance state management:
+  - Fixed NO_HEARTBEAT infinite loop when parent Task is already in terminal state (DONE/ERROR_FATAL). The `validate_transition()` function now allows orphaned task instances to transition to ERROR_FATAL instead of endlessly retrying invalid state transitions.
+  - Fixed duplicate error log entries caused by HTTP retries. The `_log_error()` function now validates transitions before creating error logs and includes idempotency checks.
+  - Fixed `terminate_task_instances` to correctly identify and terminate task instances by `workflow_run_id`. Previously used incorrect joins through Task table that could miss instances during resume.
+  - Fixed orphaned task instances during ungraceful distributor shutdowns. The reaper now properly terminates task instances that the old distributor never cleaned up.
+  - Improved task instance cleanup logic: `QUEUED`/`INSTANTIATED` instances now go directly to `ERROR_FATAL` (no worker exists), while `LAUNCHED`/`RUNNING` instances go to `KILL_SELF` for worker cleanup.
+  - Fixed premature workflow resume by having reaper wait for all `KILL_SELF` task instances to be cleaned up before transitioning workflow run to `TERMINATED`.
+  - Enhanced `is_resumable` endpoint to return `pending_kill_self` count, preventing resume attempts while cleanup is pending.
+- **State Transition Validation**: Renamed `get_transit_status()` to `validate_transition()` with detailed logging at each validation step for improved debuggability of state machine issues.
+
+### Deprecated
+- Legacy argparse-based CLI commands deprecated with warnings (will be removed in 3.0):
+  - `jobmon workflow_status` → `jobmon workflow status`
+  - `jobmon workflow_tasks` → `jobmon workflow tasks`
+  - `jobmon workflow_reset` → `jobmon workflow reset`
+  - `jobmon workflow_resume` → `jobmon workflow resume`
+  - `jobmon task_status` → `jobmon task status`
+  - `jobmon update_task_status` → `jobmon task update`
+  - `jobmon task_dependencies` → `jobmon task dependencies`
+  - `jobmon concurrency_limit` → `jobmon workflow concurrency`
+  - `jobmon get_filepaths` → `jobmon workflow logs`
+  - `jobmon task_template_resources` → `jobmon workflow resources usage`
+  - `jobmon create_resource_yaml` → `jobmon workflow resources yaml`
+  - `jobmon update_config` → `jobmon config set`
+
+
+## [3.6.0] - 2025-12-02
 ### Added
 - **WorkflowRun Refactor - New API**: Complete refactoring of the workflow run execution system with a cleaner, more testable architecture:
   - New `run_workflow()` and `resume_workflow_run()` factory functions as the recommended API for executing workflows
