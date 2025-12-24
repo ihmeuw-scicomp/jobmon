@@ -78,7 +78,6 @@ class WorkflowRunFactory:
         """
         wait_start = time.time()
         pending_kill_self = 0
-        did_force_cleanup = False
 
         while not self.workflow_is_resumable:
             elapsed = time.time() - wait_start
@@ -96,17 +95,16 @@ class WorkflowRunFactory:
             if pending_kill_self > 0:
                 if force_cleanup:
                     # Force cleanup immediately - don't wait for workers
+                    # Server also finalizes the workflow run, so next check should pass
                     logger.warning(
                         f"Force cleaning up {pending_kill_self} KILL_SELF task instance(s). "
                         f"These will be transitioned to ERROR_FATAL."
                     )
                     self.force_cleanup_kill_self()
-                    did_force_cleanup = True
-                    # Reset timeout to give reaper time to mark workflow as resumable
-                    wait_start = time.time()
                     logger.info(
-                        "Force cleanup complete. Waiting for workflow to become resumable..."
+                        "Force cleanup complete. Workflow should now be resumable."
                     )
+                    # Re-check immediately - server should have finalized the workflow run
                     continue
                 else:
                     logger.warning(
@@ -119,11 +117,6 @@ class WorkflowRunFactory:
             if pending_kill_self > 0:
                 logger.info(
                     f"Waiting for resume. {pending_kill_self} KILL_SELF task(s) pending. "
-                    f"Timeout in {round(remaining, 1)}s"
-                )
-            elif did_force_cleanup:
-                logger.info(
-                    f"Waiting for reaper to finalize workflow. "
                     f"Timeout in {round(remaining, 1)}s"
                 )
             else:
