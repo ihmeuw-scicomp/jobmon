@@ -24,8 +24,10 @@ from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.task_status import TaskStatus
+from jobmon.server.web.models.task_status_audit import TaskStatusAudit
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import ServerError
+from jobmon.server.web.services.transition_service import TransitionService
 
 logger = structlog.get_logger(__name__)
 
@@ -174,6 +176,7 @@ def transit_ti_and_t(
 
     Update task_instance and task in a single transation or to avoid inconsistent state.
     If unable to obtain logs for both, update none.
+    Also creates audit records for Task status transitions.
 
     Args:
         task_instance: The TaskInstance to update
@@ -203,11 +206,15 @@ def transit_ti_and_t(
             ti_result = db.execute(ti_lock_stmt).one()
             task_id = ti_result.task_id
 
-            # Then lock Task (by ID - deterministic order)
+            # Then lock Task (by ID - deterministic order) and get workflow_id for audit
             task_lock_stmt = (
-                select(Task.id).where(Task.id == task_id).with_for_update(nowait=True)
+                select(Task.id, Task.status, Task.workflow_id)
+                .where(Task.id == task_id)
+                .with_for_update(nowait=True)
             )
-            db.execute(task_lock_stmt).one()
+            task_row = db.execute(task_lock_stmt).one()
+            original_task_status = task_row.status
+            workflow_id = task_row.workflow_id
 
             # Update TaskInstance with status and optional report_by_date
             ti_values = {
@@ -244,6 +251,17 @@ def transit_ti_and_t(
                         .values(status=final_t_status, status_date=func.now())
                     )
                     db.execute(update_stmt)
+
+                # Audit: Log the final Task status transition (skip intermediate)
+                # Only audit if we actually changed the task status
+                audit_record = TaskStatusAudit(
+                    task_id=task_id,
+                    workflow_id=workflow_id,
+                    previous_status=original_task_status,
+                    new_status=final_t_status,
+                )
+                db.add(audit_record)
+
             # release locks immediately; please do not use flush() here
             # ti and t table are updated atomicity
             db.commit()
@@ -1075,52 +1093,53 @@ async def instantiate_task_instances(
 
     for attempt in range(max_retries):
         try:
-            # 1) Update the task table where FSM allows it
-            sub_query = (
+            # 1) Get task IDs from the task instance IDs
+            task_ids_query = (
                 select(Task.id)
                 .join(TaskInstance, TaskInstance.task_id == Task.id)
-                .where(
-                    and_(
-                        TaskInstance.id.in_(task_instance_ids_list),
-                        Task.status == constants.TaskStatus.QUEUED,
-                    )
-                )
-            ).alias("derived_table")
-            task_update = (
-                update(Task)
-                .where(Task.id.in_(select(sub_query.c.id)))
-                .values(
-                    status=constants.TaskStatus.INSTANTIATING, status_date=func.now()
-                )
-                .execution_options(synchronize_session=False)
+                .where(TaskInstance.id.in_(task_instance_ids_list))
+                .distinct()
             )
-            db.execute(task_update)
+            task_ids = [row[0] for row in db.execute(task_ids_query).all()]
 
-            # 2) Then propagate back into task instance where a change was made
-            sub_query = (
-                select(TaskInstance.id)
-                .join(Task, TaskInstance.task_id == Task.id)
-                .where(
-                    and_(
-                        # a successful transition
-                        (Task.status == constants.TaskStatus.INSTANTIATING),
-                        # and part of the current set
-                        TaskInstance.id.in_(task_instance_ids_list),
+            # 2) Use TransitionService for QUEUED -> INSTANTIATING with audit
+            if task_ids:
+                result = TransitionService.transition_tasks(
+                    session=db,
+                    task_ids=task_ids,
+                    to_status=constants.TaskStatus.INSTANTIATING,
+                    use_skip_locked=True,
+                )
+                transitioned_task_ids = result["transitioned"]
+            else:
+                transitioned_task_ids = []
+
+            # 3) Then propagate back into task instance where a change was made
+            if transitioned_task_ids:
+                sub_query = (
+                    select(TaskInstance.id)
+                    .join(Task, TaskInstance.task_id == Task.id)
+                    .where(
+                        and_(
+                            # Task was transitioned by the service
+                            Task.id.in_(transitioned_task_ids),
+                            # and part of the current set
+                            TaskInstance.id.in_(task_instance_ids_list),
+                        )
                     )
+                ).alias("derived_table")
+                task_instance_update = (
+                    update(TaskInstance)
+                    .where(TaskInstance.id.in_(select(sub_query.c.id)))
+                    .values(
+                        status=constants.TaskInstanceStatus.INSTANTIATED,
+                        status_date=func.now(),
+                    )
+                    .execution_options(synchronize_session=False)
                 )
-            ).alias("derived_table")
-            task_instance_update = (
-                update(TaskInstance)
-                .where(TaskInstance.id.in_(select(sub_query.c.id)))
-                .values(
-                    status=constants.TaskInstanceStatus.INSTANTIATED,
-                    status_date=func.now(),
-                )
-                .execution_options(synchronize_session=False)
-            )
-            db.execute(task_instance_update)
+                db.execute(task_instance_update)
 
-            # 3) Atomic commit - both updates succeed or both fail
+            # 4) Atomic commit - both updates succeed or both fail
             db.commit()
 
             # Log each successfully instantiated task instance (info level - state transition)

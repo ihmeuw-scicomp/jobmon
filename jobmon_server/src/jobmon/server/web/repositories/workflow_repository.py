@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from jobmon.core.constants import WorkflowStatus as Statuses
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.task import Task
+from jobmon.server.web.models.task_status import TaskStatus
+from jobmon.server.web.models.task_status_audit import TaskStatusAudit
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.tool import Tool
@@ -185,19 +187,45 @@ class WorkflowRepository:
         # Update task statuses associated with the workflow
         # Default behavior is a full workflow reset, all tasks to registered state
         # User can optionally request only a partial reset if they want to resume
-        invalid_statuses = ["G"]
+        invalid_statuses = [TaskStatus.REGISTERING]
         if partial_reset:
-            invalid_statuses.append("D")
-        update_filter = [
-            Task.workflow_id == workflow_id,
-            Task.status.notin_(invalid_statuses),
-        ]
-        update_stmt = (
-            update(Task)
-            .where(*update_filter)
-            .values(status="G", status_date=func.now(), num_attempts=0)
-        )
-        self.session.execute(update_stmt)
+            invalid_statuses.append(TaskStatus.DONE)
+
+        # Get tasks that will be reset for audit logging
+        tasks_to_reset = self.session.execute(
+            select(Task.id, Task.status).where(
+                Task.workflow_id == workflow_id,
+                Task.status.notin_(invalid_statuses),
+            )
+        ).all()
+
+        if tasks_to_reset:
+            # Update tasks
+            update_filter = [
+                Task.workflow_id == workflow_id,
+                Task.status.notin_(invalid_statuses),
+            ]
+            update_stmt = (
+                update(Task)
+                .where(*update_filter)
+                .values(
+                    status=TaskStatus.REGISTERING,
+                    status_date=func.now(),
+                    num_attempts=0,
+                )
+            )
+            self.session.execute(update_stmt)
+
+            # Create audit records for the reset
+            for task_id, prev_status in tasks_to_reset:
+                audit = TaskStatusAudit(
+                    task_id=task_id,
+                    workflow_id=workflow_id,
+                    previous_status=prev_status,
+                    new_status=TaskStatus.REGISTERING,
+                )
+                self.session.add(audit)
+
         self.session.commit()
 
     def get_workflow_status(

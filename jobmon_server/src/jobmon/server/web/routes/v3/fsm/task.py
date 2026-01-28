@@ -391,19 +391,49 @@ async def set_task_resume_state(
 
     # Logic: reset_if_running -> Reset all tasks not in "D" state
     # else, reset all tasks not in "D" or "R" state
-    # for performance, also excclude TaskStatus.REGISTERING
+    # for performance, also exclude TaskStatus.REGISTERING
     excluded_states = [TaskStatus.DONE, TaskStatus.REGISTERING]
     if not reset_if_running:
         excluded_states.append(TaskStatus.RUNNING)
 
-    db.execute(
-        update(Task)
-        .where(Task.status.not_in(excluded_states), Task.workflow_id == workflow_id)
-        .values(
-            status=TaskStatus.REGISTERING,
-            num_attempts=0,
-            status_date=func.now(),
-        )
+    # Get task IDs that need to be reset
+    task_ids_query = select(Task.id).where(
+        Task.status.not_in(excluded_states), Task.workflow_id == workflow_id
     )
+    task_ids = [row[0] for row in db.execute(task_ids_query).all()]
+
+    if task_ids:
+        # Use TransitionService for audit logging
+        # Note: REGISTERING doesn't have valid source statuses in FSM for all states,
+        # so we need to do a direct update with audit records
+        # This is a reset operation, not a normal FSM transition
+        from jobmon.server.web.models.task_status_audit import TaskStatusAudit
+
+        # Get current statuses for audit records
+        current_statuses = db.execute(
+            select(Task.id, Task.status, Task.workflow_id).where(Task.id.in_(task_ids))
+        ).all()
+
+        # Bulk update
+        db.execute(
+            update(Task)
+            .where(Task.id.in_(task_ids))
+            .values(
+                status=TaskStatus.REGISTERING,
+                num_attempts=0,
+                status_date=func.now(),
+            )
+        )
+
+        # Create audit records for the reset
+        for task_id, prev_status, wf_id in current_statuses:
+            audit = TaskStatusAudit(
+                task_id=task_id,
+                workflow_id=wf_id,
+                previous_status=prev_status,
+                new_status=TaskStatus.REGISTERING,
+            )
+            db.add(audit)
+
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp

@@ -521,21 +521,26 @@ class TestOTLPConfigurationOverrides:
             assert create_log_exporter() is None
 
         with patch("jobmon.core.otlp.manager.OTLP_AVAILABLE", True):
-            # Patch importlib.import_module since _normalize_exporter_config
-            # dynamically imports the module
+            # Mock the _normalize_exporter_config function which handles dynamic import
             mock_exporter_class = Mock()
             mock_instance = Mock()
             mock_exporter_class.return_value = mock_instance
 
-            mock_module = Mock()
-            mock_module.OTLPLogExporter = mock_exporter_class
+            with patch(
+                "jobmon.core.otlp.manager._normalize_exporter_config"
+            ) as mock_normalize:
+                mock_normalize.return_value = (mock_exporter_class, {"insecure": True})
 
-            with patch("importlib.import_module", return_value=mock_module):
                 # Should create exporter with default config
                 result = create_log_exporter()
                 assert result is mock_instance
+                mock_exporter_class.assert_called_with(insecure=True)
 
                 # Should pass through custom config
+                mock_normalize.return_value = (
+                    mock_exporter_class,
+                    {"insecure": True, "endpoint": "http://custom:4317", "timeout": 30},
+                )
                 result = create_log_exporter(endpoint="http://custom:4317", timeout=30)
                 mock_exporter_class.assert_called_with(
                     insecure=True, endpoint="http://custom:4317", timeout=30
