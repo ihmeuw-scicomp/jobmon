@@ -15,6 +15,7 @@ classifiers = [
 ]
 dependencies = [
     'jobmon_core',
+    'click>=8.0',
     'fastapi[standard]>=0.103.2',
     'fastapi-plugins>=0.12.0',
     'pymysql>=1.1.0', # install MySQLdb/mysqlclient for more performance
@@ -36,6 +37,9 @@ dependencies = [
 dynamic = ["version"]
 
 [project.scripts]
+# New CLI entry point (preferred)
+jobmon-server = "jobmon.server.cli:main"
+# Legacy entry point (deprecated, will be removed in v3.0)
 jobmon_server = "jobmon.server.cli:main"
 
 [project.optional-dependencies]

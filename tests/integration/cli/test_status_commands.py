@@ -1011,7 +1011,9 @@ def test_resume_workflow_from_cli(tool, task_template, db_engine, cli):
         )
 
         mock_set_resume.assert_called_once_with(
-            reset_running_jobs=args.reset_running_jobs, resume_timeout=args.timeout
+            reset_running_jobs=args.reset_running_jobs,
+            resume_timeout=args.timeout,
+            force_cleanup=False,
         )
 
     # Check that the swarm is complete

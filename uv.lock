@@ -1456,6 +1456,8 @@ wheels = [
 name = "jobmon-client"
 source = { editable = "jobmon_client" }
 dependencies = [
+    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "click", version = "8.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "jobmon-core" },
     { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
@@ -1471,6 +1473,7 @@ server = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.0" },
     { name = "jobmon-core", editable = "jobmon_core" },
     { name = "jobmon-server", marker = "extra == 'server'", editable = "jobmon_server" },
     { name = "numpy" },
@@ -1533,6 +1536,8 @@ source = { editable = "jobmon_server" }
 dependencies = [
     { name = "alembic" },
     { name = "authlib" },
+    { name = "click", version = "8.1.8", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "click", version = "8.2.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "fastapi", extra = ["standard"] },
     { name = "fastapi-plugins" },
     { name = "httpx" },
@@ -1566,6 +1571,7 @@ otlp = [
 requires-dist = [
     { name = "alembic" },
     { name = "authlib" },
+    { name = "click", specifier = ">=8.0" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.103.2" },
     { name = "fastapi-plugins", specifier = ">=0.12.0" },
     { name = "httpx" },

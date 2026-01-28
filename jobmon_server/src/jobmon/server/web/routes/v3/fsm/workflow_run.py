@@ -16,7 +16,6 @@ from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web._compat import subtract_time
 from jobmon.server.web.config import get_jobmon_config
 from jobmon.server.web.db.deps import get_db, get_dialect
-from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.models.workflow import Workflow
@@ -107,9 +106,15 @@ async def add_workflow_run(request: Request, db: Session = Depends(get_db)) -> A
 async def terminate_workflow_run(
     workflow_run_id: int, request: Request, db: Session = Depends(get_db)
 ) -> Any:
-    """Terminate a workflow run and get its tasks in order."""
+    """Terminate task instances for a workflow run being resumed.
+
+    - QUEUED/INSTANTIATED: Set directly to ERROR_FATAL (no worker exists to clean up)
+    - LAUNCHED/RUNNING: Set to KILL_SELF (worker will detect and clean up)
+    - HOT_RESUME: Preserve RUNNING tasks (let them finish)
+    - COLD_RESUME: Kill everything including RUNNING tasks
+    """
     set_jobmon_context(workflow_run_id=workflow_run_id)
-    logger.info("Terminate workflow_run")
+    logger.info("Terminating task instances for workflow_run")
     try:
         workflow_run_id = int(workflow_run_id)
     except Exception as e:
@@ -120,45 +125,79 @@ async def terminate_workflow_run(
     select_stmt = select(WorkflowRun).where(WorkflowRun.id == workflow_run_id)
     workflow_run = db.execute(select_stmt).scalars().one()
 
+    # TIs without a worker (no job submitted) - go directly to ERROR_FATAL
+    ti_states_to_error_fatal = [
+        constants.TaskInstanceStatus.QUEUED,
+        constants.TaskInstanceStatus.INSTANTIATED,
+    ]
+
+    # TIs with a worker (job in cluster) - set to KILL_SELF for worker cleanup
+    # HOT_RESUME: Don't kill running tasks (let them finish)
+    # COLD_RESUME: Kill everything including running tasks
     if workflow_run.status == constants.WorkflowRunStatus.HOT_RESUME:
-        task_states = [constants.TaskStatus.LAUNCHED]
+        ti_states_to_kill_self = [
+            constants.TaskInstanceStatus.LAUNCHED,
+        ]
     else:
-        task_states = [
-            constants.TaskStatus.LAUNCHED,
-            constants.TaskStatus.RUNNING,
+        ti_states_to_kill_self = [
+            constants.TaskInstanceStatus.LAUNCHED,
+            constants.TaskInstanceStatus.RUNNING,
         ]
 
+    # 1) Log and transition QUEUED/INSTANTIATED directly to ERROR_FATAL
     insert_error_log_stmt = insert(TaskInstanceErrorLog).from_select(
         ["task_instance_id", "description", "error_time"],
         select(
             TaskInstance.id,
             (
-                "Workflow resume requested. Setting to K from status of: "
+                "Workflow resume requested. Setting to ERROR_FATAL from status: "
+                + TaskInstance.status
+                + " (no worker to clean up)"
+            ),
+            func.now(),
+        ).where(
+            TaskInstance.workflow_run_id == workflow_run_id,
+            TaskInstance.status.in_(ti_states_to_error_fatal),
+        ),
+    )
+    db.execute(insert_error_log_stmt)
+
+    update_to_error_fatal = (
+        update(TaskInstance)
+        .where(
+            TaskInstance.workflow_run_id == workflow_run_id,
+            TaskInstance.status.in_(ti_states_to_error_fatal),
+        )
+        .values(
+            status=constants.TaskInstanceStatus.ERROR_FATAL,
+            status_date=func.now(),
+        )
+        .execution_options(synchronize_session=False)
+    )
+    result_error_fatal = db.execute(update_to_error_fatal)
+
+    # 2) Log and transition LAUNCHED/RUNNING to KILL_SELF (worker will clean up)
+    insert_kill_self_log_stmt = insert(TaskInstanceErrorLog).from_select(
+        ["task_instance_id", "description", "error_time"],
+        select(
+            TaskInstance.id,
+            (
+                "Workflow resume requested. Setting to KILL_SELF from status: "
                 + TaskInstance.status
             ),
             func.now(),
         ).where(
             TaskInstance.workflow_run_id == workflow_run_id,
-            TaskInstance.status == constants.TaskInstanceStatus.KILL_SELF,
+            TaskInstance.status.in_(ti_states_to_kill_self),
         ),
     )
-    db.execute(insert_error_log_stmt)
+    db.execute(insert_kill_self_log_stmt)
 
-    workflow_id = workflow_run.workflow_id
-    update_task_instance_stmt = (
+    update_to_kill_self = (
         update(TaskInstance)
         .where(
-            TaskInstance.id.in_(
-                select(TaskInstance.id).where(
-                    TaskInstance.workflow_run_id == WorkflowRun.id,
-                    TaskInstance.task_id.in_(
-                        select(Task.id).where(
-                            Task.workflow_id == workflow_id,
-                            Task.status.in_(task_states),
-                        )
-                    ),
-                )
-            )
+            TaskInstance.workflow_run_id == workflow_run_id,
+            TaskInstance.status.in_(ti_states_to_kill_self),
         )
         .values(
             status=constants.TaskInstanceStatus.KILL_SELF,
@@ -166,11 +205,22 @@ async def terminate_workflow_run(
         )
         .execution_options(synchronize_session=False)
     )
+    result_kill_self = db.execute(update_to_kill_self)
 
-    db.execute(update_task_instance_stmt)
+    logger.info(
+        "Task instances terminated for workflow resume",
+        workflow_run_id=workflow_run_id,
+        num_error_fatal=result_error_fatal.rowcount,
+        num_kill_self=result_kill_self.rowcount,
+        resume_type=workflow_run.status,
+    )
 
     resp = JSONResponse(
-        content={"workflow_run_id": workflow_run_id}, status_code=StatusCodes.OK
+        content={
+            "workflow_run_id": workflow_run_id,
+            "num_terminated": result_error_fatal.rowcount + result_kill_self.rowcount,
+        },
+        status_code=StatusCodes.OK,
     )
     return resp
 

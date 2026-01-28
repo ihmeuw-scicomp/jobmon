@@ -16,6 +16,7 @@ classifiers = [
 ]
 dependencies = [
     'jobmon_core',
+    'click>=8.0',
     'numpy',
     'pandas',
     'pyyaml',
