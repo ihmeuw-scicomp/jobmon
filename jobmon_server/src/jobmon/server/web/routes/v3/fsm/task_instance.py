@@ -22,268 +22,11 @@ from jobmon.server.web.models.array import Array
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
-from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
-from jobmon.server.web.models.task_status import TaskStatus
-from jobmon.server.web.models.task_status_audit import TaskStatusAudit
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import ServerError
 from jobmon.server.web.services.transition_service import TransitionService
 
 logger = structlog.get_logger(__name__)
-
-
-def get_new_task_status(task_instance: TaskInstance, new_state: str) -> tuple[str, str]:
-    """Get the valid status to transit to. (TaskInstanceStatus, TaskStatus)."""
-    current_task_status = task_instance.task.status
-    if new_state == TaskInstanceStatus.QUEUED:
-        return TaskStatus.QUEUED, TaskStatus.QUEUED
-    if new_state == TaskInstanceStatus.INSTANTIATED:
-        return TaskStatus.INSTANTIATING, TaskStatus.INSTANTIATING
-    if new_state == TaskInstanceStatus.LAUNCHED:
-        return TaskStatus.LAUNCHED, TaskStatus.LAUNCHED
-    if new_state == TaskInstanceStatus.RUNNING:
-        return TaskStatus.RUNNING, TaskStatus.RUNNING
-    elif new_state == TaskInstanceStatus.DONE:
-        return TaskStatus.DONE, TaskStatus.DONE
-    elif new_state in task_instance.error_states:
-        if task_instance.task.num_attempts >= task_instance.task.max_attempts:
-            logger.info("Giving up task after max attempts.")
-            return TaskStatus.ERROR_RECOVERABLE, TaskStatus.ERROR_FATAL
-        else:
-            if new_state == TaskInstanceStatus.RESOURCE_ERROR:
-                logger.debug("Adjust resource for task.")
-                return TaskStatus.ERROR_RECOVERABLE, TaskStatus.ADJUSTING_RESOURCES
-            else:
-                logger.debug("Retrying Task.")
-                return TaskStatus.ERROR_RECOVERABLE, TaskStatus.REGISTERING
-    elif new_state == TaskInstanceStatus.ERROR_FATAL:
-        return TaskStatus.ERROR_RECOVERABLE, TaskStatus.ERROR_FATAL
-    else:
-        return current_task_status, current_task_status
-
-
-def validate_transition(task_instance: TaskInstance, new_ti_status: str) -> dict | None:
-    """Validate and return the status transition info for a TaskInstance.
-
-    Checks if a TaskInstance can transition to the new status by validating:
-    1. The transition is timely (not a race condition)
-    2. The TaskInstance transition is in valid_transitions
-    3. The corresponding Task transition is in valid_transitions
-       (unless Task is already terminal, in which case TI can go to ERROR_FATAL)
-
-    Args:
-        task_instance: The TaskInstance to validate transition for
-        new_ti_status: The desired new TaskInstance status
-
-    Returns:
-        A dict with transition info if valid, None if transition is not allowed
-    """
-    ti_id = task_instance.id
-    current_ti_status = task_instance.status
-    current_task_status = task_instance.task.status
-
-    # Terminal Task states - Task has reached final outcome
-    terminal_task_states = [constants.TaskStatus.DONE, constants.TaskStatus.ERROR_FATAL]
-
-    # Check 1: Is this a timely transition (not caused by race condition)?
-    if not task_instance._is_timely_transition(new_ti_status):
-        logger.warning(
-            "Untimely transition rejected",
-            task_instance_id=ti_id,
-            current_ti_status=current_ti_status,
-            requested_ti_status=new_ti_status,
-        )
-        return None
-
-    # Check 2: Is the TaskInstance transition valid?
-    if (current_ti_status, new_ti_status) not in task_instance.valid_transitions:
-        logger.warning(
-            "Invalid TaskInstance transition",
-            task_instance_id=ti_id,
-            current_ti_status=current_ti_status,
-            requested_ti_status=new_ti_status,
-        )
-        return None
-
-    # Special case: If Task is already in a terminal state, allow orphaned TIs
-    # to transition to ERROR_FATAL without changing Task status.
-    # This handles cases like:
-    # - Another TI succeeded (Task=DONE) but this TI is stuck in NO_HEARTBEAT
-    # - Another TI hit max_attempts (Task=ERROR_FATAL) but this TI is still processing
-    if current_task_status in terminal_task_states:
-        if (
-            new_ti_status in task_instance.error_states
-            or new_ti_status == constants.TaskInstanceStatus.ERROR_FATAL
-        ):
-            logger.info(
-                "Task already terminal, allowing orphaned TI to transition to error",
-                task_instance_id=ti_id,
-                current_task_status=current_task_status,
-                current_ti_status=current_ti_status,
-                requested_ti_status=new_ti_status,
-            )
-            # Return with no Task status change needed
-            return {
-                "new_ti_status": constants.TaskInstanceStatus.ERROR_FATAL,
-                "new_t_status": current_task_status,  # Keep current
-                "final_t_status": current_task_status,  # Keep current
-            }
-
-    # Check 3: Get the corresponding Task status transitions
-    new_task_status, final_task_status = get_new_task_status(
-        task_instance, new_ti_status
-    )
-    if new_task_status is None:
-        logger.warning(
-            "Could not determine new Task status",
-            task_instance_id=ti_id,
-            requested_ti_status=new_ti_status,
-        )
-        return None
-
-    # Check 4: Is the Task transition valid?
-    if (
-        current_task_status,
-        new_task_status,
-    ) not in task_instance.task.valid_transitions:
-        logger.warning(
-            "Invalid Task transition - Task may have already transitioned",
-            task_instance_id=ti_id,
-            task_id=task_instance.task.id,
-            current_task_status=current_task_status,
-            requested_task_status=new_task_status,
-            current_ti_status=current_ti_status,
-            requested_ti_status=new_ti_status,
-        )
-        return None
-
-    return {
-        "new_ti_status": new_ti_status,
-        "new_t_status": new_task_status,
-        "final_t_status": final_task_status,
-    }
-
-
-def transit_ti_and_t(
-    task_instance: TaskInstance,
-    status_dict: dict,
-    db: Session,
-    report_by_date: Optional[float] = None,
-    log_message: Optional[str] = None,
-    dialect: Optional[str] = None,
-) -> None:
-    """Transit the task_instance and task to the new status.
-
-    Update task_instance and task in a single transation or to avoid inconsistent state.
-    If unable to obtain logs for both, update none.
-    Also creates audit records for Task status transitions.
-
-    Args:
-        task_instance: The TaskInstance to update
-        status_dict: Dictionary with status transition info
-        db: Database session
-        report_by_date: Optional seconds to add for report_by_date
-        log_message: Optional message to log on success
-        dialect: Database dialect (mysql, sqlite) - required if report_by_date is set
-    """
-    new_ti_status = status_dict["new_ti_status"]
-    new_t_status = status_dict["new_t_status"]
-    final_t_status = status_dict["final_t_status"]
-    task = task_instance.task
-    # retry 5 times for lock because we need to lock two tables in a single transaction
-    # use nowait=True to avoid waiting for the lock
-    # thus, increase the max_retries to 5
-    max_retries = 5
-    for i in range(max_retries):
-        try:
-            # Lock TaskInstance first (by ID - deterministic order)
-            # please do not lock the two tables at the same time to avoid deadlock
-            ti_lock_stmt = (
-                select(TaskInstance.id, TaskInstance.task_id)
-                .where(TaskInstance.id == task_instance.id)
-                .with_for_update(nowait=True)
-            )
-            ti_result = db.execute(ti_lock_stmt).one()
-            task_id = ti_result.task_id
-
-            # Then lock Task (by ID - deterministic order) and get workflow_id for audit
-            task_lock_stmt = (
-                select(Task.id, Task.status, Task.workflow_id)
-                .where(Task.id == task_id)
-                .with_for_update(nowait=True)
-            )
-            task_row = db.execute(task_lock_stmt).one()
-            original_task_status = task_row.status
-            workflow_id = task_row.workflow_id
-
-            # Update TaskInstance with status and optional report_by_date
-            ti_values = {
-                "status": new_ti_status,
-                "status_date": func.now(),
-            }
-            if report_by_date is not None and dialect is not None:
-                ti_values["report_by_date"] = add_time(report_by_date, dialect)
-
-            update_stmt = (
-                update(TaskInstance)
-                .where(TaskInstance.id == task_instance.id)
-                .values(ti_values)
-                .execution_options(synchronize_session=False)
-            )
-            db.execute(update_stmt)
-
-            if task.status != new_t_status or new_t_status != final_t_status:
-                # Update Task status
-                update_stmt = (
-                    update(Task)
-                    .where(Task.id == task_id)
-                    .values(status=new_t_status, status_date=func.now())
-                )
-                db.execute(update_stmt)
-
-                # do not use flush() here to avoid partial commit
-
-                # update to the final task status
-                if new_t_status != final_t_status:
-                    update_stmt = (
-                        update(Task)
-                        .where(Task.id == task_id)
-                        .values(status=final_t_status, status_date=func.now())
-                    )
-                    db.execute(update_stmt)
-
-                # Audit: Log the final Task status transition (skip intermediate)
-                # Only audit if we actually changed the task status
-                audit_record = TaskStatusAudit(
-                    task_id=task_id,
-                    workflow_id=workflow_id,
-                    previous_status=original_task_status,
-                    new_status=final_t_status,
-                )
-                db.add(audit_record)
-
-            # release locks immediately; please do not use flush() here
-            # ti and t table are updated atomicity
-            db.commit()
-
-            # Log only on successful completion
-            if log_message:
-                logger.info(log_message, nodename=task_instance.nodename)
-
-            return
-        except OperationalError as e:
-            logger.warning(
-                f"Database error detected {e}, retrying attempt {i + 1}/{max_retries}"
-            )
-            db.rollback()  # Clear the corrupted session state
-            sleep(0.001 * (2 ** (i + 1)))  # Exponential backoff: 2ms, 4ms...
-        except Exception as e:
-            logger.error(f"Failed to transit task_instance: {e}")
-            db.rollback()  # Clear the corrupted session state
-            raise e
-    raise HTTPException(
-        status_code=503, detail="Database temporarily unavailable, please retry"
-    )
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_running")
@@ -301,123 +44,91 @@ async def log_running(
         distributor_id=data.get("distributor_id"),
     )
 
-    # Retry logic for database operations
-    max_retries = 5
+    try:
+        # load task_instance; do not lock
+        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+        task_instance = db.execute(select_stmt).scalars().one()
 
-    for attempt in range(max_retries):
-        try:
-            # load task_instance; do not lock
-            select_stmt = select(TaskInstance).where(
-                TaskInstance.id == task_instance_id
+        # Update attributes
+        if data.get("distributor_id") is not None:
+            task_instance.distributor_id = data["distributor_id"]
+        if data.get("nodename") is not None:
+            task_instance.nodename = data["nodename"]
+        task_instance.process_group_id = data["process_group_id"]
+
+        # Handle state transition
+        dialect = get_dialect(request)
+        result = TransitionService.transition_task_instance(
+            session=db,
+            task_instance_id=task_instance.id,
+            task_id=task_instance.task_id,
+            current_ti_status=task_instance.status,
+            new_ti_status=constants.TaskInstanceStatus.RUNNING,
+            task_num_attempts=task_instance.task.num_attempts,
+            task_max_attempts=task_instance.task.max_attempts,
+            report_by_date=add_time(data["next_report_increment"], dialect),
+        )
+        if result["ti_updated"]:
+            logger.info(
+                f"Task instance {task_instance_id} transitioned to RUNNING in database"
             )
-            task_instance = db.execute(select_stmt).scalars().one()
-
-            # Update attributes
-            if data.get("distributor_id") is not None:
-                task_instance.distributor_id = data["distributor_id"]
-            if data.get("nodename") is not None:
-                task_instance.nodename = data["nodename"]
-            task_instance.process_group_id = data["process_group_id"]
-
-            # Handle state transition
-            dialect = get_dialect(request)
-            status = validate_transition(
-                task_instance, constants.TaskInstanceStatus.RUNNING
-            )
-            if status is not None:
-                transit_ti_and_t(
-                    task_instance,
-                    status,
-                    db,
-                    data["next_report_increment"],
-                    log_message=(
-                        f"Task instance {task_instance_id} "
-                        f"transitioned to RUNNING in database"
-                    ),
-                    dialect=dialect,
+            db.commit()
+        else:
+            if task_instance.status == constants.TaskInstanceStatus.RUNNING:
+                logger.warning(
+                    f"Unable to transition to running from {task_instance.status}"
                 )
+            elif task_instance.status == constants.TaskInstanceStatus.KILL_SELF:
+                # KILL_SELF means workflow resume requested termination.
+                # Transition to ERROR_FATAL. This is safe because the workflow
+                # won't be resumable until all KILL_SELF TIs are cleaned up.
+                result = TransitionService.transition_task_instance(
+                    session=db,
+                    task_instance_id=task_instance.id,
+                    task_id=task_instance.task_id,
+                    current_ti_status=task_instance.status,
+                    new_ti_status=constants.TaskInstanceStatus.ERROR_FATAL,
+                    task_num_attempts=task_instance.task.num_attempts,
+                    task_max_attempts=task_instance.task.max_attempts,
+                    report_by_date=add_time(data["next_report_increment"], dialect),
+                )
+                if result["ti_updated"]:
+                    db.commit()
+            elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
+                result = TransitionService.transition_task_instance(
+                    session=db,
+                    task_instance_id=task_instance.id,
+                    task_id=task_instance.task_id,
+                    current_ti_status=task_instance.status,
+                    new_ti_status=constants.TaskInstanceStatus.ERROR,
+                    task_num_attempts=task_instance.task.num_attempts,
+                    task_max_attempts=task_instance.task.max_attempts,
+                    report_by_date=add_time(data["next_report_increment"], dialect),
+                )
+                if result["ti_updated"]:
+                    db.commit()
             else:
-                if task_instance.status == constants.TaskInstanceStatus.RUNNING:
+                if result["error"] == "untimely_transition":
                     logger.warning(
-                        f"Unable to transition to running from {task_instance.status}"
+                        f"Untimely transition to running from {task_instance.status}"
                     )
-                elif task_instance.status == constants.TaskInstanceStatus.KILL_SELF:
-                    # KILL_SELF means workflow resume requested termination.
-                    # Transition to ERROR_FATAL. This is safe because the workflow
-                    # won't be resumable until all KILL_SELF TIs are cleaned up.
-                    status = validate_transition(
-                        task_instance, constants.TaskInstanceStatus.ERROR_FATAL
-                    )
-                    if status is not None:
-                        transit_ti_and_t(
-                            task_instance,
-                            status,
-                            db,
-                            data["next_report_increment"],
-                            dialect=dialect,
-                        )
-                elif task_instance.status == constants.TaskInstanceStatus.NO_HEARTBEAT:
-                    status = validate_transition(
-                        task_instance, constants.TaskInstanceStatus.ERROR
-                    )
-                    if status is not None:
-                        transit_ti_and_t(
-                            task_instance,
-                            status,
-                            db,
-                            data["next_report_increment"],
-                            dialect=dialect,
-                        )
                 else:
                     logger.error(
                         f"Unable to transition to running from {task_instance.status}"
                     )
 
-            # Commit the session to ensure all changes are persisted
-            db.commit()
+        # Commit any remaining attribute changes
+        db.commit()
 
-            wire_format = task_instance.to_wire_as_worker_node_task_instance()
-            return JSONResponse(
-                content={"task_instance": wire_format}, status_code=StatusCodes.OK
-            )
+        wire_format = task_instance.to_wire_as_worker_node_task_instance()
+        return JSONResponse(
+            content={"task_instance": wire_format}, status_code=StatusCodes.OK
+        )
 
-        except OperationalError as e:
-            if (
-                "database is locked" in str(e)
-                or "Lock wait timeout" in str(e)
-                or "could not obtain lock" in str(e)
-                or "Deadlock found" in str(e)
-                or "lock(s) could not be acquired immediately and NOWAIT is set"
-                in str(e)
-            ):
-                logger.warning(
-                    f"Database error detected for log_running, retrying attempt "
-                    f"{attempt + 1}/{max_retries}. {e}"
-                )
-                db.rollback()  # Clear the corrupted session state
-                sleep(
-                    0.001 * (2 ** (attempt + 1))
-                )  # Exponential backoff: 2ms, 4ms, 8ms...
-            else:
-                logger.error(f"Unexpected database error in log_running: {e}")
-                db.rollback()
-                raise e
-        except Exception as e:
-            logger.error(
-                f"Failed to log running for task_instance {task_instance_id}: {e}"
-            )
-            db.rollback()
-            raise e
-
-    # All retries failed
-    logger.error(
-        f"Failed to log running for task_instance {task_instance_id} "
-        f"after {max_retries} attempts"
-    )
-    db.rollback()
-    raise HTTPException(
-        status_code=503, detail="Database temporarily unavailable, please retry"
-    )
+    except Exception as e:
+        logger.error(f"Failed to log running for task_instance {task_instance_id}: {e}")
+        db.rollback()
+        raise e
 
 
 @api_v3_router.post("/task_instance/{task_instance_id}/log_report_by")
@@ -465,21 +176,22 @@ async def log_ti_report_by(
 
             # Handle possible state transition
             if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
-                status = validate_transition(
-                    task_instance, constants.TaskInstanceStatus.RUNNING
+                result = TransitionService.transition_task_instance(
+                    session=db,
+                    task_instance_id=task_instance.id,
+                    task_id=task_instance.task_id,
+                    current_ti_status=task_instance.status,
+                    new_ti_status=constants.TaskInstanceStatus.RUNNING,
+                    task_num_attempts=task_instance.task.num_attempts,
+                    task_max_attempts=task_instance.task.max_attempts,
+                    report_by_date=add_time(data["next_report_increment"], dialect),
                 )
-                if status is not None:
-                    transit_ti_and_t(
-                        task_instance,
-                        status,
-                        db,
-                        data["next_report_increment"],
-                        dialect=dialect,
-                    )
+                if result["ti_updated"]:
                     logger.info(
                         "Heartbeat triggered transition from TRIAGING to RUNNING",
                         task_instance_id=task_instance_id,
                     )
+                    db.commit()
                 else:
                     logger.error(
                         f"Unable to transition to running from {task_instance.status}"
@@ -621,21 +333,27 @@ async def log_done(
             if val is not None:
                 setattr(task_instance, field, val)
 
-        # Attempt transition
-        status = validate_transition(task_instance, constants.TaskInstanceStatus.DONE)
-        if status is not None:
-            # log_done doesn't provide next_report_increment
-            transit_ti_and_t(
-                task_instance,
-                status,
-                db,
-                log_message=(
-                    f"Task instance {task_instance_id} "
-                    f"transitioned to DONE in database"
-                ),
+        # Attempt transition using TransitionService
+        result = TransitionService.transition_task_instance(
+            session=db,
+            task_instance_id=task_instance.id,
+            task_id=task_instance.task_id,
+            current_ti_status=task_instance.status,
+            new_ti_status=constants.TaskInstanceStatus.DONE,
+            task_num_attempts=task_instance.task.num_attempts,
+            task_max_attempts=task_instance.task.max_attempts,
+        )
+        if result["ti_updated"]:
+            logger.info(
+                f"Task instance {task_instance_id} transitioned to DONE in database"
             )
+            db.commit()
         else:
-            if task_instance.status == constants.TaskInstanceStatus.DONE:
+            if result["error"] == "untimely_transition":
+                logger.warning(
+                    f"Untimely transition to DONE from {task_instance.status}"
+                )
+            elif task_instance.status == constants.TaskInstanceStatus.DONE:
                 logger.warning(
                     f"Unable to transition to done from {task_instance.status}"
                 )
@@ -667,14 +385,22 @@ async def log_error_worker_node(
         select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
         task_instance = db.execute(select_stmt).scalars().one()
 
-        # ti that tries to log error should not in T unles there was a race condition
+        # ti that tries to log error should not in T unless there was a race condition
         # we need to transition to R first
         if task_instance.status == constants.TaskInstanceStatus.TRIAGING:
-            all_status = validate_transition(
-                task_instance, constants.TaskInstanceStatus.RUNNING
+            result = TransitionService.transition_task_instance(
+                session=db,
+                task_instance_id=task_instance.id,
+                task_id=task_instance.task_id,
+                current_ti_status=task_instance.status,
+                new_ti_status=constants.TaskInstanceStatus.RUNNING,
+                task_num_attempts=task_instance.task.num_attempts,
+                task_max_attempts=task_instance.task.max_attempts,
             )
-            if all_status is not None:
-                transit_ti_and_t(task_instance, all_status, db)
+            if result["ti_updated"]:
+                db.commit()
+                # Refresh task_instance to get updated status
+                db.refresh(task_instance)
             else:
                 logger.error(
                     f"Unable to transition to running from {task_instance.status}"
@@ -698,12 +424,30 @@ async def log_error_worker_node(
         error_state = data["error_state"]
         error_description = data["error_description"]
 
-        status = validate_transition(task_instance, error_state)
-        if status is not None:
-            # Error transitions don't need next_report_increment
-            transit_ti_and_t(task_instance, status, db)
+        result = TransitionService.transition_task_instance(
+            session=db,
+            task_instance_id=task_instance.id,
+            task_id=task_instance.task_id,
+            current_ti_status=task_instance.status,
+            new_ti_status=error_state,
+            task_num_attempts=task_instance.task.num_attempts,
+            task_max_attempts=task_instance.task.max_attempts,
+        )
+        if result["ti_updated"]:
+            # Create error log entry
+            error = TaskInstanceErrorLog(
+                task_instance_id=task_instance.id,
+                description=error_description,
+            )
+            db.add(error)
+            # release locks immediately
+            db.commit()
         else:
-            if task_instance.status == error_state:
+            if result["error"] == "untimely_transition":
+                logger.warning(
+                    f"Untimely transition to {error_state} from {task_instance.status}"
+                )
+            elif task_instance.status == error_state:
                 logger.warning(
                     f"Unable to transition to {error_state} from {task_instance.status}"
                 )
@@ -711,14 +455,6 @@ async def log_error_worker_node(
                 logger.error(
                     f"Unable to transition to {error_state} from {task_instance.status}"
                 )
-        # Create error log entry
-        error = TaskInstanceErrorLog(
-            task_instance_id=task_instance.id,
-            description=error_description,
-        )
-        db.add(error)
-        # release locks immediately
-        db.commit()
 
         return JSONResponse(
             content={"status": task_instance.status},
@@ -793,7 +529,6 @@ async def log_no_distributor_id(
         f"Logging ti {task_instance_id} did not get distributor id upon submission"
     )
     data = cast(Dict, await request.json())
-    logger.debug(f"Log NO DISTRIBUTOR ID. Data {data['no_id_err_msg']}")
     err_msg = data["no_id_err_msg"]
 
     # Retry logic for database operations
@@ -912,28 +647,31 @@ async def log_distributor_id(
         )
     else:
         # Only try to transition if not in final state (distributor_id already updated above)
-        status = validate_transition(
-            task_instance, constants.TaskInstanceStatus.LAUNCHED
+        result = TransitionService.transition_task_instance(
+            session=db,
+            task_instance_id=task_instance.id,
+            task_id=task_instance.task_id,
+            current_ti_status=task_instance.status,
+            new_ti_status=constants.TaskInstanceStatus.LAUNCHED,
+            task_num_attempts=task_instance.task.num_attempts,
+            task_max_attempts=task_instance.task.max_attempts,
+            report_by_date=add_time(data["next_report_increment"], dialect),
         )
-        if status is not None:
-            # need to log report_by_date to avoid race condition
-            # this already has retry logic
-            transit_ti_and_t(
-                task_instance,
-                status,
-                db,
-                data["next_report_increment"],
-                dialect=dialect,
-            )
-            db.commit()  # commit any additional changes from transit
+        if result["ti_updated"]:
+            db.commit()
             return JSONResponse(
                 content={"message": "Task instance transitioned to LAUNCHED"},
                 status_code=StatusCodes.OK,
             )
         else:
-            logger.error(
-                f"Unable to transition to launched from {task_instance.status}"
-            )
+            if result["error"] == "untimely_transition":
+                logger.warning(
+                    f"Untimely transition to LAUNCHED from {task_instance.status}"
+                )
+            else:
+                logger.error(
+                    f"Unable to transition to launched from {task_instance.status}"
+                )
             # distributor_id was already committed above, so we're done
             return JSONResponse(
                 content={
@@ -1273,9 +1011,17 @@ def _update_task_instance_state(
             )
             response += msg
         else:
-            status = validate_transition(task_instance, status_id)
-            if status is not None:
-                transit_ti_and_t(task_instance, status, db)
+            result = TransitionService.transition_task_instance(
+                session=db,
+                task_instance_id=task_instance.id,
+                task_id=task_instance.task_id,
+                current_ti_status=task_instance.status,
+                new_ti_status=status_id,
+                task_num_attempts=task_instance.task.num_attempts,
+                task_max_attempts=task_instance.task.max_attempts,
+            )
+            if result["ti_updated"]:
+                db.commit()
             else:
                 msg = (
                     f"Illegal state transition. Not transitioning task, "
@@ -1328,71 +1074,64 @@ def _log_error(
         )
         return resp
 
-    # Validate transition BEFORE creating error log
-    # This prevents duplicate error logs when transition is invalid
-    status = validate_transition(ti, error_state)
-    if status is None:
-        logger.warning(
-            "Invalid error transition, not creating error log",
+    try:
+        # Create error log first (will be rolled back if transition fails)
+        error = TaskInstanceErrorLog(task_instance_id=ti.id, description=error_msg)
+        session.add(error)
+
+        # Perform the transition using TransitionService (has internal retry logic)
+        result = TransitionService.transition_task_instance(
+            session=session,
             task_instance_id=ti.id,
-            current_status=ti.status,
-            requested_status=error_state,
-            task_status=ti.task.status,
+            task_id=ti.task_id,
+            current_ti_status=ti.status,
+            new_ti_status=error_state,
+            task_num_attempts=ti.task.num_attempts,
+            task_max_attempts=ti.task.max_attempts,
         )
-        resp = JSONResponse(
-            content={
-                "message": f"Invalid transition from {ti.status} to {error_state}"
-            },
-            status_code=StatusCodes.OK,
-        )
-        return resp
 
-    # Retry logic for database operations
-    max_retries = 5
-
-    for attempt in range(max_retries):
-        try:
-            # Create error log only after confirming transition is valid
-            error = TaskInstanceErrorLog(task_instance_id=ti.id, description=error_msg)
-            session.add(error)
-
-            # Perform the transition
-            transit_ti_and_t(ti, status, session)
-
+        if result["ti_updated"]:
             logger.info(
                 "Task instance transitioned to error state",
                 task_instance_id=ti.id,
                 error_state=error_state,
+                orphaned=result.get("orphaned", False),
             )
-
+            session.commit()
             resp = JSONResponse(content={"message": ""}, status_code=StatusCodes.OK)
-            return resp  # Success - exit the function
-        except OperationalError as e:
-            logger.warning(
-                f"Database lock detected for TI {ti.id}, "
-                f"retrying attempt {attempt + 1}/{max_retries}. {e}"
-            )
+            return resp
+        else:
+            # Transition was not valid - rollback error log
             session.rollback()
-            sleep(0.001 * (2 ** (attempt + 1)))  # 2ms, 4ms, 8ms delays
-            continue
-        except Exception as e:
-            # Always complete the request successfully to avoid infinite retries
-            logger.error(f"Failed to log error for task_instance {ti.id}: {e}")
-            session.rollback()
+            if result["error"] == "untimely_transition":
+                logger.warning(
+                    "Untimely error transition, not creating error log",
+                    task_instance_id=ti.id,
+                    current_status=ti.status,
+                    requested_status=error_state,
+                )
+            else:
+                logger.warning(
+                    "Invalid error transition, not creating error log",
+                    task_instance_id=ti.id,
+                    current_status=ti.status,
+                    requested_status=error_state,
+                    error=result["error"],
+                )
             resp = JSONResponse(
-                content={"message": "Error logged with warnings"},
+                content={
+                    "message": f"Invalid transition from {ti.status} to {error_state}"
+                },
                 status_code=StatusCodes.OK,
             )
             return resp
 
-    # If all retries failed
-    logger.error(
-        f"Failed to log error for task_instance {ti.id} after {max_retries} attempts"
-    )
-    session.rollback()
-    resp = JSONResponse(
-        content={"message": "Error logged with warnings after retry failure"},
-        status_code=StatusCodes.OK,
-    )
-
-    return resp
+    except Exception as e:
+        # Always complete the request successfully to avoid infinite retries
+        logger.error(f"Failed to log error for task_instance {ti.id}: {e}")
+        session.rollback()
+        resp = JSONResponse(
+            content={"message": "Error logged with warnings"},
+            status_code=StatusCodes.OK,
+        )
+        return resp

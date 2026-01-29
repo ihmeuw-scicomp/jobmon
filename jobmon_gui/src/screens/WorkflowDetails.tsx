@@ -24,6 +24,7 @@ import {
 } from '@jobmon_gui/components/common/AppBreadcrumbs';
 import TabPanel from '@jobmon_gui/components/common/TabPanel';
 import WorkflowDAG from '@jobmon_gui/components/workflow_details/WorkflowDAG.tsx';
+import TaskConcurrencyTab from '@jobmon_gui/components/workflow_details/TaskConcurrencyTab.tsx';
 import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilterPersistence';
 
 // Color constant matching the fatal status color from CSS
@@ -130,7 +131,8 @@ function WorkflowDetails() {
                     aria-label="Tab selection"
                 >
                     <Tab label="Task Templates" value={0} />
-                    <Tab label="DAG Viz" value={1} />
+                    <Tab label="Concurrency" value={1} />
+                    <Tab label="DAG Viz" value={2} />
                 </Tabs>
             </Box>
 
@@ -166,7 +168,8 @@ function WorkflowDetails() {
                                                     taskTemplate.task_template_version_id,
                                                     workflowId,
                                                 ],
-                                                queryFn: getWorkflowUsageQueryFn,
+                                                queryFn:
+                                                    getWorkflowUsageQueryFn,
                                             });
                                             void queryClient.prefetchQuery({
                                                 queryKey: [
@@ -184,7 +187,8 @@ function WorkflowDetails() {
                                                     workflowId,
                                                     taskTemplate.name,
                                                 ],
-                                                queryFn: getWorkflowTasksQueryFn,
+                                                queryFn:
+                                                    getWorkflowTasksQueryFn,
                                             });
                                         }}
                                         onClick={() => {
@@ -200,15 +204,17 @@ function WorkflowDetails() {
                                             );
                                         }}
                                     >
-                                        <Box 
-                                            className="div_floatleft" 
+                                        <Box
+                                            className="div_floatleft"
                                             sx={taskTemplateNameContainerStyles}
                                         >
                                             <Typography className="tt-name">
                                                 {taskTemplate.name}
                                             </Typography>
                                             {taskTemplate.FATAL > 0 && (
-                                                <CloseIcon sx={fatalIconStyles} />
+                                                <CloseIcon
+                                                    sx={fatalIconStyles}
+                                                />
                                             )}
                                         </Box>
                                         <Box className="div_floatright">
@@ -226,6 +232,9 @@ function WorkflowDetails() {
                 </Box>
             </TabPanel>
             <TabPanel index={tt_active_tab} value={1}>
+                <TaskConcurrencyTab workflowId={workflowId} />
+            </TabPanel>
+            <TabPanel index={tt_active_tab} value={2}>
                 <WorkflowDAG workflowId={workflowId} />
             </TabPanel>
         </Box>

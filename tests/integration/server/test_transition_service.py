@@ -316,6 +316,7 @@ class TestTransitionTaskInstance:
             session=dbsession,
             task_instance_id=ti.id,
             task_id=task.id,
+            current_ti_status=TaskInstanceStatus.LAUNCHED,
             new_ti_status=TaskInstanceStatus.RUNNING,
             task_num_attempts=task.num_attempts,
             task_max_attempts=task.max_attempts,
@@ -400,6 +401,7 @@ class TestTransitionTaskInstance:
             session=dbsession,
             task_instance_id=ti.id,
             task_id=task.id,
+            current_ti_status=TaskInstanceStatus.RUNNING,
             new_ti_status=TaskInstanceStatus.ERROR,
             task_num_attempts=task.num_attempts,  # 1
             task_max_attempts=task.max_attempts,  # 3
@@ -468,6 +470,7 @@ class TestTransitionTaskInstance:
             session=dbsession,
             task_instance_id=ti.id,
             task_id=task.id,
+            current_ti_status=TaskInstanceStatus.RUNNING,
             new_ti_status=TaskInstanceStatus.ERROR,
             task_num_attempts=3,  # At max
             task_max_attempts=3,
@@ -619,3 +622,698 @@ class TestFSMValidTransitions:
         """DONE and ERROR_FATAL should be terminal."""
         assert TaskFSM.is_terminal(TaskStatus.DONE)
         assert TaskFSM.is_terminal(TaskStatus.ERROR_FATAL)
+
+
+class TestAuditExitedAt:
+    """Test that exited_at is properly set when tasks transition between statuses."""
+
+    def test_exited_at_set_on_subsequent_transition(
+        self, dbsession: Session, workflow_with_tasks
+    ):
+        """When a task transitions, previous audit record's exited_at should be set."""
+        tasks = workflow_with_tasks["tasks"]
+        task = tasks[0]
+
+        # First transition: REGISTERING -> QUEUED
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.QUEUED,
+            increment_attempts=True,
+        )
+
+        # Get the first audit record
+        first_audit = (
+            dbsession.execute(
+                select(TaskStatusAudit)
+                .where(TaskStatusAudit.task_id == task.id)
+                .where(TaskStatusAudit.new_status == TaskStatus.QUEUED)
+            )
+            .scalars()
+            .one()
+        )
+        # After first transition, exited_at should be NULL
+        assert first_audit.exited_at is None
+
+        # Second transition: QUEUED -> INSTANTIATING
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.INSTANTIATING,
+        )
+
+        # Refresh the first audit record
+        dbsession.refresh(first_audit)
+
+        # Now exited_at should be set
+        assert first_audit.exited_at is not None
+
+        # Get the second audit record
+        second_audit = (
+            dbsession.execute(
+                select(TaskStatusAudit)
+                .where(TaskStatusAudit.task_id == task.id)
+                .where(TaskStatusAudit.new_status == TaskStatus.INSTANTIATING)
+            )
+            .scalars()
+            .one()
+        )
+
+        # Second record should have exited_at as NULL
+        assert second_audit.exited_at is None
+
+    def test_exited_at_set_for_terminal_transition(
+        self, dbsession: Session, workflow_with_tasks
+    ):
+        """When task reaches terminal state (DONE), previous record's exited_at is set."""
+        tasks = workflow_with_tasks["tasks"]
+        workflow_run = workflow_with_tasks["workflow_run"]
+        array = workflow_with_tasks["array"]
+        task_resources = workflow_with_tasks["task_resources"]
+        task = tasks[0]
+
+        # Walk through the state machine to RUNNING
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.QUEUED,
+            increment_attempts=True,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.INSTANTIATING,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.LAUNCHED,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.RUNNING,
+        )
+
+        # Get the RUNNING audit record
+        running_audit = (
+            dbsession.execute(
+                select(TaskStatusAudit)
+                .where(TaskStatusAudit.task_id == task.id)
+                .where(TaskStatusAudit.new_status == TaskStatus.RUNNING)
+            )
+            .scalars()
+            .one()
+        )
+        assert running_audit.exited_at is None
+
+        # Create TI for DONE transition
+        ti = TaskInstance(
+            task_id=task.id,
+            workflow_run_id=workflow_run.id,
+            array_id=array.id,
+            task_resources_id=task_resources.id,
+            array_batch_num=1,
+            array_step_id=0,
+            status=TaskInstanceStatus.RUNNING,
+        )
+        dbsession.add(ti)
+        dbsession.flush()
+
+        # Transition to DONE
+        TransitionService.transition_task_instance(
+            session=dbsession,
+            task_instance_id=ti.id,
+            task_id=task.id,
+            current_ti_status=TaskInstanceStatus.RUNNING,
+            new_ti_status=TaskInstanceStatus.DONE,
+            task_num_attempts=task.num_attempts,
+            task_max_attempts=task.max_attempts,
+        )
+
+        # RUNNING audit record should now have exited_at set
+        dbsession.refresh(running_audit)
+        assert running_audit.exited_at is not None
+
+        # DONE audit record should have exited_at as NULL (terminal state)
+        done_audit = (
+            dbsession.execute(
+                select(TaskStatusAudit)
+                .where(TaskStatusAudit.task_id == task.id)
+                .where(TaskStatusAudit.new_status == TaskStatus.DONE)
+            )
+            .scalars()
+            .one()
+        )
+        assert done_audit.exited_at is None
+
+    def test_bulk_audit_exited_at(self, dbsession: Session, workflow_with_tasks):
+        """Bulk transitions should properly close previous audit records."""
+        tasks = workflow_with_tasks["tasks"]
+        task_ids = [t.id for t in tasks]
+
+        # First bulk transition: REGISTERING -> QUEUED
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=task_ids,
+            to_status=TaskStatus.QUEUED,
+            increment_attempts=True,
+            use_skip_locked=True,
+        )
+
+        # All QUEUED records should have exited_at as NULL
+        queued_audits = (
+            dbsession.execute(
+                select(TaskStatusAudit).where(
+                    TaskStatusAudit.task_id.in_(task_ids),
+                    TaskStatusAudit.new_status == TaskStatus.QUEUED,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(queued_audits) == 5
+        for audit in queued_audits:
+            assert audit.exited_at is None
+
+        # Second bulk transition: QUEUED -> INSTANTIATING
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=task_ids,
+            to_status=TaskStatus.INSTANTIATING,
+            use_skip_locked=True,
+        )
+
+        # Refresh and check QUEUED records now have exited_at set
+        for audit in queued_audits:
+            dbsession.refresh(audit)
+            assert audit.exited_at is not None
+
+        # INSTANTIATING records should have exited_at as NULL
+        instantiating_audits = (
+            dbsession.execute(
+                select(TaskStatusAudit).where(
+                    TaskStatusAudit.task_id.in_(task_ids),
+                    TaskStatusAudit.new_status == TaskStatus.INSTANTIATING,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(instantiating_audits) == 5
+        for audit in instantiating_audits:
+            assert audit.exited_at is None
+
+    def test_create_audit_record_method(self, dbsession: Session, workflow_with_tasks):
+        """Test the create_audit_record method directly."""
+        workflow = workflow_with_tasks["workflow"]
+        tasks = workflow_with_tasks["tasks"]
+        task = tasks[0]
+
+        # Create initial record
+        TransitionService.create_audit_record(
+            session=dbsession,
+            task_id=task.id,
+            workflow_id=workflow.id,
+            previous_status=None,
+            new_status=TaskStatus.QUEUED,
+        )
+
+        # Get the record
+        audit1 = (
+            dbsession.execute(
+                select(TaskStatusAudit)
+                .where(TaskStatusAudit.task_id == task.id)
+                .where(TaskStatusAudit.new_status == TaskStatus.QUEUED)
+            )
+            .scalars()
+            .one()
+        )
+        assert audit1.exited_at is None
+
+        # Create second record
+        TransitionService.create_audit_record(
+            session=dbsession,
+            task_id=task.id,
+            workflow_id=workflow.id,
+            previous_status=TaskStatus.QUEUED,
+            new_status=TaskStatus.INSTANTIATING,
+        )
+
+        # First record should now have exited_at set
+        dbsession.refresh(audit1)
+        assert audit1.exited_at is not None
+
+    def test_create_audit_records_bulk_method(
+        self, dbsession: Session, workflow_with_tasks
+    ):
+        """Test the create_audit_records_bulk method directly."""
+        workflow = workflow_with_tasks["workflow"]
+        tasks = workflow_with_tasks["tasks"]
+        task_ids = [t.id for t in tasks]
+
+        # Create initial records
+        records1 = [
+            {
+                "task_id": tid,
+                "workflow_id": workflow.id,
+                "previous_status": None,
+                "new_status": TaskStatus.QUEUED,
+            }
+            for tid in task_ids
+        ]
+        TransitionService.create_audit_records_bulk(session=dbsession, records=records1)
+
+        # All should have exited_at as NULL
+        audits1 = (
+            dbsession.execute(
+                select(TaskStatusAudit).where(
+                    TaskStatusAudit.task_id.in_(task_ids),
+                    TaskStatusAudit.new_status == TaskStatus.QUEUED,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        assert len(audits1) == 5
+        for audit in audits1:
+            assert audit.exited_at is None
+
+        # Create second batch of records
+        records2 = [
+            {
+                "task_id": tid,
+                "workflow_id": workflow.id,
+                "previous_status": TaskStatus.QUEUED,
+                "new_status": TaskStatus.INSTANTIATING,
+            }
+            for tid in task_ids
+        ]
+        TransitionService.create_audit_records_bulk(session=dbsession, records=records2)
+
+        # First records should now have exited_at set
+        for audit in audits1:
+            dbsession.refresh(audit)
+            assert audit.exited_at is not None
+
+    def test_empty_bulk_records(self, dbsession: Session, workflow_with_tasks):
+        """Empty records list should not cause errors."""
+        # Should not raise
+        TransitionService.create_audit_records_bulk(session=dbsession, records=[])
+
+
+class TestTIValidation:
+    """Test TaskInstance transition validation in TransitionService."""
+
+    def test_untimely_transition_rejected(
+        self, dbsession: Session, workflow_with_tasks
+    ):
+        """Untimely transitions should return error without updating."""
+        tasks = workflow_with_tasks["tasks"]
+        workflow_run = workflow_with_tasks["workflow_run"]
+        array = workflow_with_tasks["array"]
+        task_resources = workflow_with_tasks["task_resources"]
+        task = tasks[0]
+
+        # Set up task and TI in RUNNING state
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.QUEUED,
+            increment_attempts=True,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.INSTANTIATING,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.LAUNCHED,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.RUNNING,
+        )
+
+        # Create a TaskInstance in RUNNING
+        ti = TaskInstance(
+            task_id=task.id,
+            workflow_run_id=workflow_run.id,
+            array_id=array.id,
+            task_resources_id=task_resources.id,
+            array_batch_num=1,
+            array_step_id=0,
+            status=TaskInstanceStatus.RUNNING,
+        )
+        dbsession.add(ti)
+        dbsession.flush()
+
+        # Try untimely transition: RUNNING -> LAUNCHED (race condition)
+        result = TransitionService.transition_task_instance(
+            session=dbsession,
+            task_instance_id=ti.id,
+            task_id=task.id,
+            current_ti_status=TaskInstanceStatus.RUNNING,
+            new_ti_status=TaskInstanceStatus.LAUNCHED,
+            task_num_attempts=task.num_attempts,
+            task_max_attempts=task.max_attempts,
+        )
+
+        assert result["ti_updated"] is False
+        assert result["error"] == "untimely_transition"
+        assert result["orphaned"] is False
+
+        # TI should not be updated
+        dbsession.refresh(ti)
+        assert ti.status == TaskInstanceStatus.RUNNING
+
+    def test_invalid_transition_rejected(self, dbsession: Session, workflow_with_tasks):
+        """Invalid TI transitions should return error without updating."""
+        tasks = workflow_with_tasks["tasks"]
+        workflow_run = workflow_with_tasks["workflow_run"]
+        array = workflow_with_tasks["array"]
+        task_resources = workflow_with_tasks["task_resources"]
+        task = tasks[0]
+
+        # Set up task and TI in QUEUED state
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.QUEUED,
+            increment_attempts=True,
+        )
+
+        # Create a TaskInstance in QUEUED
+        ti = TaskInstance(
+            task_id=task.id,
+            workflow_run_id=workflow_run.id,
+            array_id=array.id,
+            task_resources_id=task_resources.id,
+            array_batch_num=1,
+            array_step_id=0,
+            status=TaskInstanceStatus.QUEUED,
+        )
+        dbsession.add(ti)
+        dbsession.flush()
+
+        # Try invalid transition: QUEUED -> DONE (skipping many states)
+        result = TransitionService.transition_task_instance(
+            session=dbsession,
+            task_instance_id=ti.id,
+            task_id=task.id,
+            current_ti_status=TaskInstanceStatus.QUEUED,
+            new_ti_status=TaskInstanceStatus.DONE,
+            task_num_attempts=task.num_attempts,
+            task_max_attempts=task.max_attempts,
+        )
+
+        assert result["ti_updated"] is False
+        assert result["error"] == "invalid_ti_transition"
+        assert result["orphaned"] is False
+
+        # TI should not be updated
+        dbsession.refresh(ti)
+        assert ti.status == TaskInstanceStatus.QUEUED
+
+    def test_error_error_untimely_rejected(
+        self, dbsession: Session, workflow_with_tasks
+    ):
+        """ERROR -> ERROR should be rejected as untimely (race condition)."""
+        tasks = workflow_with_tasks["tasks"]
+        workflow_run = workflow_with_tasks["workflow_run"]
+        array = workflow_with_tasks["array"]
+        task_resources = workflow_with_tasks["task_resources"]
+        task = tasks[0]
+
+        # Set up task in RUNNING
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.QUEUED,
+            increment_attempts=True,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.INSTANTIATING,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.LAUNCHED,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.RUNNING,
+        )
+
+        # Create a TaskInstance already in ERROR
+        ti = TaskInstance(
+            task_id=task.id,
+            workflow_run_id=workflow_run.id,
+            array_id=array.id,
+            task_resources_id=task_resources.id,
+            array_batch_num=1,
+            array_step_id=0,
+            status=TaskInstanceStatus.ERROR,
+        )
+        dbsession.add(ti)
+        dbsession.flush()
+
+        # Try ERROR -> ERROR (both worker node and distributor)
+        result = TransitionService.transition_task_instance(
+            session=dbsession,
+            task_instance_id=ti.id,
+            task_id=task.id,
+            current_ti_status=TaskInstanceStatus.ERROR,
+            new_ti_status=TaskInstanceStatus.ERROR,
+            task_num_attempts=task.num_attempts,
+            task_max_attempts=task.max_attempts,
+        )
+
+        assert result["ti_updated"] is False
+        assert result["error"] == "untimely_transition"
+
+
+class TestOrphanedTIHandling:
+    """Test orphaned TaskInstance handling when Task is terminal."""
+
+    def test_task_done_ti_error_becomes_error_fatal(
+        self, dbsession: Session, workflow_with_tasks
+    ):
+        """When Task is DONE and TI errors, TI should become ERROR_FATAL."""
+        tasks = workflow_with_tasks["tasks"]
+        workflow_run = workflow_with_tasks["workflow_run"]
+        array = workflow_with_tasks["array"]
+        task_resources = workflow_with_tasks["task_resources"]
+        task = tasks[0]
+
+        # Set up task to DONE (another TI succeeded)
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.QUEUED,
+            increment_attempts=True,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.INSTANTIATING,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.LAUNCHED,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.RUNNING,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.DONE,
+        )
+
+        # Create an orphaned TaskInstance still in RUNNING
+        ti = TaskInstance(
+            task_id=task.id,
+            workflow_run_id=workflow_run.id,
+            array_id=array.id,
+            task_resources_id=task_resources.id,
+            array_batch_num=1,
+            array_step_id=0,
+            status=TaskInstanceStatus.RUNNING,
+        )
+        dbsession.add(ti)
+        dbsession.flush()
+
+        # TI tries to transition to ERROR (but Task is DONE)
+        result = TransitionService.transition_task_instance(
+            session=dbsession,
+            task_instance_id=ti.id,
+            task_id=task.id,
+            current_ti_status=TaskInstanceStatus.RUNNING,
+            new_ti_status=TaskInstanceStatus.ERROR,
+            task_num_attempts=task.num_attempts,
+            task_max_attempts=task.max_attempts,
+        )
+
+        # TI should be updated to ERROR_FATAL, Task stays DONE
+        assert result["ti_updated"] is True
+        assert result["orphaned"] is True
+        assert result["task_transitioned"] is False
+        assert result["task_status"] == TaskStatus.DONE
+
+        dbsession.refresh(ti)
+        assert ti.status == TaskInstanceStatus.ERROR_FATAL
+
+        dbsession.refresh(task)
+        assert task.status == TaskStatus.DONE
+
+    def test_task_error_fatal_ti_error_becomes_error_fatal(
+        self, dbsession: Session, workflow_with_tasks
+    ):
+        """When Task is ERROR_FATAL and TI errors, TI should become ERROR_FATAL."""
+        tasks = workflow_with_tasks["tasks"]
+        workflow_run = workflow_with_tasks["workflow_run"]
+        array = workflow_with_tasks["array"]
+        task_resources = workflow_with_tasks["task_resources"]
+        task = tasks[0]
+
+        # Set up task to ERROR_FATAL (max attempts exceeded)
+        task.num_attempts = 3
+        dbsession.flush()
+
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.QUEUED,
+            increment_attempts=False,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.INSTANTIATING,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.LAUNCHED,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.ERROR_FATAL,
+        )
+
+        # Create an orphaned TaskInstance still in LAUNCHED
+        ti = TaskInstance(
+            task_id=task.id,
+            workflow_run_id=workflow_run.id,
+            array_id=array.id,
+            task_resources_id=task_resources.id,
+            array_batch_num=1,
+            array_step_id=0,
+            status=TaskInstanceStatus.LAUNCHED,
+        )
+        dbsession.add(ti)
+        dbsession.flush()
+
+        # TI tries to transition to NO_HEARTBEAT (but Task is ERROR_FATAL)
+        result = TransitionService.transition_task_instance(
+            session=dbsession,
+            task_instance_id=ti.id,
+            task_id=task.id,
+            current_ti_status=TaskInstanceStatus.LAUNCHED,
+            new_ti_status=TaskInstanceStatus.NO_HEARTBEAT,
+            task_num_attempts=task.num_attempts,
+            task_max_attempts=task.max_attempts,
+        )
+
+        # TI should be updated to ERROR_FATAL, Task stays ERROR_FATAL
+        assert result["ti_updated"] is True
+        assert result["orphaned"] is True
+        assert result["task_transitioned"] is False
+        assert result["task_status"] == TaskStatus.ERROR_FATAL
+
+        dbsession.refresh(ti)
+        assert ti.status == TaskInstanceStatus.ERROR_FATAL
+
+        dbsession.refresh(task)
+        assert task.status == TaskStatus.ERROR_FATAL
+
+    def test_task_done_ti_done_not_orphaned(
+        self, dbsession: Session, workflow_with_tasks
+    ):
+        """When Task is DONE and TI transitions to DONE, not treated as orphaned."""
+        tasks = workflow_with_tasks["tasks"]
+        workflow_run = workflow_with_tasks["workflow_run"]
+        array = workflow_with_tasks["array"]
+        task_resources = workflow_with_tasks["task_resources"]
+        task = tasks[0]
+
+        # Set up task to DONE
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.QUEUED,
+            increment_attempts=True,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.INSTANTIATING,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.LAUNCHED,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.RUNNING,
+        )
+        TransitionService.transition_tasks(
+            session=dbsession,
+            task_ids=[task.id],
+            to_status=TaskStatus.DONE,
+        )
+
+        # Create a TaskInstance in RUNNING
+        ti = TaskInstance(
+            task_id=task.id,
+            workflow_run_id=workflow_run.id,
+            array_id=array.id,
+            task_resources_id=task_resources.id,
+            array_batch_num=1,
+            array_step_id=0,
+            status=TaskInstanceStatus.RUNNING,
+        )
+        dbsession.add(ti)
+        dbsession.flush()
+
+        # TI transitions to DONE (not an error, so not orphaned handling)
+        result = TransitionService.transition_task_instance(
+            session=dbsession,
+            task_instance_id=ti.id,
+            task_id=task.id,
+            current_ti_status=TaskInstanceStatus.RUNNING,
+            new_ti_status=TaskInstanceStatus.DONE,
+            task_num_attempts=task.num_attempts,
+            task_max_attempts=task.max_attempts,
+        )
+
+        # TI should be updated to DONE, orphaned should be False
+        assert result["ti_updated"] is True
+        assert result["orphaned"] is False
+        assert result["task_transitioned"] is False  # Already DONE
+
+        dbsession.refresh(ti)
+        assert ti.status == TaskInstanceStatus.DONE

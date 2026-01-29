@@ -10,7 +10,6 @@ from jobmon.core.constants import WorkflowStatus as Statuses
 from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_status import TaskStatus
-from jobmon.server.web.models.task_status_audit import TaskStatusAudit
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.tool import Tool
@@ -30,6 +29,7 @@ from jobmon.server.web.schemas.workflow import (
     WorkflowUserValidationResponse,
     WorkflowValidationResponse,
 )
+from jobmon.server.web.services.transition_service import TransitionService
 
 logger = structlog.get_logger(__name__)
 
@@ -216,15 +216,19 @@ class WorkflowRepository:
             )
             self.session.execute(update_stmt)
 
-            # Create audit records for the reset
-            for task_id, prev_status in tasks_to_reset:
-                audit = TaskStatusAudit(
-                    task_id=task_id,
-                    workflow_id=workflow_id,
-                    previous_status=prev_status,
-                    new_status=TaskStatus.REGISTERING,
-                )
-                self.session.add(audit)
+            # Create audit records for the reset (properly closes previous records)
+            audit_records = [
+                {
+                    "task_id": task_id,
+                    "workflow_id": workflow_id,
+                    "previous_status": prev_status,
+                    "new_status": TaskStatus.REGISTERING,
+                }
+                for task_id, prev_status in tasks_to_reset
+            ]
+            TransitionService.create_audit_records_bulk(
+                session=self.session, records=audit_records
+            )
 
         self.session.commit()
 

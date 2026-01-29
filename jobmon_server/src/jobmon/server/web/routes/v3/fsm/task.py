@@ -30,6 +30,7 @@ from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
+from jobmon.server.web.services.transition_service import TransitionService
 
 logger = structlog.get_logger(__name__)
 
@@ -407,7 +408,6 @@ async def set_task_resume_state(
         # Note: REGISTERING doesn't have valid source statuses in FSM for all states,
         # so we need to do a direct update with audit records
         # This is a reset operation, not a normal FSM transition
-        from jobmon.server.web.models.task_status_audit import TaskStatusAudit
 
         # Get current statuses for audit records
         current_statuses = db.execute(
@@ -425,15 +425,17 @@ async def set_task_resume_state(
             )
         )
 
-        # Create audit records for the reset
-        for task_id, prev_status, wf_id in current_statuses:
-            audit = TaskStatusAudit(
-                task_id=task_id,
-                workflow_id=wf_id,
-                previous_status=prev_status,
-                new_status=TaskStatus.REGISTERING,
-            )
-            db.add(audit)
+        # Create audit records for the reset (properly closes previous records)
+        audit_records = [
+            {
+                "task_id": task_id,
+                "workflow_id": wf_id,
+                "previous_status": prev_status,
+                "new_status": TaskStatus.REGISTERING,
+            }
+            for task_id, prev_status, wf_id in current_statuses
+        ]
+        TransitionService.create_audit_records_bulk(session=db, records=audit_records)
 
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp

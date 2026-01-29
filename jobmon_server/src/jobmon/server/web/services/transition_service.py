@@ -1,7 +1,7 @@
 """Unified transition service with TI-centric architecture and audit logging."""
 
 from time import sleep
-from typing import Any, Dict, List, Optional, Set, Type
+from typing import Any, Dict, List, Optional, Set, Tuple, Type
 
 import structlog
 from sqlalchemy import insert, select, update
@@ -9,7 +9,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
-from jobmon.core.constants import TaskStatus
+from jobmon.core.constants import TaskInstanceStatus, TaskStatus
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_status_audit import TaskStatusAudit
@@ -41,12 +41,167 @@ class TransitionService:
     DEFAULT_MAX_RETRIES = 5
     DEFAULT_BASE_DELAY_MS = 2  # Exponential backoff: 2ms, 4ms, 8ms, 16ms, 32ms
 
+    # TaskInstance valid transitions (mirrors TaskInstance.valid_transitions)
+    TI_VALID_TRANSITIONS: Set[Tuple[str, str]] = {
+        (TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED),
+        (TaskInstanceStatus.QUEUED, TaskInstanceStatus.KILL_SELF),
+        (TaskInstanceStatus.INSTANTIATED, TaskInstanceStatus.LAUNCHED),
+        (TaskInstanceStatus.INSTANTIATED, TaskInstanceStatus.NO_DISTRIBUTOR_ID),
+        (TaskInstanceStatus.INSTANTIATED, TaskInstanceStatus.KILL_SELF),
+        (TaskInstanceStatus.INSTANTIATED, TaskInstanceStatus.RUNNING),
+        (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.RUNNING),
+        (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.UNKNOWN_ERROR),
+        (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.NO_HEARTBEAT),
+        (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.RESOURCE_ERROR),
+        (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.KILL_SELF),
+        (TaskInstanceStatus.LAUNCHED, TaskInstanceStatus.ERROR_FATAL),
+        (TaskInstanceStatus.RUNNING, TaskInstanceStatus.TRIAGING),
+        (TaskInstanceStatus.RUNNING, TaskInstanceStatus.ERROR),
+        (TaskInstanceStatus.RUNNING, TaskInstanceStatus.UNKNOWN_ERROR),
+        (TaskInstanceStatus.RUNNING, TaskInstanceStatus.RESOURCE_ERROR),
+        (TaskInstanceStatus.RUNNING, TaskInstanceStatus.KILL_SELF),
+        (TaskInstanceStatus.RUNNING, TaskInstanceStatus.DONE),
+        (TaskInstanceStatus.TRIAGING, TaskInstanceStatus.RUNNING),
+        (TaskInstanceStatus.TRIAGING, TaskInstanceStatus.RESOURCE_ERROR),
+        (TaskInstanceStatus.TRIAGING, TaskInstanceStatus.UNKNOWN_ERROR),
+        (TaskInstanceStatus.TRIAGING, TaskInstanceStatus.ERROR_FATAL),
+        (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.ERROR_FATAL),
+        (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.DONE),
+        (TaskInstanceStatus.NO_HEARTBEAT, TaskInstanceStatus.ERROR),
+    }
+
+    # TaskInstance untimely transitions (race conditions to ignore gracefully)
+    TI_UNTIMELY_TRANSITIONS: Set[Tuple[str, str]] = {
+        (TaskInstanceStatus.RUNNING, TaskInstanceStatus.LAUNCHED),
+        (TaskInstanceStatus.ERROR, TaskInstanceStatus.LAUNCHED),
+        (TaskInstanceStatus.ERROR, TaskInstanceStatus.UNKNOWN_ERROR),
+        (TaskInstanceStatus.ERROR, TaskInstanceStatus.ERROR),
+        (TaskInstanceStatus.UNKNOWN_ERROR, TaskInstanceStatus.DONE),
+        (TaskInstanceStatus.UNKNOWN_ERROR, TaskInstanceStatus.ERROR),
+        (TaskInstanceStatus.UNKNOWN_ERROR, TaskInstanceStatus.RESOURCE_ERROR),
+        (TaskInstanceStatus.RESOURCE_ERROR, TaskInstanceStatus.UNKNOWN_ERROR),
+        (TaskInstanceStatus.DONE, TaskInstanceStatus.UNKNOWN_ERROR),
+        (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.ERROR),
+        (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.RESOURCE_ERROR),
+        (TaskInstanceStatus.KILL_SELF, TaskInstanceStatus.UNKNOWN_ERROR),
+    }
+
+    # TaskInstance error states (including NO_HEARTBEAT for orphaned TI handling)
+    TI_ERROR_STATES: Set[str] = {
+        TaskInstanceStatus.NO_DISTRIBUTOR_ID,
+        TaskInstanceStatus.ERROR,
+        TaskInstanceStatus.UNKNOWN_ERROR,
+        TaskInstanceStatus.RESOURCE_ERROR,
+        TaskInstanceStatus.NO_HEARTBEAT,
+    }
+
+    # Task terminal states
+    TASK_TERMINAL_STATES: Set[str] = {TaskStatus.DONE, TaskStatus.ERROR_FATAL}
+
+    # Lock error messages to detect
+    LOCK_ERROR_MESSAGES = [
+        "could not obtain lock",
+        "nowait",
+        "lock wait timeout",
+        "deadlock",
+        "database is locked",
+    ]
+
+    @classmethod
+    def _is_lock_error(cls: Type["TransitionService"], error: Exception) -> bool:
+        """Check if an OperationalError is a lock-related error."""
+        error_str = str(error).lower()
+        return any(msg in error_str for msg in cls.LOCK_ERROR_MESSAGES)
+
+    @classmethod
+    def _calculate_backoff_delay(cls: Type["TransitionService"], attempt: int) -> float:
+        """Calculate exponential backoff delay in seconds."""
+        return cls.DEFAULT_BASE_DELAY_MS * (2 ** (attempt + 1)) / 1000
+
+    @classmethod
+    def create_audit_record(
+        cls: Type["TransitionService"],
+        session: Session,
+        task_id: int,
+        workflow_id: int,
+        previous_status: str,
+        new_status: str,
+    ) -> None:
+        """Create audit record with proper exited_at handling.
+
+        1. Closes any open audit record for this task (sets exited_at = func.now())
+        2. Creates new audit record (entered_at uses model default = func.now())
+
+        Uses database func.now() for timestamps to ensure server-time consistency.
+
+        Args:
+            session: Database session
+            task_id: The task ID being transitioned
+            workflow_id: The workflow ID the task belongs to
+            previous_status: The status the task is transitioning from
+            new_status: The status the task is transitioning to
+        """
+        # Close previous open record
+        session.execute(
+            update(TaskStatusAudit)
+            .where(
+                TaskStatusAudit.task_id == task_id,
+                TaskStatusAudit.exited_at.is_(None),
+            )
+            .values(exited_at=func.now())
+            .execution_options(synchronize_session=False)
+        )
+
+        # Create new record (entered_at uses model default)
+        session.execute(
+            insert(TaskStatusAudit).values(
+                task_id=task_id,
+                workflow_id=workflow_id,
+                previous_status=previous_status,
+                new_status=new_status,
+            )
+        )
+
+    @classmethod
+    def create_audit_records_bulk(
+        cls: Type["TransitionService"],
+        session: Session,
+        records: List[Dict],
+    ) -> None:
+        """Bulk create audit records with proper exited_at handling.
+
+        Uses database func.now() for timestamps.
+
+        Args:
+            session: Database session
+            records: List of dicts with task_id, workflow_id, previous_status, new_status
+        """
+        if not records:
+            return
+
+        task_ids = [r["task_id"] for r in records]
+
+        # Bulk close previous open records
+        session.execute(
+            update(TaskStatusAudit)
+            .where(
+                TaskStatusAudit.task_id.in_(task_ids),
+                TaskStatusAudit.exited_at.is_(None),
+            )
+            .values(exited_at=func.now())
+            .execution_options(synchronize_session=False)
+        )
+
+        # Bulk insert new records (entered_at uses model default)
+        session.execute(insert(TaskStatusAudit).values(records))
+
     @classmethod
     def transition_task_instance(
         cls: Type["TransitionService"],
         session: Session,
         task_instance_id: int,
         task_id: int,
+        current_ti_status: str,
         new_ti_status: str,
         task_num_attempts: int,
         task_max_attempts: int,
@@ -55,11 +210,13 @@ class TransitionService:
     ) -> Dict[str, Any]:
         """Worker-triggered: TI transition cascades to Task.
 
-        1. Lock TI (NOWAIT) -> Lock Task (NOWAIT)
-        2. Update TI status
-        3. Compute implied Task status (via TaskFSM.get_task_status_for_ti)
-        4. Validate Task FSM gate
-        5. Update Task -> Audit Task
+        1. Validate TI transition (untimely, valid_transitions)
+        2. Lock TI (NOWAIT) -> Lock Task (NOWAIT)
+        3. Update TI status
+        4. Compute implied Task status (via TaskFSM.get_task_status_for_ti)
+        5. Handle orphaned TI (Task terminal → TI goes to ERROR_FATAL)
+        6. Validate Task FSM gate
+        7. Update Task -> Audit Task
 
         Preserves TI-first locking order for atomicity.
         Has internal retries with rollback.
@@ -68,6 +225,7 @@ class TransitionService:
             session: Database session (caller must commit on success)
             task_instance_id: TaskInstance ID to transition
             task_id: Task ID associated with the TaskInstance
+            current_ti_status: Current TaskInstance status (for validation)
             new_ti_status: New TaskInstance status
             task_num_attempts: Current task num_attempts
             task_max_attempts: Task max_attempts
@@ -79,9 +237,45 @@ class TransitionService:
                 "ti_updated": bool,
                 "task_transitioned": bool,
                 "task_status": str or None,
-                "error": str or None
+                "error": str or None,  # "untimely_transition", "invalid_ti_transition", None
+                "orphaned": bool,      # True if Task was terminal
             }
         """
+        # Validate TI transition before any locking
+        transition_tuple = (current_ti_status, new_ti_status)
+
+        # Check for untimely transitions (race conditions)
+        if transition_tuple in cls.TI_UNTIMELY_TRANSITIONS:
+            logger.warning(
+                "Untimely TI transition rejected",
+                task_instance_id=task_instance_id,
+                current_ti_status=current_ti_status,
+                new_ti_status=new_ti_status,
+            )
+            return {
+                "ti_updated": False,
+                "task_transitioned": False,
+                "task_status": None,
+                "error": "untimely_transition",
+                "orphaned": False,
+            }
+
+        # Check for invalid TI transitions
+        if transition_tuple not in cls.TI_VALID_TRANSITIONS:
+            logger.warning(
+                "Invalid TI transition",
+                task_instance_id=task_instance_id,
+                current_ti_status=current_ti_status,
+                new_ti_status=new_ti_status,
+            )
+            return {
+                "ti_updated": False,
+                "task_transitioned": False,
+                "task_status": None,
+                "error": "invalid_ti_transition",
+                "orphaned": False,
+            }
+
         # Get final task status (skipping intermediate ERROR_RECOVERABLE)
         final_t_status = TaskFSM.get_task_status_for_ti(
             ti_status=new_ti_status,
@@ -103,19 +297,8 @@ class TransitionService:
             except OperationalError as e:
                 last_error = e
                 session.rollback()
-                error_str = str(e).lower()
-                is_lock_error = any(
-                    msg in error_str
-                    for msg in [
-                        "could not obtain lock",
-                        "nowait",
-                        "lock wait timeout",
-                        "deadlock",
-                        "database is locked",
-                    ]
-                )
-                if is_lock_error and attempt < max_retries - 1:
-                    delay = cls.DEFAULT_BASE_DELAY_MS * (2 ** (attempt + 1)) / 1000
+                if cls._is_lock_error(e) and attempt < max_retries - 1:
+                    delay = cls._calculate_backoff_delay(attempt)
                     logger.warning(
                         f"Lock contention on TI transition, "
                         f"retry {attempt + 1}/{max_retries}",
@@ -136,7 +319,8 @@ class TransitionService:
             "ti_updated": False,
             "task_transitioned": False,
             "task_status": None,
-            "error": "Max retries exceeded",
+            "error": "max_retries_exceeded",
+            "orphaned": False,
         }
 
     @classmethod
@@ -166,9 +350,29 @@ class TransitionService:
         )
         task_row = session.execute(task_lock_stmt).one()
 
-        # 3. Update TI status
+        # 3. Check for orphaned TI scenario (Task is terminal)
+        orphaned = False
+        actual_ti_status = new_ti_status
+        if task_row.status in cls.TASK_TERMINAL_STATES:
+            # Task is already DONE or ERROR_FATAL
+            # If TI is transitioning to an error state, force it to ERROR_FATAL
+            if (
+                new_ti_status in cls.TI_ERROR_STATES
+                or new_ti_status == TaskInstanceStatus.ERROR_FATAL
+            ):
+                logger.info(
+                    "Task already terminal, orphaned TI transitioning to ERROR_FATAL",
+                    task_instance_id=task_instance_id,
+                    task_id=task_id,
+                    current_task_status=task_row.status,
+                    original_ti_status=new_ti_status,
+                )
+                actual_ti_status = TaskInstanceStatus.ERROR_FATAL
+                orphaned = True
+
+        # 4. Update TI status
         ti_values: Dict[str, Any] = {
-            "status": new_ti_status,
+            "status": actual_ti_status,
             "status_date": func.now(),
         }
         if report_by_date is not None:
@@ -181,9 +385,9 @@ class TransitionService:
             .execution_options(synchronize_session=False)
         )
 
-        # 4. Update Task if transition needed
+        # 5. Update Task if transition needed (skip if orphaned)
         task_transitioned = False
-        if final_t_status and task_row.status != final_t_status:
+        if not orphaned and final_t_status and task_row.status != final_t_status:
             # Validate FSM gate
             if TaskFSM.is_valid_transition(task_row.status, final_t_status):
                 session.execute(
@@ -193,14 +397,13 @@ class TransitionService:
                     .execution_options(synchronize_session=False)
                 )
 
-                # 5. Audit Task transition
-                session.execute(
-                    insert(TaskStatusAudit).values(
-                        task_id=task_id,
-                        workflow_id=task_row.workflow_id,
-                        previous_status=task_row.status,
-                        new_status=final_t_status,
-                    )
+                # 6. Audit Task transition (closes previous record, creates new one)
+                cls.create_audit_record(
+                    session=session,
+                    task_id=task_id,
+                    workflow_id=task_row.workflow_id,
+                    previous_status=task_row.status,
+                    new_status=final_t_status,
                 )
                 task_transitioned = True
 
@@ -224,6 +427,7 @@ class TransitionService:
             "task_transitioned": task_transitioned,
             "task_status": final_t_status if task_transitioned else task_row.status,
             "error": None,
+            "orphaned": orphaned,
         }
 
     @classmethod
@@ -334,21 +538,8 @@ class TransitionService:
             except OperationalError as e:
                 last_error = e
                 session.rollback()
-                error_str = str(e).lower()
-                is_lock_error = any(
-                    msg in error_str
-                    for msg in [
-                        "could not obtain lock",
-                        "nowait",
-                        "lock wait timeout",
-                        "deadlock",
-                        "database is locked",
-                    ]
-                )
-                if is_lock_error and attempt < max_retries - 1:
-                    # Exponential backoff: 2ms, 4ms, 8ms, 16ms, 32ms
-                    # Matches pattern in task_instance.py:186
-                    delay = cls.DEFAULT_BASE_DELAY_MS * (2 ** (attempt + 1)) / 1000
+                if cls._is_lock_error(e) and attempt < max_retries - 1:
+                    delay = cls._calculate_backoff_delay(attempt)
                     logger.warning(
                         f"Lock contention on transition, retry {attempt + 1}/{max_retries}",
                         to_status=to_status,
@@ -447,7 +638,7 @@ class TransitionService:
             .execution_options(synchronize_session=False)
         )
 
-        # 5. Bulk audit insert
+        # 5. Bulk audit insert (closes previous records, creates new ones)
         audit_values = [
             {
                 "task_id": row.id,
@@ -457,7 +648,7 @@ class TransitionService:
             }
             for row in eligible
         ]
-        session.execute(insert(TaskStatusAudit).values(audit_values))
+        cls.create_audit_records_bulk(session=session, records=audit_values)
 
         logger.info(
             "Tasks transitioned",
