@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import ReactFlow, { MiniMap, Controls, Background } from 'reactflow';
 import dagre from 'dagre';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
 import {
     get_task_template_dag,
@@ -22,9 +23,11 @@ interface TaskTemplateDAGResponse {
 export default function WorkflowDAG(workflowId: {
     workflowId: string | number;
 }) {
+    const navigate = useNavigate();
     const [nodes, setNodes] = useState([]);
     const [edges, setEdges] = useState([]);
     const [selectedNode, setSelectedNode] = useState(null);
+    const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
     const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
     const popoverRef = useRef(null);
     const [tt_data, setTTData] = useState<TTStatusResponse[string] | undefined>(
@@ -140,6 +143,7 @@ export default function WorkflowDAG(workflowId: {
 
     const handleNodeHover = (event, node) => {
         setSelectedNode(node);
+        setHoveredNodeId(node.id);
         setPopoverPosition(node.position);
         setTTData(
             Object.values(wfTTStatus.data).find(item => item.name === node.id)
@@ -148,7 +152,36 @@ export default function WorkflowDAG(workflowId: {
 
     const handleNodeLeave = () => {
         setSelectedNode(null);
+        setHoveredNodeId(null);
     };
+
+    const handleNodeClick = (event, node) => {
+        // Find the task template data for the clicked node to get the ID
+        const taskTemplateData = Object.values(wfTTStatus.data || {}).find(
+            item => item.name === node.id
+        );
+        if (taskTemplateData) {
+            navigate(
+                `/workflow/${workflowId.workflowId}/task_template/${taskTemplateData.id}`
+            );
+        }
+    };
+
+    // Compute edges with highlighting based on hovered node
+    const styledEdges = useMemo(() => {
+        return edges.map(edge => {
+            const isConnected =
+                hoveredNodeId &&
+                (edge.source === hoveredNodeId || edge.target === hoveredNodeId);
+            return {
+                ...edge,
+                style: isConnected
+                    ? { stroke: '#2196f3', strokeWidth: 2 }
+                    : undefined,
+                animated: isConnected,
+            };
+        });
+    }, [edges, hoveredNodeId]);
 
     useEffect(() => {
         const handleClickOutside = event => {
@@ -174,9 +207,10 @@ export default function WorkflowDAG(workflowId: {
             ) : (
                 <ReactFlow
                     nodes={laidOutNodes}
-                    edges={edges}
+                    edges={styledEdges}
                     onNodeMouseEnter={handleNodeHover}
                     onNodeMouseLeave={handleNodeLeave}
+                    onNodeClick={handleNodeClick}
                 >
                     <MiniMap />
                     <Controls />

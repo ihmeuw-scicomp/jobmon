@@ -5,6 +5,10 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Workflow DAG Visualization Enhancements**: Improved DAG node interactions on the Workflow Details page:
+  - Clicking a DAG node (task template) now navigates to the corresponding task template details page
+  - Hovering over a node highlights all connected edges (incoming and outgoing) in blue for better visual clarity
+  - Existing hover behavior (status modal) is preserved
 - **CLI Refactor - Click Migration**: Complete migration from argparse to Click framework with hierarchical command structure:
   - New hierarchical commands: `jobmon workflow status/tasks/reset/resume/concurrency/logs`, `jobmon workflow resources usage/yaml`, `jobmon task status/update/dependencies`, `jobmon config show/set`
   - Server CLI reorganized: `jobmon-server db init/upgrade/terminate`, `jobmon-server reaper start`
