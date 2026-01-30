@@ -5,6 +5,11 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Workflow DAG Visualization Enhancements**: Improved DAG node interactions on the Workflow Details page:
+  - Clicking a DAG node (task template) now navigates to the corresponding task template details page
+  - Hovering over a node highlights all connected edges (incoming and outgoing) in blue for better visual clarity
+  - Existing hover behavior (status modal) is preserved
+  - Node size (width and height) now scales with the number of tasks in each task template for better visual proportion
 - **CLI Refactor - Click Migration**: Complete migration from argparse to Click framework with hierarchical command structure:
   - New hierarchical commands: `jobmon workflow status/tasks/reset/resume/concurrency/logs`, `jobmon workflow resources usage/yaml`, `jobmon task status/update/dependencies`, `jobmon config show/set`
   - Server CLI reorganized: `jobmon-server db init/upgrade/terminate`, `jobmon-server reaper start`
@@ -17,6 +22,7 @@ All notable changes to Jobmon will be documented in this file.
 - Refactored `status_commands.py` monolith into domain-focused modules: `commands/workflow.py`, `commands/task.py`, `commands/resources.py`, `commands/config.py`, `commands/validation.py`
 
 ### Fixed
+- **Workflow DAG (GUI)**: Task template names on the DAG viz no longer overflow node boundaries—nodes use variable width/height to fit the full name and scale with task count. Task template hover popover now appears correctly when the DAG is panned or scrolled (positioned from mouse coordinates).
 - **Workflow Resume Cleanup**: Fixed multiple critical issues with workflow resume and task instance state management:
   - Fixed NO_HEARTBEAT infinite loop when parent Task is already in terminal state (DONE/ERROR_FATAL). The `validate_transition()` function now allows orphaned task instances to transition to ERROR_FATAL instead of endlessly retrying invalid state transitions.
   - Fixed duplicate error log entries caused by HTTP retries. The `_log_error()` function now validates transitions before creating error logs and includes idempotency checks.
