@@ -1,5 +1,13 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import ReactFlow, { MiniMap, Controls, Background } from 'reactflow';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import ReactFlow, {
+    MiniMap,
+    Controls,
+    Background,
+    Handle,
+    Position,
+    Node,
+    Edge,
+} from 'reactflow';
 import dagre from 'dagre';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -10,8 +18,12 @@ import {
 } from '@jobmon_gui/configs/ApiUrls.ts';
 import TaskTemplatePopover from '@jobmon_gui/components/TaskTemplatePopover.tsx';
 import { useQuery } from '@tanstack/react-query';
-import { TTStatusResponse } from '@jobmon_gui/types/TaskTemplateStatus.ts';
+import { TTStatus, TTStatusResponse } from '@jobmon_gui/types/TaskTemplateStatus.ts';
 import { CircularProgress } from '@mui/material';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface TaskTemplateDAGResponse {
     tt_dag: {
@@ -20,154 +32,235 @@ interface TaskTemplateDAGResponse {
     }[];
 }
 
-export default function WorkflowDAG(workflowId: {
-    workflowId: string | number;
-}) {
-    const navigate = useNavigate();
-    const [nodes, setNodes] = useState([]);
-    const [edges, setEdges] = useState([]);
-    const [selectedNode, setSelectedNode] = useState(null);
-    const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-    const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
-    const popoverRef = useRef(null);
-    const [tt_data, setTTData] = useState<TTStatusResponse[string] | undefined>(
-        undefined
+interface DagNodeData {
+    label: string;
+    width: number;
+    height: number;
+}
+
+interface PopoverPosition {
+    x: number;
+    y: number;
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const NODE_DIMENSIONS = {
+    minWidth: 120,
+    minHeight: 36,
+    charWidthEstimate: 8,
+    horizontalPadding: 24,
+    taskCountWidthPerTask: 3,
+    taskCountWidthCap: 120,
+    taskCountHeightPerTask: 2,
+    taskCountHeightCap: 80,
+} as const;
+
+const DAGRE_LAYOUT = {
+    rankdir: 'TB' as const,
+    ranksep: 60,
+    nodesep: 50,
+    marginx: 20,
+    marginy: 20,
+};
+
+const POPOVER_OFFSET = 16;
+const POPOVER_Z_INDEX = 1000;
+
+const DAG_NODE_STYLE: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '8px 12px',
+    boxSizing: 'border-box',
+    background: '#fff',
+    border: '1px solid #b1b1b7',
+    borderRadius: 3,
+    wordBreak: 'break-word',
+    textAlign: 'center',
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getNodeDimensions(label: string, taskCount: number): { width: number; height: number } {
+    const {
+        minWidth,
+        minHeight,
+        charWidthEstimate,
+        horizontalPadding,
+        taskCountWidthPerTask,
+        taskCountWidthCap,
+        taskCountHeightPerTask,
+        taskCountHeightCap,
+    } = NODE_DIMENSIONS;
+
+    const baseWidth = Math.max(
+        minWidth,
+        (label?.length ?? 0) * charWidthEstimate + horizontalPadding
     );
+    const widthBonus = Math.min(taskCount * taskCountWidthPerTask, taskCountWidthCap);
+    const heightBonus = Math.min(taskCount * taskCountHeightPerTask, taskCountHeightCap);
+
+    return {
+        width: baseWidth + widthBonus,
+        height: minHeight + heightBonus,
+    };
+}
+
+function buildNodesAndEdges(ttDag: TaskTemplateDAGResponse['tt_dag']): {
+    nodes: Node<DagNodeData>[];
+    edges: Edge[];
+} {
+    const nodes: Node<DagNodeData>[] = [];
+    const edges: Edge[] = [];
+    const seenIds = new Set<string>();
+
+    ttDag.forEach((task, index) => {
+        const sourceId = task.name;
+        const targetId = task.downstream_task_template_id;
+
+        if (!seenIds.has(sourceId)) {
+            nodes.push({
+                id: sourceId,
+                type: 'dagNode',
+                data: { label: sourceId },
+                position: { x: 0, y: 0 },
+            });
+            seenIds.add(sourceId);
+        }
+        if (targetId && !seenIds.has(targetId)) {
+            nodes.push({
+                id: targetId,
+                type: 'dagNode',
+                data: { label: targetId },
+                position: { x: 0, y: 0 },
+            });
+            seenIds.add(targetId);
+        }
+        if (targetId) {
+            edges.push({ id: `e${index}`, source: sourceId, target: targetId });
+        }
+    });
+
+    return { nodes, edges };
+}
+
+function applyDagreLayout(
+    nodes: Node<DagNodeData>[],
+    edges: Edge[]
+): Node<DagNodeData>[] {
+    const graph = new dagre.graphlib.Graph();
+    graph.setGraph(DAGRE_LAYOUT);
+    graph.setDefaultEdgeLabel(() => ({}));
+
+    nodes.forEach(node => {
+        const w = node.data?.width ?? NODE_DIMENSIONS.minWidth;
+        const h = node.data?.height ?? NODE_DIMENSIONS.minHeight;
+        graph.setNode(node.id, { width: w, height: h });
+    });
+    edges.forEach(edge => {
+        graph.setEdge(edge.source, edge.target, { minlen: 1, weight: 1 });
+    });
+
+    dagre.layout(graph);
+
+    return nodes.map(node => {
+        const { x, y } = graph.node(node.id);
+        const w = node.data?.width ?? NODE_DIMENSIONS.minWidth;
+        const h = node.data?.height ?? NODE_DIMENSIONS.minHeight;
+        return {
+            ...node,
+            position: { x: x - w / 2, y: y - h / 2 },
+        };
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Custom node component
+// ---------------------------------------------------------------------------
+
+function DagNode({ data }: { data: DagNodeData }) {
+    const label = data.label ?? '';
+    const width = data.width ?? NODE_DIMENSIONS.minWidth;
+    const height = data.height ?? NODE_DIMENSIONS.minHeight;
+
+    return (
+        <>
+            <Handle type="target" position={Position.Top} />
+            <div style={{ width, minHeight: height, ...DAG_NODE_STYLE }}>
+                {label}
+            </div>
+            <Handle type="source" position={Position.Bottom} />
+        </>
+    );
+}
+
+const nodeTypes = { dagNode: DagNode };
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
+interface WorkflowDAGProps {
+    workflowId: string | number;
+}
+
+export default function WorkflowDAG({ workflowId }: WorkflowDAGProps) {
+    const navigate = useNavigate();
+    const popoverRef = useRef<HTMLDivElement>(null);
+
+    const [nodes, setNodes] = useState<Node<DagNodeData>[]>([]);
+    const [edges, setEdges] = useState<Edge[]>([]);
+    const [selectedNode, setSelectedNode] = useState<Node<DagNodeData> | null>(null);
+    const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+    const [popoverPosition, setPopoverPosition] = useState<PopoverPosition | null>(null);
 
     const wfTTStatus = useQuery({
-        queryKey: ['workflow_details', 'tt_status', workflowId.workflowId],
+        queryKey: ['workflow_details', 'tt_status', workflowId],
         queryFn: async () => {
-            return axios
-                .get<TTStatusResponse>(
-                    workflow_tt_status_url + workflowId.workflowId,
-                    {
-                        ...jobmonAxiosConfig,
-                    }
-                )
-                .then(r => {
-                    return r.data;
-                });
+            const { data } = await axios.get<TTStatusResponse>(
+                workflow_tt_status_url + workflowId,
+                { ...jobmonAxiosConfig }
+            );
+            return data;
         },
     });
 
-    const createNodesAndEdgesFromTTDAG = tt_dag => {
-        const nodes = [];
-        const edges = [];
-        const nodeSet = new Set();
+    const dagQuery = useQuery({
+        queryKey: ['workflow_details', 'task_template_dag', workflowId],
+        queryFn: async () => {
+            const { data } = await axios.get<TaskTemplateDAGResponse>(
+                get_task_template_dag(workflowId),
+                { ...jobmonAxiosConfig }
+            );
+            return data;
+        },
+        enabled: !!workflowId,
+    });
 
-        tt_dag.forEach((task, index) => {
-            const sourceId = task.name;
-            const targetId = task.downstream_task_template_id;
-
-            if (!nodeSet.has(sourceId)) {
-                nodes.push({ id: sourceId, data: { label: sourceId } });
-                nodeSet.add(sourceId);
-            }
-            if (targetId && !nodeSet.has(targetId)) {
-                nodes.push({ id: targetId, data: { label: targetId } });
-                nodeSet.add(targetId);
-            }
-
-            if (targetId) {
-                edges.push({
-                    id: `e${index}`,
-                    source: sourceId,
-                    target: targetId,
-                });
-            }
-        });
-
-        return { nodes, edges };
-    };
-
-    useEffect(() => {
-        if (!workflowId.workflowId) return;
-
-        axios
-            .get<TaskTemplateDAGResponse>(
-                get_task_template_dag(workflowId.workflowId),
-                {
-                    ...jobmonAxiosConfig,
-                }
-            )
-            .then(r => {
-                const { nodes, edges } = createNodesAndEdgesFromTTDAG(
-                    r.data.tt_dag
-                );
-                setNodes(nodes);
-                setEdges(edges);
-            })
-            .catch(error => {
-                console.error('Error fetching task template DAG:', error);
-            });
-    }, [workflowId]);
-
-    const getLayoutNodes = (nodes, edges) => {
-        const g = new dagre.graphlib.Graph();
-        g.setGraph({
-            rankdir: 'TB',
-            ranksep: 60,
-            nodesep: 50,
-            marginx: 20,
-            marginy: 20,
-        });
-        g.setDefaultEdgeLabel(() => ({}));
-
-        nodes.forEach(node => {
-            g.setNode(node.id, { width: 172, height: 36 });
-        });
-
-        edges.forEach(edge => {
-            g.setEdge(edge.source, edge.target, {
-                minlen: 1,
-                weight: 1,
-            });
-        });
-
-        dagre.layout(g);
-
-        nodes.forEach(node => {
-            const nodeWithPosition = g.node(node.id);
-            node.position = {
-                x: nodeWithPosition.x - 172 / 2,
-                y: nodeWithPosition.y - 36 / 2,
-            };
-        });
-
-        return nodes;
-    };
+    const ttStatusByName = useMemo(() => {
+        if (!wfTTStatus.data) return {};
+        return Object.fromEntries(
+            Object.values(wfTTStatus.data).map(tt => [tt.name, tt])
+        ) as Record<string, TTStatus>;
+    }, [wfTTStatus.data]);
 
     const laidOutNodes = useMemo(() => {
-        return getLayoutNodes(nodes, edges);
-    }, [nodes, edges]);
-
-    const handleNodeHover = (event, node) => {
-        setSelectedNode(node);
-        setHoveredNodeId(node.id);
-        setPopoverPosition(node.position);
-        setTTData(
-            Object.values(wfTTStatus.data).find(item => item.name === node.id)
-        );
-    };
-
-    const handleNodeLeave = () => {
-        setSelectedNode(null);
-        setHoveredNodeId(null);
-    };
-
-    const handleNodeClick = (event, node) => {
-        // Find the task template data for the clicked node to get the ID
-        const taskTemplateData = Object.values(wfTTStatus.data || {}).find(
-            item => item.name === node.id
-        );
-        if (taskTemplateData) {
-            navigate(
-                `/workflow/${workflowId.workflowId}/task_template/${taskTemplateData.id}`
+        const nodesWithDimensions = nodes.map(node => {
+            const taskCount = ttStatusByName[node.id]?.tasks ?? 0;
+            const { width, height } = getNodeDimensions(
+                node.data?.label ?? '',
+                taskCount
             );
-        }
-    };
+            return { ...node, data: { ...node.data, width, height } };
+        });
+        return applyDagreLayout(nodesWithDimensions, edges);
+    }, [nodes, edges, ttStatusByName]);
 
-    // Compute edges with highlighting based on hovered node
     const styledEdges = useMemo(() => {
         return edges.map(edge => {
             const isConnected =
@@ -184,50 +277,92 @@ export default function WorkflowDAG(workflowId: {
     }, [edges, hoveredNodeId]);
 
     useEffect(() => {
-        const handleClickOutside = event => {
-            if (
-                popoverRef.current &&
-                !popoverRef.current.contains(event.target)
-            ) {
+        if (dagQuery.data) {
+            const { nodes: newNodes, edges: newEdges } = buildNodesAndEdges(
+                dagQuery.data.tt_dag
+            );
+            setNodes(newNodes);
+            setEdges(newEdges);
+        }
+    }, [dagQuery.data]);
+
+    const hoveredTTData = selectedNode
+        ? ttStatusByName[selectedNode.id]
+        : undefined;
+
+    const handleNodeMouseEnter = useCallback(
+        (event: React.MouseEvent, node: Node<DagNodeData>) => {
+            setSelectedNode(node);
+            setHoveredNodeId(node.id);
+            setPopoverPosition({ x: event.clientX, y: event.clientY });
+        },
+        []
+    );
+
+    const handleNodeMouseLeave = useCallback(() => {
+        setSelectedNode(null);
+        setHoveredNodeId(null);
+        setPopoverPosition(null);
+    }, []);
+
+    const handleNodeClick = useCallback(
+        (_event: React.MouseEvent, node: Node<DagNodeData>) => {
+            const tt = ttStatusByName[node.id];
+            if (tt) {
+                navigate(`/workflow/${workflowId}/task_template/${tt.id}`);
+            }
+        },
+        [navigate, workflowId, ttStatusByName]
+    );
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (popoverRef.current && target && !popoverRef.current.contains(target)) {
                 setSelectedNode(null);
+                setHoveredNodeId(null);
+                setPopoverPosition(null);
             }
         };
-
         document.addEventListener('mousedown', handleClickOutside);
-
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    const showPopover = selectedNode && hoveredTTData && popoverPosition;
+
+    if (dagQuery.isLoading || nodes.length === 0) {
+        return (
+            <div style={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CircularProgress />
+            </div>
+        );
+    }
 
     return (
         <div style={{ height: '100vh', width: '100vw', position: 'relative' }}>
-            {nodes.length === 0 ? (
-                <CircularProgress />
-            ) : (
-                <ReactFlow
-                    nodes={laidOutNodes}
-                    edges={styledEdges}
-                    onNodeMouseEnter={handleNodeHover}
-                    onNodeMouseLeave={handleNodeLeave}
-                    onNodeClick={handleNodeClick}
-                >
-                    <MiniMap />
-                    <Controls />
-                    <Background />
-                </ReactFlow>
-            )}
+            <ReactFlow
+                nodes={laidOutNodes}
+                edges={styledEdges}
+                nodeTypes={nodeTypes}
+                onNodeMouseEnter={handleNodeMouseEnter}
+                onNodeMouseLeave={handleNodeMouseLeave}
+                onNodeClick={handleNodeClick}
+            >
+                <MiniMap />
+                <Controls />
+                <Background />
+            </ReactFlow>
 
-            {selectedNode && tt_data && (
+            {showPopover && (
                 <TaskTemplatePopover
                     ref={popoverRef}
-                    data={tt_data}
+                    data={hoveredTTData}
                     placement="top"
                     style={{
-                        position: 'absolute',
-                        left: popoverPosition.x + 300,
-                        top: popoverPosition.y + 300,
-                        transform: 'translate(-50%, -50%)',
+                        position: 'fixed',
+                        left: popoverPosition.x + POPOVER_OFFSET,
+                        top: popoverPosition.y + POPOVER_OFFSET,
+                        zIndex: POPOVER_Z_INDEX,
                     }}
                 />
             )}
