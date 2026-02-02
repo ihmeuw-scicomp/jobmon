@@ -47,6 +47,3 @@ export const update_task_status_url = api_base_url + `/task/update_statuses`;
 export const get_task_template_id_url = (
     task_template_version_id: number | string
 ) => api_base_url + `/task_template/id/${task_template_version_id}`;
-
-export const get_task_concurrency_url = (workflow_id: number | string) =>
-    api_base_url + `/workflow/${workflow_id}/task_concurrency`;

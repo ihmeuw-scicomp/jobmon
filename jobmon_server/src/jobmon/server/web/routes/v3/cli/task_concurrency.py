@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 import structlog
-from fastapi import Depends, Query
+from fastapi import Depends, HTTPException, Query
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
@@ -66,6 +66,10 @@ async def get_task_concurrency(
     workflow_id: int,
     start_time: Optional[datetime] = Query(None, description="Start of time range"),
     end_time: Optional[datetime] = Query(None, description="End of time range"),
+    group_by: str = Query(
+        GROUP_BY_STATUS,
+        description='Grouping strategy for the series (only "status" supported)',
+    ),
     bucket_seconds: int = Query(
         None,
         ge=1,
@@ -84,6 +88,7 @@ async def get_task_concurrency(
     Uses task_status_audit table with ix_task_status_audit_workflow_time index.
 
     Groups by active status category (PENDING, LAUNCHED, RUNNING).
+    The only supported grouping strategy is "status".
     Note: Only active task statuses are shown (no DONE/ERROR terminal states).
 
     The response includes:
@@ -105,6 +110,13 @@ async def get_task_concurrency(
     }
     """
     # Determine bucket size
+    if group_by != GROUP_BY_STATUS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported group_by value '{group_by}'. "
+            f"Only '{GROUP_BY_STATUS}' is supported.",
+        )
+
     if bucket_seconds is not None:
         bucket_delta = timedelta(seconds=bucket_seconds)
     else:
@@ -117,6 +129,7 @@ async def get_task_concurrency(
         end_time=end_time,
         bucket_delta_seconds=bucket_delta.total_seconds(),
         task_template_name=task_template_name,
+        group_by=group_by,
     )
 
     # If no time range specified, use workflow's time range from audit table

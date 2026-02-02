@@ -49,13 +49,6 @@ async def log_running(
         select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
         task_instance = db.execute(select_stmt).scalars().one()
 
-        # Update attributes
-        if data.get("distributor_id") is not None:
-            task_instance.distributor_id = data["distributor_id"]
-        if data.get("nodename") is not None:
-            task_instance.nodename = data["nodename"]
-        task_instance.process_group_id = data["process_group_id"]
-
         # Handle state transition
         dialect = get_dialect(request)
         result = TransitionService.transition_task_instance(
@@ -116,6 +109,15 @@ async def log_running(
                     logger.error(
                         f"Unable to transition to running from {task_instance.status}"
                     )
+
+        # Refresh and update attributes after any transition retries/rollbacks
+        select_stmt = select(TaskInstance).where(TaskInstance.id == task_instance_id)
+        task_instance = db.execute(select_stmt).scalars().one()
+        if data.get("distributor_id") is not None:
+            task_instance.distributor_id = data["distributor_id"]
+        if data.get("nodename") is not None:
+            task_instance.nodename = data["nodename"]
+        task_instance.process_group_id = data["process_group_id"]
 
         # Commit any remaining attribute changes
         db.commit()
@@ -1075,10 +1077,6 @@ def _log_error(
         return resp
 
     try:
-        # Create error log first (will be rolled back if transition fails)
-        error = TaskInstanceErrorLog(task_instance_id=ti.id, description=error_msg)
-        session.add(error)
-
         # Perform the transition using TransitionService (has internal retry logic)
         result = TransitionService.transition_task_instance(
             session=session,
@@ -1091,6 +1089,10 @@ def _log_error(
         )
 
         if result["ti_updated"]:
+            # Create error log only after a successful transition. TransitionService
+            # can rollback on lock contention, which would otherwise clear the log.
+            error = TaskInstanceErrorLog(task_instance_id=ti.id, description=error_msg)
+            session.add(error)
             logger.info(
                 "Task instance transitioned to error state",
                 task_instance_id=ti.id,
