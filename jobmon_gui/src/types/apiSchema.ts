@@ -1977,37 +1977,35 @@ export interface paths {
         };
         /**
          * Get Task Concurrency
-         * @description Get concurrent task counts over time, grouped by status or task_template.
+         * @description Get concurrent task counts over time, grouped by status.
          *
          *     Returns time-bucketed counts for timeseries visualization.
          *     Uses task_status_audit table with ix_task_status_audit_workflow_time index.
          *
-         *     Group by options:
-         *     - status: Groups by active status category (PENDING, LAUNCHED, RUNNING)
-         *     - task_template: Groups RUNNING tasks by task template name
-         *
-         *     Note: Only active task statuses are shown (no DONE/ERROR terminal states).
+         *     Groups by status category (PENDING, LAUNCHED, RUNNING, ERROR, DONE).
+         *     The only supported grouping strategy is "status".
+         *     Note: DONE and ERROR show tasks that entered those states within each bucket
+         *     (not cumulative or interval overlap).
          *
          *     The response includes:
          *     - buckets: List of time bucket start times
-         *     - series: Dict mapping group names to lists of concurrent counts
+         *     - series: Dict mapping status names to lists of concurrent counts
+         *     - template_breakdown: Dict mapping status to list of {template: count} per bucket
          *
-         *     Example response (group_by=status):
+         *     Example response:
          *     {
          *         "buckets": ["2024-01-01T00:00:00", "2024-01-01T00:01:00", ...],
          *         "series": {
          *             "PENDING": [5, 8, 10, 7, ...],
          *             "LAUNCHED": [3, 5, 4, 2, ...],
-         *             "RUNNING": [2, 3, 4, 3, ...]
-         *         }
-         *     }
-         *
-         *     Example response (group_by=task_template):
-         *     {
-         *         "buckets": ["2024-01-01T00:00:00", "2024-01-01T00:01:00", ...],
-         *         "series": {
-         *             "my_template": [5, 8, 10, 7, ...],
-         *             "other_template": [2, 3, 4, 3, ...]
+         *             "RUNNING": [2, 3, 4, 3, ...],
+         *             "ERROR": [0, 1, 0, 2, ...],  // error events within each bucket
+         *             "DONE": [0, 2, 5, 3, ...]  // tasks completed within each bucket
+         *         },
+         *         "template_breakdown": {
+         *             "RUNNING": [{"template_a": 2, "template_b": 1}, ...],
+         *             "ERROR": [{"template_a": 0, "template_b": 1}, ...],
+         *             "DONE": [{"template_a": 0, "template_b": 2}, ...]
          *         }
          *     }
          */
@@ -2288,7 +2286,7 @@ export interface components {
             };
             /**
              * Template Breakdown
-             * @description Per-status template breakdown: status -> list of {template: count} per bucket
+             * @description Per-status breakdown: status -> [{template: count}] per bucket
              */
             template_breakdown?: {
                 [key: string]: {
@@ -5346,13 +5344,13 @@ export interface operations {
                 start_time?: string | null;
                 /** @description End of time range */
                 end_time?: string | null;
+                /** @description Grouping strategy for the series (only "status" supported) */
+                group_by?: string;
                 /** @description Bucket size in seconds (overrides bucket_minutes) */
                 bucket_seconds?: number;
                 /** @description Bucket size in minutes */
                 bucket_minutes?: number;
-                /** @description Group by: 'status' (PENDING/LAUNCHED/RUNNING) or 'task_template' */
-                group_by?: string;
-                /** @description Filter by task template name (only applies to group_by=status) */
+                /** @description Filter by task template name */
                 task_template_name?: string | null;
             };
             header?: never;

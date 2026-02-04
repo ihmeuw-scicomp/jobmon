@@ -30,20 +30,32 @@ logger = structlog.get_logger(__name__)
 # PENDING includes: Q (QUEUED), I (INSTANTIATING)
 PENDING_STATUSES = frozenset({TaskStatus.QUEUED, TaskStatus.INSTANTIATING})
 
+# Error statuses - both recoverable (E) and fatal (F) combined into "ERROR"
+ERROR_STATUSES = frozenset({TaskStatus.ERROR_RECOVERABLE, TaskStatus.ERROR_FATAL})
+
+# Terminal status for completion counting
+DONE_STATUS = TaskStatus.DONE
+
 # Valid group_by option
 GROUP_BY_STATUS = "status"
 
 
-def _is_active_at_time(
-    period_start: datetime, period_end: Optional[datetime], bucket_time: datetime
+def _is_active_during_interval(
+    period_start: datetime,
+    period_end: Optional[datetime],
+    interval_start: datetime,
+    interval_end: datetime,
 ) -> bool:
-    """Check if a status period was active at a specific point in time.
+    """Check if a status period overlaps with a time interval.
 
-    A period is active at bucket_time if:
-    entered_at <= bucket_time AND (exited_at IS NULL OR exited_at > bucket_time)
+    A period overlaps with [interval_start, interval_end) if:
+    period_start < interval_end AND (period_end IS NULL OR period_end > interval_start)
+
+    This counts tasks that were in the status at ANY point during the interval,
+    not just at a single sample point.
     """
-    return period_start <= bucket_time and (
-        period_end is None or period_end > bucket_time
+    return period_start < interval_end and (
+        period_end is None or period_end > interval_start
     )
 
 
@@ -58,6 +70,8 @@ def _categorize_status(status: str) -> Optional[str]:
         return "LAUNCHED"
     if status == TaskStatus.RUNNING:
         return "RUNNING"
+    if status in ERROR_STATUSES:
+        return "ERROR"
     return None
 
 
@@ -87,9 +101,10 @@ async def get_task_concurrency(
     Returns time-bucketed counts for timeseries visualization.
     Uses task_status_audit table with ix_task_status_audit_workflow_time index.
 
-    Groups by active status category (PENDING, LAUNCHED, RUNNING).
+    Groups by status category (PENDING, LAUNCHED, RUNNING, ERROR, DONE).
     The only supported grouping strategy is "status".
-    Note: Only active task statuses are shown (no DONE/ERROR terminal states).
+    Note: DONE and ERROR show tasks that entered those states within each bucket
+    (not cumulative or interval overlap).
 
     The response includes:
     - buckets: List of time bucket start times
@@ -102,10 +117,14 @@ async def get_task_concurrency(
         "series": {
             "PENDING": [5, 8, 10, 7, ...],
             "LAUNCHED": [3, 5, 4, 2, ...],
-            "RUNNING": [2, 3, 4, 3, ...]
+            "RUNNING": [2, 3, 4, 3, ...],
+            "ERROR": [0, 1, 0, 2, ...],  // error events within each bucket
+            "DONE": [0, 2, 5, 3, ...]  // tasks completed within each bucket
         },
         "template_breakdown": {
-            "RUNNING": [{"template_a": 2, "template_b": 1}, ...]
+            "RUNNING": [{"template_a": 2, "template_b": 1}, ...],
+            "ERROR": [{"template_a": 0, "template_b": 1}, ...],
+            "DONE": [{"template_a": 0, "template_b": 2}, ...]
         }
     }
     """
@@ -165,6 +184,7 @@ async def get_task_concurrency(
         start_time,
         end_time,
         buckets,
+        bucket_delta,
         task_template_name=task_template_name,
     )
 
@@ -191,15 +211,20 @@ def _get_series_by_status(
     start_time: datetime,
     end_time: datetime,
     buckets: List[datetime],
+    bucket_delta: timedelta,
     task_template_name: Optional[str] = None,
 ) -> tuple[Dict[str, List[int]], Dict[str, List[Dict[str, int]]]]:
-    """Get series data grouped by status category using point-in-time sampling.
+    """Get series data grouped by status category.
 
-    For each bucket timestamp, count what status each task is in at that exact moment.
-    A task is in status S at time T if:
-    entered_at <= T AND (exited_at IS NULL OR exited_at > T)
+    For active statuses (PENDING, LAUNCHED, RUNNING): interval-based counting.
+    A task is counted if it was in status S at any point during the bucket interval.
+    period_start < bucket_end AND (period_end IS NULL OR period_end > bucket_start)
+
+    For DONE: count tasks that completed within each bucket interval.
+    A task completed in bucket [T, T+delta) if entered_at is in that range.
 
     Args:
+        bucket_delta: Duration of each bucket (for DONE interval counting)
         task_template_name: Optional filter to only include tasks from a specific template
 
     Returns:
@@ -207,7 +232,23 @@ def _get_series_by_status(
         - series: Dict mapping status to list of counts per bucket
         - template_breakdown: Dict mapping status to list of {template: count} dicts per bucket
     """
-    # Always join to get template names for breakdown
+    # Initialize series and template breakdown
+    series: Dict[str, List[int]] = {
+        "PENDING": [0] * len(buckets),
+        "LAUNCHED": [0] * len(buckets),
+        "RUNNING": [0] * len(buckets),
+        "ERROR": [0] * len(buckets),
+        "DONE": [0] * len(buckets),
+    }
+    template_breakdown: Dict[str, List[Dict[str, int]]] = {
+        "PENDING": [{} for _ in buckets],
+        "LAUNCHED": [{} for _ in buckets],
+        "RUNNING": [{} for _ in buckets],
+        "ERROR": [{} for _ in buckets],
+        "DONE": [{} for _ in buckets],
+    }
+
+    # Fetch all relevant status periods with template names
     status_periods_query = (
         select(
             TaskStatusAudit.task_id,
@@ -241,28 +282,59 @@ def _get_series_by_status(
 
     status_periods = db.execute(status_periods_query).all()
 
-    # Initialize series and template breakdown
-    series: Dict[str, List[int]] = {
-        "PENDING": [0] * len(buckets),
-        "LAUNCHED": [0] * len(buckets),
-        "RUNNING": [0] * len(buckets),
-    }
-    template_breakdown: Dict[str, List[Dict[str, int]]] = {
-        "PENDING": [{} for _ in buckets],
-        "LAUNCHED": [{} for _ in buckets],
-        "RUNNING": [{} for _ in buckets],
-    }
-
     for i, bucket_time in enumerate(buckets):
+        bucket_end = bucket_time + bucket_delta
+        # Track which tasks we've already counted per category to avoid
+        # double-counting when a task has multiple status periods in the
+        # same category (e.g., Q then I both map to PENDING)
+        counted_tasks: Dict[str, set] = {
+            "PENDING": set(),
+            "LAUNCHED": set(),
+            "RUNNING": set(),
+            "ERROR": set(),
+            "DONE": set(),
+        }
+
         for task_id, status, period_start, period_end, template_name in status_periods:
-            if _is_active_at_time(period_start, period_end, bucket_time):
-                category = _categorize_status(status)
-                if category:
-                    series[category][i] += 1
-                    # Track template breakdown
-                    if template_name not in template_breakdown[category][i]:
-                        template_breakdown[category][i][template_name] = 0
-                    template_breakdown[category][i][template_name] += 1
+            category = _categorize_status(status)
+
+            # For active statuses (PENDING, LAUNCHED, RUNNING): count tasks active
+            # at any point during the interval (interval overlap)
+            if category in {"PENDING", "LAUNCHED", "RUNNING"}:
+                if _is_active_during_interval(
+                    period_start, period_end, bucket_time, bucket_end
+                ):
+                    if task_id not in counted_tasks[category]:
+                        counted_tasks[category].add(task_id)
+                        series[category][i] += 1
+                        if template_name not in template_breakdown[category][i]:
+                            template_breakdown[category][i][template_name] = 0
+                        template_breakdown[category][i][template_name] += 1
+
+            # For ERROR: count tasks that entered an error state within this bucket
+            # (point-in-time counting, like DONE)
+            if category == "ERROR":
+                if (
+                    bucket_time <= period_start < bucket_end
+                    and task_id not in counted_tasks["ERROR"]
+                ):
+                    counted_tasks["ERROR"].add(task_id)
+                    series["ERROR"][i] += 1
+                    if template_name not in template_breakdown["ERROR"][i]:
+                        template_breakdown["ERROR"][i][template_name] = 0
+                    template_breakdown["ERROR"][i][template_name] += 1
+
+            # For DONE: count tasks that entered DONE within this bucket interval
+            if status == DONE_STATUS:
+                if (
+                    bucket_time <= period_start < bucket_end
+                    and task_id not in counted_tasks["DONE"]
+                ):
+                    counted_tasks["DONE"].add(task_id)
+                    series["DONE"][i] += 1
+                    if template_name not in template_breakdown["DONE"][i]:
+                        template_breakdown["DONE"][i][template_name] = 0
+                    template_breakdown["DONE"][i][template_name] += 1
 
     return series, template_breakdown
 

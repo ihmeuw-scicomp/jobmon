@@ -119,6 +119,67 @@ class TransitionService:
         return cls.DEFAULT_BASE_DELAY_MS * (2 ** (attempt + 1)) / 1000
 
     @classmethod
+    def _is_error_retry_transition(
+        cls: Type["TransitionService"],
+        ti_status: str,
+        final_task_status: str,
+    ) -> bool:
+        """Check if this is an error-with-retry transition.
+
+        Returns True when a TaskInstance enters an error state but the Task
+        is transitioning to REGISTERING or ADJUSTING_RESOURCES (i.e., retrying).
+        This indicates we should record an ERROR_RECOVERABLE audit entry.
+        """
+        return ti_status in cls.TI_ERROR_STATES and final_task_status in {
+            TaskStatus.REGISTERING,
+            TaskStatus.ADJUSTING_RESOURCES,
+        }
+
+    @classmethod
+    def create_audit_record_with_immediate_exit(
+        cls: Type["TransitionService"],
+        session: Session,
+        task_id: int,
+        workflow_id: int,
+        previous_status: str,
+        new_status: str,
+    ) -> None:
+        """Create audit record with both entered_at and exited_at set (for transient states).
+
+        Used for ERROR_RECOVERABLE status which is a transient state - the task
+        enters and exits it in the same transition.
+
+        Args:
+            session: Database session
+            task_id: The task ID being transitioned
+            workflow_id: The workflow ID the task belongs to
+            previous_status: The status the task is transitioning from
+            new_status: The transient status (e.g., ERROR_RECOVERABLE)
+        """
+        # Close previous open record
+        session.execute(
+            update(TaskStatusAudit)
+            .where(
+                TaskStatusAudit.task_id == task_id,
+                TaskStatusAudit.exited_at.is_(None),
+            )
+            .values(exited_at=func.now())
+            .execution_options(synchronize_session=False)
+        )
+
+        # Create new record with exited_at = entered_at = func.now()
+        session.execute(
+            insert(TaskStatusAudit).values(
+                task_id=task_id,
+                workflow_id=workflow_id,
+                previous_status=previous_status,
+                new_status=new_status,
+                entered_at=func.now(),
+                exited_at=func.now(),
+            )
+        )
+
+    @classmethod
     def create_audit_record(
         cls: Type["TransitionService"],
         session: Session,
@@ -397,14 +458,33 @@ class TransitionService:
                     .execution_options(synchronize_session=False)
                 )
 
-                # 6. Audit Task transition (closes previous record, creates new one)
-                cls.create_audit_record(
-                    session=session,
-                    task_id=task_id,
-                    workflow_id=task_row.workflow_id,
-                    previous_status=task_row.status,
-                    new_status=final_t_status,
-                )
+                # 6. Audit Task transition (closes previous, creates new)
+                # For error-retry, record ERROR_RECOVERABLE as transient
+                if cls._is_error_retry_transition(new_ti_status, final_t_status):
+                    # First: record ERROR_RECOVERABLE (transient state)
+                    cls.create_audit_record_with_immediate_exit(
+                        session=session,
+                        task_id=task_id,
+                        workflow_id=task_row.workflow_id,
+                        previous_status=task_row.status,
+                        new_status=TaskStatus.ERROR_RECOVERABLE,
+                    )
+                    # Second: record final status (REGISTERING or ADJUSTING_RESOURCES)
+                    cls.create_audit_record(
+                        session=session,
+                        task_id=task_id,
+                        workflow_id=task_row.workflow_id,
+                        previous_status=TaskStatus.ERROR_RECOVERABLE,
+                        new_status=final_t_status,
+                    )
+                else:
+                    cls.create_audit_record(
+                        session=session,
+                        task_id=task_id,
+                        workflow_id=task_row.workflow_id,
+                        previous_status=task_row.status,
+                        new_status=final_t_status,
+                    )
                 task_transitioned = True
 
                 logger.info(
