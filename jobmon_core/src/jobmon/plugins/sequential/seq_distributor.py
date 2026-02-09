@@ -2,9 +2,12 @@
 
 import logging
 import os
+import platform
+import resource
 import shutil
+import sys
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from jobmon.core.cluster_protocol import ClusterDistributor, ClusterWorkerNode
 from jobmon.core.constants import TaskInstanceStatus
@@ -53,8 +56,17 @@ class SequentialDistributor(ClusterDistributor):
         self.started = False
 
         self._cluster_name = cluster_name
-        worker_node_entry_point = shutil.which("worker_node_entry_point")
-        if not worker_node_entry_point:
+
+        # Find worker_node_entry_point in the same environment as the
+        # running Python to avoid version mismatches with conda base.
+        bin_dir = os.path.dirname(sys.executable)
+        candidate_path = os.path.join(bin_dir, "worker_node_entry_point")
+        worker_node_entry_point: Optional[str]
+        if os.path.exists(candidate_path):
+            worker_node_entry_point = candidate_path
+        else:
+            worker_node_entry_point = shutil.which("worker_node_entry_point")
+        if not worker_node_entry_point or not os.path.exists(worker_node_entry_point):
             raise ValueError("worker_node_entry_point can't be found.")
         self._worker_node_entry_point = worker_node_entry_point
 
@@ -80,13 +92,11 @@ class SequentialDistributor(ClusterDistributor):
         self.started = False
 
     def get_queueing_errors(self, distributor_ids: List[str]) -> Dict[str, str]:
-        """Get the task instances that have errored out."""
-        raise NotImplementedError
+        """Get the task instances that have errored out.
 
-    def get_array_queueing_errors(
-        self, distributor_id: Union[int, str]
-    ) -> Dict[Union[int, str], str]:
-        raise NotImplementedError
+        Sequential runs synchronously so queueing errors aren't possible.
+        """
+        return {}
 
     def get_remote_exit_info(self, distributor_id: str) -> Tuple[str, str]:
         """Get exit info from task instances that have run."""
@@ -103,9 +113,13 @@ class SequentialDistributor(ClusterDistributor):
     def get_submitted_or_running(
         self, distributor_ids: Optional[List[str]] = None
     ) -> Set[str]:
-        """Check status of running task."""
-        running = os.environ.get("JOB_ID", "")
-        return {running}
+        """Check status of running task.
+
+        Sequential tasks complete before submit_to_batch_distributor
+        returns, so nothing is ever submitted or running at heartbeat
+        time.
+        """
+        return set()
 
     def terminate_task_instances(self, distributor_ids: List[str]) -> None:
         """Terminate task instances.
@@ -183,7 +197,14 @@ class SequentialWorkerNode(ClusterWorkerNode):
         """Exit info, error message."""
         return TaskInstanceStatus.ERROR, error_msg
 
-    @staticmethod
-    def get_usage_stats() -> Dict:
-        """Usage information specific to the exector."""
-        return {}
+    def get_usage_stats(self) -> Dict:
+        """Usage information specific to the executor."""
+        usage = resource.getrusage(resource.RUSAGE_CHILDREN)
+        maxrss = usage.ru_maxrss
+        if platform.system() == "Darwin":
+            maxrss = maxrss // 1024
+        return {
+            "maxrss_kb": maxrss,
+            "user_time_sec": usage.ru_utime,
+            "system_time_sec": usage.ru_stime,
+        }
