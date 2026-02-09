@@ -201,10 +201,10 @@ class SequentialWorkerNode(ClusterWorkerNode):
         """Usage information specific to the executor."""
         usage = resource.getrusage(resource.RUSAGE_CHILDREN)
         maxrss = usage.ru_maxrss
-        if platform.system() == "Darwin":
-            maxrss = maxrss // 1024
+        if platform.system() != "Darwin":
+            maxrss = maxrss * 1024  # KB -> bytes on Linux
         return {
-            "maxrss_kb": maxrss,
+            "maxrss_bytes": maxrss,
             "user_time_sec": usage.ru_utime,
             "system_time_sec": usage.ru_stime,
         }

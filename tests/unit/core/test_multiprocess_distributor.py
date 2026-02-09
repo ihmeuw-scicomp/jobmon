@@ -84,9 +84,9 @@ def test_get_usage_stats():
     """get_usage_stats should return a dict with expected keys."""
     worker_node = MultiprocessWorkerNode()
     stats = worker_node.get_usage_stats()
-    assert "maxrss_kb" in stats
+    assert "maxrss_bytes" in stats
     assert "user_time_sec" in stats
     assert "system_time_sec" in stats
-    assert isinstance(stats["maxrss_kb"], int)
+    assert isinstance(stats["maxrss_bytes"], int)
     assert isinstance(stats["user_time_sec"], float)
     assert isinstance(stats["system_time_sec"], float)

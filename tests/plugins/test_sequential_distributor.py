@@ -37,9 +37,9 @@ def test_get_usage_stats_returns_expected_keys():
     """get_usage_stats should return resource usage with expected keys."""
     worker = SequentialWorkerNode()
     stats = worker.get_usage_stats()
-    assert "maxrss_kb" in stats
+    assert "maxrss_bytes" in stats
     assert "user_time_sec" in stats
     assert "system_time_sec" in stats
-    assert isinstance(stats["maxrss_kb"], int)
+    assert isinstance(stats["maxrss_bytes"], int)
     assert isinstance(stats["user_time_sec"], float)
     assert isinstance(stats["system_time_sec"], float)

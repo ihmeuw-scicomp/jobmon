@@ -278,10 +278,10 @@ class MultiprocessWorkerNode(ClusterWorkerNode):
         """Usage information specific to the distributor."""
         usage = resource.getrusage(resource.RUSAGE_CHILDREN)
         maxrss = usage.ru_maxrss
-        if platform.system() == "Darwin":
-            maxrss = maxrss // 1024  # bytes -> KB on macOS
+        if platform.system() != "Darwin":
+            maxrss = maxrss * 1024  # KB -> bytes on Linux
         return {
-            "maxrss_kb": maxrss,
+            "maxrss_bytes": maxrss,
             "user_time_sec": usage.ru_utime,
             "system_time_sec": usage.ru_stime,
         }

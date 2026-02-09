@@ -38,8 +38,9 @@ function formatRuntime(seconds: number | null | undefined): string {
     return humanizeDuration(seconds * 1000, { largest: 1, round: true });
 }
 
-function formatMemory(gib: number | null | undefined): string {
-    if (gib == null) return 'N/A';
+function formatMemory(bytes: number | null | undefined): string {
+    if (bytes == null) return 'N/A';
+    const gib = bytes / 1073741824;
     return `${gib.toFixed(1)} GiB`;
 }
 
