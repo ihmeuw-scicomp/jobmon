@@ -65,6 +65,7 @@ async def bind_tasks_no_args(request: Request, db: Session = Depends(get_db)) ->
     }  # Dictionary mapping existing Tasks to the supplied arguments
     # Dict mapping input tasks to the corresponding args/attributes
     task_hash_lookup = {}  # Reverse dictionary of inputs, maps hash back to values
+    reset_audit_records: List[Dict] = []
     for hashval, items in tasks.items():
         (
             node_id,
@@ -85,12 +86,23 @@ async def bind_tasks_no_args(request: Request, db: Session = Depends(get_db)) ->
         # task status and update the args/attributes
         if id_tuple in present_tasks.keys():
             task = present_tasks[id_tuple]
+            prev_status = task.status
             task.reset(
                 name=name,
                 command=command,
                 max_attempts=max_att,
                 reset_if_running=reset,
             )
+            # If status actually changed, record for audit
+            if task.status != prev_status:
+                reset_audit_records.append(
+                    {
+                        "task_id": task.id,
+                        "workflow_id": workflow_id,
+                        "previous_status": prev_status,
+                        "new_status": constants.TaskStatus.REGISTERING,
+                    }
+                )
 
         # If not, add the task
         else:
@@ -115,6 +127,10 @@ async def bind_tasks_no_args(request: Request, db: Session = Depends(get_db)) ->
     if present_tasks:
         # ORM task objects already updated in task.reset, flush the changes
         db.flush()
+        if reset_audit_records:
+            TransitionService.create_audit_records_bulk(
+                session=db, records=reset_audit_records
+            )
 
     # Bind new tasks with raw SQL
     if len(tasks_to_add):
@@ -135,6 +151,21 @@ async def bind_tasks_no_args(request: Request, db: Session = Depends(get_db)) ->
             ),
         )
         new_tasks = db.execute(new_task_query).scalars().all()
+
+        # Audit records for newly created tasks
+        if new_tasks:
+            new_audit_records = [
+                {
+                    "task_id": task.id,
+                    "workflow_id": workflow_id,
+                    "previous_status": None,
+                    "new_status": constants.TaskStatus.REGISTERING,
+                }
+                for task in new_tasks
+            ]
+            TransitionService.create_audit_records_bulk(
+                session=db, records=new_audit_records
+            )
 
     else:
         # Empty task list

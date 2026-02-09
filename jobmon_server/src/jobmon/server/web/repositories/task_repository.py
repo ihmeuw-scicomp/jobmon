@@ -37,6 +37,7 @@ from jobmon.server.web.schemas.task import (
     TaskSubdagResponse,
 )
 from jobmon.server.web.server_side_exception import InvalidUsage
+from jobmon.server.web.services.transition_service import TransitionService
 
 logger = structlog.get_logger(__name__)
 
@@ -100,7 +101,7 @@ class TaskRepository:
             task_ids = self._get_recursive_task_ids(task_ids, new_status)
 
         # Update task statuses
-        self._update_task_statuses_in_db(task_ids, new_status)
+        self._update_task_statuses_in_db(task_ids, new_status, workflow_id)
 
         # Handle special cases based on status
         if new_status == constants.TaskStatus.REGISTERING:
@@ -135,14 +136,38 @@ class TaskRepository:
         logger.info(f"reset status to new_status: {new_status}")
         return task_ids
 
-    def _update_task_statuses_in_db(self, task_ids: List[int], new_status: str) -> None:
+    def _update_task_statuses_in_db(
+        self, task_ids: List[int], new_status: str, workflow_id: str
+    ) -> None:
         """Update task statuses in the database."""
+        # Get previous statuses for audit (only tasks that will change)
+        prev_statuses = self.session.execute(
+            select(Task.id, Task.status).where(
+                Task.id.in_(task_ids), Task.status != new_status
+            )
+        ).all()
+
+        # Update
         update_stmt = update(Task).where(
             and_(Task.id.in_(task_ids), Task.status != new_status)
         )
-        vals = {"status": new_status}
-        self.session.execute(update_stmt.values(**vals))
+        self.session.execute(update_stmt.values(status=new_status))
         self.session.flush()
+
+        # Audit
+        if prev_statuses:
+            audit_records = [
+                {
+                    "task_id": task_id,
+                    "workflow_id": int(workflow_id),
+                    "previous_status": prev_status,
+                    "new_status": new_status,
+                }
+                for task_id, prev_status in prev_statuses
+            ]
+            TransitionService.create_audit_records_bulk(
+                session=self.session, records=audit_records
+            )
 
     def _get_workflow_run(self, workflow_id: str) -> WorkflowRun | None:
         """Get the latest workflow run for a workflow."""
