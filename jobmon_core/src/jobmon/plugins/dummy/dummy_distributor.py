@@ -1,19 +1,16 @@
-"""Sequential distributor that runs one task at a time."""
+"""Dummy distributor that runs one task at a time."""
 
-from collections import OrderedDict
 import logging
 import os
-import platform
-import resource
+import random
 import shutil
-import sys
+from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from jobmon.core.cluster_protocol import ClusterDistributor, ClusterWorkerNode
 from jobmon.core.constants import TaskInstanceStatus
-from jobmon.core.exceptions import RemoteExitInfoNotAvailable, ReturnCodes
 from jobmon.worker_node.cli import WorkerNodeCLI
-
+from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +35,7 @@ class LimitedSizeDict(OrderedDict):
                 self.popitem(last=False)
 
 
-class SequentialDistributor(ClusterDistributor):
+class DummyDistributor(ClusterDistributor):
     """Executor to run tasks one at a time."""
 
     def __init__(
@@ -48,7 +45,7 @@ class SequentialDistributor(ClusterDistributor):
         *args: tuple,
         **kwargs: dict,
     ) -> None:
-        """Initialization of the sequential distributor.
+        """Initialization of the dummy distributor.
 
         Args:
             cluster_name (str): name of the cluster
@@ -57,17 +54,8 @@ class SequentialDistributor(ClusterDistributor):
         self.started = False
 
         self._cluster_name = cluster_name
-
-        # Find worker_node_entry_point in the same environment as the
-        # running Python to avoid version mismatches with conda base.
-        bin_dir = os.path.dirname(sys.executable)
-        candidate_path = os.path.join(bin_dir, "worker_node_entry_point")
-        worker_node_entry_point: Optional[str]
-        if os.path.exists(candidate_path):
-            worker_node_entry_point = candidate_path
-        else:
-            worker_node_entry_point = shutil.which("worker_node_entry_point")
-        if not worker_node_entry_point or not os.path.exists(worker_node_entry_point):
+        worker_node_entry_point = shutil.which("worker_node_entry_point")
+        if not worker_node_entry_point:
             raise ValueError("worker_node_entry_point can't be found.")
         self._worker_node_entry_point = worker_node_entry_point
 
@@ -95,30 +83,21 @@ class SequentialDistributor(ClusterDistributor):
     def get_queueing_errors(self, distributor_ids: List[str]) -> Dict[str, str]:
         """Get the task instances that have errored out.
 
-        Sequential runs synchronously so queueing errors aren't possible.
+        Dummy runs synchronously so queueing errors aren't possible.
         """
         return {}
 
     def get_remote_exit_info(self, distributor_id: str) -> Tuple[str, str]:
         """Get exit info from task instances that have run."""
-        try:
-            exit_code = self._exit_info[distributor_id]
-            if exit_code == 199:
-                msg = "job was in kill self state"
-                return TaskInstanceStatus.UNKNOWN_ERROR, msg
-            else:
-                return TaskInstanceStatus.UNKNOWN_ERROR, f"found {exit_code}"
-        except KeyError:
-            raise RemoteExitInfoNotAvailable
+        return TaskInstanceStatus.UNKNOWN_ERROR, "Whatever"
 
     def get_submitted_or_running(
         self, distributor_ids: Optional[List[str]] = None
     ) -> Set[str]:
         """Check status of running task.
 
-        Sequential tasks complete before submit_to_batch_distributor
-        returns, so nothing is ever submitted or running at heartbeat
-        time.
+        Dummy tasks complete before submit_to_batch_distributor returns,
+        so nothing is ever submitted or running at heartbeat time.
         """
         return set()
 
@@ -139,34 +118,40 @@ class SequentialDistributor(ClusterDistributor):
         name: str,
         requested_resources: Dict[str, Any],
     ) -> str:
-        """Execute sequentially."""
-        # add an executor id to the environment
-        os.environ["JOB_ID"] = str(self._next_distributor_id)
-        distributor_id = str(self._next_distributor_id)
-        self._next_distributor_id += 1
+        """Run a fake execution of the task.
 
-        # run the job and log the exit code
-        try:
-            # run command
-            cli = WorkerNodeCLI()
-            args = cli.parse_args(command)
-            exit_code = cli.run_task_instance_job(args)
+        In a real executor, this is where submission to the cluster would happen.
+        Here, since it's a dummy executor, we just get a random number and empty
+        file paths.
+        """
+        logger.debug("This is the Dummy Distributor")
+        # even number for non array tasks
+        distributor_id = random.randint(1, int(1e6)) * 2
+        os.environ["JOB_ID"] = str(distributor_id)
 
-        except SystemExit as e:
-            if e.code == ReturnCodes.WORKER_NODE_CLI_FAILURE:
-                exit_code = ReturnCodes.WORKER_NODE_CLI_FAILURE
-            else:
-                raise
+        cli = WorkerNodeCLI()
+        # Configure component logging since we bypass main()
+        cli.configure_component_logging()
+        args = cli.parse_args(command)
 
-        self._exit_info[distributor_id] = exit_code
+        worker_node_factory = WorkerNodeFactory(cluster_name=args.cluster_name)
+        # Do not do ANY logging at all
+        worker_node_task_instance = worker_node_factory.get_job_task_instance(
+            task_instance_id=args.task_instance_id
+        )
+        # Log running, log done, and exit
+        worker_node_task_instance.log_running()
+        worker_node_task_instance.set_command_output(0, "", "")
+        worker_node_task_instance.log_done()
+
         return str(distributor_id)
 
 
-class SequentialWorkerNode(ClusterWorkerNode):
+class DummyWorkerNode(ClusterWorkerNode):
     """Get Executor Info for a Task Instance."""
 
     def __init__(self) -> None:
-        """Initialization of the sequential executor worker node."""
+        """Initialization of the dummy executor worker node."""
         self._distributor_id: Optional[str] = None
         self._logfile_template = {
             "stdout": "{root}/{name}.o{job_id}",
@@ -196,14 +181,7 @@ class SequentialWorkerNode(ClusterWorkerNode):
         """Exit info, error message."""
         return TaskInstanceStatus.ERROR, error_msg
 
-    def get_usage_stats(self) -> Dict:
-        """Usage information specific to the executor."""
-        usage = resource.getrusage(resource.RUSAGE_CHILDREN)
-        maxrss = usage.ru_maxrss
-        if platform.system() == "Darwin":
-            maxrss = maxrss // 1024
-        return {
-            "maxrss_kb": maxrss,
-            "user_time_sec": usage.ru_utime,
-            "system_time_sec": usage.ru_stime,
-        }
+    @staticmethod
+    def get_usage_stats() -> Dict:
+        """Usage information specific to the exector."""
+        return {}
