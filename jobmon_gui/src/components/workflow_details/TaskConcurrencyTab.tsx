@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import Plotly from 'plotly.js-dist';
 import createPlotlyComponent from 'react-plotly.js/factory';
 
@@ -22,14 +22,13 @@ import {
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DownloadIcon from '@mui/icons-material/Download';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import PauseIcon from '@mui/icons-material/Pause';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
 import PanToolIcon from '@mui/icons-material/PanTool';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
+import TuneIcon from '@mui/icons-material/Tune';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
@@ -44,18 +43,27 @@ import type { Layout, PlotRelayoutEvent, Data as PlotlyData } from 'plotly.js';
 
 dayjs.extend(utc);
 
-// Colors for status categories - semantically meaningful
-// Using darker line colors for better contrast on buttons and chart
+// Colors for status categories — synchronized with TEMPLATE_STATUS_COLORS
+// so the concurrency chart matches the DAG, popover, and summary panels.
 const STATUS_COLORS: Record<string, { line: string; fill: string; rgb: [number, number, number] }> = {
-    PENDING: { line: '#b8960a', fill: 'rgba(255, 215, 0, 0.3)', rgb: [184, 150, 10] }, // dark gold - waiting
-    LAUNCHED: { line: '#f57c00', fill: 'rgba(255, 167, 38, 0.4)', rgb: [245, 124, 0] }, // amber/orange - submitted
-    RUNNING: { line: '#1565c0', fill: 'rgba(25, 118, 210, 0.4)', rgb: [21, 101, 192] }, // dark blue - active
-    ERROR: { line: '#b71c1c', fill: 'rgba(183, 28, 28, 0.4)', rgb: [183, 28, 28] }, // deep red - error
-    DONE: { line: '#2e7d32', fill: 'rgba(76, 175, 80, 0.4)', rgb: [46, 125, 50] }, // dark green - completed
+    PENDING: { line: '#e69f00', fill: 'rgba(230, 159, 0, 0.3)', rgb: [230, 159, 0] },
+    LAUNCHED: { line: '#f0e442', fill: 'rgba(240, 228, 66, 0.3)', rgb: [240, 228, 66] },
+    RUNNING: { line: '#0072b2', fill: 'rgba(0, 114, 178, 0.3)', rgb: [0, 114, 178] },
+    ERROR: { line: '#d55e00', fill: 'rgba(213, 94, 0, 0.3)', rgb: [213, 94, 0] },
+    DONE: { line: '#009e73', fill: 'rgba(0, 158, 115, 0.3)', rgb: [0, 158, 115] },
 };
 
 // Order for display: PENDING first (waiting), LAUNCHED (submitted), RUNNING (active), ERROR (failed), DONE (completed)
 const STATUS_DISPLAY_ORDER = ['PENDING', 'LAUNCHED', 'RUNNING', 'ERROR', 'DONE'];
+
+// Display labels — map backend keys to popover-consistent names
+const STATUS_DISPLAY_LABEL: Record<string, string> = {
+    PENDING: 'PENDING',
+    LAUNCHED: 'SCHEDULED',
+    RUNNING: 'RUNNING',
+    ERROR: 'ERROR',
+    DONE: 'DONE',
+};
 
 // Convert RGB to HSL
 function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
@@ -126,9 +134,6 @@ function generateColorShades(rgb: [number, number, number], count: number): { li
     return shades;
 }
 
-// Auto-refresh interval in milliseconds
-const AUTO_REFRESH_INTERVAL_MS = 30000;
-
 // Default bucket size for time series aggregation (seconds)
 const DEFAULT_BUCKET_SECONDS = 10;
 
@@ -145,13 +150,12 @@ const BUCKET_SIZE_OPTIONS = [
 ];
 
 // Chart dimension constraints
-const MIN_CHART_HEIGHT = 400;
+const MIN_CHART_HEIGHT = 300;
 
 // Maximum templates to show in hover tooltip
 const MAX_TEMPLATES_IN_HOVER = 5;
 
 // Date format for time range display
-const TIME_RANGE_DISPLAY_FORMAT = 'MMM D, HH:mm';
 
 type TimeRangePreset = 'all' | '1h' | '6h' | '24h' | '7d';
 
@@ -248,23 +252,15 @@ function filterBuckets(
     };
 }
 
-// Format the time range for display in the button
-function formatTimeRangeLabel(selection: TimeRangeSelection): string {
-    if (selection.type === 'preset') {
-        return PRESET_CONFIGS[selection.preset || 'all'].label;
-    }
-    if (selection.customStart && selection.customEnd) {
-        return `${selection.customStart.format(TIME_RANGE_DISPLAY_FORMAT)} - ${selection.customEnd.format(TIME_RANGE_DISPLAY_FORMAT)}`;
-    }
-    return 'Custom range';
-}
 
 interface TaskConcurrencyTabProps {
     workflowId: string | number | undefined;
+    highlightedTemplates?: string[];
 }
 
 export default function TaskConcurrencyTab({
     workflowId,
+    highlightedTemplates,
 }: TaskConcurrencyTabProps) {
     const [timeRangeSelection, setTimeRangeSelection] = useState<TimeRangeSelection>({
         type: 'preset',
@@ -272,7 +268,6 @@ export default function TaskConcurrencyTab({
     });
     const [bucketSeconds, setBucketSeconds] = useState(DEFAULT_BUCKET_SECONDS);
     const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
-    const [autoRefresh, setAutoRefresh] = useState(false);
     const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set());
     const [groupByTemplate, setGroupByTemplate] = useState(false);
     const [normalizeYAxis, setNormalizeYAxis] = useState(false);
@@ -281,10 +276,17 @@ export default function TaskConcurrencyTab({
     const [tempCustomEnd, setTempCustomEnd] = useState<dayjs.Dayjs | null>(null);
     const [dragMode, setDragMode] = useState<'zoom' | 'pan'>('zoom');
     const [uiRevision, setUiRevision] = useState(0); // Increment to reset Plotly's UI state
+    const [settingsAnchor, setSettingsAnchor] = useState<HTMLElement | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const graphDivRef = useRef<any>(null); // Store the Plotly graph div for direct manipulation
+    // Plotly attaches internal layout data (_fullLayout) to the graph div
+    const graphDivRef = useRef<HTMLDivElement & { _fullLayout?: { xaxis?: { range?: [number | string, number | string] } } }>(null);
     const theme = useTheme();
     const isSmallScreen = useMediaQuery(theme.breakpoints.down('md'));
+
+    // Sync external highlight selection — clear when undefined (no node selected)
+    useEffect(() => {
+        setSelectedTemplates(highlightedTemplates ?? []);
+    }, [highlightedTemplates]);
 
     // Fetch available templates for dropdown
     const { data: templatesData } = useQuery({
@@ -306,7 +308,6 @@ export default function TaskConcurrencyTab({
         queryFn: getTaskConcurrencyQueryFn,
         refetchOnMount: true,
         refetchOnWindowFocus: false,
-        refetchInterval: autoRefresh ? AUTO_REFRESH_INTERVAL_MS : false,
         enabled: !!workflowId,
     });
 
@@ -445,7 +446,7 @@ export default function TaskConcurrencyTab({
     }, []);
 
     // Store reference to Plotly graph div when initialized
-    const handlePlotInitialized = useCallback((_figure: any, graphDiv: any) => {
+    const handlePlotInitialized = useCallback((_figure: object, graphDiv: typeof graphDivRef.current) => {
         graphDivRef.current = graphDiv;
     }, []);
 
@@ -597,7 +598,7 @@ export default function TaskConcurrencyTab({
                         type: 'bar',
                         marker: { color: colors.fill, line: { color: colors.line, width: 1 } },
                         yaxis: yAxisKey,
-                        hovertemplate: `<b>${templateName}</b><br>Count: %{y}<extra>${statusName}</extra>`,
+                        hovertemplate: `<b>${templateName}</b><br>Count: %{y}<extra>${STATUS_DISPLAY_LABEL[statusName] ?? statusName}</extra>`,
                     });
                 });
             } else {
@@ -615,12 +616,12 @@ export default function TaskConcurrencyTab({
                 resultTraces.push({
                     x: buckets,
                     y: filteredSeries,
-                    name: statusName,
+                    name: STATUS_DISPLAY_LABEL[statusName] ?? statusName,
                     type: 'bar',
                     marker: { color: colors.fill, line: { color: colors.line, width: 1 } },
                     yaxis: yAxisKey,
                     text: hoverText,
-                    hovertemplate: `<b>${statusName}</b>: %{y}%{text}<extra></extra>`,
+                    hovertemplate: `<b>${STATUS_DISPLAY_LABEL[statusName] ?? statusName}</b>: %{y}%{text}<extra></extra>`,
                 });
             }
         });
@@ -628,17 +629,6 @@ export default function TaskConcurrencyTab({
         return resultTraces;
     }, [filteredData, visibleStatuses, groupByTemplate, selectedTemplates, formatTemplateBreakdown]);
 
-
-    const chartTitle = useMemo(() => {
-        let title = 'Active Tasks by Status';
-        if (selectedTemplates.length > 0) {
-            title += `: ${selectedTemplates.length} template${selectedTemplates.length > 1 ? 's' : ''} selected`;
-        }
-        if (groupByTemplate) {
-            title += ' — Grouped by Template';
-        }
-        return title;
-    }, [selectedTemplates, groupByTemplate]);
 
     const layout: Partial<Layout> = useMemo(
         () => {
@@ -661,7 +651,7 @@ export default function TaskConcurrencyTab({
             }
 
             // Build y-axis configs for each subplot
-            const yAxes: Record<string, any> = {};
+            const yAxes: Record<string, object> = {};
             visibleStatuses.forEach((statusName, idx) => {
                 const axisKey = idx === 0 ? 'yaxis' : `yaxis${idx + 1}`;
                 const domainStart = 1 - (idx + 1) * plotHeight - idx * gap;
@@ -669,7 +659,7 @@ export default function TaskConcurrencyTab({
 
                 yAxes[axisKey] = {
                     title: {
-                        text: statusName,
+                        text: STATUS_DISPLAY_LABEL[statusName] ?? statusName,
                         font: { size: 12, family: 'Roboto, sans-serif', color: STATUS_COLORS[statusName]?.line },
                     },
                     tickfont: { size: 10 },
@@ -682,16 +672,6 @@ export default function TaskConcurrencyTab({
             });
 
             return {
-                title: {
-                    text: chartTitle,
-                    font: {
-                        size: isSmallScreen ? 14 : 18,
-                        family: 'Roboto, sans-serif',
-                        color: '#1976d2',
-                    },
-                    x: 0.02,
-                    xanchor: 'left',
-                },
                 xaxis: {
                     title: {
                         text: 'Time',
@@ -719,8 +699,8 @@ export default function TaskConcurrencyTab({
                 autosize: true,
                 showlegend: groupByTemplate, // Show legend when grouped by template
                 margin: isSmallScreen
-                    ? { l: 70, r: 20, t: 50, b: 60, pad: 3 }
-                    : { l: 80, r: 30, t: 60, b: 60, pad: 5 },
+                    ? { l: 60, r: 15, t: 30, b: 50, pad: 3 }
+                    : { l: 70, r: 20, t: 30, b: 50, pad: 5 },
                 hovermode: 'x unified' as const,
                 hoverlabel: {
                     bgcolor: 'white',
@@ -733,7 +713,7 @@ export default function TaskConcurrencyTab({
                 paper_bgcolor: 'rgba(0,0,0,0)',
             };
         },
-        [isSmallScreen, chartTitle, xAxisRange, dragMode, uiRevision, bucketSeconds, filteredData, visibleStatuses, groupByTemplate, normalizeYAxis]
+        [isSmallScreen, xAxisRange, dragMode, uiRevision, bucketSeconds, filteredData, visibleStatuses, groupByTemplate, normalizeYAxis]
     );
 
     const handleExportCSV = useCallback(() => {
@@ -848,276 +828,290 @@ export default function TaskConcurrencyTab({
     }
 
     return (
-        <Box sx={{ width: '100%', p: 2 }}>
-            {/* Toolbar - Row 1: Data & Time Controls */}
-            <Box
-                sx={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 2,
-                    mb: 1.5,
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                }}
-            >
-                {/* Left: Data Filters */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <FormControl size="small" sx={{ minWidth: 180 }}>
-                        <InputLabel>Templates</InputLabel>
-                        <Select
-                            multiple
-                            value={selectedTemplates}
-                            label="Templates"
-                            onChange={(e) => setSelectedTemplates(e.target.value as string[])}
-                            renderValue={(selected) =>
-                                selected.length === 0 ? 'All' : `${selected.length} selected`
-                            }
-                        >
-                            {templatesData?.task_templates?.map(t => (
-                                <MenuItem key={t} value={t}>{t}</MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <FormControl size="small" sx={{ minWidth: 90 }}>
-                        <InputLabel>Bucket</InputLabel>
-                        <Select
-                            value={bucketSeconds}
-                            label="Bucket"
-                            onChange={(e) => setBucketSeconds(e.target.value as number)}
-                        >
-                            {BUCKET_SIZE_OPTIONS.map(opt => (
-                                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-
-                    {/* Time Range */}
-                    <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<CalendarTodayIcon />}
-                        onClick={handleDatePickerOpen}
-                        sx={{ textTransform: 'none', minWidth: 140 }}
-                    >
-                        {formatTimeRangeLabel(timeRangeSelection)}
-                    </Button>
-
-                    <ButtonGroup size="small" variant="outlined">
-                        <Tooltip title="Zoom mode">
-                            <Button
-                                variant={dragMode === 'zoom' ? 'contained' : 'outlined'}
-                                onClick={() => setDragMode('zoom')}
-                            >
-                                <ZoomInIcon fontSize="small" />
-                            </Button>
-                        </Tooltip>
-                        <Tooltip title="Pan mode">
-                            <Button
-                                variant={dragMode === 'pan' ? 'contained' : 'outlined'}
-                                onClick={() => setDragMode('pan')}
-                            >
-                                <PanToolIcon fontSize="small" />
-                            </Button>
-                        </Tooltip>
-                    </ButtonGroup>
-
-                    <ButtonGroup size="small" variant="outlined">
-                        <Tooltip title="Zoom in">
-                            <Button onClick={handleZoomIn}>
-                                <AddIcon fontSize="small" />
-                            </Button>
-                        </Tooltip>
-                        <Tooltip title="Zoom out">
-                            <Button onClick={handleZoomOut}>
-                                <RemoveIcon fontSize="small" />
-                            </Button>
-                        </Tooltip>
-                        <Tooltip title="Reset zoom">
-                            <Button onClick={handleResetZoom}>
-                                <RestartAltIcon fontSize="small" />
-                            </Button>
-                        </Tooltip>
-                    </ButtonGroup>
-
-                    <Popover
-                        open={Boolean(datePickerAnchor)}
-                        anchorEl={datePickerAnchor}
-                        onClose={handleDatePickerClose}
-                        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-                        slotProps={{
-                            paper: { sx: { bgcolor: 'background.paper', boxShadow: 4 } },
-                        }}
-                    >
-                        <LocalizationProvider dateAdapter={AdapterDayjs}>
-                            <Box sx={{ p: 2, width: 320 }}>
-                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                    Quick select
-                                </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2 }}>
-                                    {(Object.entries(PRESET_CONFIGS) as [TimeRangePreset, { label: string }][]).map(
-                                        ([key, config]) => (
-                                            <Button
-                                                key={key}
-                                                size="small"
-                                                variant={
-                                                    timeRangeSelection.type === 'preset' &&
-                                                    timeRangeSelection.preset === key
-                                                        ? 'contained'
-                                                        : 'outlined'
-                                                }
-                                                onClick={() => handlePresetSelect(key)}
-                                                sx={{ textTransform: 'none' }}
-                                            >
-                                                {config.label}
-                                            </Button>
-                                        )
-                                    )}
-                                </Box>
-                                <Divider sx={{ my: 2 }} />
-                                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                                    Custom range
-                                </Typography>
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                    <DateTimePicker
-                                        label="Start"
-                                        value={tempCustomStart}
-                                        onChange={setTempCustomStart}
-                                        slotProps={{ textField: { size: 'small', fullWidth: true } }}
-                                    />
-                                    <DateTimePicker
-                                        label="End"
-                                        value={tempCustomEnd}
-                                        onChange={setTempCustomEnd}
-                                        slotProps={{ textField: { size: 'small', fullWidth: true } }}
-                                    />
-                                    <Button
-                                        variant="contained"
-                                        onClick={handleCustomRangeApply}
-                                        disabled={!tempCustomStart || !tempCustomEnd}
-                                    >
-                                        Apply
-                                    </Button>
-                                </Box>
-                            </Box>
-                        </LocalizationProvider>
-                    </Popover>
-                </Box>
-
-                {/* Right: Actions */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Tooltip
-                        title={
-                            autoRefresh
-                                ? 'Disable auto-refresh'
-                                : `Enable auto-refresh (${AUTO_REFRESH_INTERVAL_MS / 1000}s)`
-                        }
-                    >
-                        <IconButton
-                            size="small"
-                            onClick={() => setAutoRefresh(!autoRefresh)}
-                            color={autoRefresh ? 'primary' : 'default'}
-                        >
-                            {autoRefresh ? <PauseIcon /> : <PlayArrowIcon />}
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Refresh now">
-                        <IconButton size="small" onClick={() => refetch()}>
-                            <RefreshIcon />
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Export CSV">
-                        <IconButton size="small" onClick={handleExportCSV}>
-                            <DownloadIcon />
-                        </IconButton>
-                    </Tooltip>
-                </Box>
-            </Box>
-
-            {/* Toolbar - Row 2: View Options */}
-            <Box
-                sx={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 1.5,
-                    mb: 2,
-                    alignItems: 'center',
-                    pb: 1.5,
-                    borderBottom: '1px solid',
-                    borderColor: 'divider',
-                }}
-            >
-                {/* Status toggle buttons */}
-                <ButtonGroup size="small" variant="outlined">
-                    {STATUS_DISPLAY_ORDER.map(status => {
-                        const isHidden = hiddenStatuses.has(status);
-                        return (
-                            <Tooltip
-                                key={status}
-                                title={isHidden ? 'Click to show' : 'Click to hide'}
-                            >
-                                <Button
-                                    variant={isHidden ? 'outlined' : 'contained'}
-                                    onClick={() => toggleStatusVisibility(status)}
-                                    sx={{
-                                        borderColor: STATUS_COLORS[status].line,
-                                        color: isHidden ? 'rgba(0,0,0,0.3)' : 'white',
-                                        backgroundColor: isHidden ? 'rgba(0,0,0,0.05)' : STATUS_COLORS[status].line,
-                                        textDecoration: isHidden ? 'line-through' : 'none',
-                                        opacity: isHidden ? 0.6 : 1,
-                                        '&:hover': {
-                                            backgroundColor: isHidden
-                                                ? 'rgba(0,0,0,0.1)'
-                                                : STATUS_COLORS[status].line,
-                                            borderColor: STATUS_COLORS[status].line,
-                                        },
-                                    }}
-                                >
-                                    {status}
-                                </Button>
-                            </Tooltip>
-                        );
-                    })}
-                </ButtonGroup>
-
-                <Divider orientation="vertical" flexItem />
-
-                {/* View toggles */}
-                <Tooltip title={groupByTemplate ? 'Show aggregated' : 'Group by template'}>
-                    <Button
-                        size="small"
-                        variant={groupByTemplate ? 'contained' : 'outlined'}
-                        onClick={() => setGroupByTemplate(!groupByTemplate)}
-                    >
-                        By Template
-                    </Button>
-                </Tooltip>
-
-                <Tooltip title={normalizeYAxis ? 'Use independent scales' : 'Sync y-axis scales'}>
-                    <Button
-                        size="small"
-                        variant={normalizeYAxis ? 'contained' : 'outlined'}
-                        onClick={() => setNormalizeYAxis(!normalizeYAxis)}
-                    >
-                        Sync Scales
-                    </Button>
-                </Tooltip>
-            </Box>
-
-            {/* Chart */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
+            {/* Chart area with integrated toolbar */}
             <Box
                 ref={containerRef}
                 sx={{
-                    width: '100%',
-                    minHeight: MIN_CHART_HEIGHT,
-                    border: '1px solid #e0e0e0',
-                    borderRadius: 1,
+                    flex: 1,
+                    minHeight: 0,
+                    minWidth: 0,
                     bgcolor: 'background.paper',
+                    position: 'relative',
                 }}
             >
+                {/* Top-right action icons */}
+                <Box
+                    sx={{
+                        position: 'absolute',
+                        top: 4,
+                        right: 8,
+                        zIndex: 2,
+                        display: 'flex',
+                        gap: 0.25,
+                        bgcolor: 'rgba(255,255,255,0.85)',
+                        borderRadius: 1,
+                        px: 0.25,
+                    }}
+                >
+                    <Tooltip title="Export CSV">
+                        <IconButton size="small" onClick={handleExportCSV} sx={{ p: 0.5 }}>
+                            <DownloadIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Chart settings">
+                        <IconButton
+                            size="small"
+                            onClick={(e) => setSettingsAnchor(e.currentTarget)}
+                            sx={{ p: 0.5 }}
+                        >
+                            <TuneIcon fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
+
+                {/* Settings popover */}
+                <Popover
+                    open={Boolean(settingsAnchor)}
+                    anchorEl={settingsAnchor}
+                    onClose={() => setSettingsAnchor(null)}
+                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                    transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+                    slotProps={{
+                        paper: { sx: { width: 300, maxHeight: '80vh', overflow: 'auto' } },
+                    }}
+                >
+                    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {/* Data section */}
+                        <Box>
+                            <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                Data
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                                <FormControl size="small" fullWidth>
+                                    <InputLabel>Templates</InputLabel>
+                                    <Select
+                                        multiple
+                                        value={selectedTemplates}
+                                        label="Templates"
+                                        onChange={(e) => setSelectedTemplates(e.target.value as string[])}
+                                        renderValue={(selected) =>
+                                            selected.length === 0 ? 'All' : `${selected.length} selected`
+                                        }
+                                        sx={{ '& .MuiSelect-select': { fontSize: '0.85rem' } }}
+                                    >
+                                        {templatesData?.task_templates?.map(t => (
+                                            <MenuItem key={t} value={t}>{t}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                                <FormControl size="small" sx={{ minWidth: 95 }}>
+                                    <InputLabel>Bucket</InputLabel>
+                                    <Select
+                                        value={bucketSeconds}
+                                        label="Bucket"
+                                        onChange={(e) => setBucketSeconds(e.target.value as number)}
+                                        sx={{ '& .MuiSelect-select': { fontSize: '0.85rem' } }}
+                                    >
+                                        {BUCKET_SIZE_OPTIONS.map(opt => (
+                                            <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Box>
+                        </Box>
+
+                        <Divider />
+
+                        {/* Time range section */}
+                        <Box>
+                            <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                Time Range
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                {(Object.entries(PRESET_CONFIGS) as [TimeRangePreset, { label: string }][]).map(
+                                    ([key, config]) => (
+                                        <Button
+                                            key={key}
+                                            size="small"
+                                            variant={
+                                                timeRangeSelection.type === 'preset' &&
+                                                timeRangeSelection.preset === key
+                                                    ? 'contained'
+                                                    : 'outlined'
+                                            }
+                                            onClick={() => handlePresetSelect(key)}
+                                            sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                                        >
+                                            {config.label}
+                                        </Button>
+                                    )
+                                )}
+                                <Button
+                                    size="small"
+                                    variant={timeRangeSelection.type === 'custom' ? 'contained' : 'outlined'}
+                                    onClick={handleDatePickerOpen}
+                                    startIcon={<CalendarTodayIcon sx={{ fontSize: '0.85rem !important' }} />}
+                                    sx={{ textTransform: 'none', fontSize: '0.75rem' }}
+                                >
+                                    Custom
+                                </Button>
+                            </Box>
+                        </Box>
+
+                        <Popover
+                            open={Boolean(datePickerAnchor)}
+                            anchorEl={datePickerAnchor}
+                            onClose={handleDatePickerClose}
+                            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                            slotProps={{
+                                paper: { sx: { bgcolor: 'background.paper', boxShadow: 4 } },
+                            }}
+                        >
+                            <LocalizationProvider dateAdapter={AdapterDayjs}>
+                                <Box sx={{ p: 2, width: 300 }}>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <DateTimePicker
+                                            label="Start"
+                                            value={tempCustomStart}
+                                            onChange={setTempCustomStart}
+                                            slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                                        />
+                                        <DateTimePicker
+                                            label="End"
+                                            value={tempCustomEnd}
+                                            onChange={setTempCustomEnd}
+                                            slotProps={{ textField: { size: 'small', fullWidth: true } }}
+                                        />
+                                        <Button
+                                            variant="contained"
+                                            onClick={handleCustomRangeApply}
+                                            disabled={!tempCustomStart || !tempCustomEnd}
+                                        >
+                                            Apply
+                                        </Button>
+                                    </Box>
+                                </Box>
+                            </LocalizationProvider>
+                        </Popover>
+
+                        <Divider />
+
+                        {/* Zoom & navigation section */}
+                        <Box>
+                            <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                Navigation
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
+                                <ButtonGroup size="small" variant="outlined">
+                                    <Tooltip title="Zoom mode">
+                                        <Button
+                                            variant={dragMode === 'zoom' ? 'contained' : 'outlined'}
+                                            onClick={() => setDragMode('zoom')}
+                                            sx={{ minWidth: 0, px: 0.75 }}
+                                        >
+                                            <ZoomInIcon fontSize="small" />
+                                        </Button>
+                                    </Tooltip>
+                                    <Tooltip title="Pan mode">
+                                        <Button
+                                            variant={dragMode === 'pan' ? 'contained' : 'outlined'}
+                                            onClick={() => setDragMode('pan')}
+                                            sx={{ minWidth: 0, px: 0.75 }}
+                                        >
+                                            <PanToolIcon fontSize="small" />
+                                        </Button>
+                                    </Tooltip>
+                                    <Tooltip title="Zoom in">
+                                        <Button onClick={handleZoomIn} sx={{ minWidth: 0, px: 0.75 }}>
+                                            <AddIcon fontSize="small" />
+                                        </Button>
+                                    </Tooltip>
+                                    <Tooltip title="Zoom out">
+                                        <Button onClick={handleZoomOut} sx={{ minWidth: 0, px: 0.75 }}>
+                                            <RemoveIcon fontSize="small" />
+                                        </Button>
+                                    </Tooltip>
+                                    <Tooltip title="Reset zoom">
+                                        <Button onClick={handleResetZoom} sx={{ minWidth: 0, px: 0.75 }}>
+                                            <RestartAltIcon fontSize="small" />
+                                        </Button>
+                                    </Tooltip>
+                                </ButtonGroup>
+                            </Box>
+                        </Box>
+
+                        <Divider />
+
+                        {/* Status visibility section */}
+                        <Box>
+                            <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                Status Visibility
+                            </Typography>
+                            <Box sx={{ mt: 0.5 }}>
+                                <ButtonGroup size="small" variant="outlined">
+                                    {STATUS_DISPLAY_ORDER.map(status => {
+                                        const isHidden = hiddenStatuses.has(status);
+                                        return (
+                                            <Tooltip key={status} title={isHidden ? `Show ${STATUS_DISPLAY_LABEL[status]}` : `Hide ${STATUS_DISPLAY_LABEL[status]}`}>
+                                                <Button
+                                                    variant={isHidden ? 'outlined' : 'contained'}
+                                                    onClick={() => toggleStatusVisibility(status)}
+                                                    sx={{
+                                                        borderColor: STATUS_COLORS[status].line,
+                                                        color: isHidden ? 'rgba(0,0,0,0.3)' : status === 'LAUNCHED' ? '#333' : 'white',
+                                                        backgroundColor: isHidden ? 'rgba(0,0,0,0.05)' : STATUS_COLORS[status].line,
+                                                        textDecoration: isHidden ? 'line-through' : 'none',
+                                                        opacity: isHidden ? 0.6 : 1,
+                                                        fontSize: '0.65rem',
+                                                        px: 0.75,
+                                                        minWidth: 0,
+                                                        '&:hover': {
+                                                            backgroundColor: isHidden
+                                                                ? 'rgba(0,0,0,0.1)'
+                                                                : STATUS_COLORS[status].line,
+                                                            borderColor: STATUS_COLORS[status].line,
+                                                        },
+                                                    }}
+                                                >
+                                                    {(STATUS_DISPLAY_LABEL[status] ?? status).slice(0, 3)}
+                                                </Button>
+                                            </Tooltip>
+                                        );
+                                    })}
+                                </ButtonGroup>
+                            </Box>
+                        </Box>
+
+                        <Divider />
+
+                        {/* View options section */}
+                        <Box>
+                            <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                View
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                                <Button
+                                    size="small"
+                                    variant={groupByTemplate ? 'contained' : 'outlined'}
+                                    onClick={() => setGroupByTemplate(!groupByTemplate)}
+                                    sx={{ fontSize: '0.75rem', textTransform: 'none' }}
+                                >
+                                    By Template
+                                </Button>
+                                <Button
+                                    size="small"
+                                    variant={normalizeYAxis ? 'contained' : 'outlined'}
+                                    onClick={() => setNormalizeYAxis(!normalizeYAxis)}
+                                    sx={{ fontSize: '0.75rem', textTransform: 'none' }}
+                                >
+                                    Sync Scales
+                                </Button>
+                            </Box>
+                        </Box>
+                    </Box>
+                </Popover>
                 {traces.length > 0 ? (
                     <Plot
                         data={traces}
@@ -1130,8 +1124,8 @@ export default function TaskConcurrencyTab({
                         config={{
                             responsive: true,
                             displaylogo: false,
-                            displayModeBar: false, // We use custom controls in the header
-                            scrollZoom: true, // Enable scroll wheel zoom
+                            displayModeBar: false,
+                            scrollZoom: true,
                         }}
                     />
                 ) : (
@@ -1140,7 +1134,7 @@ export default function TaskConcurrencyTab({
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            height: MIN_CHART_HEIGHT,
+                            height: '100%',
                         }}
                     >
                         <Typography color="text.secondary">

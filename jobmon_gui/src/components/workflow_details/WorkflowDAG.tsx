@@ -1,25 +1,36 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, {
+    useState,
+    useMemo,
+    useEffect,
+    useCallback,
+    createContext,
+    useContext,
+    useSyncExternalStore,
+} from 'react';
 import ReactFlow, {
-    MiniMap,
     Controls,
     Background,
     Handle,
     Position,
     Node,
     Edge,
+    NodeProps,
+    useReactFlow,
+    ReactFlowProvider,
 } from 'reactflow';
 import dagre from 'dagre';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
-import {
-    get_task_template_dag,
-    workflow_tt_status_url,
-} from '@jobmon_gui/configs/ApiUrls.ts';
+import { get_task_template_dag } from '@jobmon_gui/configs/ApiUrls.ts';
 import TaskTemplatePopover from '@jobmon_gui/components/TaskTemplatePopover.tsx';
 import { useQuery } from '@tanstack/react-query';
-import { TTStatus, TTStatusResponse } from '@jobmon_gui/types/TaskTemplateStatus.ts';
+import { TTStatus } from '@jobmon_gui/types/TaskTemplateStatus.ts';
 import { CircularProgress } from '@mui/material';
+import {
+    TEMPLATE_STATUS_COLORS,
+    TEMPLATE_STATUS_KEYS,
+} from '@jobmon_gui/constants/taskStatus';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,8 +45,16 @@ interface TaskTemplateDAGResponse {
 
 interface DagNodeData {
     label: string;
-    width: number;
-    height: number;
+    width?: number;
+    height?: number;
+    statusCounts?: {
+        PENDING: number;
+        SCHEDULED: number;
+        RUNNING: number;
+        DONE: number;
+        FATAL: number;
+        tasks: number;
+    };
 }
 
 interface PopoverPosition {
@@ -44,18 +63,84 @@ interface PopoverPosition {
 }
 
 // ---------------------------------------------------------------------------
+// Visual state store — lives outside React's render cycle.
+// DagNode subscribes via useSyncExternalStore so only the 1-2 affected
+// nodes re-render on hover/select changes. The nodes array passed to
+// ReactFlow stays completely stable.
+// ---------------------------------------------------------------------------
+
+interface DagVisualState {
+    hoveredId: string | null;
+    selectedId: string | null;
+}
+
+function createDagVisualStore() {
+    let state: DagVisualState = { hoveredId: null, selectedId: null };
+    const listeners = new Set<() => void>();
+
+    const notify = () => listeners.forEach(l => l());
+
+    return {
+        getSnapshot: () => state,
+        subscribe: (listener: () => void) => {
+            listeners.add(listener);
+            return () => {
+                listeners.delete(listener);
+            };
+        },
+        setHovered: (id: string | null) => {
+            if (state.hoveredId !== id) {
+                state = { ...state, hoveredId: id };
+                notify();
+            }
+        },
+        setSelected: (id: string | null) => {
+            if (state.selectedId !== id) {
+                state = { ...state, selectedId: id };
+                notify();
+            }
+        },
+    };
+}
+
+type DagVisualStore = ReturnType<typeof createDagVisualStore>;
+
+const DagVisualStoreContext = createContext<DagVisualStore | null>(null);
+
+function useDagNodeIsHovered(id: string): boolean {
+    const store = useContext(DagVisualStoreContext)!;
+    return useSyncExternalStore(
+        store.subscribe,
+        useCallback(
+            () => store.getSnapshot().hoveredId === id,
+            [store, id]
+        )
+    );
+}
+
+function useDagNodeIsSelected(id: string): boolean {
+    const store = useContext(DagVisualStoreContext)!;
+    return useSyncExternalStore(
+        store.subscribe,
+        useCallback(
+            () => store.getSnapshot().selectedId === id,
+            [store, id]
+        )
+    );
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const NODE_DIMENSIONS = {
     minWidth: 120,
+    maxWidthBonus: 60,
     minHeight: 36,
+    maxHeightBonus: 24,
     charWidthEstimate: 8,
     horizontalPadding: 24,
-    taskCountWidthPerTask: 3,
-    taskCountWidthCap: 120,
-    taskCountHeightPerTask: 2,
-    taskCountHeightCap: 80,
+    statusBarHeight: 8,
 } as const;
 
 const DAGRE_LAYOUT = {
@@ -69,14 +154,47 @@ const DAGRE_LAYOUT = {
 const POPOVER_OFFSET = 16;
 const POPOVER_Z_INDEX = 1000;
 
+// Node & edge colors (inline styles for ReactFlow — theme not available)
+const COLOR_BORDER = '#b1b1b7';
+const COLOR_PRIMARY = '#1976d2';
+const COLOR_HOVER_BG = '#e3f2fd';
+
+const EDGE_STYLE_DEFAULT = { stroke: COLOR_BORDER, strokeWidth: 1 };
+const EDGE_STYLE_HIGHLIGHTED = { stroke: COLOR_PRIMARY, strokeWidth: 2.5 };
+const EDGE_STYLE_DIMMED = { stroke: '#e0e0e0', strokeWidth: 1 };
+
+
+function getDominantColor(
+    statusCounts?: DagNodeData['statusCounts']
+): string {
+    if (!statusCounts || statusCounts.tasks === 0) return COLOR_BORDER;
+
+    // FATAL takes priority — any fatal tasks means immediate red
+    if (statusCounts.FATAL > 0) return TEMPLATE_STATUS_COLORS.FATAL;
+
+    // DONE only when 100% complete
+    if (statusCounts.DONE === statusCounts.tasks)
+        return TEMPLATE_STATUS_COLORS.DONE;
+
+    // Among active states, pick the one with the highest count
+    let maxCount = 0;
+    let dominant = COLOR_BORDER;
+    for (const key of ['RUNNING', 'SCHEDULED', 'PENDING'] as const) {
+        if (statusCounts[key] > maxCount) {
+            maxCount = statusCounts[key];
+            dominant = TEMPLATE_STATUS_COLORS[key];
+        }
+    }
+    return dominant;
+}
+
 const DAG_NODE_STYLE: React.CSSProperties = {
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     padding: '8px 12px',
     boxSizing: 'border-box',
-    background: '#fff',
-    border: '1px solid #b1b1b7',
     borderRadius: 3,
     wordBreak: 'break-word',
     textAlign: 'center',
@@ -86,32 +204,60 @@ const DAG_NODE_STYLE: React.CSSProperties = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getNodeDimensions(label: string, taskCount: number): { width: number; height: number } {
-    const {
-        minWidth,
-        minHeight,
-        charWidthEstimate,
-        horizontalPadding,
-        taskCountWidthPerTask,
-        taskCountWidthCap,
-        taskCountHeightPerTask,
-        taskCountHeightCap,
-    } = NODE_DIMENSIONS;
+function computeRelativeScales(
+    taskCounts: Record<string, number>
+): Record<string, number> {
+    const entries = Object.entries(taskCounts);
+    if (entries.length === 0) return {};
 
-    const baseWidth = Math.max(
-        minWidth,
-        (label?.length ?? 0) * charWidthEstimate + horizontalPadding
-    );
-    const widthBonus = Math.min(taskCount * taskCountWidthPerTask, taskCountWidthCap);
-    const heightBonus = Math.min(taskCount * taskCountHeightPerTask, taskCountHeightCap);
+    const counts = entries.map(([, c]) => Math.max(1, c));
+    const logMin = Math.log(Math.min(...counts));
+    const logMax = Math.log(Math.max(...counts));
+    const logRange = logMax - logMin;
 
-    return {
-        width: baseWidth + widthBonus,
-        height: minHeight + heightBonus,
-    };
+    const scales: Record<string, number> = {};
+    for (const [name, count] of entries) {
+        if (logRange === 0) {
+            scales[name] = 0.5;
+        } else {
+            scales[name] =
+                (Math.log(Math.max(1, count)) - logMin) / logRange;
+        }
+    }
+    return scales;
 }
 
-function buildNodesAndEdges(ttDag: TaskTemplateDAGResponse['tt_dag']): {
+function getNodeDimensions(
+    label: string,
+    hasStatus: boolean,
+    relativeScale: number
+): { width: number; height: number } {
+    const {
+        minWidth,
+        maxWidthBonus,
+        minHeight,
+        maxHeightBonus,
+        charWidthEstimate,
+        horizontalPadding,
+        statusBarHeight,
+    } = NODE_DIMENSIONS;
+
+    const labelWidth =
+        (label?.length ?? 0) * charWidthEstimate + horizontalPadding;
+    const scaleBonus = maxWidthBonus * relativeScale;
+    const width = Math.max(minWidth, labelWidth) + scaleBonus;
+
+    const height =
+        minHeight +
+        maxHeightBonus * relativeScale +
+        (hasStatus ? statusBarHeight : 0);
+
+    return { width, height };
+}
+
+function buildNodesAndEdges(
+    ttDag: TaskTemplateDAGResponse['tt_dag']
+): {
     nodes: Node<DagNodeData>[];
     edges: Edge[];
 } {
@@ -142,7 +288,11 @@ function buildNodesAndEdges(ttDag: TaskTemplateDAGResponse['tt_dag']): {
             seenIds.add(targetId);
         }
         if (targetId) {
-            edges.push({ id: `e${index}`, source: sourceId, target: targetId });
+            edges.push({
+                id: `e${index}`,
+                source: sourceId,
+                target: targetId,
+            });
         }
     });
 
@@ -163,7 +313,10 @@ function applyDagreLayout(
         graph.setNode(node.id, { width: w, height: h });
     });
     edges.forEach(edge => {
-        graph.setEdge(edge.source, edge.target, { minlen: 1, weight: 1 });
+        graph.setEdge(edge.source, edge.target, {
+            minlen: 1,
+            weight: 1,
+        });
     });
 
     dagre.layout(graph);
@@ -180,24 +333,78 @@ function applyDagreLayout(
 }
 
 // ---------------------------------------------------------------------------
-// Custom node component
+// Custom node component — reads visual state from the store, NOT from
+// node data. This means the nodes array never changes for hover/select,
+// and only the 1-2 affected DagNode components re-render.
 // ---------------------------------------------------------------------------
 
-function DagNode({ data }: { data: DagNodeData }) {
+const DagNode = React.memo(function DagNode({
+    data,
+    id,
+}: NodeProps<DagNodeData>) {
+    const isHovered = useDagNodeIsHovered(id);
+    const isSelected = useDagNodeIsSelected(id);
+
     const label = data.label ?? '';
     const width = data.width ?? NODE_DIMENSIONS.minWidth;
     const height = data.height ?? NODE_DIMENSIONS.minHeight;
+    const dominantColor = getDominantColor(data.statusCounts);
+    const total = data.statusCounts?.tasks ?? 0;
 
     return (
         <>
             <Handle type="target" position={Position.Top} />
-            <div style={{ width, minHeight: height, ...DAG_NODE_STYLE }}>
-                {label}
+            <div
+                style={{
+                    width,
+                    minHeight: height,
+                    ...DAG_NODE_STYLE,
+                    borderLeft: `3px solid ${dominantColor}`,
+                    borderTop: `1px solid ${COLOR_BORDER}`,
+                    borderRight: `1px solid ${COLOR_BORDER}`,
+                    borderBottom: `1px solid ${COLOR_BORDER}`,
+                    outline: isSelected
+                        ? `2px solid ${COLOR_PRIMARY}`
+                        : 'none',
+                    outlineOffset: 1,
+                    background: isHovered ? COLOR_HOVER_BG : '#fff',
+                    transition: 'background 0.15s ease',
+                }}
+            >
+                <span>{label}</span>
+                {total > 0 && (
+                    <div
+                        style={{
+                            display: 'flex',
+                            width: '100%',
+                            height: 4,
+                            marginTop: 4,
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                        }}
+                    >
+                        {TEMPLATE_STATUS_KEYS.map(key => {
+                            const count =
+                                data.statusCounts?.[key] ?? 0;
+                            if (count === 0) return null;
+                            return (
+                                <div
+                                    key={key}
+                                    style={{
+                                        width: `${(count / total) * 100}%`,
+                                        backgroundColor:
+                                            TEMPLATE_STATUS_COLORS[key],
+                                    }}
+                                />
+                            );
+                        })}
+                    </div>
+                )}
             </div>
             <Handle type="source" position={Position.Bottom} />
         </>
     );
-}
+});
 
 const nodeTypes = { dagNode: DagNode };
 
@@ -207,165 +414,258 @@ const nodeTypes = { dagNode: DagNode };
 
 interface WorkflowDAGProps {
     workflowId: string | number;
+    ttStatusByName: Record<string, TTStatus>;
+    selectedTemplateName?: string | null;
+    hoveredTemplateName?: string | null;
+    onTemplateSelect?: (name: string) => void;
+    onTemplateHover?: (name: string | null) => void;
+    height?: string;
 }
 
-export default function WorkflowDAG({ workflowId }: WorkflowDAGProps) {
+const EMPTY_STATUS: Record<string, TTStatus> = {};
+
+function WorkflowDAGInner({
+    workflowId,
+    ttStatusByName = EMPTY_STATUS,
+    selectedTemplateName,
+    hoveredTemplateName,
+    onTemplateSelect,
+    onTemplateHover,
+    height,
+}: WorkflowDAGProps) {
     const navigate = useNavigate();
-    const popoverRef = useRef<HTMLDivElement>(null);
+    const { fitView } = useReactFlow();
+
+    const visualStore = useMemo(() => createDagVisualStore(), []);
 
     const [nodes, setNodes] = useState<Node<DagNodeData>[]>([]);
     const [edges, setEdges] = useState<Edge[]>([]);
-    const [selectedNode, setSelectedNode] = useState<Node<DagNodeData> | null>(null);
-    const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-    const [popoverPosition, setPopoverPosition] = useState<PopoverPosition | null>(null);
+    const [popoverNodeId, setPopoverNodeId] = useState<string | null>(
+        null
+    );
+    const [popoverPosition, setPopoverPosition] =
+        useState<PopoverPosition | null>(null);
 
-    const wfTTStatus = useQuery({
-        queryKey: ['workflow_details', 'tt_status', workflowId],
-        queryFn: async () => {
-            const { data } = await axios.get<TTStatusResponse>(
-                workflow_tt_status_url + workflowId,
-                { ...jobmonAxiosConfig }
-            );
-            return data;
-        },
-    });
+    // Sync props → store. The store's no-op guard prevents spurious
+    // notifications when the value hasn't actually changed.
+    useEffect(() => {
+        visualStore.setSelected(selectedTemplateName ?? null);
+    }, [selectedTemplateName, visualStore]);
+
+    useEffect(() => {
+        visualStore.setHovered(hoveredTemplateName ?? null);
+    }, [hoveredTemplateName, visualStore]);
 
     const dagQuery = useQuery({
-        queryKey: ['workflow_details', 'task_template_dag', workflowId],
+        queryKey: [
+            'workflow_details',
+            'task_template_dag',
+            workflowId,
+        ],
         queryFn: async () => {
-            const { data } = await axios.get<TaskTemplateDAGResponse>(
-                get_task_template_dag(workflowId),
-                { ...jobmonAxiosConfig }
-            );
+            const { data } =
+                await axios.get<TaskTemplateDAGResponse>(
+                    get_task_template_dag(workflowId),
+                    { ...jobmonAxiosConfig }
+                );
             return data;
         },
         enabled: !!workflowId,
     });
 
-    const ttStatusByName = useMemo(() => {
-        if (!wfTTStatus.data) return {};
-        return Object.fromEntries(
-            Object.values(wfTTStatus.data).map(tt => [tt.name, tt])
-        ) as Record<string, TTStatus>;
-    }, [wfTTStatus.data]);
+    // Structural layout — only contains label, dimensions, statusCounts.
+    // No hover/select state. This array is what ReactFlow receives and
+    // it only changes when the graph structure or status values change.
+    const structuralNodes = useMemo(() => {
+        const taskCounts: Record<string, number> = {};
+        for (const node of nodes) {
+            taskCounts[node.id] =
+                ttStatusByName[node.id]?.tasks ?? 0;
+        }
+        const scales = computeRelativeScales(taskCounts);
 
-    const laidOutNodes = useMemo(() => {
         const nodesWithDimensions = nodes.map(node => {
-            const taskCount = ttStatusByName[node.id]?.tasks ?? 0;
-            const { width, height } = getNodeDimensions(
+            const tt = ttStatusByName[node.id];
+            const { width, height: h } = getNodeDimensions(
                 node.data?.label ?? '',
-                taskCount
+                (tt?.tasks ?? 0) > 0,
+                scales[node.id] ?? 0
             );
-            return { ...node, data: { ...node.data, width, height } };
+            const statusCounts = tt
+                ? {
+                      PENDING: tt.PENDING,
+                      SCHEDULED: tt.SCHEDULED,
+                      RUNNING: tt.RUNNING,
+                      DONE: tt.DONE,
+                      FATAL: tt.FATAL,
+                      tasks: tt.tasks,
+                  }
+                : undefined;
+            return {
+                ...node,
+                data: {
+                    ...node.data,
+                    width,
+                    height: h,
+                    statusCounts,
+                },
+            };
         });
         return applyDagreLayout(nodesWithDimensions, edges);
     }, [nodes, edges, ttStatusByName]);
 
-    const styledEdges = useMemo(() => {
-        return edges.map(edge => {
-            const isConnected =
-                hoveredNodeId &&
-                (edge.source === hoveredNodeId || edge.target === hoveredNodeId);
-            return {
-                ...edge,
-                style: isConnected
-                    ? { stroke: '#2196f3', strokeWidth: 2 }
-                    : undefined,
-                animated: isConnected,
-            };
-        });
-    }, [edges, hoveredNodeId]);
+    // Fit the view once when the graph structure first loads.
+    const graphStructureKey = useMemo(
+        () => nodes.map(n => n.id).sort().join('\0'),
+        [nodes]
+    );
+
+    useEffect(() => {
+        if (structuralNodes.length > 0) {
+            const timer = setTimeout(() => {
+                fitView({ padding: 0.15, duration: 200 });
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [graphStructureKey, fitView]);
 
     useEffect(() => {
         if (dagQuery.data) {
-            const { nodes: newNodes, edges: newEdges } = buildNodesAndEdges(
-                dagQuery.data.tt_dag
-            );
+            const { nodes: newNodes, edges: newEdges } =
+                buildNodesAndEdges(dagQuery.data.tt_dag);
             setNodes(newNodes);
             setEdges(newEdges);
         }
     }, [dagQuery.data]);
 
-    const hoveredTTData = selectedNode
-        ? ttStatusByName[selectedNode.id]
+    // Subscribe to hoveredId for edge highlighting
+    const hoveredId = useSyncExternalStore(
+        visualStore.subscribe,
+        useCallback(() => visualStore.getSnapshot().hoveredId, [visualStore])
+    );
+
+    const styledEdges = useMemo(() => {
+        if (!hoveredId) {
+            return edges.map(e => ({ ...e, style: EDGE_STYLE_DEFAULT }));
+        }
+        return edges.map(e => ({
+            ...e,
+            style:
+                e.source === hoveredId || e.target === hoveredId
+                    ? EDGE_STYLE_HIGHLIGHTED
+                    : EDGE_STYLE_DIMMED,
+            zIndex:
+                e.source === hoveredId || e.target === hoveredId ? 1 : 0,
+        }));
+    }, [edges, hoveredId]);
+
+    const popoverTTData = popoverNodeId
+        ? ttStatusByName[popoverNodeId]
         : undefined;
 
     const handleNodeMouseEnter = useCallback(
         (event: React.MouseEvent, node: Node<DagNodeData>) => {
-            setSelectedNode(node);
-            setHoveredNodeId(node.id);
-            setPopoverPosition({ x: event.clientX, y: event.clientY });
+            visualStore.setHovered(node.id);
+            setPopoverNodeId(node.id);
+            setPopoverPosition({
+                x: event.clientX,
+                y: event.clientY,
+            });
+            onTemplateHover?.(node.id);
         },
-        []
+        [onTemplateHover, visualStore]
     );
 
     const handleNodeMouseLeave = useCallback(() => {
-        setSelectedNode(null);
-        setHoveredNodeId(null);
+        visualStore.setHovered(null);
+        setPopoverNodeId(null);
         setPopoverPosition(null);
-    }, []);
+        onTemplateHover?.(null);
+    }, [onTemplateHover, visualStore]);
 
     const handleNodeClick = useCallback(
         (_event: React.MouseEvent, node: Node<DagNodeData>) => {
-            const tt = ttStatusByName[node.id];
-            if (tt) {
-                navigate(`/workflow/${workflowId}/task_template/${tt.id}`);
+            if (onTemplateSelect) {
+                onTemplateSelect(node.id);
+            } else {
+                const tt = ttStatusByName[node.id];
+                if (tt) {
+                    navigate(
+                        `/workflow/${workflowId}/task_template/${tt.id}`
+                    );
+                }
             }
         },
-        [navigate, workflowId, ttStatusByName]
+        [navigate, workflowId, ttStatusByName, onTemplateSelect]
     );
 
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as HTMLElement | null;
-            if (popoverRef.current && target && !popoverRef.current.contains(target)) {
-                setSelectedNode(null);
-                setHoveredNodeId(null);
-                setPopoverPosition(null);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
+    const showPopover =
+        popoverNodeId && popoverTTData && popoverPosition;
 
-    const showPopover = selectedNode && hoveredTTData && popoverPosition;
+    const containerHeight = height ?? '100%';
 
     if (dagQuery.isLoading || nodes.length === 0) {
         return (
-            <div style={{ height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div
+                style={{
+                    height: containerHeight,
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }}
+            >
                 <CircularProgress />
             </div>
         );
     }
 
     return (
-        <div style={{ height: '100vh', width: '100vw', position: 'relative' }}>
-            <ReactFlow
-                nodes={laidOutNodes}
-                edges={styledEdges}
-                nodeTypes={nodeTypes}
-                onNodeMouseEnter={handleNodeMouseEnter}
-                onNodeMouseLeave={handleNodeMouseLeave}
-                onNodeClick={handleNodeClick}
+        <DagVisualStoreContext.Provider value={visualStore}>
+            <div
+                style={{
+                    height: containerHeight,
+                    width: '100%',
+                    position: 'relative',
+                }}
             >
-                <MiniMap />
-                <Controls />
-                <Background />
-            </ReactFlow>
+                <ReactFlow
+                    nodes={structuralNodes}
+                    edges={styledEdges}
+                    nodeTypes={nodeTypes}
+                    onNodeMouseEnter={handleNodeMouseEnter}
+                    onNodeMouseLeave={handleNodeMouseLeave}
+                    onNodeClick={handleNodeClick}
+                    fitView
+                    fitViewOptions={{ padding: 0.15 }}
+                >
+                    <Controls />
+                    <Background />
+                </ReactFlow>
 
-            {showPopover && (
-                <TaskTemplatePopover
-                    ref={popoverRef}
-                    data={hoveredTTData}
-                    placement="top"
-                    style={{
-                        position: 'fixed',
-                        left: popoverPosition.x + POPOVER_OFFSET,
-                        top: popoverPosition.y + POPOVER_OFFSET,
-                        zIndex: POPOVER_Z_INDEX,
-                    }}
-                />
-            )}
-        </div>
+                {showPopover && (
+                    <TaskTemplatePopover
+                        data={popoverTTData}
+                        placement="top"
+                        style={{
+                            position: 'fixed',
+                            left:
+                                popoverPosition.x + POPOVER_OFFSET,
+                            top:
+                                popoverPosition.y + POPOVER_OFFSET,
+                            zIndex: POPOVER_Z_INDEX,
+                        }}
+                    />
+                )}
+            </div>
+        </DagVisualStoreContext.Provider>
+    );
+}
+
+export default function WorkflowDAG(props: WorkflowDAGProps) {
+    return (
+        <ReactFlowProvider>
+            <WorkflowDAGInner {...props} />
+        </ReactFlowProvider>
     );
 }
