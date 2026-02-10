@@ -1,32 +1,28 @@
-// Filters component for Usage analysis
+// Filters popover for Usage analysis scatter plot
 
 import React from 'react';
 import {
     Box,
     Checkbox,
     Chip,
+    Divider,
     FormControl,
     FormControlLabel,
-    Grid,
-    IconButton,
     InputLabel,
     ListItemText,
     MenuItem,
     OutlinedInput,
-    Paper,
+    Popover,
     Select,
     Switch,
-    Tooltip,
     Typography,
 } from '@mui/material';
-import {
-    Clear as ClearIcon,
-    Refresh as RefreshIcon,
-} from '@mui/icons-material';
 import { taskStatusMeta } from '@jobmon_gui/constants/taskStatus';
 import { ResourceCluster } from './usageCalculations';
 
-interface UsageFiltersProps {
+export interface UsageFiltersProps {
+    anchorEl: HTMLElement | null;
+    onClose: () => void;
     availableAttempts: string[];
     availableStatuses: string[];
     availableResourceClusters: ResourceCluster[];
@@ -41,11 +37,12 @@ interface UsageFiltersProps {
     onSelectedResourceClustersChange: (clusters: Set<string>) => void;
     onSelectedTaskNamesChange: (taskNames: Set<string>) => void;
     onShowResourceZonesChange: (show: boolean) => void;
-    onClearFilters: () => void;
     onResetFilters: () => void;
 }
 
 const UsageFilters: React.FC<UsageFiltersProps> = ({
+    anchorEl,
+    onClose,
     availableAttempts,
     availableStatuses,
     availableResourceClusters,
@@ -60,81 +57,52 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
     onSelectedResourceClustersChange,
     onSelectedTaskNamesChange,
     onShowResourceZonesChange,
-    onClearFilters,
     onResetFilters,
 }) => {
     return (
-        <Paper
-            elevation={0}
-            sx={{
-                p: 2,
-                mb: 2,
-                mx: { xs: 1, sm: 2 },
-                border: '1px solid',
-                borderColor: 'divider',
-                borderRadius: 2,
+        <Popover
+            open={Boolean(anchorEl)}
+            anchorEl={anchorEl}
+            onClose={onClose}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            slotProps={{
+                paper: {
+                    sx: {
+                        width: 300,
+                        maxHeight: '80vh',
+                        overflow: 'auto',
+                    },
+                },
             }}
         >
             <Box
-                display="flex"
-                alignItems="center"
-                justifyContent="space-between"
-                mb={2}
+                sx={{
+                    p: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1.5,
+                }}
             >
-                <Typography
-                    variant="subtitle1"
-                    fontWeight="bold"
-                    color="primary.main"
-                >
-                    Filters & Controls
-                </Typography>
-                <Box display="flex" gap={1}>
-                    <Tooltip title="Clear all filters">
-                        <IconButton
-                            size="small"
-                            onClick={onClearFilters}
-                            sx={{
-                                bgcolor: 'grey.100',
-                                '&:hover': { bgcolor: 'grey.200' },
-                            }}
-                        >
-                            <ClearIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Reset to defaults">
-                        <IconButton
-                            size="small"
-                            onClick={onResetFilters}
-                            sx={{
-                                bgcolor: 'primary.50',
-                                color: 'primary.main',
-                                '&:hover': { bgcolor: 'primary.100' },
-                            }}
-                        >
-                            <RefreshIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
-                </Box>
-            </Box>
-
-            <Grid container spacing={1.5} alignItems="flex-start">
-                {/* Data Filters - expanded to take more space */}
-                <Grid item xs={12} md={8}>
+                {/* Data Filters */}
+                <Box>
                     <Typography
-                        variant="caption"
+                        variant="overline"
                         color="text.secondary"
-                        fontWeight="medium"
+                        sx={{ fontSize: '0.65rem' }}
+                    >
+                        Data Filters
+                    </Typography>
+
+                    <Box
                         sx={{
-                            mb: 1,
-                            display: 'block',
-                            height: '1.2em',
-                            lineHeight: '1.2em',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 1.5,
+                            mt: 0.5,
                         }}
                     >
-                        DATA FILTERS
-                    </Typography>
-                    <Box display="flex" gap={2} flexWrap="wrap">
-                        <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <FormControl size="small" fullWidth>
                             <InputLabel id="attempt-filter-label">
                                 Attempts
                             </InputLabel>
@@ -154,31 +122,19 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
                                         )
                                     );
                                 }}
-                                input={<OutlinedInput label="Attempts" />}
-                                renderValue={selected => (
-                                    <Box
-                                        display="flex"
-                                        flexWrap="wrap"
-                                        gap={0.5}
-                                    >
-                                        {selected.slice(0, 2).map(value => (
-                                            <Chip
-                                                key={value}
-                                                label={`#${value}`}
-                                                size="small"
-                                            />
-                                        ))}
-                                        {selected.length > 2 && (
-                                            <Chip
-                                                label={`+${selected.length - 2}`}
-                                                size="small"
-                                                variant="outlined"
-                                            />
-                                        )}
-                                    </Box>
-                                )}
+                                input={
+                                    <OutlinedInput label="Attempts" />
+                                }
+                                renderValue={selected =>
+                                    selected.length ===
+                                    availableAttempts.length
+                                        ? 'All'
+                                        : `${selected.length} selected`
+                                }
                                 MenuProps={{
-                                    PaperProps: { style: { maxHeight: 200 } },
+                                    PaperProps: {
+                                        style: { maxHeight: 200 },
+                                    },
                                 }}
                             >
                                 {availableAttempts.map(attempt => (
@@ -201,7 +157,7 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
                             </Select>
                         </FormControl>
 
-                        <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <FormControl size="small" fullWidth>
                             <InputLabel id="status-filter-label">
                                 Status
                             </InputLabel>
@@ -221,40 +177,25 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
                                         )
                                     );
                                 }}
-                                input={<OutlinedInput label="Status" />}
-                                renderValue={selected => (
-                                    <Box
-                                        display="flex"
-                                        flexWrap="wrap"
-                                        gap={0.5}
-                                    >
-                                        {selected.slice(0, 1).map(value => (
-                                            <Chip
-                                                key={value}
-                                                label={
-                                                    taskStatusMeta[value]
-                                                        ?.label || value
-                                                }
-                                                size="small"
-                                                color={
-                                                    value === 'D'
-                                                        ? 'success'
-                                                        : 'error'
-                                                }
-                                                variant="outlined"
-                                            />
-                                        ))}
-                                        {selected.length > 1 && (
-                                            <Chip
-                                                label={`+${selected.length - 1}`}
-                                                size="small"
-                                                variant="outlined"
-                                            />
-                                        )}
-                                    </Box>
-                                )}
+                                input={
+                                    <OutlinedInput label="Status" />
+                                }
+                                renderValue={selected =>
+                                    selected.length ===
+                                    availableStatuses.length
+                                        ? 'All'
+                                        : selected
+                                              .map(
+                                                  s =>
+                                                      taskStatusMeta[s]
+                                                          ?.label || s
+                                              )
+                                              .join(', ')
+                                }
                                 MenuProps={{
-                                    PaperProps: { style: { maxHeight: 200 } },
+                                    PaperProps: {
+                                        style: { maxHeight: 200 },
+                                    },
                                 }}
                             >
                                 {availableStatuses.map(statusKey => (
@@ -280,14 +221,16 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
                             </Select>
                         </FormControl>
 
-                        <FormControl size="small" sx={{ minWidth: 250 }}>
+                        <FormControl size="small" fullWidth>
                             <InputLabel id="resource-cluster-filter-label">
                                 Resource Clusters
                             </InputLabel>
                             <Select
                                 labelId="resource-cluster-filter-label"
                                 multiple
-                                value={Array.from(selectedResourceClusters)}
+                                value={Array.from(
+                                    selectedResourceClusters
+                                )}
                                 onChange={event => {
                                     const {
                                         target: { value },
@@ -303,68 +246,44 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
                                 input={
                                     <OutlinedInput label="Resource Clusters" />
                                 }
-                                renderValue={selected => (
-                                    <Box
-                                        display="flex"
-                                        flexWrap="wrap"
-                                        gap={0.5}
-                                    >
-                                        {selected.slice(0, 1).map(value => {
-                                            const cluster =
-                                                availableResourceClusters.find(
-                                                    c => c.id === value
-                                                );
-                                            return (
-                                                <Chip
-                                                    key={value}
-                                                    label={
-                                                        cluster
-                                                            ? `${cluster.id} (${cluster.taskCount})`
-                                                            : value
-                                                    }
-                                                    size="small"
-                                                    color="primary"
-                                                    variant="outlined"
-                                                />
-                                            );
-                                        })}
-                                        {selected.length > 1 && (
-                                            <Chip
-                                                label={`+${selected.length - 1}`}
-                                                size="small"
-                                                variant="outlined"
-                                            />
-                                        )}
-                                    </Box>
-                                )}
+                                renderValue={selected =>
+                                    selected.length ===
+                                    availableResourceClusters.length
+                                        ? 'All'
+                                        : `${selected.length} selected`
+                                }
                                 MenuProps={{
-                                    PaperProps: { style: { maxHeight: 300 } },
+                                    PaperProps: {
+                                        style: { maxHeight: 300 },
+                                    },
                                 }}
                             >
-                                {availableResourceClusters.map(cluster => (
-                                    <MenuItem
-                                        key={cluster.id}
-                                        value={cluster.id}
-                                        dense
-                                    >
-                                        <Checkbox
-                                            checked={selectedResourceClusters.has(
-                                                cluster.id
-                                            )}
-                                            size="small"
-                                        />
-                                        <ListItemText
-                                            primary={cluster.label}
-                                            primaryTypographyProps={{
-                                                fontSize: '0.875rem',
-                                            }}
-                                        />
-                                    </MenuItem>
-                                ))}
+                                {availableResourceClusters.map(
+                                    cluster => (
+                                        <MenuItem
+                                            key={cluster.id}
+                                            value={cluster.id}
+                                            dense
+                                        >
+                                            <Checkbox
+                                                checked={selectedResourceClusters.has(
+                                                    cluster.id
+                                                )}
+                                                size="small"
+                                            />
+                                            <ListItemText
+                                                primary={cluster.label}
+                                                primaryTypographyProps={{
+                                                    fontSize: '0.875rem',
+                                                }}
+                                            />
+                                        </MenuItem>
+                                    )
+                                )}
                             </Select>
                         </FormControl>
 
-                        <FormControl size="small" sx={{ minWidth: 250 }}>
+                        <FormControl size="small" fullWidth>
                             <InputLabel id="task-name-filter-label">
                                 Task Names
                             </InputLabel>
@@ -384,37 +303,19 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
                                         )
                                     );
                                 }}
-                                input={<OutlinedInput label="Task Names" />}
-                                renderValue={selected => (
-                                    <Box
-                                        display="flex"
-                                        flexWrap="wrap"
-                                        gap={0.5}
-                                    >
-                                        {selected.slice(0, 1).map(value => (
-                                            <Chip
-                                                key={value}
-                                                label={
-                                                    value.length > 20
-                                                        ? `${value.substring(0, 20)}...`
-                                                        : value
-                                                }
-                                                size="small"
-                                                color="secondary"
-                                                variant="outlined"
-                                            />
-                                        ))}
-                                        {selected.length > 1 && (
-                                            <Chip
-                                                label={`+${selected.length - 1}`}
-                                                size="small"
-                                                variant="outlined"
-                                            />
-                                        )}
-                                    </Box>
-                                )}
+                                input={
+                                    <OutlinedInput label="Task Names" />
+                                }
+                                renderValue={selected =>
+                                    selected.length ===
+                                    availableTaskNames.length
+                                        ? 'All'
+                                        : `${selected.length} selected`
+                                }
                                 MenuProps={{
-                                    PaperProps: { style: { maxHeight: 300 } },
+                                    PaperProps: {
+                                        style: { maxHeight: 300 },
+                                    },
                                 }}
                             >
                                 {availableTaskNames.map(taskName => (
@@ -424,7 +325,9 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
                                         dense
                                     >
                                         <Checkbox
-                                            checked={selectedTaskNames.has(taskName)}
+                                            checked={selectedTaskNames.has(
+                                                taskName
+                                            )}
                                             size="small"
                                         />
                                         <ListItemText
@@ -438,65 +341,81 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
                             </Select>
                         </FormControl>
                     </Box>
-                </Grid>
+                </Box>
 
-                {/* Resource Efficiency Zones - expanded */}
-                <Grid item xs={12} md={4}>
+                <Divider />
+
+                {/* View Options */}
+                <Box>
                     <Typography
-                        variant="caption"
+                        variant="overline"
                         color="text.secondary"
-                        fontWeight="medium"
-                        sx={{
-                            mb: 1,
-                            display: 'block',
-                            height: '1.2em',
-                            lineHeight: '1.2em',
-                        }}
+                        sx={{ fontSize: '0.65rem' }}
                     >
-                        RESOURCE EFFICIENCY
+                        View Options
                     </Typography>
-                    <Box display="flex" flexDirection="column" gap={1}>
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={showResourceZones}
-                                    onChange={() =>
-                                        onShowResourceZonesChange(
-                                            !showResourceZones
-                                        )
-                                    }
-                                    color="primary"
-                                    size="small"
-                                />
-                            }
-                            label={
-                                <Typography
-                                    variant="body2"
-                                    sx={{
-                                        fontSize: '0.8rem',
-                                        fontWeight: 'medium',
-                                    }}
-                                >
-                                    Show Efficiency Zones
-                                </Typography>
-                            }
-                            sx={{ mr: 0 }}
-                        />
-
-                        {showResourceZones && (
-                            <Box
-                                sx={{
-                                    display: 'flex',
-                                    flexWrap: 'wrap',
-                                    gap: 1,
-                                    p: 1,
-                                    bgcolor: 'grey.50',
-                                    borderRadius: 1,
-                                    border: '1px solid',
-                                    borderColor: 'grey.200',
-                                }}
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={showResourceZones}
+                                onChange={() =>
+                                    onShowResourceZonesChange(
+                                        !showResourceZones
+                                    )
+                                }
+                                color="primary"
+                                size="small"
+                            />
+                        }
+                        label={
+                            <Typography
+                                variant="body2"
+                                sx={{ fontSize: '0.8rem' }}
                             >
+                                Efficiency Zones
+                            </Typography>
+                        }
+                        sx={{ ml: 0, mt: 0.5 }}
+                    />
+
+                    {showResourceZones && (
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: 1,
+                                p: 1,
+                                mt: 0.5,
+                                bgcolor: 'grey.50',
+                                borderRadius: 1,
+                                border: '1px solid',
+                                borderColor: 'grey.200',
+                            }}
+                        >
+                            {[
+                                {
+                                    color: 'rgba(76, 175, 80, 0.4)',
+                                    border: 'rgba(76, 175, 80, 0.6)',
+                                    label: 'Optimal',
+                                },
+                                {
+                                    color: 'rgba(255, 193, 7, 0.4)',
+                                    border: 'rgba(255, 193, 7, 0.6)',
+                                    label: 'Wasteful',
+                                },
+                                {
+                                    color: 'rgba(244, 67, 54, 0.4)',
+                                    border: 'rgba(244, 67, 54, 0.6)',
+                                    label: 'Risk',
+                                },
+                                {
+                                    color: 'rgba(156, 39, 176, 0.4)',
+                                    border: 'rgba(156, 39, 176, 0.6)',
+                                    label: 'Mixed',
+                                },
+                            ].map(zone => (
                                 <Box
+                                    key={zone.label}
                                     display="flex"
                                     alignItems="center"
                                     gap={0.5}
@@ -505,91 +424,37 @@ const UsageFilters: React.FC<UsageFiltersProps> = ({
                                         sx={{
                                             width: 8,
                                             height: 8,
-                                            backgroundColor:
-                                                'rgba(76, 175, 80, 0.4)',
+                                            backgroundColor: zone.color,
                                             borderRadius: 0.5,
-                                            border: '1px solid rgba(76, 175, 80, 0.6)',
+                                            border: `1px solid ${zone.border}`,
                                         }}
                                     />
                                     <Typography
                                         variant="caption"
                                         sx={{ fontSize: '0.6rem' }}
                                     >
-                                        Optimal
+                                        {zone.label}
                                     </Typography>
                                 </Box>
-                                <Box
-                                    display="flex"
-                                    alignItems="center"
-                                    gap={0.5}
-                                >
-                                    <Box
-                                        sx={{
-                                            width: 8,
-                                            height: 8,
-                                            backgroundColor:
-                                                'rgba(255, 193, 7, 0.4)',
-                                            borderRadius: 0.5,
-                                            border: '1px solid rgba(255, 193, 7, 0.6)',
-                                        }}
-                                    />
-                                    <Typography
-                                        variant="caption"
-                                        sx={{ fontSize: '0.6rem' }}
-                                    >
-                                        Wasteful
-                                    </Typography>
-                                </Box>
-                                <Box
-                                    display="flex"
-                                    alignItems="center"
-                                    gap={0.5}
-                                >
-                                    <Box
-                                        sx={{
-                                            width: 8,
-                                            height: 8,
-                                            backgroundColor:
-                                                'rgba(244, 67, 54, 0.4)',
-                                            borderRadius: 0.5,
-                                            border: '1px solid rgba(244, 67, 54, 0.6)',
-                                        }}
-                                    />
-                                    <Typography
-                                        variant="caption"
-                                        sx={{ fontSize: '0.6rem' }}
-                                    >
-                                        Risk
-                                    </Typography>
-                                </Box>
-                                <Box
-                                    display="flex"
-                                    alignItems="center"
-                                    gap={0.5}
-                                >
-                                    <Box
-                                        sx={{
-                                            width: 8,
-                                            height: 8,
-                                            backgroundColor:
-                                                'rgba(156, 39, 176, 0.4)',
-                                            borderRadius: 0.5,
-                                            border: '1px solid rgba(156, 39, 176, 0.6)',
-                                        }}
-                                    />
-                                    <Typography
-                                        variant="caption"
-                                        sx={{ fontSize: '0.6rem' }}
-                                    >
-                                        Mixed
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        )}
-                    </Box>
-                </Grid>
-            </Grid>
-        </Paper>
+                            ))}
+                        </Box>
+                    )}
+                </Box>
+
+                <Divider />
+
+                {/* Reset */}
+                <Box>
+                    <Chip
+                        label="Reset filters"
+                        size="small"
+                        onClick={onResetFilters}
+                        variant="outlined"
+                        color="primary"
+                    />
+                </Box>
+            </Box>
+        </Popover>
     );
 };
 

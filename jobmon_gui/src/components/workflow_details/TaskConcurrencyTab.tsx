@@ -829,31 +829,55 @@ export default function TaskConcurrencyTab({
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
-            {/* Chart area with integrated toolbar */}
+            {/* Chart navigation toolbar */}
             <Box
-                ref={containerRef}
                 sx={{
-                    flex: 1,
-                    minHeight: 0,
-                    minWidth: 0,
-                    bgcolor: 'background.paper',
-                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    px: 1.5,
+                    py: 0.5,
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
                 }}
             >
-                {/* Top-right action icons */}
-                <Box
-                    sx={{
-                        position: 'absolute',
-                        top: 4,
-                        right: 8,
-                        zIndex: 2,
-                        display: 'flex',
-                        gap: 0.25,
-                        bgcolor: 'rgba(255,255,255,0.85)',
-                        borderRadius: 1,
-                        px: 0.25,
-                    }}
-                >
+                <ButtonGroup size="small" variant="outlined">
+                    <Tooltip title="Zoom mode">
+                        <Button
+                            variant={dragMode === 'zoom' ? 'contained' : 'outlined'}
+                            onClick={() => setDragMode('zoom')}
+                            sx={{ minWidth: 0, px: 0.75 }}
+                        >
+                            <ZoomInIcon fontSize="small" />
+                        </Button>
+                    </Tooltip>
+                    <Tooltip title="Pan mode">
+                        <Button
+                            variant={dragMode === 'pan' ? 'contained' : 'outlined'}
+                            onClick={() => setDragMode('pan')}
+                            sx={{ minWidth: 0, px: 0.75 }}
+                        >
+                            <PanToolIcon fontSize="small" />
+                        </Button>
+                    </Tooltip>
+                    <Tooltip title="Zoom in">
+                        <Button onClick={handleZoomIn} sx={{ minWidth: 0, px: 0.75 }}>
+                            <AddIcon fontSize="small" />
+                        </Button>
+                    </Tooltip>
+                    <Tooltip title="Zoom out">
+                        <Button onClick={handleZoomOut} sx={{ minWidth: 0, px: 0.75 }}>
+                            <RemoveIcon fontSize="small" />
+                        </Button>
+                    </Tooltip>
+                    <Tooltip title="Reset zoom">
+                        <Button onClick={handleResetZoom} sx={{ minWidth: 0, px: 0.75 }}>
+                            <RestartAltIcon fontSize="small" />
+                        </Button>
+                    </Tooltip>
+                </ButtonGroup>
+
+                <Box sx={{ display: 'flex', gap: 0.25 }}>
                     <Tooltip title="Export CSV">
                         <IconButton size="small" onClick={handleExportCSV} sx={{ p: 0.5 }}>
                             <DownloadIcon fontSize="small" />
@@ -869,6 +893,19 @@ export default function TaskConcurrencyTab({
                         </IconButton>
                     </Tooltip>
                 </Box>
+            </Box>
+
+            {/* Chart area */}
+            <Box
+                ref={containerRef}
+                sx={{
+                    flex: 1,
+                    minHeight: 0,
+                    minWidth: 0,
+                    bgcolor: 'background.paper',
+                    position: 'relative',
+                }}
+            >
 
                 {/* Settings popover */}
                 <Popover
@@ -995,52 +1032,6 @@ export default function TaskConcurrencyTab({
                                 </Box>
                             </LocalizationProvider>
                         </Popover>
-
-                        <Divider />
-
-                        {/* Zoom & navigation section */}
-                        <Box>
-                            <Typography variant="overline" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                                Navigation
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
-                                <ButtonGroup size="small" variant="outlined">
-                                    <Tooltip title="Zoom mode">
-                                        <Button
-                                            variant={dragMode === 'zoom' ? 'contained' : 'outlined'}
-                                            onClick={() => setDragMode('zoom')}
-                                            sx={{ minWidth: 0, px: 0.75 }}
-                                        >
-                                            <ZoomInIcon fontSize="small" />
-                                        </Button>
-                                    </Tooltip>
-                                    <Tooltip title="Pan mode">
-                                        <Button
-                                            variant={dragMode === 'pan' ? 'contained' : 'outlined'}
-                                            onClick={() => setDragMode('pan')}
-                                            sx={{ minWidth: 0, px: 0.75 }}
-                                        >
-                                            <PanToolIcon fontSize="small" />
-                                        </Button>
-                                    </Tooltip>
-                                    <Tooltip title="Zoom in">
-                                        <Button onClick={handleZoomIn} sx={{ minWidth: 0, px: 0.75 }}>
-                                            <AddIcon fontSize="small" />
-                                        </Button>
-                                    </Tooltip>
-                                    <Tooltip title="Zoom out">
-                                        <Button onClick={handleZoomOut} sx={{ minWidth: 0, px: 0.75 }}>
-                                            <RemoveIcon fontSize="small" />
-                                        </Button>
-                                    </Tooltip>
-                                    <Tooltip title="Reset zoom">
-                                        <Button onClick={handleResetZoom} sx={{ minWidth: 0, px: 0.75 }}>
-                                            <RestartAltIcon fontSize="small" />
-                                        </Button>
-                                    </Tooltip>
-                                </ButtonGroup>
-                            </Box>
-                        </Box>
 
                         <Divider />
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import '@jobmon_gui/styles/jobmon_gui.css';
@@ -26,10 +26,12 @@ import { getWorkflowTasksQueryFn } from '@jobmon_gui/queries/GetWorkflowTasks.ts
 import { Task, TaskTableProps } from '@jobmon_gui/types/TaskTable.ts';
 import { JobmonModal } from '@jobmon_gui/components/JobmonModal.tsx';
 import { ScrollableCodeBlock } from '@jobmon_gui/components/ScrollableTextArea.tsx';
+import humanizeDuration from 'humanize-duration';
 
 export default function TaskTable({
     taskTemplateName,
     workflowId,
+    resourceDataByTaskId,
 }: TaskTableProps) {
     dayjs.extend(utc);
     const queryClient = useQueryClient();
@@ -44,6 +46,21 @@ export default function TaskTable({
         enabled: !!workflowId && !!taskTemplateName,
         refetchOnMount: true, // Refetch on mount to reflect task status upgrade
     });
+
+    const enrichedData = useMemo(() => {
+        if (!tasks?.data || !resourceDataByTaskId) return tasks?.data || [];
+        return tasks.data.map(task => {
+            const res = resourceDataByTaskId.get(task.task_id);
+            if (res) {
+                return {
+                    ...task,
+                    runtime_seconds: res.runtime,
+                    memory_gib: res.memory,
+                };
+            }
+            return task;
+        });
+    }, [tasks?.data, resourceDataByTaskId]);
 
     const handleCommandClick = (command: string) => {
         setSelectedCommand(command);
@@ -136,10 +153,31 @@ export default function TaskTable({
                 return formatDayjsDate(rawValue);
             },
         }),
+        columnHelper.accessor('runtime_seconds', {
+            header: 'Runtime',
+            size: 150,
+            Cell: ({ cell }) => {
+                const val = cell.getValue() as number | null | undefined;
+                if (val == null) return 'N/A';
+                return humanizeDuration(val * 1000, {
+                    largest: 2,
+                    round: true,
+                });
+            },
+        }),
+        columnHelper.accessor('memory_gib', {
+            header: 'Memory (GiB)',
+            size: 130,
+            Cell: ({ cell }) => {
+                const val = cell.getValue() as number | null | undefined;
+                if (val == null) return 'N/A';
+                return val.toFixed(2);
+            },
+        }),
     ];
 
     const table = useMaterialReactTable({
-        data: tasks?.data || [],
+        data: enrichedData,
         columns: columns,
         initialState: { density: 'comfortable', showColumnFilters: true },
         enableColumnFilterModes: true,
@@ -215,7 +253,11 @@ export default function TaskTable({
 
     const workflow_status = [
         { status: 'PENDING', circleClass: 'bar-pp', label: 'PENDING' },
-        { status: 'SCHEDULED', circleClass: 'bar-ss', label: 'SCHEDULED' },
+        {
+            status: 'SCHEDULED',
+            circleClass: 'bar-ss',
+            label: 'SCHEDULED',
+        },
         { status: 'RUNNING', circleClass: 'bar-rr', label: 'RUNNING' },
         { status: 'FATAL', circleClass: 'bar-ff', label: 'FATAL' },
         { status: 'DONE', circleClass: 'bar-dd', label: 'DONE' },
@@ -257,7 +299,7 @@ export default function TaskTable({
     }
 
     return (
-        <Box p={2} display="flex" justifyContent="center" width="100%">
+        <Box p={2} display="flex" justifyContent="center" width="100%" sx={{ overflowX: 'auto' }}>
             <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <MaterialReactTable table={table} />
             </LocalizationProvider>

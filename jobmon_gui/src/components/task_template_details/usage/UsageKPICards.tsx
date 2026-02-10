@@ -74,25 +74,25 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
     );
 
     return (
-        <Box sx={{ mb: 3, px: { xs: 1, sm: 2 } }}>
+        <Box sx={{ mb: 1 }}>
             {/* Data Source Indicator */}
             {isShowingSelection && (
                 <Box
                     sx={{
                         bgcolor: 'primary.50',
                         color: 'primary.main',
-                        p: 2,
-                        borderRadius: 2,
+                        p: 1,
+                        borderRadius: 1,
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 1.5,
+                        gap: 1,
                         border: '1px solid',
                         borderColor: 'primary.200',
-                        mb: 2,
+                        mb: 1,
                     }}
                 >
-                    <InfoIcon sx={{ fontSize: 20 }} />
-                    <Typography variant="body2" fontWeight="medium">
+                    <InfoIcon sx={{ fontSize: 16 }} />
+                    <Typography variant="caption" fontWeight="medium">
                         Showing statistics for{' '}
                         <strong>{selectedDataCount}</strong> selected points
                         (out of {totalDataCount} total)
@@ -101,7 +101,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
             )}
 
             {/* KPI Cards Grid */}
-            <Grid container spacing={2}>
+            <Grid container spacing={1}>
                 {/* Runtime Stats Card */}
                 <Grid item xs={12} md={6}>
                     <Card
@@ -118,21 +118,21 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                             },
                         }}
                     >
-                        <CardContent sx={{ p: 3 }}>
-                            <Box display="flex" alignItems="center" mb={2.5}>
+                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Box display="flex" alignItems="center" mb={1.5}>
                                 <Box
                                     sx={{
                                         bgcolor: 'primary.50',
                                         color: 'primary.main',
-                                        p: 1,
+                                        p: 0.75,
                                         borderRadius: 1,
-                                        mr: 2,
+                                        mr: 1.5,
                                     }}
                                 >
-                                    <TimerIcon sx={{ fontSize: 20 }} />
+                                    <TimerIcon sx={{ fontSize: 18 }} />
                                 </Box>
                                 <Typography
-                                    variant="h6"
+                                    variant="subtitle1"
                                     component="div"
                                     fontWeight="bold"
                                 >
@@ -140,7 +140,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                 </Typography>
                             </Box>
 
-                            <Grid container spacing={2.5}>
+                            <Grid container spacing={1.5}>
                                 <Grid item xs={4}>
                                     <Typography
                                         variant="caption"
@@ -156,7 +156,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                     <Typography
                                         variant="body2"
                                         fontWeight="bold"
-                                        sx={{ mt: 0.75 }}
+                                        sx={{ mt: 0.5 }}
                                     >
                                         {kpiStats.minRuntime !== undefined
                                             ? humanizeDuration(
@@ -184,7 +184,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                     <Typography
                                         variant="body2"
                                         fontWeight="bold"
-                                        sx={{ mt: 0.75 }}
+                                        sx={{ mt: 0.5 }}
                                     >
                                         {kpiStats.maxRuntime !== undefined
                                             ? humanizeDuration(
@@ -212,7 +212,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                     <Typography
                                         variant="body2"
                                         fontWeight="bold"
-                                        sx={{ mt: 0.75 }}
+                                        sx={{ mt: 0.5 }}
                                     >
                                         {kpiStats.medianRuntime !== undefined
                                             ? humanizeDuration(
@@ -226,12 +226,12 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                     </Typography>
                                 </Grid>
 
-                                {/* Enhanced Efficiency Row with Progress Bar and Badge */}
-                                <Grid item xs={12} sx={{ mt: 1 }}>
+                                {/* Efficiency Row */}
+                                <Grid item xs={12} sx={{ mt: 0.5 }}>
                                     <Box
                                         sx={{
                                             bgcolor: 'grey.50',
-                                            p: 1.5,
+                                            p: 1,
                                             borderRadius: 1,
                                             border: '1px solid',
                                             borderColor: 'grey.200',
@@ -241,7 +241,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                             display="flex"
                                             alignItems="center"
                                             justifyContent="space-between"
-                                            mb={1}
+                                            mb={0.5}
                                         >
                                             <Typography
                                                 variant="caption"
@@ -258,8 +258,8 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                                 label={runtimeStatus.label}
                                                 size="small"
                                                 sx={{
-                                                    fontSize: '0.65rem',
-                                                    height: 20,
+                                                    fontSize: '0.6rem',
+                                                    height: 18,
                                                     backgroundColor:
                                                         runtimeStatus.bgColor,
                                                     color: runtimeStatus.textColor,
@@ -268,19 +268,18 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                             />
                                         </Box>
 
-                                        <Box mb={1.5}>
+                                        <Box mb={1}>
                                             <Box
                                                 display="flex"
                                                 alignItems="center"
                                                 justifyContent="space-between"
-                                                mb={0.5}
+                                                mb={0.25}
                                             >
                                                 <Typography
-                                                    variant="body1"
+                                                    variant="body2"
                                                     fontWeight="bold"
                                                     sx={{
                                                         color: runtimeStatus.textColor,
-                                                        fontSize: '1.1rem',
                                                     }}
                                                 >
                                                     {resourceEfficiency.runtimeUtilization.toFixed(
@@ -302,12 +301,12 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                                     100
                                                 )}
                                                 sx={{
-                                                    height: 8,
-                                                    borderRadius: 4,
+                                                    height: 6,
+                                                    borderRadius: 3,
                                                     backgroundColor: 'grey.200',
                                                     '& .MuiLinearProgress-bar':
                                                         {
-                                                            borderRadius: 4,
+                                                            borderRadius: 3,
                                                             backgroundColor:
                                                                 runtimeStatus.textColor,
                                                         },
@@ -330,7 +329,6 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                             <Typography
                                                 variant="body2"
                                                 fontWeight="bold"
-                                                sx={{ mt: 0.25 }}
                                             >
                                                 {kpiStats.medianRequestedRuntime !==
                                                 undefined
@@ -368,21 +366,21 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                             },
                         }}
                     >
-                        <CardContent sx={{ p: 3 }}>
-                            <Box display="flex" alignItems="center" mb={2.5}>
+                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                            <Box display="flex" alignItems="center" mb={1.5}>
                                 <Box
                                     sx={{
                                         bgcolor: 'secondary.50',
                                         color: 'secondary.main',
-                                        p: 1,
+                                        p: 0.75,
                                         borderRadius: 1,
-                                        mr: 2,
+                                        mr: 1.5,
                                     }}
                                 >
-                                    <MemoryIcon sx={{ fontSize: 20 }} />
+                                    <MemoryIcon sx={{ fontSize: 18 }} />
                                 </Box>
                                 <Typography
-                                    variant="h6"
+                                    variant="subtitle1"
                                     component="div"
                                     fontWeight="bold"
                                 >
@@ -390,7 +388,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                 </Typography>
                             </Box>
 
-                            <Grid container spacing={2.5}>
+                            <Grid container spacing={1.5}>
                                 <Grid item xs={4}>
                                     <Typography
                                         variant="caption"
@@ -406,7 +404,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                     <Typography
                                         variant="body2"
                                         fontWeight="bold"
-                                        sx={{ mt: 0.75 }}
+                                        sx={{ mt: 0.5 }}
                                     >
                                         {kpiStats.minMemoryGiB !== undefined
                                             ? `${kpiStats.minMemoryGiB.toFixed(2)} GiB`
@@ -428,7 +426,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                     <Typography
                                         variant="body2"
                                         fontWeight="bold"
-                                        sx={{ mt: 0.75 }}
+                                        sx={{ mt: 0.5 }}
                                     >
                                         {kpiStats.maxMemoryGiB !== undefined
                                             ? `${kpiStats.maxMemoryGiB.toFixed(2)} GiB`
@@ -450,7 +448,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                     <Typography
                                         variant="body2"
                                         fontWeight="bold"
-                                        sx={{ mt: 0.75 }}
+                                        sx={{ mt: 0.5 }}
                                     >
                                         {kpiStats.medianMemoryGiB !== undefined
                                             ? `${kpiStats.medianMemoryGiB.toFixed(2)} GiB`
@@ -458,12 +456,12 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                     </Typography>
                                 </Grid>
 
-                                {/* Enhanced Efficiency Row with Progress Bar and Badge */}
-                                <Grid item xs={12} sx={{ mt: 1 }}>
+                                {/* Efficiency Row */}
+                                <Grid item xs={12} sx={{ mt: 0.5 }}>
                                     <Box
                                         sx={{
                                             bgcolor: 'grey.50',
-                                            p: 1.5,
+                                            p: 1,
                                             borderRadius: 1,
                                             border: '1px solid',
                                             borderColor: 'grey.200',
@@ -473,7 +471,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                             display="flex"
                                             alignItems="center"
                                             justifyContent="space-between"
-                                            mb={1}
+                                            mb={0.5}
                                         >
                                             <Typography
                                                 variant="caption"
@@ -490,8 +488,8 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                                 label={memoryStatus.label}
                                                 size="small"
                                                 sx={{
-                                                    fontSize: '0.65rem',
-                                                    height: 20,
+                                                    fontSize: '0.6rem',
+                                                    height: 18,
                                                     backgroundColor:
                                                         memoryStatus.bgColor,
                                                     color: memoryStatus.textColor,
@@ -500,19 +498,18 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                             />
                                         </Box>
 
-                                        <Box mb={1.5}>
+                                        <Box mb={1}>
                                             <Box
                                                 display="flex"
                                                 alignItems="center"
                                                 justifyContent="space-between"
-                                                mb={0.5}
+                                                mb={0.25}
                                             >
                                                 <Typography
-                                                    variant="body1"
+                                                    variant="body2"
                                                     fontWeight="bold"
                                                     sx={{
                                                         color: memoryStatus.textColor,
-                                                        fontSize: '1.1rem',
                                                     }}
                                                 >
                                                     {resourceEfficiency.memoryUtilization.toFixed(
@@ -534,12 +531,12 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                                     100
                                                 )}
                                                 sx={{
-                                                    height: 8,
-                                                    borderRadius: 4,
+                                                    height: 6,
+                                                    borderRadius: 3,
                                                     backgroundColor: 'grey.200',
                                                     '& .MuiLinearProgress-bar':
                                                         {
-                                                            borderRadius: 4,
+                                                            borderRadius: 3,
                                                             backgroundColor:
                                                                 memoryStatus.textColor,
                                                         },
@@ -562,7 +559,6 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                             <Typography
                                                 variant="body2"
                                                 fontWeight="bold"
-                                                sx={{ mt: 0.25 }}
                                             >
                                                 {kpiStats.medianRequestedMemoryGiB !==
                                                 undefined

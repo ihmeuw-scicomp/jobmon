@@ -1,5 +1,14 @@
-import React, { useRef, useEffect, memo, useState } from 'react';
-import Plot from 'react-plotly.js';
+import React, {
+    useRef,
+    useEffect,
+    memo,
+    useState,
+    useCallback,
+    useImperativeHandle,
+    forwardRef,
+} from 'react';
+import Plotly from 'plotly.js-dist';
+import createPlotlyComponent from 'react-plotly.js/factory';
 import { Box, useMediaQuery, useTheme } from '@mui/material';
 import {
     taskStatusMeta,
@@ -9,11 +18,18 @@ import {
     calculateZoneBoundaries,
     calculateResourceZone,
 } from './usageCalculations';
-import { Layout, PlotMouseEvent, PlotSelectionEvent } from 'plotly.js';
-import * as Plotly from 'plotly.js';
+import type { Layout, PlotMouseEvent, PlotSelectionEvent, PlotDatum, Data } from 'plotly.js';
+
+const Plot = createPlotlyComponent(Plotly);
 
 // Import the shared ScatterDataPoint type
 import { ScatterDataPoint } from '@jobmon_gui/types/Usage';
+
+export interface ScatterPlotHandle {
+    zoomIn: () => void;
+    zoomOut: () => void;
+    resetZoom: () => void;
+}
 
 interface RuntimeMemoryScatterPlotProps {
     data: ScatterDataPoint[]; // Expects already filtered data
@@ -21,11 +37,15 @@ interface RuntimeMemoryScatterPlotProps {
     medianRequestedRuntime?: number;
     medianRequestedMemory?: number;
     taskTemplateName?: string;
-    onSelected?: (selectedData: ScatterDataPoint[]) => void; // Add selection callback
-    showResourceZones?: boolean; // New prop for zone toggle
+    onSelected?: (selectedData: ScatterDataPoint[]) => void;
+    showResourceZones?: boolean;
+    dragMode?: 'zoom' | 'pan' | 'select' | 'lasso';
 }
 
-const RuntimeMemoryScatterPlot: React.FC<RuntimeMemoryScatterPlotProps> = ({
+const RuntimeMemoryScatterPlotInner = forwardRef<
+    ScatterPlotHandle,
+    RuntimeMemoryScatterPlotProps
+>(({
     data,
     onTaskClick,
     medianRequestedRuntime,
@@ -33,9 +53,10 @@ const RuntimeMemoryScatterPlot: React.FC<RuntimeMemoryScatterPlotProps> = ({
     taskTemplateName,
     onSelected,
     showResourceZones = false,
-}) => {
+    dragMode: externalDragMode = 'zoom',
+}, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const plotRef = useRef<Plot | null>(null);
+    const plotRef = useRef<InstanceType<typeof Plot> | null>(null);
     const selectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const lastSelectionRef = useRef<ScatterDataPoint[]>([]);
     const lastSelectionTimeRef = useRef<number>(0);
@@ -87,6 +108,58 @@ const RuntimeMemoryScatterPlot: React.FC<RuntimeMemoryScatterPlotProps> = ({
             }
         };
     }, []);
+
+    // Zoom helpers exposed via ref
+    const getPlotDiv = useCallback(() => {
+        const plotInstance = plotRef.current as unknown as {
+            el?: HTMLDivElement;
+        };
+        return plotInstance?.el || null;
+    }, []);
+
+    const handleZoom = useCallback(
+        (scaleFactor: number) => {
+            const gd = getPlotDiv();
+            if (!gd) return;
+            const fullLayout = (gd as unknown as { _fullLayout?: Record<string, unknown> })._fullLayout;
+            if (!fullLayout) return;
+            const xaxis = fullLayout.xaxis as { range?: [number, number] } | undefined;
+            const yaxis = fullLayout.yaxis as { range?: [number, number] } | undefined;
+            if (!xaxis?.range || !yaxis?.range) return;
+
+            const [xStart, xEnd] = xaxis.range;
+            const [yStart, yEnd] = yaxis.range;
+            const xCenter = (xStart + xEnd) / 2;
+            const yCenter = (yStart + yEnd) / 2;
+            const xHalf = ((xEnd - xStart) * scaleFactor) / 2;
+            const yHalf = ((yEnd - yStart) * scaleFactor) / 2;
+
+            Plotly.relayout(gd as unknown as HTMLElement, {
+                'xaxis.range': [xCenter - xHalf, xCenter + xHalf],
+                'yaxis.range': [yCenter - yHalf, yCenter + yHalf],
+            });
+        },
+        [getPlotDiv]
+    );
+
+    const handleResetZoom = useCallback(() => {
+        const gd = getPlotDiv();
+        if (!gd) return;
+        Plotly.relayout(gd as unknown as HTMLElement, {
+            'xaxis.autorange': true,
+            'yaxis.autorange': true,
+        });
+    }, [getPlotDiv]);
+
+    useImperativeHandle(
+        ref,
+        () => ({
+            zoomIn: () => handleZoom(0.5),
+            zoomOut: () => handleZoom(2),
+            resetZoom: handleResetZoom,
+        }),
+        [handleZoom, handleResetZoom]
+    );
 
     if (!data || data.length === 0) {
         // Render a message if no data after filtering, or if initial data was empty
@@ -240,8 +313,8 @@ const RuntimeMemoryScatterPlot: React.FC<RuntimeMemoryScatterPlotProps> = ({
             xanchor: 'left',
         },
         hovermode: 'closest',
-        dragmode: 'zoom', // Default to zoom for navigation, users can switch to select
-        selectdirection: 'any', // Allow selection in any direction
+        dragmode: externalDragMode,
+        selectdirection: 'any',
         width: containerDimensions.width,
         height: containerDimensions.height,
         autosize: false, // Disable autosize and use explicit dimensions
@@ -337,7 +410,7 @@ const RuntimeMemoryScatterPlot: React.FC<RuntimeMemoryScatterPlotProps> = ({
             // Extract selected data points from all traces
             const selectedData: ScatterDataPoint[] = [];
 
-            event.points.forEach((point: Plotly.PlotDatum) => {
+            event.points.forEach((point: PlotDatum) => {
                 const traceKey = point.customdata?.traceKey;
                 const pointIndex = point.pointIndex;
 
@@ -375,7 +448,7 @@ const RuntimeMemoryScatterPlot: React.FC<RuntimeMemoryScatterPlotProps> = ({
                 <Plot
                     ref={plotRef}
                     key="scatter-plot" // Use static key to prevent remounting
-                    data={plotTraces as Plotly.Data[]}
+                    data={plotTraces as Data[]}
                     layout={layout}
                     onClick={handleClick}
                     onSelected={handleSelected}
@@ -393,40 +466,32 @@ const RuntimeMemoryScatterPlot: React.FC<RuntimeMemoryScatterPlotProps> = ({
                     config={{
                         responsive: true,
                         displaylogo: false,
-                        modeBarButtonsToRemove: ['pan2d', 'autoScale2d'],
-                        displayModeBar: true,
-                        modeBarButtonsToAdd: ['select2d', 'lasso2d'],
+                        displayModeBar: false,
+                        scrollZoom: true,
                         staticPlot: false,
-                        showTips: true, // Show tooltips for mode bar buttons
-                        toImageButtonOptions: {
-                            format: 'png',
-                            filename: 'runtime_memory_analysis',
-                            height: 600,
-                            width: 1000,
-                            scale: 2,
-                        },
                     }}
                 />
             </div>
         </Box>
     );
-};
+});
 
 // Memoize the component to prevent unnecessary re-renders that clear selection
 const arePropsEqual = (
     prevProps: RuntimeMemoryScatterPlotProps,
     nextProps: RuntimeMemoryScatterPlotProps
 ) => {
-    // Only re-render if the actual plot data or configuration changes
-    // Don't re-render when callbacks change (which happens when parent state updates)
-    // Don't compare medians to prevent re-renders when selection changes median calculations
     return (
         prevProps.data === nextProps.data &&
         prevProps.taskTemplateName === nextProps.taskTemplateName &&
-        prevProps.showResourceZones === nextProps.showResourceZones
-        // Deliberately NOT comparing callback props (onSelected, onTaskClick, etc.)
-        // Deliberately NOT comparing median props to prevent selection-clearing re-renders
+        prevProps.showResourceZones === nextProps.showResourceZones &&
+        prevProps.dragMode === nextProps.dragMode
     );
 };
 
-export default memo(RuntimeMemoryScatterPlot, arePropsEqual);
+const RuntimeMemoryScatterPlot = memo(
+    RuntimeMemoryScatterPlotInner,
+    arePropsEqual
+);
+
+export default RuntimeMemoryScatterPlot;

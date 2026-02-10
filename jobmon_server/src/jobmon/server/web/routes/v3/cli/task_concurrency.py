@@ -151,14 +151,20 @@ async def get_task_concurrency(
         group_by=group_by,
     )
 
-    # If no time range specified, use workflow's time range from audit table
+    # If no time range specified, use workflow's time range from audit table.
+    # Use entered_at (not exited_at) for the max — exited_at can be inflated
+    # when a record is closed by a non-displayed transition (e.g. reset to
+    # REGISTERING closes DONE records at the reset time, stretching the axis).
+    # Exclude REGISTERING — it's a non-transient parking state that produces
+    # no visible series data.
     if start_time is None or end_time is None:
         time_range_query = select(
             func.min(TaskStatusAudit.entered_at),
-            func.max(
-                func.coalesce(TaskStatusAudit.exited_at, TaskStatusAudit.entered_at)
-            ),
-        ).where(TaskStatusAudit.workflow_id == workflow_id)
+            func.max(TaskStatusAudit.entered_at),
+        ).where(
+            TaskStatusAudit.workflow_id == workflow_id,
+            TaskStatusAudit.new_status != TaskStatus.REGISTERING,
+        )
         time_range = db.execute(time_range_query).one()
 
         if time_range[0] is None:
