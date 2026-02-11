@@ -38,6 +38,7 @@ interface RuntimeMemoryScatterPlotProps {
     medianRequestedMemory?: number;
     taskTemplateName?: string;
     onSelected?: (selectedData: ScatterDataPoint[]) => void;
+    selectedInstanceIds?: Set<number>;
     showResourceZones?: boolean;
     dragMode?: 'zoom' | 'pan' | 'select' | 'lasso';
 }
@@ -52,6 +53,7 @@ const RuntimeMemoryScatterPlotInner = forwardRef<
     medianRequestedMemory,
     taskTemplateName,
     onSelected,
+    selectedInstanceIds,
     showResourceZones = false,
     dragMode: externalDragMode = 'zoom',
 }, ref) => {
@@ -199,6 +201,14 @@ const RuntimeMemoryScatterPlotInner = forwardRef<
             const statusConfig =
                 taskStatusMeta[statusKey] || taskStatusMeta.UNKNOWN;
 
+            // Compute selectedpoints indices for this trace
+            const traceSelectedPoints = selectedInstanceIds && selectedInstanceIds.size > 0
+                ? statusData.reduce<number[]>((acc, d, i) => {
+                    if (selectedInstanceIds.has(d.task_instance_id)) acc.push(i);
+                    return acc;
+                }, [])
+                : undefined;
+
             return {
                 name: statusConfig.label,
                 x: statusData.map(d => d.runtime),
@@ -206,6 +216,7 @@ const RuntimeMemoryScatterPlotInner = forwardRef<
                 mode: 'markers',
                 type: 'scatter',
                 visible: true,
+                selectedpoints: traceSelectedPoints,
                 text: statusData.map(d => {
                     const pointStatusMeta =
                         taskStatusMeta[String(d.status).toUpperCase()] ||
@@ -453,6 +464,8 @@ const RuntimeMemoryScatterPlotInner = forwardRef<
                     onClick={handleClick}
                     onSelected={handleSelected}
                     onDeselect={() => {
+                        // Skip deselect when external selection is driving highlights
+                        if (selectedInstanceIds && selectedInstanceIds.size > 0) return;
                         // Add a small delay to prevent race conditions with selection
                         selectionTimeoutRef.current = setTimeout(() => {
                             if (onSelected) {
@@ -485,7 +498,8 @@ const arePropsEqual = (
         prevProps.data === nextProps.data &&
         prevProps.taskTemplateName === nextProps.taskTemplateName &&
         prevProps.showResourceZones === nextProps.showResourceZones &&
-        prevProps.dragMode === nextProps.dragMode
+        prevProps.dragMode === nextProps.dragMode &&
+        prevProps.selectedInstanceIds === nextProps.selectedInstanceIds
     );
 };
 

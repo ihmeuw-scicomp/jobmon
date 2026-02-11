@@ -2404,6 +2404,8 @@ export interface components {
             node_id: number;
             /** Task Id */
             task_id: number;
+            /** Task Instance Id */
+            task_instance_id?: number | null;
             /** Task Name */
             task_name?: string | null;
             /** Requested Resources */

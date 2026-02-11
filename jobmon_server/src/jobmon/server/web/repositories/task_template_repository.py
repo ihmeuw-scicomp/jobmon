@@ -83,6 +83,7 @@ class TaskTemplateRepository:
                 ),
                 node_id=row_data["node_id"],
                 task_id=row_data["task_id"],
+                task_instance_id=row_data.get("task_instance_id"),
                 task_name=row_data.get("task_name"),
                 requested_resources=row_data["requested_resources"],
                 attempt_number_of_instance=row_data.get("attempt_number_of_instance"),
@@ -178,6 +179,7 @@ class TaskTemplateRepository:
                     "task_command": row[7],  # task_command_col
                     "task_num_attempts": row[8],  # task_num_attempts_col
                     "task_max_attempts": row[9],  # task_max_attempts_col
+                    "task_instance_id": row[12],  # task_instance_id_col
                 }
                 item = self._convert_to_task_resource_detail_item(row_data)
                 if item:
@@ -218,6 +220,7 @@ class TaskTemplateRepository:
                 Task.command.label("task_command"),
                 Task.num_attempts.label("task_num_attempts"),
                 Task.max_attempts.label("task_max_attempts"),
+                TaskInstance.id.label("task_instance_id"),
             )
             .select_from(TaskTemplateVersion)
             .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
@@ -259,6 +262,7 @@ class TaskTemplateRepository:
             base_query.c.task_command,
             base_query.c.task_num_attempts,
             base_query.c.task_max_attempts,
+            base_query.c.task_instance_id,
         ).select_from(base_query)
 
         for subquery in node_arg_subqueries:
@@ -283,6 +287,7 @@ class TaskTemplateRepository:
                 "task_command": row[9],  # task_command
                 "task_num_attempts": row[10],  # task_num_attempts
                 "task_max_attempts": row[11],  # task_max_attempts
+                "task_instance_id": row[12],  # task_instance_id
             }
             item = self._convert_to_task_resource_detail_item(row_data)
             if item:
@@ -437,6 +442,7 @@ class TaskTemplateRepository:
                         m=detail_item.m,
                         node_id=detail_item.node_id,
                         task_id=detail_item.task_id,
+                        task_instance_id=detail_item.task_instance_id,
                         task_name=detail_item.task_name,
                         requested_resources=detail_item.requested_resources,
                         attempt_number_of_instance=detail_item.attempt_number_of_instance,
@@ -915,6 +921,8 @@ class TaskTemplateRepository:
             for row in paged_rows:
                 error_logs.append(
                     ErrorLogItem(
+                        task_id=row.task_id,
+                        task_instance_id=task_instance_id,
                         task_instance_err_id=row.id,
                         error_time=row.error_time,
                         error=row.description,

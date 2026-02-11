@@ -124,6 +124,7 @@ export const useUsageData = ({
                 ) {
                     return {
                         task_id: item.task_id,
+                        task_instance_id: item.task_instance_id ?? 0,
                         runtime: runtime,
                         memory: memoryGiB,
                         status: String(item.status || 'UNKNOWN').toUpperCase(),

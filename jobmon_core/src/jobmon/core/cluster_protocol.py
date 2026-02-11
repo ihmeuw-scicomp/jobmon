@@ -232,7 +232,13 @@ class ClusterWorkerNode(Protocol):
 
     @abstractmethod
     def get_usage_stats(self) -> Dict:
-        """Usage information specific to the exector."""
+        """Return resource usage with server-ready keys.
+
+        Expected keys (all stringified):
+            maxrss  – peak resident set size in bytes
+            cpu     – total CPU seconds (user + system)
+            usage_str – JSON blob of the full raw stats
+        """
         raise NotImplementedError
 
     @abstractmethod

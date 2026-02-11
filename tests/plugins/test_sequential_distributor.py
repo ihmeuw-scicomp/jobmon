@@ -34,12 +34,12 @@ def test_get_submitted_or_running_returns_empty_set():
 
 
 def test_get_usage_stats_returns_expected_keys():
-    """get_usage_stats should return resource usage with expected keys."""
+    """get_usage_stats should return server-ready keys."""
     worker = SequentialWorkerNode()
     stats = worker.get_usage_stats()
-    assert "maxrss_bytes" in stats
-    assert "user_time_sec" in stats
-    assert "system_time_sec" in stats
-    assert isinstance(stats["maxrss_bytes"], int)
-    assert isinstance(stats["user_time_sec"], float)
-    assert isinstance(stats["system_time_sec"], float)
+    assert "maxrss" in stats
+    assert "cpu" in stats
+    assert "usage_str" in stats
+    assert isinstance(stats["maxrss"], str)
+    assert isinstance(stats["cpu"], str)
+    assert isinstance(stats["usage_str"], str)

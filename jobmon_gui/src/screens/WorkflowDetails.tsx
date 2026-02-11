@@ -16,12 +16,10 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useTaskTableStore } from '@jobmon_gui/stores/TaskTable.ts';
-import { useClusteredErrorsTableStore } from '@jobmon_gui/stores/ClusteredErrorsTable.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowUsageQueryFn } from '@jobmon_gui/queries/GetWorkflowUsage.ts';
 import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors.ts';
-import { getWorkflowTasksQueryFn } from '@jobmon_gui/queries/GetWorkflowTasks.ts';
 import {
     AppBreadcrumbs,
     BreadcrumbItem,
@@ -171,10 +169,6 @@ function WorkflowDetails() {
             ...useTaskTableStore.getState(),
             filters: [],
         });
-        useClusteredErrorsTableStore.setState({
-            ...useClusteredErrorsTableStore.getState(),
-            filters: [],
-        });
         navigate(`/workflow/${workflowId}/task_template/${ttId}`);
     };
 
@@ -199,15 +193,6 @@ function WorkflowDetails() {
                 taskTemplate.task_template_version_id,
             ],
             queryFn: getClusteredErrorsFn,
-        });
-        void queryClient.prefetchQuery({
-            queryKey: [
-                'workflow_details',
-                'tasks',
-                workflowId,
-                taskTemplate.name,
-            ],
-            queryFn: getWorkflowTasksQueryFn,
         });
     };
 

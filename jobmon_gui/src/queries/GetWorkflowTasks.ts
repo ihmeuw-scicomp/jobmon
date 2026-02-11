@@ -1,10 +1,23 @@
 import axios from 'axios';
 import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
-import { Task, Tasks } from '@jobmon_gui/types/TaskTable.ts';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { task_table_url } from '@jobmon_gui/configs/ApiUrls.ts';
 import timezone from 'dayjs/plugin/timezone';
+
+type Task = {
+    task_command: string;
+    task_id: number;
+    task_max_attempts: number;
+    task_name: string;
+    task_num_attempts: number;
+    task_status: string;
+    task_status_date: dayjs.Dayjs;
+};
+
+type Tasks = {
+    tasks: Task[];
+};
 
 type getWorkflowTasksQueryFnArgs = {
     queryKey: (string | number | null | string[] | number[] | null[])[];

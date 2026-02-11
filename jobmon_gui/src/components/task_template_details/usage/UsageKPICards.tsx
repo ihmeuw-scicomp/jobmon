@@ -10,11 +10,7 @@ import {
     LinearProgress,
     Chip,
 } from '@mui/material';
-import {
-    Memory as MemoryIcon,
-    Timer as TimerIcon,
-    Info as InfoIcon,
-} from '@mui/icons-material';
+import { Info as InfoIcon } from '@mui/icons-material';
 import humanizeDuration from 'humanize-duration';
 import {
     UsageKPIStats,
@@ -26,6 +22,7 @@ interface UsageKPICardsProps {
     resourceEfficiency: ResourceEfficiencyMetrics;
     selectedDataCount?: number; // Add prop to show if we're viewing selected data
     totalDataCount?: number;
+    layout?: 'horizontal' | 'vertical';
 }
 
 const UsageKPICards: React.FC<UsageKPICardsProps> = ({
@@ -33,6 +30,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
     resourceEfficiency,
     selectedDataCount,
     totalDataCount,
+    layout = 'horizontal',
 }) => {
     const isShowingSelection =
         selectedDataCount !== undefined && selectedDataCount > 0;
@@ -103,44 +101,43 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
             {/* KPI Cards Grid */}
             <Grid container spacing={1}>
                 {/* Runtime Stats Card */}
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={layout === 'vertical' ? 12 : 6}>
                     <Card
                         elevation={0}
                         sx={{
                             height: '100%',
                             border: '1px solid',
                             borderColor: 'divider',
+                            borderLeft: '3px solid',
+                            borderLeftColor: 'primary.main',
                             borderRadius: 2,
                             transition: 'all 0.2s ease-in-out',
-                            '&:hover': {
-                                boxShadow: 3,
-                                borderColor: 'primary.main',
-                            },
+                            '&:hover': { boxShadow: 3 },
                         }}
                     >
-                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                            <Box display="flex" alignItems="center" mb={1.5}>
-                                <Box
-                                    sx={{
-                                        bgcolor: 'primary.50',
-                                        color: 'primary.main',
-                                        p: 0.75,
-                                        borderRadius: 1,
-                                        mr: 1.5,
-                                    }}
-                                >
-                                    <TimerIcon sx={{ fontSize: 18 }} />
-                                </Box>
-                                <Typography
-                                    variant="subtitle1"
-                                    component="div"
-                                    fontWeight="bold"
-                                >
-                                    Runtime Analysis
-                                </Typography>
-                            </Box>
+                        <CardContent
+                            sx={{
+                                p: layout === 'vertical' ? 1.5 : 2,
+                                '&:last-child': {
+                                    pb: layout === 'vertical' ? 1.5 : 2,
+                                },
+                            }}
+                        >
+                            <Typography
+                                variant="caption"
+                                color="primary.main"
+                                fontWeight="bold"
+                                sx={{
+                                    textTransform: 'uppercase',
+                                    letterSpacing: 0.5,
+                                    mb: 0.5,
+                                    display: 'block',
+                                }}
+                            >
+                                Runtime
+                            </Typography>
 
-                            <Grid container spacing={1.5}>
+                            <Grid container spacing={layout === 'vertical' ? 0.5 : 1.5}>
                                 <Grid item xs={4}>
                                     <Typography
                                         variant="caption"
@@ -351,44 +348,43 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                 </Grid>
 
                 {/* Memory Stats Card */}
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={layout === 'vertical' ? 12 : 6}>
                     <Card
                         elevation={0}
                         sx={{
                             height: '100%',
                             border: '1px solid',
                             borderColor: 'divider',
+                            borderLeft: '3px solid',
+                            borderLeftColor: 'secondary.main',
                             borderRadius: 2,
                             transition: 'all 0.2s ease-in-out',
-                            '&:hover': {
-                                boxShadow: 3,
-                                borderColor: 'secondary.main',
-                            },
+                            '&:hover': { boxShadow: 3 },
                         }}
                     >
-                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                            <Box display="flex" alignItems="center" mb={1.5}>
-                                <Box
-                                    sx={{
-                                        bgcolor: 'secondary.50',
-                                        color: 'secondary.main',
-                                        p: 0.75,
-                                        borderRadius: 1,
-                                        mr: 1.5,
-                                    }}
-                                >
-                                    <MemoryIcon sx={{ fontSize: 18 }} />
-                                </Box>
-                                <Typography
-                                    variant="subtitle1"
-                                    component="div"
-                                    fontWeight="bold"
-                                >
-                                    Memory Analysis
-                                </Typography>
-                            </Box>
+                        <CardContent
+                            sx={{
+                                p: layout === 'vertical' ? 1.5 : 2,
+                                '&:last-child': {
+                                    pb: layout === 'vertical' ? 1.5 : 2,
+                                },
+                            }}
+                        >
+                            <Typography
+                                variant="caption"
+                                color="secondary.main"
+                                fontWeight="bold"
+                                sx={{
+                                    textTransform: 'uppercase',
+                                    letterSpacing: 0.5,
+                                    mb: 0.5,
+                                    display: 'block',
+                                }}
+                            >
+                                Memory
+                            </Typography>
 
-                            <Grid container spacing={1.5}>
+                            <Grid container spacing={layout === 'vertical' ? 0.5 : 1.5}>
                                 <Grid item xs={4}>
                                     <Typography
                                         variant="caption"

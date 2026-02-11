@@ -420,6 +420,10 @@ async def log_error_worker_node(
             "nodename",
             "stdout",
             "stderr",
+            "wallclock",
+            "maxrss",
+            "cpu",
+            "usage_str",
         ]
         for field in optional_vals:
             val = data.get(field)

@@ -5,41 +5,58 @@ import {
     Box,
     Button,
     ButtonGroup,
+    Checkbox,
+    Chip,
+    FormControl,
+    FormControlLabel,
     IconButton,
+    InputLabel,
+    ListItemText,
+    MenuItem,
+    OutlinedInput,
     Paper,
+    Select,
     Skeleton,
+    Switch,
     Tooltip,
     Typography,
 } from '@mui/material';
 import {
     Info as InfoIcon,
     Download as DownloadIcon,
-    Tune as TuneIcon,
     ZoomIn as ZoomInIcon,
     PanTool as PanToolIcon,
     Add as AddIcon,
     Remove as RemoveIcon,
     RestartAlt as RestartAltIcon,
     HighlightAlt as SelectIcon,
+    Gesture as LassoIcon,
 } from '@mui/icons-material';
 import RuntimeMemoryScatterPlot, {
     ScatterPlotHandle,
 } from './RuntimeMemoryScatterPlot';
-import UsageFilters, { UsageFiltersProps } from './UsageFilters';
 import { ScatterDataPoint } from '@jobmon_gui/types/Usage';
+import { ResourceCluster } from './usageCalculations';
 
-type FilterProps = Omit<UsageFiltersProps, 'anchorEl' | 'onClose'>;
-
-interface UsagePlotSectionProps extends FilterProps {
+interface UsagePlotSectionProps {
     isLoading: boolean;
     filteredScatterData: ScatterDataPoint[];
     taskTemplateName: string;
     medianRequestedRuntime?: number;
     medianRequestedMemoryGiB?: number;
+    showResourceZones: boolean;
+    selectedInstanceIds?: Set<number>;
     onTaskClick: (taskId: number | string) => void;
     onSelected: (selectedPoints: ScatterDataPoint[]) => void;
+    onShowResourceZonesChange: (show: boolean) => void;
     onDownloadCSV?: () => void;
     hasData?: boolean;
+    availableResourceClusters: ResourceCluster[];
+    selectedResourceClusters: Set<string>;
+    onSelectedResourceClustersChange: (clusters: Set<string>) => void;
+    onResetFilters: () => void;
+    hasActiveSelection?: boolean;
+    onClearSelection?: () => void;
 }
 
 const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
@@ -48,29 +65,23 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
     taskTemplateName,
     medianRequestedRuntime,
     medianRequestedMemoryGiB,
+    showResourceZones,
+    selectedInstanceIds,
     onTaskClick,
     onSelected,
+    onShowResourceZonesChange,
     onDownloadCSV,
     hasData = false,
-    // Filter props forwarded to popover
-    availableAttempts,
-    availableStatuses,
     availableResourceClusters,
-    availableTaskNames,
-    selectedAttempts,
-    selectedStatuses,
     selectedResourceClusters,
-    selectedTaskNames,
-    showResourceZones,
-    onSelectedAttemptsChange,
-    onSelectedStatusesChange,
     onSelectedResourceClustersChange,
-    onSelectedTaskNamesChange,
-    onShowResourceZonesChange,
     onResetFilters,
+    hasActiveSelection,
+    onClearSelection,
 }) => {
-    const [settingsAnchor, setSettingsAnchor] =
-        useState<HTMLElement | null>(null);
+    const isResourceFiltered =
+        selectedResourceClusters.size <
+        availableResourceClusters.length;
     const [dragMode, setDragMode] = useState<
         'zoom' | 'pan' | 'select' | 'lasso'
     >('zoom');
@@ -80,11 +91,14 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
         <Paper
             elevation={0}
             sx={{
-                mx: 1,
                 mb: 1,
                 border: '1px solid',
                 borderColor: 'divider',
                 borderRadius: 2,
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
             }}
         >
             {/* Chart navigation toolbar */}
@@ -141,6 +155,21 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                             <SelectIcon fontSize="small" />
                         </Button>
                     </Tooltip>
+                    <Tooltip title="Lasso select">
+                        <Button
+                            variant={
+                                dragMode === 'lasso'
+                                    ? 'contained'
+                                    : 'outlined'
+                            }
+                            onClick={() =>
+                                setDragMode('lasso')
+                            }
+                            sx={{ minWidth: 0, px: 0.75 }}
+                        >
+                            <LassoIcon fontSize="small" />
+                        </Button>
+                    </Tooltip>
                     <Tooltip title="Zoom in">
                         <Button
                             onClick={() =>
@@ -176,9 +205,123 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                 <Box
                     sx={{
                         display: 'flex',
-                        gap: 0.25,
+                        alignItems: 'center',
+                        gap: 1,
+                        flex: 1,
+                        justifyContent: 'center',
                     }}
                 >
+                    <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <InputLabel id="resource-cluster-filter-label">
+                            Resource Clusters
+                        </InputLabel>
+                        <Select
+                            labelId="resource-cluster-filter-label"
+                            multiple
+                            value={Array.from(
+                                selectedResourceClusters
+                            )}
+                            onChange={event => {
+                                const {
+                                    target: { value },
+                                } = event;
+                                onSelectedResourceClustersChange(
+                                    new Set(
+                                        typeof value === 'string'
+                                            ? value.split(',')
+                                            : (value as string[])
+                                    )
+                                );
+                            }}
+                            input={
+                                <OutlinedInput label="Resource Clusters" />
+                            }
+                            renderValue={selected =>
+                                selected.length ===
+                                availableResourceClusters.length
+                                    ? 'All'
+                                    : `${selected.length} selected`
+                            }
+                            MenuProps={{
+                                PaperProps: {
+                                    style: { maxHeight: 300 },
+                                },
+                            }}
+                        >
+                            {availableResourceClusters.map(cluster => (
+                                <MenuItem
+                                    key={cluster.id}
+                                    value={cluster.id}
+                                    dense
+                                >
+                                    <Checkbox
+                                        checked={selectedResourceClusters.has(
+                                            cluster.id
+                                        )}
+                                        size="small"
+                                    />
+                                    <ListItemText
+                                        primary={cluster.label}
+                                        primaryTypographyProps={{
+                                            fontSize: '0.875rem',
+                                        }}
+                                    />
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                    {hasActiveSelection && onClearSelection && (
+                        <Chip
+                            label="Clear selection"
+                            size="small"
+                            onDelete={onClearSelection}
+                            color="primary"
+                            variant="outlined"
+                            sx={{ height: 28 }}
+                        />
+                    )}
+                    {isResourceFiltered && (
+                        <Chip
+                            label="Reset filters"
+                            size="small"
+                            onClick={onResetFilters}
+                            variant="outlined"
+                            color="default"
+                            sx={{ height: 28 }}
+                        />
+                    )}
+                </Box>
+
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                    }}
+                >
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={showResourceZones}
+                                onChange={() =>
+                                    onShowResourceZonesChange(
+                                        !showResourceZones
+                                    )
+                                }
+                                color="primary"
+                                size="small"
+                            />
+                        }
+                        label={
+                            <Typography
+                                variant="body2"
+                                sx={{ fontSize: '0.8rem' }}
+                            >
+                                Efficiency Zones
+                            </Typography>
+                        }
+                        sx={{ mr: 0.5 }}
+                    />
                     {onDownloadCSV && (
                         <Tooltip title="Download CSV">
                             <IconButton
@@ -191,68 +334,20 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                             </IconButton>
                         </Tooltip>
                     )}
-                    <Tooltip title="Chart settings">
-                        <IconButton
-                            size="small"
-                            onClick={e =>
-                                setSettingsAnchor(
-                                    e.currentTarget
-                                )
-                            }
-                            sx={{ p: 0.5 }}
-                        >
-                            <TuneIcon fontSize="small" />
-                        </IconButton>
-                    </Tooltip>
                 </Box>
             </Box>
 
             <Box
                 sx={{
-                    height: {
+                    minHeight: {
                         xs: '350px',
                         sm: '450px',
-                        md: '550px',
+                        md: '400px',
                     },
+                    flex: 1,
                     position: 'relative',
                 }}
             >
-
-                {/* Settings popover */}
-                <UsageFilters
-                    anchorEl={settingsAnchor}
-                    onClose={() => setSettingsAnchor(null)}
-                    availableAttempts={availableAttempts}
-                    availableStatuses={availableStatuses}
-                    availableResourceClusters={
-                        availableResourceClusters
-                    }
-                    availableTaskNames={availableTaskNames}
-                    selectedAttempts={selectedAttempts}
-                    selectedStatuses={selectedStatuses}
-                    selectedResourceClusters={
-                        selectedResourceClusters
-                    }
-                    selectedTaskNames={selectedTaskNames}
-                    showResourceZones={showResourceZones}
-                    onSelectedAttemptsChange={
-                        onSelectedAttemptsChange
-                    }
-                    onSelectedStatusesChange={
-                        onSelectedStatusesChange
-                    }
-                    onSelectedResourceClustersChange={
-                        onSelectedResourceClustersChange
-                    }
-                    onSelectedTaskNamesChange={
-                        onSelectedTaskNamesChange
-                    }
-                    onShowResourceZonesChange={
-                        onShowResourceZonesChange
-                    }
-                    onResetFilters={onResetFilters}
-                />
-
                 {isLoading ? (
                     <Box sx={{ p: 3, height: '100%' }}>
                         <Skeleton
@@ -281,6 +376,7 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                             }
                             taskTemplateName={taskTemplateName}
                             showResourceZones={showResourceZones}
+                            selectedInstanceIds={selectedInstanceIds}
                             onSelected={onSelected}
                             dragMode={dragMode}
                         />
@@ -316,8 +412,8 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                             sx={{ maxWidth: 400 }}
                         >
                             No data matches the current filter
-                            criteria. Try adjusting your filters or
-                            check if data exists for this task
+                            criteria. Try adjusting your filters
+                            or check if data exists for this task
                             template.
                         </Typography>
                     </Box>

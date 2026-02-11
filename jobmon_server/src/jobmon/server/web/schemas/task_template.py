@@ -25,6 +25,7 @@ class TaskResourceDetailItem(BaseModel):
     m: Optional[int] = Field(default=None, alias="maxrss")
     node_id: int
     task_id: int
+    task_instance_id: Optional[int] = None
     task_name: Optional[str] = None
     requested_resources: Optional[str] = None  # Raw JSON string from DB
     attempt_number_of_instance: Optional[int] = None  # Added field
@@ -41,6 +42,7 @@ class TaskResourceVizItem(BaseModel):
     m: Optional[int] = None
     node_id: int
     task_id: int
+    task_instance_id: Optional[int] = None
     task_name: Optional[str] = None
     requested_resources: Optional[str] = None
     attempt_number_of_instance: Optional[int] = None

@@ -1,10 +1,5 @@
 import dayjs from 'dayjs';
 
-export type ClusteredErrorsProps = {
-    taskTemplateId: string | number;
-    workflowId: number | string;
-};
-
 export type ErrorSampleModalDetails = {
     sample_index: number;
     sample_ids: number[];

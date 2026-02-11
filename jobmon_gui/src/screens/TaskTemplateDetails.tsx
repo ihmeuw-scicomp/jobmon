@@ -1,27 +1,24 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
-import Grid from '@mui/material/Grid';
 import Skeleton from '@mui/material/Skeleton';
-import Tab from '@mui/material/Tab';
-import Tabs from '@mui/material/Tabs';
 import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 
 import {
     AppBreadcrumbs,
     BreadcrumbItem,
 } from '@jobmon_gui/components/common/AppBreadcrumbs';
 import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
-import TabPanel from '@jobmon_gui/components/common/TabPanel';
-import ClusteredErrors from '@jobmon_gui/components/task_template_details/ClusteredErrors';
 import TaskTable from '@jobmon_gui/components/task_template_details/TaskTable';
-import TaskTemplateHeader from '@jobmon_gui/components/task_template_details/TaskTemplateHeader';
 import UsageKPICards from '@jobmon_gui/components/task_template_details/usage/UsageKPICards';
 import UsagePlotSection from '@jobmon_gui/components/task_template_details/usage/UsagePlotSection';
-import ErrorSummaryCard from '@jobmon_gui/components/task_template_details/usage/ErrorSummaryCard';
+import ErrorClustersCard from '@jobmon_gui/components/task_template_details/usage/ErrorClustersCard';
 import { useTaskTemplateDetails } from '@jobmon_gui/queries/GetTaskTemplateDetails.ts';
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
@@ -44,6 +41,9 @@ import {
     UsageKPIStats,
     ResourceEfficiencyMetrics,
 } from '@jobmon_gui/types/Usage';
+import { TaskInstanceRow } from '@jobmon_gui/types/TaskTable';
+
+dayjs.extend(utc);
 
 type TaskTemplateResourceUsageResponse =
     components['schemas']['TaskTemplateResourceUsageResponse'];
@@ -53,8 +53,8 @@ export default function TaskTemplateDetails() {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const location = useLocation();
-
-    const [activeTab, setActiveTab] = useState(0);
+    const theme = useTheme();
+    const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
 
     const TaskTemplateDetailsData = useTaskTemplateDetails(
         workflowId,
@@ -105,63 +105,61 @@ export default function TaskTemplateDetails() {
     });
 
     const errorLogs = clusteredErrorsQuery.data?.error_logs || [];
-    const errorClusterCount = errorLogs.length;
-    const totalFailures = useMemo(
-        () =>
-            errorLogs.reduce(
-                (sum, el) => sum + (el.group_instance_count || 0),
-                0
-            ),
-        [errorLogs]
-    );
-    const topErrorPreview = useMemo(() => {
-        if (errorLogs.length === 0) return undefined;
-        const topError = errorLogs[0]?.sample_error || '';
-        return topError.length > 120 ? `...${topError.slice(-120)}` : topError;
-    }, [errorLogs]);
 
     // --- Usage filters ---
     const {
-        selectedAttempts,
-        selectedStatuses,
         selectedResourceClusters,
-        selectedTaskNames,
-        availableAttempts,
-        availableStatuses,
         availableResourceClusters,
-        availableTaskNames,
-        setSelectedAttempts,
-        setSelectedStatuses,
         setSelectedResourceClusters,
-        setSelectedTaskNames,
         resetFilters,
     } = useUsageFilters({ rawTaskNodesFromApi });
 
     // --- Plot interaction state ---
     const [selectedData, setSelectedData] = useState<ScatterDataPoint[]>([]);
     const [showResourceZones, setShowResourceZones] = useState(false);
+    const [tableFilteredInstanceIds, setTableFilteredInstanceIds] =
+        useState<Set<number> | null>(null);
+
+    // --- Helper: resource cluster filter predicate ---
+    const passesResourceClusterFilter = useCallback(
+        (d: { requested_resources?: string | null }): boolean => {
+            const clusterKey = getResourceClusterKey(d.requested_resources);
+            return (
+                clusterKey === null || selectedResourceClusters.has(clusterKey)
+            );
+        },
+        [selectedResourceClusters]
+    );
+
+    // --- Filtered instance data (shared by table + scatter) ---
+    const filteredInstanceData: TaskInstanceRow[] = useMemo(() => {
+        if (!rawTaskNodesFromApi) return [];
+        return rawTaskNodesFromApi
+            .filter(passesResourceClusterFilter)
+            .map(item => ({
+                task_id: item.task_id,
+                task_instance_id: item.task_instance_id ?? 0,
+                task_name: item.task_name || '',
+                attempt_number: item.attempt_number_of_instance || 1,
+                instance_status: String(item.status || 'UNKNOWN').toUpperCase(),
+                task_command: item.task_command || '',
+                task_num_attempts: item.task_num_attempts ?? 0,
+                task_max_attempts: item.task_max_attempts ?? 0,
+                task_status_date: item.task_status_date
+                    ? dayjs.utc(item.task_status_date)
+                    : dayjs(),
+                runtime_seconds: typeof item.r === 'number' ? item.r : null,
+                memory_gib:
+                    typeof item.m === 'number' ? bytes_to_gib(item.m) : null,
+            }));
+    }, [rawTaskNodesFromApi, passesResourceClusterFilter]);
 
     // --- Helper: filtered requested resource values ---
     const getFilteredRequestedResourceValues = useMemo(() => {
         return (fieldName: 'runtime' | 'memory'): (number | undefined)[] => {
             if (!rawTaskNodesFromApi) return [];
             return rawTaskNodesFromApi
-                .filter(d => {
-                    const clusterKey = getResourceClusterKey(
-                        d.requested_resources
-                    );
-                    return (
-                        selectedAttempts.has(
-                            String(d.attempt_number_of_instance || 1)
-                        ) &&
-                        selectedStatuses.has(
-                            String(d.status || 'UNKNOWN').toUpperCase()
-                        ) &&
-                        (clusterKey === null ||
-                            selectedResourceClusters.has(clusterKey)) &&
-                        (!d.task_name || selectedTaskNames.has(d.task_name))
-                    );
-                })
+                .filter(passesResourceClusterFilter)
                 .map(item => {
                     try {
                         const reqRes = item.requested_resources
@@ -174,95 +172,134 @@ export default function TaskTemplateDetails() {
                     }
                 });
         };
-    }, [
-        rawTaskNodesFromApi,
-        selectedAttempts,
-        selectedStatuses,
-        selectedResourceClusters,
-        selectedTaskNames,
-    ]);
+    }, [rawTaskNodesFromApi, passesResourceClusterFilter]);
 
-    // --- Filtered scatter data ---
-    const filteredScatterData = useMemo(() => {
-        if (!rawTaskNodesFromApi) return [];
-
-        return rawTaskNodesFromApi
-            .filter(d => {
-                const clusterKey = getResourceClusterKey(d.requested_resources);
-                return (
-                    selectedAttempts.has(
-                        String(d.attempt_number_of_instance || 1)
-                    ) &&
-                    selectedStatuses.has(
-                        String(d.status || 'UNKNOWN').toUpperCase()
-                    ) &&
-                    (clusterKey === null ||
-                        selectedResourceClusters.has(clusterKey)) &&
-                    (!d.task_name || selectedTaskNames.has(d.task_name))
-                );
-            })
-            .map((item): ScatterDataPoint | null => {
-                const runtime = typeof item.r === 'number' ? item.r : null;
-                const memoryBytes = typeof item.m === 'number' ? item.m : null;
-                const memoryGiB =
-                    memoryBytes !== null ? bytes_to_gib(memoryBytes) : null;
-
-                let requestedRuntime: number | undefined;
-                let requestedMemory: number | undefined;
-                try {
-                    const reqRes = item.requested_resources
-                        ? JSON.parse(item.requested_resources)
-                        : {};
-                    const reqRuntimeVal = Number(reqRes.runtime);
-                    const reqMemoryVal = Number(reqRes.memory);
-                    requestedRuntime =
+    // --- Filtered scatter data (derived from filteredInstanceData) ---
+    // We need requested resource values from raw API data, so we
+    // build a lookup keyed by task_id + attempt for merging.
+    const requestedResourcesById = useMemo(() => {
+        const map = new Map<
+            number,
+            {
+                requestedRuntime?: number;
+                requestedMemory?: number;
+            }
+        >();
+        for (const item of rawTaskNodesFromApi) {
+            const id = item.task_instance_id;
+            if (id == null) continue;
+            try {
+                const reqRes = item.requested_resources
+                    ? JSON.parse(item.requested_resources)
+                    : {};
+                const reqRuntimeVal = Number(reqRes.runtime);
+                const reqMemoryVal = Number(reqRes.memory);
+                map.set(id, {
+                    requestedRuntime:
                         !isNaN(reqRuntimeVal) && reqRuntimeVal > 0
                             ? reqRuntimeVal
-                            : undefined;
-                    requestedMemory =
+                            : undefined,
+                    requestedMemory:
                         !isNaN(reqMemoryVal) && reqMemoryVal > 0
                             ? reqMemoryVal
-                            : undefined;
-                } catch {
-                    // Skip invalid JSON
-                }
+                            : undefined,
+                });
+            } catch {
+                map.set(id, {});
+            }
+        }
+        return map;
+    }, [rawTaskNodesFromApi]);
 
-                if (
-                    runtime !== null &&
-                    runtime > 0 &&
-                    memoryGiB !== null &&
-                    memoryGiB > 0
-                ) {
-                    return {
-                        task_id: item.task_id,
-                        task_name: item.task_name,
-                        runtime: runtime,
-                        memory: memoryGiB,
-                        status: String(item.status || 'UNKNOWN').toUpperCase(),
-                        attempt_num: item.attempt_number_of_instance || 1,
-                        requestedRuntime: requestedRuntime,
-                        requestedMemory: requestedMemory,
-                    };
-                }
-                return null;
-            })
-            .filter((item): item is ScatterDataPoint => item !== null);
-    }, [
-        rawTaskNodesFromApi,
-        selectedAttempts,
-        selectedStatuses,
-        selectedResourceClusters,
-        selectedTaskNames,
-    ]);
+    const filteredScatterData = useMemo(() => {
+        return filteredInstanceData
+            .filter(
+                d =>
+                    d.runtime_seconds !== null &&
+                    d.runtime_seconds > 0 &&
+                    d.memory_gib !== null &&
+                    d.memory_gib > 0
+            )
+            .map((d): ScatterDataPoint => {
+                const req = requestedResourcesById.get(d.task_instance_id);
+                return {
+                    task_id: d.task_id,
+                    task_instance_id: d.task_instance_id,
+                    task_name: d.task_name,
+                    runtime: d.runtime_seconds!,
+                    memory: d.memory_gib!,
+                    status: d.instance_status,
+                    attempt_num: d.attempt_number,
+                    requestedRuntime: req?.requestedRuntime,
+                    requestedMemory: req?.requestedMemory,
+                };
+            });
+    }, [filteredInstanceData, requestedResourcesById]);
+
+    // --- Effective scatter data (narrowed by table column filters) ---
+    const effectiveScatterData = useMemo(() => {
+        if (!tableFilteredInstanceIds) return filteredScatterData;
+        return filteredScatterData.filter(d =>
+            tableFilteredInstanceIds.has(d.task_instance_id)
+        );
+    }, [filteredScatterData, tableFilteredInstanceIds]);
 
     // --- KPI computation ---
     const dataForKPICalculations = useMemo(() => {
-        return selectedData.length > 0 ? selectedData : filteredScatterData;
-    }, [selectedData, filteredScatterData]);
+        if (selectedData.length > 0) {
+            if (tableFilteredInstanceIds) {
+                return selectedData.filter(d =>
+                    tableFilteredInstanceIds.has(d.task_instance_id)
+                );
+            }
+            return selectedData;
+        }
+        return effectiveScatterData;
+    }, [selectedData, effectiveScatterData, tableFilteredInstanceIds]);
 
     const handleDataSelection = (selectedPoints: ScatterDataPoint[]) => {
         setSelectedData(selectedPoints);
     };
+
+    const handleErrorFilterByInstanceIds = useCallback(
+        (instanceIds: number[]) => {
+            const instanceIdSet = new Set(instanceIds);
+            const currentIds = new Set(
+                selectedData.map(d => d.task_instance_id)
+            );
+            const isSame =
+                selectedData.length > 0 &&
+                instanceIds.every(id => currentIds.has(id)) &&
+                currentIds.size === instanceIdSet.size;
+            if (isSame) {
+                setSelectedData([]);
+                return;
+            }
+            setSelectedData(
+                effectiveScatterData.filter(d =>
+                    instanceIdSet.has(d.task_instance_id)
+                )
+            );
+        },
+        [selectedData, effectiveScatterData]
+    );
+
+    const handleClearSelection = useCallback(() => {
+        setSelectedData([]);
+    }, []);
+
+    const handleTableFilteredInstanceIdsChange = useCallback(
+        (ids: Set<number> | null) => {
+            setTableFilteredInstanceIds(ids);
+        },
+        []
+    );
+
+    // Stable Set of selected instance IDs for scatter highlighting
+    const selectedInstanceIds = useMemo(() => {
+        if (selectedData.length === 0) return undefined;
+        return new Set(selectedData.map(d => d.task_instance_id));
+    }, [selectedData]);
 
     const filteredRequestedRuntimes = useMemo(() => {
         return getFilteredRequestedResourceValues('runtime');
@@ -283,9 +320,13 @@ export default function TaskTemplateDetails() {
 
     const medianRequestedRuntimeForKPI = useMemo(() => {
         if (selectedData.length > 0) {
-            const selectedTaskIds = new Set(selectedData.map(d => d.task_id));
+            const selIds = new Set(selectedData.map(d => d.task_instance_id));
             const selectedRequestedRuntimes = rawTaskNodesFromApi
-                .filter(item => selectedTaskIds.has(item.task_id))
+                .filter(
+                    item =>
+                        item.task_instance_id != null &&
+                        selIds.has(item.task_instance_id)
+                )
                 .map(item => {
                     try {
                         const reqRes = item.requested_resources
@@ -304,9 +345,13 @@ export default function TaskTemplateDetails() {
 
     const medianRequestedMemoryGiBForKPI = useMemo(() => {
         if (selectedData.length > 0) {
-            const selectedTaskIds = new Set(selectedData.map(d => d.task_id));
+            const selIds = new Set(selectedData.map(d => d.task_instance_id));
             const selectedRequestedMemories = rawTaskNodesFromApi
-                .filter(item => selectedTaskIds.has(item.task_id))
+                .filter(
+                    item =>
+                        item.task_instance_id != null &&
+                        selIds.has(item.task_instance_id)
+                )
                 .map(item => {
                     try {
                         const reqRes = item.requested_resources
@@ -505,32 +550,58 @@ export default function TaskTemplateDetails() {
         }
     };
 
-    // --- Resource data map for TaskTable enrichment ---
-    const resourceDataByTaskId = useMemo(() => {
-        const map = new Map<
-            number,
-            {
-                runtime: number | null;
-                memory: number | null;
-                attempt: number;
-            }
-        >();
-        for (const item of rawTaskNodesFromApi) {
-            const existing = map.get(item.task_id);
-            const attemptNum = item.attempt_number_of_instance || 1;
-            if (!existing || attemptNum > existing.attempt) {
-                map.set(item.task_id, {
-                    runtime: typeof item.r === 'number' ? item.r : null,
-                    memory:
-                        typeof item.m === 'number'
-                            ? bytes_to_gib(item.m)
-                            : null,
-                    attempt: attemptNum,
-                });
-            }
+    // --- Cross-component filtering ---
+    // Error logs filtered by data filters only (not scatter/error selection)
+    const dataFilterInstanceIds = useMemo(() => {
+        return new Set(filteredScatterData.map(d => d.task_instance_id));
+    }, [filteredScatterData]);
+
+    const isDataFiltered = useMemo(() => {
+        return selectedResourceClusters.size < availableResourceClusters.length;
+    }, [selectedResourceClusters, availableResourceClusters]);
+
+    const errorLogsForCard = useMemo(() => {
+        if (!isDataFiltered && !tableFilteredInstanceIds) return errorLogs;
+        let effectiveIds = dataFilterInstanceIds;
+        if (tableFilteredInstanceIds) {
+            effectiveIds = new Set(
+                [...effectiveIds].filter(id => tableFilteredInstanceIds.has(id))
+            );
         }
-        return map;
-    }, [rawTaskNodesFromApi]);
+        return errorLogs
+            .map(el => {
+                const matchingInstanceIds = el.task_instance_ids.filter(id =>
+                    effectiveIds.has(id)
+                );
+                if (matchingInstanceIds.length === 0) return null;
+                return {
+                    ...el,
+                    task_instance_ids: matchingInstanceIds,
+                    group_instance_count: matchingInstanceIds.length,
+                };
+            })
+            .filter((el): el is NonNullable<typeof el> => el !== null);
+    }, [
+        errorLogs,
+        dataFilterInstanceIds,
+        isDataFiltered,
+        tableFilteredInstanceIds,
+    ]);
+
+    // Table data: pre-filtered by scatter selection
+    const tableData = useMemo(() => {
+        if (selectedData.length === 0) return filteredInstanceData;
+        const selectedIds = new Set(selectedData.map(d => d.task_instance_id));
+        return filteredInstanceData.filter(d =>
+            selectedIds.has(d.task_instance_id)
+        );
+    }, [filteredInstanceData, selectedData]);
+
+    // Clear brush selection and table filter feedback when filters change
+    useEffect(() => {
+        setSelectedData([]);
+        setTableFilteredInstanceIds(null);
+    }, [selectedResourceClusters]);
 
     // --- Scatter task click handler ---
     const handleScatterTaskClick = (clickedTaskId: number | string) => {
@@ -587,43 +658,97 @@ export default function TaskTemplateDetails() {
         <Box>
             <AppBreadcrumbs items={breadcrumbItems} />
 
-            <Box sx={{ justifyContent: 'start', pt: 1 }}>
-                <TaskTemplateHeader
-                    taskTemplateId={
-                        TaskTemplateDetailsData.data.task_template_id
-                    }
-                    taskTemplateName={
-                        TaskTemplateDetailsData.data.task_template_name
-                    }
-                />
+            {/* Header + Progress Bar */}
+            <Box
+                sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    px: 1,
+                    pt: 1,
+                    pb: 0.5,
+                }}
+            >
+                <Typography
+                    variant="h6"
+                    component="h1"
+                    fontWeight="bold"
+                    sx={{ whiteSpace: 'nowrap' }}
+                >
+                    {TaskTemplateDetailsData.data.task_template_id}
+                    {TaskTemplateDetailsData.data.task_template_name
+                        ? ` - ${TaskTemplateDetailsData.data.task_template_name}`
+                        : ''}
+                </Typography>
+                <Box id="tt_progress" sx={{ flex: 1, minWidth: 0 }}>
+                    <JobmonProgressBar
+                        workflowId={workflowId}
+                        ttId={TaskTemplateDetailsData.data.task_template_id}
+                        placement="bottom"
+                    />
+                </Box>
             </Box>
 
-            {/* Progress Bar */}
-            <Box id="tt_progress" className="div-level-2">
-                <JobmonProgressBar
-                    workflowId={workflowId}
-                    ttId={TaskTemplateDetailsData.data.task_template_id}
-                    placement="bottom"
-                />
-            </Box>
+            {/* --- SECTION A: Analytics (sidebar + main) --- */}
 
-            {/* --- SECTION A: Analytics (always visible) --- */}
-
-            {/* KPI Cards Row */}
             {usageIsLoading ? (
-                <Box sx={{ px: 1, mb: 1 }}>
-                    <Grid container spacing={1}>
-                        {[1, 2, 3].map(key => (
-                            <Grid item xs={12} sm={4} key={key}>
-                                <Skeleton variant="rectangular" height={150} />
-                            </Grid>
-                        ))}
-                    </Grid>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        flexDirection: { xs: 'column', md: 'row' },
+                        px: 1,
+                        gap: 1,
+                    }}
+                >
+                    <Box
+                        sx={{
+                            flex: {
+                                xs: '1 1 auto',
+                                md: '0 0 280px',
+                            },
+                            maxWidth: { md: 280 },
+                            minWidth: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 1,
+                        }}
+                    >
+                        <Skeleton variant="rectangular" height={150} />
+                        <Skeleton variant="rectangular" height={150} />
+                        <Skeleton variant="rectangular" height={200} />
+                    </Box>
+                    <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
+                        <Skeleton variant="rectangular" height={500} />
+                    </Box>
                 </Box>
             ) : (
-                <Grid container spacing={1} sx={{ px: 1, mb: 0 }}>
-                    <Grid item xs={12} md={8}>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        flexDirection: {
+                            xs: 'column',
+                            md: 'row',
+                        },
+                        px: 1,
+                        gap: 1,
+                    }}
+                >
+                    {/* Sidebar */}
+                    <Box
+                        sx={{
+                            flex: {
+                                xs: '1 1 auto',
+                                md: '0 0 280px',
+                            },
+                            maxWidth: { md: 280 },
+                            minWidth: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 1,
+                        }}
+                    >
                         <UsageKPICards
+                            layout={isMdUp ? 'vertical' : 'horizontal'}
                             kpiStats={kpiStats}
                             resourceEfficiency={resourceEfficiency}
                             selectedDataCount={
@@ -631,100 +756,81 @@ export default function TaskTemplateDetails() {
                                     ? selectedData.length
                                     : undefined
                             }
-                            totalDataCount={filteredScatterData.length}
+                            totalDataCount={effectiveScatterData.length}
                         />
-                    </Grid>
-                    <Grid item xs={12} md={4}>
-                        <ErrorSummaryCard
-                            errorClusterCount={errorClusterCount}
-                            totalFailures={totalFailures}
-                            topErrorPreview={topErrorPreview}
+                        <ErrorClustersCard
+                            errorLogs={errorLogsForCard}
                             isLoading={clusteredErrorsQuery.isLoading}
-                            onViewDetails={() => setActiveTab(1)}
+                            workflowId={workflowId}
+                            taskTemplateId={
+                                TaskTemplateDetailsData.data.task_template_id
+                            }
+                            selectedInstanceIds={selectedInstanceIds}
+                            onFilterByInstanceIds={
+                                handleErrorFilterByInstanceIds
+                            }
+                            maxListHeight={isMdUp ? 400 : 180}
                         />
-                    </Grid>
-                </Grid>
+                    </Box>
+
+                    {/* Main content */}
+                    <Box
+                        sx={{
+                            flex: '1 1 0',
+                            minWidth: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                        }}
+                    >
+                        <UsagePlotSection
+                            isLoading={usageInfo.isLoading}
+                            filteredScatterData={effectiveScatterData}
+                            taskTemplateName={taskTemplateName || ''}
+                            medianRequestedRuntime={
+                                medianRequestedRuntimeForKPI
+                            }
+                            medianRequestedMemoryGiB={
+                                medianRequestedMemoryGiBForKPI
+                            }
+                            showResourceZones={showResourceZones}
+                            selectedInstanceIds={selectedInstanceIds}
+                            onTaskClick={handleScatterTaskClick}
+                            onSelected={handleDataSelection}
+                            onShowResourceZonesChange={setShowResourceZones}
+                            onDownloadCSV={downloadCSV}
+                            hasData={
+                                rawTaskNodesFromApi &&
+                                rawTaskNodesFromApi.length > 0
+                            }
+                            availableResourceClusters={
+                                availableResourceClusters
+                            }
+                            selectedResourceClusters={selectedResourceClusters}
+                            onSelectedResourceClustersChange={
+                                setSelectedResourceClusters
+                            }
+                            onResetFilters={resetFilters}
+                            hasActiveSelection={selectedData.length > 0}
+                            onClearSelection={handleClearSelection}
+                        />
+                    </Box>
+                </Box>
             )}
 
-            {/* Scatter Plot Section (filters inside as popover) */}
-            {!usageIsLoading && (
-                <UsagePlotSection
-                    isLoading={usageInfo.isLoading}
-                    filteredScatterData={filteredScatterData}
-                    taskTemplateName={taskTemplateName || ''}
-                    medianRequestedRuntime={medianRequestedRuntimeForKPI}
-                    medianRequestedMemoryGiB={medianRequestedMemoryGiBForKPI}
-                    showResourceZones={showResourceZones}
-                    onTaskClick={handleScatterTaskClick}
-                    onSelected={handleDataSelection}
-                    onDownloadCSV={downloadCSV}
-                    hasData={
-                        rawTaskNodesFromApi && rawTaskNodesFromApi.length > 0
-                    }
-                    availableAttempts={availableAttempts}
-                    availableStatuses={availableStatuses}
-                    availableResourceClusters={availableResourceClusters}
-                    availableTaskNames={availableTaskNames}
-                    selectedAttempts={selectedAttempts}
-                    selectedStatuses={selectedStatuses}
-                    selectedResourceClusters={selectedResourceClusters}
-                    selectedTaskNames={selectedTaskNames}
-                    onSelectedAttemptsChange={setSelectedAttempts}
-                    onSelectedStatusesChange={setSelectedStatuses}
-                    onSelectedResourceClustersChange={
-                        setSelectedResourceClusters
-                    }
-                    onSelectedTaskNamesChange={setSelectedTaskNames}
-                    onShowResourceZonesChange={setShowResourceZones}
-                    onResetFilters={resetFilters}
-                />
-            )}
-
-            {/* --- SECTION B: Detail Tables (2 tabs) --- */}
-            <Box
-                sx={{
-                    borderBottom: 1,
-                    borderColor: 'divider',
-                    mt: 1,
-                }}
-            >
-                <Tabs
-                    value={activeTab}
-                    onChange={(_event, newValue) => setActiveTab(newValue)}
-                    aria-label="Tab selection"
-                >
-                    <Tab label="Tasks" value={0} />
-                    <Tab
-                        label={
-                            <Badge
-                                badgeContent={errorClusterCount}
-                                color="error"
-                                max={999}
-                            >
-                                Errors
-                            </Badge>
-                        }
-                        value={1}
-                    />
-                </Tabs>
-            </Box>
-            <TabPanel value={activeTab} index={0}>
+            {/* Task Table (full width, below both columns) */}
+            <Box sx={{ mt: 1 }}>
                 <TaskTable
+                    data={tableData}
+                    isLoading={usageIsLoading}
                     taskTemplateName={
                         TaskTemplateDetailsData.data.task_template_name
                     }
                     workflowId={workflowId}
-                    resourceDataByTaskId={resourceDataByTaskId}
-                />
-            </TabPanel>
-            <TabPanel value={activeTab} index={1}>
-                <ClusteredErrors
-                    taskTemplateId={
-                        TaskTemplateDetailsData.data.task_template_id
+                    onFilteredInstanceIdsChange={
+                        handleTableFilteredInstanceIdsChange
                     }
-                    workflowId={workflowId}
                 />
-            </TabPanel>
+            </Box>
         </Box>
     );
 }

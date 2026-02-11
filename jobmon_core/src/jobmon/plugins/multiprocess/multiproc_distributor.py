@@ -1,5 +1,6 @@
 """Multiprocess executes tasks in parallel using a thread pool."""
 
+import json
 import logging
 import os
 import platform
@@ -280,10 +281,16 @@ class MultiprocessWorkerNode(ClusterWorkerNode):
         maxrss = usage.ru_maxrss
         if platform.system() != "Darwin":
             maxrss = maxrss * 1024  # KB -> bytes on Linux
-        return {
+        cpu = round(usage.ru_utime + usage.ru_stime, 2)
+        raw = {
             "maxrss_bytes": maxrss,
             "user_time_sec": usage.ru_utime,
             "system_time_sec": usage.ru_stime,
+        }
+        return {
+            "maxrss": str(maxrss),
+            "cpu": str(cpu),
+            "usage_str": json.dumps(raw),
         }
 
     def initialize_logfile(self, log_type: str, log_dir: str, name: str) -> str:
