@@ -30,7 +30,13 @@ export interface TaskStatusMeta {
 // Updated to reflect specific backend statuses and user preference for symbols
 // Using JobmonProgressBar colors from CSS variables for consistency
 export const taskStatusMeta: Record<string, TaskStatusMeta> = {
+    G: { label: 'Registered', symbol: 'diamond', color: '#e69f00' }, // --color-pending
+    Q: { label: 'Queued', symbol: 'diamond', color: '#e69f00' }, // --color-pending
+    I: { label: 'Instantiated', symbol: 'diamond', color: '#e69f00' }, // --color-pending
+    O: { label: 'Scheduled', symbol: 'square', color: '#f0e442' }, // --color-scheduled
+    R: { label: 'Running', symbol: 'triangle-up', color: '#0072b2' }, // --color-running
     D: { label: 'Done', symbol: 'circle', color: '#009e73' }, // --color-done (green)
+    A: { label: 'Adjusting', symbol: 'diamond', color: '#785abd' }, // --color-aborted
     F: { label: 'Fatal Error', symbol: 'x', color: '#d55e00' }, // --color-fatal (orange)
     Z: { label: 'Resource Error', symbol: 'x', color: '#d55e00' }, // Use fatal color for resource errors
     X: { label: 'No Heartbeat', symbol: 'x', color: '#d55e00' }, // Use fatal color for heartbeat issues
@@ -38,6 +44,9 @@ export const taskStatusMeta: Record<string, TaskStatusMeta> = {
     E: { label: 'Error', symbol: 'x', color: '#d55e00' }, // Use fatal color for general errors
     UNKNOWN: { label: 'Unknown Status', symbol: 'asterisk', color: '#757575' }, // Gray fallback
 };
+
+// Status codes that represent error/failure states
+export const ERROR_STATUSES = ['E', 'F', 'A', 'Z', 'X', 'U'] as const;
 
 // Helper function to get status color
 export const getStatusColor = (status: string): string => {

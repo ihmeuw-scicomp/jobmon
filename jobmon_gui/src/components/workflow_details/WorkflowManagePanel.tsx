@@ -80,14 +80,29 @@ export default function WorkflowManagePanel({
         },
     });
 
-    const extractErrorMessage = (error: any): string => {
-        if (error.response?.data?.detail) {
-            return error.response.data.detail;
+    const extractErrorMessage = (error: unknown): string => {
+        if (error instanceof Error) return error.message;
+        if (
+            typeof error === 'object' &&
+            error !== null &&
+            'response' in error
+        ) {
+            const resp = (error as { response?: { data?: Record<string, unknown> } })
+                .response;
+            const detail = resp?.data?.detail;
+            if (typeof detail === 'string') return detail;
+            const exc = resp?.data?.error;
+            if (
+                typeof exc === 'object' &&
+                exc !== null &&
+                'exception_message' in exc
+            ) {
+                return String(
+                    (exc as { exception_message: string }).exception_message
+                );
+            }
         }
-        if (error.response?.data?.error?.exception_message) {
-            return error.response.data.error.exception_message;
-        }
-        return error.message || error.toString();
+        return String(error);
     };
 
     const handleWfInputChange = (

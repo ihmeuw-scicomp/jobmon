@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import TaskInstanceTable from '@jobmon_gui/components/task_details/TaskInstanceTable';
 import TaskDAG from '@jobmon_gui/components/task_details/TaskDAG.tsx';
+import TaskSummaryCard from '@jobmon_gui/components/task_details/TaskSummaryCard';
+import TaskStatusTimeline from '@jobmon_gui/components/task_details/TaskStatusTimeline';
 import { HiInformationCircle } from 'react-icons/hi';
 import { JobmonModal } from '@jobmon_gui/components/JobmonModal.tsx';
 import { CircularProgress, Grid } from '@mui/material';
@@ -86,15 +87,17 @@ export default function TaskDetails() {
     return (
         <div>
             <AppBreadcrumbs items={breadcrumbItems} />
-            <div>
-                <header className="div-level-2 header-1 ">
-                    <p className="color-dark">
-                        Task Name: {task_details?.data?.task_name}&nbsp;
-                    </p>
-                </header>
+            <div className="div-level-2">
+                <TaskSummaryCard
+                    taskDetails={task_details.data}
+                    taskId={taskId}
+                />
             </div>
-            <div id="wftable" className="div-level-2">
-                <TaskInstanceTable taskId={taskId} />
+            <div className="div-level-2" style={{ paddingTop: 8 }}>
+                <TaskStatusTimeline
+                    workflowId={task_details.data.workflow_id}
+                    taskId={taskId}
+                />
             </div>
             <header className="div-level-2 header-1 ">
                 <p className="color-dark">

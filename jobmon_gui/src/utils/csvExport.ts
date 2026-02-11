@@ -34,7 +34,7 @@ const CSV_COLUMNS = [
     'requested_resources_json',
 ] as const;
 
-const parseResourceJson = (
+export const parseResourceJson = (
     json: string | null | undefined
 ): { runtime?: number; memory?: number } => {
     if (!json) return {};

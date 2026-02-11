@@ -678,6 +678,8 @@ class TaskRepository:
                 TaskInstance.submitted_date,
                 TaskInstance.status_date,
                 Queue.name,
+                TaskInstance.cpu,
+                TaskInstance.io,
             )
             .outerjoin_from(
                 TaskInstance,
@@ -721,6 +723,8 @@ class TaskRepository:
                 ti_submit_date=serialize_datetime(row[12]),
                 ti_status_date=serialize_datetime(row[13]),
                 ti_queue_name=row[14],
+                ti_cpu=row[15],
+                ti_io=row[16],
             )
             for row in rows
         ]
@@ -737,6 +741,8 @@ class TaskRepository:
                 Task.command,
                 Task.status_date,
                 TaskTemplate.id,
+                Task.num_attempts,
+                Task.max_attempts,
             )
             .join(Node, Task.node_id == Node.id)
             .join(
@@ -762,6 +768,8 @@ class TaskRepository:
                     task_command=row[3],
                     task_status_date=status_date,
                     task_template_id=row[5],
+                    num_attempts=row[6],
+                    max_attempts=row[7],
                 )
             )
 

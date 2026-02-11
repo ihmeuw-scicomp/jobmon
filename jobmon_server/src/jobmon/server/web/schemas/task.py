@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
@@ -41,7 +41,8 @@ class TaskSubdagResponse(BaseModel):
     """Response model for task subdag."""
 
     workflow_id: Optional[int]
-    sub_task: Optional[Dict[int, Any]]  # Changed from str to int - keys are task IDs
+    # Keys are task IDs, values are [status, name]
+    sub_task: Optional[Dict[int, List[str]]]
 
 
 class TaskDependencyItem(BaseModel):
@@ -72,22 +73,25 @@ class TasksRecursiveResponse(BaseModel):
 
 
 class TaskResourceUsageResponse(BaseModel):
-    """Response model for task resource usage."""
+    """Response model for task resource usage.
 
-    resource_usage: List[Any]  # tuple from SerializeTaskResourceUsage.to_wire()
+    resource_usage is a 4-element list from
+    SerializeTaskResourceUsage.to_wire():
+    [num_attempts, nodename, runtime, memory]
+    """
 
-
-class DownstreamTasksRequest(BaseModel):
-    """Request model for downstream tasks."""
-
-    task_ids: List[int]
-    dag_id: int
+    resource_usage: List[Union[int, str, None]]
 
 
 class DownstreamTasksResponse(BaseModel):
-    """Response model for downstream tasks."""
+    """Response model for downstream tasks.
 
-    downstream_tasks: Dict[int, List[Any]]
+    Each value is [node_id, downstream_node_ids] where
+    downstream_node_ids is a list of ints (new clients) or
+    a JSON string (legacy clients) or None.
+    """
+
+    downstream_tasks: Dict[int, List[Union[int, List[int], str, None]]]
 
 
 class TaskInstanceDetailItem(BaseModel):
@@ -108,6 +112,8 @@ class TaskInstanceDetailItem(BaseModel):
     ti_submit_date: Optional[str]
     ti_status_date: Optional[str]
     ti_queue_name: Optional[str]
+    ti_cpu: Optional[str]
+    ti_io: Optional[str]
 
 
 class TaskInstanceDetailsResponse(BaseModel):
@@ -125,6 +131,8 @@ class TaskDetailItem(BaseModel):
     task_command: str
     task_status_date: str
     task_template_id: int
+    num_attempts: int
+    max_attempts: int
 
 
 class TaskDetailsResponse(BaseModel):
