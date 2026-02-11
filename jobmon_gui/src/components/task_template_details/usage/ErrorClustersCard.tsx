@@ -30,7 +30,7 @@ import { getTaskDetailsQueryFn } from
 import {
     ClusteredError,
     ErrorDetails,
-    ErrorSampleModalDetails,
+    ErrorSampleDetails,
 } from '@jobmon_gui/types/ClusteredErrors.ts';
 
 interface ErrorClustersCardProps {
@@ -55,7 +55,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
     const queryClient = useQueryClient();
     const location = useLocation();
     const [errorDetailIndex, setErrorDetailIndex] = useState<
-        boolean | ErrorSampleModalDetails
+        boolean | ErrorSampleDetails
     >(false);
     const [language, setLanguage] = useState('python');
 
@@ -72,6 +72,12 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
             if (
                 errorDetailIndex === false ||
                 errorDetailIndex === true
+            ) {
+                return;
+            }
+            if (
+                errorDetailIndex.sample_index >=
+                errorDetailIndex.sample_ids.length
             ) {
                 return;
             }
@@ -94,7 +100,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
 
     // Prefetch next sample
     const prefetchErrorDetails = async (
-        nextIdx: boolean | ErrorSampleModalDetails
+        nextIdx: boolean | ErrorSampleDetails
     ) => {
         await queryClient.prefetchQuery({
             queryKey: [
@@ -106,6 +112,12 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
             ],
             queryFn: async () => {
                 if (nextIdx === false || nextIdx === true) return;
+                if (
+                    nextIdx.sample_index >=
+                    nextIdx.sample_ids.length
+                ) {
+                    return;
+                }
                 const ti_id =
                     nextIdx.sample_ids[nextIdx.sample_index];
                 return axios

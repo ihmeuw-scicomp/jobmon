@@ -24,19 +24,6 @@ export interface ResourceEfficiencyMetrics {
     outlierCount: number;
 }
 
-export interface UsageFilters {
-    selectedAttempts: Set<string>;
-    selectedStatuses: Set<string>;
-    showMedianRuntimeLine: boolean;
-    showMedianMemoryLine: boolean;
-}
-
-export interface UsageProps {
-    taskTemplateName: string;
-    taskTemplateVersionId: string;
-    workflowId: number | string;
-}
-
 export interface UsageKPIStats {
     minRuntime?: number;
     maxRuntime?: number;

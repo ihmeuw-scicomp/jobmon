@@ -29,6 +29,7 @@ import {
 import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors.ts';
 import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilterPersistence';
 import { bytes_to_gib } from '@jobmon_gui/utils/formatters';
+import { downloadUsageCSV } from '@jobmon_gui/utils/csvExport';
 import { useUsageFilters } from '@jobmon_gui/hooks/useUsageFilters';
 import {
     calculateResourceEfficiency,
@@ -44,6 +45,19 @@ import {
 import { TaskInstanceRow } from '@jobmon_gui/types/TaskTable';
 
 dayjs.extend(utc);
+
+/** Parse a single numeric field from a requested_resources JSON string. */
+const parseResourceField = (
+    json: string | null | undefined,
+    field: 'runtime' | 'memory'
+): number | undefined => {
+    try {
+        const val = Number(json ? JSON.parse(json)[field] : undefined);
+        return !isNaN(val) && val > 0 ? val : undefined;
+    } catch {
+        return undefined;
+    }
+};
 
 type TaskTemplateResourceUsageResponse =
     components['schemas']['TaskTemplateResourceUsageResponse'];
@@ -160,17 +174,9 @@ export default function TaskTemplateDetails() {
             if (!rawTaskNodesFromApi) return [];
             return rawTaskNodesFromApi
                 .filter(passesResourceClusterFilter)
-                .map(item => {
-                    try {
-                        const reqRes = item.requested_resources
-                            ? JSON.parse(item.requested_resources)
-                            : {};
-                        const val = Number(reqRes[fieldName]);
-                        return !isNaN(val) ? val : undefined;
-                    } catch {
-                        return undefined;
-                    }
-                });
+                .map(item =>
+                    parseResourceField(item.requested_resources, fieldName)
+                );
         };
     }, [rawTaskNodesFromApi, passesResourceClusterFilter]);
 
@@ -188,25 +194,16 @@ export default function TaskTemplateDetails() {
         for (const item of rawTaskNodesFromApi) {
             const id = item.task_instance_id;
             if (id == null) continue;
-            try {
-                const reqRes = item.requested_resources
-                    ? JSON.parse(item.requested_resources)
-                    : {};
-                const reqRuntimeVal = Number(reqRes.runtime);
-                const reqMemoryVal = Number(reqRes.memory);
-                map.set(id, {
-                    requestedRuntime:
-                        !isNaN(reqRuntimeVal) && reqRuntimeVal > 0
-                            ? reqRuntimeVal
-                            : undefined,
-                    requestedMemory:
-                        !isNaN(reqMemoryVal) && reqMemoryVal > 0
-                            ? reqMemoryVal
-                            : undefined,
-                });
-            } catch {
-                map.set(id, {});
-            }
+            map.set(id, {
+                requestedRuntime: parseResourceField(
+                    item.requested_resources,
+                    'runtime'
+                ),
+                requestedMemory: parseResourceField(
+                    item.requested_resources,
+                    'memory'
+                ),
+            });
         }
         return map;
     }, [rawTaskNodesFromApi]);
@@ -318,55 +315,49 @@ export default function TaskTemplateDetails() {
         [filteredRequestedMemoriesGiB]
     );
 
-    const medianRequestedRuntimeForKPI = useMemo(() => {
-        if (selectedData.length > 0) {
-            const selIds = new Set(selectedData.map(d => d.task_instance_id));
-            const selectedRequestedRuntimes = rawTaskNodesFromApi
-                .filter(
-                    item =>
-                        item.task_instance_id != null &&
-                        selIds.has(item.task_instance_id)
-                )
-                .map(item => {
-                    try {
-                        const reqRes = item.requested_resources
-                            ? JSON.parse(item.requested_resources)
-                            : {};
-                        const val = Number(reqRes.runtime);
-                        return !isNaN(val) ? val : undefined;
-                    } catch {
-                        return undefined;
-                    }
-                });
-            return calculateMedian(selectedRequestedRuntimes);
-        }
-        return medianRequestedRuntime;
-    }, [selectedData, rawTaskNodesFromApi, medianRequestedRuntime]);
+    // Median requested resource for KPI: narrows to selected data when
+    // a scatter selection is active, otherwise uses the full filtered set.
+    const selectedInstanceIds_forKPI = useMemo(
+        () =>
+            selectedData.length > 0
+                ? new Set(selectedData.map(d => d.task_instance_id))
+                : null,
+        [selectedData]
+    );
 
-    const medianRequestedMemoryGiBForKPI = useMemo(() => {
-        if (selectedData.length > 0) {
-            const selIds = new Set(selectedData.map(d => d.task_instance_id));
-            const selectedRequestedMemories = rawTaskNodesFromApi
-                .filter(
-                    item =>
-                        item.task_instance_id != null &&
-                        selIds.has(item.task_instance_id)
-                )
-                .map(item => {
-                    try {
-                        const reqRes = item.requested_resources
-                            ? JSON.parse(item.requested_resources)
-                            : {};
-                        const val = Number(reqRes.memory);
-                        return !isNaN(val) ? val : undefined;
-                    } catch {
-                        return undefined;
-                    }
-                });
-            return calculateMedian(selectedRequestedMemories);
+    const medianRequestedForKPI = useMemo(() => {
+        if (!selectedInstanceIds_forKPI) {
+            return {
+                runtime: medianRequestedRuntime,
+                memory: medianRequestedMemoryGiB,
+            };
         }
-        return medianRequestedMemoryGiB;
-    }, [selectedData, rawTaskNodesFromApi, medianRequestedMemoryGiB]);
+        const selected = rawTaskNodesFromApi.filter(
+            item =>
+                item.task_instance_id != null &&
+                selectedInstanceIds_forKPI.has(item.task_instance_id)
+        );
+        return {
+            runtime: calculateMedian(
+                selected.map(item =>
+                    parseResourceField(item.requested_resources, 'runtime')
+                )
+            ),
+            memory: calculateMedian(
+                selected.map(item =>
+                    parseResourceField(item.requested_resources, 'memory')
+                )
+            ),
+        };
+    }, [
+        selectedInstanceIds_forKPI,
+        rawTaskNodesFromApi,
+        medianRequestedRuntime,
+        medianRequestedMemoryGiB,
+    ]);
+
+    const medianRequestedRuntimeForKPI = medianRequestedForKPI.runtime;
+    const medianRequestedMemoryGiBForKPI = medianRequestedForKPI.memory;
 
     const kpiRuntimes = useMemo(
         () => dataForKPICalculations.map(d => d.runtime),
@@ -432,122 +423,11 @@ export default function TaskTemplateDetails() {
     }, [dataForKPICalculations]);
 
     // --- CSV download ---
-    const parseRequestedResources = (
-        requestedResourcesJson: string | null | undefined
-    ): { runtime?: number; memory?: number } => {
-        if (!requestedResourcesJson) return {};
-        try {
-            const parsed = JSON.parse(requestedResourcesJson);
-            const runtime = Number(parsed.runtime);
-            const memory = Number(parsed.memory);
-            return {
-                runtime: !isNaN(runtime) && runtime > 0 ? runtime : undefined,
-                memory: !isNaN(memory) && memory > 0 ? memory : undefined,
-            };
-        } catch {
-            return {};
-        }
-    };
-
-    const formatDateForCSV = (date: string | null | undefined): string => {
-        if (!date) return '';
-        try {
-            return new Date(date).toISOString();
-        } catch {
-            return String(date);
-        }
-    };
-
     const downloadCSV = () => {
-        if (!rawTaskNodesFromApi || rawTaskNodesFromApi.length === 0) {
-            return;
-        }
-
-        const csvColumns = [
-            'task_id',
-            'task_name',
-            'status',
-            'task_status_date',
-            'task_command',
-            'task_num_attempts',
-            'task_max_attempts',
-            'runtime_seconds',
-            'memory_gib',
-            'memory_bytes',
-            'attempt_number',
-            'requested_runtime_seconds',
-            'requested_memory_gib',
-            'node_id',
-            'requested_resources_json',
-        ] as const;
-
-        const csvData = rawTaskNodesFromApi.map(item => {
-            const runtime = typeof item.r === 'number' ? item.r : null;
-            const memoryBytes = typeof item.m === 'number' ? item.m : null;
-            const memoryGiB =
-                memoryBytes !== null ? bytes_to_gib(memoryBytes) : null;
-            const requestedResources = parseRequestedResources(
-                item.requested_resources
-            );
-
-            return {
-                task_id: item.task_id,
-                task_name: item.task_name || '',
-                status: item.status || 'UNKNOWN',
-                task_status_date: formatDateForCSV(item.task_status_date),
-                task_command: item.task_command || '',
-                task_num_attempts: item.task_num_attempts ?? null,
-                task_max_attempts: item.task_max_attempts ?? null,
-                runtime_seconds: runtime,
-                memory_gib: memoryGiB,
-                memory_bytes: memoryBytes,
-                attempt_number: item.attempt_number_of_instance || 1,
-                requested_runtime_seconds: requestedResources.runtime,
-                requested_memory_gib: requestedResources.memory,
-                node_id: item.node_id,
-                requested_resources_json: item.requested_resources || '',
-            };
-        });
-
-        const headers = csvColumns;
-
-        const csvContent = [
-            headers.join(','),
-            ...csvData.map(row =>
-                headers
-                    .map(header => {
-                        const value = row[header as keyof typeof row];
-                        if (value === null || value === undefined) {
-                            return '';
-                        }
-                        const stringValue = String(value);
-                        if (
-                            stringValue.includes(',') ||
-                            stringValue.includes('"') ||
-                            stringValue.includes('\n')
-                        ) {
-                            return `"${stringValue.replace(/"/g, '""')}"`;
-                        }
-                        return stringValue;
-                    })
-                    .join(',')
-            ),
-        ].join('\n');
-
-        const blob = new Blob([csvContent], {
-            type: 'text/csv;charset=utf-8;',
-        });
-        const link = document.createElement('a');
-        if (link.download !== undefined) {
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', `${taskTemplateName}_usage_data.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }
+        downloadUsageCSV(
+            rawTaskNodesFromApi,
+            `${taskTemplateName}_usage_data.csv`
+        );
     };
 
     // --- Cross-component filtering ---
