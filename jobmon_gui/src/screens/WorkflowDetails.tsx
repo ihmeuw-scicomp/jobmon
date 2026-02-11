@@ -318,7 +318,6 @@ function WorkflowDetails() {
                             onTemplateHover={setHoveredTemplateName}
                             onPrefetch={prefetchTemplateData}
                             workflowDetails={wfDetails.data}
-                            workflowId={workflowId}
                             onManageClick={handleManageClick}
                         />
                     )}

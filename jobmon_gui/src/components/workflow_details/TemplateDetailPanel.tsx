@@ -7,10 +7,13 @@ import TextField from '@mui/material/TextField';
 import CircularProgress from '@mui/material/CircularProgress';
 import Chip from '@mui/material/Chip';
 import Tooltip from '@mui/material/Tooltip';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import ReplayIcon from '@mui/icons-material/Replay';
-import SkipNextIcon from '@mui/icons-material/SkipNext';
+import BuildIcon from '@mui/icons-material/Build';
+import InfoIcon from '@mui/icons-material/Info';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import humanizeDuration from 'humanize-duration';
 import axios from 'axios';
@@ -64,6 +67,7 @@ export default function TemplateDetailPanel({
         templateData.MAXC >= MAX_CONCURRENCY_SENTINEL ? '' : templateData.MAXC
     );
     const [statusMsg, setStatusMsg] = useState('');
+    const [showManage, setShowManage] = useState(false);
 
     const updateConcurrency = useMutation({
         mutationFn: async ({
@@ -125,7 +129,7 @@ export default function TemplateDetailPanel({
                 );
             })
             .then(r => {
-                if (r) setStatusMsg('Done');
+                if (r) setStatusMsg('Success');
             })
             .catch(() => {
                 setStatusMsg('Error');
@@ -173,7 +177,7 @@ export default function TemplateDetailPanel({
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1,
-                    mb: 2,
+                    mb: 1,
                 }}
             >
                 <IconButton size="small" onClick={onBack}>
@@ -182,12 +186,84 @@ export default function TemplateDetailPanel({
                 <Typography variant="h6" sx={{ flex: 1, fontSize: '1rem' }}>
                     {templateData.name}
                 </Typography>
-                <Tooltip title="View full details">
-                    <IconButton size="small" onClick={onNavigate}>
-                        <OpenInNewIcon fontSize="small" />
+                <Tooltip title="Manage Template">
+                    <IconButton
+                        size="small"
+                        onClick={() => setShowManage(v => !v)}
+                    >
+                        <BuildIcon fontSize="small" />
                     </IconButton>
                 </Tooltip>
             </Box>
+            <Button
+                variant="outlined"
+                fullWidth
+                onClick={onNavigate}
+                sx={{
+                    mb: 2,
+                    textTransform: 'none',
+                    fontSize: '0.85rem',
+                }}
+            >
+                View Task Details
+            </Button>
+
+            {/* Manage controls (toggled by wrench icon) */}
+            {showManage && (
+                <Box sx={{ mb: 1.5 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                        Manage Template
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                        <FormControl variant="outlined" size="small" sx={{ flex: 1 }} disabled={disabled}>
+                            <InputLabel id="tt-status-label">Set Status</InputLabel>
+                            <Select
+                                labelId="tt-status-label"
+                                label="Set Status"
+                                onChange={e => {
+                                    const val = e.target.value as string;
+                                    if (val === 'G') handleStatusUpdate('rerun');
+                                    else if (val === 'D') handleStatusUpdate('skip');
+                                }}
+                            >
+                                <MenuItem value="G">Re-run</MenuItem>
+                                <MenuItem value="D">Skip to Done</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <TextField
+                            label="Concurrency"
+                            value={concurrencyValue}
+                            onChange={handleConcurrencyChange}
+                            inputProps={{
+                                step: 1,
+                                min: 0,
+                                max: 2147483647,
+                                type: 'number',
+                            }}
+                            variant="outlined"
+                            size="small"
+                            disabled={disabled}
+                            sx={{ flex: 1 }}
+                            placeholder="\u221e"
+                        />
+                        <Tooltip
+                            title="Skip to Done: mark tasks as done. Re-run: reset tasks and downstream."
+                            placement="right"
+                        >
+                            <InfoIcon fontSize="small" color="action" sx={{ mt: 1, cursor: 'help' }} />
+                        </Tooltip>
+                    </Box>
+                    {statusMsg && (
+                        <Typography
+                            variant="caption"
+                            color={statusMsg === 'Success' ? 'success.main' : 'error'}
+                            sx={{ display: 'block', mt: 0.5 }}
+                        >
+                            {statusMsg}
+                        </Typography>
+                    )}
+                </Box>
+            )}
 
             {/* Status bar + breakdown */}
             <Box sx={{ mb: 1.5 }}>
@@ -393,57 +469,6 @@ export default function TemplateDetailPanel({
                 </Box>
             )}
 
-            {/* Actions: re-run/skip + concurrency */}
-            <Box sx={{ display: 'flex', gap: 1, mb: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
-                <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<ReplayIcon />}
-                    onClick={() => handleStatusUpdate('rerun')}
-                    disabled={disabled}
-                    sx={{ fontSize: '0.75rem', textTransform: 'none' }}
-                >
-                    Re-run
-                </Button>
-                <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<SkipNextIcon />}
-                    onClick={() => handleStatusUpdate('skip')}
-                    disabled={disabled}
-                    sx={{ fontSize: '0.75rem', textTransform: 'none' }}
-                >
-                    Skip to Done
-                </Button>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
-                    <Typography variant="caption" color="text.secondary">
-                        Max:
-                    </Typography>
-                    <TextField
-                        value={concurrencyValue}
-                        onChange={handleConcurrencyChange}
-                        inputProps={{
-                            step: 1,
-                            min: 0,
-                            max: 2147483647,
-                            type: 'number',
-                        }}
-                        variant="outlined"
-                        size="small"
-                        disabled={disabled}
-                        sx={{ width: 80, '& .MuiInputBase-input': { py: 0.5, fontSize: '0.8rem' } }}
-                        placeholder="\u221e"
-                    />
-                </Box>
-                {statusMsg && (
-                    <Typography
-                        variant="caption"
-                        color={statusMsg === 'Done' ? 'success.main' : 'error'}
-                    >
-                        {statusMsg}
-                    </Typography>
-                )}
-            </Box>
         </Box>
     );
 }
