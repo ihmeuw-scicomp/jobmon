@@ -270,7 +270,7 @@ export default function TaskConcurrencyTab({
     const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
     const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set());
     const [groupByTemplate, setGroupByTemplate] = useState(false);
-    const [normalizeYAxis, setNormalizeYAxis] = useState(false);
+    const [normalizeYAxis, setNormalizeYAxis] = useState(true);
     const [datePickerAnchor, setDatePickerAnchor] = useState<HTMLElement | null>(null);
     const [tempCustomStart, setTempCustomStart] = useState<dayjs.Dayjs | null>(null);
     const [tempCustomEnd, setTempCustomEnd] = useState<dayjs.Dayjs | null>(null);

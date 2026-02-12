@@ -3,18 +3,20 @@ import '@jobmon_gui/styles/jobmon_gui.css';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import WorkflowHeader from '@jobmon_gui/components/workflow_details/WorkflowHeader';
 import Box from '@mui/material/Box';
-import {
-    CircularProgress,
-    IconButton,
-    Tooltip,
-    useMediaQuery,
-    useTheme,
-} from '@mui/material';
+import CircularProgress from '@mui/material/CircularProgress';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Typography from '@mui/material/Typography';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import TimelineIcon from '@mui/icons-material/Timeline';
 import { useTaskTableStore } from '@jobmon_gui/stores/TaskTable.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
@@ -26,6 +28,7 @@ import {
 } from '@jobmon_gui/components/common/AppBreadcrumbs';
 import WorkflowDAG from '@jobmon_gui/components/workflow_details/WorkflowDAG.tsx';
 import TaskConcurrencyTab from '@jobmon_gui/components/workflow_details/TaskConcurrencyTab.tsx';
+import TemplateTimelineTab from '@jobmon_gui/components/workflow_details/TemplateTimelineTab.tsx';
 import TemplateDetailPanel from '@jobmon_gui/components/workflow_details/TemplateDetailPanel.tsx';
 import WorkflowSummaryPanel from '@jobmon_gui/components/workflow_details/WorkflowSummaryPanel.tsx';
 import WorkflowManagePanel from '@jobmon_gui/components/workflow_details/WorkflowManagePanel.tsx';
@@ -52,6 +55,9 @@ function WorkflowDetails() {
     const [autoRefresh, setAutoRefresh] = useState(false);
     const [rightPanelView, setRightPanelView] =
         useState<RightPanelView>('summary');
+    const [bottomPanelView, setBottomPanelView] = useState<
+        'concurrency' | 'timeline'
+    >('timeline');
 
     // Page-level auto-refresh: invalidate all workflow queries periodically
     useEffect(() => {
@@ -324,24 +330,97 @@ function WorkflowDetails() {
                 </Box>
             </Box>
 
-            {/* BOTTOM: Concurrency timeline */}
+            {/* BOTTOM: Concurrency / Timeline */}
             <Box
                 sx={{
                     borderTop: 1,
                     borderColor: 'divider',
                     flex: '1 1 45%',
                     minHeight: 0,
-                    overflow: 'auto',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
                 }}
             >
-                <TaskConcurrencyTab
-                    workflowId={workflowId}
-                    highlightedTemplates={
-                        selectedTemplateName
-                            ? [selectedTemplateName]
-                            : undefined
-                    }
-                />
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        px: 1,
+                        py: 0.25,
+                        borderBottom: '1px solid',
+                        borderColor: 'divider',
+                        flexShrink: 0,
+                    }}
+                >
+                    <ToggleButtonGroup
+                        value={bottomPanelView}
+                        exclusive
+                        onChange={(_, val) => {
+                            if (val) setBottomPanelView(val);
+                        }}
+                        size="small"
+                        sx={{
+                            '& .MuiToggleButton-root': {
+                                py: 0.25,
+                                px: 1,
+                                textTransform: 'none',
+                                fontSize: '0.75rem',
+                            },
+                        }}
+                    >
+                        <ToggleButton value="concurrency">
+                            <Tooltip title="Task concurrency over time">
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0.5,
+                                    }}
+                                >
+                                    <BarChartIcon sx={{ fontSize: 16 }} />
+                                    Concurrency
+                                </Box>
+                            </Tooltip>
+                        </ToggleButton>
+                        <ToggleButton value="timeline">
+                            <Tooltip title="Template execution Gantt timeline">
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0.5,
+                                    }}
+                                >
+                                    <TimelineIcon sx={{ fontSize: 16 }} />
+                                    Timeline
+                                </Box>
+                            </Tooltip>
+                        </ToggleButton>
+                    </ToggleButtonGroup>
+                </Box>
+                <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                    {bottomPanelView === 'concurrency' ? (
+                        <TaskConcurrencyTab
+                            workflowId={workflowId}
+                            highlightedTemplates={
+                                selectedTemplateName
+                                    ? [selectedTemplateName]
+                                    : undefined
+                            }
+                        />
+                    ) : (
+                        <TemplateTimelineTab
+                            workflowId={workflowId}
+                            highlightedTemplates={
+                                selectedTemplateName
+                                    ? [selectedTemplateName]
+                                    : undefined
+                            }
+                            onTemplateClick={handleTemplateSelect}
+                        />
+                    )}
+                </Box>
             </Box>
         </Box>
     );
