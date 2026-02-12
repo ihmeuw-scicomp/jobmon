@@ -2252,12 +2252,44 @@ export interface components {
         /**
          * DownstreamTasksResponse
          * @description Response model for downstream tasks.
+         *
+         *     Each value is [node_id, downstream_node_ids] where
+         *     downstream_node_ids is a list of ints (new clients) or
+         *     a JSON string (legacy clients) or None.
          */
         DownstreamTasksResponse: {
             /** Downstream Tasks */
             downstream_tasks: {
-                [key: string]: unknown[];
+                [key: string]: (number | number[] | string | null)[];
             };
+        };
+        /**
+         * FormattedStats
+         * @description Formatted statistics for legacy client compatibility.
+         */
+        FormattedStats: {
+            /** Num Tasks */
+            num_tasks?: number | null;
+            /** Min Mem */
+            min_mem?: string | null;
+            /** Max Mem */
+            max_mem?: string | null;
+            /** Mean Mem */
+            mean_mem?: string | null;
+            /** Min Runtime */
+            min_runtime?: number | null;
+            /** Max Runtime */
+            max_runtime?: number | null;
+            /** Mean Runtime */
+            mean_runtime?: number | null;
+            /** Median Mem */
+            median_mem?: string | null;
+            /** Median Runtime */
+            median_runtime?: number | null;
+            /** Ci Mem */
+            ci_mem?: (number | null)[] | null;
+            /** Ci Runtime */
+            ci_runtime?: (number | null)[] | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2333,6 +2365,10 @@ export interface components {
             task_status_date: string;
             /** Task Template Id */
             task_template_id: number;
+            /** Num Attempts */
+            num_attempts: number;
+            /** Max Attempts */
+            max_attempts: number;
         };
         /**
          * TaskDetailsResponse
@@ -2377,6 +2413,10 @@ export interface components {
             ti_status_date: string | null;
             /** Ti Queue Name */
             ti_queue_name: string | null;
+            /** Ti Cpu */
+            ti_cpu: string | null;
+            /** Ti Io */
+            ti_io: string | null;
         };
         /**
          * TaskInstanceDetailsResponse
@@ -2389,10 +2429,14 @@ export interface components {
         /**
          * TaskResourceUsageResponse
          * @description Response model for task resource usage.
+         *
+         *     resource_usage is a 4-element list from
+         *     SerializeTaskResourceUsage.to_wire():
+         *     [num_attempts, nodename, runtime, memory]
          */
         TaskResourceUsageResponse: {
             /** Resource Usage */
-            resource_usage: unknown[];
+            resource_usage: (number | string | null)[];
         };
         /** TaskResourceVizItem */
         TaskResourceVizItem: {
@@ -2464,7 +2508,7 @@ export interface components {
             workflow_id: number | null;
             /** Sub Task */
             sub_task: {
-                [key: string]: unknown;
+                [key: string]: string[];
             } | null;
         };
         /**
@@ -2542,13 +2586,8 @@ export interface components {
             ci_runtime?: (number | null)[] | null;
             /** Result Viz */
             result_viz?: components['schemas']['TaskResourceVizItem'][] | null;
-            /**
-             * Formatted Stats
-             * @description Provide formatted statistics similar to legacy client format.
-             */
-            readonly formatted_stats: {
-                [key: string]: unknown;
-            };
+            /** @description Provide formatted statistics similar to legacy client format. */
+            readonly formatted_stats: components['schemas']['FormattedStats'];
         };
         /**
          * TasksRecursiveResponse

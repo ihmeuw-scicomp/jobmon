@@ -29,7 +29,10 @@ import {
 import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors.ts';
 import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilterPersistence';
 import { bytes_to_gib } from '@jobmon_gui/utils/formatters';
-import { downloadUsageCSV } from '@jobmon_gui/utils/csvExport';
+import {
+    downloadUsageCSV,
+    parseResourceJson,
+} from '@jobmon_gui/utils/csvExport';
 import { useUsageFilters } from '@jobmon_gui/hooks/useUsageFilters';
 import {
     calculateResourceEfficiency,
@@ -45,19 +48,6 @@ import {
 import { TaskInstanceRow } from '@jobmon_gui/types/TaskTable';
 
 dayjs.extend(utc);
-
-/** Parse a single numeric field from a requested_resources JSON string. */
-const parseResourceField = (
-    json: string | null | undefined,
-    field: 'runtime' | 'memory'
-): number | undefined => {
-    try {
-        const val = Number(json ? JSON.parse(json)[field] : undefined);
-        return !isNaN(val) && val > 0 ? val : undefined;
-    } catch {
-        return undefined;
-    }
-};
 
 type TaskTemplateResourceUsageResponse =
     components['schemas']['TaskTemplateResourceUsageResponse'];
@@ -174,8 +164,9 @@ export default function TaskTemplateDetails() {
             if (!rawTaskNodesFromApi) return [];
             return rawTaskNodesFromApi
                 .filter(passesResourceClusterFilter)
-                .map(item =>
-                    parseResourceField(item.requested_resources, fieldName)
+                .map(
+                    item =>
+                        parseResourceJson(item.requested_resources)[fieldName]
                 );
         };
     }, [rawTaskNodesFromApi, passesResourceClusterFilter]);
@@ -195,14 +186,10 @@ export default function TaskTemplateDetails() {
             const id = item.task_instance_id;
             if (id == null) continue;
             map.set(id, {
-                requestedRuntime: parseResourceField(
-                    item.requested_resources,
-                    'runtime'
-                ),
-                requestedMemory: parseResourceField(
-                    item.requested_resources,
-                    'memory'
-                ),
+                requestedRuntime: parseResourceJson(item.requested_resources)
+                    .runtime,
+                requestedMemory: parseResourceJson(item.requested_resources)
+                    .memory,
             });
         }
         return map;
@@ -330,16 +317,8 @@ export default function TaskTemplateDetails() {
 
     // Median requested resource for KPI: narrows to selected data when
     // a scatter selection is active, otherwise uses the full filtered set.
-    const selectedInstanceIds_forKPI = useMemo(
-        () =>
-            selectedData.length > 0
-                ? new Set(selectedData.map(d => d.task_instance_id))
-                : null,
-        [selectedData]
-    );
-
     const medianRequestedForKPI = useMemo(() => {
-        if (!selectedInstanceIds_forKPI) {
+        if (!selectedInstanceIds) {
             return {
                 runtime: medianRequestedRuntime,
                 memory: medianRequestedMemoryGiB,
@@ -348,22 +327,22 @@ export default function TaskTemplateDetails() {
         const selected = rawTaskNodesFromApi.filter(
             item =>
                 item.task_instance_id != null &&
-                selectedInstanceIds_forKPI.has(item.task_instance_id)
+                selectedInstanceIds.has(item.task_instance_id)
         );
         return {
             runtime: calculateMedian(
-                selected.map(item =>
-                    parseResourceField(item.requested_resources, 'runtime')
+                selected.map(
+                    item => parseResourceJson(item.requested_resources).runtime
                 )
             ),
             memory: calculateMedian(
-                selected.map(item =>
-                    parseResourceField(item.requested_resources, 'memory')
+                selected.map(
+                    item => parseResourceJson(item.requested_resources).memory
                 )
             ),
         };
     }, [
-        selectedInstanceIds_forKPI,
+        selectedInstanceIds,
         rawTaskNodesFromApi,
         medianRequestedRuntime,
         medianRequestedMemoryGiB,

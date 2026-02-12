@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
@@ -53,6 +53,22 @@ class TaskResourceVizItem(BaseModel):
     task_max_attempts: Optional[int] = None
 
 
+class FormattedStats(BaseModel):
+    """Formatted statistics for legacy client compatibility."""
+
+    num_tasks: Optional[int] = None
+    min_mem: Optional[str] = None
+    max_mem: Optional[str] = None
+    mean_mem: Optional[str] = None
+    min_runtime: Optional[int] = None
+    max_runtime: Optional[int] = None
+    mean_runtime: Optional[float] = None
+    median_mem: Optional[str] = None
+    median_runtime: Optional[float] = None
+    ci_mem: Optional[List[Union[float, None]]] = None
+    ci_runtime: Optional[List[Union[float, None]]] = None
+
+
 class TaskTemplateResourceUsageResponse(BaseModel):
     """Unified response model for task template resource usage."""
 
@@ -78,23 +94,21 @@ class TaskTemplateResourceUsageResponse(BaseModel):
 
     # Computed properties for client convenience
     @computed_field
-    def formatted_stats(self) -> Dict[str, Any]:
+    def formatted_stats(self) -> FormattedStats:
         """Provide formatted statistics similar to legacy client format."""
-        return {
-            "num_tasks": self.num_tasks,
-            "min_mem": f"{self.min_mem}B" if self.min_mem is not None else None,
-            "max_mem": f"{self.max_mem}B" if self.max_mem is not None else None,
-            "mean_mem": f"{self.mean_mem}B" if self.mean_mem is not None else None,
-            "min_runtime": self.min_runtime,
-            "max_runtime": self.max_runtime,
-            "mean_runtime": self.mean_runtime,
-            "median_mem": (
-                f"{self.median_mem}B" if self.median_mem is not None else None
-            ),
-            "median_runtime": self.median_runtime,
-            "ci_mem": self.ci_mem,
-            "ci_runtime": self.ci_runtime,
-        }
+        return FormattedStats(
+            num_tasks=self.num_tasks,
+            min_mem=f"{self.min_mem}B" if self.min_mem is not None else None,
+            max_mem=f"{self.max_mem}B" if self.max_mem is not None else None,
+            mean_mem=f"{self.mean_mem}B" if self.mean_mem is not None else None,
+            min_runtime=self.min_runtime,
+            max_runtime=self.max_runtime,
+            mean_runtime=self.mean_runtime,
+            median_mem=(f"{self.median_mem}B" if self.median_mem is not None else None),
+            median_runtime=self.median_runtime,
+            ci_mem=self.ci_mem,
+            ci_runtime=self.ci_runtime,
+        )
 
 
 class TaskTemplateDetailsResponse(BaseModel):

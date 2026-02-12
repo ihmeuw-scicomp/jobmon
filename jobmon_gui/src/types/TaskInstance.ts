@@ -14,6 +14,8 @@ export type TaskInstance = {
     ti_submit_date: string | null;
     ti_status_date: string | null;
     ti_queue_name: string | null;
+    ti_cpu: string | null;
+    ti_io: string | null;
 };
 
 export type TypeInstanceResponse = {

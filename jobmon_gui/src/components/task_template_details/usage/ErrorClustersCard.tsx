@@ -58,8 +58,8 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
     const queryClient = useQueryClient();
     const location = useLocation();
     const [errorDetailIndex, setErrorDetailIndex] = useState<
-        boolean | ErrorSampleDetails
-    >(false);
+        ErrorSampleDetails | null
+    >(null);
     const [language, setLanguage] = useState('python');
 
     // --- Error detail query ---
@@ -72,10 +72,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
             errorDetailIndex,
         ],
         queryFn: async () => {
-            if (
-                errorDetailIndex === false ||
-                errorDetailIndex === true
-            ) {
+            if (errorDetailIndex === null) {
                 return;
             }
             if (
@@ -95,15 +92,12 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                 )
                 .then(r => r.data);
         },
-        enabled:
-            !!taskTemplateId &&
-            errorDetailIndex !== false &&
-            errorDetailIndex !== true,
+        enabled: !!taskTemplateId && errorDetailIndex !== null,
     });
 
     // Prefetch next sample
     const prefetchErrorDetails = async (
-        nextIdx: boolean | ErrorSampleDetails
+        nextIdx: ErrorSampleDetails
     ) => {
         await queryClient.prefetchQuery({
             queryKey: [
@@ -114,7 +108,6 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                 nextIdx,
             ],
             queryFn: async () => {
-                if (nextIdx === false || nextIdx === true) return;
                 if (
                     nextIdx.sample_index >=
                     nextIdx.sample_ids.length
@@ -134,10 +127,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
     };
 
     useEffect(() => {
-        if (
-            errorDetailIndex === false ||
-            errorDetailIndex === true
-        ) {
+        if (errorDetailIndex === null) {
             return;
         }
         if (
@@ -162,10 +152,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
 
     // --- Sample navigation ---
     const nextSample = () => {
-        if (
-            errorDetailIndex === false ||
-            errorDetailIndex === true
-        ) {
+        if (errorDetailIndex === null) {
             return;
         }
         setErrorDetailIndex({
@@ -176,8 +163,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
 
     const previousSample = () => {
         if (
-            errorDetailIndex === false ||
-            errorDetailIndex === true ||
+            errorDetailIndex === null ||
             errorDetailIndex.sample_index === 0
         ) {
             return;
@@ -193,14 +179,9 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
     };
 
     const currentTiID = () => {
-        if (
-            errorDetailIndex === false ||
-            errorDetailIndex === true
-        ) {
-            return '';
-        }
-        return errorDetailIndex?.sample_ids[
-            errorDetailIndex?.sample_index
+        if (errorDetailIndex === null) return '';
+        return errorDetailIndex.sample_ids[
+            errorDetailIndex.sample_index
         ];
     };
 
@@ -214,8 +195,8 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
             );
         }
         const error =
-            (errorDetails as ErrorDetails)?.data?.error_logs?.[0] ||
-            false;
+            (errorDetails as unknown as ErrorDetails)?.data
+                ?.error_logs?.[0] ?? null;
         if (errorDetails.isError || !error) {
             return (
                 <Typography sx={{ p: 2 }}>
@@ -664,8 +645,8 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
             {/* Error detail drawer */}
             <Drawer
                 anchor="right"
-                open={errorDetailIndex !== false}
-                onClose={() => setErrorDetailIndex(false)}
+                open={errorDetailIndex !== null}
+                onClose={() => setErrorDetailIndex(null)}
                 PaperProps={{
                     sx: { width: { xs: '100%', md: 640 } },
                 }}
@@ -683,7 +664,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                         Error Sample: TI {currentTiID()}
                     </Typography>
                     <IconButton
-                        onClick={() => setErrorDetailIndex(false)}
+                        onClick={() => setErrorDetailIndex(null)}
                         size="small"
                     >
                         <CloseIcon />
@@ -701,26 +682,24 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                         onClick={previousSample}
                         size="small"
                         disabled={
-                            typeof errorDetailIndex !== 'boolean' &&
-                            errorDetailIndex?.sample_index === 0
+                            errorDetailIndex !== null &&
+                            errorDetailIndex.sample_index === 0
                         }
                     >
                         <NavigateBeforeIcon />
                     </IconButton>
                     <Typography variant="body2" sx={{ mx: 1 }}>
-                        {errorDetailIndex &&
-                        typeof errorDetailIndex !== 'boolean'
-                            ? `${errorDetailIndex.sample_index + 1} of ${errorDetailIndex.sample_ids?.length}`
+                        {errorDetailIndex
+                            ? `${errorDetailIndex.sample_index + 1} of ${errorDetailIndex.sample_ids.length}`
                             : 'No error logs available'}
                     </Typography>
                     <IconButton
                         onClick={nextSample}
                         size="small"
                         disabled={
-                            typeof errorDetailIndex !== 'boolean' &&
-                            errorDetailIndex?.sample_index ===
-                                errorDetailIndex?.sample_ids
-                                    ?.length - 1
+                            errorDetailIndex !== null &&
+                            errorDetailIndex.sample_index ===
+                                errorDetailIndex.sample_ids.length - 1
                         }
                     >
                         <NavigateNextIcon />
