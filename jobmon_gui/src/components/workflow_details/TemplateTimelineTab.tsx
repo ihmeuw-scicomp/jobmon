@@ -139,8 +139,10 @@ export default function TemplateTimelineTab({
         (event: Readonly<PlotMouseEvent>) => {
             if (!onTemplateClick || !event.points?.length) return;
             const point = event.points[0];
-            const templateName = (point as { customdata?: string }).customdata;
-            if (templateName) {
+            const templateName = (
+                point as { customdata?: unknown }
+            ).customdata;
+            if (typeof templateName === 'string') {
                 onTemplateClick(templateName);
             }
         },
@@ -282,7 +284,7 @@ export default function TemplateTimelineTab({
                     type: 'scatter',
                     x: tmpl.timestamps,
                     y: counts,
-                    customdata: counts,
+                    customdata: tmpl.timestamps.map(() => tmpl.template_name),
                     xaxis: 'x',
                     yaxis: yRef,
                     stackgroup: `tmpl_${tIdx}`,
@@ -294,7 +296,7 @@ export default function TemplateTimelineTab({
                     showlegend: tIdx === 0 && globalActiveStatuses.has(status),
                     legendgroup: status,
                     hovertemplate: hasAny
-                        ? `${STATUS_DISPLAY_LABEL[status]}: %{customdata}<extra>${tmpl.template_name}</extra>`
+                        ? `${STATUS_DISPLAY_LABEL[status]}: %{y}<extra>${tmpl.template_name}</extra>`
                         : undefined,
                     hoverinfo: hasAny ? undefined : ('skip' as const),
                 } as PlotlyData);
