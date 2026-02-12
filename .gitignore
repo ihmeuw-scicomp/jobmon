@@ -65,3 +65,6 @@ docker_config/logconfig.otlp.yaml
 
 # Playwright MCP screenshots
 .playwright-mcp/
+
+# Development screenshots
+*.png
