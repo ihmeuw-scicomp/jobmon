@@ -60,6 +60,7 @@ const DAGNode = memo(
             fullName: string;
             statusLabel: string;
             statusColor: string;
+            statusTextColor: string;
             isCurrent: boolean;
         };
     }) => {
@@ -86,11 +87,7 @@ const DAGNode = memo(
                         fontSize: 11,
                         textAlign: 'center',
                         cursor: 'pointer',
-                        color:
-                            data.statusColor === '#0072b2' ||
-                            data.statusColor === '#009e73'
-                                ? '#fff'
-                                : '#000',
+                        color: data.statusTextColor,
                     }}
                 >
                     <Handle
@@ -185,6 +182,7 @@ export default function TaskDAG({
                 fullName: task.name,
                 statusLabel: getStatusLabel(task.status),
                 statusColor: getStatusColor(task.status),
+                statusTextColor: getStatusTextColor(task.status),
                 isCurrent,
             },
             position: { x: 0, y: 0 },

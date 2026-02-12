@@ -15,11 +15,13 @@ import { getTaskInstanceDetailsQueryFn } from '@jobmon_gui/queries/GetTaskInstan
 import {
     getStatusColor,
     getStatusLabel,
+    getStatusTextColor,
     taskStatusMeta,
 } from '@jobmon_gui/constants/taskStatus';
 import { components } from '@jobmon_gui/types/apiSchema';
 import { TaskInstance } from '@jobmon_gui/types/TaskInstance';
 import { formatBytes, bytes_to_gib } from '@jobmon_gui/utils/formatters';
+import { parseResourceJson } from '@jobmon_gui/utils/csvExport';
 import ResourceComparisonBar from './ResourceComparisonBar';
 import { JobmonModal } from '@jobmon_gui/components/JobmonModal';
 import { ScrollableCodeBlock } from '@jobmon_gui/components/ScrollableTextArea';
@@ -150,15 +152,6 @@ function outcomeColor(outcome: string): string {
     return getStatusColor(outcome);
 }
 
-function parseResources(ti_resources: string | null) {
-    if (!ti_resources) return null;
-    try {
-        return JSON.parse(ti_resources);
-    } catch {
-        return null;
-    }
-}
-
 function sortTaskInstancesById(instances: TaskInstance[]): TaskInstance[] {
     return [...instances].sort((a, b) => {
         const aId =
@@ -208,7 +201,7 @@ function AttemptDetailPanel({
     onViewStdout: () => void;
     onViewStderr: () => void;
 }) {
-    const resources = parseResources(instance.ti_resources);
+    const resources = parseResourceJson(instance.ti_resources);
 
     const requestedMemoryGiB = resources?.memory ?? null;
     const utilizedMemoryGiB = bytes_to_gib(
@@ -461,11 +454,6 @@ function AttemptRow({
     onViewStdout: () => void;
     onViewStderr: () => void;
 }) {
-    const isDark = (color: string) =>
-        color === '#0072b2' ||
-        color === '#009e73' ||
-        color === '#d55e00';
-
     // Compute proportional widths with minimum visibility
     const widths = useMemo(() => {
         const { segments, totalMs } = attempt;
@@ -562,9 +550,7 @@ function AttemptRow({
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    color: isDark(seg.color)
-                                        ? '#fff'
-                                        : '#000',
+                                    color: getStatusTextColor(seg.status),
                                     fontSize: 10,
                                     fontWeight: 500,
                                     overflow: 'hidden',

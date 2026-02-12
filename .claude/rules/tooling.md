@@ -20,8 +20,8 @@ Available sessions:
 
 ## Frontend Commands
 
-- EVERY `npm` command MUST include the full cd prefix:
-  `cd /Users/mlsandar/repos/jobmon/jobmon_gui && npm run build`
+- EVERY `npm` command MUST include the `cd jobmon_gui &&` prefix:
+  `cd jobmon_gui && npm run build`
 - Shell working directory does NOT reliably persist between tool calls
 - Run `npm run build` after every set of frontend changes (catches TypeScript errors)
 
