@@ -1711,3 +1711,83 @@ def test_rsc_overide(client_env, monkeypatch):
     # verify the task has the default compute resources
     assert t4.cluster_name == "dummy"
     assert t4.compute_resources == {"queue": "null.q", "core": 1}
+
+
+def test_main_module_resolves_to_source_path(client_env) -> None:
+    """Verify __main__ module auto-resolves to a source file path."""
+
+    def dummy_func(x: int) -> None:
+        """Dummy."""
+
+    # Simulate a function defined in __main__
+    dummy_func.__module__ = "__main__"
+
+    tg = task_generator.TaskGenerator(
+        task_function=dummy_func,
+        serializers={},
+        tool_name="test_tool",
+        naming_args=[],
+    )
+
+    # The module_source_path should have been auto-set
+    assert tg.module_source_path is not None
+    # The mod_name should NOT be __main__ if resolution succeeded,
+    # but even if it stays __main__ the source path is set
+    assert tg.module_source_path.endswith(".py")
+
+
+def test_explicit_module_source_path_not_overridden(client_env) -> None:
+    """Verify explicit module_source_path is preserved."""
+
+    def dummy_func(x: int) -> None:
+        """Dummy."""
+
+    dummy_func.__module__ = "__main__"
+    explicit_path = "/some/explicit/path.py"
+
+    tg = task_generator.TaskGenerator(
+        task_function=dummy_func,
+        serializers={},
+        tool_name="test_tool",
+        naming_args=[],
+        module_source_path=explicit_path,
+    )
+
+    assert tg.module_source_path == explicit_path
+
+
+def test_string_annotations_resolve_to_types(client_env) -> None:
+    """Verify string annotations like 'int' resolve to actual types."""
+
+    def func_with_string_annots(a: "int", b: "str") -> None:
+        """Has string annotations."""
+
+    tg = task_generator.TaskGenerator(
+        task_function=func_with_string_annots,
+        serializers={},
+        tool_name="test_tool",
+        naming_args=[],
+    )
+
+    assert tg.params["a"] is int
+    assert tg.params["b"] is str
+
+
+def test_complex_string_annotations(client_env) -> None:
+    """Verify complex string annotations resolve correctly."""
+
+    def func_with_complex_annots(a: "Optional[int]", b: "List[str]") -> None:
+        """Has complex string annotations."""
+
+    tg = task_generator.TaskGenerator(
+        task_function=func_with_complex_annots,
+        serializers={},
+        tool_name="test_tool",
+        naming_args=[],
+    )
+
+    # Optional[int] should be resolved
+    assert task_generator.is_optional_type(tg.params["a"])
+    # List[str] should be a parameterized list
+    assert hasattr(tg.params["b"], "__origin__")
+    assert tg.params["b"].__origin__ is list
