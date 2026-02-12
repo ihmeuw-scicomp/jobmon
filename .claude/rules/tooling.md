@@ -20,5 +20,13 @@ Available sessions:
 
 ## Frontend Commands
 
-- All npm/bun commands must run from `jobmon_gui/` directory
-- Use `cd jobmon_gui && npm <command>` pattern
+- EVERY `npm` command MUST include the full cd prefix:
+  `cd /Users/mlsandar/repos/jobmon/jobmon_gui && npm run build`
+- Shell working directory does NOT reliably persist between tool calls
+- Run `npm run build` after every set of frontend changes (catches TypeScript errors)
+
+## Generated Files
+
+- `jobmon_gui/src/types/apiSchema.ts` is auto-generated - NEVER manually edit
+- Full regeneration workflow: backend schema change → `docker compose restart jobmon_backend` → `uv run nox -s generate_api_types`
+- `apiSchema.ts` is very large (~42K tokens) - use Grep to search specific types, never Read in full

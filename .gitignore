@@ -62,3 +62,6 @@ docker_config/logconfig.otlp.yaml
 
 # Ignore design documents folder
 /design/
+
+# Playwright MCP screenshots
+.playwright-mcp/
