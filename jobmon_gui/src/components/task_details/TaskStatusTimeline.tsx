@@ -134,8 +134,7 @@ function groupIntoAttempts(records: AuditRecord[]): Attempt[] {
 function finalizeAttempt(segments: Segment[]): Attempt {
     const totalMs = segments.reduce((sum, s) => sum + s.durationMs, 0);
     const last = segments[segments.length - 1];
-    const isTerminal = TERMINAL_STATUSES.has(last.status);
-    const outcome = last.active && !isTerminal ? 'active' : last.status;
+    const outcome = last.active ? `active:${last.status}` : last.status;
     return { segments, totalMs, outcome };
 }
 
@@ -143,13 +142,19 @@ function finalizeAttempt(segments: Segment[]): Attempt {
 const MIN_SEGMENT_PCT = 3;
 
 function outcomeLabel(outcome: string): string {
-    if (outcome === 'active') return 'Running';
-    return getStatusLabel(outcome);
+    if (outcome.startsWith('active:')) {
+        const status = outcome.slice('active:'.length);
+        return getStatusLabel(status || 'R');
+    }
+    return getStatusLabel(outcome || 'R');
 }
 
 function outcomeColor(outcome: string): string {
-    if (outcome === 'active') return getStatusColor('R');
-    return getStatusColor(outcome);
+    if (outcome.startsWith('active:')) {
+        const status = outcome.slice('active:'.length);
+        return getStatusColor(status || 'R');
+    }
+    return getStatusColor(outcome || 'R');
 }
 
 function sortTaskInstancesById(instances: TaskInstance[]): TaskInstance[] {
