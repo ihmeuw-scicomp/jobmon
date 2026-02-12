@@ -56,6 +56,50 @@ export const getStatusColor = (status: string): string => {
     );
 };
 
+const normalizeHex = (color: string): string => {
+    const hex = color.trim().replace(/^#/, '');
+    if (hex.length === 3) {
+        return hex
+            .split('')
+            .map(c => c + c)
+            .join('');
+    }
+    return hex;
+};
+
+const toRelativeLuminance = (hexColor: string): number => {
+    const hex = normalizeHex(hexColor);
+    if (!/^[0-9a-fA-F]{6}$/.test(hex)) {
+        return 0;
+    }
+
+    const channels = [0, 2, 4].map(
+        i => parseInt(hex.slice(i, i + 2), 16) / 255
+    );
+    const [r, g, b] = channels.map(channel =>
+        channel <= 0.03928
+            ? channel / 12.92
+            : ((channel + 0.055) / 1.055) ** 2.4
+    );
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+const getContrastRatio = (foreground: string, background: string): number => {
+    const fg = toRelativeLuminance(foreground);
+    const bg = toRelativeLuminance(background);
+    const lighter = Math.max(fg, bg);
+    const darker = Math.min(fg, bg);
+    return (lighter + 0.05) / (darker + 0.05);
+};
+
+// Select black/white text based on best contrast for the status color.
+export const getStatusTextColor = (status: string): string => {
+    const backgroundColor = getStatusColor(status);
+    const whiteContrast = getContrastRatio('#ffffff', backgroundColor);
+    const blackContrast = getContrastRatio('#000000', backgroundColor);
+    return whiteContrast >= blackContrast ? '#fff' : '#000';
+};
+
 // Helper function to get status label
 export const getStatusLabel = (status: string): string => {
     return taskStatusMeta[status?.toUpperCase()]?.label || status || 'Unknown';

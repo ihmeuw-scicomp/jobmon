@@ -40,6 +40,7 @@ import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
 import {
     getStatusColor,
     getStatusLabel,
+    getStatusTextColor,
     taskStatusMeta,
 } from '@jobmon_gui/constants/taskStatus';
 
@@ -336,6 +337,7 @@ export default function TaskDAG({
 
     const detailStatus = task_details?.data?.task_status || '';
     const detailColor = getStatusColor(detailStatus);
+    const detailTextColor = getStatusTextColor(detailStatus);
     const detailLabel = getStatusLabel(detailStatus);
 
     return (
@@ -399,7 +401,7 @@ export default function TaskDAG({
                                 size="small"
                                 sx={{
                                     backgroundColor: detailColor,
-                                    color: '#fff',
+                                    color: detailTextColor,
                                     fontWeight: 600,
                                     fontSize: 10,
                                     height: 20,

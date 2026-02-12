@@ -37,7 +37,7 @@ type Segment = {
     color: string;
     durationMs: number;
     durationText: string;
-    enteredAt: string;
+    enteredAt: string | null;
     exitedAt: string | null;
     active: boolean;
 };
@@ -63,18 +63,26 @@ function formatMs(ms: number): string {
 const TERMINAL_STATUSES = new Set(['D', 'F']);
 
 function buildSegment(record: AuditRecord): Segment {
-    const enteredAt = record.entered_at ?? '';
+    const enteredAt = record.entered_at ?? null;
     const exitedAt = record.exited_at ?? null;
     const active = !exitedAt;
     const isTerminal = TERMINAL_STATUSES.has(record.new_status);
+    const enteredMs = enteredAt ? Date.parse(enteredAt) : NaN;
+    const exitedMs = exitedAt ? Date.parse(exitedAt) : NaN;
+    const hasValidEnteredMs = Number.isFinite(enteredMs);
+    const hasValidExitedMs = Number.isFinite(exitedMs);
+
     // Terminal statuses are endpoints, not durations — don't inflate the bar
     const durationMs =
         active && isTerminal
             ? 0
+            : !hasValidEnteredMs
+              ? 0
             : active
-              ? Date.now() - new Date(enteredAt).getTime()
-              : new Date(exitedAt!).getTime() -
-                new Date(enteredAt).getTime();
+              ? Date.now() - enteredMs
+              : hasValidExitedMs
+                ? exitedMs - enteredMs
+                : 0;
     const durationText = isTerminal
         ? ''
         : active
@@ -90,6 +98,13 @@ function buildSegment(record: AuditRecord): Segment {
         exitedAt,
         active: active && !isTerminal,
     };
+}
+
+function formatTimestamp(value: string | null): string {
+    if (!value) return 'Unknown';
+    const parsedMs = Date.parse(value);
+    if (!Number.isFinite(parsedMs)) return 'Unknown';
+    return new Date(parsedMs).toLocaleString();
 }
 
 function groupIntoAttempts(records: AuditRecord[]): Attempt[] {
@@ -142,6 +157,44 @@ function parseResources(ti_resources: string | null) {
     } catch {
         return null;
     }
+}
+
+function sortTaskInstancesById(instances: TaskInstance[]): TaskInstance[] {
+    return [...instances].sort((a, b) => {
+        const aId =
+            typeof a.ti_id === 'number'
+                ? a.ti_id
+                : parseInt(String(a.ti_id), 10) || 0;
+        const bId =
+            typeof b.ti_id === 'number'
+                ? b.ti_id
+                : parseInt(String(b.ti_id), 10) || 0;
+        return aId - bId;
+    });
+}
+
+function mapAttemptsToInstances(
+    attempts: Attempt[],
+    instances: TaskInstance[] | undefined
+): Array<TaskInstance | null> {
+    if (attempts.length === 0) return [];
+    if (!instances || instances.length === 0) {
+        return attempts.map(() => null);
+    }
+
+    // Audit records are capped (limit=100) and may drop older attempts.
+    // Align from the newest side so latest attempts map to latest instances.
+    const sortedInstances = sortTaskInstancesById(instances);
+    const mapped = attempts.map(() => null as TaskInstance | null);
+    const attemptOffset = Math.max(0, attempts.length - sortedInstances.length);
+    const instanceOffset = Math.max(0, sortedInstances.length - attempts.length);
+    const overlap = Math.min(attempts.length, sortedInstances.length);
+
+    for (let i = 0; i < overlap; i += 1) {
+        mapped[attemptOffset + i] = sortedInstances[instanceOffset + i];
+    }
+
+    return mapped;
 }
 
 // --- Sub-components ---
@@ -489,16 +542,14 @@ function AttemptRow({
                                     Duration: {seg.durationText}
                                     <br />
                                     Entered:{' '}
-                                    {new Date(
-                                        seg.enteredAt
-                                    ).toLocaleString()}
+                                    {formatTimestamp(seg.enteredAt)}
                                     {seg.exitedAt && (
                                         <>
                                             <br />
                                             Exited:{' '}
-                                            {new Date(
+                                            {formatTimestamp(
                                                 seg.exitedAt
-                                            ).toLocaleString()}
+                                            )}
                                         </>
                                     )}
                                 </span>
@@ -639,6 +690,11 @@ export default function TaskStatusTimeline({
         return groupIntoAttempts([...records].reverse());
     }, [data]);
 
+    const attemptInstances = useMemo(
+        () => mapAttemptsToInstances(attempts, tiQuery.data),
+        [attempts, tiQuery.data]
+    );
+
     // Collect unique statuses across all attempts for the legend
     const legendItems = useMemo(() => {
         const seen = new Set<string>();
@@ -702,8 +758,7 @@ export default function TaskStatusTimeline({
                 }}
             >
                 {attempts.map((attempt, idx) => {
-                    const instance =
-                        tiQuery.data?.[idx] ?? null;
+                    const instance = attemptInstances[idx] ?? null;
                     return (
                         <AttemptRow
                             key={idx}

@@ -81,7 +81,6 @@ export default function WorkflowManagePanel({
     });
 
     const extractErrorMessage = (error: unknown): string => {
-        if (error instanceof Error) return error.message;
         if (
             typeof error === 'object' &&
             error !== null &&
@@ -102,6 +101,7 @@ export default function WorkflowManagePanel({
                 );
             }
         }
+        if (error instanceof Error) return error.message;
         return String(error);
     };
 

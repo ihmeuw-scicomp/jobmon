@@ -21,6 +21,7 @@ import { TaskDetails } from '@jobmon_gui/types/TaskDetails';
 import {
     getStatusColor,
     getStatusLabel,
+    getStatusTextColor,
     ERROR_STATUSES,
 } from '@jobmon_gui/constants/taskStatus';
 import { formatJobmonDate } from '@jobmon_gui/utils/DayTime';
@@ -52,6 +53,7 @@ export default function TaskSummaryCard({
 
     const status = taskDetails.task_status;
     const statusColor = getStatusColor(status);
+    const statusTextColor = getStatusTextColor(status);
     const statusLabel = getStatusLabel(status);
     const statusIcon = STATUS_ICONS[status] || null;
 
@@ -117,7 +119,7 @@ export default function TaskSummaryCard({
                         size="small"
                         sx={{
                             backgroundColor: statusColor,
-                            color: '#fff',
+                            color: statusTextColor,
                             fontWeight: 600,
                         }}
                     />
