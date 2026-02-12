@@ -2,7 +2,9 @@ import ast
 import importlib
 import inspect
 import logging
+import os
 import shutil
+import sys
 import traceback
 from types import ModuleType
 from typing import (
@@ -16,6 +18,7 @@ from typing import (
     Type,
     Union,
     get_args,
+    get_type_hints,
 )
 
 import docstring_parser
@@ -324,16 +327,38 @@ class TaskGenerator:
         self.serializers = serializers
         self.tool = Tool(tool_name)
         self.max_attempts = max_attempts
-        self.mod_name = f"{task_function.__module__}"
+        mod_name = task_function.__module__
         self.name = task_function.__name__
-        self.full_path = f"{task_function.__module__}:{self.name}"
         self.module_source_path = module_source_path
-        self.params = {
-            name: details.annotation
-            for name, details in inspect.signature(
-                self.task_function
-            ).parameters.items()
-        }
+
+        # If the function's module is __main__, resolve the real module
+        # name and source path so the generated command is runnable.
+        if mod_name == "__main__":
+            if not self.module_source_path:
+                self.module_source_path = os.path.abspath(
+                    inspect.getfile(task_function)
+                )
+            resolved = self._resolve_module_name(self.module_source_path)
+            if resolved is not None:
+                mod_name = resolved
+
+        self.mod_name = mod_name
+        self.full_path = f"{self.mod_name}:{self.name}"
+
+        # Use get_type_hints to resolve string annotations (PEP 563)
+        # back to real type objects, falling back to inspect.signature
+        # if get_type_hints fails (e.g. forward references).
+        try:
+            hints = get_type_hints(task_function)
+            self.params = {
+                name: hints.get(name, details.annotation)
+                for name, details in inspect.signature(task_function).parameters.items()
+            }
+        except Exception:
+            self.params = {
+                name: details.annotation
+                for name, details in inspect.signature(task_function).parameters.items()
+            }
         if naming_args is None:
             logger.warning(
                 "You have specified no naming_args on a task_generator, which means that all "
@@ -387,6 +412,31 @@ class TaskGenerator:
                     f"annotate this parameter with one of the known types: "
                     f"{SIMPLE_TYPES | BUILT_IN_COLLECTIONS | OPTIONAL_TYPES}."
                 )
+
+    @staticmethod
+    def _resolve_module_name(file_path: str) -> Optional[str]:
+        """Derive a dotted module name from a file path using sys.path.
+
+        Returns None if no matching sys.path entry is found.
+        """
+        file_path = os.path.abspath(file_path)
+        for path_entry in sys.path:
+            if not path_entry:
+                continue
+            path_entry = os.path.abspath(path_entry)
+            if file_path.startswith(path_entry + os.sep):
+                rel = os.path.relpath(file_path, path_entry)
+                # Strip .py extension
+                if rel.endswith(".py"):
+                    rel = rel[:-3]
+                # Convert path separators to dots
+                parts = rel.split(os.sep)
+                # Strip trailing __init__
+                if parts[-1] == "__init__":
+                    parts = parts[:-1]
+                if parts:
+                    return ".".join(parts)
+        return None
 
     def _is_valid_annotation(self, annotation: Type) -> bool:
         """Returns True if the annotation is valid, False otherwise."""
