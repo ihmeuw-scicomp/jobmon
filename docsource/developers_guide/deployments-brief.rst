@@ -2,7 +2,7 @@
 Deployments
 ***********
 
-More details are available in the `jobmon-continuous-integration-label`_. section.
+More details are available in the :doc:`continuous_integration` section.
 
 Docker
 ######

@@ -1,18 +1,15 @@
 """Routes used by task instances on worker nodes."""
 
-from http import HTTPStatus as StatusCodes
 import os
+from http import HTTPStatus as StatusCodes
 from typing import Any
 
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, text
+from sqlalchemy.orm import Session
 from structlog import get_logger
 
-from jobmon.server.web.db import get_sessionmaker
-
 logger = get_logger(__name__)
-
-SessionMaker = get_sessionmaker()
 
 
 # ############################ SHARED LANDING ROUTES ##########################################
@@ -24,38 +21,37 @@ def is_alive() -> Any:
     return resp
 
 
-def _get_time() -> str:
-    with SessionMaker() as session:
-        db_time = session.execute(select(func.now())).scalar()
-        str_time = (
-            db_time.strftime("%Y-%m-%d %H:%M:%S") if db_time else "0000-00-00 00:00:00"
-        )
+def _get_time(session: Session) -> str:
+    db_time = session.execute(select(func.now())).scalar()
+    str_time = (
+        db_time.strftime("%Y-%m-%d %H:%M:%S") if db_time else "0000-00-00 00:00:00"
+    )
     return str_time
 
 
-def get_pst_now() -> Any:
+def get_pst_now(session: Session) -> Any:
     """Get the time from the database."""
-    time = _get_time()
+    time = _get_time(session)
     rd = {"time": time}
     resp = JSONResponse(content=rd, status_code=StatusCodes.OK)
     return resp
 
 
-def health() -> Any:
+def health(session: Session) -> Any:
     """Test connectivity to the database.
 
     Return 200 if everything is OK. Defined in each module with a different route, so it can
     be checked individually.
     """
-    _get_time()
+    _get_time(session)
+    logger.info("Health check completed successfully")
     resp = JSONResponse(content={"status": "OK"}, status_code=StatusCodes.OK)
     return resp
 
 
 # ############################ TESTING ROUTES ################################################
-def test_route() -> None:
+def test_route(session: Session) -> None:
     """Test route to force a 500 error."""
-    session = SessionMaker()
     with session.begin():
         session.execute(text("SELECT * FROM blip_bloop_table")).all()
         session.commit()

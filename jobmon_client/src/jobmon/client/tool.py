@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import getpass
 from http import HTTPStatus as StatusCodes
-import logging
 from typing import Any, Dict, List, Optional, Union
 
+import structlog
 import yaml
 
 from jobmon.client.task_template import TaskTemplate
@@ -20,19 +20,18 @@ from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 from jobmon.core.serializers import SerializeClientTool
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+# Default tool name includes username for uniqueness
+_DEFAULT_TOOL_NAME = f"unknown-{getpass.getuser()}"
 
 
 class InvalidToolError(Exception):
     """Exception for Tools that do not exist in the DB."""
 
-    pass
-
 
 class InvalidToolVersionError(Exception):
     """Exception for Tool version that is not valid."""
-
-    pass
 
 
 class Tool:
@@ -43,7 +42,7 @@ class Tool:
 
     def __init__(
         self,
-        name: str = f"unknown-{getpass.getuser()}",
+        name: str = _DEFAULT_TOOL_NAME,
         active_tool_version_id: Union[str, int] = "latest",
         requester: Optional[Requester] = None,
     ) -> None:
@@ -58,6 +57,11 @@ class Tool:
                 workflows to.
             requester: communicate with the FastApi services.
         """
+        # Ensure structlog is configured before any logging happens
+        from jobmon.client.logging import ensure_structlog_configured
+
+        ensure_structlog_configured()
+
         if requester is None:
             requester = Requester.from_defaults()
         self.requester = requester

@@ -20,6 +20,7 @@ dist
 .coverage.*
 .test_report.xml
 jobmon.db
+jobmon_server/jobmon.db
 
 # ignore cache directories
 *__pycache__*
@@ -35,14 +36,29 @@ jobmon.db
 
 # ignore auto generated docs
 docsource/api
+docsource/_build/
+docsource/autoapi/
 
 # ignore ide settings
 .idea/
 
 /jobmon_gui/node_modules/
 /corpora/
-.venv
+.venv*
 *.code-workspace
 /.env
 # ignore .env
 .env
+node_modules/*
+
+# Ignore local dev config files (contain sensitive endpoints)
+# Keep example files, ignore actual configs
+dev/config/jobmonconfig.local.yaml
+dev/config/logconfig.otlp.yaml
+
+# Legacy location (kept for backwards compatibility during transition)
+docker_config/jobmonconfig.local.yaml
+docker_config/logconfig.otlp.yaml
+
+# Ignore design documents folder
+/design/

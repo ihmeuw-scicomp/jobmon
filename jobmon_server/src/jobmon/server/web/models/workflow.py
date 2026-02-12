@@ -3,11 +3,10 @@
 import datetime
 from typing import Tuple
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, VARCHAR
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
 import structlog
+from sqlalchemy import VARCHAR, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 
 from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.core.serializers import SerializeDistributorWorkflow
@@ -15,7 +14,6 @@ from jobmon.server.web.models import Base
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_run_status import WorkflowRunStatus
 from jobmon.server.web.models.workflow_status import WorkflowStatus
-
 
 logger = structlog.get_logger(__name__)
 
@@ -92,13 +90,11 @@ class Workflow(Base):
 
     def transition(self, new_state: str) -> None:
         """Transition the state of the workflow."""
-        # bind_to_logger(workflow_id=self.id)
-        logger.info(f"Transitioning workflow_id from {self.status} to {new_state}")
         if self._is_timely_transition(new_state):
+            logger.info(f"Transitioning workflow_id from {self.status} to {new_state}")
             self._validate_transition(new_state)
             self.status = new_state
             self.status_date = func.now()
-        logger.info(f"WorkflowStatus is now {self.status}")
 
     def _validate_transition(self, new_state: str) -> None:
         """Ensure the Job state transition is valid."""
@@ -113,9 +109,15 @@ class Workflow(Base):
             return True
 
     def link_workflow_run(
-        self, workflow_run: WorkflowRun, next_report_increment: float
+        self, workflow_run: WorkflowRun, next_report_increment: float, dialect: str
     ) -> Tuple:
-        """Link a workflow run to this workflow."""
+        """Link a workflow run to this workflow.
+
+        Args:
+            workflow_run: The workflow run to link
+            next_report_increment: Number of seconds until next expected heartbeat
+            dialect: The database dialect (mysql, sqlite)
+        """
         # bind_to_logger(workflow_id=self.id)
         logger.info(f"Linking WorkflowRun {workflow_run.id} to Workflow")
         linked_wfr = [
@@ -123,7 +125,9 @@ class Workflow(Base):
         ]
 
         if not any(linked_wfr) and self.ready_to_link:
-            workflow_run.heartbeat(next_report_increment, WorkflowRunStatus.LINKING)
+            workflow_run.heartbeat(
+                next_report_increment, dialect, WorkflowRunStatus.LINKING
+            )
             current_wfr = [(workflow_run.id, workflow_run.status)]
         # active workflow run, don't bind.
         elif not any(linked_wfr) and not self.ready_to_link:

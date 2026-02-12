@@ -3,16 +3,24 @@
 import argparse
 from typing import Optional
 
+import structlog
+
 from jobmon.core.cli import CLI
 from jobmon.core.cluster import Cluster
+from jobmon.core.logging import set_jobmon_context
 from jobmon.distributor.api import DistributorService
+
+logger = structlog.get_logger(__name__)
 
 
 class DistributorCLI(CLI):
-    """Command line interface for Distributor."""
+    """Command line interface for Distributor with automatic logging."""
 
     def __init__(self) -> None:
-        """Initialization of distributor CLI."""
+        """Initialization of distributor CLI with automatic component logging."""
+        # Enable automatic logging for distributor component
+        super().__init__(component_name="distributor")
+
         self.parser = argparse.ArgumentParser()
         self._subparsers = self.parser.add_subparsers(
             dest="sub_command", parser_class=argparse.ArgumentParser
@@ -22,9 +30,15 @@ class DistributorCLI(CLI):
 
     @staticmethod
     def run_distributor(args: argparse.Namespace) -> None:
-        """Configuration for the jobmon worker node."""
+        """Start the distributor service for a workflow run."""
+        # Bind global context for this distributor instance
+        set_jobmon_context(workflow_run_id=args.workflow_run_id)
+
+        logger.info("Distributor starting")
+
         cluster = Cluster.get_cluster(args.cluster_name)
         cluster_interface = cluster.get_distributor()
+
         distributor_service = DistributorService(cluster_interface)
         distributor_service.set_workflow_run(args.workflow_run_id)
         distributor_service.run()

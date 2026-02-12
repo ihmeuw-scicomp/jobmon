@@ -3,17 +3,16 @@
 import json
 from typing import Tuple
 
+import structlog
 from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-import structlog
 
 from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.core.serializers import SerializeTaskInstance
 from jobmon.server.web.models import Base
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.task_status import TaskStatus
-
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)

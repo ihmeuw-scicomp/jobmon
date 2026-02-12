@@ -1,0 +1,77 @@
+[tool.uv.workspace]
+members = [
+    "jobmon_client",
+    "jobmon_core",
+    "jobmon_server"
+]
+
+[project]
+name = "jobmon-workspace"
+version = "0.1.0"
+readme = "README.md"
+requires-python = ">=3.8"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio>=1.0.0",
+    "jobmon_client",
+    "jobmon_core[otlp]",
+    "jobmon_server[otlp]",
+    "pytest-xdist",
+    "pytest-cov",
+    "mock",
+    "filelock",
+    "pytest-mock",
+    "flake8",
+    "flake8-annotations",
+    "flake8-docstrings",
+    "flake8-black",
+    "black",
+    "isort",
+    "autoflake",
+    "mypy",
+    "types-Flask",
+    "types-requests",
+    "types-PyMySQL",
+    "types-PyYAML",
+    "types-tabulate",
+    "types-psutil",
+    "types-Flask-Cors",
+    "types-sqlalchemy-utils",
+    "types-setuptools",
+    "types-mysqlclient",
+    "build",
+    "nox",
+    "pre-commit"
+]
+docs = [
+    "jobmon_client",
+    "jobmon_core[otlp]",
+    "jobmon_server[otlp]",
+    # Sphinx 7.x supports Python 3.9+, Sphinx 8.0-8.1 requires 3.10+, 8.2+ requires 3.11+
+    # Using 7.x for broader Python compatibility with requires-python>=3.8
+    "sphinx>=7.4,<8",
+    "sphinx-rtd-theme>=2,<3",
+    "sphinx-autoapi>=3",
+    "sphinx-autodoc-typehints>=2",
+    "sphinx-tabs>=3",
+    "sphinxcontrib-jquery>=4",
+]
+
+[tool.uv.sources]
+jobmon_client = { workspace = true }
+jobmon_core = { workspace = true }
+jobmon_server = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.isort]
+profile = "black"
+line_length = 88 # Usually black's default, but good to be explicit
+known_first_party = ["jobmon"] 

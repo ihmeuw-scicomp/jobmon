@@ -1,0 +1,90 @@
+db:
+  sqlalchemy_database_uri: ''
+  # Connection pool configuration (SQLAlchemy defaults used if not set)
+  pool:
+    # Uncomment and set any of these to override SQLAlchemy defaults:
+    # size: 5           # Number of connections to maintain in the pool
+    # max_overflow: 10  # Additional connections allowed beyond pool_size  
+    # timeout: 30       # Wait time for a connection from the pool (seconds)
+    # recycle: 3600     # Recycle connections after this many seconds
+    # pre_ping: false   # Test connections before use to detect stale connections
+
+distributor:
+  poll_interval: 10
+
+heartbeat:
+  report_by_buffer: 3.1
+  task_instance_interval: 90
+  workflow_run_interval: 30
+  # Graceful termination retry settings
+  graceful_termination_retry_count: 3  # Number of retries when no active tasks but not all done
+  graceful_termination_retry_heartbeat: true  # Whether to log heartbeat during retry
+
+http:
+  request_timeout: 20
+  retries_attempts: 10
+  retries_timeout: 300
+  route_prefix: '/api/v3'
+  service_url: ''
+
+# Logging configuration - supports both file-based and section-based overrides
+logging:
+  # File-based overrides (highest precedence)
+  # Specify custom logconfig files to completely replace default templates
+  client_logconfig_file: ""      # Path to custom client logconfig YAML file
+  server_logconfig_file: ""      # Path to custom server logconfig YAML file
+  
+  # Section-based overrides (applied to default templates)
+  # Override specific formatters, handlers, or loggers while keeping templates
+  client:
+    formatters: {}               # Override/add client formatters
+    handlers: {}                 # Override/add client handlers
+    loggers: {}                  # Override/add client loggers
+    
+  server:
+    formatters: {}               # Override/add server formatters
+    handlers: {}                 # Override/add server handlers
+    loggers: {}                  # Override/add server loggers
+
+# Examples of environment variable overrides:
+# JOBMON__LOGGING__CLIENT_LOGCONFIG_FILE=/path/to/custom.yaml
+# JOBMON__LOGGING__CLIENT__FORMATTERS__CUSTOM__FORMAT="%(name)s: %(message)s"
+# JOBMON__LOGGING__SERVER__LOGGERS__MYAPP__LEVEL=DEBUG
+
+oidc:
+  name: OIDC
+
+# Telemetry configuration (replaces otlp section)
+telemetry:
+  # Shared resource identification (used by both logs and traces)
+  deployment_environment: prod
+  
+  # Debug mode for OTLP/telemetry troubleshooting
+  debug: false
+  
+  # Distributed tracing configuration (spans only - logs handled via logconfig)
+  tracing:
+    requester_enabled: false     # Enable HTTP request tracing (replaces otlp.http_enabled)
+    server_enabled: false        # Enable server tracing (replaces otlp.web_enabled)
+    span_exporter: "console_span"   # Which exporter to use for trace spans
+    
+    exporters:
+      # Production GRPC span exporter
+      grpc_span:
+        endpoint: "http://localhost:4317"
+        module: "opentelemetry.exporter.otlp.proto.grpc.trace_exporter"
+        class: "OTLPSpanExporter"
+        timeout: 30
+        headers: {}
+        compression: "gzip"
+        
+      # Local development console exporter
+      console_span:
+        module: "opentelemetry.exporter.console.trace_exporter"
+        class: "ConsoleSpanExporter"
+
+reaper:
+  poll_interval_minutes: 5
+
+worker_node:
+  command_interrupt_timeout: 10

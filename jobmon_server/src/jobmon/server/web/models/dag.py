@@ -1,6 +1,6 @@
 """DAG Database Table."""
 
-from sqlalchemy import Column, DateTime, Integer, VARCHAR
+from sqlalchemy import VARCHAR, Column, DateTime, Integer
 from sqlalchemy.orm import relationship
 
 from jobmon.server.web.models import Base

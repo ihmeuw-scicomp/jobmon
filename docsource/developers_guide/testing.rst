@@ -2,150 +2,133 @@
 Testing
 *******
 
-TODO: UPDATE AFTER WE SUNSET EPHEMERA
-*************************************
-Nox
-***
-Jobmon core and both of the plugins use Nox for testing. Nox is a command-line tool that
-automates testing in Python environments. To use Nox make sure that it has been installed in
-your conda environment. Below are some useful Nox commands:
+Jobmon uses pytest with nox for testing. Tests use SQLite databases that are
+automatically created for each test session (or worker when running in parallel).
 
-To run the whole test suite sequentially::
+Running Tests with Nox
+======================
 
-    nox --session tests -- tests
+Nox is the preferred way to run tests as it manages virtual environments automatically.
 
-To re-use the build conda environment, add -r::
+Run all tests:
 
-    nox -r --session tests -- tests
+.. code-block:: bash
 
-To run the whole test suite in parallel::
+   nox -s tests -- tests/
 
-    nox -r --session tests -- tests -n <number of workers you want to use>
-    e.g nox -r --session tests -- tests -n 3
+Re-use the existing test environment (faster):
 
-To run a single file in the test suite::
+.. code-block:: bash
 
-    nox -r --session tests -- <file path>
-    e.g. nox -r --session tests -- tests/cli/test_status_commands.py
+   nox -r -s tests -- tests/
 
-To run a single test in the test suite::
+Run tests in parallel:
 
-    nox -r --session tests -- <file path>::<test_name>
-    e.g. nox -r --session tests -- tests/cli/test_status_commands.py::test_workflow_status
+.. code-block:: bash
 
-Ephemera
-********
-Jobmon core and the plugins spin up an ephemera database (in memory database) for testing purposes. This database is
-created at the start of the tests and is spun down at the end of the tests. The fixtures for
-the tests are defined in conftest.py:
+   nox -r -s tests -- tests/ -n 4
 
-* ephemera - Creates one instance of the ephemera database returns the database connection string.
-* web server process - Creates all services in Flask in a separate process.
-* db_cfg - Creates all services in Flask in the same process.
-* client_env - Exports FQDN and ports.
+Run a specific test file:
 
-Jobmon Core
-***********
-Jobmon core is split in to integration and unit tests. Integration tests (end-to-end) should go all the way
-through till workflow.run(). Client unit tests should only go until workflow.bind().
+.. code-block:: bash
 
-Unit tests are in the following folders:
+   nox -r -s tests -- tests/integration/client/test_workflow.py
 
-* jobmon/tests/cli
-* jobmon/tests/client
-* jobmon/tests/distributor
-* jobmon/tests/server
-* jobmon/tests/swarm
-* jobmon/tests/worker_node
-* jobmon/tests/workflow_reaper
+Run a single test:
 
-Integration tests are in:
+.. code-block:: bash
 
-* jobmon/tests/end_to_end
+   nox -r -s tests -- tests/integration/client/test_workflow.py::test_workflow_bind
 
-.. note::
-    The Jobmon PR Jenkins pipeline runs the whole Jobmon test suite. A developer is not allowed
-    to merge their PR until there has been a successful pipeline build i.e. all tests are passing.
+Test Database Setup
+===================
 
-UGE Plugin
-**********
-The UGE plugin is also split in to unit tests and integration tests (end-to-end).
+Tests use SQLite databases created automatically:
 
-Unit tests are in the following folders:
+* Each test session (or parallel worker) gets its own database
+* Databases are created in temporary directories
+* The ``db_engine`` fixture creates and migrates the database
+* The ``db_session`` fixture provides a transactional session per test
 
-* jobmon_uge/tests/distributor
-* jobmon_uge/tests/queue
-* jobmon_uge/tests/worker_node
+Key fixtures are defined in ``tests/fixtures/``:
 
-Integration tests are in the following folders:
+* ``database.py`` - Database engine and session fixtures
+* ``server.py`` - Web server process and client connection fixtures
+* ``workflows.py`` - Tool, task template, and workflow fixtures
 
-* jobmon_uge/tests/integration
+Test Organization
+=================
 
-.. note::
-    The Jobmon UGE PR Jenkins pipeline runs the whole Jobmon test suite. A developer is not allowed
-    to merge their PR until there has been a successful pipeline build i.e. all tests are passing.
+Tests are organized by test type:
 
-Slurm Plugin
-************
-The Slurm plugin is also split in to unit tests and integration tests (end-to-end).
+Unit tests (``tests/unit/``):
 
-Unit tests are in the following folders:
+* ``tests/unit/core/`` - Configuration, utilities, templates
+* ``tests/unit/client/`` - Client library unit tests
+* ``tests/unit/server/`` - Server logic unit tests
+* ``tests/unit/swarm/`` - Swarm component unit tests (mocked)
+* ``tests/unit/logging/`` - All logging configuration tests
 
-* jobmon_slurm/tests/distributor
-* jobmon_slurm/tests/resources
-* jobmon_slurm/tests/worker_node
+Integration tests (``tests/integration/``):
 
-Integration tests are in the following folders:
+* ``tests/integration/client/`` - Workflow/task binding, arrays
+* ``tests/integration/server/`` - Database operations, routes
+* ``tests/integration/distributor/`` - Task instantiation, triaging
+* ``tests/integration/swarm/`` - Swarm execution integration
+* ``tests/integration/reaper/`` - Workflow cleanup
+* ``tests/integration/cli/`` - CLI command tests
 
-* jobmon_slurm/tests/integration
+End-to-end tests (``tests/e2e/``):
+
+* Full workflow execution tests with real distributors
 
 .. note::
-    Currently, the Jobmon Slurm Jenkins pipeline is unable to run the Slurm test suite.
-    Developers should make sure that they run the whole Slurm test suite locally before merging
-    their PR.
+   Unit tests run without a server and are fast (~16 seconds).
+   Integration tests require a server and database.
+   E2E tests exercise complete workflow execution.
 
-Smoke Test
-**********
-A smoke test is a quick test for overall system functionality.
+Other Test Commands
+===================
 
-six_job_test.py is a simple smoke test that runs a small application of six jobs.
-It should be used to confirm that communication between the client, services, and database are configured properly.
-If it fails that indicates the services are not properly configured.
+Linting and formatting:
 
-To run the six job_test: ``python ./deployment/tests/six_job_test.py {cluster_name}``
+.. code-block:: bash
 
-Load Test
-*********
-A Load Test is used to find the scaling limits of a release. Load testing is a heuristic used
-to confirm that Jobmon is hitting the performance benchmarks required to run large applications
-on IHME's cluster. Load testing is not covered by standard unit testing. It is not automated
-and requires a human participant.
+   nox -s lint      # Run linters (flake8, mypy)
+   nox -s format    # Run formatters (black, isort)
 
-The general principle is run a fake application on a fresh deployment of Jobmon which mimics
-how a large application would interface with Jobmon in order to confirm that Jobmon can handle
-the load.
+Type checking:
 
-How to run a load test:
-    1. Deploy the version of Jobmon that you want to load test to the Kubernetes "jobmon-dev" namespace.
-    2. ssh onto a cluster node, srun, and activate your conda environment.
-    3. Install the Jobmon version that was deployed to jobmon-dev in step 1.
-    4. Set sample.yaml to reflect your desired testing preferences.
-    5. python deployment/tests/multi_workflow_test.py --yaml_path deployment/tests/sample.yaml --scratch_dir {directory_for_load_test_results}
-    6. Record the load testing data
-        * The data is added to the HUB here: https://hub.ihme.washington.edu/pages/viewpage.action?spaceKey=DataScience&title=Jobmon+Load+Testing+General
-        * Use the output from the load test for the bind time
-        * Use APM to get the latency time.
+.. code-block:: bash
 
+   nox -s typecheck
 
-Longevity Tests
-***************
-A longevity test is similar to a smoke test but it is run for days, with many calls,
-typically searching for race conditions, memory leaks, or other rare errors or errors caused
-by a build-up in resource utilization.
+Generate ERD diagram:
 
-How to run a longevity test:
-    1. Create a conda environment with Jobmon Core, and the plugin you want to use installed,
-       and activate it while on a cluster node
-    2. Issue the following command to point to the desired server if needed: jobmon_config
-       update --web_service_fqdn 10.158.146.80 --web_service_port 80
-    3. Run the following command (optionally specify "n" for how many minutes the test should run) python deployment/tests/longevity_test.py n
+.. code-block:: bash
+
+   nox -s schema_diagram
+
+Load Testing
+============
+
+Load tests verify Jobmon's performance under heavy usage. These are not
+automated and require manual execution.
+
+To run a load test:
+
+1. Deploy the Jobmon version to test
+2. Configure the test parameters in ``deployment/tests/sample.yaml``
+3. Run: ``python deployment/tests/multi_workflow_test.py --yaml_path deployment/tests/sample.yaml --scratch_dir {output_dir}``
+
+Smoke Testing
+=============
+
+The ``six_job_test.py`` script is a quick smoke test that verifies basic
+system functionality:
+
+.. code-block:: bash
+
+   python deployment/tests/six_job_test.py {cluster_name}
+
+This confirms communication between client, server, and database is working.

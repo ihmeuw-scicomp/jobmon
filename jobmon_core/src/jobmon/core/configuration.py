@@ -1,21 +1,28 @@
 """Parse configuration options and set them to be used throughout the Jobmon Architecture."""
 
 import argparse
+import ast
+import json
 import os
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from dotenv import load_dotenv
 import yaml
+from dotenv import load_dotenv
 
 from jobmon.core import CONFIG_FILE_FROM_INSTALLER_PLUGIN
 from jobmon.core.cli import CLI
 from jobmon.core.exceptions import ConfigError
 
-load_dotenv()
+# Load .env file for development convenience, but skip for pytest to ensure test isolation
+# This ensures tests have complete control over configuration while developers get
+# .env convenience
+if not os.environ.get("PYTEST_CURRENT_TEST"):
+    load_dotenv()
 
 DEFAULTS_FILE_NAME = "defaults.yaml"
-DEFAULTS_FILE = Path(__file__).parent / DEFAULTS_FILE_NAME
+DEFAULTS_FILE = Path(__file__).parent / "config" / DEFAULTS_FILE_NAME
 ENV_VAR_PREFIX = "JOBMON__"
 
 
@@ -27,13 +34,14 @@ class JobmonConfig:
 
         Args:
             filepath: where to read defaults from.
-            dict_config: dictionary of values to override
+            dict_config: Dictionary of values to override.
 
         Config file priority:
-            1. user specified file passed in
-            2. environment variable JOBMON__CONFIG_FILE (backdoor for testing):q!
-            3. config file from installer
-            4. default config file in core
+
+        1. user specified file passed in
+        2. environment variable ``JOBMON__CONFIG_FILE`` (backdoor for testing)
+        3. config file from installer
+        4. default config file in core
         """
         if filepath:
             self._filepath = filepath
@@ -78,6 +86,56 @@ class JobmonConfig:
         if isinstance(value, str):
             return os.path.expandvars(value)
         return value
+
+    def _coerce_value(self, value: Any) -> Any:
+        """Recursively coerce values to appropriate Python types.
+
+        • 'true', 'false', etc. → bool
+        • Numeric strings → int/float
+        • JSON / Python literals → parsed objects
+        • Dict / list containers → recurse element-wise
+        • Anything else → returned unchanged
+        """
+        # Already a non-string, recurse if container
+        if isinstance(value, Mapping):
+            return {k: self._coerce_value(v) for k, v in value.items()}
+        if isinstance(value, Sequence) and not isinstance(
+            value, (str, bytes, bytearray)
+        ):
+            return [self._coerce_value(v) for v in value]
+
+        if not isinstance(value, str):
+            return value
+
+        s_val = value.strip()
+        lower_s_val = s_val.lower()
+
+        # Try numeric conversion first - numbers like "1" and "0" should remain
+        # numeric, not be converted to booleans
+        try:
+            # Try int first, then float
+            if "." not in s_val:
+                return int(s_val)
+            else:
+                return float(s_val)
+        except ValueError:
+            pass
+
+        # Boolean conversion for explicit boolean strings only
+        # (excludes "1" and "0" which are handled above as integers)
+        if lower_s_val in ("t", "true", "yes"):
+            return True
+        if lower_s_val in ("f", "false", "no"):
+            return False
+
+        # Try JSON, then Python literal, fall back to raw string
+        for parser in (json.loads, ast.literal_eval):
+            try:
+                return parser(s_val)
+            except Exception:  # noqa: BLE001
+                pass
+
+        return s_val
 
     def _get_yaml_variable(self, section: str, key: str) -> Optional[str]:
         return self._config.get(section, {}).get(key)
@@ -144,7 +202,16 @@ class JobmonConfig:
                 if idx == len(path) - 1:  # last segment – assign
                     cur[seg_lower] = value
                 else:
-                    cur = cur.setdefault(seg_lower, {})
+                    # Check if parent key exists as primitive value
+                    # Convert it to dict to accommodate nested children
+                    if seg_lower in cur and not isinstance(cur[seg_lower], dict):
+                        # Parent key exists as primitive - convert to dict to allow children
+                        cur[seg_lower] = {}
+
+                    # Create nested dict structure if needed
+                    if seg_lower not in cur:
+                        cur[seg_lower] = {}
+                    cur = cur[seg_lower]
 
         for env_key, env_val in os.environ.items():
             if not env_key.startswith(prefix):
@@ -166,16 +233,31 @@ class JobmonConfig:
 
         return section_dict
 
+    def get_section_coerced(self, section: str) -> Dict[str, Any]:
+        """Returns a dictionary with all values coerced to appropriate Python types.
+
+        Same as get_section() but automatically converts:
+        - String booleans to bool
+        - Numeric strings to int/float
+        - JSON/Python literals to their parsed values
+        - Nested structures recursively
+        """
+        section_dict = self.get_section(section)
+        return self._coerce_value(section_dict)
+
     def get_boolean(self, section: str, key: str) -> bool:
         """Get the configuration value for the section and key as bool.
 
         Raise if key not found.
         """
-        val = str(self.get(section, key)).lower().strip()
-        if val in ("t", "true", "1", "yes"):
-            return True
-        elif val in ("f", "false", "0", "no"):
-            return False
+        val = self.get(section, key)
+        coerced_val = self._coerce_value(val)
+
+        if isinstance(coerced_val, bool):
+            return coerced_val
+        # Also accept integers 0 and 1 as boolean values
+        elif isinstance(coerced_val, int) and coerced_val in (0, 1):
+            return bool(coerced_val)
         else:
             raise ConfigError(
                 f'Failed to convert value to bool. Please check "{key}" key in "{section}" '
@@ -189,26 +271,30 @@ class JobmonConfig:
         Raise if key not found.
         """
         val = self.get(section, key)
-        try:
-            return int(val)
-        except ValueError as exc:
+        coerced_val = self._coerce_value(val)
+
+        if isinstance(coerced_val, int):
+            return coerced_val
+        else:
             raise ConfigError(
                 f'Failed to convert value to int. Please check "{key}" key in "{section}" '
                 f'section or environment var "{self._get_env_var_name(section, key)}". '
                 f'Current value: "{val}".'
-            ) from exc
+            )
 
     def get_float(self, section: str, key: str) -> float:
         """Get the configuration value for the section/key as float. Raise if key not found."""
         val = self.get(section, key)
-        try:
-            return float(val)
-        except ValueError as exc:
+        coerced_val = self._coerce_value(val)
+
+        if isinstance(coerced_val, (int, float)):
+            return float(coerced_val)
+        else:
             raise ConfigError(
                 f'Failed to convert value to float. Please check "{key}" key in "{section}" '
                 f'section or environment var "{self._get_env_var_name(section, key)}". '
                 f'Current value: "{val}".'
-            ) from exc
+            )
 
     def set(self, section: str, key: str, val: str) -> None:
         """Set the configuration value for the section/key."""
@@ -227,41 +313,13 @@ class JobmonConfig:
 
 
 class ConfigCLI(CLI):
-    """Client command line interface for update the config."""
+    """CLI for ``jobmon_config`` command."""
 
     def __init__(self) -> None:
         """Initialization of client CLI."""
         super().__init__()
         self._subparsers = self.parser.add_subparsers(
             dest="sub_command", parser_class=argparse.ArgumentParser
-        )
-        self._add_update_config_subparser()
-
-    @staticmethod
-    def update_config(args: argparse.Namespace) -> None:
-        """Update .jobmon.ini.
-
-        Args:
-            args: only --web_service_fqdn --web_service_port are expected.
-        """
-        config = JobmonConfig()
-        config.set(
-            "http",
-            "service_url",
-            f"http://{args.web_service_fqdn}:{args.web_service_port}",
-        )
-        config.write()
-
-    def _add_update_config_subparser(self) -> None:
-        update_config_parser = self._subparsers.add_parser("update")
-        update_config_parser.set_defaults(func=self.update_config)
-        update_config_parser.add_argument(
-            "--web_service_fqdn", type=str, help="The fqdn of the web service."
-        )
-        update_config_parser.add_argument(
-            "--web_service_port",
-            type=str,
-            help="The port for the web service..",
         )
 
 

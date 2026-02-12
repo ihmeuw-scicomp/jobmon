@@ -1,31 +1,80 @@
 import json
-from typing import Any, AsyncGenerator, Callable, Optional
+import traceback
+from typing import Any, Callable, Optional
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.requests import ClientDisconnect
+from starlette.responses import Response
 from starlette.status import HTTP_404_NOT_FOUND
-import structlog
 
-from jobmon.server.web.db import get_sessionmaker
+from jobmon.core.logging import set_jobmon_context
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
 
 
-# Dependency for removing session after each request
-async def teardown_session() -> AsyncGenerator:
-    """Remove the session after each request."""
+def _record_exception_in_span(error: Exception) -> None:
+    """Record exception details in the current OpenTelemetry span."""
     try:
-        yield
-    finally:
-        get_sessionmaker().remove()  # type: ignore
+        from opentelemetry import trace
+        from opentelemetry.trace import Status, StatusCode
+
+        span = trace.get_current_span()
+        if span and span.is_recording():
+            # Set span status to ERROR
+            span.set_status(Status(StatusCode.ERROR, str(error)))
+
+            # Record the exception as a span event
+            span.record_exception(error)
+
+            # Add exception details as span attributes
+            span.set_attribute("error.type", type(error).__name__)
+            span.set_attribute("error.message", str(error))
+
+            # Add exception module and stack trace
+            span.set_attribute("error.module", type(error).__module__)
+
+            # Add HTTP status code if available
+            if hasattr(error, "status_code"):
+                span.set_attribute("http.status_code", error.status_code)
+
+            # Add stack trace as a span event for more detailed debugging
+            stack_trace = traceback.format_exc()
+            if stack_trace and stack_trace != "NoneType: None\n":
+                span.add_event("exception.stacktrace", {"stacktrace": stack_trace})
+
+            # Debug logging to verify span recording is working
+            logger.debug(
+                "Recorded exception in span",
+                span_id=format(span.get_span_context().span_id, "016x"),
+                trace_id=format(span.get_span_context().trace_id, "032x"),
+                error_type=type(error).__name__,
+                error_message=str(error),
+                span_recording=span.is_recording(),
+            )
+        else:
+            logger.warning(
+                "No active span to record exception",
+                span_exists=span is not None,
+                span_recording=span.is_recording() if span else False,
+                error_type=type(error).__name__,
+            )
+
+    except Exception as e:
+        # Don't let span recording errors break the main error handling
+        logger.warning("Failed to record exception in span", record_error=str(e))
 
 
 def _handle_error(
     request: Request, error: Exception, status_code: Optional[int] = None
 ) -> Any:
     """Handle all exceptions in a uniform manner."""
+    # Record the exception in the OpenTelemetry span
+    _record_exception_in_span(error)
+
     # Extract status code from the error
     status_code = status_code or getattr(error, "status_code", 500)
 
@@ -38,9 +87,17 @@ def _handle_error(
         "exception_message": str(error),
         "status_code": str(status_code),
     }
+
+    # Enhanced logging with exception details
     logger.exception(
-        "server encountered:", status_code=status_code, route=request.url.path
+        "server encountered:",
+        status_code=status_code,
+        route=request.url.path,
+        error_type=type(error).__name__,
+        error_message=str(error),
+        full_exception=str(error),
     )
+
     rd = {"error": response_data}
     response = JSONResponse(
         content=rd,  # type: ignore
@@ -52,6 +109,13 @@ def _handle_error(
 
 def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
     """Add logging hooks and exception handlers."""
+
+    @app.exception_handler(ClientDisconnect)
+    async def handle_client_disconnect(
+        request: Request, exc: ClientDisconnect
+    ) -> Response:
+        logger.info("Client disconnected during request", route=request.url.path)
+        return Response(status_code=499)
 
     @app.exception_handler(Exception)
     def handle_generic_exception(request: Request, error: Any) -> Any:
@@ -75,6 +139,19 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
         """
         structlog.contextvars.clear_contextvars()
 
+        # Generate unique request ID for correlation
+        import uuid
+
+        request_id = str(uuid.uuid4())[:8]
+
+        # Bind request context
+        set_jobmon_context(
+            allow_non_jobmon_keys=True,
+            path=request.url.path,
+            method=request.method,
+            request_id=request_id,
+        )
+
         context_data = None
 
         # Step 1: Check headers for X-Server-Structlog-Context (newer clients)
@@ -83,8 +160,8 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
             try:
                 context_data = json.loads(context_str)
             except json.JSONDecodeError:
-                structlog.contextvars.bind_contextvars(
-                    path=request.url.path,
+                set_jobmon_context(
+                    allow_non_jobmon_keys=True,
                     error="Invalid JSON in X-Server-Structlog-Context header",
                 )
 
@@ -110,26 +187,17 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
                     try:
                         context_data = json.loads(context_str)
                     except json.JSONDecodeError:
-                        structlog.contextvars.bind_contextvars(
-                            path=request.url.path,
+                        set_jobmon_context(
+                            allow_non_jobmon_keys=True,
                             error="Invalid JSON in server_structlog_context query param",
                         )
 
         # Step 3: Bind the context if found
         if context_data:
-            structlog.contextvars.bind_contextvars(
-                path=request.url.path, **context_data
-            )
+            set_jobmon_context(allow_non_jobmon_keys=True, **context_data)
 
         # Step 4: Proceed with the request
         response = await call_next(request)
-        return response
-
-    # Include the teardown function globally, using FastAPI dependencies (for session cleanup)
-    @app.middleware("http")
-    async def session_middleware(request: Request, call_next: Callable) -> Any:
-        response = await call_next(request)
-        teardown_session()  # Call the session teardown after Request
         return response
 
     return app

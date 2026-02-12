@@ -2,15 +2,17 @@
 
 from datetime import datetime, timedelta
 from http import HTTPStatus as StatusCodes
-from typing import Any, cast, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
-from fastapi import Request
 import sqlalchemy
-from sqlalchemy import select
-from starlette.responses import JSONResponse
 import structlog
+from fastapi import Depends, Request
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from starlette.responses import JSONResponse
 
-from jobmon.server.web.db import get_sessionmaker
+from jobmon.core.logging import set_jobmon_context
+from jobmon.server.web.db.deps import get_db
 from jobmon.server.web.models.node_arg import NodeArg
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
@@ -22,11 +24,10 @@ from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage
 
 logger = structlog.get_logger(__name__)
-SessionMaker = get_sessionmaker()
 
 
 @api_v3_router.post("/tool")
-async def add_tool(request: Request) -> Any:
+async def add_tool(request: Request, db: Session = Depends(get_db)) -> Any:
     """Add a tool to the database."""
     data = cast(Dict, await request.json())
     try:
@@ -38,30 +39,29 @@ async def add_tool(request: Request) -> Any:
 
     # add tool to db
     try:
-        with SessionMaker() as session:
-            with session.begin():
-                logger.info(f"Adding tool {tool_name}")
-                tool = Tool(name=tool_name)
-                session.add(tool)
-                session.flush()
-                session.refresh(tool)
-                wire_format = tool.to_wire_as_client_tool()
+        logger.info(f"Adding tool {tool_name}")
+        tool = Tool(name=tool_name)
+        db.add(tool)
+        db.flush()
+        db.refresh(tool)
+        wire_format = tool.to_wire_as_client_tool()
     except sqlalchemy.exc.IntegrityError:
-        with SessionMaker() as session:
-            with session.begin():
-                select_stmt = select(Tool).where(Tool.name == tool_name)
-                tool = session.execute(select_stmt).scalars().one()
-                wire_format = tool.to_wire_as_client_tool()
+        db.rollback()
+        select_stmt = select(Tool).where(Tool.name == tool_name)
+        tool = db.execute(select_stmt).scalars().one()
+        wire_format = tool.to_wire_as_client_tool()
 
     resp = JSONResponse(content={"tool": wire_format}, status_code=StatusCodes.OK)
     return resp
 
 
 @api_v3_router.get("/tool/{tool_id}/tool_versions")
-def get_tool_versions(tool_id: int, request: Request) -> Any:
+def get_tool_versions(
+    tool_id: int, request: Request, db: Session = Depends(get_db)
+) -> Any:
     """Get the Tool Version."""
     # check input variable
-    structlog.contextvars.bind_contextvars(tool_id=tool_id)
+    set_jobmon_context(tool_id=tool_id)
     logger.info(f"Getting available tool versions for tool_id {tool_id}")
     try:
         tool_id = int(tool_id)
@@ -71,17 +71,15 @@ def get_tool_versions(tool_id: int, request: Request) -> Any:
         ) from e
 
     # get data from db
-    with SessionMaker() as session:
-        with session.begin():
-            select_stmt = select(ToolVersion).where(ToolVersion.tool_id == tool_id)
-            tool_versions = session.execute(select_stmt).scalars().all()
-        wire_format = [t.to_wire_as_client_tool_version() for t in tool_versions]
+    select_stmt = select(ToolVersion).where(ToolVersion.tool_id == tool_id)
+    tool_versions = db.execute(select_stmt).scalars().all()
+    wire_format = [t.to_wire_as_client_tool_version() for t in tool_versions]
 
-        logger.info(f"Tool version for {tool_id} is {wire_format}")
+    logger.info(f"Tool version for {tool_id} is {wire_format}")
 
-        resp = JSONResponse(
-            content={"tool_versions": wire_format}, status_code=StatusCodes.OK
-        )
+    resp = JSONResponse(
+        content={"tool_versions": wire_format}, status_code=StatusCodes.OK
+    )
     return resp
 
 
@@ -90,25 +88,27 @@ def get_tool_resource_usage(
     tool_name: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    db: Session = Depends(get_db),
 ) -> Any:
     """Gets resource usage and node args for all TaskInstances associated with a given tool.
 
     We limit this to one week time spans to not overwhelm the database.
 
     Args:
-        tool_name (str): Name of the tool.
-        start_date (str): The start date in 'YYYY-MM-DD' format (query parameter).
-        end_date (str): The end date in 'YYYY-MM-DD' format (query parameter).
+        tool_name: Name of the tool.
+        start_date: The start date in 'YYYY-MM-DD' format (query parameter).
+        end_date: The end date in 'YYYY-MM-DD' format (query parameter).
 
     Returns:
-        List[Dict[str, Any]]: A list of dictionaries containing TaskInstance ID,
-        node argument value, TaskInstance maxrss, TaskInstance wallclock, and
-        requested resources.
+        A list of dictionaries containing TaskInstance ID, node argument value,
+        TaskInstance maxrss, TaskInstance wallclock, and requested resources.
 
-    Example Call:
+    Example Call::
+
         /tool/large_wf_tool/tool_resource_usage?start_date=2024-07-11&end_date=2024-07-18
 
-    Example Response:
+    Example Response::
+
         [
             {
                 "node_arg_val": "--provenance True",
@@ -151,45 +151,39 @@ def get_tool_resource_usage(
             status_code=StatusCodes.BAD_REQUEST,
         )
 
-    with SessionMaker() as session:
-        with session.begin():
-            sql = (
-                select(
-                    TaskInstance.id,
-                    TaskInstance.wallclock,
-                    TaskInstance.maxrss,
-                    NodeArg.val,
-                    TaskResources.requested_resources,
-                )
-                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
-                .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
-                .join_from(
-                    Workflow, ToolVersion, Workflow.tool_version_id == ToolVersion.id
-                )
-                .join_from(ToolVersion, Tool, ToolVersion.tool_id == Tool.id)
-                .join_from(Task, NodeArg, Task.node_id == NodeArg.node_id)
-                .join_from(
-                    Task, TaskResources, Task.task_resources_id == TaskResources.id
-                )
-                .where(
-                    Tool.name == tool_name,
-                    Workflow.created_date.between(start_date, end_date),
-                    Task.status == "D",
-                    TaskInstance.status == "D",
-                )
-            )
-            results = session.execute(sql).all()
-
-        column_names = (
-            "ti_id",
-            "ti_wallclock",
-            "ti_maxrss",
-            "node_arg_val",
-            "ti_requested_resources",
+    sql = (
+        select(
+            TaskInstance.id,
+            TaskInstance.wallclock,
+            TaskInstance.maxrss,
+            NodeArg.val,
+            TaskResources.requested_resources,
         )
-        results_formatted: list[Dict[str, Any]] = [
-            dict(zip(column_names, result)) for result in results
-        ]
+        .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+        .join_from(Task, Workflow, Task.workflow_id == Workflow.id)
+        .join_from(Workflow, ToolVersion, Workflow.tool_version_id == ToolVersion.id)
+        .join_from(ToolVersion, Tool, ToolVersion.tool_id == Tool.id)
+        .join_from(Task, NodeArg, Task.node_id == NodeArg.node_id)
+        .join_from(Task, TaskResources, Task.task_resources_id == TaskResources.id)
+        .where(
+            Tool.name == tool_name,
+            Workflow.created_date.between(start_date, end_date),
+            Task.status == "D",
+            TaskInstance.status == "D",
+        )
+    )
+    results = db.execute(sql).all()
+
+    column_names = (
+        "ti_id",
+        "ti_wallclock",
+        "ti_maxrss",
+        "node_arg_val",
+        "ti_requested_resources",
+    )
+    results_formatted: list[Dict[str, Any]] = [
+        dict(zip(column_names, result)) for result in results
+    ]
 
     resp = JSONResponse(content=results_formatted, status_code=StatusCodes.OK)
     return resp

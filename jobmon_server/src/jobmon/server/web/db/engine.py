@@ -1,119 +1,159 @@
 # jobmon/server/db/engine.py
+"""Database engine management using FastAPI lifespan pattern.
+
+This module provides database engine creation and lifecycle management
+without global singletons. The engine is stored in FastAPI's app.state
+and managed through the db_lifespan context manager.
+"""
 from __future__ import annotations
 
-import ast
-from collections.abc import Mapping, Sequence
-import json
 import logging
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict
 
+from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from jobmon.core.configuration import ConfigError
 from jobmon.server.web.config import get_jobmon_config
-from jobmon.server.web.db.dns import get_dns_engine
+
+if TYPE_CHECKING:
+    from fastapi import FastAPI
 
 log = logging.getLogger(__name__)
 
-_engine: Engine | None = None
-_SessionMaker: sessionmaker | None = None
 
+def create_engine_from_config() -> tuple[Engine, str, Dict[str, Any]]:
+    """Create a SQLAlchemy engine from the current configuration.
 
-_TRUE = {"true", "t", "1", "yes"}
-_FALSE = {"false", "f", "0", "no"}
-
-
-def _coerce(val: object) -> object:
-    """Recursively coerce strings to Python types.
-
-    • 'true', 'false', etc. → bool
-    • JSON / Python literals → parsed objects
-    • Dict / list containers → recurse element-wise
-    • Anything else → returned unchanged
+    Returns:
+        Tuple of (engine, dialect_name, config_info) where config_info contains
+        the pool settings and connect args used for debugging.
     """
-    # Already a non-string, recurse if container
-    if isinstance(val, Mapping):
-        return {k: _coerce(v) for k, v in val.items()}
-    if isinstance(val, Sequence) and not isinstance(val, (str, bytes, bytearray)):
-        return [_coerce(v) for v in val]
-
-    if not isinstance(val, str):
-        return val
-
-    s_val = val.strip()
-    lower_s_val = s_val.lower()
-
-    # Cheap bool path first
-    if lower_s_val in _TRUE:
-        return True
-    if lower_s_val in _FALSE:
-        return False
-
-    # Try JSON, then Python literal, fall back to raw string
-    for parser in (json.loads, ast.literal_eval):
-        try:
-            parsed = parser(s_val)
-            return parsed
-        except Exception:  # noqa: BLE001
-            pass
-
-    return s_val
-
-
-def get_engine() -> Engine:
-    """Return the lazily-initialised SQLAlchemy engine."""
-    global _engine
-    if _engine is not None:
-        return _engine
-
     cfg = get_jobmon_config()
     uri = cfg.get("db", "sqlalchemy_database_uri")
 
-    # Grab the raw value exactly once
-    try:
-        raw_ca = cfg.get_section("db").get("sqlalchemy_connect_args")
-    except ConfigError:
-        raw_ca = None
+    # Get database configuration with automatic type coercion
+    connect_args = None
+    pool_kwargs: Dict[str, Any] = {}
 
-    connect_args = _coerce(raw_ca) if raw_ca else None
+    try:
+        db_config = cfg.get_section_coerced("db")
+        connect_args = db_config.get("sqlalchemy_connect_args")
+
+        # Get pool settings - ensure pool_config is always a dict
+        pool_config = db_config.get("pool") or {}
+        if not isinstance(pool_config, dict):
+            pool_config = {}
+
+        pool_param_mapping = {
+            "recycle": "pool_recycle",
+            "pre_ping": "pool_pre_ping",
+            "timeout": "pool_timeout",
+            "size": "pool_size",
+            "max_overflow": "max_overflow",
+        }
+
+        for config_key, sqlalchemy_param in pool_param_mapping.items():
+            if config_key in pool_config:
+                pool_kwargs[sqlalchemy_param] = pool_config[config_key]
+
+    except (ConfigError, ValueError):
+        pass
 
     log.debug("DATABASE URI: %s", uri)
     log.debug("CONNECT ARGS: %s", connect_args)
+    log.debug("POOL SETTINGS: %s", pool_kwargs)
 
-    _engine = (
-        get_dns_engine(uri, connect_args=connect_args)
+    engine = (
+        create_engine(uri, connect_args=connect_args, **pool_kwargs)
         if connect_args
-        else get_dns_engine(uri)
+        else create_engine(uri, **pool_kwargs)
     )
-    return _engine
+
+    dialect_name = engine.dialect.name.lower()
+    log.info("Created SQLAlchemy database engine (dialect=%s)", dialect_name)
+
+    # Instrument the engine with OpenTelemetry if enabled
+    engine_tracer = None
+    try:
+        telemetry_section = cfg.get_section_coerced("telemetry")
+        tracing_config = telemetry_section.get("tracing", {})
+        use_otel = tracing_config.get("server_enabled", False)
+        if use_otel:
+            from jobmon.server.web.otlp import ServerOTLPManager
+
+            # Store the EngineTracer to prevent garbage collection - its event
+            # listeners are bound methods that would become invalid if GC'd
+            engine_tracer = ServerOTLPManager.instrument_engine(engine)
+            if engine_tracer:
+                log.debug("Instrumented database engine with OpenTelemetry")
+            else:
+                log.warning("OpenTelemetry engine instrumentation returned None")
+    except Exception as e:
+        # Don't fail engine creation if instrumentation fails
+        log.warning("Failed to instrument database engine with OpenTelemetry: %s", e)
+
+    config_info = {
+        "connect_args": connect_args,
+        "pool_kwargs": pool_kwargs,
+        "engine_tracer": engine_tracer,  # Keep reference to prevent GC
+    }
+    return engine, dialect_name, config_info
 
 
-def get_sessionmaker() -> sessionmaker:
-    """Get the SQLAlchemy sessionmaker singleton."""
-    global _SessionMaker
-    if _SessionMaker is None:
-        _SessionMaker = sessionmaker(
-            bind=get_engine(), autoflush=False, autocommit=False
-        )
-    return _SessionMaker
+@asynccontextmanager
+async def db_lifespan(app: "FastAPI") -> AsyncIterator[None]:
+    """Manage database engine lifecycle via FastAPI lifespan.
+
+    Creates the database engine and sessionmaker on startup, stores them
+    in app.state, and properly disposes of the engine on shutdown.
+
+    Usage::
+
+        app = FastAPI(lifespan=db_lifespan)
+
+        # In route handlers:
+        def get_db(request: Request):
+            SessionLocal = request.app.state.db_sessionmaker
+            ...
+    """
+    # Startup: create engine and sessionmaker
+    engine, dialect_name, config_info = create_engine_from_config()
+
+    app.state.db_engine = engine
+    app.state.db_dialect = dialect_name
+    app.state.db_sessionmaker = sessionmaker(
+        bind=engine, autoflush=False, autocommit=False
+    )
+    # Store config_info which includes engine_tracer - this keeps the
+    # EngineTracer alive for the lifetime of the app, preventing its
+    # event listeners from being garbage collected
+    app.state.db_config_info = config_info
+
+    log.info("Database engine initialized (dialect=%s)", dialect_name)
+
+    yield  # Application runs here
+
+    # Shutdown: dispose of engine
+    log.info("Disposing database engine")
+    engine.dispose()
 
 
-# helpers for tests
-def _reset_singletons() -> None:  # called by tests that patch JobmonConfig
-    global _engine, _SessionMaker
-    _engine = _SessionMaker = None
+# =============================================================================
+# Helper functions for routes that need dialect info
+# =============================================================================
+# These are convenience functions that can be used when you have access to
+# the app or request object. For route handlers, prefer using get_dialect()
+# from deps.py which uses dependency injection.
 
 
-def get_dialect_name() -> str:
-    """Lower-case dialect string, e.g. 'mysql', 'sqlite', 'postgresql'."""
-    return get_engine().dialect.name.lower()
+def is_mysql_dialect(dialect: str) -> bool:
+    """Check if the dialect is MySQL."""
+    return dialect == "mysql"
 
 
-def is_mysql() -> bool:
-    """Check if the current database dialect is MySQL."""
-    return get_dialect_name() == "mysql"
-
-
-def is_sqlite() -> bool:
-    """Check if the current database dialect is SQLite."""
-    return get_dialect_name() == "sqlite"
+def is_sqlite_dialect(dialect: str) -> bool:
+    """Check if the dialect is SQLite."""
+    return dialect == "sqlite"

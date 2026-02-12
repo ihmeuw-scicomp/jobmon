@@ -1,7 +1,8 @@
+/// <reference types="vitest" />
 import {defineConfig} from "vite"
 import react from "@vitejs/plugin-react"
 import path from "path";
-import mdPlugin, {Mode} from "vite-plugin-markdown"
+import { plugin as mdPlugin, Mode } from "vite-plugin-markdown"
 // https://vitejs.dev/config/
 export default defineConfig({
     base: '/',
@@ -17,5 +18,10 @@ export default defineConfig({
         alias: {
             '@jobmon_gui': path.resolve(__dirname, './src'),
         },
+    },
+    test: {
+        globals: true,
+        environment: 'jsdom',
+        setupFiles: ['./src/test/setup.ts'],
     },
 })

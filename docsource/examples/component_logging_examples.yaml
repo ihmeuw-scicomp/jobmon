@@ -1,0 +1,459 @@
+# Example configurations for automatic component logging (distributor, worker, client, server)
+# 
+# NOTE: By default, all components use console logging. OTLP is opt-in via configuration overrides.
+
+# ============================================================================
+# Example 1: Default Console Logging (Zero Configuration)
+# ============================================================================
+
+# With no logging configuration, all components automatically use console logging:
+# - jobmon.distributor: console logging to stdout  
+# - jobmon.worker_node: console logging to stdout
+# - jobmon.client: console logging to stdout
+# - jobmon.server.web: console logging to stdout
+
+# No configuration needed - components work out of the box!
+
+# ============================================================================
+# Example 2: Enable OTLP for All Components (File-Based Configuration)
+# ============================================================================
+
+# Main configuration file (e.g., jobmonconfig.otlp.yaml)
+logging:
+  # All components share the same OTLP configuration file
+  client_logconfig_file: /app/config/logconfig.otlp.yaml
+  server_logconfig_file: /app/config/logconfig.otlp.yaml
+  distributor_logconfig_file: /app/config/logconfig.otlp.yaml
+  worker_logconfig_file: /app/config/logconfig.otlp.yaml
+
+---
+# Extended logconfig.otlp.yaml with component loggers
+version: 1
+disable_existing_loggers: false
+
+formatters: !template formatters
+
+handlers:
+  # Existing handlers
+  console_default:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: console_default
+    
+  otlp:
+    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+    level: INFO
+    exporter:
+      module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+      class: OTLPLogExporter
+      endpoint: http://localhost:4317
+      timeout: 30
+      insecure: true
+      max_export_batch_size: 4
+      export_timeout_millis: 2000
+      schedule_delay_millis: 500
+      max_queue_size: 1024
+
+loggers:
+  # Client loggers with OTLP enabled
+  jobmon.client:
+    handlers: [console_default, otlp]
+    level: INFO
+    propagate: true
+    
+  # NEW: Component loggers (reuse existing OTLP handler)
+  jobmon.distributor:
+    handlers: [otlp]
+    level: INFO
+    propagate: false
+    
+  jobmon.worker_node:
+    handlers: [otlp]
+    level: INFO
+    propagate: false
+
+# ============================================================================
+# Example 3: Selective OTLP for Specific Components
+# ============================================================================
+
+# Enable OTLP only for distributor and worker (headless processes)
+# while keeping client and server with console logging
+logging:
+  # Only distributor uses OTLP
+  distributor:
+    handlers:
+      otlp_distributor:
+        class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+        level: INFO
+        exporter:
+          module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+          class: OTLPLogExporter
+          endpoint: http://localhost:4317
+          timeout: 30
+          insecure: true
+          max_export_batch_size: 8
+          export_timeout_millis: 3000
+          schedule_delay_millis: 1000
+          max_queue_size: 2048
+    loggers:
+      jobmon.distributor:
+        handlers: [otlp_distributor]  # OTLP only, no console
+        level: INFO
+        propagate: false
+        
+  # Only worker uses OTLP  
+  worker:
+    handlers:
+      otlp_worker:
+        class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+        level: INFO
+        exporter:
+          module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+          class: OTLPLogExporter
+          endpoint: http://localhost:4317
+          timeout: 30
+          insecure: true
+          max_export_batch_size: 2
+          export_timeout_millis: 1000
+          schedule_delay_millis: 200
+          max_queue_size: 512
+    loggers:
+      jobmon.worker_node:
+        handlers: [otlp_worker]  # OTLP only, no console
+        level: INFO
+        propagate: false
+
+# Client and server continue to use their default console logging
+# (no configuration needed - they use defaults)
+
+# ============================================================================
+# Example 4: Enable OTLP via Section-Based Configuration (Production Deployments)
+# ============================================================================
+
+# Extended jobmon_config.dev.yaml with component sections
+logging:
+  client:
+    handlers:
+      otlp:
+        class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+        level: INFO
+        exporter:
+          module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+          class: OTLPLogExporter
+          endpoint: https://otelcol.aks.scicomp.ihme.washington.edu:443
+          timeout: 30
+          insecure: false
+          max_export_batch_size: 4
+          export_timeout_millis: 2000
+          schedule_delay_millis: 500
+          max_queue_size: 1024
+    loggers:
+      jobmon.client:
+        handlers: [console_default, otlp]
+        level: INFO
+        propagate: true
+        
+  # NEW: Distributor-specific configuration (long-running process)
+  distributor:
+    handlers:
+      otlp_distributor:
+        class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+        level: INFO
+        exporter:
+          module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+          class: OTLPLogExporter
+          endpoint: https://otelcol.aks.scicomp.ihme.washington.edu:443
+          timeout: 30
+          insecure: false
+          # Production long-running process settings
+          max_export_batch_size: 16
+          export_timeout_millis: 5000
+          schedule_delay_millis: 2000
+          max_queue_size: 4096
+    loggers:
+      jobmon.distributor:
+        handlers: [otlp_distributor]
+        level: INFO
+        propagate: false
+      jobmon.core.cluster:
+        handlers: [otlp_distributor]
+        level: WARNING
+        propagate: false
+        
+  # NEW: Worker-specific configuration (short-lived process)
+  worker:
+    handlers:
+      otlp_worker:
+        class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+        level: INFO
+        exporter:
+          module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+          class: OTLPLogExporter
+          endpoint: https://otelcol.aks.scicomp.ihme.washington.edu:443
+          timeout: 30
+          insecure: false
+          # Production short-lived process settings
+          max_export_batch_size: 2
+          export_timeout_millis: 1000
+          schedule_delay_millis: 200
+          max_queue_size: 512
+    loggers:
+      jobmon.worker_node:
+        handlers: [otlp_worker]
+        level: INFO
+        propagate: false
+      jobmon.core.task:
+        handlers: [otlp_worker]
+        level: INFO
+        propagate: false
+
+# ============================================================================
+# Example 3: Performance-Tuned Configuration (High-Throughput)
+# ============================================================================
+
+# Optimized for high-volume production environments
+logging:
+  distributor:
+    handlers:
+      otlp_distributor:
+        class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+        level: WARNING  # Reduce log volume
+        exporter:
+          module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+          class: OTLPLogExporter
+          endpoint: https://production-otlp.company.com:4317
+          timeout: 30
+          insecure: false
+          # High-throughput settings
+          max_export_batch_size: 64
+          export_timeout_millis: 10000
+          schedule_delay_millis: 5000
+          max_queue_size: 16384
+    loggers:
+      jobmon.distributor:
+        handlers: [otlp_distributor]
+        level: WARNING
+        propagate: false
+        
+  worker:
+    handlers:
+      otlp_worker:
+        class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+        level: ERROR  # Only errors for workers in high-volume
+        exporter:
+          module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+          class: OTLPLogExporter
+          endpoint: https://production-otlp.company.com:4317
+          timeout: 30
+          insecure: false
+          # Fast export for errors
+          max_export_batch_size: 1
+          export_timeout_millis: 500
+          schedule_delay_millis: 100
+          max_queue_size: 256
+    loggers:
+      jobmon.worker_node:
+        handlers: [otlp_worker]
+        level: ERROR
+        propagate: false
+
+# ============================================================================
+# Example 4: Development Configuration (Debug Mode)
+# ============================================================================
+
+# Debug configuration for development environments
+logging:
+  distributor:
+    handlers:
+      console_debug:
+        class: logging.StreamHandler
+        level: DEBUG
+        formatter: console_default
+        
+      otlp_distributor:
+        class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+        level: DEBUG
+        exporter:
+          module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+          class: OTLPLogExporter
+          endpoint: http://localhost:4317
+          timeout: 30
+          insecure: true
+          # Fast batching for development
+          max_export_batch_size: 1
+          export_timeout_millis: 500
+          schedule_delay_millis: 100
+          max_queue_size: 256
+          
+    loggers:
+      jobmon.distributor:
+        handlers: [console_debug, otlp_distributor]
+        level: DEBUG
+        propagate: false
+      jobmon.core.cluster:
+        handlers: [console_debug, otlp_distributor]
+        level: DEBUG
+        propagate: false
+        
+  worker:
+    handlers:
+      console_debug:
+        class: logging.StreamHandler
+        level: DEBUG
+        formatter: console_default
+        
+    loggers:
+      jobmon.worker_node:
+        handlers: [console_debug]  # Console only for worker debugging
+        level: DEBUG
+        propagate: false
+      jobmon.core.task:
+        handlers: [console_debug]
+        level: DEBUG
+        propagate: false
+
+# ============================================================================
+# Example 5: Mixed Configuration (Enterprise)
+# ============================================================================
+
+# Enterprise configuration with different approaches per component
+logging:
+  # Use files for stable components
+  client_logconfig_file: /etc/jobmon/logconfig_client.yaml
+  server_logconfig_file: /etc/jobmon/logconfig_server.yaml
+  
+  # Use sections for dynamic component configuration
+  distributor:
+    handlers:
+      otlp_distributor:
+        class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+        level: INFO
+        exporter:
+          module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+          class: OTLPLogExporter
+          endpoint: https://production-otlp.company.com:4317
+          timeout: 30
+          insecure: false
+          headers:
+            authorization: "Bearer ${OTLP_TOKEN}"
+          max_export_batch_size: 32
+          export_timeout_millis: 10000
+          schedule_delay_millis: 5000
+          max_queue_size: 8192
+    loggers:
+      jobmon.distributor:
+        handlers: [otlp_distributor]
+        level: INFO
+        propagate: false
+        
+  # Worker logging explicitly disabled for this environment
+  worker: {}
+
+# ============================================================================
+# Example 6: Component-Specific File Overrides
+# ============================================================================
+
+# Using different files per component for fine-grained control
+logging:
+  client_logconfig_file: /etc/jobmon/client.yaml
+  server_logconfig_file: /etc/jobmon/server.yaml
+  distributor_logconfig_file: /etc/jobmon/distributor.yaml
+  worker_logconfig_file: /etc/jobmon/worker.yaml
+
+# ============================================================================
+# Usage Notes:
+# ============================================================================
+
+# 1. Component Startup:
+#    - DistributorCLI automatically configures logging on startup
+#    - WorkerNodeCLI automatically configures logging on startup
+#    - No manual logging configuration required in component code
+
+# 2. Configuration Precedence (per component):
+#    - File override: logging.{component}_logconfig_file
+#    - Template: {component}/config/logconfig_{component}.yaml  
+#    - Section override: logging.{component}.*
+#    - No logging: if no configuration found
+
+# 3. Graceful Degradation:
+#    If logging configuration fails, components start with no logging.
+#    This ensures components always start successfully.
+
+# 4. Process Type Optimizations:
+#    - Distributor: Long-running process (large batches, slower export)
+#    - Worker: Short-lived process (small batches, fast export)
+
+# 5. OTLP Resource Attributes:
+#    Each component instance gets unique resource attributes:
+#    - service.name: "jobmon.{component}"
+#    - service.instance.id: UUID
+#    - process.pid: Process ID
+#    - jobmon.component: component name
+
+# 6. Performance Tuning Guidelines:
+#    
+#    Development (responsive debugging):
+#    - max_export_batch_size: 1-4
+#    - export_timeout_millis: 500-1000
+#    - schedule_delay_millis: 100-200
+#    
+#    Production (efficient throughput):
+#    - Distributor: batch_size: 16-64, timeout: 5000-10000ms
+#    - Worker: batch_size: 1-2, timeout: 500-1000ms
+#    
+#    High-volume (minimize overhead):
+#    - Use WARNING or ERROR levels only
+#    - Large batch sizes with long delays
+#    - Consider disabling worker logging entirely
+
+# 7. Server Advanced Configuration:
+#    The server component has the most sophisticated logging setup:
+#    - Multiple precedence levels: dict > file > JobmonConfig > template
+#    - Built-in OTLP validation
+#    - Structlog integration
+#    - Advanced error handling and fallbacks
+#    - Can be configured via CLI, web app startup, or configuration files
+#
+# Example server-specific configuration:
+# logging:
+#   server:
+#     handlers:
+#       otlp_server:
+#         class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+#         level: INFO
+#         exporter:
+#           module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+#           class: OTLPLogExporter
+#           endpoint: https://production-otlp.company.com:4317
+#           timeout: 30
+#           insecure: false
+#           # Server optimizations (balance between distributor and worker)
+#           max_export_batch_size: 8
+#           export_timeout_millis: 3000
+#           schedule_delay_millis: 1000
+#           max_queue_size: 2048
+#       console_structlog:
+#         class: logging.StreamHandler
+#         level: INFO
+#         formatter: structlog_event_only
+#     loggers:
+#       jobmon.server.web:
+#         handlers: [console_structlog, otlp_server]
+#         level: INFO
+#         propagate: true
+#       sqlalchemy:
+#         handlers: [otlp_server]
+#         level: WARNING
+#         propagate: false
+#       uvicorn.access:
+#         handlers: [otlp_server]
+#         level: INFO
+#         propagate: false
+
+# 8. Local Package Architecture:
+#    Templates are located in component packages:
+#    - jobmon.client/config/logconfig_client.yaml
+#    - jobmon.server.web/config/logconfig_server.yaml
+#    - jobmon.distributor/config/logconfig_distributor.yaml
+#    - jobmon.worker_node/config/logconfig_worker.yaml
+#    - Shared templates: jobmon.core/config/templates/*.yaml

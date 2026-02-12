@@ -3,21 +3,34 @@
 from __future__ import annotations
 
 import hashlib
-from http import HTTPStatus as StatusCodes
 import json
-import logging
-from math import ceil
 import numbers
 import re
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple, Union
+from http import HTTPStatus as StatusCodes
+from math import ceil
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
+
+import structlog
+
+if TYPE_CHECKING:
+    import aiohttp
 
 from jobmon.client.units import MemUnit, TimeUnit
 from jobmon.core.cluster_protocol import ClusterQueue
 from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class TaskResources:
@@ -57,7 +70,7 @@ class TaskResources:
         return self._id
 
     def bind(self) -> None:
-        """Bind TaskResources to the database."""
+        """Bind TaskResources to the database (synchronous)."""
         # Check if it's already been bound
         if self.is_bound:
             logger.debug(
@@ -74,6 +87,42 @@ class TaskResources:
         }
         return_code, response = self.requester.send_request(
             app_route=app_route, message=msg, request_type="post"
+        )
+
+        if return_code != StatusCodes.OK:
+            raise InvalidResponse(
+                f"Unexpected status code {return_code} from POST "
+                f"request through route {app_route}. Expected "
+                f"code 200. Response content: {response}"
+            )
+        self._id = response
+
+    async def bind_async(self, session: "aiohttp.ClientSession") -> None:
+        """Bind TaskResources to the database (asynchronous).
+
+        Args:
+            session: An aiohttp ClientSession for making async HTTP requests.
+        """
+        # Check if it's already been bound
+        if self.is_bound:
+            logger.debug(
+                "This task resource has already been bound, and assigned"
+                f"task_resources_id {self.id}"
+            )
+            return
+
+        app_route = "/task/bind_resources"
+        msg = {
+            "queue_id": self.queue.queue_id,
+            "task_resources_type_id": "O",
+            "requested_resources": self.requested_resources,
+        }
+        return_code, response = await self.requester.send_request_async(
+            session=session,
+            app_route=app_route,
+            message=msg,
+            request_type="post",
+            tenacious=True,
         )
 
         if return_code != StatusCodes.OK:

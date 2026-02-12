@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import logging
 from typing import Any, Callable
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 class DistributorCommand:
@@ -27,4 +28,4 @@ class DistributorCommand:
             if raise_on_error:
                 raise
             else:
-                logger.warning(e)
+                logger.exception("Distributor command failed", error=str(e))

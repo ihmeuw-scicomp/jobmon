@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import logging
+import structlog
 
 from jobmon.core.constants import WorkflowRunStatus
 from jobmon.core.requester import Requester
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class DistributorWorkflowRun:

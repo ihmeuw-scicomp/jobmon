@@ -2,19 +2,24 @@ services:
   jobmon_backend:
     build: 
       context: ./
-      dockerfile: ./jobmon_server/Dockerfile
+      dockerfile: ./jobmon_server/Dockerfile.local
       args:
-        EDITABLE: "${EDITABLE:-false}"  # Pass the EDITABLE argument with a default of false
-        EXTRAS: "${EXTRAS:-}"          # Pass the EXTRAS argument with a default of empty
+        EDITABLE: "${EDITABLE:-true}"  # Default to true for local dev
+        EXTRAS: "${EXTRAS:-mysql,otlp}" # Include otlp for template system compatibility
     ports:
       - "8070:80"
     volumes:
-      - ./jobmon_core:/app/jobmon/jobmon_core:ro
-      - ./jobmon_server:/app/jobmon/jobmon_server:ro
+      - ./jobmon_core:/app/jobmon_core:ro
+      - ./jobmon_server:/app/jobmon_server  # Remove :ro to allow database creation
+      - ./dev/config:/app/config:ro  # Mount local config directory
+    environment:
+      # Jobmon Configuration
+      - JOBMON__CONFIG_FILE=/app/config/jobmonconfig.local.yaml
     env_file:
       - .env
     command: >
-      /bin/sh -c "fastapi run /app/main.py --port 80 --reload"
+      /bin/sh -c "python -m uvicorn --factory main:get_app --host 0.0.0.0 --port 80 --workers 6"
+
   jobmon_frontend:
     build: 
       context: ./jobmon_gui
@@ -22,20 +27,26 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./jobmon_gui/src:/app/src:ro
-    env_file:
-      - .env  # Load environment variables from the .env file
+      - ./jobmon_gui/src:/app/src
+    environment:
+      - REACT_APP_API_URL=http://localhost:8070/api/v3
 
-  # jobmon_server_dev:
-  #   build:
-  #     context: ./
-  #     dockerfile: ./Dockerfile.server.dev
-  #   ports:
-  #     - "8070:8070"
-  #   volumes:
-  #     - ./jobmon_core:/app/jobmon_core:ro
-  #     - ./jobmon_server:/app/jobmon_server:ro
-  #     - ./jobmon_client:/app/jobmon_client:ro
-  #   env_file:
-  #     - .env
-  #   command: bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate ./.nox/build_gui_test_env && python jobmon_gui/local_testing/main.py"
+  jobmon_client:
+    build:
+      context: ./
+      dockerfile: ./jobmon_client/Dockerfile.local
+      args:
+        EDITABLE: "${EDITABLE:-true}"  # Default to true for local dev
+        EXTRAS: "${CLIENT_EXTRAS:-otlp}"  # Default extras for client
+    volumes:
+      - ./jobmon_core:/app/jobmon_core:ro
+      - ./jobmon_client:/app/jobmon_client:ro
+      - ./dev/config:/app/config:ro  # Mount local config directory
+      - ./dev/workflows:/app/test_scripts  # Volume for test workflow scripts
+    environment:
+      # Jobmon Configuration
+      - JOBMON__CONFIG_FILE=/app/config/jobmonconfig.local.yaml
+    env_file:
+      - .env
+    stdin_open: true  # Keep STDIN open for interactive use
+    tty: true         # Allocate a pseudo-TTY for interactive use

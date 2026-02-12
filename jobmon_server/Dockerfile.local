@@ -1,0 +1,40 @@
+# jobmon_server/Dockerfile.local
+FROM python:3.13
+
+ENV APP_HOME=/app
+WORKDIR $APP_HOME
+
+# Install uv
+RUN python -m pip install --upgrade pip --no-cache-dir && \
+    pip install --no-cache-dir uv
+
+# Configure Artifactory for UV
+ENV UV_EXTRA_INDEX_URL=https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple
+
+# Set build-time arguments for extras, defaulting for local development
+ARG EXTRAS="mysql,otlp" # Default extras for local dev (e.g., mysql and otlp)
+ARG EDITABLE=true      # Default to editable install for local dev
+
+# Define valid extras (can be the same as production Dockerfile)
+ENV VALID_CORE_EXTRAS="otlp"
+# Add other DB extras for VALID_SERVER_EXTRAS here, e.g., "postgres"
+ENV VALID_SERVER_EXTRAS="otlp mysql"
+
+# Copy source code
+COPY . ${APP_HOME}/
+
+# Install dependencies using the shared script
+# Pass Docker ARGs as ENV VARs to the script, reflecting development defaults
+RUN EXTRAS_ARG="${EXTRAS}" \
+    EDITABLE_ARG="${EDITABLE}" \
+    APP_HOME="${APP_HOME}" \
+    VALID_CORE_EXTRAS="${VALID_CORE_EXTRAS}" \
+    VALID_SERVER_EXTRAS="${VALID_SERVER_EXTRAS}" \
+    bash $APP_HOME/jobmon_server/docker_install_deps.sh
+
+# Download NLTK data (if needed for dev)
+RUN python -m nltk.downloader popular punkt_tab
+
+# CMD for local development
+COPY jobmon_server/main.py $APP_HOME/main.py
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"] 

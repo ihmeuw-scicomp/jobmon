@@ -2,7 +2,6 @@
 
 from typing import Callable, Optional
 
-
 from jobmon.core.exceptions import ConfigError
 from jobmon.core.requester import Requester
 from jobmon.server.workflow_reaper.notifiers import SlackNotifier

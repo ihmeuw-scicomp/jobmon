@@ -15,6 +15,12 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # We will rely on runner-level pip.conf or pre-set UV_EXTRA_INDEX_URL for Artifactory access for now.
+    # If Nox sessions fail due to missing packages from Artifactory,
+    # we will need to explicitly set UV_EXTRA_INDEX_URL here, likely using a secret.
+    # env:
+      # UV_EXTRA_INDEX_URL: ${{ secrets.IHME_ARTIFACTORY_PYPI_SIMPLE_URL }}
+
     permissions:
       contents: read
       checks: write
@@ -27,13 +33,32 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v3
         with:
-          python-version: '3.x'
+          python-version: '3.11' # Pin to Python 3.11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: 'jobmon_gui/package-lock.json'
           
-      - name: Install nox
-        run: pip install --upgrade nox
+      - name: Install uv and nox
+        run: pip install --upgrade uv nox
+
+      - name: Configure uv cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv # Standard uv cache path on Linux
+          # Key based on the hash of all uv.lock files
+          key: ${{ runner.os }}-uv-${{ hashFiles('**/uv.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-
         
-      - name: Type checking and Linting
+      - name: Backend Type checking and Linting
         run: nox -s typecheck lint
+
+      - name: Frontend Type checking and Linting
+        run: nox -s typecheck_frontend lint_frontend
 
       - name: Run tests
         id: tests

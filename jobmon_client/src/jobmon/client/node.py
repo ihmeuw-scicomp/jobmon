@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import hashlib
-import logging
 from typing import Any, Dict, List, Optional, Set
+
+import structlog
 
 from jobmon.client.task_template_version import TaskTemplateVersion
 from jobmon.core.constants import SpecialChars
 from jobmon.core.requester import Requester
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class Node:

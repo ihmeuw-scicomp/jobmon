@@ -20,10 +20,11 @@ def apply_migrations(uri: str, revision: str = "head") -> None:
     command.upgrade(cfg, revision)
 
 
-def init_db() -> None:
+def init_db(uri: str = "") -> None:
     """Initialize the database: create if needed, apply migrations."""
-    cfg = get_jobmon_config()
-    uri = cfg.get("db", "sqlalchemy_database_uri")
+    if not uri:
+        cfg = get_jobmon_config()
+        uri = cfg.get("db", "sqlalchemy_database_uri")
     fresh = False
     if not database_exists(uri):
         create_database(uri)

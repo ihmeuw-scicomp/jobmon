@@ -1,11 +1,12 @@
 """Multiprocess executes tasks in parallel if multiple threads are available."""
 
 import logging
-from multiprocessing import JoinableQueue, Process, Queue
 import os
 import queue
 import shutil
 import subprocess
+import sys
+from multiprocessing import JoinableQueue, Process, Queue
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import psutil
@@ -110,7 +111,8 @@ class MultiprocessDistributor(ClusterDistributor):
     """Executes tasks locally in parallel.
 
     It uses the multiprocessing Python library and queues to parallelize the execution of
-    tasks. The subprocessing pattern looks like this:
+    tasks. The subprocessing pattern looks like this::
+
         LocalExec
         --> consumer1
         ----> subconsumer1
@@ -135,8 +137,18 @@ class MultiprocessDistributor(ClusterDistributor):
         self.started = False
         self._cluster_name = cluster_name
 
-        worker_node_entry_point = shutil.which("worker_node_entry_point")
-        if not worker_node_entry_point:
+        # Find worker_node_entry_point in the same environment as the running Python
+        # This avoids version mismatches when multiple jobmon installations exist
+        # (e.g., conda base vs project .venv)
+        bin_dir = os.path.dirname(sys.executable)
+        candidate_path = os.path.join(bin_dir, "worker_node_entry_point")
+        worker_node_entry_point: Optional[str]
+        if os.path.exists(candidate_path):
+            worker_node_entry_point = candidate_path
+        else:
+            # Fall back to shutil.which if not found in same directory as Python
+            worker_node_entry_point = shutil.which("worker_node_entry_point")
+        if not worker_node_entry_point or not os.path.exists(worker_node_entry_point):
             raise ValueError("worker_node_entry_point can't be found.")
         self._worker_node_entry_point = worker_node_entry_point
 

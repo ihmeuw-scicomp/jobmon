@@ -3,23 +3,23 @@
 from __future__ import annotations
 
 import copy
+import fcntl
 import hashlib
 import itertools
-import logging
-import logging.config
 import os
-from subprocess import PIPE, Popen, TimeoutExpired
 import sys
-from types import TracebackType
-from typing import Any, Dict, Iterator, List, Optional, Sequence, TYPE_CHECKING, Union
+import time
 import uuid
+from subprocess import PIPE, Popen, TimeoutExpired
+from types import TracebackType
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Iterator, List, Optional, Union
 
 import psutil
+import structlog
 
 from jobmon.client.array import Array
 from jobmon.client.dag import Dag
-from jobmon.client.logging import JobmonLoggerConfig
-from jobmon.client.swarm.workflow_run import WorkflowRun as SwarmWorkflowRun
+from jobmon.client.swarm import WorkflowRunConfig, run_workflow
 from jobmon.client.task import Task
 from jobmon.client.task_resources import TaskResources
 from jobmon.client.tool_version import ToolVersion
@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from jobmon.client.tool import Tool
 
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class DistributorContext:
@@ -54,6 +54,42 @@ class DistributorContext:
         self._cluster_name = cluster_name
         self._workflow_run_id = workflow_run_id
         self._timeout = timeout
+
+    def wait_for_startup_signal(self, timeout: int = 180) -> bool:
+        """Wait for startup signal with non-blocking reads to handle timing issues."""
+        buffer = ""
+        start_time = time.time()
+
+        assert self.process.stderr is not None  # keep mypy happy
+
+        # Make stderr non-blocking to avoid hanging if signal already sent
+        fd = self.process.stderr.fileno()
+        fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+        while time.time() - start_time < timeout:
+            try:
+                chunk = self.process.stderr.read(100)
+                if chunk:
+                    buffer += chunk
+                    # Look for startup signal (handles package warnings naturally)
+                    if "ALIVE" in buffer:
+                        logger.info("Received startup signal")
+                        return True
+            except BlockingIOError:
+                # No data available, check if process died
+                if self.process.poll() is not None:
+                    logger.error(
+                        f"Distributor process exited with code: "
+                        f"{self.process.returncode}"
+                    )
+                    return False
+                time.sleep(0.1)
+            except Exception as e:
+                logger.warning(f"Error reading stderr: {e}")
+                time.sleep(0.1)
+
+        return False
 
     def __enter__(self) -> DistributorContext:
         """Starts the Distributor Process."""
@@ -83,15 +119,17 @@ class DistributorContext:
             env=env,
         )
 
-        # check if stderr contains "ALIVE"
-        assert self.process.stderr is not None  # keep mypy happy on optional type
-        stderr_val = self.process.stderr.read(5)
-        if stderr_val != "ALIVE":
-            stderr_all = self.process.stderr.read()
+        # Use simple non-blocking startup detection
+        if not self.wait_for_startup_signal(self._timeout):
+            stderr_all = ""
+            try:
+                _, stderr_all = self.process.communicate(timeout=5)
+            except TimeoutExpired:
+                pass
             err = self._shutdown()
             raise DistributorStartupTimeout(
-                f"Distributor process did not start, stderr='{err}'\n\n"
-                f"Full stderr: {stderr_all}"
+                f"Distributor process did not start within {self._timeout}s, "
+                f"stderr='{err}'\n\nFull stderr: {stderr_all}"
             )
         return self
 
@@ -111,10 +149,16 @@ class DistributorContext:
         return self.process.returncode is None
 
     def _shutdown(self) -> str:
+        """Shutdown the distributor process."""
         self.process.terminate()
         try:
             _, err = self.process.communicate(timeout=self._timeout)
+            if "SHUTDOWN" in err:
+                logger.info("Received shutdown confirmation")
+            else:
+                logger.warning("No shutdown confirmation received")
         except TimeoutExpired:
+            logger.warning("Timeout waiting for graceful shutdown")
             err = ""
 
         if "SHUTDOWN" not in err:
@@ -386,7 +430,7 @@ class Workflow(object):
         self.arrays[template_name] = array
         array.workflow = self
 
-    def add_tasks(self, tasks: Sequence[Task]) -> None:
+    def add_tasks(self, tasks: Iterable[Task]) -> None:
         """Add a list of task to the workflow to be executed."""
         for task in tasks:
             # add the task
@@ -403,7 +447,6 @@ class Workflow(object):
             cluster_name: name of cluster to set default values for.
             yaml_file: the yaml file that is providing the compute resource values.
         """
-        pass
 
     def set_default_compute_resources_from_dict(
         self, cluster_name: str, dictionary: Dict[str, Any]
@@ -492,24 +535,39 @@ class Workflow(object):
             distributor_startup_timeout: amount of time to wait for the distributor process to
                 start up
             resume_timeout: seconds to wait for a workflow to become resumable before giving up
-            configure_logging: setup jobmon logging. If False, no logging will be configured.
-                If True, default logging will be configured.
+            configure_logging: setup jobmon client logging. If False, no logging will be
+                configured. If True, automatic component logging will be configured.
 
         Returns:
             str of WorkflowRunStatus
         """
+        # LAZY STRUCTLOG CONFIGURATION: Ensure structlog is configured before any logging
+        # This happens on first workflow.run() call, ensuring host application always
+        # has the opportunity to configure structlog first (eliminating import-order issues)
+        from jobmon.client.logging import ensure_structlog_configured
+
+        ensure_structlog_configured()
+
+        # Set gRPC fork support environment variables BEFORE any gRPC initialization
+        # This must happen before configure_logging as OTLP handlers create gRPC connections
         if configure_logging is True:
-            JobmonLoggerConfig.attach_default_handler(
-                logger_name="jobmon.client", log_level=logging.INFO
-            )
+            # Only set gRPC fork support if OTLP is available
+            from jobmon.core.otlp import OTLP_AVAILABLE
+
+            if OTLP_AVAILABLE:
+                import os
+
+                os.environ["GRPC_ENABLE_FORK_SUPPORT"] = "true"
+                os.environ["GRPC_POLL_STRATEGY"] = "poll"
+            self._configure_component_logging()
 
         # bind to database
         logger.info("Adding Workflow metadata to database")
         self.bind()
 
-        config = JobmonConfig()
+        jobmon_config = JobmonConfig()
         try:
-            gui_url = config.get("http", "gui_url")
+            gui_url = jobmon_config.get("http", "gui_url")
         except ConfigError:
             gui_url = ""
 
@@ -562,41 +620,53 @@ class Workflow(object):
         with DistributorContext(
             cluster_name, wfr.workflow_run_id, distributor_startup_timeout
         ) as distributor:
-            # set up swarm and initial DAG
-            swarm = SwarmWorkflowRun(
-                workflow_run_id=wfr.workflow_run_id,
-                fail_after_n_executions=self._fail_after_n_executions,
-                requester=self.requester,
+            # Run workflow using factory function
+            config = WorkflowRunConfig(
                 fail_fast=fail_fast,
-                status=wfr.status,
+                fail_after_n_executions=self._fail_after_n_executions,
             )
-            swarm.from_workflow(self)
-            self._num_previously_completed = swarm.num_previously_complete
+            # wfr.status is always set after create_workflow_run() and _update_status()
+            assert (
+                wfr.status is not None
+            ), "WorkflowRun status should be set after binding"
+            result = run_workflow(
+                workflow=self,
+                workflow_run_id=wfr.workflow_run_id,
+                distributor_alive=distributor.alive,
+                status=wfr.status,
+                config=config,
+                timeout=seconds_until_timeout,
+                requester=self.requester,
+            )
 
-            try:
-                swarm.run(distributor.alive, seconds_until_timeout)
-            finally:
-                # figure out doneness
-                num_new_completed = (
-                    len(swarm.done_tasks) - swarm.num_previously_complete
+            # Extract results
+            self._num_previously_completed = result.num_previously_complete
+            num_new_completed = result.done_count - result.num_previously_complete
+
+            # Update workflow tasks with final status from result
+            for task in self.tasks.values():
+                task.final_status = result.task_final_statuses[task.task_id]
+
+            # Log completion
+            if result.final_status != WorkflowRunStatus.DONE:
+                logger.info(
+                    f"WorkflowRun execution ended, num failed {result.failed_count}"
                 )
-                if swarm.status != WorkflowRunStatus.DONE:
-                    logger.info(
-                        f"WorkflowRun execution ended, num failed {len(swarm.failed_tasks)}"
-                    )
-                else:
-                    logger.info(
-                        f"WorkflowRun execute finished successfully, {num_new_completed} tasks"
-                    )
-
-                # update workflow tasks with final status
-                for task in self.tasks.values():
-                    task.final_status = swarm.tasks[task.task_id].status
-                self._num_newly_completed = num_new_completed
+            else:
+                logger.info(
+                    f"WorkflowRun execute finished successfully, {num_new_completed} tasks"
+                )
+            self._num_newly_completed = num_new_completed
 
         self.last_workflow_run_id = wfr.workflow_run_id
 
-        return swarm.status
+        return result.final_status
+
+    def _configure_component_logging(self) -> None:
+        """Configure component logging for client workflow operations."""
+        from jobmon.client.logging import configure_client_logging
+
+        configure_client_logging()
 
     def set_task_template_max_concurrency_limit(
         self, task_template_name: str, limit: int
@@ -668,12 +738,17 @@ class Workflow(object):
             if raise_on_error:
                 raise
             else:
-                logger.info(e)
+                logger.exception("Workflow validation error", error=str(e))
 
     def bind(self) -> None:
         """Get a workflow_id."""
         if self.is_bound:
             return
+
+        # LAZY STRUCTLOG CONFIGURATION: Ensure structlog is configured before any logging
+        from jobmon.client.logging import ensure_structlog_configured
+
+        ensure_structlog_configured()
 
         # strict = False means we can coerce. obviously we need to raise at this point
         self.validate(strict=False, raise_on_error=True)

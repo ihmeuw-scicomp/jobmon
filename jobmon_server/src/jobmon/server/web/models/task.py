@@ -1,6 +1,8 @@
 """Task Table for the Database."""
 
+import structlog
 from sqlalchemy import (
+    VARCHAR,
     Column,
     DateTime,
     ForeignKey,
@@ -8,18 +10,15 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    VARCHAR,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-import structlog
 
 from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.core.serializers import SerializeDistributorTask, SerializeSwarmTask
 from jobmon.server.web.models import Base
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.task_status import TaskStatus
-
 
 logger = structlog.get_logger(__name__)
 
@@ -109,6 +108,9 @@ class Task(Base):
 
     def transition(self, new_state: str) -> None:
         """Transition the Task to a new state."""
+        if self.status == new_state:
+            # do nothing if the task is already in the new state
+            return
         # bind_to_logger(workflow_id=self.workflow_id, task_id=self.id)
         logger.info(f"Transitioning task from {self.status} to {new_state}")
         self._validate_transition(new_state)

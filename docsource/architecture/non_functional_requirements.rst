@@ -54,7 +54,7 @@ Usability
 =========
 
 Usability is key, otherwise Jobmon will not be adopted.
-Jobmon must offer more features and be at least as easy to use than raw Slurm, UGE,
+Jobmon must offer more features and be at least as easy to use than raw Slurm
 or any container-based batch system.
 
 Jobmon's advantages are described in various slide decks and will not be repeated here.

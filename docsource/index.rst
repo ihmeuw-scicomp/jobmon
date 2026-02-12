@@ -1,58 +1,96 @@
-.. jobmon documentation master file, created by
-   sphinx-quickstart on Fri Sep 23 09:01:26 2016.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. jobmon documentation master file
 
+######
 Jobmon
 ######
 
-Jobmon is a Scientific Workflow Management system developed at IHME specifically for the
-institute's needs. It is developed and maintained by IHME's Scientific Computing team.
-Jobmon aims to reduce human pain by providing:
+Jobmon is a Scientific Workflow Management system that simplifies running 
+computational workflows on distributed computing systems. It provides:
 
-- An easy to use Python API and R API.
-- Centralized monitoring of jobs, including the jobs' statuses and errors.
-- A central SQL database with all information on past, current, and future runs.
-- Automatic retries to protect against random cluster failures.
-- Automatic retries following a resource failure, e.g. re-running a job with increased memory.
-- Whole-of-workflow resumes to handle missing data or in-flight code fixes.
-- Adds Application structure to what otherwise would be a soup of jobs.
-- Fine-grained job dependencies, including for jobs within "job arrays."
-- An easy-to-use GUI.
+- **Easy-to-use Python and R APIs** for defining workflows
+- **Centralized monitoring** of jobs, including statuses and errors
+- **Automatic retries** to protect against cluster failures
+- **Resource-aware retries** that scale memory and runtime after failures
+- **Workflow resumes** to continue from where you left off
+- **Fine-grained job dependencies** including support for job arrays
+- **A web-based GUI** for monitoring and debugging
 
-Jobmon was originally developed to augment the Univa Grid Engine (UGE)
-and subsequently ported to Slurm when IHME switch from UGE to Slurm.
+Quick Links
+===========
+
+- :doc:`Getting Started <getting_started/index>` - New to Jobmon? Start here with installation and your first workflow.
+- :doc:`User Guide <user_guide/index>` - Learn about workflows, tasks, resources, and monitoring.
+- :doc:`Configuration <configuration/index>` - Configure Jobmon for your environment.
+- :doc:`Advanced Topics <advanced/index>` - Arrays, dynamic resources, troubleshooting, and more.
 
 #################
 Table of Contents
 #################
 
 .. toctree::
-    :maxdepth: 2
-    :caption: User Manual
+   :maxdepth: 2
+   :caption: Getting Started
 
-    quickstart
-    core_concepts
-    monitoring_debugging
-    advanced_usage
-    glossary
-    API Reference <api/modules>
+   getting_started/index
 
 .. toctree::
    :maxdepth: 2
-   :caption: Developer's Guide
+   :caption: User Guide
+
+   user_guide/index
+   user_guide/core_concepts
+   user_guide/workflows
+   user_guide/tasks
+   user_guide/compute_resources
+   user_guide/monitoring
+   user_guide/cli_reference
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Configuration
+
+   configuration/index
+   configuration/logging/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Advanced Topics
+
+   advanced/index
+   advanced/advanced_usage
+   advanced/task_generator
+   advanced/monitoring_debugging
+   advanced/troubleshooting
+   advanced/performance
+   advanced/migration
+
+.. toctree::
+   :maxdepth: 2
+   :caption: IHME Users
+
+   ihme/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Reference
+
+   glossary
+   API Reference <autoapi/index>
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Developer Guide
 
    developers_guide/index
 
-
 .. toctree::
-    :maxdepth: 2
-    :caption: Architecture and Detailed Design
+   :maxdepth: 2
+   :caption: Architecture
 
-    architecture/index
+   architecture/index
 
-Indices and tables
-******************
+Indices and Tables
+==================
 
 * :ref:`genindex`
 * :ref:`modindex`

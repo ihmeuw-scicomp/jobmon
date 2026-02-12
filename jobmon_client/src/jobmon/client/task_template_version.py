@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 from http import HTTPStatus as StatusCodes
-import logging
 from string import Formatter
-from typing import Any, Dict, List, Optional, Tuple, Type, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
+
+import structlog
 
 from jobmon.core.exceptions import InvalidResponse
 from jobmon.core.requester import Requester
@@ -15,7 +16,7 @@ from jobmon.core.serializers import SerializeClientTaskTemplateVersion
 if TYPE_CHECKING:
     from jobmon.client.task_template import TaskTemplate
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class TaskTemplateVersion:

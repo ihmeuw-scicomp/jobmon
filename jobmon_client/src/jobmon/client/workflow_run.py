@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import getpass
-import logging
 import time
 from typing import Optional
+
+import structlog
 
 from jobmon.client import __version__
 from jobmon.core.configuration import JobmonConfig
 from jobmon.core.exceptions import WorkflowNotResumable
 from jobmon.core.requester import Requester
 
-
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class WorkflowRunFactory:
@@ -38,11 +38,22 @@ class WorkflowRunFactory:
         self.workflow_is_resumable = False
 
     def set_workflow_resume(
-        self, reset_running_jobs: bool = True, resume_timeout: int = 300
+        self,
+        reset_running_jobs: bool = True,
+        resume_timeout: int = 300,
+        force_cleanup: bool = False,
     ) -> None:
         """Set statuses of the given workflow ID's workflow to a resumable state.
 
         Move active workflow runs to hot/cold resume states, depending on reset_running_jobs.
+
+        Args:
+            reset_running_jobs: If True (cold resume), also terminate running tasks.
+                               If False (hot resume), let running tasks finish.
+            resume_timeout: Maximum time to wait for workflow to become resumable.
+            force_cleanup: If True and timeout is reached with pending KILL_SELF
+                          task instances, force cleanup and proceed. Use this when
+                          jobs have been externally terminated (scancel, node failure).
         """
         if self.workflow_is_resumable:
             return
@@ -53,35 +64,112 @@ class WorkflowRunFactory:
             request_type="post",
         )
         # Wait for the workflow to become resumable
-        self.wait_for_workflow_resume(resume_timeout)
+        self.wait_for_workflow_resume(resume_timeout, force_cleanup=force_cleanup)
 
-    def wait_for_workflow_resume(self, resume_timeout: int = 300) -> None:
-        # previous workflow exists but is resumable. we will wait till it terminates
+    def wait_for_workflow_resume(
+        self, resume_timeout: int = 300, force_cleanup: bool = False
+    ) -> None:
+        """Wait for workflow to become resumable.
 
+        Args:
+            resume_timeout: Maximum time to wait in seconds
+            force_cleanup: If True and KILL_SELF task instances are detected,
+                          clean them up immediately instead of waiting for workers
+        """
         wait_start = time.time()
+        pending_kill_self = 0
+
         while not self.workflow_is_resumable:
-            logger.info(
-                f"Waiting for resume. "
-                f"Timeout in {round(resume_timeout - (time.time() - wait_start), 1)}"
-            )
+            elapsed = time.time() - wait_start
+            remaining = resume_timeout - elapsed
+
             app_route = f"/workflow/{self.workflow_id}/is_resumable"
             return_code, response = self.requester.send_request(
                 app_route=app_route, message={}, request_type="get"
             )
 
             self.workflow_is_resumable = bool(response.get("workflow_is_resumable"))
-            if (time.time() - wait_start) > resume_timeout:
-                raise WorkflowNotResumable(
-                    "workflow_run timed out waiting for previous "
-                    "workflow_run to exit. Try again in a few minutes."
+            pending_kill_self = response.get("pending_kill_self", 0)
+
+            # Handle KILL_SELF task instances
+            if pending_kill_self > 0:
+                if force_cleanup:
+                    # Force cleanup immediately - don't wait for workers
+                    # Server also finalizes the workflow run, so next check should pass
+                    logger.warning(
+                        f"Force cleaning up {pending_kill_self} KILL_SELF task instance(s). "
+                        f"These will be transitioned to ERROR_FATAL."
+                    )
+                    self.force_cleanup_kill_self()
+                    logger.info(
+                        "Force cleanup complete. Workflow should now be resumable."
+                    )
+                    # Re-check immediately - server should have finalized the workflow run
+                    continue
+                else:
+                    logger.warning(
+                        f"Waiting for {pending_kill_self} task instance(s) in KILL_SELF "
+                        f"state to be cleaned up by workers. If these jobs were externally "
+                        f"terminated (scancel, node failure), use force_cleanup=True."
+                    )
+
+            # Log progress
+            if pending_kill_self > 0:
+                logger.info(
+                    f"Waiting for resume. {pending_kill_self} KILL_SELF task(s) pending. "
+                    f"Timeout in {round(remaining, 1)}s"
                 )
             else:
-                sleep_time = round(float(resume_timeout) / 10.0, 1)
-                time.sleep(sleep_time)
+                logger.info(f"Waiting for resume. Timeout in {round(remaining, 1)}s")
 
-    def reset_task_statuses(self, reset_if_running: bool = True) -> None:
-        """Sets the tasks associated with a workflow to the appropriate states."""
-        self.wait_for_workflow_resume()
+            # Check timeout
+            if elapsed > resume_timeout:
+                msg = (
+                    "workflow_run timed out waiting for previous "
+                    "workflow_run to exit."
+                )
+                if pending_kill_self > 0:
+                    msg += (
+                        f" {pending_kill_self} task instance(s) stuck in KILL_SELF "
+                        f"state. Jobs may have been externally terminated. "
+                        f"Use force_cleanup=True to force cleanup."
+                    )
+                raise WorkflowNotResumable(msg)
+
+            sleep_time = round(float(resume_timeout) / 10.0, 1)
+            time.sleep(sleep_time)
+
+    def force_cleanup_kill_self(self) -> int:
+        """Force cleanup of stuck KILL_SELF task instances.
+
+        Use this when jobs have been externally terminated (e.g., scancel, node failure)
+        and the workflow is stuck waiting for cleanup that will never happen.
+
+        Returns:
+            Number of task instances cleaned up
+        """
+        logger.info(
+            f"Force cleanup of KILL_SELF task instances for workflow {self.workflow_id}"
+        )
+        app_route = f"/workflow/{self.workflow_id}/force_cleanup_kill_self"
+        return_code, response = self.requester.send_request(
+            app_route=app_route, message={}, request_type="post"
+        )
+        num_cleaned = response.get("num_cleaned_up", 0)
+        logger.info(f"Cleaned up {num_cleaned} KILL_SELF task instance(s)")
+        return num_cleaned
+
+    def reset_task_statuses(
+        self, reset_if_running: bool = True, force_cleanup: bool = False
+    ) -> None:
+        """Sets the tasks associated with a workflow to the appropriate states.
+
+        Args:
+            reset_if_running: If True, also reset running tasks.
+            force_cleanup: If True and workflow not resumable due to stuck KILL_SELF
+                          task instances, force cleanup and proceed.
+        """
+        self.wait_for_workflow_resume(force_cleanup=force_cleanup)
 
         self.requester.send_request(
             app_route=f"/task/{self.workflow_id}/set_resume_state",

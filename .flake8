@@ -32,6 +32,8 @@ extend-ignore =
 per-file-ignores =
     jobmon_client/src/jobmon/_client_version.py:BLK100
     jobmon_client/src/jobmon/client/api.py:F401
+    jobmon_client/src/jobmon/client/cli/legacy.py:ANN,D
+    jobmon_client/src/jobmon/client/cli_v1.py:ANN,D
     jobmon_core/src/jobmon/_core_version.py:BLK100
     jobmon_core/src/jobmon/distributor/api.py:F401
     jobmon_server/src/jobmon/_server_version.py:BLK100

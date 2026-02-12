@@ -6,10 +6,10 @@ TaskInstances will be created from it for every execution.
 from __future__ import annotations
 
 import hashlib
-from http import HTTPStatus as StatusCodes
-import logging
 import numbers
+from http import HTTPStatus as StatusCodes
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -17,9 +17,10 @@ from typing import (
     List,
     Optional,
     Set,
-    TYPE_CHECKING,
     Union,
 )
+
+import structlog
 
 from jobmon.client.node import Node
 from jobmon.client.task_resources import TaskResources
@@ -35,7 +36,7 @@ if TYPE_CHECKING:
     from jobmon.client.array import Array
     from jobmon.client.workflow import Workflow
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def validate_task_resource_scales(resource_scales: Dict[str, Any]) -> None:
@@ -456,7 +457,6 @@ class Task:
             cluster_name: name of cluster to set default values for.
             yaml_file: the yaml file that is providing the compute resource values.
         """
-        pass
 
     def update_compute_resources(self, **kwargs: Any) -> None:
         """Function that allows users to update their compute resources."""

@@ -1,0 +1,39 @@
+repos:
+-   repo: local
+    hooks:
+    -   id: nox-format
+        name: Nox Format (Backend)
+        entry: env -u FORCE_COLOR nox -r -s format --nocolor
+        language: system
+        types: [python]
+        pass_filenames: false
+    -   id: nox-lint
+        name: Nox Lint (Backend)
+        entry: env -u FORCE_COLOR nox -r -s lint --nocolor
+        language: system
+        types: [python]
+        pass_filenames: false
+    -   id: nox-typecheck
+        name: Nox Typecheck (Backend)
+        entry: env -u FORCE_COLOR nox -r -s typecheck --nocolor
+        language: system
+        types: [python]
+        pass_filenames: false
+    -   id: nox-format-frontend
+        name: Nox Format (Frontend)
+        entry: env -u FORCE_COLOR nox -r -s format_frontend --nocolor
+        language: system
+        files: ^jobmon_gui/src/.*\.(ts|tsx|js|jsx|json|css|md)$
+        pass_filenames: false
+    -   id: nox-lint-frontend
+        name: Nox Lint (Frontend)
+        entry: env -u FORCE_COLOR nox -r -s lint_frontend --nocolor
+        language: system
+        files: ^jobmon_gui/src/.*\.(ts|tsx)$
+        pass_filenames: false
+    -   id: nox-typecheck-frontend
+        name: Nox Typecheck (Frontend)
+        entry: env -u FORCE_COLOR nox -r -s typecheck_frontend --nocolor
+        language: system
+        files: ^jobmon_gui/src/.*\.(ts|tsx)$
+        pass_filenames: false

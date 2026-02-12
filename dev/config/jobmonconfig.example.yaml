@@ -1,0 +1,96 @@
+# Local development configuration for docker-compose
+# Fixed: Using proper GRPC endpoints with TLS for both logs and traces
+
+distributor:
+  poll_interval: 10
+
+heartbeat:
+  report_by_buffer: 3.1
+  task_instance_interval: 90
+  workflow_run_interval: 30
+
+http:
+  request_timeout: 20
+  retries_timeout: 300
+  retries_attempts: 10
+  route_prefix: /api/v3
+  service_url: http://jobmon_backend:80
+
+# Worker Node Config
+worker_node:
+  command_interrupt_timeout: 10
+
+# Override default logconfig location to use mounted file
+logging:
+  server_logconfig_file: /app/config/logconfig.example.yaml
+  distributor_logconfig_file: /app/config/logconfig.otlp.yaml
+  client_logconfig_file: /app/config/logconfig.otlp.yaml
+  worker_logconfig_file: /app/config/logconfig.otlp.yaml
+
+# Authentication disabled for local development
+auth:
+  enabled: false
+
+# Telemetry configuration (replaces otlp section)
+telemetry:
+  # Environment identifier for telemetry resources
+  deployment_environment: local
+  debug: true
+
+  # Distributed tracing configuration
+  tracing:
+    requester_enabled: true    # Client-side HTTP request tracing  
+    server_enabled: true        # Server-side tracing enabled for local dev
+    span_exporter: "http_span"  # Use HTTP exporter (simpler, path-based)
+  
+    exporters:
+      # HTTP exporter - simpler protocol, uses path-based endpoints (/v1/traces)
+      # Recommended for most use cases - easier to debug, works with standard HTTP tooling
+      http_span:
+        module: "opentelemetry.exporter.otlp.proto.http.trace_exporter"
+        class: "OTLPSpanExporter"
+        endpoint: "https://otelcol.aks.scicomp.ihme.washington.edu/v1/traces"
+        timeout: 30
+      
+      # gRPC exporter - uses single endpoint with protocol detection (port 443)
+      # Alternative for high-volume scenarios or when gRPC features are needed
+      grpc_span:
+        module: "opentelemetry.exporter.otlp.proto.grpc.trace_exporter"
+        class: "OTLPSpanExporter"
+        endpoint: "https://otelcol.aks.scicomp.ihme.washington.edu:443"
+        timeout: 30
+        insecure: false
+  
+  # OTLP logging configuration (shared across all components)
+  logging:
+    enabled: true
+    log_exporter: "http_log"  # Use HTTP exporter (simpler, path-based)
+    
+    exporters:
+      # HTTP exporter - simpler protocol, uses path-based endpoints (/v1/logs)
+      # Recommended for most use cases - easier to debug, works with standard HTTP tooling
+      http_log:
+        module: "opentelemetry.exporter.otlp.proto.http._log_exporter"
+        class: "OTLPLogExporter"
+        endpoint: "https://otelcol.aks.scicomp.ihme.washington.edu/v1/logs"
+        timeout: 30
+      
+      # gRPC exporter - uses single endpoint with protocol detection (port 443)
+      # Alternative for high-volume scenarios or when gRPC features are needed
+      grpc_log:
+        module: "opentelemetry.exporter.otlp.proto.grpc._log_exporter"
+        class: "OTLPLogExporter"
+        endpoint: "https://otelcol.aks.scicomp.ihme.washington.edu:443"
+        timeout: 30
+        insecure: false
+
+cors:
+  allowed_origins: "http://localhost:3000"  # Local frontend
+
+db:
+  sqlalchemy_database_uri: "sqlite:///jobmon_server/jobmon.db"
+  sqlalchemy_connect_args: {}
+  pool:
+    recycle: 300
+    pre_ping: true
+    timeout: 20

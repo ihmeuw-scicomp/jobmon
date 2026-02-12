@@ -1,16 +1,15 @@
 """Sequential distributor that runs one task at a time."""
 
-from collections import OrderedDict
 import logging
 import os
 import shutil
+from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from jobmon.core.cluster_protocol import ClusterDistributor, ClusterWorkerNode
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import RemoteExitInfoNotAvailable, ReturnCodes
 from jobmon.worker_node.cli import WorkerNodeCLI
-
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +134,8 @@ class SequentialDistributor(ClusterDistributor):
         try:
             # run command
             cli = WorkerNodeCLI()
+            # Configure component logging since we bypass main()
+            cli.configure_component_logging()
             args = cli.parse_args(command)
             exit_code = cli.run_task_instance_job(args)
 

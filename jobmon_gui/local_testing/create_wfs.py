@@ -44,7 +44,7 @@ def parse_arguments():
 
 def create_simple_wf():
     """Use the task_generator_wf.py script to create a simple workflow."""
-    wf_script_path = Path(__file__).parent.parent.parent / "tests/worker_node/task_generator_wf.py"
+    wf_script_path = Path(__file__).parent.parent.parent / "tests/integration/client/task_generator_wf.py"
     # Run the command and wait for it to finish
     result = subprocess.check_output(["python", str(wf_script_path), "1"])
     # This line will only run after the command above finishes
@@ -150,7 +150,7 @@ if __name__ == "__main__":
     # Access the arguments
     url = args.server_url
     os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070"
-    os.environ["JOBMON__HTTP__ROUTE_PREFIX"] = "/api/v2"
+    os.environ["JOBMON__HTTP__ROUTE_PREFIX"] = "/api/v3"
     wfs = args.wf
     wf_type = args.wf_type
     create_wf(wfs, wf_type)

@@ -1,0 +1,93 @@
+# Local development logconfig for jobmon with OTLP ENABLED
+# Example config with inline exporter configuration
+# Sends to local OTLP collector
+
+version: 1
+disable_existing_loggers: false
+
+# Shared formatters (inlined for simplicity)
+formatters:
+  console_default:
+    format: "%(levelname)s [%(name)s] %(message)s"
+  structlog_event_only:
+    '()': jobmon.core.config.structlog_formatters.JobmonStructlogEventOnlyFormatter
+
+# Local development handlers with working OTLP configuration
+handlers:
+  # Simple console handlers
+  console_default:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: console_default
+    
+  console_structlog:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: structlog_event_only
+
+  # OTLP handler with inline exporter configuration
+  # More aggressive batching for client processes
+  otlp:
+    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+    level: INFO
+    exporter:
+      module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+      class: OTLPLogExporter
+      endpoint: http://localhost:4317
+      timeout: 30
+      insecure: true
+      max_export_batch_size: 4
+      export_timeout_millis: 2000
+      schedule_delay_millis: 500
+      max_queue_size: 1024
+
+  # Alias for structlog loggers (same handler)
+  otlp_structlog:
+    class: jobmon.core.otlp.JobmonOTLPLoggingHandler
+    level: INFO
+    exporter:
+      module: opentelemetry.exporter.otlp.proto.grpc._log_exporter
+      class: OTLPLogExporter
+      endpoint: http://localhost:4317
+      timeout: 30
+      insecure: true
+      max_export_batch_size: 4
+      export_timeout_millis: 2000
+      schedule_delay_millis: 500
+      max_queue_size: 1024
+
+# Local development logger configurations WITH OTLP ENABLED
+loggers:
+  # Primary jobmon logging (console + OTLP enabled, basic formatters)
+  jobmon.client:
+    handlers: [console_default, otlp]  # OTLP ENABLED - uses basic formatters
+    level: INFO
+    propagate: true  # ALLOW CHILD LOGGERS TO INHERIT OTLP HANDLER
+
+  # General jobmon logging (catch-all for any jobmon logs not caught by specific loggers)
+  jobmon.core:
+    handlers: [otlp]  # OTLP ENABLED - uses basic formatters
+    level: INFO
+    propagate: true
+
+  # Server web module (console + OTLP enabled with structlog)
+  jobmon.server.web:
+    handlers: [console_structlog, otlp_structlog]  # OTLP ENABLED - uses structlog formatters
+    level: INFO
+    propagate: true
+
+  # Standard server library loggers (console + OTLP enabled)
+  sqlalchemy:
+    handlers: [console_default, otlp]  # OTLP ENABLED
+    level: WARN
+    propagate: false
+
+  uvicorn.access:
+    handlers: [console_default, otlp]  # OTLP ENABLED
+    level: INFO
+    propagate: false
+
+  uvicorn.error:
+    handlers: [console_default, otlp]  # OTLP ENABLED
+    level: INFO
+    propagate: false

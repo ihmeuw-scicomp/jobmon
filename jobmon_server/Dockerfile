@@ -1,46 +1,42 @@
-FROM python:3.12
+FROM python:3.13
 
-# Install the core certificate bundle (6-7 MB)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+# Set an environment variable for where your app code will live
+ENV APP_HOME=/app
+WORKDIR $APP_HOME
 
-# Set build-time arguments
+# Install uv
+RUN python -m pip install --upgrade pip --no-cache-dir && \
+    pip install --no-cache-dir uv
+
+# Configure Artifactory for UV
+ENV UV_EXTRA_INDEX_URL=https://artifactory.ihme.washington.edu/artifactory/api/pypi/pypi-shared/simple
+
+# Set build-time arguments for extras
 ARG EXTRAS=""
 ARG EDITABLE=false
 
-# Define valid extras for jobmon_core and jobmon_server
+# Define valid extras for jobmon_core and jobmon_server (used by the script)
+# These are now passed as environment variables to the script
 ENV VALID_CORE_EXTRAS="otlp"
+# Add other DB extras here, e.g., "postgres"
 ENV VALID_SERVER_EXTRAS="otlp mysql"
 
-# Copy the entire jobmon directory
-# Consider using .dockerignore to exclude files not needed for the build
-COPY ./ /app/jobmon
-RUN cp /app/jobmon/jobmon_server/main.py /app/main.py
+# Copy source code
+# Copies everything, including the new script from jobmon_server/
+COPY ./ ./
 
-# Generate a requirements.txt file and install dependencies
-RUN bash -c ' \
-    CORE_EXTRAS=""; \
-    SERVER_EXTRAS=""; \
-    for EXTRA in ${EXTRAS//,/ }; do \
-        if echo "$VALID_CORE_EXTRAS" | grep -qw "$EXTRA"; then \
-            CORE_EXTRAS="${CORE_EXTRAS},$EXTRA"; \
-        fi; \
-        if echo "$VALID_SERVER_EXTRAS" | grep -qw "$EXTRA"; then \
-            SERVER_EXTRAS="${SERVER_EXTRAS},$EXTRA"; \
-        fi; \
-    done; \
-    if [ -n "$CORE_EXTRAS" ]; then CORE_EXTRAS="[${CORE_EXTRAS#,}]"; fi; \
-    if [ -n "$SERVER_EXTRAS" ]; then SERVER_EXTRAS="[${SERVER_EXTRAS#,}]"; fi; \
-    INSTALL_MODE=""; \
-    if [ "$EDITABLE" = "true" ]; then INSTALL_MODE="-e"; fi; \
-    echo "$INSTALL_MODE /app/jobmon/jobmon_core${CORE_EXTRAS}" > requirements.txt; \
-    echo "$INSTALL_MODE /app/jobmon/jobmon_server${SERVER_EXTRAS}" >> requirements.txt; \
-    pip install -r requirements.txt \
-'
+# Install dependencies using the script
+# Pass Docker ARGs as ENV VARs to the script
+RUN EXTRAS_ARG="${EXTRAS}" \
+    EDITABLE_ARG="${EDITABLE}" \
+    APP_HOME="${APP_HOME}" \
+    VALID_CORE_EXTRAS="${VALID_CORE_EXTRAS}" \
+    VALID_SERVER_EXTRAS="${VALID_SERVER_EXTRAS}" \
+    bash $APP_HOME/jobmon_server/docker_install_deps.sh
 
 # Download NLTK data
 RUN python -m nltk.downloader popular punkt_tab
 
-# Set the command to run the server
-CMD ["fastapi", "run", "/app/main.py", "--port", "80"]
+# Ensure the main.py used by CMD is correctly pathed
+COPY jobmon_server/main.py $APP_HOME/main.py
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80"]
