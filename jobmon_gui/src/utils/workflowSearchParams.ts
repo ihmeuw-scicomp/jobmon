@@ -15,7 +15,7 @@ function isFilterValue(value: string | FilterValue): value is FilterValue {
 function addFilterToParams(
     params: Record<string, string>,
     key: string,
-    value: string | FilterValue,
+    value: string | FilterValue
 ): void {
     if (typeof value === 'string') {
         if (value) {
@@ -119,4 +119,3 @@ export function getSearchParamsFromLocation(
     }
     return new URLSearchParams(searchString);
 }
-

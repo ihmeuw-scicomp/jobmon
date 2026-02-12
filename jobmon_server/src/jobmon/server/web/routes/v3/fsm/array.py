@@ -22,6 +22,7 @@ from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
+from jobmon.server.web.services.transition_service import TransitionService
 
 logger = structlog.get_logger(__name__)
 
@@ -124,37 +125,32 @@ async def record_array_batch_num(
             for i in range(0, len(task_ids_to_update), batch_size)
         ]
 
-        # Process each batch with retries
-        max_retries = 5
-
+        # Process each batch with TransitionService
         for batch in task_batches:
-            # Atomic batch operation: Update Task status AND create TaskInstance
-            # in one transaction
+            # Use TransitionService for Task transition with audit logging
+            # Service has internal retries and handles SKIP LOCKED
+            result = TransitionService.gate_tasks_for_queueing(
+                session=db,
+                task_ids=batch,
+            )
+
+            gated_task_ids = result["gated"]
+
+            if result["locked"]:
+                logger.warning(
+                    f"Some tasks were locked during queueing, will retry: "
+                    f"{result['locked']}"
+                )
+
+            if not gated_task_ids:
+                # No tasks were gated in this batch
+                continue
+
+            # Calculate array_batch_num and create TaskInstances
+            # This still uses retry logic for the TI creation part
+            max_retries = 5
             for attempt in range(max_retries):
                 try:
-                    # Update task status to QUEUED
-                    update_stmt = (
-                        update(Task)
-                        .where(
-                            and_(
-                                Task.id.in_(batch),
-                                Task.status.in_(
-                                    [
-                                        TaskStatus.REGISTERING,
-                                        TaskStatus.ADJUSTING_RESOURCES,
-                                    ]
-                                ),
-                            )
-                        )
-                        .values(
-                            status=TaskStatus.QUEUED,
-                            status_date=func.now(),
-                            num_attempts=(Task.num_attempts + 1),
-                        )
-                        .execution_options(synchronize_session=False)
-                    )
-                    db.execute(update_stmt)
-
                     # Calculate array_batch_num separately to avoid deadlock
                     # Use SELECT FOR UPDATE with NOWAIT to prevent waiting on locks
                     batch_num_result = db.execute(
@@ -166,6 +162,7 @@ async def record_array_batch_num(
                     ).scalar()
 
                     # Insert into TaskInstance with the calculated batch number
+                    # Only for tasks that passed the gate
                     insert_stmt = insert(TaskInstance).from_select(
                         # columns map 1:1 to selected rows
                         [
@@ -202,19 +199,22 @@ async def record_array_batch_num(
                                 "status"
                             ),
                             func.now().label("status_date"),
-                        ).where(Task.id.in_(batch), Task.status == TaskStatus.QUEUED),
+                        ).where(
+                            Task.id.in_(gated_task_ids),
+                            Task.status == TaskStatus.QUEUED,
+                        ),
                         # no python side defaults. Server defaults only
                         include_defaults=False,
                     )
                     db.execute(insert_stmt)
 
-                    # ATOMIC COMMIT: Both Task update AND TaskInstance insert together
+                    # Commit TaskInstance insert
                     db.commit()
                     break  # Success - exit retry loop
 
                 except OperationalError as e:
                     logger.warning(
-                        f"DB error {e}, retrying attempt "
+                        f"DB error during TI creation {e}, retrying attempt "
                         f"{attempt + 1}/{max_retries}"
                     )
                     db.rollback()
@@ -222,7 +222,7 @@ async def record_array_batch_num(
             else:
                 # All retries failed
                 logger.error(
-                    f"Failed to complete atomic batch operation after {max_retries} attempts"
+                    f"Failed to create TaskInstances after {max_retries} attempts"
                 )
                 db.rollback()
                 raise HTTPException(
@@ -280,40 +280,45 @@ async def transition_array_to_launched(
             task_ids = [row[0] for row in results]
             task_instance_ids = [row[1] for row in results]
 
-            # Now define task_condition with the fetched task_ids
-            task_condition = and_(
-                Task.array_id == array_id,
-                Task.id.in_(task_ids),
-                Task.status == TaskStatus.INSTANTIATING,
-            )
-            # 1) Transition Tasks to LAUNCHED (UPDATE automatically locks rows)
-            update_task_stmt = (
-                update(Task)
-                .where(task_condition)
-                .values(status=TaskStatus.LAUNCHED, status_date=func.now())
-                .execution_options(synchronize_session=False)
-            )
-            db.execute(update_task_stmt)
+            # 1) Use TransitionService for Task transition with audit logging
+            if task_ids:
+                result = TransitionService.transition_tasks(
+                    session=db,
+                    task_ids=task_ids,
+                    to_status=TaskStatusConstants.LAUNCHED,
+                    use_skip_locked=True,
+                )
+                transitioned_task_ids = result["transitioned"]
+            else:
+                transitioned_task_ids = []
 
             # 2) Transition TaskInstances to LAUNCHED in the same transaction
-            dialect = get_dialect(request)
-            update_ti_stmt = (
-                update(TaskInstance)
-                .where(
-                    and_(
-                        TaskInstance.id.in_(task_instance_ids),
-                        TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
+            # Only for tasks that were actually transitioned
+            if transitioned_task_ids:
+                # Get TI IDs for the transitioned tasks
+                ti_ids_to_update = [
+                    row[1] for row in results if row[0] in transitioned_task_ids
+                ]
+
+                if ti_ids_to_update:
+                    dialect = get_dialect(request)
+                    update_ti_stmt = (
+                        update(TaskInstance)
+                        .where(
+                            and_(
+                                TaskInstance.id.in_(ti_ids_to_update),
+                                TaskInstance.status == TaskInstanceStatus.INSTANTIATED,
+                            )
+                        )
+                        .values(
+                            status=TaskInstanceStatus.LAUNCHED,
+                            submitted_date=func.now(),
+                            status_date=func.now(),
+                            report_by_date=add_time(next_report, dialect),
+                        )
+                        .execution_options(synchronize_session=False)
                     )
-                )
-                .values(
-                    status=TaskInstanceStatus.LAUNCHED,
-                    submitted_date=func.now(),
-                    status_date=func.now(),
-                    report_by_date=add_time(next_report, dialect),
-                )
-                .execution_options(synchronize_session=False)
-            )
-            db.execute(update_ti_stmt)
+                    db.execute(update_ti_stmt)
 
             # 3) Atomic commit - both updates succeed or both fail
             db.commit()
@@ -390,12 +395,6 @@ async def transition_to_killed(
         array_batch_num=batch_num,
     )
 
-    # Define "killable" Task states
-    killable_task_states = (
-        TaskStatusConstants.LAUNCHED,
-        TaskStatusConstants.RUNNING,
-    )
-
     # Atomic update of both Task and TaskInstance with retry logic
     max_retries = 5
 
@@ -423,36 +422,42 @@ async def transition_to_killed(
                 )
                 return JSONResponse(content={}, status_code=StatusCodes.OK)
 
-            # 1) Transition Tasks to ERROR_FATAL (only if in killable states)
-            task_condition = and_(
-                Task.array_id == array_id,
-                Task.id.in_(task_ids),
-                Task.status.in_(killable_task_states),
-            )
-            update_task_stmt = (
-                update(Task)
-                .where(task_condition)
-                .values(status=TaskStatusConstants.ERROR_FATAL, status_date=func.now())
-                .execution_options(synchronize_session=False)
-            )
-            db.execute(update_task_stmt)
+            # 1) Use TransitionService for Task transition with audit logging
+            if task_ids:
+                result = TransitionService.transition_tasks(
+                    session=db,
+                    task_ids=task_ids,
+                    to_status=TaskStatusConstants.ERROR_FATAL,
+                    use_skip_locked=True,
+                )
+                transitioned_task_ids = result["transitioned"]
+            else:
+                transitioned_task_ids = []
 
-            # 2) Transition TaskInstances to ERROR_FATAL
-            update_ti_stmt = (
-                update(TaskInstance)
-                .where(
-                    and_(
-                        TaskInstance.id.in_(task_instance_ids),
-                        TaskInstance.status == TaskInstanceStatus.KILL_SELF,
+            # 2) Transition TaskInstances to ERROR_FATAL in the same transaction
+            # Only for tasks that were actually transitioned
+            if transitioned_task_ids:
+                # Get TI IDs for the transitioned tasks
+                ti_ids_to_update = [
+                    row[1] for row in results if row[0] in transitioned_task_ids
+                ]
+
+                if ti_ids_to_update:
+                    update_ti_stmt = (
+                        update(TaskInstance)
+                        .where(
+                            and_(
+                                TaskInstance.id.in_(ti_ids_to_update),
+                                TaskInstance.status == TaskInstanceStatus.KILL_SELF,
+                            )
+                        )
+                        .values(
+                            status=TaskInstanceStatus.ERROR_FATAL,
+                            status_date=func.now(),
+                        )
+                        .execution_options(synchronize_session=False)
                     )
-                )
-                .values(
-                    status=TaskInstanceStatus.ERROR_FATAL,
-                    status_date=func.now(),
-                )
-                .execution_options(synchronize_session=False)
-            )
-            db.execute(update_ti_stmt)
+                    db.execute(update_ti_stmt)
 
             # 3) Atomic commit
             db.commit()

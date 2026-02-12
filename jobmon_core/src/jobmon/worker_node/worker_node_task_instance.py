@@ -1,6 +1,7 @@
 """The Task Instance Object once it has been submitted to run on a worker node."""
 
 import asyncio
+import json
 import os
 import signal
 import socket
@@ -204,6 +205,26 @@ class WorkerNodeTaskInstance:
             "distributor_id": self.distributor_id,
         }
 
+        # Collect resource usage from cluster plugin
+        try:
+            usage_stats = self.cluster_interface.get_usage_stats()
+        except Exception:
+            usage_stats = {}
+
+        if usage_stats:
+            message["maxrss"] = str(usage_stats.get("maxrss_bytes", ""))
+            message["cpu"] = str(
+                round(
+                    usage_stats.get("user_time_sec", 0)
+                    + usage_stats.get("system_time_sec", 0),
+                    2,
+                )
+            )
+            message["usage_str"] = json.dumps(usage_stats)
+
+        if hasattr(self, "_run_start_time"):
+            message["wallclock"] = str(round(time() - self._run_start_time, 2))
+
         app_route = f"/task_instance/{self.task_instance_id}/log_done"
         _, response = self.requester.send_request(
             app_route=app_route,
@@ -381,6 +402,7 @@ class WorkerNodeTaskInstance:
         """
         # If it logs running and is not able to transition it raises TransitionError
         self.log_running()
+        self._run_start_time = time()
 
         try:
             # run the command in a subprocess

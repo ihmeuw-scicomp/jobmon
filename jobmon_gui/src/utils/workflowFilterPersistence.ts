@@ -25,10 +25,6 @@ export function getSavedWorkflowFilters(): string | null {
  * Get filter parameters to use for navigation, preferring current location
  * search params over saved filters
  */
-export function getWorkflowFiltersForNavigation(
-    currentSearch: string
-): string {
+export function getWorkflowFiltersForNavigation(currentSearch: string): string {
     return currentSearch || getSavedWorkflowFilters() || '';
 }
-
-

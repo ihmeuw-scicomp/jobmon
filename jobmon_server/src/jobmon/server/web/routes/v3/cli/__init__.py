@@ -4,5 +4,5 @@ from fastapi import APIRouter
 
 cli_router = APIRouter(tags=["cli"])
 
-for module in ["array", "task", "task_template", "workflow"]:
+for module in ["array", "task", "task_template", "workflow", "task_concurrency"]:
     import_module(f"jobmon.server.web.routes.v3.cli.{module}")

@@ -81,8 +81,8 @@ const CustomThemeProvider = ({ children }: PropsWithChildren) => {
             banner: {
                 fontFamily: 'Archivo',
                 fontWeight: 300,
-                fontSize: '3rem',
-                lineHeight: 1.167,
+                fontSize: '1.25rem',
+                lineHeight: 1.2,
                 letterSpacing: '0em',
                 color: 'white',
             },

@@ -1,4 +1,23 @@
 // Shared task status constants and metadata
+// Used across Usage.tsx, RuntimeMemoryScatterPlot.tsx, and workflow detail views
+
+// Template-level status colors (used in DAG, detail panel, summary panel)
+export const TEMPLATE_STATUS_COLORS: Record<string, string> = {
+    PENDING: '#e69f00',
+    SCHEDULED: '#f0e442',
+    RUNNING: '#0072b2',
+    DONE: '#009e73',
+    FATAL: '#d55e00',
+};
+
+export const TEMPLATE_STATUS_KEYS = [
+    'PENDING',
+    'SCHEDULED',
+    'RUNNING',
+    'DONE',
+    'FATAL',
+] as const;
+
 // Used across Usage.tsx and RuntimeMemoryScatterPlot.tsx for consistent status handling
 
 export interface TaskStatusMeta {

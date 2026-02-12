@@ -24,26 +24,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/v3/{full_path}': {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        /**
-         * Options Handler
-         * @description Handle CORS preflight requests for all v3 endpoints.
-         */
-        options: operations['options_handler_api_v3__full_path__options'];
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     '/api/v3/array': {
         parameters: {
             query?: never;
@@ -119,7 +99,9 @@ export interface paths {
          * Transition To Killed
          * @description Transition TIs from KILL_SELF to ERROR_FATAL.
          *
-         *     Also mark parent Tasks with status=ERROR_FATAL if they're in a killable state.
+         *     Also marks parent Tasks as ERROR_FATAL if they're in a killable state.
+         *     This is safe because the workflow won't be resumable until all KILL_SELF
+         *     TIs are cleaned up (no race condition with new workflow runs).
          */
         post: operations['transition_to_killed_api_v3_array__array_id__transition_to_killed_post'];
         delete?: never;
@@ -268,6 +250,7 @@ export interface paths {
          *     Args:
          *         request: The request object.
          *         db: The database session.
+         *         dialect: The database dialect (mysql, sqlite, etc.)
          */
         post: operations['add_nodes_api_v3_nodes_post'];
         delete?: never;
@@ -861,19 +844,20 @@ export interface paths {
          *     We limit this to one week time spans to not overwhelm the database.
          *
          *     Args:
-         *         tool_name (str): Name of the tool.
-         *         start_date (str): The start date in 'YYYY-MM-DD' format (query parameter).
-         *         end_date (str): The end date in 'YYYY-MM-DD' format (query parameter).
+         *         tool_name: Name of the tool.
+         *         start_date: The start date in 'YYYY-MM-DD' format (query parameter).
+         *         end_date: The end date in 'YYYY-MM-DD' format (query parameter).
          *
          *     Returns:
-         *         List[Dict[str, Any]]: A list of dictionaries containing TaskInstance ID,
-         *         node argument value, TaskInstance maxrss, TaskInstance wallclock, and
-         *         requested resources.
+         *         A list of dictionaries containing TaskInstance ID, node argument value,
+         *         TaskInstance maxrss, TaskInstance wallclock, and requested resources.
          *
-         *     Example Call:
+         *     Example Call::
+         *
          *         /tool/large_wf_tool/tool_resource_usage?start_date=2024-07-11&end_date=2024-07-18
          *
-         *     Example Response:
+         *     Example Response::
+         *
          *         [
          *             {
          *                 "node_arg_val": "--provenance True",
@@ -1030,10 +1014,41 @@ export interface paths {
         /**
          * Workflow Is Resumable
          * @description Check if a workflow is in a resumable state.
+         *
+         *     Returns:
+         *         workflow_is_resumable: True if workflow can be resumed
+         *         pending_kill_self: Number of KILL_SELF task instances waiting for cleanup
          */
         get: operations['workflow_is_resumable_api_v3_workflow__workflow_id__is_resumable_get'];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/v3/workflow/{workflow_id}/force_cleanup_kill_self': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Force Cleanup Kill Self
+         * @description Force cleanup of stuck KILL_SELF task instances and finalize workflow run.
+         *
+         *     Use this when jobs have been externally terminated (e.g., scancel, node failure)
+         *     and the workflow is stuck waiting for cleanup that will never happen.
+         *
+         *     This transitions all KILL_SELF task instances to ERROR_FATAL and then
+         *     immediately finalizes any workflow runs in COLD_RESUME/HOT_RESUME state
+         *     to TERMINATED (instead of waiting for the reaper).
+         */
+        post: operations['force_cleanup_kill_self_api_v3_workflow__workflow_id__force_cleanup_kill_self_post'];
         delete?: never;
         options?: never;
         head?: never;
@@ -1165,6 +1180,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/api/v3/workflow/{workflow_id}/increase_resources': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Increase Resources For Resource Error Tasks
+         * @description Increase resources for tasks in E or F whose latest TaskInstance is Z.
+         *
+         *     Steps per task:
+         *     - Update Task.status -> ERROR_RECOVERABLE (E)
+         *     - Load TaskResources.requested_resources JSON
+         *     - Load Task.resource_scales (stringified dict)
+         *     - Apply scaling:
+         *         * numeric value => ceil(val * (1 + scale))
+         *         * list value => absolute value chosen by attempt index
+         *     - Update TaskResources.requested_resources JSON
+         *     - Set TaskResources.task_resources_type_id -> 'A' (Adjusted)
+         */
+        post: operations['increase_resources_for_resource_error_tasks_api_v3_workflow__workflow_id__increase_resources_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/api/v3/workflow/{workflow_id}/update_array_max_concurrently_running': {
         parameters: {
             query?: never;
@@ -1235,7 +1280,12 @@ export interface paths {
         get?: never;
         /**
          * Terminate Workflow Run
-         * @description Terminate a workflow run and get its tasks in order.
+         * @description Terminate task instances for a workflow run being resumed.
+         *
+         *     - QUEUED/INSTANTIATED: Set directly to ERROR_FATAL (no worker exists to clean up)
+         *     - LAUNCHED/RUNNING: Set to KILL_SELF (worker will detect and clean up)
+         *     - HOT_RESUME: Preserve RUNNING tasks (let them finish)
+         *     - COLD_RESUME: Kill everything including RUNNING tasks
          */
         put: operations['terminate_workflow_run_api_v3_workflow_run__workflow_run_id__terminate_task_instances_put'];
         post?: never;
@@ -1615,13 +1665,14 @@ export interface paths {
          * @description Update the status of the tasks.
          *
          *     Description:
-         *         - When workflow_id='all', it updates all tasks in the workflow with
-         *         recursive=False. This improves performance.
-         *         - When recursive=True, it updates the tasks and its dependencies all
-         *         the way up or down the DAG.
-         *         - When recursive=False, it updates only the tasks in the task_ids list.
-         *         - Validates workflow status before proceeding with updates.
-         *         - After updating the tasks, it checks the workflow status and updates it.
+         *
+         *     - When ``workflow_id='all'``, it updates all tasks in the workflow with
+         *       ``recursive=False``. This improves performance.
+         *     - When ``recursive=True``, it updates the tasks and its dependencies all
+         *       the way up or down the DAG.
+         *     - When ``recursive=False``, it updates only the tasks in the task_ids list.
+         *     - Validates workflow status before proceeding with updates.
+         *     - After updating the tasks, it checks the workflow status and updates it.
          */
         put: operations['update_task_statuses_api_v3_task_update_statuses_put'];
         post?: never;
@@ -1917,6 +1968,116 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/api/v3/workflow/{workflow_id}/task_concurrency': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Task Concurrency
+         * @description Get concurrent task counts over time, grouped by status.
+         *
+         *     Returns time-bucketed counts for timeseries visualization.
+         *     Uses task_status_audit table with ix_task_status_audit_workflow_time index.
+         *
+         *     Groups by status category (PENDING, LAUNCHED, RUNNING, ERROR, DONE).
+         *     The only supported grouping strategy is "status".
+         *     Note: DONE and ERROR show tasks that entered those states within each bucket
+         *     (not cumulative or interval overlap).
+         *
+         *     The response includes:
+         *     - buckets: List of time bucket start times
+         *     - series: Dict mapping status names to lists of concurrent counts
+         *     - template_breakdown: Dict mapping status to list of {template: count} per bucket
+         *
+         *     Example response:
+         *     {
+         *         "buckets": ["2024-01-01T00:00:00", "2024-01-01T00:01:00", ...],
+         *         "series": {
+         *             "PENDING": [5, 8, 10, 7, ...],
+         *             "LAUNCHED": [3, 5, 4, 2, ...],
+         *             "RUNNING": [2, 3, 4, 3, ...],
+         *             "ERROR": [0, 1, 0, 2, ...],  // error events within each bucket
+         *             "DONE": [0, 2, 5, 3, ...]  // tasks completed within each bucket
+         *         },
+         *         "template_breakdown": {
+         *             "RUNNING": [{"template_a": 2, "template_b": 1}, ...],
+         *             "ERROR": [{"template_a": 0, "template_b": 1}, ...],
+         *             "DONE": [{"template_a": 0, "template_b": 2}, ...]
+         *         }
+         *     }
+         */
+        get: operations['get_task_concurrency_api_v3_workflow__workflow_id__task_concurrency_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/v3/workflow/{workflow_id}/task_status_audit': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Task Status Audit
+         * @description Get task status audit records for a workflow.
+         *
+         *     Returns the audit trail showing all task status transitions.
+         *     Useful for debugging and understanding task lifecycle.
+         *
+         *     Args:
+         *         workflow_id: The workflow ID to get audit records for
+         *         task_id: Optional filter for a specific task
+         *         limit: Maximum number of records to return
+         *
+         *     Returns:
+         *         List of audit records with task_id, previous_status, new_status, timestamps
+         */
+        get: operations['get_task_status_audit_api_v3_workflow__workflow_id__task_status_audit_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/v3/workflow/{workflow_id}/task_templates': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workflow Task Templates
+         * @description Get list of task template names used in a workflow.
+         *
+         *     Returns distinct task template names for tasks in this workflow.
+         *     Used for filtering the concurrency view by template.
+         *
+         *     Args:
+         *         workflow_id: The workflow ID to get templates for
+         *
+         *     Returns:
+         *         List of distinct task template names, sorted alphabetically
+         */
+        get: operations['get_workflow_task_templates_api_v3_workflow__workflow_id__task_templates_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/api/v3/workflow/{workflow_id}/fix_status_inconsistency': {
         parameters: {
             query?: never;
@@ -2104,6 +2265,36 @@ export interface components {
             detail?: components['schemas']['ValidationError'][];
         };
         /**
+         * TaskConcurrencyResponse
+         * @description Response model for task concurrency timeline.
+         *
+         *     Contains time-bucketed concurrent task counts grouped by status,
+         *     with optional template breakdown for hover details.
+         */
+        TaskConcurrencyResponse: {
+            /**
+             * Buckets
+             * @description ISO timestamp strings for each time bucket
+             */
+            buckets: string[];
+            /**
+             * Series
+             * @description Mapping of status names to concurrent counts per bucket
+             */
+            series: {
+                [key: string]: number[];
+            };
+            /**
+             * Template Breakdown
+             * @description Per-status breakdown: status -> [{template: count}] per bucket
+             */
+            template_breakdown?: {
+                [key: string]: {
+                    [key: string]: number;
+                }[];
+            } | null;
+        };
+        /**
          * TaskDependenciesResponse
          * @description Response model for task dependencies.
          */
@@ -2231,6 +2422,30 @@ export interface components {
             task_max_attempts?: number | null;
         };
         /**
+         * TaskStatusAuditRecord
+         * @description A single task status audit record.
+         */
+        TaskStatusAuditRecord: {
+            /** Task Id */
+            task_id: number;
+            /** Previous Status */
+            previous_status?: string | null;
+            /** New Status */
+            new_status: string;
+            /** Entered At */
+            entered_at?: string | null;
+            /** Exited At */
+            exited_at?: string | null;
+        };
+        /**
+         * TaskStatusAuditResponse
+         * @description Response model for task status audit records.
+         */
+        TaskStatusAuditResponse: {
+            /** Audit Records */
+            audit_records: components['schemas']['TaskStatusAuditRecord'][];
+        };
+        /**
          * TaskStatusResponse
          * @description Response model for task status.
          */
@@ -2246,7 +2461,9 @@ export interface components {
             /** Workflow Id */
             workflow_id: number | null;
             /** Sub Task */
-            sub_task: Record<string, never> | null;
+            sub_task: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * TaskTableItem
@@ -2327,7 +2544,9 @@ export interface components {
              * Formatted Stats
              * @description Provide formatted statistics similar to legacy client format.
              */
-            readonly formatted_stats: Record<string, never>;
+            readonly formatted_stats: {
+                [key: string]: unknown;
+            };
         };
         /**
          * TasksRecursiveResponse
@@ -2444,6 +2663,17 @@ export interface components {
             workflows: string;
         };
         /**
+         * WorkflowTaskTemplatesResponse
+         * @description Response model for workflow task templates list.
+         */
+        WorkflowTaskTemplatesResponse: {
+            /**
+             * Task Templates
+             * @description List of distinct task template names used in this workflow
+             */
+            task_templates: string[];
+        };
+        /**
          * WorkflowTasksResponse
          * @description Response model for workflow tasks.
          */
@@ -2494,37 +2724,6 @@ export interface operations {
                 };
                 content: {
                     'application/json': unknown;
-                };
-            };
-        };
-    };
-    options_handler_api_v3__full_path__options: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                full_path: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    'application/json': unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
                 };
             };
         };
@@ -3793,6 +3992,37 @@ export interface operations {
             };
         };
     };
+    force_cleanup_kill_self_api_v3_workflow__workflow_id__force_cleanup_kill_self_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
     get_max_concurrently_running_api_v3_workflow__workflow_id__get_max_concurrently_running_get: {
         parameters: {
             query?: never;
@@ -3967,6 +4197,37 @@ export interface operations {
                 };
                 content: {
                     'application/json': unknown;
+                };
+            };
+        };
+    };
+    increase_resources_for_resource_error_tasks_api_v3_workflow__workflow_id__increase_resources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
                 };
             };
         };
@@ -4469,6 +4730,9 @@ export interface operations {
                 date_submitted?: string | null;
                 date_submitted_end?: string | null;
                 status?: string | null;
+                'user!'?: string[] | null;
+                'tool!'?: string[] | null;
+                'status!'?: string[] | null;
             };
             header?: never;
             path?: never;
@@ -5060,6 +5324,117 @@ export interface operations {
                 };
                 content: {
                     'application/json': unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_task_concurrency_api_v3_workflow__workflow_id__task_concurrency_get: {
+        parameters: {
+            query?: {
+                /** @description Start of time range */
+                start_time?: string | null;
+                /** @description End of time range */
+                end_time?: string | null;
+                /** @description Grouping strategy for the series (only "status" supported) */
+                group_by?: string;
+                /** @description Bucket size in seconds (overrides bucket_minutes) */
+                bucket_seconds?: number;
+                /** @description Bucket size in minutes */
+                bucket_minutes?: number;
+                /** @description Filter by task template name */
+                task_template_name?: string | null;
+            };
+            header?: never;
+            path: {
+                workflow_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['TaskConcurrencyResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_task_status_audit_api_v3_workflow__workflow_id__task_status_audit_get: {
+        parameters: {
+            query?: {
+                /** @description Filter by specific task ID */
+                task_id?: number | null;
+                /** @description Maximum records to return */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                workflow_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['TaskStatusAuditResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_workflow_task_templates_api_v3_workflow__workflow_id__task_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['WorkflowTaskTemplatesResponse'];
                 };
             };
             /** @description Validation Error */

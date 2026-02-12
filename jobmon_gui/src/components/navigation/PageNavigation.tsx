@@ -26,6 +26,7 @@ import Typography from '@mui/material/Typography';
 import MediationIcon from '@mui/icons-material/Mediation';
 import BifrostLinks from '@jobmon_gui/components/navigation/BifrostLinks';
 import BatchPredictionIcon from '@mui/icons-material/BatchPrediction';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
 import { Tooltip } from '@mui/material';
 import bifrostEnabled from '@jobmon_gui/components/navigation/Bifrost';
 import '@fontsource/archivo';
@@ -129,7 +130,7 @@ export default function PageNavigation({ children }: PropsWithChildren) {
                 sx={{ backgroundColor: '#17B9CF' }}
                 id="AppBar"
             >
-                <Toolbar>
+                <Toolbar variant="dense" disableGutters sx={{ minHeight: 32, px: 1 }}>
                     <Box
                         sx={{
                             display: 'flex',
@@ -139,8 +140,8 @@ export default function PageNavigation({ children }: PropsWithChildren) {
                     >
                         <img
                             src={IhmeIcon}
-                            style={{ padding: 5 }}
-                            height={50}
+                            style={{ padding: 1 }}
+                            height={24}
                             alt=""
                         />
                         <Typography
@@ -192,7 +193,7 @@ export default function PageNavigation({ children }: PropsWithChildren) {
                             alignItems: 'center',
                             gap: 1
                         }}>
-                            🔓 Authentication Disabled
+                            <LockOpenIcon fontSize="small" /> Authentication Disabled
                         </Box>
                     ) : null}
                 </Toolbar>
@@ -206,7 +207,7 @@ export default function PageNavigation({ children }: PropsWithChildren) {
                     mr: 2,
                 }}
             >
-                <Toolbar />
+                <Toolbar variant="dense" sx={{ minHeight: 32 }} />
                 <DrawerHeader id="DrawerHeader">
                     {drawerOpen ? (
                         <IconButton
@@ -310,8 +311,8 @@ export default function PageNavigation({ children }: PropsWithChildren) {
                     v: {import.meta.env.VITE_APP_VERSION}
                 </Typography>
             </Drawer>
-            <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
-                <Toolbar />
+            <Box component="main" sx={{ flexGrow: 1, px: 1, pt: 0.5, pb: 0.5 }}>
+                <Toolbar variant="dense" sx={{ minHeight: 32 }} />
                 {children}
             </Box>
         </Box>

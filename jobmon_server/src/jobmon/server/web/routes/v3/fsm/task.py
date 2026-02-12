@@ -30,6 +30,7 @@ from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.workflow import Workflow
 from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
+from jobmon.server.web.services.transition_service import TransitionService
 
 logger = structlog.get_logger(__name__)
 
@@ -64,6 +65,7 @@ async def bind_tasks_no_args(request: Request, db: Session = Depends(get_db)) ->
     }  # Dictionary mapping existing Tasks to the supplied arguments
     # Dict mapping input tasks to the corresponding args/attributes
     task_hash_lookup = {}  # Reverse dictionary of inputs, maps hash back to values
+    reset_audit_records: List[Dict] = []
     for hashval, items in tasks.items():
         (
             node_id,
@@ -84,12 +86,23 @@ async def bind_tasks_no_args(request: Request, db: Session = Depends(get_db)) ->
         # task status and update the args/attributes
         if id_tuple in present_tasks.keys():
             task = present_tasks[id_tuple]
+            prev_status = task.status
             task.reset(
                 name=name,
                 command=command,
                 max_attempts=max_att,
                 reset_if_running=reset,
             )
+            # If status actually changed, record for audit
+            if task.status != prev_status:
+                reset_audit_records.append(
+                    {
+                        "task_id": task.id,
+                        "workflow_id": workflow_id,
+                        "previous_status": prev_status,
+                        "new_status": constants.TaskStatus.REGISTERING,
+                    }
+                )
 
         # If not, add the task
         else:
@@ -114,6 +127,10 @@ async def bind_tasks_no_args(request: Request, db: Session = Depends(get_db)) ->
     if present_tasks:
         # ORM task objects already updated in task.reset, flush the changes
         db.flush()
+        if reset_audit_records:
+            TransitionService.create_audit_records_bulk(
+                session=db, records=reset_audit_records
+            )
 
     # Bind new tasks with raw SQL
     if len(tasks_to_add):
@@ -134,6 +151,21 @@ async def bind_tasks_no_args(request: Request, db: Session = Depends(get_db)) ->
             ),
         )
         new_tasks = db.execute(new_task_query).scalars().all()
+
+        # Audit records for newly created tasks
+        if new_tasks:
+            new_audit_records = [
+                {
+                    "task_id": task.id,
+                    "workflow_id": workflow_id,
+                    "previous_status": None,
+                    "new_status": constants.TaskStatus.REGISTERING,
+                }
+                for task in new_tasks
+            ]
+            TransitionService.create_audit_records_bulk(
+                session=db, records=new_audit_records
+            )
 
     else:
         # Empty task list
@@ -391,19 +423,50 @@ async def set_task_resume_state(
 
     # Logic: reset_if_running -> Reset all tasks not in "D" state
     # else, reset all tasks not in "D" or "R" state
-    # for performance, also excclude TaskStatus.REGISTERING
+    # for performance, also exclude TaskStatus.REGISTERING
     excluded_states = [TaskStatus.DONE, TaskStatus.REGISTERING]
     if not reset_if_running:
         excluded_states.append(TaskStatus.RUNNING)
 
-    db.execute(
-        update(Task)
-        .where(Task.status.not_in(excluded_states), Task.workflow_id == workflow_id)
-        .values(
-            status=TaskStatus.REGISTERING,
-            num_attempts=0,
-            status_date=func.now(),
-        )
+    # Get task IDs that need to be reset
+    task_ids_query = select(Task.id).where(
+        Task.status.not_in(excluded_states), Task.workflow_id == workflow_id
     )
+    task_ids = [row[0] for row in db.execute(task_ids_query).all()]
+
+    if task_ids:
+        # Use TransitionService for audit logging
+        # Note: REGISTERING doesn't have valid source statuses in FSM for all states,
+        # so we need to do a direct update with audit records
+        # This is a reset operation, not a normal FSM transition
+
+        # Get current statuses for audit records
+        current_statuses = db.execute(
+            select(Task.id, Task.status, Task.workflow_id).where(Task.id.in_(task_ids))
+        ).all()
+
+        # Bulk update
+        db.execute(
+            update(Task)
+            .where(Task.id.in_(task_ids))
+            .values(
+                status=TaskStatus.REGISTERING,
+                num_attempts=0,
+                status_date=func.now(),
+            )
+        )
+
+        # Create audit records for the reset (properly closes previous records)
+        audit_records = [
+            {
+                "task_id": task_id,
+                "workflow_id": wf_id,
+                "previous_status": prev_status,
+                "new_status": TaskStatus.REGISTERING,
+            }
+            for task_id, prev_status, wf_id in current_statuses
+        ]
+        TransitionService.create_audit_records_bulk(session=db, records=audit_records)
+
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
