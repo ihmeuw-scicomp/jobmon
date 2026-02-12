@@ -1,5 +1,6 @@
 """Sequential distributor that runs one task at a time."""
 
+import json
 import logging
 import os
 import platform
@@ -203,8 +204,14 @@ class SequentialWorkerNode(ClusterWorkerNode):
         maxrss = usage.ru_maxrss
         if platform.system() != "Darwin":
             maxrss = maxrss * 1024  # KB -> bytes on Linux
-        return {
+        cpu = round(usage.ru_utime + usage.ru_stime, 2)
+        raw = {
             "maxrss_bytes": maxrss,
             "user_time_sec": usage.ru_utime,
             "system_time_sec": usage.ru_stime,
+        }
+        return {
+            "maxrss": str(maxrss),
+            "cpu": str(cpu),
+            "usage_str": json.dumps(raw),
         }

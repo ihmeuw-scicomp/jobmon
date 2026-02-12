@@ -139,6 +139,7 @@ async def get_task_template_resource_usage(
                         m=detail_item.m,
                         node_id=detail_item.node_id,
                         task_id=detail_item.task_id,
+                        task_instance_id=detail_item.task_instance_id,
                         task_name=detail_item.task_name,
                         requested_resources=detail_item.requested_resources,
                         attempt_number_of_instance=detail_item.attempt_number_of_instance,

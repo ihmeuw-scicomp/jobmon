@@ -5,11 +5,14 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
-- **Workflow DAG Visualization Enhancements**: Improved DAG node interactions on the Workflow Details page:
-  - Clicking a DAG node (task template) now navigates to the corresponding task template details page
-  - Hovering over a node highlights all connected edges (incoming and outgoing) in blue for better visual clarity
-  - Existing hover behavior (status modal) is preserved
-  - Node size (width and height) now scales with the number of tasks in each task template for better visual proportion
+- **Task Status Audit**: TI-centric audit logging for task status transitions with `task_status_audit` table, `TaskFSM` service, and `TransitionService` with SKIP LOCKED support and retry logic
+- **Task Concurrency Visualization**: Interactive concurrency tab on workflow details with stacked bar charts per status, configurable bucket sizes, template grouping, and scale sync toggles
+- **Workflow DAG Redesign**: Two-panel workflow details layout with status-colored DAG nodes, mini status bars, edge highlighting, and visual state store for efficient re-renders
+- **Dashboard Consolidation**: Redesigned Task Template Details into a unified dashboard layout with KPI cards, scatter plot, task table, and error clusters on a single page
+- **Error Detail Drawer**: Replaced full-page error modal with a right-side MUI Drawer (640px) that keeps the dashboard visible while inspecting error details
+- **ErrorClustersCard**: New consolidated component replacing ClusteredErrors, ErrorSummaryCard, and UsageFilters with error cluster list, scatter plot filter integration, and inline error detail drawer
+- **Usage Stats on Error Path**: Worker node now collects resource usage (maxrss, cpu) when reporting errors, so failed task instances appear in the usage scatter plot
+- **Audit Logging for GUI Actions**: Task status changes from the GUI (Set to Registered/Done) and `bind_tasks_no_args` now create audit records
 - **CLI Refactor - Click Migration**: Complete migration from argparse to Click framework with hierarchical command structure:
   - New hierarchical commands: `jobmon workflow status/tasks/reset/resume/concurrency/logs`, `jobmon workflow resources usage/yaml`, `jobmon task status/update/dependencies`, `jobmon config show/set`
   - Server CLI reorganized: `jobmon-server db init/upgrade/terminate`, `jobmon-server reaper start`
@@ -18,11 +21,20 @@ All notable changes to Jobmon will be documented in this file.
 - **Force Cleanup for Stuck Task Instances**: New `--force-cleanup` flag in `jobmon workflow resume` command to manually cleanup stuck `KILL_SELF` task instances when jobs have been externally terminated (e.g., via `scancel` or node failure)
 
 ### Changed
+- **Multiprocess Distributor**: Replaced multiprocessing queues with ThreadPoolExecutor, adding venv-aware worker_node_entry_point resolution and proper queueing error tracking
+- **Distributor `get_usage_stats()` Protocol**: Standardized return keys to `maxrss`, `cpu`, `usage_str` (all stringified) across multiprocess and sequential distributors. Worker node now passes these through directly instead of re-deriving them.
+- **Task Concurrency API**: Added ERROR and DONE status categories, interval-based counting for active statuses, and configurable bucket sizes
+- **Task Concurrency Time Range**: Uses `entered_at` instead of `exited_at` for axis bounds to avoid inflated ranges from non-displayed transitions
+- **Task Resource Queries**: Added `task_instance_id` to task resource detail queries and schemas for scatter plot point identification
 - **CLI Entry Points**: Server CLI entry point renamed from `jobmon_server` to `jobmon-server` (hyphenated)
 - Refactored `status_commands.py` monolith into domain-focused modules: `commands/workflow.py`, `commands/task.py`, `commands/resources.py`, `commands/config.py`, `commands/validation.py`
+- Unified status colors across all views (DAG, popover, concurrency chart, summary panel) into shared constants
 
 ### Fixed
-- **Workflow DAG (GUI)**: Task template names on the DAG viz no longer overflow node boundaries—nodes use variable width/height to fit the full name and scale with task count. Task template hover popover now appears correctly when the DAG is panned or scrolled (positioned from mouse coordinates).
+- **Task Instance State Transition Data Loss**: Moved attribute updates and error log creation to after successful transitions to avoid losing data when TransitionService rolls back due to lock contention
+- **Error Detail Missing task_id**: Fixed bug where `task_id` and `task_instance_id` were omitted from `ErrorLogItem` when querying by a specific task instance ID
+- **Error Text Readability**: Error and stderr code blocks now word-wrap long lines and use smaller font size (0.75rem)
+- **Sequential/Dummy Distributors**: Fixed `get_queueing_errors` raising NotImplementedError instead of returning empty dict, fixed `get_submitted_or_running` returning stale data, removed dead `get_array_queueing_errors` method
 - **Workflow Resume Cleanup**: Fixed multiple critical issues with workflow resume and task instance state management:
   - Fixed NO_HEARTBEAT infinite loop when parent Task is already in terminal state (DONE/ERROR_FATAL). The `validate_transition()` function now allows orphaned task instances to transition to ERROR_FATAL instead of endlessly retrying invalid state transitions.
   - Fixed duplicate error log entries caused by HTTP retries. The `_log_error()` function now validates transitions before creating error logs and includes idempotency checks.
@@ -32,6 +44,10 @@ All notable changes to Jobmon will be documented in this file.
   - Fixed premature workflow resume by having reaper wait for all `KILL_SELF` task instances to be cleaned up before transitioning workflow run to `TERMINATED`.
   - Enhanced `is_resumable` endpoint to return `pending_kill_self` count, preventing resume attempts while cleanup is pending.
 - **State Transition Validation**: Renamed `get_transit_status()` to `validate_transition()` with detailed logging at each validation step for improved debuggability of state machine issues.
+
+### Removed
+- `Usage.tsx`, `UsageFilters.tsx`, `ErrorSummaryCard.tsx`, `ClusteredErrors.tsx` — replaced by consolidated dashboard components
+- `useUsageFilters` hook — filter logic moved into `TaskTemplateDetails` screen
 
 ### Deprecated
 - Legacy argparse-based CLI commands deprecated with warnings (will be removed in 3.0):

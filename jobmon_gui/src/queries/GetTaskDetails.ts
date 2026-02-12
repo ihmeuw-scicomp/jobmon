@@ -19,8 +19,5 @@ export const getTaskDetailsQueryFn = async ({
             ...jobmonAxiosConfig,
             data: null,
         })
-        .then(r => {
-            console.log('task_details', r.data);
-            return r.data.task_details[0];
-        });
+        .then(r => r.data.task_details[0]);
 };

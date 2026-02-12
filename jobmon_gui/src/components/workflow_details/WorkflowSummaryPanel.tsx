@@ -8,15 +8,10 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import BuildIcon from '@mui/icons-material/Build';
-import ReplayIcon from '@mui/icons-material/Replay';
-import SkipNextIcon from '@mui/icons-material/SkipNext';
 import humanizeDuration from 'humanize-duration';
-import axios from 'axios';
 import { formatJobmonDate } from '@jobmon_gui/utils/DayTime.ts';
 import { WorkflowDetails } from '@jobmon_gui/types/WorkflowDetails.ts';
-import { TTStatusResponse, TTStatus } from '@jobmon_gui/types/TaskTemplateStatus';
-import { task_table_url, update_task_status_url } from '@jobmon_gui/configs/ApiUrls.ts';
-import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
+import { TTStatusResponse } from '@jobmon_gui/types/TaskTemplateStatus';
 import {
     TEMPLATE_STATUS_COLORS,
     TEMPLATE_STATUS_KEYS,
@@ -45,7 +40,6 @@ interface WorkflowSummaryPanelProps {
         name: string;
     }) => void;
     workflowDetails?: WorkflowDetails;
-    workflowId?: string | number;
     onManageClick?: () => void;
 }
 
@@ -56,11 +50,9 @@ export default function WorkflowSummaryPanel({
     onTemplateHover,
     onPrefetch,
     workflowDetails,
-    workflowId,
     onManageClick,
 }: WorkflowSummaryPanelProps) {
     const [showMore, setShowMore] = useState(false);
-    const [actionMsg, setActionMsg] = useState<Record<string | number, string>>({});
     const templates = Object.values(ttData);
     const templateCount = templates.length;
 
@@ -79,47 +71,6 @@ export default function WorkflowSummaryPanel({
     const failingTemplates = templates
         .filter(tt => tt.FATAL > 0)
         .sort((a, b) => b.FATAL - a.FATAL);
-
-    const handleQuickAction = (tt: TTStatus, action: 'rerun' | 'skip') => {
-        if (!workflowId) return;
-        setActionMsg(prev => ({ ...prev, [tt.id]: 'Updating...' }));
-        const newStatus = action === 'rerun' ? 'G' : 'D';
-        const recursive = action === 'rerun';
-
-        axios
-            .get<{ tasks: { task_id: string | number }[] }>(
-                task_table_url + workflowId,
-                { params: { tt_name: tt.name }, ...jobmonAxiosConfig }
-            )
-            .then(r => {
-                const taskIds = r.data.tasks.map(
-                    (t: { task_id: string | number }) => t.task_id
-                );
-                if (taskIds.length > 10000 && recursive) {
-                    setActionMsg(prev => ({
-                        ...prev,
-                        [tt.id]: 'Too many tasks — use manage panel',
-                    }));
-                    return;
-                }
-                return axios.put(
-                    update_task_status_url,
-                    {
-                        workflow_id: workflowId,
-                        task_ids: taskIds,
-                        new_status: newStatus,
-                        recursive,
-                    },
-                    jobmonAxiosConfig
-                );
-            })
-            .then(r => {
-                if (r) setActionMsg(prev => ({ ...prev, [tt.id]: 'Done' }));
-            })
-            .catch(() => {
-                setActionMsg(prev => ({ ...prev, [tt.id]: 'Error' }));
-            });
-    };
 
     const wfElapsed = workflowDetails
         ? humanizeDuration(
@@ -161,9 +112,11 @@ export default function WorkflowSummaryPanel({
                         )}
                         {!workflowDetails.wf_name && <Box sx={{ flex: 1 }} />}
                         {onManageClick && (
-                            <IconButton size="small" onClick={onManageClick} title="Manage Workflow">
-                                <BuildIcon fontSize="small" />
-                            </IconButton>
+                            <Tooltip title="Manage Workflow">
+                                <IconButton size="small" onClick={onManageClick}>
+                                    <BuildIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
                         )}
                     </Box>
 
@@ -320,45 +273,6 @@ export default function WorkflowSummaryPanel({
                                         flexShrink: 0,
                                     }}
                                 />
-                                {workflowId && (
-                                    <>
-                                        <Tooltip title="Re-run: set to Registered (resets downstream)">
-                                            <IconButton
-                                                size="small"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleQuickAction(tt, 'rerun');
-                                                }}
-                                            >
-                                                <ReplayIcon sx={{ fontSize: 16 }} />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Skip: mark as Done">
-                                            <IconButton
-                                                size="small"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleQuickAction(tt, 'skip');
-                                                }}
-                                            >
-                                                <SkipNextIcon sx={{ fontSize: 16 }} />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </>
-                                )}
-                                {actionMsg[tt.id] && (
-                                    <Typography
-                                        variant="caption"
-                                        color={
-                                            actionMsg[tt.id] === 'Done'
-                                                ? 'success.main'
-                                                : 'error'
-                                        }
-                                        sx={{ flexShrink: 0 }}
-                                    >
-                                        {actionMsg[tt.id]}
-                                    </Typography>
-                                )}
                             </Box>
                         ))}
                     </Box>

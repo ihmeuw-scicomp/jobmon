@@ -170,18 +170,18 @@ export default function WorkflowManagePanel({
                     sx={{ flex: 1 }}
                 />
                 <FormControl variant="outlined" size="small" sx={{ flex: 1 }}>
-                    <InputLabel id="wf-status-label">All Tasks</InputLabel>
+                    <InputLabel id="wf-status-label">Set Status</InputLabel>
                     <Select
                         labelId="wf-status-label"
-                        label="All Tasks"
+                        label="Set Status"
                         onChange={e => handleUpdateStatusAll(e.target.value as string)}
                     >
-                        <MenuItem value="D">Done</MenuItem>
-                        <MenuItem value="G">Registered</MenuItem>
+                        <MenuItem value="G">Re-run</MenuItem>
+                        <MenuItem value="D">Skip to Done</MenuItem>
                     </Select>
                 </FormControl>
                 <Tooltip
-                    title="Done: mark task only. Registered: also resets downstream tasks."
+                    title="Skip to Done: mark tasks as done. Re-run: reset tasks and downstream."
                     placement="right"
                 >
                     <InfoIcon fontSize="small" color="action" sx={{ mt: 1, cursor: 'help' }} />

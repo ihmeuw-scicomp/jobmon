@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 import uuid
 
 from jobmon.client.api import Tool
@@ -18,6 +19,26 @@ def get_task_template(tool, template_name):
     return tt
 
 
+def _fail_then_succeed_cmd(marker_path: str, error_msg: str) -> str:
+    """Return a bash command that fails on first attempt, succeeds on retry.
+
+    Uses a marker file: if the file doesn't exist, the command creates it
+    and exits with an error. On the next attempt the file already exists,
+    so the command removes it and succeeds.
+    """
+    return (
+        f"bash -c '"
+        f"if [ ! -f {marker_path} ]; then "
+        f"  touch {marker_path}; "
+        f"  echo \"{error_msg}\" >&2; "
+        f"  exit 1; "
+        f"else "
+        f"  rm -f {marker_path}; "
+        f"  sleep 5; "
+        f"fi'"
+    )
+
+
 def six_job_test(cluster_name: str, wf_id_file: str = None):
     """
     Creates and runs one workflow with six jobs. Used to 'smoke test' a
@@ -25,7 +46,7 @@ def six_job_test(cluster_name: str, wf_id_file: str = None):
     """
     # Configure client logging first to enable OTLP logging from the start
     configure_client_logging()
-    
+
     # First Tier
     # Deliberately put in on the long queue with max runtime > 1 day
     tool = Tool(name=f"Jackalope alpha testing - {cluster_name}")
@@ -35,17 +56,33 @@ def six_job_test(cluster_name: str, wf_id_file: str = None):
         command="sleep 10"
     )
 
-    # Second Tier, both depend on first tier
+    # Second Tier — deterministic failure then retry.
+    # t2: fails once with a "data validation" error, succeeds on retry.
+    # t3: fails once with an "OOM" error, succeeds on retry.
+    marker_dir = tempfile.mkdtemp(prefix="jobmon_test_")
+    t2_marker = os.path.join(marker_dir, "t2_attempted")
+    t3_marker = os.path.join(marker_dir, "t3_attempted")
+
     t2 = get_task_template(tool, "phase_2").create_task(
         name='t2',
-        command="sleep 20",
-        upstream_tasks=[t1]
+        command=_fail_then_succeed_cmd(
+            t2_marker,
+            "ERROR: Data validation failed - input file "
+            "contains NaN values in column 'mortality_rate'"
+        ),
+        upstream_tasks=[t1],
+        max_attempts=3,
     )
 
     t3 = get_task_template(tool, "phase_2").create_task(
         name='t3',
-        command="sleep 25",
-        upstream_tasks=[t1]
+        command=_fail_then_succeed_cmd(
+            t3_marker,
+            "ERROR: MemoryError - Cannot allocate 4.2 GiB "
+            "for array shape (550000000,) dtype float64"
+        ),
+        upstream_tasks=[t1],
+        max_attempts=3,
     )
 
     # Third Tier, cross product dependency on second tier

@@ -220,7 +220,10 @@ export const useTaskTableStore = create<taskTableStore>()(
             getDensity: () => {
                 return get().density;
             },
-            columnVisibility: { elapsed: false, time_limit: false },
+            columnVisibility: {
+                task_num_attempts: false,
+                task_max_attempts: false,
+            },
             setColumnVisibility: (updaterOrValue: Updater<VisibilityState>) => {
                 // updateOrValue will be of one of these types: ((prevState: S) => S) | S
 

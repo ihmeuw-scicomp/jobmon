@@ -1,11 +1,6 @@
 import dayjs from 'dayjs';
 
-export type ClusteredErrorsProps = {
-    taskTemplateId: string | number;
-    workflowId: number | string;
-};
-
-export type ErrorSampleModalDetails = {
+export type ErrorSampleDetails = {
     sample_index: number;
     sample_ids: number[];
 };
@@ -41,9 +36,4 @@ export interface ErrorDetails {
     data?: {
         error_logs?: ErrorLog[];
     };
-}
-
-export interface ColumnType extends ClusteredError {
-    // Extend ClusteredError type to add optional actions column
-    actions?: string;
 }

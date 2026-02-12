@@ -81,12 +81,12 @@ def test_get_queueing_errors_consumes_entry(distributor):
 
 
 def test_get_usage_stats():
-    """get_usage_stats should return a dict with expected keys."""
+    """get_usage_stats should return server-ready keys."""
     worker_node = MultiprocessWorkerNode()
     stats = worker_node.get_usage_stats()
-    assert "maxrss_bytes" in stats
-    assert "user_time_sec" in stats
-    assert "system_time_sec" in stats
-    assert isinstance(stats["maxrss_bytes"], int)
-    assert isinstance(stats["user_time_sec"], float)
-    assert isinstance(stats["system_time_sec"], float)
+    assert "maxrss" in stats
+    assert "cpu" in stats
+    assert "usage_str" in stats
+    assert isinstance(stats["maxrss"], str)
+    assert isinstance(stats["cpu"], str)
+    assert isinstance(stats["usage_str"], str)
