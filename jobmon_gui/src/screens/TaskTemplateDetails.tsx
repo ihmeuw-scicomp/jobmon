@@ -264,10 +264,17 @@ export default function TaskTemplateDetails() {
             const currentIds = new Set(
                 selectedData.map(d => d.task_instance_id)
             );
+            // Only cluster instances that appear in the scatter can be selected; compare against that subset so toggle-off works when some cluster instances lack usage data.
+            const scatterIdSet = new Set(
+                effectiveScatterData.map(d => d.task_instance_id)
+            );
+            const clusterScatterIds = instanceIds.filter(id =>
+                scatterIdSet.has(id)
+            );
             const isSame =
                 selectedData.length > 0 &&
-                instanceIds.every(id => currentIds.has(id)) &&
-                currentIds.size === instanceIdSet.size;
+                currentIds.size === clusterScatterIds.length &&
+                clusterScatterIds.every(id => currentIds.has(id));
             if (isSame) {
                 setSelectedData([]);
                 return;
@@ -297,6 +304,12 @@ export default function TaskTemplateDetails() {
         if (selectedData.length === 0) return undefined;
         return new Set(selectedData.map(d => d.task_instance_id));
     }, [selectedData]);
+
+    // Set of instance IDs that appear in the scatter (have valid runtime/memory), for error-cluster isActive and toggle-off.
+    const scatterInstanceIds = useMemo(
+        () => new Set(effectiveScatterData.map(d => d.task_instance_id)),
+        [effectiveScatterData]
+    );
 
     const filteredRequestedRuntimes = useMemo(() => {
         return getFilteredRequestedResourceValues('runtime');
@@ -646,6 +659,7 @@ export default function TaskTemplateDetails() {
                                 TaskTemplateDetailsData.data.task_template_id
                             }
                             selectedInstanceIds={selectedInstanceIds}
+                            scatterInstanceIds={scatterInstanceIds}
                             onFilterByInstanceIds={
                                 handleErrorFilterByInstanceIds
                             }

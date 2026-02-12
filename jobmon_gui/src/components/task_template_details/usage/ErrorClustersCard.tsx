@@ -39,6 +39,8 @@ interface ErrorClustersCardProps {
     workflowId: number | string;
     taskTemplateId: number | string;
     selectedInstanceIds?: Set<number>;
+    /** Set of task_instance_ids that appear in the scatter (have valid runtime/memory). Used so isActive is true when selection matches this cluster's scatter subset. */
+    scatterInstanceIds?: Set<number>;
     onFilterByInstanceIds?: (instanceIds: number[]) => void;
     maxListHeight?: number;
 }
@@ -49,6 +51,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
     workflowId,
     taskTemplateId,
     selectedInstanceIds,
+    scatterInstanceIds,
     onFilterByInstanceIds,
     maxListHeight = 180,
 }) => {
@@ -498,17 +501,23 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                                     80
                                         ? `...${cluster.sample_error.slice(-80)}`
                                         : cluster.sample_error;
+                                // Only cluster instances with scatter data can be selected; compare against that subset so clusters with missing usage data still highlight when their scatter-visible instances are selected.
+                                const clusterIdsInScatter =
+                                    scatterInstanceIds != null
+                                        ? cluster.task_instance_ids.filter(
+                                              id =>
+                                                  scatterInstanceIds.has(id)
+                                          )
+                                        : cluster.task_instance_ids;
                                 const isActive =
                                     !!selectedInstanceIds &&
                                     selectedInstanceIds.size > 0 &&
-                                    cluster.task_instance_ids.every(
-                                        id =>
-                                            selectedInstanceIds.has(
-                                                id
-                                            )
+                                    clusterIdsInScatter.length > 0 &&
+                                    clusterIdsInScatter.every(id =>
+                                        selectedInstanceIds.has(id)
                                     ) &&
-                                    cluster.task_instance_ids
-                                        .length > 0;
+                                    selectedInstanceIds.size ===
+                                        clusterIdsInScatter.length;
                                 return (
                                     <Box
                                         key={idx}
