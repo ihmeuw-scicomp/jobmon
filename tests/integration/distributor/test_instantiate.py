@@ -310,6 +310,82 @@ def test_array_submit_raises_error(db_engine, tool):
             assert task_instance.status == "W"
 
 
+def test_array_submit_error_no_stuck_batch(db_engine, tool):
+    """Regression test: after a batch submission failure, a second cycle
+    of refresh + process on INSTANTIATED must not crash with KeyError
+    and TIs must not remain stuck in INSTANTIATED."""
+    from jobmon.server.web.models.task_instance import TaskInstance
+
+    class ErrorDistributor(MultiprocessDistributor):
+        def submit_array_to_batch_distributor(
+            self,
+            command: str,
+            name: str,
+            requested_resources,
+            array_length: int,
+        ) -> Dict[int, str]:
+            raise ValueError("No distributor_id")
+
+    # create the workflow and bind to database
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="multiprocess",
+        compute_resources={"queue": "null.q"},
+    )
+    t1 = tool.active_task_templates["simple_template"].create_task(arg="echo 1")
+    t2 = tool.active_task_templates["simple_template"].create_task(arg="echo 2")
+    workflow = tool.create_workflow(name="test_array_submit_error_no_stuck_batch")
+    workflow.add_tasks([t1, t2])
+    workflow.bind()
+    workflow._bind_tasks()
+    factory = WorkflowRunFactory(workflow.workflow_id)
+    wfr = factory.create_workflow_run()
+
+    # create task instances
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
+    )
+    prepare_and_queue_tasks(state, gateway, orchestrator)
+
+    distributor_service = DistributorService(
+        ErrorDistributor("sequential"),
+        requester=workflow.requester,
+    )
+    distributor_service.set_workflow_run(wfr.workflow_run_id)
+
+    # Cycle 1: QUEUED -> INSTANTIATED, then batch submit fails -> W
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
+    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+
+    # Verify TIs moved to NO_DISTRIBUTOR_ID in DB
+    with Session(bind=db_engine) as session:
+        select_stmt = (
+            select(TaskInstance)
+            .where(TaskInstance.task_id.in_([t1.task_id, t2.task_id]))
+            .order_by(TaskInstance.id)
+        )
+        task_instances = session.execute(select_stmt).scalars().all()
+        session.commit()
+        for ti in task_instances:
+            assert ti.status == "W"
+
+    # Cycle 2: re-process INSTANTIATED — previously crashed with
+    # KeyError on the already-popped batch
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+
+    # No TIs should be stuck in INSTANTIATED
+    assert (
+        len(
+            distributor_service._task_instance_status_map[
+                TaskInstanceStatus.INSTANTIATED
+            ]
+        )
+        == 0
+    )
+
+
 def test_workflow_concurrency_limiting(tool, task_template):
     """tests that we only return a subset of queued jobs based on the n_queued
     parameter"""
