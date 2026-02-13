@@ -10,6 +10,9 @@ export type TaskConcurrencyResponse =
 export type WorkflowTaskTemplatesResponse =
     components['schemas']['WorkflowTaskTemplatesResponse'];
 
+export type TemplateTimelineResponse =
+    components['schemas']['TemplateTimelineResponse'];
+
 type GetTaskConcurrencyQueryFnArgs = {
     queryKey: (string | number | undefined | null)[];
 };
@@ -53,6 +56,30 @@ export async function getWorkflowTaskTemplatesQueryFn({
 
     const response = await axios.get<WorkflowTaskTemplatesResponse>(
         `${api_base_url}/workflow/${workflowId}/task_templates`,
+        {
+            ...jobmonAxiosConfig,
+            data: null,
+        }
+    );
+    return response.data;
+}
+
+type GetTemplateTimelineQueryFnArgs = {
+    queryKey: (string | number | undefined | null)[];
+};
+
+export async function getTemplateTimelineQueryFn({
+    queryKey,
+}: GetTemplateTimelineQueryFnArgs): Promise<
+    TemplateTimelineResponse | undefined
+> {
+    if (!queryKey || queryKey.length < 3) {
+        return;
+    }
+    const [, , workflowId] = queryKey;
+
+    const response = await axios.get<TemplateTimelineResponse>(
+        `${api_base_url}/workflow/${workflowId}/template_timeline`,
         {
             ...jobmonAxiosConfig,
             data: null,

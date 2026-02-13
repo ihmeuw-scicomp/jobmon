@@ -20,6 +20,8 @@ from jobmon.server.web.schemas.task_concurrency import (
     TaskConcurrencyResponse,
     TaskStatusAuditRecord,
     TaskStatusAuditResponse,
+    TemplateTimelineResponse,
+    TemplateTimelineRow,
     WorkflowTaskTemplatesResponse,
 )
 
@@ -64,6 +66,8 @@ def _categorize_status(status: str) -> Optional[str]:
 
     Returns the category name or None if the status should not be displayed.
     """
+    if status == TaskStatus.REGISTERING:
+        return "REGISTERED"
     if status in PENDING_STATUSES:
         return "PENDING"
     if status == TaskStatus.LAUNCHED:
@@ -72,6 +76,8 @@ def _categorize_status(status: str) -> Optional[str]:
         return "RUNNING"
     if status in ERROR_STATUSES:
         return "ERROR"
+    if status == DONE_STATUS:
+        return "DONE"
     return None
 
 
@@ -304,6 +310,11 @@ def _get_series_by_status(
         for task_id, status, period_start, period_end, template_name in status_periods:
             category = _categorize_status(status)
 
+            # Skip categories not tracked by the concurrency view
+            # (REGISTERED is only used by the timeline endpoint)
+            if category not in counted_tasks:
+                continue
+
             # For active statuses (PENDING, LAUNCHED, RUNNING): count tasks active
             # at any point during the interval (interval overlap)
             if category in {"PENDING", "LAUNCHED", "RUNNING"}:
@@ -439,3 +450,134 @@ async def get_workflow_task_templates(
     template_names = [row[0] for row in result]
 
     return WorkflowTaskTemplatesResponse(task_templates=template_names)
+
+
+TIMELINE_CATEGORIES = [
+    "REGISTERED",
+    "PENDING",
+    "LAUNCHED",
+    "RUNNING",
+    "ERROR",
+    "DONE",
+]
+
+
+@api_v3_router.get("/workflow/{workflow_id}/template_timeline")
+async def get_template_timeline(
+    workflow_id: int,
+    db: Session = Depends(get_db),
+) -> TemplateTimelineResponse:
+    """Get template execution timeline for a workflow.
+
+    Returns per-template event-driven time series: at every
+    status-transition timestamp the exact task count per status
+    category is recorded.  No bucketing — the frontend renders
+    a continuous stacked area chart from the raw events.
+    """
+    logger.info("Getting template timeline", workflow_id=workflow_id)
+
+    # Fetch every status transition, ordered chronologically.
+    records_query = (
+        select(
+            TaskStatusAudit.task_id,
+            TaskStatusAudit.new_status,
+            TaskStatusAudit.entered_at,
+            TaskTemplate.name.label("template_name"),
+        )
+        .join(Task, Task.id == TaskStatusAudit.task_id)
+        .join(Node, Node.id == Task.node_id)
+        .join(
+            TaskTemplateVersion,
+            TaskTemplateVersion.id == Node.task_template_version_id,
+        )
+        .join(
+            TaskTemplate,
+            TaskTemplate.id == TaskTemplateVersion.task_template_id,
+        )
+        .where(TaskStatusAudit.workflow_id == workflow_id)
+        .order_by(TaskStatusAudit.entered_at)
+    )
+    records = db.execute(records_query).all()
+
+    if not records:
+        return TemplateTimelineResponse(templates=[])
+
+    # Group records by template
+    tmpl_events: Dict[str, list] = {}
+    tmpl_task_ids: Dict[str, set] = {}
+    for task_id, status, entered_at, template_name in records:
+        category = _categorize_status(status)
+        if category is None:
+            continue
+        tmpl_events.setdefault(template_name, []).append(
+            (task_id, category, entered_at)
+        )
+        tmpl_task_ids.setdefault(template_name, set()).add(task_id)
+
+    # Build per-template event series
+    rows: List[TemplateTimelineRow] = []
+    first_exec_ts: Dict[str, datetime] = {}
+
+    for tname, events in tmpl_events.items():
+        # events already sorted by entered_at (from ORDER BY)
+        task_status: Dict[int, str] = {}
+        counts: Dict[str, int] = {c: 0 for c in TIMELINE_CATEGORIES}
+        timestamps: List[str] = []
+        series: Dict[str, List[int]] = {c: [] for c in TIMELINE_CATEGORIES}
+        exec_started = False
+
+        i = 0
+        while i < len(events):
+            ts = events[i][2]
+            # Apply all transitions at this timestamp
+            while i < len(events) and events[i][2] == ts:
+                tid, cat, _ = events[i]
+                old = task_status.get(tid)
+                # If a task goes ERROR -> REGISTERED it's a retry;
+                # keep showing it as ERROR until it truly progresses.
+                if old == "ERROR" and cat == "REGISTERED":
+                    cat = "ERROR"
+                if old is not None:
+                    counts[old] -= 1
+                task_status[tid] = cat
+                counts[cat] += 1
+                if not exec_started and cat != "REGISTERED":
+                    exec_started = True
+                    first_exec_ts[tname] = ts
+                i += 1
+
+            # Only emit data points once execution has started
+            if exec_started:
+                timestamps.append(ts.isoformat())
+                for c in TIMELINE_CATEGORIES:
+                    series[c].append(counts[c])
+
+        if not timestamps:
+            continue
+
+        # Extend each template by 1 second so the final state
+        # (typically all-DONE) has visible width in the step chart.
+        last_ts = events[-1][2]
+        end_ts = (last_ts + timedelta(seconds=1)).isoformat()
+        timestamps.append(end_ts)
+        for c in TIMELINE_CATEGORIES:
+            series[c].append(series[c][-1])
+
+        rows.append(
+            TemplateTimelineRow(
+                template_name=tname,
+                total_tasks=len(tmpl_task_ids.get(tname, set())),
+                timestamps=timestamps,
+                series=series,
+            )
+        )
+
+    rows.sort(key=lambda r: first_exec_ts.get(r.template_name, datetime.max))
+
+    logger.info(
+        "Template timeline generated",
+        workflow_id=workflow_id,
+        num_templates=len(rows),
+    )
+
+    return TemplateTimelineResponse(templates=rows)
