@@ -25,7 +25,14 @@ class DistributorCommand:
         try:
             self._func(*self._args, **self._kwargs)
         except Exception as e:
+            self.error_raised = True
             if raise_on_error:
                 raise
             else:
-                logger.exception("Distributor command failed", error=str(e))
+                logger.exception(
+                    "Distributor command failed",
+                    command=getattr(self._func, "__qualname__", str(self._func)),
+                    error_type=type(e).__name__,
+                    error=str(e),
+                    args=str(self._args)[:200],
+                )

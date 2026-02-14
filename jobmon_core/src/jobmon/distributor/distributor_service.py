@@ -257,7 +257,13 @@ class DistributorService:
         task_instances = self._task_instance_status_map.pop(status)
         self._task_instance_status_map[status] = set()
         for task_instance in task_instances:
-            self._task_instance_status_map[task_instance.status].add(task_instance)
+            try:
+                self._task_instance_status_map[task_instance.status].add(task_instance)
+            except KeyError:
+                # TI moved to a non-tracked status (e.g., NO_DISTRIBUTOR_ID).
+                # Expire it from the distributor; the swarm handles
+                # re-queuing.
+                del self._task_instances[task_instance.task_instance_id]
 
     def instantiate_task_instances(
         self, task_instances: List[DistributorTaskInstance]
@@ -332,9 +338,17 @@ class DistributorService:
     def launch_task_instance_batch(
         self, task_instance_batch: TaskInstanceBatch
     ) -> None:
-        self._task_instance_batches.pop(
-            (task_instance_batch.array_id, task_instance_batch.batch_number)
+        batch_key = (
+            task_instance_batch.array_id,
+            task_instance_batch.batch_number,
         )
+        if self._task_instance_batches.pop(batch_key, None) is None:
+            logger.warning(
+                "Batch already removed from tracking, skipping launch",
+                array_id=task_instance_batch.array_id,
+                array_batch_num=task_instance_batch.batch_number,
+            )
+            return
 
         batch_size = len(task_instance_batch.task_instances)
         logger.debug(
