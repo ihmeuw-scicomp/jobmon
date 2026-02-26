@@ -121,6 +121,7 @@ class DistributorTaskInstance:
             message={"no_id_err_msg": no_id_err_msg},
             request_type="post",
         )
+        self.status = TaskInstanceStatus.NO_DISTRIBUTOR_ID
 
         logger.info(
             "Task instance transitioned INSTANTIATED → NO_DISTRIBUTOR_ID",
