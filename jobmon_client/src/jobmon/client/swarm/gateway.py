@@ -413,6 +413,25 @@ class ServerGateway:
 
         return DownstreamTasksResponse(downstream_tasks=downstream_tasks)
 
+    async def get_most_recent_ti_error(
+        self, task_id: int
+    ) -> tuple[Optional[int], str]:
+        """Fetch the most recent task instance error for a failed task.
+
+        Args:
+            task_id: The task ID to query.
+
+        Returns:
+            Tuple of (task_instance_id, error_description). task_instance_id
+            is None if no error record exists.
+        """
+        _, response = await self._request(
+            app_route=f"/task/{task_id}/most_recent_ti_error",
+            message={},
+            request_type="get",
+        )
+        return response["task_instance_id"], response.get("error_description", "")
+
     async def get_server_time(self) -> datetime:
         """Get the current time from the server.
 

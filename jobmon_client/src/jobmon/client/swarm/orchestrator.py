@@ -485,7 +485,9 @@ class WorkflowRunOrchestrator:
         if update.task_statuses:
             changed_tasks = self._state.apply_update(update)
             if changed_tasks:
-                self._process_changed_tasks(changed_tasks)
+                failed_tasks = self._process_changed_tasks(changed_tasks)
+                if failed_tasks:
+                    await self._log_failed_task_errors(failed_tasks)
 
     # ──────────────────────────────────────────────────────────────────────────
     # Synchronization
@@ -504,7 +506,9 @@ class WorkflowRunOrchestrator:
 
         # Process changed tasks (propagate completions, set resources)
         if changed_tasks:
-            self._process_changed_tasks(changed_tasks)
+            failed_tasks = self._process_changed_tasks(changed_tasks)
+            if failed_tasks:
+                await self._log_failed_task_errors(failed_tasks)
 
         logger.debug(
             f"State synchronized. ready_to_run_count: {self._state.get_ready_to_run_count()}, "
@@ -512,7 +516,7 @@ class WorkflowRunOrchestrator:
             f"full_sync: {full_sync}"
         )
 
-    def _process_changed_tasks(self, changed_tasks: set["SwarmTask"]) -> None:
+    def _process_changed_tasks(self, changed_tasks: set["SwarmTask"]) -> list["SwarmTask"]:
         """Process tasks whose status changed.
 
         This handles post-update operations that can't be done in SwarmState:
@@ -529,9 +533,12 @@ class WorkflowRunOrchestrator:
         when A is processed, and again when B is processed directly (since it has
         REGISTERING status and all_upstreams_done). We prevent this by tracking
         tasks enqueued via propagation.
+
+        Returns:
+            List of tasks that transitioned to ERROR_FATAL in this update.
         """
         num_newly_completed = 0
-        num_newly_failed = 0
+        newly_failed: list["SwarmTask"] = []
 
         # Track tasks enqueued via propagation to prevent double-enqueuing
         enqueued_via_propagation: set["SwarmTask"] = set()
@@ -549,7 +556,7 @@ class WorkflowRunOrchestrator:
                     enqueued_via_propagation.add(downstream)
 
             elif task.status == TaskStatus.ERROR_FATAL:
-                num_newly_failed += 1
+                newly_failed.append(task)
 
             elif task.status == TaskStatus.REGISTERING and task.all_upstreams_done:
                 # Skip if already enqueued via propagation from an upstream DONE task
@@ -579,8 +586,42 @@ class WorkflowRunOrchestrator:
                 telemetry_percent_done=percent_done,
             )
 
-        if num_newly_failed > 0:
-            logger.warning(f"{num_newly_failed} newly failed tasks.")
+        if newly_failed:
+            failed_ids = [t.task_id for t in newly_failed]
+            logger.warning(
+                f"{len(newly_failed)} newly failed tasks.",
+                failed_task_ids=failed_ids,
+            )
+
+        return newly_failed
+
+    async def _log_failed_task_errors(self, failed_tasks: list["SwarmTask"]) -> None:
+        """Fetch and log error details for each newly-failed task.
+
+        Makes one API call per failed task to retrieve the most recent
+        task instance error, then logs task_id, task_instance_id, and
+        error description together.
+
+        Args:
+            failed_tasks: Tasks that just transitioned to ERROR_FATAL.
+        """
+        for task in failed_tasks:
+            try:
+                ti_id, error_desc = await self._gateway.get_most_recent_ti_error(
+                    task.task_id
+                )
+                logger.warning(
+                    "Task failed",
+                    task_id=task.task_id,
+                    task_instance_id=ti_id,
+                    error=error_desc[:500] if error_desc else "",
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Task failed (could not retrieve error details)",
+                    task_id=task.task_id,
+                    error=str(exc),
+                )
 
     # ──────────────────────────────────────────────────────────────────────────
     # Resource Management
