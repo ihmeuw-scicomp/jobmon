@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import traceback
 from typing import Any, Dict, Optional, Union
 
 from jobmon.core.config.structlog_config import (
@@ -141,9 +142,12 @@ class JobmonOTLPLoggingHandler(logging.Handler):
         Strips the 'telemetry_' prefix from attribute names for cleaner OTLP exports
         while maintaining internal namespacing.
         """
+        # exc_info is captured properly as exception.* attributes — skip the raw boolean
+        _SKIP_KEYS = frozenset(("event", "timestamp", "exc_info"))
+
         attributes = {}
         for key, value in event_dict.items():
-            if key.startswith("_") or key in ("event", "timestamp"):
+            if key.startswith("_") or key in _SKIP_KEYS:
                 continue
 
             # Strip telemetry_ prefix for OTLP export
@@ -214,6 +218,25 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             # Add request correlation if available
             if event_dict and "request_id" in event_dict:
                 attributes["jobmon.request_id"] = event_dict["request_id"]
+
+            # Add source code attributes
+            attributes["code.filepath"] = record.pathname
+            attributes["code.lineno"] = record.lineno
+            attributes["code.function"] = record.funcName
+            attributes["code.namespace"] = record.name
+
+            # Add thread attributes
+            attributes["thread.id"] = record.thread
+            attributes["thread.name"] = record.threadName
+
+            # Add exception info using standard OTLP exception attributes
+            if record.exc_info and record.exc_info[0] is not None:
+                exc_type, exc_value, exc_tb = record.exc_info
+                attributes["exception.type"] = exc_type.__qualname__
+                attributes["exception.message"] = str(exc_value)
+                attributes["exception.stacktrace"] = "".join(
+                    traceback.format_exception(exc_type, exc_value, exc_tb)
+                )
 
             # Create OTLP log record (using public API from 1.39+)
             from opentelemetry._logs import LogRecord as OTLPLogRecord
