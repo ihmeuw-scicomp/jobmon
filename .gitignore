@@ -67,3 +67,6 @@ docker_config/logconfig.otlp.yaml
 .claude/worktrees/
 .playwright-mcp/
 .github-pat
+
+# Development screenshots
+*.png

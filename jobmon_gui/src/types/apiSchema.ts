@@ -2078,6 +2078,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/api/v3/workflow/{workflow_id}/template_timeline': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Template Timeline
+         * @description Get template execution timeline for a workflow.
+         *
+         *     Returns per-template event-driven time series: at every
+         *     status-transition timestamp the exact task count per status
+         *     category is recorded.  No bucketing — the frontend renders
+         *     a continuous stacked area chart from the raw events.
+         */
+        get: operations['get_template_timeline_api_v3_workflow__workflow_id__template_timeline_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/api/v3/workflow/{workflow_id}/fix_status_inconsistency': {
         parameters: {
             query?: never;
@@ -2252,12 +2277,44 @@ export interface components {
         /**
          * DownstreamTasksResponse
          * @description Response model for downstream tasks.
+         *
+         *     Each value is [node_id, downstream_node_ids] where
+         *     downstream_node_ids is a list of ints (new clients) or
+         *     a JSON string (legacy clients) or None.
          */
         DownstreamTasksResponse: {
             /** Downstream Tasks */
             downstream_tasks: {
-                [key: string]: unknown[];
+                [key: string]: (number | number[] | string | null)[];
             };
+        };
+        /**
+         * FormattedStats
+         * @description Formatted statistics for legacy client compatibility.
+         */
+        FormattedStats: {
+            /** Num Tasks */
+            num_tasks?: number | null;
+            /** Min Mem */
+            min_mem?: string | null;
+            /** Max Mem */
+            max_mem?: string | null;
+            /** Mean Mem */
+            mean_mem?: string | null;
+            /** Min Runtime */
+            min_runtime?: number | null;
+            /** Max Runtime */
+            max_runtime?: number | null;
+            /** Mean Runtime */
+            mean_runtime?: number | null;
+            /** Median Mem */
+            median_mem?: string | null;
+            /** Median Runtime */
+            median_runtime?: number | null;
+            /** Ci Mem */
+            ci_mem?: (number | null)[] | null;
+            /** Ci Runtime */
+            ci_runtime?: (number | null)[] | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -2333,6 +2390,10 @@ export interface components {
             task_status_date: string;
             /** Task Template Id */
             task_template_id: number;
+            /** Num Attempts */
+            num_attempts: number;
+            /** Max Attempts */
+            max_attempts: number;
         };
         /**
          * TaskDetailsResponse
@@ -2377,6 +2438,10 @@ export interface components {
             ti_status_date: string | null;
             /** Ti Queue Name */
             ti_queue_name: string | null;
+            /** Ti Cpu */
+            ti_cpu: string | null;
+            /** Ti Io */
+            ti_io: string | null;
         };
         /**
          * TaskInstanceDetailsResponse
@@ -2389,10 +2454,14 @@ export interface components {
         /**
          * TaskResourceUsageResponse
          * @description Response model for task resource usage.
+         *
+         *     resource_usage is a 4-element list from
+         *     SerializeTaskResourceUsage.to_wire():
+         *     [num_attempts, nodename, runtime, memory]
          */
         TaskResourceUsageResponse: {
             /** Resource Usage */
-            resource_usage: unknown[];
+            resource_usage: (number | string | null)[];
         };
         /** TaskResourceVizItem */
         TaskResourceVizItem: {
@@ -2464,7 +2533,7 @@ export interface components {
             workflow_id: number | null;
             /** Sub Task */
             sub_task: {
-                [key: string]: unknown;
+                [key: string]: string[];
             } | null;
         };
         /**
@@ -2542,13 +2611,8 @@ export interface components {
             ci_runtime?: (number | null)[] | null;
             /** Result Viz */
             result_viz?: components['schemas']['TaskResourceVizItem'][] | null;
-            /**
-             * Formatted Stats
-             * @description Provide formatted statistics similar to legacy client format.
-             */
-            readonly formatted_stats: {
-                [key: string]: unknown;
-            };
+            /** @description Provide formatted statistics similar to legacy client format. */
+            readonly formatted_stats: components['schemas']['FormattedStats'];
         };
         /**
          * TasksRecursiveResponse
@@ -2557,6 +2621,48 @@ export interface components {
         TasksRecursiveResponse: {
             /** Task Ids */
             task_ids: number[];
+        };
+        /**
+         * TemplateTimelineResponse
+         * @description Response for template execution timeline.
+         *
+         *     Each template carries its own ``timestamps`` array (the moments
+         *     where any task in the template changed status) together with
+         *     per-status counts, suitable for rendering as a continuous
+         *     stacked area chart.
+         */
+        TemplateTimelineResponse: {
+            /**
+             * Templates
+             * @description Per-template event series, sorted by first activity
+             */
+            templates: components['schemas']['TemplateTimelineRow'][];
+        };
+        /**
+         * TemplateTimelineRow
+         * @description One row in the timeline — a single task template's event series.
+         *
+         *     Each entry in ``timestamps`` marks an actual status transition;
+         *     the corresponding index in each ``series`` list gives the number
+         *     of tasks in that status immediately after the transition.
+         */
+        TemplateTimelineRow: {
+            /** Template Name */
+            template_name: string;
+            /** Total Tasks */
+            total_tasks: number;
+            /**
+             * Timestamps
+             * @description ISO timestamps of status transition events
+             */
+            timestamps: string[];
+            /**
+             * Series
+             * @description Status category -> task count at each timestamp
+             */
+            series: {
+                [key: string]: number[];
+            };
         };
         /** ValidationError */
         ValidationError: {
@@ -5437,6 +5543,37 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['WorkflowTaskTemplatesResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_template_timeline_api_v3_workflow__workflow_id__template_timeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['TemplateTimelineResponse'];
                 };
             };
             /** @description Validation Error */

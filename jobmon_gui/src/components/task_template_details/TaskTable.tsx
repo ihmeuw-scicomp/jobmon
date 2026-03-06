@@ -49,9 +49,7 @@ export default function TaskTable({
     };
 
     const handleCopyCommand = () => {
-        navigator.clipboard.writeText(selectedCommand).catch(err => {
-            console.error('Failed to copy command:', err);
-        });
+        navigator.clipboard.writeText(selectedCommand).catch(() => {});
     };
 
     const handleCloseModal = () => {

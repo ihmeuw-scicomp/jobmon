@@ -16,14 +16,7 @@ export const job_info_table_time_column_names = ['task_status_date'];
 
 const taskTableStorage = createJSONStorage(() => localStorage, {
     reviver: (key, value) => {
-        // Custom storage retriever to convert date strings back into dayjs objects
-        // We are looking for:
-        //   1. A key named "value"
-        //   2. An array with a length of 2
-        //   3. Either value[0] or value[1] to be a string that can be parsed with dayjs
         if (key == 'pageIndex') {
-            // If we don't store pageIndex with the rest of local storage the page behaves strangely,
-            // but we want to default to page zero on page load, so overwrite the value here
             return 0;
         }
         if (
@@ -32,12 +25,11 @@ const taskTableStorage = createJSONStorage(() => localStorage, {
             value.length == 2 &&
             (dayjs(value[0]).isValid() || dayjs(value[1]).isValid())
         ) {
-            const range_start = value[0] ? dayjs(value[0]) : '';
-            const range_end = value[1] ? dayjs(value[1]) : '';
-            const new_value = [range_start, range_end];
-            return new_value;
+            return [
+                value[0] ? dayjs(value[0]) : '',
+                value[1] ? dayjs(value[1]) : '',
+            ];
         }
-
         return value;
     },
 });
@@ -49,7 +41,7 @@ export interface ColumnFilter {
 
 export type ColumnFiltersState = ColumnFilter[];
 
-export type taskTableStore = {
+export type TaskTableStore = {
     maxRows: number;
     setMaxRows: (newMaxRows: number) => void;
     getMaxRows: () => number;
@@ -84,8 +76,6 @@ export type taskTableStore = {
 };
 
 const dateRangeFilter = (f: ColumnFilter) => {
-    // Detect the date/time fields, and ensure that the first value is less than
-    // or equal to the second value
     if (job_info_table_time_column_names.includes(f.id)) {
         if (
             Array.isArray(f.value) &&
@@ -106,165 +96,69 @@ const dateRangeFilter = (f: ColumnFilter) => {
     return f;
 };
 
-export const useTaskTableStore = create<taskTableStore>()(
+/** Factory for zustand setters that accept Updater<T>. */
+function zustandSetter<S, K extends keyof S>(
+    get: () => S,
+    set: (partial: Partial<S>) => void,
+    key: K,
+    transform?: (val: S[K]) => S[K]
+): (updaterOrValue: Updater<S[K]>) => S[K] {
+    return (updaterOrValue: Updater<S[K]>) => {
+        const current = get()[key];
+        let next: S[K] =
+            typeof updaterOrValue === 'function'
+                ? (updaterOrValue as (prev: S[K]) => S[K])(current)
+                : updaterOrValue;
+        if (transform) next = transform(next);
+        set({ [key]: next } as unknown as Partial<S>);
+        return get()[key];
+    };
+}
+
+export const useTaskTableStore = create<TaskTableStore>()(
     persist(
         (set, get) => ({
             maxRows: 100,
             setMaxRows: (newMaxRows: number) => {
-                set({ ...get(), maxRows: newMaxRows });
+                set({ maxRows: newMaxRows });
             },
-            getMaxRows: () => {
-                return get().maxRows;
-            },
+            getMaxRows: () => get().maxRows,
 
-            pagination: {
-                pageIndex: 0,
-                pageSize: 10, //customize the default page size
-            },
-            setPagination: (updaterOrValue: Updater<PaginationState>) => {
-                // updateOrValue will be of one of these types: ((prevState: S) => S) | S
+            pagination: { pageIndex: 0, pageSize: 10 },
+            setPagination: zustandSetter(get, set, 'pagination'),
+            getPagination: () => get().pagination,
 
-                if (typeof updaterOrValue === 'function') {
-                    // the input variable is a function
-                    set(() => ({
-                        ...get(),
-                        pagination: updaterOrValue(get().pagination),
-                    }));
-                } else {
-                    // the input variable is a value
-                    set(() => ({ ...get(), pagination: updaterOrValue }));
-                }
-                return get().pagination;
-            },
-            getPagination: () => {
-                return get().pagination;
-            },
-            filters: [],
-            setFilters: (updaterOrValue: Updater<ColumnFiltersState>) => {
-                // updateOrValue will be of one of these types: ((prevState: S) => S) | S
+            filters: [] as ColumnFiltersState,
+            setFilters: zustandSetter(
+                get,
+                set,
+                'filters',
+                (v: ColumnFiltersState) => v.map(dateRangeFilter)
+            ),
+            getFilters: () => get().filters,
 
-                if (typeof updaterOrValue === 'function') {
-                    // the input variable is a function
-                    set(() => ({
-                        ...get(),
-                        filters: updaterOrValue(get().filters).map(
-                            dateRangeFilter
-                        ),
-                    }));
-                } else {
-                    // the input variable is a value
-                    set(() => ({
-                        ...get(),
-                        filters: updaterOrValue.map(dateRangeFilter),
-                    }));
-                }
-                return get().filters;
-            },
-            getFilters: () => {
-                return get().filters;
-            },
-            sorting: [],
-            setSorting: (updaterOrValue: Updater<SortingState>) => {
-                // updateOrValue will be of one of these types: ((prevState: S) => S) | S
+            sorting: [] as SortingState,
+            setSorting: zustandSetter(get, set, 'sorting'),
+            getSorting: () => get().sorting,
 
-                if (typeof updaterOrValue === 'function') {
-                    // the input variable is a function
-                    set(() => ({
-                        ...get(),
-                        sorting: updaterOrValue(get().sorting),
-                    }));
-                } else {
-                    // the input variable is a value
-                    set(() => ({ ...get(), sorting: updaterOrValue }));
-                }
-                return get().sorting;
-            },
-            getSorting: () => {
-                return get().sorting;
-            },
-            columnOrder: [],
-            setColumnOrder: (updaterOrValue: Updater<ColumnOrderState>) => {
-                // updateOrValue will be of one of these types: ((prevState: S) => S) | S
+            columnOrder: [] as ColumnOrderState,
+            setColumnOrder: zustandSetter(get, set, 'columnOrder'),
+            getColumnOrder: () => get().columnOrder,
 
-                if (typeof updaterOrValue === 'function') {
-                    // the input variable is a function
-                    set(() => ({
-                        ...get(),
-                        columnOrder: updaterOrValue(get().columnOrder),
-                    }));
-                } else {
-                    // the input variable is a value
-                    set(() => ({ ...get(), columnOrder: updaterOrValue }));
-                }
-                return get().columnOrder;
-            },
-            getColumnOrder: () => {
-                return get().columnOrder;
-            },
-            density: 'comfortable',
-            setDensity: (updaterOrValue: Updater<MRT_DensityState>) => {
-                // updateOrValue will be of one of these types: ((prevState: S) => S) | S
+            density: 'comfortable' as MRT_DensityState,
+            setDensity: zustandSetter(get, set, 'density'),
+            getDensity: () => get().density,
 
-                if (typeof updaterOrValue === 'function') {
-                    // the input variable is a function
-                    set(() => ({
-                        ...get(),
-                        density: updaterOrValue(get().density),
-                    }));
-                } else {
-                    // the input variable is a value
-                    set(() => ({ ...get(), density: updaterOrValue }));
-                }
-                return get().density;
-            },
-            getDensity: () => {
-                return get().density;
-            },
             columnVisibility: {
                 task_num_attempts: false,
                 task_max_attempts: false,
-            },
-            setColumnVisibility: (updaterOrValue: Updater<VisibilityState>) => {
-                // updateOrValue will be of one of these types: ((prevState: S) => S) | S
+            } as VisibilityState,
+            setColumnVisibility: zustandSetter(get, set, 'columnVisibility'),
+            getColumnVisibility: () => get().columnVisibility,
 
-                if (typeof updaterOrValue === 'function') {
-                    // the input variable is a function
-                    set(() => ({
-                        ...get(),
-                        columnVisibility: updaterOrValue(
-                            get().columnVisibility
-                        ),
-                    }));
-                } else {
-                    // the input variable is a value
-                    set(() => ({ ...get(), columnVisibility: updaterOrValue }));
-                }
-                return get().columnVisibility;
-            },
-            getColumnVisibility: () => {
-                return get().columnVisibility;
-            },
             filterVisibility: true,
-            setFilterVisibility: (updaterOrValue: Updater<boolean>) => {
-                // updateOrValue will be of one of these types: ((prevState: S) => S) | S
-
-                if (typeof updaterOrValue === 'function') {
-                    // the input variable is a function
-                    set(() => ({
-                        ...get(),
-                        filterVisibility: updaterOrValue(
-                            get().filterVisibility
-                        ),
-                    }));
-                } else {
-                    // the input variable is a value
-                    set(() => ({ ...get(), filterVisibility: updaterOrValue }));
-                }
-                return get().filterVisibility;
-            },
-            getFilterVisibility: () => {
-                return get().filterVisibility;
-            },
+            setFilterVisibility: zustandSetter(get, set, 'filterVisibility'),
+            getFilterVisibility: () => get().filterVisibility,
         }),
         {
             name: 'TaskTable',
