@@ -23,6 +23,9 @@ import {
     TemplateTimelineResponse,
 } from '@jobmon_gui/queries/GetTaskConcurrency.ts';
 import type { Layout, PlotMouseEvent, Data as PlotlyData } from 'plotly.js';
+import {
+    TEMPLATE_STATUS_COLORS,
+} from '@jobmon_gui/constants/taskStatus';
 
 // Status display order (bottom to top in stacked area)
 const STATUS_ORDER = [
@@ -35,12 +38,12 @@ const STATUS_ORDER = [
 ];
 
 const STATUS_COLORS: Record<string, string> = {
-    REGISTERED: '#999999',
-    PENDING: '#e69f00',
-    LAUNCHED: '#f0e442',
-    RUNNING: '#0072b2',
-    ERROR: '#d55e00',
-    DONE: '#009e73',
+    REGISTERED: '#757575',
+    PENDING: TEMPLATE_STATUS_COLORS.PENDING,
+    LAUNCHED: TEMPLATE_STATUS_COLORS.SCHEDULED,
+    RUNNING: TEMPLATE_STATUS_COLORS.RUNNING,
+    ERROR: TEMPLATE_STATUS_COLORS.FATAL,
+    DONE: TEMPLATE_STATUS_COLORS.DONE,
 };
 
 const STATUS_DISPLAY_LABEL: Record<string, string> = {
@@ -304,15 +307,19 @@ export default function TemplateTimelineTab({
         }
 
         // Annotations: template total tasks on the right side
+        // Use paper-relative y so positioning is correct regardless
+        // of whether syncScales is on (raw counts) or off (percent).
         const annotations = templates.map(
             (tmpl: TemplateTimelineResponse['templates'][0], tIdx: number) => {
-                const yRef = tIdx === 0 ? 'y' : `y${tIdx + 1}`;
+                const domainTop = 1 - tIdx * (subplotHeight + SUBPLOT_GAP);
+                const domainBottom = domainTop - subplotHeight;
+                const domainMid = (domainTop + domainBottom) / 2;
                 return {
                     text: `<b>${tmpl.total_tasks}</b> task${tmpl.total_tasks === 1 ? '' : 's'}`,
                     xref: 'paper' as const,
-                    yref: yRef as string,
+                    yref: 'paper' as const,
                     x: 1.005,
-                    y: syncScales ? (globalMaxTasks * 1.05) / 2 : 50,
+                    y: domainMid,
                     showarrow: false,
                     font: {
                         size: 9,

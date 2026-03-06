@@ -42,12 +42,10 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
 
 interface TaskSummaryCardProps {
     taskDetails: TaskDetails;
-    taskId: string | number | undefined;
 }
 
 export default function TaskSummaryCard({
     taskDetails,
-    taskId: _taskId,
 }: TaskSummaryCardProps) {
     const [commandOpen, setCommandOpen] = useState(false);
 

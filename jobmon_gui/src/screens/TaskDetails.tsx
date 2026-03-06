@@ -88,10 +88,7 @@ export default function TaskDetails() {
         <div>
             <AppBreadcrumbs items={breadcrumbItems} />
             <div className="div-level-2">
-                <TaskSummaryCard
-                    taskDetails={task_details.data}
-                    taskId={taskId}
-                />
+                <TaskSummaryCard taskDetails={task_details.data} />
             </div>
             <div className="div-level-2" style={{ paddingTop: 8 }}>
                 <TaskStatusTimeline
