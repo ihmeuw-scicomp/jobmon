@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 import traceback
 from typing import Any, Dict, Optional, Union
 
@@ -229,9 +230,21 @@ class JobmonOTLPLoggingHandler(logging.Handler):
             attributes["thread.id"] = record.thread
             attributes["thread.name"] = record.threadName
 
-            # Add exception info using standard OTLP exception attributes
-            if record.exc_info and record.exc_info[0] is not None:
-                exc_type, exc_value, exc_tb = record.exc_info
+            # Add exception info using standard OTLP exception attributes.
+            # Resolve exc_info: record.exc_info may be None when structlog's
+            # direct rendering path receives exc_info=True (the boolean doesn't
+            # survive _extract_exc_info). Fall back to event_dict or sys.exc_info().
+            exc_info = record.exc_info
+            if (not exc_info or exc_info[0] is None) and event_dict:
+                raw = event_dict.get("exc_info")
+                if raw is True:
+                    exc_info = sys.exc_info()
+                elif isinstance(raw, tuple) and len(raw) == 3:
+                    exc_info = raw
+                elif isinstance(raw, BaseException):
+                    exc_info = (type(raw), raw, raw.__traceback__)
+            if exc_info and exc_info[0] is not None:
+                exc_type, exc_value, exc_tb = exc_info
                 attributes["exception.type"] = exc_type.__qualname__
                 attributes["exception.message"] = str(exc_value)
                 attributes["exception.stacktrace"] = "".join(
