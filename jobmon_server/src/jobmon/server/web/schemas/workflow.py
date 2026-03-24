@@ -49,8 +49,7 @@ class WorkflowStatusResponse(BaseModel):
 class WorkflowStatusVizResponse(BaseModel):
     """Response model for workflow status visualization."""
 
-    # Dictionary mapping workflow_id to status data
-    pass  # This will be a Dict[int, Any] but FastAPI handles this automatically
+    # Empty model — FastAPI returns raw dict directly
 
 
 class WorkflowOverviewRequest(BaseModel):

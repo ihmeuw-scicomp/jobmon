@@ -63,7 +63,12 @@ docker_config/logconfig.otlp.yaml
 # Ignore design documents folder
 /design/
 
+# Playwright MCP screenshots
+.playwright-mcp/
+
+# Development screenshots
+*.png
+
 # Ignore Claude Code artifacts
 .claude/worktrees/
-.playwright-mcp/
 .github-pat

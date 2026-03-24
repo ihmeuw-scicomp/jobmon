@@ -7,6 +7,8 @@ export type TaskDetails = {
     task_status_date: string;
     workflow_id: number;
     task_template_id: number;
+    num_attempts: number;
+    max_attempts: number;
 };
 export type TaskDetailsResponse = {
     task_details: TaskDetails[];
