@@ -547,6 +547,155 @@ class TestOTLPConfigurationOverrides:
                 )
 
 
+class TestOTLPExceptionCapture:
+    """Test exception info extraction in OTLP handler."""
+
+    @patch("jobmon.core.otlp.handlers.OTLP_AVAILABLE", True)
+    def test_exc_info_from_record(self):
+        """Test that exception info is captured from record.exc_info."""
+        from jobmon.core.otlp import JobmonOTLPLoggingHandler
+
+        mock_logger_provider = Mock()
+        mock_logger = Mock()
+        mock_logger_provider.get_logger.return_value = mock_logger
+
+        handler = JobmonOTLPLoggingHandler(logger_provider=mock_logger_provider)
+
+        try:
+            raise ValueError("test error")
+        except ValueError:
+            import sys
+
+            exc_info = sys.exc_info()
+
+        record = logging.LogRecord(
+            name="test",
+            level=logging.ERROR,
+            pathname="test.py",
+            lineno=42,
+            msg="something failed",
+            args=(),
+            exc_info=exc_info,
+        )
+
+        with patch("jobmon.core.config.structlog_config._thread_local") as mock_tl:
+            mock_tl.last_event_dict = None
+            handler.emit(record)
+
+        emitted = mock_logger.emit.call_args[0][0]
+        assert emitted.attributes["exception.type"] == "ValueError"
+        assert emitted.attributes["exception.message"] == "test error"
+        assert "ValueError: test error" in emitted.attributes["exception.stacktrace"]
+
+    @patch("jobmon.core.otlp.handlers.OTLP_AVAILABLE", True)
+    def test_exc_info_true_falls_back_to_event_dict(self):
+        """Test that exc_info=True in event_dict is resolved via sys.exc_info().
+
+        When structlog's direct rendering path receives exc_info=True, the
+        boolean doesn't survive into record.exc_info. The handler should fall
+        back to event_dict and call sys.exc_info().
+        """
+        from jobmon.core.otlp import JobmonOTLPLoggingHandler
+
+        mock_logger_provider = Mock()
+        mock_logger = Mock()
+        mock_logger_provider.get_logger.return_value = mock_logger
+
+        handler = JobmonOTLPLoggingHandler(logger_provider=mock_logger_provider)
+
+        # record.exc_info is None (simulating structlog direct rendering path)
+        record = logging.LogRecord(
+            name="test",
+            level=logging.ERROR,
+            pathname="test.py",
+            lineno=42,
+            msg="something failed",
+            args=(),
+            exc_info=None,
+        )
+
+        try:
+            raise RuntimeError("direct rendering error")
+        except RuntimeError:
+            # event_dict has exc_info=True while we're still in the except block
+            with patch("jobmon.core.config.structlog_config._thread_local") as mock_tl:
+                mock_tl.last_event_dict = {
+                    "event": "something failed",
+                    "exc_info": True,
+                }
+                handler.emit(record)
+
+        emitted = mock_logger.emit.call_args[0][0]
+        assert emitted.attributes["exception.type"] == "RuntimeError"
+        assert emitted.attributes["exception.message"] == "direct rendering error"
+        assert "RuntimeError" in emitted.attributes["exception.stacktrace"]
+
+    @patch("jobmon.core.otlp.handlers.OTLP_AVAILABLE", True)
+    def test_exc_info_exception_instance_in_event_dict(self):
+        """Test that a bare exception instance in event_dict is handled."""
+        from jobmon.core.otlp import JobmonOTLPLoggingHandler
+
+        mock_logger_provider = Mock()
+        mock_logger = Mock()
+        mock_logger_provider.get_logger.return_value = mock_logger
+
+        handler = JobmonOTLPLoggingHandler(logger_provider=mock_logger_provider)
+
+        record = logging.LogRecord(
+            name="test",
+            level=logging.ERROR,
+            pathname="test.py",
+            lineno=42,
+            msg="something failed",
+            args=(),
+            exc_info=None,
+        )
+
+        exc = TypeError("bad type")
+        with patch("jobmon.core.config.structlog_config._thread_local") as mock_tl:
+            mock_tl.last_event_dict = {
+                "event": "something failed",
+                "exc_info": exc,
+            }
+            handler.emit(record)
+
+        emitted = mock_logger.emit.call_args[0][0]
+        assert emitted.attributes["exception.type"] == "TypeError"
+        assert emitted.attributes["exception.message"] == "bad type"
+
+    @patch("jobmon.core.otlp.handlers.OTLP_AVAILABLE", True)
+    def test_exc_info_boolean_not_in_attributes(self):
+        """Test that exc_info boolean is filtered from OTLP attributes."""
+        from jobmon.core.otlp import JobmonOTLPLoggingHandler
+
+        mock_logger_provider = Mock()
+        mock_logger = Mock()
+        mock_logger_provider.get_logger.return_value = mock_logger
+
+        handler = JobmonOTLPLoggingHandler(logger_provider=mock_logger_provider)
+
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=42,
+            msg="test message",
+            args=(),
+            exc_info=None,
+        )
+
+        with patch("jobmon.core.config.structlog_config._thread_local") as mock_tl:
+            mock_tl.last_event_dict = {
+                "event": "test message",
+                "exc_info": True,
+                "level": "info",
+            }
+            handler.emit(record)
+
+        emitted = mock_logger.emit.call_args[0][0]
+        assert "exc_info" not in emitted.attributes
+
+
 class TestOTLPErrorHandling:
     """Test error handling and resilience of OTLP functionality."""
 

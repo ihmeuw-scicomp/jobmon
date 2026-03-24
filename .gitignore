@@ -68,3 +68,7 @@ docker_config/logconfig.otlp.yaml
 
 # Development screenshots
 *.png
+
+# Ignore Claude Code artifacts
+.claude/worktrees/
+.github-pat

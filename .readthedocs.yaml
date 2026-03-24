@@ -4,6 +4,9 @@
 
 version: 2
 
+formats:
+  - pdf
+
 build:
   os: ubuntu-22.04
   tools:
