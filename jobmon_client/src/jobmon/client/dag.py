@@ -222,7 +222,6 @@ class Dag(object):
                     "downstream_node_ids": downstream_nodes,
                 }
             )
-        logger.debug(f"message included in edge post request: {all_edges}")
 
         while all_edges:
             # split off first chunk elements from queue.
