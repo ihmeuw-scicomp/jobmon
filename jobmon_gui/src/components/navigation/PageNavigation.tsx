@@ -311,8 +311,8 @@ export default function PageNavigation({ children }: PropsWithChildren) {
                     v: {import.meta.env.VITE_APP_VERSION}
                 </Typography>
             </Drawer>
-            <Box component="main" sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden', px: 1, pt: 0.5, pb: 0.5 }}>
-                <Toolbar variant="dense" sx={{ minHeight: 32 }} />
+            <Box component="main" sx={{ flexGrow: 1, minWidth: 0, overflow: 'hidden', px: 1, pb: 0.5 }}>
+                <Toolbar variant="dense" sx={{ minHeight: 32, mb: 1 }} />
                 {children}
             </Box>
         </Box>
