@@ -390,11 +390,11 @@ class Tool:
                 logger.info(msg)
             else:
                 raise KeyError(msg) from exc
-
-        self.active_tool_version.set_default_compute_resources_from_dict(
-            cluster_name=default_cluster_name, compute_resources=compute_resources
-        )
-        self.active_tool_version.default_cluster_name = default_cluster_name
+        else:
+            self.active_tool_version.set_default_compute_resources_from_dict(
+                cluster_name=default_cluster_name, compute_resources=compute_resources
+            )
+            self.active_tool_version.default_cluster_name = default_cluster_name
 
         if not set_task_templates:
             return
@@ -463,11 +463,11 @@ class Tool:
                 logger.info(msg)
             else:
                 raise KeyError(msg) from exc
-
-        self.active_tool_version.set_default_resource_scales_from_dict(
-            cluster_name=default_cluster_name, resource_scales=resource_scales
-        )
-        self.active_tool_version.default_cluster_name = default_cluster_name
+        else:
+            self.active_tool_version.set_default_resource_scales_from_dict(
+                cluster_name=default_cluster_name, resource_scales=resource_scales
+            )
+            self.active_tool_version.default_cluster_name = default_cluster_name
 
         if not set_task_templates:
             return
