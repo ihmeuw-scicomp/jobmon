@@ -14,11 +14,16 @@ const UserAvatarButton = ({ userFullName, onClickHandler }) => {
         <>
             <IconButton
                 id="user-avatar-btn"
+                size="small"
+                sx={{ p: 0.5 }}
                 onClick={e => {
                     onClickHandler(e.currentTarget);
                 }}
             >
-                <Avatar {...stringAvatar(userFullName)} />
+                <Avatar
+                    {...stringAvatar(userFullName)}
+                    sx={{ width: 24, height: 24, fontSize: '0.75rem' }}
+                />
             </IconButton>
         </>
     );
