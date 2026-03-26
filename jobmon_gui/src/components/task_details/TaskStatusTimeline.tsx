@@ -645,6 +645,239 @@ function AttemptRow({
     );
 }
 
+// --- Fallback for pre-audit tasks ---
+
+function FallbackInstanceList({
+    instances,
+    modalState,
+    setModalState,
+}: {
+    instances: TaskInstance[];
+    modalState: ModalState;
+    setModalState: (s: ModalState) => void;
+}) {
+    const sorted = sortTaskInstancesById(instances);
+    const [expandedIdx, setExpandedIdx] = useState<number>(-1);
+    const modalInstance = modalState.instance;
+
+    return (
+        <Box sx={{ py: 1 }}>
+            <Typography
+                variant="subtitle2"
+                sx={{ mb: 1, fontWeight: 600 }}
+            >
+                Task Instances
+            </Typography>
+            <Box
+                sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 0.75,
+                }}
+            >
+                {sorted.map((inst, idx) => {
+                    const expanded = expandedIdx === idx;
+                    const statusColor = inst.ti_status
+                        ? getStatusColor(inst.ti_status)
+                        : '#999';
+                    const statusLabel = inst.ti_status
+                        ? getStatusLabel(inst.ti_status)
+                        : 'Unknown';
+                    return (
+                        <Box key={inst.ti_id}>
+                            <Box
+                                onClick={() =>
+                                    setExpandedIdx(
+                                        expanded ? -1 : idx
+                                    )
+                                }
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                    cursor: 'pointer',
+                                    borderRadius: '4px',
+                                    px: 0.5,
+                                    '&:hover': {
+                                        backgroundColor:
+                                            'action.hover',
+                                    },
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        flexShrink: 0,
+                                        color: 'text.secondary',
+                                    }}
+                                >
+                                    {expanded ? (
+                                        <ExpandLessIcon fontSize="small" />
+                                    ) : (
+                                        <ExpandMoreIcon fontSize="small" />
+                                    )}
+                                </Box>
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        width: 90,
+                                        flexShrink: 0,
+                                        fontWeight: 500,
+                                        color: 'text.secondary',
+                                    }}
+                                >
+                                    Attempt {idx + 1}
+                                </Typography>
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 0.5,
+                                    }}
+                                >
+                                    <Box
+                                        sx={{
+                                            width: 8,
+                                            height: 8,
+                                            borderRadius: '50%',
+                                            backgroundColor:
+                                                statusColor,
+                                            flexShrink: 0,
+                                        }}
+                                    />
+                                    <Typography
+                                        variant="caption"
+                                        sx={{ fontWeight: 500 }}
+                                    >
+                                        {statusLabel}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                            <Collapse in={expanded}>
+                                <Box
+                                    sx={{
+                                        ml: 4,
+                                        mt: 0.5,
+                                        mb: 1,
+                                        borderLeft: '2px solid',
+                                        borderColor: 'divider',
+                                        pl: 1.5,
+                                    }}
+                                >
+                                    <AttemptDetailPanel
+                                        instance={inst}
+                                        onViewStdout={() =>
+                                            setModalState({
+                                                type: 'stdout',
+                                                instance: inst,
+                                            })
+                                        }
+                                        onViewStderr={() =>
+                                            setModalState({
+                                                type: 'stderr',
+                                                instance: inst,
+                                            })
+                                        }
+                                    />
+                                </Box>
+                            </Collapse>
+                        </Box>
+                    );
+                })}
+            </Box>
+
+            {/* Stdout modal */}
+            <JobmonModal
+                title="Standard Out"
+                open={
+                    modalState.type === 'stdout' &&
+                    !!modalInstance
+                }
+                onClose={() =>
+                    setModalState({ type: null, instance: null })
+                }
+                width="80%"
+            >
+                <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                        <Typography variant="h6">
+                            Standard Out Path:
+                        </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                        <ScrollableCodeBlock>
+                            {modalInstance?.ti_stdout}
+                        </ScrollableCodeBlock>
+                    </Grid>
+                    <Grid item xs={12}>
+                        <Typography variant="h6">
+                            Standard Out Log:
+                        </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                        <ScrollableCodeBlock>
+                            <pre>
+                                {modalInstance?.ti_stdout_log}
+                            </pre>
+                        </ScrollableCodeBlock>
+                    </Grid>
+                </Grid>
+            </JobmonModal>
+
+            {/* Stderr modal */}
+            <JobmonModal
+                title="Standard Error"
+                open={
+                    modalState.type === 'stderr' &&
+                    !!modalInstance
+                }
+                onClose={() =>
+                    setModalState({ type: null, instance: null })
+                }
+                width="80%"
+            >
+                <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                        <Typography variant="h6">
+                            Standard Error Path:
+                        </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                        <ScrollableCodeBlock>
+                            {modalInstance?.ti_stderr}
+                        </ScrollableCodeBlock>
+                    </Grid>
+                    <Grid item xs={12}>
+                        <Typography variant="h6">
+                            Standard Error Log:
+                        </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                        <ScrollableCodeBlock>
+                            <pre>
+                                {modalInstance?.ti_stderr_log}
+                            </pre>
+                        </ScrollableCodeBlock>
+                    </Grid>
+                    <Grid item xs={12}>
+                        <Typography variant="h6">
+                            Standard Error Description:
+                        </Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                        <ScrollableCodeBlock>
+                            {
+                                modalInstance?.ti_error_log_description
+                            }
+                        </ScrollableCodeBlock>
+                    </Grid>
+                </Grid>
+            </JobmonModal>
+        </Box>
+    );
+}
+
 // --- Main component ---
 
 export default function TaskStatusTimeline({
@@ -719,6 +952,25 @@ export default function TaskStatusTimeline({
     }
 
     if (attempts.length === 0) {
+        // Fallback for tasks that predate the audit table: show instance
+        // details directly so users can still access stdout/stderr.
+        const fallbackInstances = tiQuery.data;
+        if (tiQuery.isLoading) {
+            return (
+                <Box sx={{ py: 1 }}>
+                    <CircularProgress size={20} />
+                </Box>
+            );
+        }
+        if (fallbackInstances && fallbackInstances.length > 0) {
+            return (
+                <FallbackInstanceList
+                    instances={fallbackInstances}
+                    modalState={modalState}
+                    setModalState={setModalState}
+                />
+            );
+        }
         return (
             <Typography variant="caption" color="text.secondary">
                 No status history available.
