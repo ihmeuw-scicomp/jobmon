@@ -63,7 +63,9 @@ function WorkflowDetails() {
         'concurrency' | 'timeline'
     >('timeline');
     const [dagNodeCount, setDagNodeCount] = useState<number | null>(null);
-    const [dagFullscreen, setDagFullscreen] = useState(false);
+    const [fullscreenPanel, setFullscreenPanel] = useState<
+        'left' | 'dag' | 'bottom' | null
+    >(null);
 
     // Page-level auto-refresh: invalidate all workflow queries periodically
     useEffect(() => {
@@ -256,6 +258,15 @@ function WorkflowDetails() {
                   : 55;
     const leftPercent = 100 - dagPercent;
 
+    const fullscreenBtnSx = {
+        position: 'absolute' as const,
+        top: 4,
+        right: 4,
+        zIndex: 5,
+        backgroundColor: 'rgba(255,255,255,0.8)',
+        '&:hover': { backgroundColor: 'rgba(255,255,255,0.95)' },
+    };
+
     const dagContent = (
         <WorkflowDAG
             workflowId={workflowId}
@@ -270,27 +281,28 @@ function WorkflowDetails() {
     );
 
     const dagPanel = (
-        <Box
-            sx={{
-                position: 'relative',
-                height: '100%',
-            }}
-        >
+        <Box sx={{ position: 'relative', height: '100%' }}>
             {dagContent}
             <Tooltip title="Fullscreen DAG">
                 <IconButton
                     size="small"
-                    onClick={() => setDagFullscreen(true)}
-                    sx={{
-                        position: 'absolute',
-                        top: 4,
-                        right: 4,
-                        zIndex: 5,
-                        backgroundColor: 'rgba(255,255,255,0.8)',
-                        '&:hover': {
-                            backgroundColor: 'rgba(255,255,255,0.95)',
-                        },
-                    }}
+                    onClick={() => setFullscreenPanel('dag')}
+                    sx={fullscreenBtnSx}
+                >
+                    <FullscreenIcon fontSize="small" />
+                </IconButton>
+            </Tooltip>
+        </Box>
+    );
+
+    const leftPanelWrapped = (
+        <Box sx={{ position: 'relative', height: '100%' }}>
+            {leftPanel}
+            <Tooltip title="Fullscreen templates">
+                <IconButton
+                    size="small"
+                    onClick={() => setFullscreenPanel('left')}
+                    sx={fullscreenBtnSx}
                 >
                     <FullscreenIcon fontSize="small" />
                 </IconButton>
@@ -379,7 +391,9 @@ function WorkflowDetails() {
                                 height: '100%',
                             }}
                         >
-                            <Box sx={{ flex: '1 1 auto' }}>{leftPanel}</Box>
+                            <Box sx={{ flex: '1 1 auto' }}>
+                                {leftPanelWrapped}
+                            </Box>
                             <Box
                                 sx={{
                                     height: 400,
@@ -393,7 +407,7 @@ function WorkflowDetails() {
                         </Box>
                     ) : (
                         <ResizableSplitPane
-                            left={leftPanel}
+                            left={leftPanelWrapped}
                             right={dagPanel}
                             leftPercent={leftPercent}
                             minLeftPercent={25}
@@ -469,6 +483,15 @@ function WorkflowDetails() {
                                     </Tooltip>
                                 </ToggleButton>
                             </ToggleButtonGroup>
+                            <Box sx={{ flex: 1 }} />
+                            <Tooltip title="Fullscreen chart">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => setFullscreenPanel('bottom')}
+                                >
+                                    <FullscreenIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
                         </Box>
                         <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
                             {bottomPanelView === 'concurrency' ? (
@@ -496,9 +519,13 @@ function WorkflowDetails() {
                 }
             />
 
-            {/* Fullscreen DAG dialog */}
-            {dagFullscreen && (
-                <Dialog open onClose={() => setDagFullscreen(false)} fullScreen>
+            {/* Fullscreen dialog for any panel */}
+            {fullscreenPanel && (
+                <Dialog
+                    open
+                    onClose={() => setFullscreenPanel(null)}
+                    fullScreen
+                >
                     <Box
                         sx={{
                             display: 'flex',
@@ -518,18 +545,58 @@ function WorkflowDetails() {
                             }}
                         >
                             <Typography variant="subtitle2" sx={{ flex: 1 }}>
-                                Workflow {workflowId} — DAG
+                                Workflow {workflowId} —{' '}
+                                {fullscreenPanel === 'dag'
+                                    ? 'DAG'
+                                    : fullscreenPanel === 'left'
+                                      ? 'Templates'
+                                      : 'Charts'}
                             </Typography>
                             <Tooltip title="Close fullscreen">
                                 <IconButton
                                     size="small"
-                                    onClick={() => setDagFullscreen(false)}
+                                    onClick={() => setFullscreenPanel(null)}
                                 >
                                     <CloseIcon fontSize="small" />
                                 </IconButton>
                             </Tooltip>
                         </Box>
-                        <Box sx={{ flex: 1, minHeight: 0 }}>{dagContent}</Box>
+                        <Box
+                            sx={{
+                                flex: 1,
+                                minHeight: 0,
+                                overflow: 'auto',
+                            }}
+                        >
+                            {fullscreenPanel === 'dag' && dagContent}
+                            {fullscreenPanel === 'left' && leftPanel}
+                            {fullscreenPanel === 'bottom' && (
+                                <>
+                                    {bottomPanelView === 'concurrency' ? (
+                                        <TaskConcurrencyTab
+                                            workflowId={workflowId}
+                                            highlightedTemplates={
+                                                selectedTemplateName
+                                                    ? [selectedTemplateName]
+                                                    : undefined
+                                            }
+                                        />
+                                    ) : (
+                                        <TemplateTimelineTab
+                                            workflowId={workflowId}
+                                            highlightedTemplates={
+                                                selectedTemplateName
+                                                    ? [selectedTemplateName]
+                                                    : undefined
+                                            }
+                                            onTemplateClick={
+                                                handleTemplateSelect
+                                            }
+                                        />
+                                    )}
+                                </>
+                            )}
+                        </Box>
                     </Box>
                 </Dialog>
             )}
