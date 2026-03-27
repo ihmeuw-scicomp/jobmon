@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
@@ -63,11 +63,27 @@ export default function TemplateDetailPanel({
     disabled,
 }: TemplateDetailPanelProps) {
     const [showAllErrors, setShowAllErrors] = useState(false);
-    const [concurrencyValue, setConcurrencyValue] = useState<number | string>(
-        templateData.MAXC >= MAX_CONCURRENCY_SENTINEL ? '' : templateData.MAXC
+    const [concurrencyValue, setConcurrencyValue] = useState<
+        number | string
+    >(
+        templateData.MAXC >= MAX_CONCURRENCY_SENTINEL
+            ? ''
+            : templateData.MAXC
     );
     const [statusMsg, setStatusMsg] = useState('');
     const [showManage, setShowManage] = useState(false);
+
+    // Reset local state when switching templates
+    useEffect(() => {
+        setConcurrencyValue(
+            templateData.MAXC >= MAX_CONCURRENCY_SENTINEL
+                ? ''
+                : templateData.MAXC
+        );
+        setStatusMsg('');
+        setShowManage(false);
+        setShowAllErrors(false);
+    }, [templateData.task_template_version_id]);
 
     const updateConcurrency = useMutation({
         mutationFn: async ({
@@ -88,15 +104,19 @@ export default function TemplateDetailPanel({
     const handleConcurrencyChange = (
         e: React.ChangeEvent<HTMLInputElement>
     ) => {
-        const val = e.target.value === '' ? '' : Number(e.target.value);
+        const val =
+            e.target.value === '' ? '' : Number(e.target.value);
         if (val === '' || (val >= 0 && val <= 2147483647)) {
             setConcurrencyValue(val);
-            updateConcurrency.mutate({
-                task_template_version_id:
-                    templateData.task_template_version_id.toString(),
-                max_tasks: val.toString(),
-            });
         }
+    };
+
+    const handleConcurrencyBlur = () => {
+        updateConcurrency.mutate({
+            task_template_version_id:
+                templateData.task_template_version_id.toString(),
+            max_tasks: concurrencyValue.toString(),
+        });
     };
 
     const handleStatusUpdate = (action: 'rerun' | 'skip') => {
@@ -234,6 +254,7 @@ export default function TemplateDetailPanel({
                             label="Concurrency"
                             value={concurrencyValue}
                             onChange={handleConcurrencyChange}
+                            onBlur={handleConcurrencyBlur}
                             inputProps={{
                                 step: 1,
                                 min: 0,
@@ -267,7 +288,7 @@ export default function TemplateDetailPanel({
 
             {/* Status bar + breakdown */}
             <Box sx={{ mb: 1.5 }}>
-                <TemplateStatusBar counts={templateData} />
+                <TemplateStatusBar counts={templateData} height={18} showLabels />
                 <Typography
                     variant="body2"
                     color="text.secondary"

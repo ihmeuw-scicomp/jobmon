@@ -3,23 +3,21 @@ import Plotly from 'plotly.js-dist';
 import createPlotlyComponent from 'react-plotly.js/factory';
 
 const Plot = createPlotlyComponent(Plotly);
-import {
-    Box,
-    Button,
-    ButtonGroup,
-    CircularProgress,
-    Divider,
-    FormControl,
-    IconButton,
-    InputLabel,
-    MenuItem,
-    Popover,
-    Select,
-    Tooltip,
-    Typography,
-    useMediaQuery,
-    useTheme,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import ButtonGroup from '@mui/material/ButtonGroup';
+import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
+import FormControl from '@mui/material/FormControl';
+import IconButton from '@mui/material/IconButton';
+import InputLabel from '@mui/material/InputLabel';
+import MenuItem from '@mui/material/MenuItem';
+import Popover from '@mui/material/Popover';
+import Select from '@mui/material/Select';
+import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import DownloadIcon from '@mui/icons-material/Download';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -46,11 +44,11 @@ dayjs.extend(utc);
 // Colors for status categories — synchronized with TEMPLATE_STATUS_COLORS
 // so the concurrency chart matches the DAG, popover, and summary panels.
 const STATUS_COLORS: Record<string, { line: string; fill: string; rgb: [number, number, number] }> = {
-    PENDING: { line: '#e69f00', fill: 'rgba(230, 159, 0, 0.3)', rgb: [230, 159, 0] },
-    LAUNCHED: { line: '#f0e442', fill: 'rgba(240, 228, 66, 0.3)', rgb: [240, 228, 66] },
-    RUNNING: { line: '#0072b2', fill: 'rgba(0, 114, 178, 0.3)', rgb: [0, 114, 178] },
-    ERROR: { line: '#d55e00', fill: 'rgba(213, 94, 0, 0.3)', rgb: [213, 94, 0] },
-    DONE: { line: '#009e73', fill: 'rgba(0, 158, 115, 0.3)', rgb: [0, 158, 115] },
+    PENDING: { line: '#e69f00', fill: 'rgba(230, 159, 0, 0.75)', rgb: [230, 159, 0] },
+    LAUNCHED: { line: '#f0e442', fill: 'rgba(240, 228, 66, 0.75)', rgb: [240, 228, 66] },
+    RUNNING: { line: '#0072b2', fill: 'rgba(0, 114, 178, 0.75)', rgb: [0, 114, 178] },
+    ERROR: { line: '#d55e00', fill: 'rgba(213, 94, 0, 0.75)', rgb: [213, 94, 0] },
+    DONE: { line: '#009e73', fill: 'rgba(0, 158, 115, 0.75)', rgb: [0, 158, 115] },
 };
 
 // Order for display: PENDING first (waiting), LAUNCHED (submitted), RUNNING (active), ERROR (failed), DONE (completed)
@@ -270,7 +268,6 @@ export default function TaskConcurrencyTab({
     const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
     const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set());
     const [groupByTemplate, setGroupByTemplate] = useState(false);
-    const [normalizeYAxis, setNormalizeYAxis] = useState(true);
     const [datePickerAnchor, setDatePickerAnchor] = useState<HTMLElement | null>(null);
     const [tempCustomStart, setTempCustomStart] = useState<dayjs.Dayjs | null>(null);
     const [tempCustomEnd, setTempCustomEnd] = useState<dayjs.Dayjs | null>(null);
@@ -530,32 +527,6 @@ export default function TaskConcurrencyTab({
             .map(([name]) => name);
     };
 
-    // Calculate filtered series totals when templates are selected
-    const getFilteredSeriesForStatus = (
-        statusName: string,
-        buckets: string[],
-        series: Record<string, number[]>,
-        template_breakdown: Record<string, Record<string, number>[]> | undefined,
-        templateFilter: string[]
-    ): number[] => {
-        // If no templates selected, use original series
-        if (templateFilter.length === 0) {
-            return series[statusName];
-        }
-        // If no breakdown data, fall back to original series
-        if (!template_breakdown?.[statusName]) {
-            return series[statusName];
-        }
-        // Calculate filtered totals from template breakdown
-        return buckets.map((_, bucketIdx) => {
-            const breakdown = template_breakdown[statusName][bucketIdx];
-            if (!breakdown) return 0;
-            return templateFilter.reduce((sum, templateName) => {
-                return sum + (breakdown[templateName] || 0);
-            }, 0);
-        });
-    };
-
     // Get visible statuses for subplot layout
     const visibleStatuses = useMemo(() => {
         if (!filteredData?.series) return [];
@@ -564,7 +535,7 @@ export default function TaskConcurrencyTab({
         );
     }, [filteredData, hiddenStatuses]);
 
-    // Generate Plotly traces - one subplot per status, stacked vertically
+    // Generate Plotly traces — single stacked bar chart
     const traces = useMemo(() => {
         if (!filteredData || filteredData.buckets.length === 0) {
             return [];
@@ -573,148 +544,212 @@ export default function TaskConcurrencyTab({
         const { buckets, series, template_breakdown } = filteredData;
         const resultTraces: PlotlyData[] = [];
 
-        visibleStatuses.forEach((statusName, statusIndex) => {
-            const yAxisKey = statusIndex === 0 ? 'y' : `y${statusIndex + 1}`;
-
-            if (groupByTemplate && template_breakdown?.[statusName]) {
-                // Show grouped bars by template
-                let templates = getTemplatesForStatus(template_breakdown[statusName]);
+        if (groupByTemplate && template_breakdown) {
+            // Show grouped bars by template within each status
+            for (const statusName of visibleStatuses) {
+                if (!template_breakdown[statusName]) continue;
+                let templates = getTemplatesForStatus(
+                    template_breakdown[statusName]
+                );
                 if (selectedTemplates.length > 0) {
-                    templates = templates.filter(t => selectedTemplates.includes(t));
+                    templates = templates.filter(t =>
+                        selectedTemplates.includes(t)
+                    );
                 }
                 const statusColor = STATUS_COLORS[statusName];
-                const shades = generateColorShades(statusColor.rgb, templates.length);
+                const shades = generateColorShades(
+                    statusColor.rgb,
+                    templates.length
+                );
 
                 templates.forEach((templateName, idx) => {
-                    const templateCounts = buckets.map((_, bucketIdx) =>
-                        template_breakdown[statusName][bucketIdx]?.[templateName] || 0
+                    const templateCounts = buckets.map(
+                        (_, bucketIdx) =>
+                            template_breakdown[statusName][
+                                bucketIdx
+                            ]?.[templateName] || 0
                     );
-                    const colors = shades[idx] || shades[shades.length - 1];
+                    const colors =
+                        shades[idx] || shades[shades.length - 1];
 
                     resultTraces.push({
                         x: buckets,
                         y: templateCounts,
                         name: templateName,
                         type: 'bar',
-                        marker: { color: colors.fill, line: { color: colors.line, width: 1 } },
-                        yaxis: yAxisKey,
+                        marker: {
+                            color: colors.fill,
+                            line: {
+                                color: colors.line,
+                                width: 1,
+                            },
+                        },
                         hovertemplate: `<b>${templateName}</b><br>Count: %{y}<extra>${STATUS_DISPLAY_LABEL[statusName] ?? statusName}</extra>`,
                     });
                 });
-            } else {
-                // Show aggregate status bar
+            }
+        } else if (
+            selectedTemplates.length > 0 &&
+            template_breakdown
+        ) {
+            // Split each status into selected (solid) + rest (dimmed)
+            for (const statusName of visibleStatuses) {
                 const colors = STATUS_COLORS[statusName];
-                const filteredSeries = getFilteredSeriesForStatus(
-                    statusName, buckets, series, template_breakdown, selectedTemplates
+                const bd = template_breakdown[statusName];
+                const totalSeries = series[statusName];
+                const label =
+                    STATUS_DISPLAY_LABEL[statusName] ??
+                    statusName;
+
+                const selectedCounts = buckets.map(
+                    (_, idx) => {
+                        if (!bd?.[idx]) return 0;
+                        return selectedTemplates.reduce(
+                            (sum, t) =>
+                                sum + (bd[idx][t] || 0),
+                            0
+                        );
+                    }
+                );
+                const restCounts = buckets.map(
+                    (_, idx) =>
+                        (totalSeries?.[idx] ?? 0) -
+                        selectedCounts[idx]
                 );
 
+                resultTraces.push({
+                    x: buckets,
+                    y: restCounts,
+                    name: label + ' (other)',
+                    legendgroup: statusName,
+                    showlegend: false,
+                    type: 'bar',
+                    marker: {
+                        color: `rgba(${colors.rgb[0]}, ${colors.rgb[1]}, ${colors.rgb[2]}, 0.12)`,
+                        line: { width: 0 },
+                    },
+                    hovertemplate: `<b>${label} (other)</b>: %{y}<extra></extra>`,
+                });
+
+                resultTraces.push({
+                    x: buckets,
+                    y: selectedCounts,
+                    name: label,
+                    legendgroup: statusName,
+                    type: 'bar',
+                    marker: {
+                        color: colors.line,
+                        line: { width: 0 },
+                    },
+                    hovertemplate: `<b>${label} (${selectedTemplates.join(', ')})</b>: %{y}<extra></extra>`,
+                });
+            }
+        } else {
+            // No selection — single stacked bar per status
+            for (const statusName of visibleStatuses) {
+                const colors = STATUS_COLORS[statusName];
+
                 const hoverText = buckets.map((_, idx) => {
-                    const breakdown = template_breakdown?.[statusName]?.[idx];
+                    const breakdown =
+                        template_breakdown?.[statusName]?.[
+                            idx
+                        ];
                     return formatTemplateBreakdown(breakdown);
                 });
 
                 resultTraces.push({
                     x: buckets,
-                    y: filteredSeries,
-                    name: STATUS_DISPLAY_LABEL[statusName] ?? statusName,
+                    y: series[statusName],
+                    name:
+                        STATUS_DISPLAY_LABEL[statusName] ??
+                        statusName,
                     type: 'bar',
-                    marker: { color: colors.fill, line: { color: colors.line, width: 1 } },
-                    yaxis: yAxisKey,
+                    marker: {
+                        color: colors.fill,
+                        line: { width: 0 },
+                    },
                     text: hoverText,
                     hovertemplate: `<b>${STATUS_DISPLAY_LABEL[statusName] ?? statusName}</b>: %{y}%{text}<extra></extra>`,
                 });
             }
-        });
+        }
 
         return resultTraces;
-    }, [filteredData, visibleStatuses, groupByTemplate, selectedTemplates, formatTemplateBreakdown]);
+    }, [
+        filteredData,
+        visibleStatuses,
+        groupByTemplate,
+        selectedTemplates,
+        formatTemplateBreakdown,
+    ]);
 
 
-    const layout: Partial<Layout> = useMemo(
-        () => {
-            const numSubplots = visibleStatuses.length || 1;
-            const gap = 0.03; // Gap between subplots
-            const plotHeight = (1 - gap * (numSubplots - 1)) / numSubplots;
-
-            // Calculate max y value across all visible statuses for normalization
-            let maxY = 0;
-            if (normalizeYAxis && filteredData?.series) {
-                for (const statusName of visibleStatuses) {
-                    const seriesData = filteredData.series[statusName];
-                    if (seriesData) {
-                        const statusMax = Math.max(...seriesData);
-                        if (statusMax > maxY) maxY = statusMax;
-                    }
-                }
-                // Add 10% padding
-                maxY = Math.ceil(maxY * 1.1);
-            }
-
-            // Build y-axis configs for each subplot
-            const yAxes: Record<string, object> = {};
-            visibleStatuses.forEach((statusName, idx) => {
-                const axisKey = idx === 0 ? 'yaxis' : `yaxis${idx + 1}`;
-                const domainStart = 1 - (idx + 1) * plotHeight - idx * gap;
-                const domainEnd = 1 - idx * plotHeight - idx * gap;
-
-                yAxes[axisKey] = {
-                    title: {
-                        text: STATUS_DISPLAY_LABEL[statusName] ?? statusName,
-                        font: { size: 12, family: 'Roboto, sans-serif', color: STATUS_COLORS[statusName]?.line },
+    const layout: Partial<Layout> = useMemo(() => {
+        return {
+            xaxis: {
+                title: {
+                    text: 'Time',
+                    font: {
+                        size: 12,
+                        family: 'Roboto, sans-serif',
                     },
-                    tickfont: { size: 10 },
-                    gridcolor: 'rgba(0,0,0,0.1)',
-                    rangemode: 'tozero',
-                    domain: [Math.max(0, domainStart), domainEnd],
-                    anchor: 'x',
-                    ...(normalizeYAxis && maxY > 0 ? { range: [0, maxY] } : {}),
-                };
-            });
-
-            return {
-                xaxis: {
-                    title: {
-                        text: 'Time',
-                        font: { size: 14, family: 'Roboto, sans-serif' },
+                },
+                tickfont: { size: 11 },
+                gridcolor: 'rgba(0,0,0,0.08)',
+                type: 'date',
+                ticks: 'outside',
+                ticklen: 5,
+                tickwidth: 1,
+                tickcolor: 'rgba(0,0,0,0.3)',
+                showgrid: true,
+                ...(xAxisRange
+                    ? { range: xAxisRange, autorange: false }
+                    : { autorange: true }),
+            },
+            yaxis: {
+                title: {
+                    text: 'Tasks',
+                    font: {
+                        size: 12,
+                        family: 'Roboto, sans-serif',
                     },
-                    tickfont: { size: 11 },
-                    gridcolor: 'rgba(0,0,0,0.2)',
-                    type: 'date',
-                    dtick: bucketSeconds * 1000,
-                    tick0: filteredData?.buckets?.[0],
-                    ticks: 'outside',
-                    ticklen: 5,
-                    tickwidth: 1,
-                    tickcolor: 'rgba(0,0,0,0.3)',
-                    showgrid: true,
-                    // Anchor to bottom subplot
-                    anchor: numSubplots > 1 ? `y${numSubplots}` : 'y',
-                    ...(xAxisRange
-                        ? { range: xAxisRange, autorange: false }
-                        : { autorange: true }
-                    ),
                 },
-                ...yAxes,
-                barmode: groupByTemplate ? 'group' : 'stack',
-                autosize: true,
-                showlegend: groupByTemplate, // Show legend when grouped by template
-                margin: isSmallScreen
-                    ? { l: 60, r: 15, t: 30, b: 50, pad: 3 }
-                    : { l: 70, r: 20, t: 30, b: 50, pad: 5 },
-                hovermode: 'x unified' as const,
-                hoverlabel: {
-                    bgcolor: 'white',
-                    bordercolor: '#ccc',
-                    font: { color: '#333', size: 12 },
-                },
-                dragmode: dragMode,
-                uirevision: uiRevision,
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                paper_bgcolor: 'rgba(0,0,0,0)',
-            };
-        },
-        [isSmallScreen, xAxisRange, dragMode, uiRevision, bucketSeconds, filteredData, visibleStatuses, groupByTemplate, normalizeYAxis]
-    );
+                tickfont: { size: 10 },
+                gridcolor: 'rgba(0,0,0,0.08)',
+                rangemode: 'tozero',
+            },
+            barmode: groupByTemplate ? 'group' : 'stack',
+            autosize: true,
+            showlegend: true,
+            legend: {
+                orientation: 'h',
+                y: 1.02,
+                yanchor: 'bottom',
+                x: 0.5,
+                xanchor: 'center',
+                font: { size: 11 },
+            },
+            margin: isSmallScreen
+                ? { l: 50, r: 15, t: 30, b: 50, pad: 3 }
+                : { l: 60, r: 20, t: 30, b: 50, pad: 5 },
+            hovermode: 'x unified' as const,
+            hoverlabel: {
+                bgcolor: 'white',
+                bordercolor: '#ccc',
+                font: { color: '#333', size: 12 },
+            },
+            dragmode: dragMode,
+            uirevision: uiRevision,
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            paper_bgcolor: 'rgba(0,0,0,0)',
+        };
+    }, [
+        isSmallScreen,
+        xAxisRange,
+        dragMode,
+        uiRevision,
+        groupByTemplate,
+    ]);
 
     const handleExportCSV = useCallback(() => {
         if (!filteredData?.buckets?.length) return;
@@ -1090,14 +1125,6 @@ export default function TaskConcurrencyTab({
                                     sx={{ fontSize: '0.75rem', textTransform: 'none' }}
                                 >
                                     By Template
-                                </Button>
-                                <Button
-                                    size="small"
-                                    variant={normalizeYAxis ? 'contained' : 'outlined'}
-                                    onClick={() => setNormalizeYAxis(!normalizeYAxis)}
-                                    sx={{ fontSize: '0.75rem', textTransform: 'none' }}
-                                >
-                                    Sync Scales
                                 </Button>
                             </Box>
                         </Box>

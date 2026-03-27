@@ -874,10 +874,21 @@ async def update_array_max_running(
 
 @api_v3_router.get("/workflow/{workflow_id}/task_template_dag")
 async def task_template_dag(workflow_id: str, db: Session = Depends(get_db)) -> Any:
-    """Compute the shape of a Workflow's DAG by TaskTemplate."""
+    """Compute the shape of a Workflow's DAG by TaskTemplate.
+
+    Templates whose nodes span multiple pipeline stages are split into
+    numbered phases so the resulting graph stays acyclic and faithfully
+    represents the execution order.
+    """
     dag_query = db.query(Workflow.dag_id).filter(Workflow.id == workflow_id)
 
     dag_id = dag_query.scalar()
+
+    if dag_id is None:
+        return JSONResponse(
+            content={"tt_dag": []},
+            status_code=StatusCodes.OK,
+        )
 
     query = (
         db.query(
@@ -899,50 +910,133 @@ async def task_template_dag(workflow_id: str, db: Session = Depends(get_db)) -> 
 
     rows = db.execute(query).fetchall()
 
-    node_to_name = {row.node_id: row.name for row in rows}
-    tt_dag_dict: dict[str, set[str]] = {}
+    node_to_name: dict[int, str] = {row.node_id: row.name for row in rows}
+
+    # Build node-level adjacency list (the true DAG)
+    node_adj: dict[int, list[int]] = defaultdict(list)
+    all_node_ids: set[int] = set()
 
     for row in rows:
-        task_name = row.name
-
-        if task_name not in tt_dag_dict:
-            tt_dag_dict[task_name] = set()
+        src_id = row.node_id
+        all_node_ids.add(src_id)
 
         if row.downstream_node_ids:
             try:
                 downstream_ids = normalize_node_ids(row.downstream_node_ids)
-                if downstream_ids:
-                    # Add downstream task names
-                    for downstream_id in downstream_ids:
-                        downstream_name = node_to_name.get(downstream_id)
-                        if downstream_name:
-                            tt_dag_dict[task_name].add(downstream_name)
+                for did in downstream_ids or []:
+                    if did in node_to_name:
+                        all_node_ids.add(did)
+                        node_adj[src_id].append(did)
             except ValueError as e:
-                # Handle malformed downstream_node_ids
                 logger.warning(
                     f"Malformed downstream_node_ids for node "
                     f"{row.node_id}: {row.downstream_node_ids}, error: {e}"
                 )
 
+    # Build reverse adjacency for upstream lookup
+    reverse_adj: dict[int, list[int]] = defaultdict(list)
+    for src, dsts in node_adj.items():
+        for d in dsts:
+            reverse_adj[d].append(src)
+
+    # Group nodes by template name, then sub-group by which
+    # *other* templates feed into them. This captures pipeline
+    # phases: e.g. finalize_provenance_stage fed by gk_model_stage
+    # is a different phase than one fed by squeeze_stage.
+    # Self-references (same template feeding itself) are ignored
+    # to avoid over-splitting.
+    template_nodes: dict[str, list[int]] = defaultdict(list)
+    for nid in all_node_ids:
+        template_nodes[node_to_name[nid]].append(nid)
+
+    # Assign each node to a "phase label"
+    node_to_phase: dict[int, str] = {}
+
+    for tt_name, nids in template_nodes.items():
+        # Group by cross-template upstream signature
+        sig_groups: dict[frozenset[str], list[int]] = defaultdict(list)
+        for nid in nids:
+            cross_upstream = frozenset(
+                node_to_name[u]
+                for u in reverse_adj.get(nid, [])
+                if u in node_to_name and node_to_name[u] != tt_name
+            )
+            sig_groups[cross_upstream].append(nid)
+
+        if len(sig_groups) == 1:
+            # Single phase — use the template name as-is
+            for nid in nids:
+                node_to_phase[nid] = tt_name
+        else:
+            # Second pass: merge upstream-phases that share the
+            # same cross-template downstream set, since they
+            # represent the same logical pipeline stage.
+            downstream_merge: dict[frozenset[str], list[int]] = defaultdict(list)
+            for sig, group_nids in sig_groups.items():
+                # Compute combined downstream for this group
+                ds_templates: set[str] = set()
+                for nid in group_nids:
+                    for d in node_adj.get(nid, []):
+                        if d in node_to_name:
+                            dn = node_to_name[d]
+                            if dn != tt_name:
+                                ds_templates.add(dn)
+                downstream_merge[frozenset(ds_templates)].extend(group_nids)
+
+            if len(downstream_merge) == 1:
+                for nid in nids:
+                    node_to_phase[nid] = tt_name
+            else:
+                sorted_keys = sorted(
+                    downstream_merge.keys(),
+                    key=lambda s: sorted(s),
+                )
+                for idx, key in enumerate(sorted_keys, 1):
+                    phase_label = f"{tt_name} ({idx})"
+                    for nid in downstream_merge[key]:
+                        node_to_phase[nid] = phase_label
+
+    # Build phase-level DAG (edges between phases, no self-loops)
+    phase_edges: dict[str, set[str]] = defaultdict(set)
+    all_phases: set[str] = set()
+
+    for nid in all_node_ids:
+        src_phase = node_to_phase[nid]
+        all_phases.add(src_phase)
+        for did in node_adj.get(nid, []):
+            if did in node_to_phase:
+                dst_phase = node_to_phase[did]
+                if dst_phase != src_phase:
+                    phase_edges[src_phase].add(dst_phase)
+
+    # Emit the response in the same format
     tt_dag: list[dict[str, str | None]] = []
-    for name, downstream_names in tt_dag_dict.items():
-        if downstream_names:
-            for downstream_name in downstream_names:
+    for phase in sorted(all_phases):
+        downstream = phase_edges.get(phase, set())
+        if downstream:
+            for ds in sorted(downstream):
                 tt_dag.append(
-                    {"name": name, "downstream_task_template_id": downstream_name}
+                    {
+                        "name": phase,
+                        "downstream_task_template_id": ds,
+                    }
                 )
         else:
-            tt_dag.append({"name": name, "downstream_task_template_id": None})
+            tt_dag.append({"name": phase, "downstream_task_template_id": None})
 
-    # Clean up intermediate data structures
-    del node_to_name
-    del tt_dag_dict
-    del rows
+    # Build mapping from phase labels to base template names
+    # (only includes entries where the phase label differs)
+    phase_map: dict[str, str] = {}
+    for nid, phase_label in node_to_phase.items():
+        base = node_to_name[nid]
+        if phase_label != base:
+            phase_map[phase_label] = base
 
-    resp_content = {"tt_dag": tt_dag}
-    resp = JSONResponse(
+    resp_content: dict[str, object] = {"tt_dag": tt_dag}
+    if phase_map:
+        resp_content["phase_map"] = phase_map
+
+    return JSONResponse(
         content=resp_content,
         status_code=StatusCodes.OK,
     )
-
-    return resp

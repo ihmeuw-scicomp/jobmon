@@ -3,6 +3,7 @@ import React, {
     useMemo,
     useEffect,
     useCallback,
+    useRef,
     createContext,
     useContext,
     useSyncExternalStore,
@@ -26,7 +27,7 @@ import { get_task_template_dag } from '@jobmon_gui/configs/ApiUrls.ts';
 import TaskTemplatePopover from '@jobmon_gui/components/TaskTemplatePopover.tsx';
 import { useQuery } from '@tanstack/react-query';
 import { TTStatus } from '@jobmon_gui/types/TaskTemplateStatus.ts';
-import { CircularProgress } from '@mui/material';
+import CircularProgress from '@mui/material/CircularProgress';
 import {
     TEMPLATE_STATUS_COLORS,
     TEMPLATE_STATUS_KEYS,
@@ -41,6 +42,7 @@ interface TaskTemplateDAGResponse {
         name: string;
         downstream_task_template_id?: string;
     }[];
+    phase_map?: Record<string, string>;
 }
 
 interface DagNodeData {
@@ -71,11 +73,18 @@ interface PopoverPosition {
 
 interface DagVisualState {
     hoveredId: string | null;
+    hoveredBase: string | null;
     selectedId: string | null;
+    selectedBase: string | null;
 }
 
 function createDagVisualStore() {
-    let state: DagVisualState = { hoveredId: null, selectedId: null };
+    let state: DagVisualState = {
+        hoveredId: null,
+        hoveredBase: null,
+        selectedId: null,
+        selectedBase: null,
+    };
     const listeners = new Set<() => void>();
 
     const notify = () => listeners.forEach(l => l());
@@ -88,15 +97,23 @@ function createDagVisualStore() {
                 listeners.delete(listener);
             };
         },
-        setHovered: (id: string | null) => {
+        setHovered: (id: string | null, base?: string | null) => {
             if (state.hoveredId !== id) {
-                state = { ...state, hoveredId: id };
+                state = {
+                    ...state,
+                    hoveredId: id,
+                    hoveredBase: base ?? id,
+                };
                 notify();
             }
         },
-        setSelected: (id: string | null) => {
+        setSelected: (id: string | null, base?: string | null) => {
             if (state.selectedId !== id) {
-                state = { ...state, selectedId: id };
+                state = {
+                    ...state,
+                    selectedId: id,
+                    selectedBase: base ?? id,
+                };
                 notify();
             }
         },
@@ -106,26 +123,33 @@ function createDagVisualStore() {
 type DagVisualStore = ReturnType<typeof createDagVisualStore>;
 
 const DagVisualStoreContext = createContext<DagVisualStore | null>(null);
+const PhaseMapContext = createContext<Record<string, string>>({});
 
 function useDagNodeIsHovered(id: string): boolean {
     const store = useContext(DagVisualStoreContext)!;
+    const pm = useContext(PhaseMapContext);
+    const baseName = resolveBaseName(id, pm);
     return useSyncExternalStore(
         store.subscribe,
-        useCallback(
-            () => store.getSnapshot().hoveredId === id,
-            [store, id]
-        )
+        useCallback(() => {
+            const { hoveredId, hoveredBase } = store.getSnapshot();
+            if (!hoveredId) return false;
+            return hoveredId === id || hoveredBase === baseName;
+        }, [store, id, baseName])
     );
 }
 
 function useDagNodeIsSelected(id: string): boolean {
     const store = useContext(DagVisualStoreContext)!;
+    const pm = useContext(PhaseMapContext);
+    const baseName = resolveBaseName(id, pm);
     return useSyncExternalStore(
         store.subscribe,
-        useCallback(
-            () => store.getSnapshot().selectedId === id,
-            [store, id]
-        )
+        useCallback(() => {
+            const { selectedId, selectedBase } = store.getSnapshot();
+            if (!selectedId) return false;
+            return selectedId === id || selectedBase === baseName;
+        }, [store, id, baseName])
     );
 }
 
@@ -144,11 +168,12 @@ const NODE_DIMENSIONS = {
 } as const;
 
 const DAGRE_LAYOUT = {
-    rankdir: 'TB' as const,
-    ranksep: 60,
-    nodesep: 50,
+    rankdir: 'LR' as const,
+    ranksep: 80,
+    nodesep: 30,
     marginx: 20,
     marginy: 20,
+    ranker: 'network-simplex' as const,
 };
 
 const POPOVER_OFFSET = 16;
@@ -255,6 +280,14 @@ function getNodeDimensions(
     return { width, height };
 }
 
+/** Look up the base template name for a phase label using the API-provided map. */
+function resolveBaseName(
+    phaseLabel: string,
+    phaseMap: Record<string, string>
+): string {
+    return phaseMap[phaseLabel] ?? phaseLabel;
+}
+
 function buildNodesAndEdges(
     ttDag: TaskTemplateDAGResponse['tt_dag']
 ): {
@@ -287,7 +320,7 @@ function buildNodesAndEdges(
             });
             seenIds.add(targetId);
         }
-        if (targetId) {
+        if (targetId && targetId !== sourceId) {
             edges.push({
                 id: `e${index}`,
                 source: sourceId,
@@ -353,7 +386,7 @@ const DagNode = React.memo(function DagNode({
 
     return (
         <>
-            <Handle type="target" position={Position.Top} />
+            <Handle type="target" position={Position.Left} />
             <div
                 style={{
                     width,
@@ -401,7 +434,7 @@ const DagNode = React.memo(function DagNode({
                     </div>
                 )}
             </div>
-            <Handle type="source" position={Position.Bottom} />
+            <Handle type="source" position={Position.Right} />
         </>
     );
 });
@@ -419,6 +452,7 @@ interface WorkflowDAGProps {
     hoveredTemplateName?: string | null;
     onTemplateSelect?: (name: string) => void;
     onTemplateHover?: (name: string | null) => void;
+    onNodeCount?: (count: number) => void;
     height?: string;
 }
 
@@ -431,6 +465,7 @@ function WorkflowDAGInner({
     hoveredTemplateName,
     onTemplateSelect,
     onTemplateHover,
+    onNodeCount,
     height,
 }: WorkflowDAGProps) {
     const navigate = useNavigate();
@@ -440,6 +475,7 @@ function WorkflowDAGInner({
 
     const [nodes, setNodes] = useState<Node<DagNodeData>[]>([]);
     const [edges, setEdges] = useState<Edge[]>([]);
+    const [phaseMap, setPhaseMap] = useState<Record<string, string>>({});
     const [popoverNodeId, setPopoverNodeId] = useState<string | null>(
         null
     );
@@ -471,6 +507,9 @@ function WorkflowDAGInner({
             return data;
         },
         enabled: !!workflowId,
+        staleTime: Infinity,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
     });
 
     // Structural layout — only contains label, dimensions, statusCounts.
@@ -480,12 +519,12 @@ function WorkflowDAGInner({
         const taskCounts: Record<string, number> = {};
         for (const node of nodes) {
             taskCounts[node.id] =
-                ttStatusByName[node.id]?.tasks ?? 0;
+                ttStatusByName[resolveBaseName(node.id, phaseMap)]?.tasks ?? 0;
         }
         const scales = computeRelativeScales(taskCounts);
 
         const nodesWithDimensions = nodes.map(node => {
-            const tt = ttStatusByName[node.id];
+            const tt = ttStatusByName[resolveBaseName(node.id, phaseMap)];
             const { width, height: h } = getNodeDimensions(
                 node.data?.label ?? '',
                 (tt?.tasks ?? 0) > 0,
@@ -512,22 +551,56 @@ function WorkflowDAGInner({
             };
         });
         return applyDagreLayout(nodesWithDimensions, edges);
-    }, [nodes, edges, ttStatusByName]);
+    }, [nodes, edges, ttStatusByName, phaseMap]);
 
-    // Fit the view once when the graph structure first loads.
+    // Fit the view when graph structure loads and when container resizes
+    const containerRef = useRef<HTMLDivElement>(null);
     const graphStructureKey = useMemo(
         () => nodes.map(n => n.id).sort().join('\0'),
         [nodes]
     );
 
+    const hasNodes = structuralNodes.length > 0;
+    const hasNodesRef = useRef(false);
+    hasNodesRef.current = hasNodes;
+
     useEffect(() => {
-        if (structuralNodes.length > 0) {
+        if (hasNodes) {
             const timer = setTimeout(() => {
-                fitView({ padding: 0.15, duration: 200 });
+                fitView({
+                    padding: 0.2,
+                    duration: 200,
+                    minZoom: 0.05,
+                });
             }, 50);
             return () => clearTimeout(timer);
         }
-    }, [graphStructureKey, fitView]);
+    }, [graphStructureKey, fitView, hasNodes]);
+
+    // Re-fit on container resize (e.g. drag handle).
+    // Uses a ref for the hasNodes check to keep the observer stable.
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        let rafId: number;
+        const observer = new ResizeObserver(() => {
+            cancelAnimationFrame(rafId);
+            if (hasNodesRef.current) {
+                rafId = requestAnimationFrame(() => {
+                    fitView({
+                        padding: 0.2,
+                        duration: 0,
+                        minZoom: 0.05,
+                    });
+                });
+            }
+        });
+        observer.observe(el);
+        return () => {
+            observer.disconnect();
+            cancelAnimationFrame(rafId);
+        };
+    }, [fitView]);
 
     useEffect(() => {
         if (dagQuery.data) {
@@ -535,45 +608,68 @@ function WorkflowDAGInner({
                 buildNodesAndEdges(dagQuery.data.tt_dag);
             setNodes(newNodes);
             setEdges(newEdges);
+            setPhaseMap(dagQuery.data.phase_map ?? {});
+            onNodeCount?.(newNodes.length);
         }
-    }, [dagQuery.data]);
+    }, [dagQuery.data, onNodeCount]);
 
-    // Subscribe to hoveredId for edge highlighting
+    // Pre-compute base template name for each node id
+    const nodeIdToBase = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const node of nodes) {
+            map.set(
+                node.id,
+                resolveBaseName(node.id, phaseMap)
+            );
+        }
+        return map;
+    }, [nodes, phaseMap]);
+
+    // Subscribe to hover state only — selection changes should not
+    // recompute edge styles.
     const hoveredId = useSyncExternalStore(
         visualStore.subscribe,
         useCallback(() => visualStore.getSnapshot().hoveredId, [visualStore])
+    );
+    const hoveredBase = useSyncExternalStore(
+        visualStore.subscribe,
+        useCallback(() => visualStore.getSnapshot().hoveredBase, [visualStore])
     );
 
     const styledEdges = useMemo(() => {
         if (!hoveredId) {
             return edges.map(e => ({ ...e, style: EDGE_STYLE_DEFAULT }));
         }
-        return edges.map(e => ({
-            ...e,
-            style:
-                e.source === hoveredId || e.target === hoveredId
-                    ? EDGE_STYLE_HIGHLIGHTED
-                    : EDGE_STYLE_DIMMED,
-            zIndex:
-                e.source === hoveredId || e.target === hoveredId ? 1 : 0,
-        }));
-    }, [edges, hoveredId]);
+        const matches = (nodeId: string) =>
+            nodeId === hoveredId || nodeIdToBase.get(nodeId) === hoveredBase;
+        return edges.map(e => {
+            const hit = matches(e.source) || matches(e.target);
+            return {
+                ...e,
+                style: hit ? EDGE_STYLE_HIGHLIGHTED : EDGE_STYLE_DIMMED,
+                zIndex: hit ? 1 : 0,
+            };
+        });
+    }, [edges, hoveredId, hoveredBase, nodeIdToBase]);
 
     const popoverTTData = popoverNodeId
-        ? ttStatusByName[popoverNodeId]
+        ? ttStatusByName[resolveBaseName(popoverNodeId, phaseMap)]
         : undefined;
 
     const handleNodeMouseEnter = useCallback(
         (event: React.MouseEvent, node: Node<DagNodeData>) => {
-            visualStore.setHovered(node.id);
+            visualStore.setHovered(
+                node.id,
+                resolveBaseName(node.id, phaseMap)
+            );
             setPopoverNodeId(node.id);
             setPopoverPosition({
                 x: event.clientX,
                 y: event.clientY,
             });
-            onTemplateHover?.(node.id);
+            onTemplateHover?.(resolveBaseName(node.id, phaseMap));
         },
-        [onTemplateHover, visualStore]
+        [onTemplateHover, visualStore, phaseMap]
     );
 
     const handleNodeMouseLeave = useCallback(() => {
@@ -586,9 +682,9 @@ function WorkflowDAGInner({
     const handleNodeClick = useCallback(
         (_event: React.MouseEvent, node: Node<DagNodeData>) => {
             if (onTemplateSelect) {
-                onTemplateSelect(node.id);
+                onTemplateSelect(resolveBaseName(node.id, phaseMap));
             } else {
-                const tt = ttStatusByName[node.id];
+                const tt = ttStatusByName[resolveBaseName(node.id, phaseMap)];
                 if (tt) {
                     navigate(
                         `/workflow/${workflowId}/task_template/${tt.id}`
@@ -596,7 +692,7 @@ function WorkflowDAGInner({
                 }
             }
         },
-        [navigate, workflowId, ttStatusByName, onTemplateSelect]
+        [navigate, workflowId, ttStatusByName, onTemplateSelect, phaseMap]
     );
 
     const showPopover =
@@ -622,7 +718,9 @@ function WorkflowDAGInner({
 
     return (
         <DagVisualStoreContext.Provider value={visualStore}>
+        <PhaseMapContext.Provider value={phaseMap}>
             <div
+                ref={containerRef}
                 style={{
                     height: containerHeight,
                     width: '100%',
@@ -636,8 +734,9 @@ function WorkflowDAGInner({
                     onNodeMouseEnter={handleNodeMouseEnter}
                     onNodeMouseLeave={handleNodeMouseLeave}
                     onNodeClick={handleNodeClick}
+                    minZoom={0.05}
                     fitView
-                    fitViewOptions={{ padding: 0.15 }}
+                    fitViewOptions={{ padding: 0.2 }}
                 >
                     <Controls />
                     <Background />
@@ -658,6 +757,7 @@ function WorkflowDAGInner({
                     />
                 )}
             </div>
+        </PhaseMapContext.Provider>
         </DagVisualStoreContext.Provider>
     );
 }
