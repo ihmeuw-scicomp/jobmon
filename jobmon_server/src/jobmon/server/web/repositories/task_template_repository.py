@@ -30,6 +30,7 @@ from jobmon.server.web.schemas.task_template import (
     CoreInfoItem,
     ErrorLogItem,
     ErrorLogResponse,
+    FatalErrorBreakdownResponse,
     MostPopularQueueResponse,
     QueueInfoItem,
     RequestedCoresResponse,
@@ -852,11 +853,10 @@ class TaskTemplateRepository:
         self,
         workflow_id: int,
         task_template_version_id: int,
-    ) -> Dict[str, Any]:
+    ) -> FatalErrorBreakdownResponse:
         """Classify fatal tasks for one template by last TI status.
 
         Scoped to workflow + template for fast indexed lookup.
-        Returns {resource: N, app: N, infra: N}.
         """
         latest_ti_id_subq = (
             select(
@@ -886,19 +886,16 @@ class TaskTemplateRepository:
             .group_by(TaskInstance.status)
         )
 
-        result: Dict[str, Any] = {
-            "resource": 0,
-            "app": 0,
-            "infra": 0,
-            "resource_error_total": 0,
-        }
+        resource = 0
+        app = 0
+        infra = 0
         for row in self.session.execute(sql).all():
             if row.ti_status == TaskInstanceStatus.RESOURCE_ERROR:
-                result["resource"] += row.cnt
+                resource += row.cnt
             elif row.ti_status == TaskInstanceStatus.ERROR:
-                result["app"] += row.cnt
+                app += row.cnt
             else:
-                result["infra"] += row.cnt
+                infra += row.cnt
 
         z_count_sql = (
             select(func.count(TaskInstance.id))
@@ -910,10 +907,10 @@ class TaskTemplateRepository:
                 TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
             )
         )
-        result["resource_error_total"] = self.session.execute(z_count_sql).scalar() or 0
+        resource_error_total = self.session.execute(z_count_sql).scalar() or 0
 
-        # Sample of Z-status TI IDs for drill-down UI
-        if result["resource_error_total"] > 0:
+        resource_error_ti_ids: List[int] = []
+        if resource_error_total > 0:
             z_ids_sql = (
                 select(TaskInstance.id)
                 .join(Task, TaskInstance.task_id == Task.id)
@@ -926,11 +923,17 @@ class TaskTemplateRepository:
                 .order_by(TaskInstance.id.desc())
                 .limit(20)
             )
-            result["resource_error_ti_ids"] = [
+            resource_error_ti_ids = [
                 row[0] for row in self.session.execute(z_ids_sql).all()
             ]
 
-        return result
+        return FatalErrorBreakdownResponse(
+            resource=resource,
+            app=app,
+            infra=infra,
+            resource_error_total=resource_error_total,
+            resource_error_ti_ids=resource_error_ti_ids,
+        )
 
     def get_tt_error_log_viz(
         self,

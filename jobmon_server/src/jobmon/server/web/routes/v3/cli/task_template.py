@@ -233,11 +233,10 @@ def get_fatal_error_breakdown(
 ) -> FatalErrorBreakdownResponse:
     """Classify fatal errors for one template by type."""
     tt_repo = TaskTemplateRepository(db)
-    breakdown = tt_repo.get_fatal_error_breakdown_for_tt(
+    return tt_repo.get_fatal_error_breakdown_for_tt(
         workflow_id=workflow_id,
         task_template_version_id=tt_version_id,
     )
-    return FatalErrorBreakdownResponse(**breakdown)
 
 
 @api_v3_router.get("/tt_error_log_viz/{wf_id}/{tt_id}")
