@@ -8,6 +8,9 @@ All notable changes to Jobmon will be documented in this file.
 - **Task Status Audit**: TI-centric audit logging for task status transitions with `task_status_audit` table, `TaskFSM` service, and `TransitionService` with SKIP LOCKED support and retry logic
 - **Task Concurrency Visualization**: Interactive concurrency tab on workflow details with stacked bar charts per status, configurable bucket sizes, template grouping, and scale sync toggles
 - **Workflow DAG Redesign**: Two-panel workflow details layout with status-colored DAG nodes, mini status bars, edge highlighting, and visual state store for efficient re-renders
+- **Workflow Details Layout Redesign**: Full-width summary bar with progress percentages, resizable template list / DAG / charts panels, fullscreen toggle for all three panels
+- **Gantt Chart**: Horizontal swimlane timeline showing per-template execution spans with status breakdown within each row, replacing the stacked area subplots
+- **Phased DAG Splitting**: Backend splits task templates spanning multiple pipeline stages into numbered phases, eliminating false cycles in the template-level DAG; returns `phase_map` for safe frontend name resolution
 - **Dashboard Consolidation**: Redesigned Task Template Details into a unified dashboard layout with KPI cards, scatter plot, task table, and error clusters on a single page
 - **Error Detail Drawer**: Replaced full-page error modal with a right-side MUI Drawer (640px) that keeps the dashboard visible while inspecting error details
 - **ErrorClustersCard**: New consolidated component replacing ClusteredErrors, ErrorSummaryCard, and UsageFilters with error cluster list, scatter plot filter integration, and inline error detail drawer
@@ -21,6 +24,11 @@ All notable changes to Jobmon will be documented in this file.
 - **Force Cleanup for Stuck Task Instances**: New `--force-cleanup` flag in `jobmon workflow resume` command to manually cleanup stuck `KILL_SELF` task instances when jobs have been externally terminated (e.g., via `scancel` or node failure)
 
 ### Changed
+- **Status Chart**: Merged 5 separate concurrency subplots into single stacked bar chart; selected template highlighted with solid bars against dimmed background
+- **Tab Renaming**: Bottom panel tabs renamed from "Concurrency"/"Timeline" to "Status"/"Gantt"
+- **DAG Layout**: Switched to left-to-right orientation, auto-sizes panel based on node count, lowered minZoom to 0.05 for large workflows
+- **Progress Bars**: Inline percentage labels and hover tooltips on summary bar and template detail panel; percent-done shown in template list
+- **Progressive Loading**: Each page section loads independently instead of blocking on a single query
 - **Multiprocess Distributor**: Replaced multiprocessing queues with ThreadPoolExecutor, adding venv-aware worker_node_entry_point resolution and proper queueing error tracking
 - **Distributor `get_usage_stats()` Protocol**: Standardized return keys to `maxrss`, `cpu`, `usage_str` (all stringified) across multiprocess and sequential distributors. Worker node now passes these through directly instead of re-deriving them.
 - **Task Concurrency API**: Added ERROR and DONE status categories, interval-based counting for active statuses, and configurable bucket sizes
@@ -31,6 +39,10 @@ All notable changes to Jobmon will be documented in this file.
 - Unified status colors across all views (DAG, popover, concurrency chart, summary panel) into shared constants
 
 ### Fixed
+- **Concurrency Input**: PUT request now fires on blur instead of every keystroke
+- **Template Detail State**: Panel resets local state (concurrency value, status message) when switching templates
+- **DAG Self-Loops**: Filtered out meaningless self-loop edges at template level
+- **Division by Zero**: Guard in template list percentage display when template has zero tasks
 - **Task Instance State Transition Data Loss**: Moved attribute updates and error log creation to after successful transitions to avoid losing data when TransitionService rolls back due to lock contention
 - **Error Detail Missing task_id**: Fixed bug where `task_id` and `task_instance_id` were omitted from `ErrorLogItem` when querying by a specific task instance ID
 - **Error Text Readability**: Error and stderr code blocks now word-wrap long lines and use smaller font size (0.75rem)
@@ -46,6 +58,7 @@ All notable changes to Jobmon will be documented in this file.
 - **State Transition Validation**: Renamed `get_transit_status()` to `validate_transition()` with detailed logging at each validation step for improved debuggability of state machine issues.
 
 ### Removed
+- `WorkflowSummaryPanel.tsx` — split into `WorkflowSummaryBar` and `TemplateListPanel`
 - `Usage.tsx`, `UsageFilters.tsx`, `ErrorSummaryCard.tsx`, `ClusteredErrors.tsx` — replaced by consolidated dashboard components
 - `useUsageFilters` hook — filter logic moved into `TaskTemplateDetails` screen
 
