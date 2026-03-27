@@ -1,19 +1,39 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HashRouter, Route } from 'react-router-dom';
+import CircularProgress from '@mui/material/CircularProgress';
+import Box from '@mui/material/Box';
 import PageNavigation from '@jobmon_gui/components/navigation/PageNavigation';
 import CustomThemeProvider from '@jobmon_gui/contexts/CustomThemeProvider';
-import Help from '@jobmon_gui/screens/Help';
-import JobmonAtIHME from '@jobmon_gui/screens/JobmonAtIhme';
-import TaskDetails from '@jobmon_gui/screens/TaskDetails';
-import TaskTemplateDetails from '@jobmon_gui/screens/TaskTemplateDetails';
-import WorkflowDetails from '@jobmon_gui/screens/WorkflowDetails';
-import WorkflowOverview from '@jobmon_gui/screens/WorkflowOverview';
 import '@fontsource-variable/roboto-mono';
 import '@fontsource/archivo';
 import { ApmRoutes } from '@elastic/apm-rum-react';
 import { AuthProvider } from '@jobmon_gui/contexts/AuthContext.tsx';
+
+const Help = lazy(() => import('@jobmon_gui/screens/Help'));
+const JobmonAtIHME = lazy(() => import('@jobmon_gui/screens/JobmonAtIhme'));
+const TaskDetails = lazy(() => import('@jobmon_gui/screens/TaskDetails'));
+const TaskTemplateDetails = lazy(
+    () => import('@jobmon_gui/screens/TaskTemplateDetails')
+);
+const WorkflowDetails = lazy(
+    () => import('@jobmon_gui/screens/WorkflowDetails')
+);
+const WorkflowOverview = lazy(
+    () => import('@jobmon_gui/screens/WorkflowOverview')
+);
+
+const PageLoader = () => (
+    <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="60vh"
+    >
+        <CircularProgress />
+    </Box>
+);
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -34,6 +54,7 @@ root.render(
             <CustomThemeProvider>
                 <AuthProvider>
                     <PageNavigation>
+                        <Suspense fallback={<PageLoader />}>
                         <ApmRoutes>
                             <Route
                                 path="workflow/:workflowId"
@@ -62,6 +83,7 @@ root.render(
                                 }
                             />
                         </ApmRoutes>
+                        </Suspense>
                     </PageNavigation>
                 </AuthProvider>
             </CustomThemeProvider>

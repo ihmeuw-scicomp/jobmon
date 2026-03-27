@@ -30,7 +30,7 @@ export interface TaskStatusMeta {
 // Updated to reflect specific backend statuses and user preference for symbols
 // Using JobmonProgressBar colors from CSS variables for consistency
 export const taskStatusMeta: Record<string, TaskStatusMeta> = {
-    G: { label: 'Registered', symbol: 'diamond', color: '#e69f00' }, // --color-pending
+    G: { label: 'Registered', symbol: 'diamond', color: '#999999' }, // gray — distinguishable from Done for colorblind users
     Q: { label: 'Queued', symbol: 'diamond', color: '#e69f00' }, // --color-pending
     I: { label: 'Instantiated', symbol: 'diamond', color: '#e69f00' }, // --color-pending
     O: { label: 'Scheduled', symbol: 'square', color: '#f0e442' }, // --color-scheduled
@@ -44,6 +44,15 @@ export const taskStatusMeta: Record<string, TaskStatusMeta> = {
     E: { label: 'Error', symbol: 'x', color: '#d55e00' }, // Use fatal color for general errors
     UNKNOWN: { label: 'Unknown Status', symbol: 'asterisk', color: '#757575' }, // Gray fallback
 };
+
+// Resource error UI colors (distinct from FATAL to differentiate resource vs app errors)
+export const RESOURCE_ERROR_COLORS = {
+    main: '#e65100',
+    fatal: '#cc3311',
+    retried: '#2e7d32',
+    retriedBg: '#e8f5e9',
+    bannerBg: '#fff3e0',
+} as const;
 
 // Status codes that represent error/failure states
 export const ERROR_STATUSES = ['E', 'F', 'A', 'Z', 'X', 'U'] as const;

@@ -4,7 +4,6 @@ import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
-import CircularProgress from '@mui/material/CircularProgress';
 import Chip from '@mui/material/Chip';
 import Tooltip from '@mui/material/Tooltip';
 import FormControl from '@mui/material/FormControl';
@@ -15,11 +14,13 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import BuildIcon from '@mui/icons-material/Build';
 import InfoIcon from '@mui/icons-material/Info';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import humanizeDuration from 'humanize-duration';
 import axios from 'axios';
 import { TTStatus } from '@jobmon_gui/types/TaskTemplateStatus';
 import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors';
 import { getWorkflowUsageQueryFn } from '@jobmon_gui/queries/GetWorkflowUsage';
+import ErrorClustersCard from '@jobmon_gui/components/task_template_details/usage/ErrorClustersCard';
+import ResourceCard from '@jobmon_gui/components/workflow_details/ResourceCard';
+import { getFatalErrorBreakdownFn } from '@jobmon_gui/queries/GetFatalErrorBreakdown';
 import {
     set_task_template_concurrency_url,
     task_table_url,
@@ -33,19 +34,6 @@ import {
 import TemplateStatusBar from '@jobmon_gui/components/common/TemplateStatusBar';
 
 const MAX_CONCURRENCY_SENTINEL = 2147483647;
-
-const INITIAL_ERROR_DISPLAY = 3;
-
-function formatRuntime(seconds: number | null | undefined): string {
-    if (seconds == null) return 'N/A';
-    return humanizeDuration(seconds * 1000, { largest: 1, round: true });
-}
-
-function formatMemory(bytes: number | null | undefined): string {
-    if (bytes == null) return 'N/A';
-    const gib = bytes / 1073741824;
-    return `${gib.toFixed(1)} GiB`;
-}
 
 interface TemplateDetailPanelProps {
     workflowId: string | number;
@@ -62,7 +50,6 @@ export default function TemplateDetailPanel({
     onNavigate,
     disabled,
 }: TemplateDetailPanelProps) {
-    const [showAllErrors, setShowAllErrors] = useState(false);
     const [concurrencyValue, setConcurrencyValue] = useState<
         number | string
     >(
@@ -82,7 +69,6 @@ export default function TemplateDetailPanel({
         );
         setStatusMsg('');
         setShowManage(false);
-        setShowAllErrors(false);
     }, [templateData.task_template_version_id]);
 
     const updateConcurrency = useMutation({
@@ -161,7 +147,7 @@ export default function TemplateDetailPanel({
             'workflow_details',
             'clustered_errors',
             workflowId,
-            templateData.task_template_version_id,
+            templateData.id,
         ],
         queryFn: getClusteredErrorsFn,
         enabled: templateData.FATAL > 0,
@@ -177,17 +163,19 @@ export default function TemplateDetailPanel({
         queryFn: getWorkflowUsageQueryFn,
     });
 
-    const usageData = usageQuery.data;
-    const hasUsageData =
-        usageData &&
-        (usageData.median_runtime != null ||
-            usageData.median_mem != null);
+    const breakdownQuery = useQuery({
+        queryKey: [
+            'workflow_details',
+            'fatal_breakdown',
+            workflowId,
+            templateData.task_template_version_id,
+        ],
+        queryFn: getFatalErrorBreakdownFn,
+        enabled: templateData.FATAL > 0,
+        staleTime: 120000,
+    });
 
     const errorClusters = errorsQuery.data?.error_logs ?? [];
-    const totalErrorClusters = errorClusters.length;
-    const visibleErrors = showAllErrors
-        ? errorClusters
-        : errorClusters.slice(0, INITIAL_ERROR_DISPLAY);
 
     return (
         <Box sx={{ p: 2, height: '100%', overflow: 'auto' }}>
@@ -320,175 +308,28 @@ export default function TemplateDetailPanel({
                 </Box>
             </Box>
 
-            {/* Errors section */}
+            {/* Errors */}
             {templateData.FATAL > 0 && (
-                <Box sx={{ mb: 2 }}>
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                            mb: 1,
-                        }}
-                    >
-                        <Typography variant="subtitle2">
-                            Errors
-                        </Typography>
-                        {errorsQuery.isSuccess && (
-                            <Chip
-                                label={`${totalErrorClusters} cluster${totalErrorClusters !== 1 ? 's' : ''}`}
-                                size="small"
-                                sx={{
-                                    height: 20,
-                                    fontSize: '0.75rem',
-                                    backgroundColor: TEMPLATE_STATUS_COLORS.FATAL,
-                                    color: '#fff',
-                                }}
-                            />
-                        )}
-                    </Box>
-
-                    {errorsQuery.isLoading && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <CircularProgress size={16} />
-                            <Typography variant="caption" color="text.secondary">
-                                Loading errors...
-                            </Typography>
-                        </Box>
-                    )}
-
-                    {errorsQuery.isError && (
-                        <Typography variant="caption" color="text.secondary">
-                            Could not load errors
-                        </Typography>
-                    )}
-
-                    {errorsQuery.isSuccess && (
-                        <>
-                            <Box
-                                sx={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: 1,
-                                }}
-                            >
-                                {visibleErrors.map((cluster, idx) => (
-                                    <Box
-                                        key={idx}
-                                        sx={{
-                                            display: 'flex',
-                                            gap: 1,
-                                            p: 1,
-                                            borderRadius: 1,
-                                            border: '1px solid',
-                                            borderColor: 'divider',
-                                        }}
-                                    >
-                                        <Chip
-                                            label={`\u00d7${cluster.group_instance_count}`}
-                                            size="small"
-                                            sx={{
-                                                height: 22,
-                                                fontSize: '0.75rem',
-                                                fontWeight: 'bold',
-                                                backgroundColor:
-                                                    TEMPLATE_STATUS_COLORS.FATAL,
-                                                color: '#fff',
-                                                flexShrink: 0,
-                                            }}
-                                        />
-                                        <Typography
-                                            variant="body2"
-                                            sx={{
-                                                fontSize: '0.8rem',
-                                                overflow: 'hidden',
-                                                display: '-webkit-box',
-                                                WebkitLineClamp: 3,
-                                                WebkitBoxOrient:
-                                                    'vertical',
-                                                wordBreak: 'break-all',
-                                                lineHeight: 1.3,
-                                            }}
-                                        >
-                                            {cluster.sample_error}
-                                        </Typography>
-                                    </Box>
-                                ))}
-                            </Box>
-
-                            {totalErrorClusters > INITIAL_ERROR_DISPLAY &&
-                                !showAllErrors && (
-                                    <Typography
-                                        variant="body2"
-                                        color="primary"
-                                        sx={{
-                                            mt: 1,
-                                            cursor: 'pointer',
-                                            '&:hover': {
-                                                textDecoration: 'underline',
-                                            },
-                                        }}
-                                        onClick={() => setShowAllErrors(true)}
-                                    >
-                                        Show all {totalErrorClusters} clusters ▸
-                                    </Typography>
-                                )}
-                        </>
-                    )}
+                <Box sx={{ mb: 1 }}>
+                    <ErrorClustersCard
+                        errorLogs={errorClusters}
+                        isLoading={errorsQuery.isLoading}
+                        workflowId={workflowId}
+                        taskTemplateId={templateData.id}
+                        maxListHeight={120}
+                    />
                 </Box>
             )}
 
-            {/* Resources section */}
-            {usageQuery.isLoading && (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                    <CircularProgress size={16} />
-                    <Typography variant="caption" color="text.secondary">
-                        Loading resources...
-                    </Typography>
-                </Box>
-            )}
-
-            {hasUsageData && (
-                <Box
-                    sx={{
-                        display: 'grid',
-                        gridTemplateColumns: 'auto 1fr',
-                        gap: '2px 8px',
-                        mb: 1.5,
-                    }}
-                >
-                    <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                        Resources
-                    </Typography>
-                    <Box />
-                    {usageData.median_runtime != null && (
-                        <>
-                            <Typography variant="caption" color="text.secondary">Runtime</Typography>
-                            <Typography variant="caption">
-                                {formatRuntime(usageData.median_runtime)}
-                                {' ('}
-                                {formatRuntime(usageData.min_runtime)}
-                                {' – '}
-                                {formatRuntime(usageData.max_runtime)}
-                                {')'}
-                            </Typography>
-                        </>
-                    )}
-                    {usageData.median_mem != null && (
-                        <>
-                            <Typography variant="caption" color="text.secondary">Memory</Typography>
-                            <Typography variant="caption">
-                                {formatMemory(usageData.median_mem)}
-                                {' ('}
-                                {formatMemory(usageData.min_mem)}
-                                {' – '}
-                                {formatMemory(usageData.max_mem)}
-                                {')'}
-                            </Typography>
-                        </>
-                    )}
-                </Box>
-            )}
+            {/* Resources card */}
+            <ResourceCard
+                workflowId={workflowId}
+                taskTemplateId={templateData.id}
+                usageData={usageQuery.data ?? null}
+                usageLoading={usageQuery.isLoading}
+                breakdown={breakdownQuery.data}
+                breakdownLoading={breakdownQuery.isLoading}
+            />
 
         </Box>
     );

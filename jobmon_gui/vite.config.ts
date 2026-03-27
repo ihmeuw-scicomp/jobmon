@@ -14,6 +14,28 @@ export default defineConfig({
     define: {
         APP_VERSION: JSON.stringify(process.env.npm_package_version),
     },
+    build: {
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    plotly: ['plotly.js-cartesian-dist'],
+                    mui: [
+                        '@mui/material',
+                        '@mui/icons-material',
+                        '@emotion/react',
+                        '@emotion/styled',
+                    ],
+                    reactflow: ['reactflow', 'dagre'],
+                    vendor: [
+                        'react',
+                        'react-dom',
+                        'react-router-dom',
+                        '@tanstack/react-query',
+                    ],
+                },
+            },
+        },
+    },
     resolve: {
         alias: {
             '@jobmon_gui': path.resolve(__dirname, './src'),

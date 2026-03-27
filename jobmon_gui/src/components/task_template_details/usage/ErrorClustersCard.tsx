@@ -17,11 +17,19 @@ import CloseIcon from '@mui/icons-material/Close';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
+import CopyButton from '@jobmon_gui/components/common/CopyButton';
 import axios from 'axios';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
+import python from 'react-syntax-highlighter/dist/esm/languages/hljs/python';
+import rLang from 'react-syntax-highlighter/dist/esm/languages/hljs/r';
+import bash from 'react-syntax-highlighter/dist/esm/languages/hljs/bash';
 import { error_log_viz_url } from '@jobmon_gui/configs/ApiUrls';
+
+SyntaxHighlighter.registerLanguage('python', python);
+SyntaxHighlighter.registerLanguage('r', rLang);
+SyntaxHighlighter.registerLanguage('bash', bash);
 import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios';
 import HtmlTooltip from '@jobmon_gui/components/HtmlToolTip';
 import { formatJobmonDate } from '@jobmon_gui/utils/DayTime.ts';
@@ -29,7 +37,7 @@ import { getTaskDetailsQueryFn } from
     '@jobmon_gui/queries/GetTaskDetails.ts';
 import {
     ClusteredError,
-    ErrorDetails,
+    ErrorLog,
     ErrorSampleDetails,
 } from '@jobmon_gui/types/ClusteredErrors.ts';
 
@@ -63,7 +71,9 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
     const [language, setLanguage] = useState('python');
 
     // --- Error detail query ---
-    const errorDetails = useQuery({
+    const errorDetails = useQuery<{
+        error_logs: ErrorLog[];
+    } | undefined>({
         queryKey: [
             'workflow_details',
             'error_details',
@@ -73,26 +83,35 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
         ],
         queryFn: async () => {
             if (errorDetailIndex === null) {
-                return;
+                return undefined;
             }
             if (
                 errorDetailIndex.sample_index >=
                 errorDetailIndex.sample_ids.length
             ) {
-                return;
+                return undefined;
             }
             const ti_id =
                 errorDetailIndex.sample_ids[
                     errorDetailIndex.sample_index
                 ];
             return axios
-                .get(
+                .get<{ error_logs: ErrorLog[] }>(
                     `${error_log_viz_url}${workflowId}/${taskTemplateId}/${ti_id}`,
                     { ...jobmonAxiosConfig, data: null }
                 )
                 .then(r => r.data);
         },
         enabled: !!taskTemplateId && errorDetailIndex !== null,
+    });
+
+    const currentError =
+        errorDetails.data?.error_logs?.[0] ?? null;
+    const taskDetailsQuery = useQuery({
+        queryKey: ['task_details', currentError?.task_id],
+        queryFn: getTaskDetailsQueryFn,
+        enabled: currentError?.task_id != null,
+        staleTime: 300000,
     });
 
     // Prefetch next sample
@@ -195,8 +214,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
             );
         }
         const error =
-            (errorDetails as unknown as ErrorDetails)?.data
-                ?.error_logs?.[0] ?? null;
+            errorDetails.data?.error_logs?.[0] ?? null;
         if (errorDetails.isError || !error) {
             return (
                 <Typography sx={{ p: 2 }}>
@@ -352,6 +370,62 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                             'No stderr output found'}
                     </SyntaxHighlighter>
                 </Box>
+
+                {/* Command */}
+                {taskDetailsQuery.data?.task_command && (
+                    <>
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent:
+                                    'space-between',
+                                mt: 2,
+                                mb: 1,
+                            }}
+                        >
+                            <Typography
+                                variant="subtitle2"
+                                fontWeight="bold"
+                            >
+                                Command
+                            </Typography>
+                            <CopyButton
+                                text={
+                                    taskDetailsQuery.data
+                                        .task_command
+                                }
+                                tooltip="Copy command"
+                            />
+                        </Box>
+                        <Box
+                            sx={{
+                                maxHeight: '20vh',
+                                overflow: 'auto',
+                                bgcolor: '#eee',
+                                borderRadius: 1,
+                                fontSize: '0.75rem',
+                                '& pre': {
+                                    whiteSpace:
+                                        'pre-wrap !important',
+                                    wordBreak:
+                                        'break-word !important',
+                                    m: '0 !important',
+                                },
+                            }}
+                        >
+                            <SyntaxHighlighter
+                                language="bash"
+                                wrapLongLines
+                            >
+                                {
+                                    taskDetailsQuery.data
+                                        .task_command
+                                }
+                            </SyntaxHighlighter>
+                        </Box>
+                    </>
+                )}
             </Box>
         );
     };

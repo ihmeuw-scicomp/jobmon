@@ -31,9 +31,3 @@ export type ClusteredErrorList = {
     page: number;
     page_size: number;
 };
-
-export interface ErrorDetails {
-    data?: {
-        error_logs?: ErrorLog[];
-    };
-}

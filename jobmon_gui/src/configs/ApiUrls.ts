@@ -44,6 +44,10 @@ export const get_task_template_details_url = (
     `/get_task_template_details?workflow_id=${workflowId}&task_template_id=${taskTemplateId}`;
 
 export const update_task_status_url = api_base_url + `/task/update_statuses`;
+export const workflow_has_resource_errors_url =
+    api_base_url + '/workflow_has_resource_errors/';
+export const fatal_error_breakdown_url =
+    api_base_url + '/fatal_error_breakdown/';
 export const get_task_template_id_url = (
     task_template_version_id: number | string
 ) => api_base_url + `/task_template/id/${task_template_version_id}`;

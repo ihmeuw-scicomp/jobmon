@@ -10,6 +10,7 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import CopyButton from '@jobmon_gui/components/common/CopyButton';
 import { BiRun } from 'react-icons/bi';
 import { IoMdCloseCircle, IoMdCloseCircleOutline } from 'react-icons/io';
 import {
@@ -197,26 +198,34 @@ export default function TaskSummaryCard({
                     >
                         Command
                     </Typography>
-                    <Tooltip
-                        title={
-                            commandOpen
-                                ? 'Hide command'
-                                : 'Show command'
-                        }
-                    >
-                        <IconButton
-                            size="small"
-                            onClick={() =>
-                                setCommandOpen(!commandOpen)
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        {commandOpen && taskDetails.task_command && (
+                            <CopyButton
+                                text={taskDetails.task_command}
+                                tooltip="Copy command"
+                            />
+                        )}
+                        <Tooltip
+                            title={
+                                commandOpen
+                                    ? 'Hide command'
+                                    : 'Show command'
                             }
                         >
-                            {commandOpen ? (
-                                <ExpandLessIcon fontSize="small" />
-                            ) : (
-                                <ExpandMoreIcon fontSize="small" />
-                            )}
-                        </IconButton>
-                    </Tooltip>
+                            <IconButton
+                                size="small"
+                                onClick={() =>
+                                    setCommandOpen(!commandOpen)
+                                }
+                            >
+                                {commandOpen ? (
+                                    <ExpandLessIcon fontSize="small" />
+                                ) : (
+                                    <ExpandMoreIcon fontSize="small" />
+                                )}
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
                 </Box>
                 <Collapse in={commandOpen}>
                     <ScrollableCodeBlock maxheight="150px">
