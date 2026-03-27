@@ -1737,6 +1737,50 @@ def test_increase_resources_selective_update(client_env, db_engine, tool):
         assert task3_final_resources == {"memory": 3, "runtime": 180}  # Still unchanged
 
 
+def _ensure_workflow_run(session, workflow_id):
+    """Ensure a workflow_run exists, creating one if needed. Return its id."""
+    wfr_id = session.execute(
+        text(
+            "SELECT id FROM workflow_run " f"WHERE workflow_id = {workflow_id} LIMIT 1"
+        )
+    ).scalar()
+    if wfr_id is None:
+        session.execute(
+            text(
+                "INSERT INTO workflow_run "
+                "(workflow_id, status, status_date) "
+                f"VALUES ({workflow_id}, 'O', datetime('now'))"
+            )
+        )
+        session.flush()
+        wfr_id = session.execute(
+            text(
+                "SELECT id FROM workflow_run "
+                f"WHERE workflow_id = {workflow_id} LIMIT 1"
+            )
+        ).scalar()
+    return wfr_id
+
+
+def _create_task_instance(session, workflow_id, task_id, status):
+    """Insert a task instance with the minimum required fields."""
+    wfr_id = _ensure_workflow_run(session, workflow_id)
+    row = session.execute(
+        text("SELECT task_resources_id, array_id FROM task " f"WHERE id = {task_id}")
+    ).one()
+    session.execute(
+        text(
+            "INSERT INTO task_instance "
+            "(workflow_run_id, task_id, task_resources_id, "
+            "array_id, array_batch_num, array_step_id, "
+            "status, status_date) "
+            f"VALUES ({wfr_id}, {task_id}, {row[0]}, "
+            f"{row[1]}, 0, 0, "
+            f"'{status}', datetime('now'))"
+        )
+    )
+
+
 def test_workflow_has_resource_errors(client_env, db_engine):
     """Test the workflow_has_resource_errors endpoint."""
     t = Tool(name="gui_resource_errors_test")
@@ -1765,18 +1809,7 @@ def test_workflow_has_resource_errors(client_env, db_engine):
 
     # Create a task instance with resource error status
     with Session(bind=db_engine) as session:
-        session.execute(
-            text(
-                f"""
-                INSERT INTO task_instance
-                    (workflow_run_id, task_id, status, status_date)
-                SELECT wr.id, {task.task_id}, 'Z', datetime('now')
-                FROM workflow_run wr
-                WHERE wr.workflow_id = {wf.workflow_id}
-                LIMIT 1
-                """
-            )
-        )
+        _create_task_instance(session, wf.workflow_id, task.task_id, "Z")
         session.commit()
 
     return_code, msg = wf.requester.send_request(
@@ -1828,19 +1861,11 @@ def test_fatal_error_breakdown(client_env, db_engine):
             (t2, "E"),
             (t3, "U"),
         ]:
-            session.execute(
-                text(
-                    f"""
-                    INSERT INTO task_instance
-                        (workflow_run_id, task_id, status,
-                         status_date)
-                    SELECT wr.id, {task.task_id}, '{ti_status}',
-                           datetime('now')
-                    FROM workflow_run wr
-                    WHERE wr.workflow_id = {wf.workflow_id}
-                    LIMIT 1
-                    """
-                )
+            _create_task_instance(
+                session,
+                wf.workflow_id,
+                task.task_id,
+                ti_status,
             )
         session.commit()
 
