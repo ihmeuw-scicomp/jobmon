@@ -395,28 +395,24 @@ h-1rem {
 }
 
 /* Color blindness palettes: https://davidmathlogic.com/colorblind/#%23D81B60-%231E88E5-%23FFC107-%23004D40 */
-/* Change pending progress bar to Bang Wong palette for color blindness */
-.pending-progress-bar {
+/* Higher specificity (.progress-bar.X) to override Bootstrap defaults */
+.progress-bar.pending-progress-bar {
     background-color: var(--color-pending);
 }
 
-/* Change scheduled progress bar to Bang Wong palette for color blindness */
-.scheduled-progress-bar {
+.progress-bar.scheduled-progress-bar {
     background-color: var(--color-scheduled);
 }
 
-/* Change running progress bar to Bang Wong palette for color blindness */
-.running-progress-bar {
+.progress-bar.running-progress-bar {
     background-color: var(--color-running);
 }
 
-/* Change done progress bar to Bang Wong palette for color blindness */
-.done-progress-bar {
+.progress-bar.done-progress-bar {
     background-color: var(--color-done);
 }
 
-/* Change fatal progress bar to Bang Wong palette for color blindness */
-.fatal-progress-bar {
+.progress-bar.fatal-progress-bar {
     background-color: var(--color-fatal);
 }
 

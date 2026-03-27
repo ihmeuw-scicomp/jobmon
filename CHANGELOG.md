@@ -5,6 +5,11 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Resource Error Detection**: New `/workflow_has_resource_errors` endpoint to check if any task instances in a workflow have resource errors; drives conditional UI in template list
+- **Fatal Error Breakdown**: New `/fatal_error_breakdown` endpoint classifying fatal tasks by last TI status (resource, app, infra) with resource error TI sample IDs for drill-down
+- **Error Log Fallback**: Error log queries now fall back to reading `stderr_log`/`stderr` directly from task instances when no `TaskInstanceErrorLog` entries exist, so resource-killed tasks still show output
+- **Copy Button**: Reusable `CopyButton` component added to task command displays in TaskDAG side panel, TaskSummaryCard, and ErrorClustersCard
+- **Resource Error Banner**: Task status timeline shows a resource error banner with specific diagnosis (runtime/memory exceeded) when a task instance has status RESOURCE_ERROR
 - **Task Status Audit**: TI-centric audit logging for task status transitions with `task_status_audit` table, `TaskFSM` service, and `TransitionService` with SKIP LOCKED support and retry logic
 - **Task Concurrency Visualization**: Interactive concurrency tab on workflow details with stacked bar charts per status, configurable bucket sizes, template grouping, and scale sync toggles
 - **Workflow DAG Redesign**: Two-panel workflow details layout with status-colored DAG nodes, mini status bars, edge highlighting, and visual state store for efficient re-renders
@@ -24,6 +29,12 @@ All notable changes to Jobmon will be documented in this file.
 - **Force Cleanup for Stuck Task Instances**: New `--force-cleanup` flag in `jobmon workflow resume` command to manually cleanup stuck `KILL_SELF` task instances when jobs have been externally terminated (e.g., via `scancel` or node failure)
 
 ### Changed
+- **Bundle Optimization**: Replaced `plotly.js-dist` (3.5 MB) with `plotly.js-cartesian-dist` (1.4 MB); added route-level lazy loading with `React.lazy`; split vendors into separate cacheable chunks (plotly, MUI, reactflow, core); total bundle reduced from 7.1 MB to ~3.2 MB across chunks
+- **Lazy Chart Tabs**: Workflow details chart tabs (Gantt, Status) lazy-load plotly on first render via `React.lazy` + `Suspense`, so the page shell renders without waiting for the 1.4 MB chart library
+- **Lighter Syntax Highlighter**: Switched `react-syntax-highlighter` from Prism (all languages) to Light build with only python, r, and bash registered
+- **Registered Status Color**: Changed Registered (`G`) status color from orange (`#e69f00`) to gray (`#999999`) so colorblind users can distinguish it from Done (green)
+- **Progress Bar CSS Specificity**: Increased selector specificity for status progress bars (`.progress-bar.pending-progress-bar`) to reliably override Bootstrap defaults regardless of CSS chunk load order
+- **Attempt Grouping**: Task status timeline now starts a new attempt on `A` (Adjusting Resources) status in addition to `G` (Registered), correctly grouping resource error retries
 - **Status Chart**: Merged 5 separate concurrency subplots into single stacked bar chart; selected template highlighted with solid bars against dimmed background
 - **Tab Renaming**: Bottom panel tabs renamed from "Concurrency"/"Timeline" to "Status"/"Gantt"
 - **DAG Layout**: Switched to left-to-right orientation, auto-sizes panel based on node count, lowered minZoom to 0.05 for large workflows
@@ -39,6 +50,7 @@ All notable changes to Jobmon will be documented in this file.
 - Unified status colors across all views (DAG, popover, concurrency chart, summary panel) into shared constants
 
 ### Fixed
+- **WorkflowDAG Missing CSS**: Added `reactflow/dist/style.css` import to `WorkflowDAG.tsx`; previously relied on `TaskDAG.tsx` importing it, which broke when route-level code splitting separated them into different chunks
 - **Concurrency Input**: PUT request now fires on blur instead of every keystroke
 - **Template Detail State**: Panel resets local state (concurrency value, status message) when switching templates
 - **DAG Self-Loops**: Filtered out meaningless self-loop edges at template level

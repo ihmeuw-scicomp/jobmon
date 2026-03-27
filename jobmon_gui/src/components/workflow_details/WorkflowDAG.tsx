@@ -19,6 +19,7 @@ import ReactFlow, {
     useReactFlow,
     ReactFlowProvider,
 } from 'reactflow';
+import 'reactflow/dist/style.css';
 import dagre from 'dagre';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';

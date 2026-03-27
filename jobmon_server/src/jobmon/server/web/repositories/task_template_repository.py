@@ -22,6 +22,7 @@ from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.models.task_resources import TaskResources
+from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.task_template import TaskTemplate
 from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.models.workflow_run import WorkflowRun
@@ -847,6 +848,90 @@ class TaskTemplateRepository:
 
         return result_dict
 
+    def get_fatal_error_breakdown_for_tt(
+        self,
+        workflow_id: int,
+        task_template_version_id: int,
+    ) -> Dict[str, Any]:
+        """Classify fatal tasks for one template by last TI status.
+
+        Scoped to workflow + template for fast indexed lookup.
+        Returns {resource: N, app: N, infra: N}.
+        """
+        latest_ti_id_subq = (
+            select(
+                TaskInstance.task_id,
+                func.max(TaskInstance.id).label("max_ti_id"),
+            )
+            .join(Task, TaskInstance.task_id == Task.id)
+            .join(Node, Task.node_id == Node.id)
+            .where(
+                Task.workflow_id == workflow_id,
+                Task.status == TaskStatus.ERROR_FATAL,
+                Node.task_template_version_id == task_template_version_id,
+            )
+            .group_by(TaskInstance.task_id)
+            .subquery()
+        )
+
+        sql = (
+            select(
+                TaskInstance.status.label("ti_status"),
+                func.count(TaskInstance.id).label("cnt"),
+            )
+            .join(
+                latest_ti_id_subq,
+                TaskInstance.id == latest_ti_id_subq.c.max_ti_id,
+            )
+            .group_by(TaskInstance.status)
+        )
+
+        result: Dict[str, Any] = {
+            "resource": 0,
+            "app": 0,
+            "infra": 0,
+            "resource_error_total": 0,
+        }
+        for row in self.session.execute(sql).all():
+            if row.ti_status == TaskInstanceStatus.RESOURCE_ERROR:
+                result["resource"] += row.cnt
+            elif row.ti_status == TaskInstanceStatus.ERROR:
+                result["app"] += row.cnt
+            else:
+                result["infra"] += row.cnt
+
+        z_count_sql = (
+            select(func.count(TaskInstance.id))
+            .join(Task, TaskInstance.task_id == Task.id)
+            .join(Node, Task.node_id == Node.id)
+            .where(
+                Task.workflow_id == workflow_id,
+                Node.task_template_version_id == task_template_version_id,
+                TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
+            )
+        )
+        result["resource_error_total"] = self.session.execute(z_count_sql).scalar() or 0
+
+        # Sample of Z-status TI IDs for drill-down UI
+        if result["resource_error_total"] > 0:
+            z_ids_sql = (
+                select(TaskInstance.id)
+                .join(Task, TaskInstance.task_id == Task.id)
+                .join(Node, Task.node_id == Node.id)
+                .where(
+                    Task.workflow_id == workflow_id,
+                    Node.task_template_version_id == task_template_version_id,
+                    TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
+                )
+                .order_by(TaskInstance.id.desc())
+                .limit(20)
+            )
+            result["resource_error_ti_ids"] = [
+                row[0] for row in self.session.execute(z_ids_sql).all()
+            ]
+
+        return result
+
     def get_tt_error_log_viz(
         self,
         workflow_id: int,
@@ -902,17 +987,61 @@ class TaskTemplateRepository:
                     TaskInstance,
                     TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
                 )
-                .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
+                .join_from(
+                    TaskInstance,
+                    Task,
+                    TaskInstance.task_id == Task.id,
+                )
                 .where(TaskInstance.id == task_instance_id)
             )
             rows = self.session.execute(sql).all()
+
+            # Fallback: no error log entries but TI exists —
+            # return stderr_log directly from the task instance.
             if len(rows) == 0:
+                fallback_sql = (
+                    select(
+                        TaskInstance.task_id,
+                        TaskInstance.id,
+                        TaskInstance.stderr_log,
+                        TaskInstance.stderr,
+                        TaskInstance.workflow_run_id,
+                        Task.workflow_id,
+                    )
+                    .join(
+                        Task,
+                        TaskInstance.task_id == Task.id,
+                    )
+                    .where(TaskInstance.id == task_instance_id)
+                )
+                fb_row = self.session.execute(fallback_sql).one_or_none()
+                if fb_row is None:
+                    return ErrorLogResponse(
+                        error_logs=[],
+                        total_count=0,
+                        page=page,
+                        page_size=page_size,
+                    )
+                stderr_text = fb_row.stderr_log or fb_row.stderr
+                error_logs.append(
+                    ErrorLogItem(
+                        task_id=fb_row.task_id,
+                        task_instance_id=task_instance_id,
+                        task_instance_err_id=None,
+                        error_time=None,
+                        error=stderr_text,
+                        task_instance_stderr_log=stderr_text,
+                        workflow_run_id=(fb_row.workflow_run_id),
+                        workflow_id=fb_row.workflow_id,
+                    )
+                )
                 return ErrorLogResponse(
-                    error_logs=[],
-                    total_count=0,
+                    error_logs=error_logs,
+                    total_count=1,
                     page=page,
                     page_size=page_size,
                 )
+
             total_count = len(rows)
 
             # Slice rows according to the requested page and page_size
@@ -1219,6 +1348,142 @@ class TaskTemplateRepository:
             )
 
             rows = self.session.execute(query).all()
+
+            # Fallback: no TaskInstanceErrorLog entries — read
+            # stderr directly from task instances for failed tasks.
+            if not rows:
+                fallback_query = (
+                    select(
+                        TaskInstance.id.label("task_instance_id"),
+                        TaskInstance.task_id,
+                        TaskInstance.stderr_log,
+                        TaskInstance.stderr,
+                        TaskInstance.status_date,
+                        TaskInstance.workflow_run_id,
+                    )
+                    .join(
+                        Task,
+                        TaskInstance.task_id == Task.id,
+                    )
+                    .join(Node, Task.node_id == Node.id)
+                    .where(
+                        Task.workflow_id == workflow_id,
+                        Node.task_template_version_id == ttv_id,
+                        Task.status == "F",
+                    )
+                    .order_by(TaskInstance.id.desc())
+                    .limit(1000)
+                )
+                fb_rows = self.session.execute(fallback_query).all()
+
+                if not fb_rows:
+                    return ErrorLogResponse(
+                        error_logs=[],
+                        total_count=0,
+                        page=page,
+                        page_size=page_size,
+                    )
+
+                if cluster_errors:
+                    df = pd.DataFrame(
+                        [
+                            {
+                                "task_instance_err_id": r.task_instance_id,
+                                "task_instance_id": r.task_instance_id,
+                                "error_time": r.status_date,
+                                "error": (
+                                    str(r.stderr_log or r.stderr)
+                                    if (r.stderr_log or r.stderr)
+                                    else None
+                                ),
+                                "task_instance_stderr_log": (
+                                    str(r.stderr_log or r.stderr)
+                                    if (r.stderr_log or r.stderr)
+                                    else None
+                                ),
+                                "workflow_run_id": r.workflow_run_id,
+                                "workflow_id": workflow_id,
+                                "task_id": r.task_id,
+                            }
+                            for r in fb_rows
+                        ]
+                    )
+
+                    clustered = cluster_error_logs(df)
+                    total_clusters = len(clustered)
+                    if total_clusters == 0:
+                        return ErrorLogResponse(
+                            error_logs=[],
+                            total_count=0,
+                            page=page,
+                            page_size=page_size,
+                        )
+
+                    paged_clusters = clustered.iloc[offset : offset + page_size]
+                    for _, crow in paged_clusters.iterrows():
+                        error_logs.append(
+                            ErrorLogItem(
+                                task_id=None,
+                                task_instance_id=None,
+                                task_instance_err_id=None,
+                                error_time=None,
+                                error=None,
+                                task_instance_stderr_log=None,
+                                workflow_run_id=int(crow["workflow_run_id"]),
+                                workflow_id=int(crow["workflow_id"]),
+                                error_score=float(crow["error_score"]),
+                                group_instance_count=int(crow["group_instance_count"]),
+                                task_instance_ids=list(
+                                    map(
+                                        int,
+                                        crow["task_instance_ids"],
+                                    )
+                                ),
+                                task_ids=list(
+                                    map(
+                                        int,
+                                        crow["task_ids"],
+                                    )
+                                ),
+                                sample_error=(
+                                    str(crow["sample_error"])
+                                    if crow["sample_error"] is not None
+                                    else None
+                                ),
+                                first_error_time=crow["first_error_time"],
+                            )
+                        )
+
+                    return ErrorLogResponse(
+                        error_logs=error_logs,
+                        total_count=total_clusters,
+                        page=page,
+                        page_size=page_size,
+                    )
+
+                # Non-clustered fallback
+                total_count = len(fb_rows)
+                paged = fb_rows[offset : offset + page_size]
+                for r in paged:
+                    stderr_text = str(r.stderr_log or r.stderr or "")
+                    error_logs.append(
+                        ErrorLogItem(
+                            task_id=r.task_id,
+                            task_instance_id=r.task_instance_id,
+                            task_instance_err_id=None,
+                            error_time=r.status_date,
+                            error=stderr_text,
+                            task_instance_stderr_log=stderr_text,
+                            workflow_run_id=r.workflow_run_id,
+                            workflow_id=workflow_id,
+                        )
+                    )
+                return ErrorLogResponse(
+                    error_logs=error_logs,
+                    total_count=total_count,
+                    page=page,
+                    page_size=page_size,
+                )
 
             if cluster_errors and rows:
                 df = pd.DataFrame(

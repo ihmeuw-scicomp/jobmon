@@ -5,18 +5,24 @@ from typing import Any, Optional
 
 import structlog
 from fastapi import Depends, HTTPException, Query
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
 from jobmon.server.web.db import get_db, get_dialect
+from jobmon.server.web.models.task import Task
+from jobmon.server.web.models.task_instance import TaskInstance
+from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
 from jobmon.server.web.repositories.task_template_repository import (
     TaskTemplateRepository,
 )
 from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.schemas.task_template import (
+    FatalErrorBreakdownResponse,
     TaskResourceVizItem,
     TaskTemplateResourceUsageRequest,
     TaskTemplateResourceUsageResponse,
+    WorkflowResourceErrorCheckResponse,
 )
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
@@ -193,6 +199,45 @@ def get_workflow_tt_status_viz(
     }
 
     return JSONResponse(content=result_dict_serializable, status_code=StatusCodes.OK)
+
+
+@api_v3_router.get("/workflow_has_resource_errors/{workflow_id}")
+def get_workflow_has_resource_errors(
+    workflow_id: int,
+    db: Session = Depends(get_db),
+) -> WorkflowResourceErrorCheckResponse:
+    """Check if any task instances in this workflow have resource errors."""
+    has_z = db.execute(
+        select(
+            exists(
+                select(TaskInstance.id)
+                .join(Task, TaskInstance.task_id == Task.id)
+                .where(
+                    Task.workflow_id == workflow_id,
+                    TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
+                )
+            )
+        )
+    ).scalar()
+
+    return WorkflowResourceErrorCheckResponse(
+        has_resource_errors=bool(has_z),
+    )
+
+
+@api_v3_router.get("/fatal_error_breakdown/{workflow_id}/{tt_version_id}")
+def get_fatal_error_breakdown(
+    workflow_id: int,
+    tt_version_id: int,
+    db: Session = Depends(get_db),
+) -> FatalErrorBreakdownResponse:
+    """Classify fatal errors for one template by type."""
+    tt_repo = TaskTemplateRepository(db)
+    breakdown = tt_repo.get_fatal_error_breakdown_for_tt(
+        workflow_id=workflow_id,
+        task_template_version_id=tt_version_id,
+    )
+    return FatalErrorBreakdownResponse(**breakdown)
 
 
 @api_v3_router.get("/tt_error_log_viz/{wf_id}/{tt_id}")

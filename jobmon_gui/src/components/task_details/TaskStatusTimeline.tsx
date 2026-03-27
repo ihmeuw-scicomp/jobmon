@@ -17,6 +17,7 @@ import {
     getStatusLabel,
     getStatusTextColor,
     taskStatusMeta,
+    RESOURCE_ERROR_COLORS,
 } from '@jobmon_gui/constants/taskStatus';
 import { components } from '@jobmon_gui/types/apiSchema';
 import { TaskInstance } from '@jobmon_gui/types/TaskInstance';
@@ -115,9 +116,13 @@ function groupIntoAttempts(records: AuditRecord[]): Attempt[] {
 
     for (const record of records) {
         const seg = buildSegment(record);
-        // A new attempt starts when we transition into G (Registered),
+        // A new attempt starts when we transition into G (Registered)
+        // or A (Adjusting Resources — resource error retry),
         // except for the very first record which always starts attempt 1.
-        if (seg.status === 'G' && current.length > 0) {
+        const isNewAttempt =
+            (seg.status === 'G' || seg.status === 'A') &&
+            current.length > 0;
+        if (isNewAttempt) {
             attempts.push(finalizeAttempt(current));
             current = [];
         }
@@ -255,8 +260,64 @@ function AttemptDetailPanel({
         metaChips.push({ label: 'I/O', value: instance.ti_io });
     }
 
+    const isResourceError =
+        instance.ti_status === 'RESOURCE_ERROR';
+    const runtimeExceeded =
+        utilizedRuntimeSec != null &&
+        requestedRuntimeSec != null &&
+        requestedRuntimeSec > 0 &&
+        utilizedRuntimeSec / requestedRuntimeSec >= 0.95;
+    const memoryExceeded =
+        utilizedMemoryGiB != null &&
+        requestedMemoryGiB != null &&
+        requestedMemoryGiB > 0 &&
+        utilizedMemoryGiB / requestedMemoryGiB >= 0.95;
+
     return (
         <Box sx={{ px: 2, py: 1 }}>
+            {/* Resource error banner */}
+            {isResourceError && (
+                <Box
+                    sx={{
+                        backgroundColor: RESOURCE_ERROR_COLORS.bannerBg,
+                        border: `1px solid ${RESOURCE_ERROR_COLORS.main}`,
+                        borderRadius: 1,
+                        px: 1.5,
+                        py: 0.75,
+                        mb: 1,
+                    }}
+                >
+                    <Typography
+                        variant="body2"
+                        sx={{
+                            fontWeight: 600,
+                            color: RESOURCE_ERROR_COLORS.main,
+                        }}
+                    >
+                        Resource Error
+                        {runtimeExceeded && memoryExceeded
+                            ? ' — runtime and memory limits exceeded'
+                            : runtimeExceeded
+                              ? ' — runtime limit exceeded'
+                              : memoryExceeded
+                                ? ' — memory limit exceeded'
+                                : ' — insufficient resources'}
+                    </Typography>
+                    {instance.ti_error_log_description && (
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                color: 'text.secondary',
+                                display: 'block',
+                                mt: 0.25,
+                            }}
+                        >
+                            {instance.ti_error_log_description}
+                        </Typography>
+                    )}
+                </Box>
+            )}
+
             {/* Metadata row */}
             <Box
                 sx={{
@@ -411,7 +472,10 @@ function AttemptDetailPanel({
                             color="text.secondary"
                             sx={{ ml: 1 }}
                         >
-                            <strong>Stderr:</strong> no output
+                            <strong>Stderr:</strong>{' '}
+                            {isResourceError
+                                ? 'killed by cluster (no stderr captured)'
+                                : 'no output'}
                         </Typography>
                         <Button
                             size="small"

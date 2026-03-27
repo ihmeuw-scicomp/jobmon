@@ -18,6 +18,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
+import CopyButton from '@jobmon_gui/components/common/CopyButton';
 import ReactFlow, {
     Background,
     Controls,
@@ -471,18 +472,35 @@ export default function TaskDAG({
                         {/* Command */}
                         {task_details?.data?.task_command && (
                             <>
-                                <Typography
-                                    variant="caption"
-                                    color="text.secondary"
+                                <Box
                                     sx={{
-                                        fontWeight: 600,
-                                        textTransform:
-                                            'uppercase',
-                                        letterSpacing: 0.5,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent:
+                                            'space-between',
                                     }}
                                 >
-                                    Command
-                                </Typography>
+                                    <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{
+                                            fontWeight: 600,
+                                            textTransform:
+                                                'uppercase',
+                                            letterSpacing: 0.5,
+                                        }}
+                                    >
+                                        Command
+                                    </Typography>
+                                    <CopyButton
+                                        text={
+                                            task_details.data
+                                                .task_command
+                                        }
+                                        tooltip="Copy command"
+                                        size={14}
+                                    />
+                                </Box>
                                 <ScrollableCodeBlock
                                     maxheight="80px"
                                     sx={{ fontSize: 11 }}

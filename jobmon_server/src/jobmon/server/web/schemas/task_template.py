@@ -177,6 +177,22 @@ class WorkflowTaskTemplateStatusItem(BaseModel):
     task_template_version_id: int
 
 
+class FatalErrorBreakdownResponse(BaseModel):
+    """Breakdown of fatal errors by type for a single template."""
+
+    resource: int = 0
+    app: int = 0
+    infra: int = 0
+    resource_error_total: int = 0
+    resource_error_ti_ids: List[int] = []
+
+
+class WorkflowResourceErrorCheckResponse(BaseModel):
+    """Response for checking if a workflow has any resource errors."""
+
+    has_resource_errors: bool
+
+
 class ErrorLogItem(BaseModel):
     """Error log item - can represent individual errors or clustered errors."""
 

@@ -1735,3 +1735,122 @@ def test_increase_resources_selective_update(client_env, db_engine, tool):
 
         assert task1_final_resources == {"memory": 2, "runtime": 120}  # Still unchanged
         assert task3_final_resources == {"memory": 3, "runtime": 180}  # Still unchanged
+
+
+def test_workflow_has_resource_errors(client_env, db_engine):
+    """Test the workflow_has_resource_errors endpoint."""
+    t = Tool(name="gui_resource_errors_test")
+    wf = t.create_workflow(name="test_resource_errors_wf")
+    tt = t.get_task_template(
+        template_name="tt_res",
+        command_template="echo {arg}",
+        node_args=["arg"],
+    )
+    task = tt.create_task(
+        arg=1,
+        cluster_name="sequential",
+        compute_resources={"queue": "null.q", "num_cores": 1},
+    )
+    wf.add_tasks([task])
+    wf.bind()
+    wf._bind_tasks()
+
+    # No resource errors yet
+    app_route = f"/workflow_has_resource_errors/{wf.workflow_id}"
+    return_code, msg = wf.requester.send_request(
+        app_route=app_route, message={}, request_type="get"
+    )
+    assert return_code == 200
+    assert msg["has_resource_errors"] is False
+
+    # Create a task instance with resource error status
+    with Session(bind=db_engine) as session:
+        session.execute(
+            text(
+                f"""
+                INSERT INTO task_instance
+                    (workflow_run_id, task_id, status, status_date)
+                SELECT wr.id, {task.task_id}, 'Z', datetime('now')
+                FROM workflow_run wr
+                WHERE wr.workflow_id = {wf.workflow_id}
+                LIMIT 1
+                """
+            )
+        )
+        session.commit()
+
+    return_code, msg = wf.requester.send_request(
+        app_route=app_route, message={}, request_type="get"
+    )
+    assert return_code == 200
+    assert msg["has_resource_errors"] is True
+
+
+def test_fatal_error_breakdown(client_env, db_engine):
+    """Test the fatal_error_breakdown endpoint classifies errors correctly."""
+    t = Tool(name="gui_fatal_breakdown_test")
+    wf = t.create_workflow(name="test_fatal_breakdown_wf")
+    tt = t.get_task_template(
+        template_name="tt_breakdown",
+        command_template="echo {arg}",
+        node_args=["arg"],
+    )
+    t1 = tt.create_task(
+        arg=1,
+        cluster_name="sequential",
+        compute_resources={"queue": "null.q", "num_cores": 1},
+    )
+    t2 = tt.create_task(
+        arg=2,
+        cluster_name="sequential",
+        compute_resources={"queue": "null.q", "num_cores": 1},
+    )
+    t3 = tt.create_task(
+        arg=3,
+        cluster_name="sequential",
+        compute_resources={"queue": "null.q", "num_cores": 1},
+    )
+    wf.add_tasks([t1, t2, t3])
+    wf.bind()
+    wf._bind_tasks()
+
+    # Set all tasks to fatal
+    with Session(bind=db_engine) as session:
+        for task in [t1, t2, t3]:
+            session.execute(text(f"UPDATE task SET status='F' WHERE id={task.task_id}"))
+        session.commit()
+
+    # Create TIs: t1 -> resource error (Z), t2 -> app error (E),
+    # t3 -> unknown error (U)
+    with Session(bind=db_engine) as session:
+        for task, ti_status in [
+            (t1, "Z"),
+            (t2, "E"),
+            (t3, "U"),
+        ]:
+            session.execute(
+                text(
+                    f"""
+                    INSERT INTO task_instance
+                        (workflow_run_id, task_id, status,
+                         status_date)
+                    SELECT wr.id, {task.task_id}, '{ti_status}',
+                           datetime('now')
+                    FROM workflow_run wr
+                    WHERE wr.workflow_id = {wf.workflow_id}
+                    LIMIT 1
+                    """
+                )
+            )
+        session.commit()
+
+    ttv_id = tt._active_task_template_version.id
+    app_route = f"/fatal_error_breakdown/{wf.workflow_id}/{ttv_id}"
+    return_code, msg = wf.requester.send_request(
+        app_route=app_route, message={}, request_type="get"
+    )
+    assert return_code == 200
+    assert msg["resource"] == 1
+    assert msg["app"] == 1
+    assert msg["infra"] == 1
+    assert msg["resource_error_total"] >= 1

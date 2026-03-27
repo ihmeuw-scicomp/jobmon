@@ -1,4 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, {
+    useState,
+    useEffect,
+    useCallback,
+    useMemo,
+    Suspense,
+    lazy,
+} from 'react';
 import '@jobmon_gui/styles/jobmon_gui.css';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import WorkflowHeader from '@jobmon_gui/components/workflow_details/WorkflowHeader';
@@ -25,18 +32,42 @@ import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTSta
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowUsageQueryFn } from '@jobmon_gui/queries/GetWorkflowUsage.ts';
 import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors.ts';
+import { getWorkflowHasResourceErrorsFn } from '@jobmon_gui/queries/GetWorkflowHasResourceErrors.ts';
 import {
     AppBreadcrumbs,
     BreadcrumbItem,
 } from '@jobmon_gui/components/common/AppBreadcrumbs';
 import WorkflowDAG from '@jobmon_gui/components/workflow_details/WorkflowDAG.tsx';
-import TaskConcurrencyTab from '@jobmon_gui/components/workflow_details/TaskConcurrencyTab.tsx';
-import TemplateTimelineTab from '@jobmon_gui/components/workflow_details/TemplateTimelineTab.tsx';
 import TemplateDetailPanel from '@jobmon_gui/components/workflow_details/TemplateDetailPanel.tsx';
 import WorkflowSummaryBar from '@jobmon_gui/components/workflow_details/WorkflowSummaryBar.tsx';
 import TemplateListPanel from '@jobmon_gui/components/workflow_details/TemplateListPanel.tsx';
 import WorkflowManagePanel from '@jobmon_gui/components/workflow_details/WorkflowManagePanel.tsx';
 import ResizableSplitPane from '@jobmon_gui/components/common/ResizableSplitPane.tsx';
+
+const TaskConcurrencyTab = lazy(
+    () =>
+        import('@jobmon_gui/components/workflow_details/TaskConcurrencyTab.tsx')
+);
+const TemplateTimelineTab = lazy(
+    () =>
+        import(
+            '@jobmon_gui/components/workflow_details/TemplateTimelineTab.tsx'
+        )
+);
+
+const ChartLoader = () => (
+    <Box
+        sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '100%',
+            minHeight: 200,
+        }}
+    >
+        <CircularProgress size={28} />
+    </Box>
+);
 import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilterPersistence';
 import { TTStatus } from '@jobmon_gui/types/TaskTemplateStatus';
 import { compare } from 'compare-versions';
@@ -97,6 +128,12 @@ function WorkflowDetails() {
         queryFn: getWorkflowTTStatusQueryFn,
         refetchOnMount: true,
         refetchOnWindowFocus: true,
+    });
+
+    const hasResourceErrorsQuery = useQuery({
+        queryKey: ['workflow_details', 'has_resource_errors', workflowId],
+        queryFn: getWorkflowHasResourceErrorsFn,
+        staleTime: 120000,
     });
 
     const ttStatusByName = useMemo(() => {
@@ -175,6 +212,7 @@ function WorkflowDetails() {
     };
 
     const prefetchTemplateData = (taskTemplate: {
+        id: string | number;
         task_template_version_id: string | number;
         name: string;
     }) => {
@@ -192,7 +230,7 @@ function WorkflowDetails() {
                 'workflow_details',
                 'clustered_errors',
                 workflowId,
-                taskTemplate.task_template_version_id,
+                taskTemplate.id,
             ],
             queryFn: getClusteredErrorsFn,
         });
@@ -232,8 +270,12 @@ function WorkflowDetails() {
         />
     ) : (
         <TemplateListPanel
+            workflowId={workflowId!}
             ttData={wfTTStatus.data}
             hoveredTemplateName={hoveredTemplateName}
+            hasResourceErrors={
+                hasResourceErrorsQuery.data?.has_resource_errors ?? false
+            }
             onTemplateSelect={handleTemplateSelect}
             onTemplateHover={setHoveredTemplateName}
             onPrefetch={prefetchTemplateData}
@@ -494,26 +536,28 @@ function WorkflowDetails() {
                             </Tooltip>
                         </Box>
                         <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-                            {bottomPanelView === 'concurrency' ? (
-                                <TaskConcurrencyTab
-                                    workflowId={workflowId}
-                                    highlightedTemplates={
-                                        selectedTemplateName
-                                            ? [selectedTemplateName]
-                                            : undefined
-                                    }
-                                />
-                            ) : (
-                                <TemplateTimelineTab
-                                    workflowId={workflowId}
-                                    highlightedTemplates={
-                                        selectedTemplateName
-                                            ? [selectedTemplateName]
-                                            : undefined
-                                    }
-                                    onTemplateClick={handleTemplateSelect}
-                                />
-                            )}
+                            <Suspense fallback={<ChartLoader />}>
+                                {bottomPanelView === 'concurrency' ? (
+                                    <TaskConcurrencyTab
+                                        workflowId={workflowId}
+                                        highlightedTemplates={
+                                            selectedTemplateName
+                                                ? [selectedTemplateName]
+                                                : undefined
+                                        }
+                                    />
+                                ) : (
+                                    <TemplateTimelineTab
+                                        workflowId={workflowId}
+                                        highlightedTemplates={
+                                            selectedTemplateName
+                                                ? [selectedTemplateName]
+                                                : undefined
+                                        }
+                                        onTemplateClick={handleTemplateSelect}
+                                    />
+                                )}
+                            </Suspense>
                         </Box>
                     </Box>
                 }
@@ -571,7 +615,7 @@ function WorkflowDetails() {
                             {fullscreenPanel === 'dag' && dagContent}
                             {fullscreenPanel === 'left' && leftPanel}
                             {fullscreenPanel === 'bottom' && (
-                                <>
+                                <Suspense fallback={<ChartLoader />}>
                                     {bottomPanelView === 'concurrency' ? (
                                         <TaskConcurrencyTab
                                             workflowId={workflowId}
@@ -594,7 +638,7 @@ function WorkflowDetails() {
                                             }
                                         />
                                     )}
-                                </>
+                                </Suspense>
                             )}
                         </Box>
                     </Box>
