@@ -267,7 +267,7 @@ export default function TemplateDetailPanel({
 
             {/* Status bar + breakdown */}
             <Box sx={{ mb: 1.5 }}>
-                <TemplateStatusBar counts={templateData} />
+                <TemplateStatusBar counts={templateData} height={18} showLabels />
                 <Typography
                     variant="body2"
                     color="text.secondary"

@@ -30,13 +30,15 @@ import WorkflowDAG from '@jobmon_gui/components/workflow_details/WorkflowDAG.tsx
 import TaskConcurrencyTab from '@jobmon_gui/components/workflow_details/TaskConcurrencyTab.tsx';
 import TemplateTimelineTab from '@jobmon_gui/components/workflow_details/TemplateTimelineTab.tsx';
 import TemplateDetailPanel from '@jobmon_gui/components/workflow_details/TemplateDetailPanel.tsx';
-import WorkflowSummaryPanel from '@jobmon_gui/components/workflow_details/WorkflowSummaryPanel.tsx';
+import WorkflowSummaryBar from '@jobmon_gui/components/workflow_details/WorkflowSummaryBar.tsx';
+import TemplateListPanel from '@jobmon_gui/components/workflow_details/TemplateListPanel.tsx';
 import WorkflowManagePanel from '@jobmon_gui/components/workflow_details/WorkflowManagePanel.tsx';
+import ResizableSplitPane from '@jobmon_gui/components/common/ResizableSplitPane.tsx';
 import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilterPersistence';
 import { TTStatus } from '@jobmon_gui/types/TaskTemplateStatus';
 import { compare } from 'compare-versions';
 
-type RightPanelView = 'summary' | 'template' | 'manage';
+type LeftPanelView = 'list' | 'template' | 'manage';
 
 function WorkflowDetails() {
     const { workflowId } = useParams();
@@ -53,11 +55,11 @@ function WorkflowDetails() {
         string | null
     >(null);
     const [autoRefresh, setAutoRefresh] = useState(false);
-    const [rightPanelView, setRightPanelView] =
-        useState<RightPanelView>('summary');
+    const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>('list');
     const [bottomPanelView, setBottomPanelView] = useState<
         'concurrency' | 'timeline'
     >('timeline');
+    const [dagNodeCount, setDagNodeCount] = useState<number | null>(null);
 
     // Page-level auto-refresh: invalidate all workflow queries periodically
     useEffect(() => {
@@ -76,7 +78,7 @@ function WorkflowDetails() {
         });
     }, [queryClient]);
 
-    // Lifted wfDetails query — shared by header + summary panel + manage panel
+    // Lifted wfDetails query — shared by header + summary bar + manage panel
     const wfDetails = useQuery({
         queryKey: ['workflow_details', 'details', workflowId],
         queryFn: getWorkflowDetailsQueryFn,
@@ -111,18 +113,6 @@ function WorkflowDetails() {
         { label: `Workflow ID ${workflowId}`, active: true },
     ];
 
-    if (wfTTStatus.isLoading) {
-        return <CircularProgress />;
-    }
-    if (wfTTStatus.isError) {
-        return (
-            <Typography>
-                Error loading workflow task template details. Please refresh and
-                try again.
-            </Typography>
-        );
-    }
-
     function normalizeVersion(version: string): string {
         return version
             .replace(/\.dev/, '-dev')
@@ -154,20 +144,20 @@ function WorkflowDetails() {
 
     const handleTemplateSelect = (name: string) => {
         setSelectedTemplateName(name);
-        setRightPanelView('template');
+        setLeftPanelView('template');
     };
 
     const handleTemplateBack = () => {
         setSelectedTemplateName(null);
-        setRightPanelView('summary');
+        setLeftPanelView('list');
     };
 
     const handleManageClick = () => {
-        setRightPanelView('manage');
+        setLeftPanelView('manage');
     };
 
     const handleManageBack = () => {
-        setRightPanelView('summary');
+        setLeftPanelView('list');
     };
 
     const resetStoresAndNavigate = (ttId: string | number) => {
@@ -201,6 +191,79 @@ function WorkflowDetails() {
             queryFn: getClusteredErrorsFn,
         });
     };
+
+    const leftPanel = wfTTStatus.isLoading ? (
+        <Box
+            sx={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100%',
+            }}
+        >
+            <CircularProgress size={28} />
+        </Box>
+    ) : wfTTStatus.isError ? (
+        <Box sx={{ p: 2 }}>
+            <Typography color="error">
+                Error loading templates. Try refreshing.
+            </Typography>
+        </Box>
+    ) : leftPanelView === 'template' && selectedTemplateData ? (
+        <TemplateDetailPanel
+            workflowId={workflowId}
+            templateData={selectedTemplateData}
+            onBack={handleTemplateBack}
+            onNavigate={() => resetStoresAndNavigate(selectedTemplateData.id)}
+            disabled={disabled}
+        />
+    ) : leftPanelView === 'manage' ? (
+        <WorkflowManagePanel
+            wfId={workflowId!}
+            workflowDetails={wfDetails.data}
+            onBack={handleManageBack}
+            onClose={handleManageClose}
+        />
+    ) : (
+        <TemplateListPanel
+            ttData={wfTTStatus.data}
+            hoveredTemplateName={hoveredTemplateName}
+            onTemplateSelect={handleTemplateSelect}
+            onTemplateHover={setHoveredTemplateName}
+            onPrefetch={prefetchTemplateData}
+        />
+    );
+
+    const handleDagNodeCount = useCallback((count: number) => {
+        setDagNodeCount(count);
+    }, []);
+
+    // Auto-size: small DAGs get less space, large ones get more
+    // 1-3 nodes → 25%, 4-8 → 35%, 9-15 → 45%, 16+ → 55%
+    const dagPercent =
+        dagNodeCount == null
+            ? 35
+            : dagNodeCount <= 3
+              ? 25
+              : dagNodeCount <= 8
+                ? 35
+                : dagNodeCount <= 15
+                  ? 45
+                  : 55;
+    const leftPercent = 100 - dagPercent;
+
+    const dagPanel = (
+        <WorkflowDAG
+            workflowId={workflowId}
+            ttStatusByName={ttStatusByName}
+            selectedTemplateName={selectedTemplateName}
+            hoveredTemplateName={hoveredTemplateName}
+            onTemplateSelect={handleTemplateSelect}
+            onTemplateHover={setHoveredTemplateName}
+            onNodeCount={handleDagNodeCount}
+            height="100%"
+        />
+    );
 
     return (
         <Box
@@ -260,75 +323,54 @@ function WorkflowDetails() {
                 </Box>
             </Box>
 
-            {/* Two-panel area — takes remaining space, shares with timeline */}
-            <Box
-                display="flex"
-                flexDirection={isSmall ? 'column' : 'row'}
-                sx={{
-                    flex: '1 1 45%',
-                    minHeight: 250,
-                    overflow: 'hidden',
-                }}
-            >
-                {/* LEFT: DAG */}
+            {/* Workflow-level summary bar — full width */}
+            <WorkflowSummaryBar
+                workflowDetails={wfDetails.data}
+                ttData={wfTTStatus.data}
+                onManageClick={handleManageClick}
+            />
+
+            {/* Middle: Template list/detail (left) | DAG (right) */}
+            {isSmall ? (
                 <Box
                     sx={{
-                        flex: isSmall ? '1 1 auto' : '0 0 60%',
-                        height: isSmall ? 400 : '100%',
-                        borderRight: isSmall ? 'none' : '1px solid',
-                        borderBottom: isSmall ? '1px solid' : 'none',
-                        borderColor: 'divider',
+                        flex: '1 1 45%',
+                        minHeight: 250,
+                        overflow: 'auto',
+                        display: 'flex',
+                        flexDirection: 'column',
                     }}
                 >
-                    <WorkflowDAG
-                        workflowId={workflowId}
-                        ttStatusByName={ttStatusByName}
-                        selectedTemplateName={selectedTemplateName}
-                        hoveredTemplateName={hoveredTemplateName}
-                        onTemplateSelect={handleTemplateSelect}
-                        onTemplateHover={setHoveredTemplateName}
-                        height="100%"
+                    <Box sx={{ flex: '1 1 auto' }}>{leftPanel}</Box>
+                    <Box
+                        sx={{
+                            height: 400,
+                            flexShrink: 0,
+                            borderTop: '1px solid',
+                            borderColor: 'divider',
+                        }}
+                    >
+                        {dagPanel}
+                    </Box>
+                </Box>
+            ) : (
+                <Box
+                    sx={{
+                        flex: '1 1 45%',
+                        minHeight: 250,
+                        overflow: 'hidden',
+                        display: 'flex',
+                    }}
+                >
+                    <ResizableSplitPane
+                        left={leftPanel}
+                        right={dagPanel}
+                        leftPercent={leftPercent}
+                        minLeftPercent={25}
+                        maxLeftPercent={80}
                     />
                 </Box>
-
-                {/* RIGHT: Detail panel */}
-                <Box
-                    sx={{
-                        flex: '1 1 40%',
-                        height: isSmall ? 'auto' : '100%',
-                        overflow: 'auto',
-                    }}
-                >
-                    {rightPanelView === 'template' && selectedTemplateData ? (
-                        <TemplateDetailPanel
-                            workflowId={workflowId}
-                            templateData={selectedTemplateData}
-                            onBack={handleTemplateBack}
-                            onNavigate={() =>
-                                resetStoresAndNavigate(selectedTemplateData.id)
-                            }
-                            disabled={disabled}
-                        />
-                    ) : rightPanelView === 'manage' ? (
-                        <WorkflowManagePanel
-                            wfId={workflowId!}
-                            workflowDetails={wfDetails.data}
-                            onBack={handleManageBack}
-                            onClose={handleManageClose}
-                        />
-                    ) : (
-                        <WorkflowSummaryPanel
-                            ttData={wfTTStatus.data}
-                            hoveredTemplateName={hoveredTemplateName}
-                            onTemplateSelect={handleTemplateSelect}
-                            onTemplateHover={setHoveredTemplateName}
-                            onPrefetch={prefetchTemplateData}
-                            workflowDetails={wfDetails.data}
-                            onManageClick={handleManageClick}
-                        />
-                    )}
-                </Box>
-            </Box>
+            )}
 
             {/* BOTTOM: Concurrency / Timeline */}
             <Box

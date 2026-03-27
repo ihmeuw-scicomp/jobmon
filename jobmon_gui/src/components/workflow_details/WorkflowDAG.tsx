@@ -3,6 +3,7 @@ import React, {
     useMemo,
     useEffect,
     useCallback,
+    useRef,
     createContext,
     useContext,
     useSyncExternalStore,
@@ -109,23 +110,29 @@ const DagVisualStoreContext = createContext<DagVisualStore | null>(null);
 
 function useDagNodeIsHovered(id: string): boolean {
     const store = useContext(DagVisualStoreContext)!;
+    const baseName = baseTemplateName(id);
     return useSyncExternalStore(
         store.subscribe,
-        useCallback(
-            () => store.getSnapshot().hoveredId === id,
-            [store, id]
-        )
+        useCallback(() => {
+            const hovered = store.getSnapshot().hoveredId;
+            if (!hovered) return false;
+            return hovered === id || hovered === baseName
+                || baseTemplateName(hovered) === baseName;
+        }, [store, id, baseName])
     );
 }
 
 function useDagNodeIsSelected(id: string): boolean {
     const store = useContext(DagVisualStoreContext)!;
+    const baseName = baseTemplateName(id);
     return useSyncExternalStore(
         store.subscribe,
-        useCallback(
-            () => store.getSnapshot().selectedId === id,
-            [store, id]
-        )
+        useCallback(() => {
+            const selected = store.getSnapshot().selectedId;
+            if (!selected) return false;
+            return selected === id || selected === baseName
+                || baseTemplateName(selected) === baseName;
+        }, [store, id, baseName])
     );
 }
 
@@ -134,21 +141,22 @@ function useDagNodeIsSelected(id: string): boolean {
 // ---------------------------------------------------------------------------
 
 const NODE_DIMENSIONS = {
-    minWidth: 120,
-    maxWidthBonus: 60,
-    minHeight: 36,
-    maxHeightBonus: 24,
-    charWidthEstimate: 8,
-    horizontalPadding: 24,
+    minWidth: 100,
+    maxWidthBonus: 40,
+    minHeight: 32,
+    maxHeightBonus: 16,
+    charWidthEstimate: 7,
+    horizontalPadding: 20,
     statusBarHeight: 8,
 } as const;
 
 const DAGRE_LAYOUT = {
-    rankdir: 'TB' as const,
-    ranksep: 60,
-    nodesep: 50,
+    rankdir: 'LR' as const,
+    ranksep: 80,
+    nodesep: 30,
     marginx: 20,
     marginy: 20,
+    ranker: 'network-simplex' as const,
 };
 
 const POPOVER_OFFSET = 16;
@@ -255,6 +263,11 @@ function getNodeDimensions(
     return { width, height };
 }
 
+/** Strip phase suffix e.g. "foo (2)" → "foo" */
+function baseTemplateName(phaseLabel: string): string {
+    return phaseLabel.replace(/ \(\d+\)$/, '');
+}
+
 function buildNodesAndEdges(
     ttDag: TaskTemplateDAGResponse['tt_dag']
 ): {
@@ -287,7 +300,7 @@ function buildNodesAndEdges(
             });
             seenIds.add(targetId);
         }
-        if (targetId) {
+        if (targetId && targetId !== sourceId) {
             edges.push({
                 id: `e${index}`,
                 source: sourceId,
@@ -353,7 +366,7 @@ const DagNode = React.memo(function DagNode({
 
     return (
         <>
-            <Handle type="target" position={Position.Top} />
+            <Handle type="target" position={Position.Left} />
             <div
                 style={{
                     width,
@@ -401,7 +414,7 @@ const DagNode = React.memo(function DagNode({
                     </div>
                 )}
             </div>
-            <Handle type="source" position={Position.Bottom} />
+            <Handle type="source" position={Position.Right} />
         </>
     );
 });
@@ -419,6 +432,7 @@ interface WorkflowDAGProps {
     hoveredTemplateName?: string | null;
     onTemplateSelect?: (name: string) => void;
     onTemplateHover?: (name: string | null) => void;
+    onNodeCount?: (count: number) => void;
     height?: string;
 }
 
@@ -431,6 +445,7 @@ function WorkflowDAGInner({
     hoveredTemplateName,
     onTemplateSelect,
     onTemplateHover,
+    onNodeCount,
     height,
 }: WorkflowDAGProps) {
     const navigate = useNavigate();
@@ -480,12 +495,12 @@ function WorkflowDAGInner({
         const taskCounts: Record<string, number> = {};
         for (const node of nodes) {
             taskCounts[node.id] =
-                ttStatusByName[node.id]?.tasks ?? 0;
+                ttStatusByName[baseTemplateName(node.id)]?.tasks ?? 0;
         }
         const scales = computeRelativeScales(taskCounts);
 
         const nodesWithDimensions = nodes.map(node => {
-            const tt = ttStatusByName[node.id];
+            const tt = ttStatusByName[baseTemplateName(node.id)];
             const { width, height: h } = getNodeDimensions(
                 node.data?.label ?? '',
                 (tt?.tasks ?? 0) > 0,
@@ -514,20 +529,41 @@ function WorkflowDAGInner({
         return applyDagreLayout(nodesWithDimensions, edges);
     }, [nodes, edges, ttStatusByName]);
 
-    // Fit the view once when the graph structure first loads.
+    // Fit the view when graph structure loads and when container resizes
+    const containerRef = useRef<HTMLDivElement>(null);
     const graphStructureKey = useMemo(
         () => nodes.map(n => n.id).sort().join('\0'),
         [nodes]
     );
 
+    const doFitView = useCallback(() => {
+        if (structuralNodes.length > 0) {
+            fitView({ padding: 0.2, duration: 200, minZoom: 0.05 });
+        }
+    }, [structuralNodes.length, fitView]);
+
     useEffect(() => {
         if (structuralNodes.length > 0) {
-            const timer = setTimeout(() => {
-                fitView({ padding: 0.15, duration: 200 });
-            }, 50);
+            const timer = setTimeout(doFitView, 50);
             return () => clearTimeout(timer);
         }
-    }, [graphStructureKey, fitView]);
+    }, [graphStructureKey, doFitView]);
+
+    // Re-fit on container resize (e.g. drag handle)
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el || structuralNodes.length === 0) return;
+        let rafId: number;
+        const observer = new ResizeObserver(() => {
+            cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(doFitView);
+        });
+        observer.observe(el);
+        return () => {
+            observer.disconnect();
+            cancelAnimationFrame(rafId);
+        };
+    }, [doFitView, structuralNodes.length]);
 
     useEffect(() => {
         if (dagQuery.data) {
@@ -535,8 +571,9 @@ function WorkflowDAGInner({
                 buildNodesAndEdges(dagQuery.data.tt_dag);
             setNodes(newNodes);
             setEdges(newEdges);
+            onNodeCount?.(newNodes.length);
         }
-    }, [dagQuery.data]);
+    }, [dagQuery.data, onNodeCount]);
 
     // Subscribe to hoveredId for edge highlighting
     const hoveredId = useSyncExternalStore(
@@ -548,19 +585,22 @@ function WorkflowDAGInner({
         if (!hoveredId) {
             return edges.map(e => ({ ...e, style: EDGE_STYLE_DEFAULT }));
         }
+        const hoveredBase = baseTemplateName(hoveredId);
+        const matches = (nodeId: string) =>
+            nodeId === hoveredId || baseTemplateName(nodeId) === hoveredBase;
         return edges.map(e => ({
             ...e,
             style:
-                e.source === hoveredId || e.target === hoveredId
+                matches(e.source) || matches(e.target)
                     ? EDGE_STYLE_HIGHLIGHTED
                     : EDGE_STYLE_DIMMED,
             zIndex:
-                e.source === hoveredId || e.target === hoveredId ? 1 : 0,
+                matches(e.source) || matches(e.target) ? 1 : 0,
         }));
     }, [edges, hoveredId]);
 
     const popoverTTData = popoverNodeId
-        ? ttStatusByName[popoverNodeId]
+        ? ttStatusByName[baseTemplateName(popoverNodeId)]
         : undefined;
 
     const handleNodeMouseEnter = useCallback(
@@ -571,7 +611,7 @@ function WorkflowDAGInner({
                 x: event.clientX,
                 y: event.clientY,
             });
-            onTemplateHover?.(node.id);
+            onTemplateHover?.(baseTemplateName(node.id));
         },
         [onTemplateHover, visualStore]
     );
@@ -586,9 +626,9 @@ function WorkflowDAGInner({
     const handleNodeClick = useCallback(
         (_event: React.MouseEvent, node: Node<DagNodeData>) => {
             if (onTemplateSelect) {
-                onTemplateSelect(node.id);
+                onTemplateSelect(baseTemplateName(node.id));
             } else {
-                const tt = ttStatusByName[node.id];
+                const tt = ttStatusByName[baseTemplateName(node.id)];
                 if (tt) {
                     navigate(
                         `/workflow/${workflowId}/task_template/${tt.id}`
@@ -623,6 +663,7 @@ function WorkflowDAGInner({
     return (
         <DagVisualStoreContext.Provider value={visualStore}>
             <div
+                ref={containerRef}
                 style={{
                     height: containerHeight,
                     width: '100%',
@@ -636,8 +677,9 @@ function WorkflowDAGInner({
                     onNodeMouseEnter={handleNodeMouseEnter}
                     onNodeMouseLeave={handleNodeMouseLeave}
                     onNodeClick={handleNodeClick}
+                    minZoom={0.05}
                     fitView
-                    fitViewOptions={{ padding: 0.15 }}
+                    fitViewOptions={{ padding: 0.2 }}
                 >
                     <Controls />
                     <Background />
