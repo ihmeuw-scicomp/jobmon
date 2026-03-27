@@ -15,19 +15,16 @@ import PanToolIcon from '@mui/icons-material/PanTool';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import AddIcon from '@mui/icons-material/Add';
 import RemoveIcon from '@mui/icons-material/Remove';
-import SyncIcon from '@mui/icons-material/Sync';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SyncIcon from '@mui/icons-material/Sync';
 import { useQuery } from '@tanstack/react-query';
 import {
     getTemplateTimelineQueryFn,
     TemplateTimelineResponse,
 } from '@jobmon_gui/queries/GetTaskConcurrency.ts';
 import type { Layout, PlotMouseEvent, Data as PlotlyData } from 'plotly.js';
-import {
-    TEMPLATE_STATUS_COLORS,
-} from '@jobmon_gui/constants/taskStatus';
+import { TEMPLATE_STATUS_COLORS } from '@jobmon_gui/constants/taskStatus';
 
-// Status display order (bottom to top in stacked area)
 const STATUS_ORDER = [
     'REGISTERED',
     'PENDING',
@@ -35,7 +32,7 @@ const STATUS_ORDER = [
     'RUNNING',
     'ERROR',
     'DONE',
-];
+] as const;
 
 const STATUS_COLORS: Record<string, string> = {
     REGISTERED: '#757575',
@@ -46,18 +43,18 @@ const STATUS_COLORS: Record<string, string> = {
     DONE: TEMPLATE_STATUS_COLORS.DONE,
 };
 
-const STATUS_DISPLAY_LABEL: Record<string, string> = {
-    REGISTERED: 'REGISTERED',
-    PENDING: 'PENDING',
-    LAUNCHED: 'SCHEDULED',
-    RUNNING: 'RUNNING',
-    ERROR: 'ERROR',
-    DONE: 'DONE',
+const STATUS_DISPLAY: Record<string, string> = {
+    REGISTERED: 'Registered',
+    PENDING: 'Pending',
+    LAUNCHED: 'Scheduled',
+    RUNNING: 'Running',
+    ERROR: 'Error',
+    DONE: 'Done',
 };
 
 const MIN_CHART_HEIGHT = 300;
-const SUBPLOT_HEIGHT = 80;
-const SUBPLOT_GAP = 0.04;
+const BAR_HEIGHT = 28;
+const BAR_GAP = 8;
 
 function hexToRgba(hex: string, alpha: number): string {
     const h = hex.replace('#', '');
@@ -79,12 +76,14 @@ export default function TemplateTimelineTab({
     onTemplateClick,
 }: TemplateTimelineTabProps) {
     const [dragMode, setDragMode] = useState<'zoom' | 'pan'>('zoom');
-    const [syncScales, setSyncScales] = useState(true);
+    const [syncScales, setSyncScales] = useState(false);
     const [uiRevision, setUiRevision] = useState(0);
     const graphDivRef = useRef<
         HTMLDivElement & {
             _fullLayout?: {
-                xaxis?: { range?: [number | string, number | string] };
+                xaxis?: {
+                    range?: [number | string, number | string];
+                };
             };
         }
     >(null);
@@ -96,7 +95,11 @@ export default function TemplateTimelineTab({
         error,
         refetch,
     } = useQuery({
-        queryKey: ['workflow_details', 'template_timeline', workflowId],
+        queryKey: [
+            'workflow_details',
+            'template_timeline',
+            workflowId,
+        ],
         queryFn: getTemplateTimelineQueryFn,
         refetchOnMount: true,
         refetchOnWindowFocus: false,
@@ -108,35 +111,45 @@ export default function TemplateTimelineTab({
     }, []);
 
     const handlePlotInitialized = useCallback(
-        (_figure: object, graphDiv: typeof graphDivRef.current) => {
+        (
+            _figure: object,
+            graphDiv: typeof graphDivRef.current
+        ) => {
             graphDivRef.current = graphDiv;
         },
         []
     );
 
     const rangeValueToMs = (value: number | string): number =>
-        typeof value === 'number' ? value : new Date(value).getTime();
+        typeof value === 'number'
+            ? value
+            : new Date(value).getTime();
 
     const handleZoom = useCallback((scaleFactor: number) => {
         const gd = graphDivRef.current;
         if (!gd?._fullLayout?.xaxis?.range) return;
-
         const [rangeStart, rangeEnd] = gd._fullLayout.xaxis.range;
         const startMs = rangeValueToMs(rangeStart);
         const endMs = rangeValueToMs(rangeEnd);
-
         const duration = endMs - startMs;
         const center = startMs + duration / 2;
         const newDuration = duration * scaleFactor;
-
-        const newStartMs = center - newDuration / 2;
-        const newEndMs = center + newDuration / 2;
-
-        Plotly.relayout(gd, { 'xaxis.range': [newStartMs, newEndMs] });
+        Plotly.relayout(gd, {
+            'xaxis.range': [
+                center - newDuration / 2,
+                center + newDuration / 2,
+            ],
+        });
     }, []);
 
-    const handleZoomIn = useCallback(() => handleZoom(0.5), [handleZoom]);
-    const handleZoomOut = useCallback(() => handleZoom(2), [handleZoom]);
+    const handleZoomIn = useCallback(
+        () => handleZoom(0.5),
+        [handleZoom]
+    );
+    const handleZoomOut = useCallback(
+        () => handleZoom(2),
+        [handleZoom]
+    );
 
     const handlePlotClick = useCallback(
         (event: Readonly<PlotMouseEvent>) => {
@@ -152,10 +165,6 @@ export default function TemplateTimelineTab({
         [onTemplateClick]
     );
 
-    // Build Plotly traces — one subplot per template, each a
-    // normalized (0-100%) stacked area showing status proportions.
-    // Each template has its own timestamps array (event-driven,
-    // no bucketing), so x values are per-template.
     const { traces, layout } = useMemo(() => {
         if (!timelineData?.templates?.length) {
             return {
@@ -170,38 +179,165 @@ export default function TemplateTimelineTab({
             ? new Set(highlightedTemplates)
             : null;
 
-        // Pre-compute which statuses have data across ALL templates
-        // so the legend shows every active status globally.
-        const globalActiveStatuses = new Set<string>();
-        for (const tmpl of templates) {
-            for (const status of STATUS_ORDER) {
-                const vals = tmpl.series[status];
-                if (vals?.some((v: number) => v > 0)) {
-                    globalActiveStatuses.add(status);
-                }
-            }
-        }
-
         const resultTraces: PlotlyData[] = [];
+        const legendShown = new Set<string>();
+        const ROW_HEIGHT = 0.7;
 
-        // When sync scales is on, use the same y-axis range across
-        // all subplots so areas are visually comparable.
         const globalMaxTasks = syncScales
             ? Math.max(...templates.map(t => t.total_tasks))
             : 0;
 
-        // Compute subplot domain ranges (top to bottom = first to last)
-        const totalGap = SUBPLOT_GAP * (numTemplates - 1);
-        const availableHeight = 1 - totalGap;
-        const subplotHeight = availableHeight / numTemplates;
+        // One trace per (template, status) pair instead of
+        // one trace per (template, timestamp, status).
+        for (let tIdx = 0; tIdx < numTemplates; tIdx++) {
+            const tmpl = templates[tIdx];
+            const isDimmed =
+                highlightSet &&
+                !highlightSet.has(tmpl.template_name);
+            const yCenter = numTemplates - tIdx;
 
-        // Build layout with shared x-axis and per-template y-axes
-        const layoutObj: Record<string, unknown> = {
+            if (tmpl.timestamps.length === 0) continue;
+
+            // Pre-compute per-timestamp totals and hover text
+            const totals: number[] = [];
+            const hoverTexts: string[] = [];
+            for (
+                let i = 0;
+                i < tmpl.timestamps.length - 1;
+                i++
+            ) {
+                let total = 0;
+                for (const status of STATUS_ORDER) {
+                    total +=
+                        tmpl.series[status]?.[i] ?? 0;
+                }
+                totals.push(total);
+
+                const hoverLines = STATUS_ORDER.map(s => {
+                    const val =
+                        tmpl.series[s]?.[i] ?? 0;
+                    if (val === 0) return null;
+                    return `${STATUS_DISPLAY[s]}: ${val}`;
+                }).filter(Boolean);
+                hoverTexts.push(
+                    `<b>${tmpl.template_name}</b><br>` +
+                    hoverLines.join('<br>') +
+                    '<extra></extra>'
+                );
+            }
+
+            // Collect segments per status into arrays
+            for (const status of STATUS_ORDER) {
+                const yArr: number[] = [];
+                const xArr: number[] = [];
+                const baseArr: number[] = [];
+                const widthArr: number[] = [];
+                const colorArr: string[] = [];
+                const customArr: string[] = [];
+                const hoverArr: string[] = [];
+
+                const baseColor =
+                    STATUS_COLORS[status] ?? '#999';
+                const alpha = isDimmed ? 0.2 : 0.85;
+                const rgba = hexToRgba(baseColor, alpha);
+
+                for (
+                    let i = 0;
+                    i < tmpl.timestamps.length - 1;
+                    i++
+                ) {
+                    const total = totals[i];
+                    if (total === 0) continue;
+
+                    const count =
+                        tmpl.series[status]?.[i] ?? 0;
+                    if (count === 0) continue;
+
+                    const t0ms = new Date(
+                        tmpl.timestamps[i]
+                    ).getTime();
+                    const t1ms = new Date(
+                        tmpl.timestamps[i + 1]
+                    ).getTime();
+
+                    const rowScale =
+                        syncScales && globalMaxTasks > 0
+                            ? (total / globalMaxTasks) *
+                              ROW_HEIGHT
+                            : ROW_HEIGHT;
+
+                    // Compute y offset by summing heights
+                    // of statuses that appear below this one
+                    let yOffset = yCenter - rowScale / 2;
+                    for (const s of STATUS_ORDER) {
+                        if (s === status) break;
+                        const c =
+                            tmpl.series[s]?.[i] ?? 0;
+                        if (c > 0) {
+                            yOffset +=
+                                (c / total) * rowScale;
+                        }
+                    }
+
+                    const fraction = count / total;
+                    const barH = fraction * rowScale;
+
+                    yArr.push(yOffset + barH / 2);
+                    xArr.push(t1ms - t0ms);
+                    baseArr.push(t0ms);
+                    widthArr.push(barH);
+                    colorArr.push(rgba);
+                    customArr.push(tmpl.template_name);
+                    hoverArr.push(hoverTexts[i]);
+                }
+
+                if (xArr.length === 0) continue;
+
+                const showLegend =
+                    !legendShown.has(status);
+                if (showLegend) legendShown.add(status);
+
+                resultTraces.push({
+                    type: 'bar',
+                    orientation: 'h',
+                    y: yArr,
+                    x: xArr,
+                    base: baseArr,
+                    marker: {
+                        color: colorArr,
+                        line: { width: 0 },
+                    },
+                    width: widthArr,
+                    name:
+                        STATUS_DISPLAY[status] ?? status,
+                    legendgroup: status,
+                    showlegend: showLegend,
+                    customdata: customArr,
+                    hovertemplate: hoverArr,
+                } as PlotlyData);
+            }
+        }
+
+        // Y-axis tick labels = template names
+        const yTickVals = templates.map(
+            (_, i) => numTemplates - i
+        );
+        const yTickText = templates.map(t => {
+            const name = t.template_name;
+            return name.length > 30
+                ? name.substring(0, 27) + '...'
+                : name;
+        });
+
+        const chartHeight = Math.max(
+            MIN_CHART_HEIGHT,
+            numTemplates * (BAR_HEIGHT + BAR_GAP) + 100
+        );
+
+        const layoutObj: Partial<Layout> = {
             autosize: true,
-            height: Math.max(
-                MIN_CHART_HEIGHT,
-                numTemplates * SUBPLOT_HEIGHT + 80
-            ),
+            height: chartHeight,
+            barmode: 'stack',
             showlegend: true,
             legend: {
                 orientation: 'h',
@@ -209,9 +345,10 @@ export default function TemplateTimelineTab({
                 yanchor: 'bottom',
                 x: 0.5,
                 xanchor: 'center',
+                font: { size: 11 },
             },
-            margin: { l: 100, r: 60, t: 30, b: 50, pad: 0 },
-            hovermode: 'x unified' as const,
+            margin: { l: 160, r: 60, t: 30, b: 50, pad: 0 },
+            hovermode: 'closest' as const,
             hoverlabel: {
                 bgcolor: 'white',
                 bordercolor: '#ccc',
@@ -221,125 +358,66 @@ export default function TemplateTimelineTab({
             uirevision: uiRevision,
             plot_bgcolor: 'rgba(0,0,0,0)',
             paper_bgcolor: 'rgba(0,0,0,0)',
-        };
-
-        // x-axis: shared, anchored to bottom subplot
-        const bottomYKey = numTemplates === 1 ? 'y' : `y${numTemplates}`;
-        layoutObj.xaxis = {
-            type: 'date',
-            title: {
-                text: 'Time',
-                font: { size: 12, family: 'Roboto, sans-serif' },
-            },
-            tickfont: { size: 10 },
-            gridcolor: 'rgba(0,0,0,0.08)',
-            anchor: bottomYKey,
-            autorange: true,
-        };
-
-        // Per-template: create y-axis and traces
-        for (let tIdx = 0; tIdx < numTemplates; tIdx++) {
-            const tmpl = templates[tIdx];
-            const isDimmed =
-                highlightSet && !highlightSet.has(tmpl.template_name);
-
-            // Domain: top-down (first template at top)
-            const domainTop = 1 - tIdx * (subplotHeight + SUBPLOT_GAP);
-            const domainBottom = domainTop - subplotHeight;
-
-            const yAxisKey = tIdx === 0 ? 'yaxis' : `yaxis${tIdx + 1}`;
-            const yRef = tIdx === 0 ? 'y' : `y${tIdx + 1}`;
-
-            layoutObj[yAxisKey] = {
-                domain: [Math.max(0, domainBottom), domainTop],
-                showticklabels: false,
-                showgrid: false,
-                zeroline: false,
-                fixedrange: true,
-                ...(syncScales
-                    ? { range: [0, globalMaxTasks * 1.05] }
-                    : {}),
+            xaxis: {
+                type: 'date',
                 title: {
-                    text: tmpl.template_name,
-                    font: { size: 11, family: 'Roboto, sans-serif' },
-                    standoff: 5,
-                },
-            };
-
-            // Create stacked area traces (one per status).
-            // Each template has its own timestamps array — use it as x.
-            // When sync scales is off, groupnorm:'percent' normalizes
-            // each timestamp to 100%.  When on, raw counts are used.
-            for (let sIdx = 0; sIdx < STATUS_ORDER.length; sIdx++) {
-                const status = STATUS_ORDER[sIdx];
-                const counts = tmpl.series[status] ?? tmpl.timestamps.map(() => 0);
-
-                const hasAny = counts.some((c: number) => c > 0);
-                const baseColor = STATUS_COLORS[status];
-                const fillColor = isDimmed
-                    ? hexToRgba(baseColor, 0.15)
-                    : hexToRgba(baseColor, 0.7);
-                const lineColor = isDimmed
-                    ? hexToRgba(baseColor, 0.25)
-                    : hexToRgba(baseColor, 0.9);
-
-                resultTraces.push({
-                    type: 'scatter',
-                    x: tmpl.timestamps,
-                    y: counts,
-                    customdata: tmpl.timestamps.map(() => tmpl.template_name),
-                    xaxis: 'x',
-                    yaxis: yRef,
-                    stackgroup: `tmpl_${tIdx}`,
-                    groupnorm: !syncScales && sIdx === 0 ? 'percent' : '',
-                    mode: 'none',
-                    fillcolor: fillColor,
-                    line: { width: 0.5, color: lineColor, shape: 'hv' },
-                    name: STATUS_DISPLAY_LABEL[status] ?? status,
-                    showlegend: tIdx === 0 && globalActiveStatuses.has(status),
-                    legendgroup: status,
-                    hovertemplate: hasAny
-                        ? `${STATUS_DISPLAY_LABEL[status]}: %{y}<extra>${tmpl.template_name}</extra>`
-                        : undefined,
-                    hoverinfo: hasAny ? undefined : ('skip' as const),
-                } as PlotlyData);
-            }
-        }
-
-        // Annotations: template total tasks on the right side
-        // Use paper-relative y so positioning is correct regardless
-        // of whether syncScales is on (raw counts) or off (percent).
-        const annotations = templates.map(
-            (tmpl: TemplateTimelineResponse['templates'][0], tIdx: number) => {
-                const domainTop = 1 - tIdx * (subplotHeight + SUBPLOT_GAP);
-                const domainBottom = domainTop - subplotHeight;
-                const domainMid = (domainTop + domainBottom) / 2;
-                return {
-                    text: `<b>${tmpl.total_tasks}</b> task${tmpl.total_tasks === 1 ? '' : 's'}`,
-                    xref: 'paper' as const,
-                    yref: 'paper' as const,
-                    x: 1.005,
-                    y: domainMid,
-                    showarrow: false,
+                    text: 'Time',
                     font: {
-                        size: 9,
-                        color: 'rgba(0,0,0,0.5)',
+                        size: 12,
                         family: 'Roboto, sans-serif',
                     },
-                    xanchor: 'left' as const,
-                    yanchor: 'middle' as const,
-                };
-            }
+                },
+                tickfont: { size: 10 },
+                gridcolor: 'rgba(0,0,0,0.08)',
+                autorange: true,
+            },
+            yaxis: {
+                tickvals: yTickVals,
+                ticktext: yTickText,
+                tickfont: {
+                    size: 11,
+                    family: 'Roboto, sans-serif',
+                },
+                autorange: true,
+                fixedrange: true,
+                showgrid: true,
+                gridcolor: 'rgba(0,0,0,0.04)',
+                zeroline: false,
+            },
+        };
+
+        // Annotations: total tasks on right side
+        const annotations = templates.map(
+            (
+                tmpl: TemplateTimelineResponse['templates'][0],
+                tIdx: number
+            ) => ({
+                text: `${tmpl.total_tasks.toLocaleString()}`,
+                xref: 'paper' as const,
+                yref: 'y' as const,
+                x: 1.005,
+                y: numTemplates - tIdx,
+                showarrow: false,
+                font: {
+                    size: 10,
+                    color: 'rgba(0,0,0,0.5)',
+                    family: 'Roboto, sans-serif',
+                },
+                xanchor: 'left' as const,
+                yanchor: 'middle' as const,
+            })
         );
         layoutObj.annotations = annotations;
 
-        return {
-            traces: resultTraces,
-            layout: layoutObj as Partial<Layout>,
-        };
-    }, [timelineData, highlightedTemplates, dragMode, uiRevision, syncScales]);
+        return { traces: resultTraces, layout: layoutObj };
+    }, [
+        timelineData,
+        highlightedTemplates,
+        dragMode,
+        uiRevision,
+        syncScales,
+    ]);
 
-    // Loading state
     if (isLoading) {
         return (
             <Box
@@ -360,7 +438,6 @@ export default function TemplateTimelineTab({
         );
     }
 
-    // Error state
     if (isError) {
         return (
             <Box
@@ -374,8 +451,10 @@ export default function TemplateTimelineTab({
                 }}
             >
                 <Typography color="error">
-                    Error loading template timeline:{' '}
-                    {error instanceof Error ? error.message : 'Unknown error'}
+                    Error loading timeline:{' '}
+                    {error instanceof Error
+                        ? error.message
+                        : 'Unknown error'}
                 </Typography>
                 <Button
                     variant="contained"
@@ -388,7 +467,6 @@ export default function TemplateTimelineTab({
         );
     }
 
-    // Empty state
     if (!timelineData?.templates?.length) {
         return (
             <Box
@@ -424,7 +502,6 @@ export default function TemplateTimelineTab({
                 height: '100%',
             }}
         >
-            {/* Toolbar */}
             <Box
                 sx={{
                     display: 'flex',
@@ -439,7 +516,9 @@ export default function TemplateTimelineTab({
                     <Tooltip title="Zoom mode">
                         <Button
                             variant={
-                                dragMode === 'zoom' ? 'contained' : 'outlined'
+                                dragMode === 'zoom'
+                                    ? 'contained'
+                                    : 'outlined'
                             }
                             onClick={() => setDragMode('zoom')}
                             sx={{ minWidth: 0, px: 0.75 }}
@@ -450,7 +529,9 @@ export default function TemplateTimelineTab({
                     <Tooltip title="Pan mode">
                         <Button
                             variant={
-                                dragMode === 'pan' ? 'contained' : 'outlined'
+                                dragMode === 'pan'
+                                    ? 'contained'
+                                    : 'outlined'
                             }
                             onClick={() => setDragMode('pan')}
                             sx={{ minWidth: 0, px: 0.75 }}
@@ -486,8 +567,8 @@ export default function TemplateTimelineTab({
                 <Tooltip
                     title={
                         syncScales
-                            ? 'Sync scales on — areas are comparable'
-                            : 'Sync scales off — each row normalized to 100%'
+                            ? 'Sync on — bar height shows absolute task count'
+                            : 'Sync off — all rows same height'
                     }
                 >
                     <Button
@@ -508,7 +589,6 @@ export default function TemplateTimelineTab({
                 </Tooltip>
             </Box>
 
-            {/* Chart area */}
             <Box
                 sx={{
                     flex: 1,
@@ -522,7 +602,10 @@ export default function TemplateTimelineTab({
                 <Plot
                     data={traces}
                     layout={layout}
-                    style={{ width: '100%', minHeight: MIN_CHART_HEIGHT }}
+                    style={{
+                        width: '100%',
+                        minHeight: MIN_CHART_HEIGHT,
+                    }}
                     useResizeHandler={true}
                     onInitialized={handlePlotInitialized}
                     onUpdate={handlePlotInitialized}

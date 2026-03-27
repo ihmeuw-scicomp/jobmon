@@ -9,6 +9,8 @@ import { TTStatusResponse } from '@jobmon_gui/types/TaskTemplateStatus';
 import { TEMPLATE_STATUS_COLORS } from '@jobmon_gui/constants/taskStatus';
 import TemplateStatusBar from '@jobmon_gui/components/common/TemplateStatusBar';
 
+const HOVER_BG = '#e3f2fd';
+
 interface TemplateListPanelProps {
     ttData: TTStatusResponse;
     hoveredTemplateName: string | null;
@@ -93,12 +95,12 @@ export default function TemplateListPanel({
                                     backgroundColor:
                                         hoveredTemplateName ===
                                         tt.name
-                                            ? '#e3f2fd'
+                                            ? HOVER_BG
                                             : undefined,
                                     transition:
                                         'background-color 0.15s ease',
                                     '&:hover': {
-                                        backgroundColor: '#e3f2fd',
+                                        backgroundColor: HOVER_BG,
                                     },
                                 }}
                             >
@@ -194,11 +196,13 @@ export default function TemplateListPanel({
                                             color="text.secondary"
                                             sx={{ flexShrink: 0 }}
                                         >
-                                            {Math.floor(
-                                                (tt.DONE /
-                                                    tt.tasks) *
-                                                    100
-                                            )}
+                                            {tt.tasks === 0
+                                                ? 0
+                                                : Math.floor(
+                                                      (tt.DONE /
+                                                          tt.tasks) *
+                                                          100
+                                                  )}
                                             %
                                         </Typography>
                                     </Box>

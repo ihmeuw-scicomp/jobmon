@@ -7,6 +7,7 @@ interface ResizableSplitPaneProps {
     leftPercent?: number;
     minLeftPercent?: number;
     maxLeftPercent?: number;
+    orientation?: 'horizontal' | 'vertical';
 }
 
 export default function ResizableSplitPane({
@@ -15,7 +16,9 @@ export default function ResizableSplitPane({
     leftPercent: controlledPercent = 60,
     minLeftPercent = 20,
     maxLeftPercent = 80,
+    orientation = 'horizontal',
 }: ResizableSplitPaneProps) {
+    const isVertical = orientation === 'vertical';
     const [localPercent, setLocalPercent] = useState(controlledPercent);
     const userDragged = useRef(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -42,12 +45,14 @@ export default function ResizableSplitPane({
         (e: React.PointerEvent) => {
             if (!dragging.current || !containerRef.current) return;
             const rect = containerRef.current.getBoundingClientRect();
-            const pct = ((e.clientX - rect.left) / rect.width) * 100;
+            const pct = isVertical
+                ? ((e.clientY - rect.top) / rect.height) * 100
+                : ((e.clientX - rect.left) / rect.width) * 100;
             setLocalPercent(
                 Math.min(maxLeftPercent, Math.max(minLeftPercent, pct))
             );
         },
-        [minLeftPercent, maxLeftPercent]
+        [isVertical, minLeftPercent, maxLeftPercent]
     );
 
     const handlePointerUp = useCallback(() => {
@@ -64,25 +69,56 @@ export default function ResizableSplitPane({
             document.removeEventListener('selectstart', onSelectStart);
     }, []);
 
+    const firstPanelSx = isVertical
+        ? {
+              flex: `0 0 ${localPercent}%`,
+              maxHeight: `${localPercent}%`,
+              minHeight: 0,
+              overflow: 'hidden',
+              display: 'flex',
+          }
+        : {
+              flex: `0 0 ${localPercent}%`,
+              maxWidth: `${localPercent}%`,
+              minWidth: 0,
+              overflow: 'hidden',
+          };
+
+    const handleHitTarget = isVertical
+        ? {
+              content: '""',
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: -4,
+              bottom: -4,
+          }
+        : {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: -4,
+              right: -4,
+          };
+
+    const secondPanelSx = isVertical
+        ? { flex: 1, minHeight: 0, overflow: 'hidden' }
+        : { flex: 1, minWidth: 0, overflow: 'hidden' };
+
     return (
         <Box
             ref={containerRef}
             sx={{
                 display: 'flex',
+                flexDirection: isVertical ? 'column' : 'row',
                 flex: 1,
                 minHeight: 0,
                 overflow: 'hidden',
             }}
         >
-            {/* Left panel */}
-            <Box
-                sx={{
-                    flex: `0 0 ${localPercent}%`,
-                    maxWidth: `${localPercent}%`,
-                    minWidth: 0,
-                    overflow: 'hidden',
-                }}
-            >
+            {/* First panel */}
+            <Box sx={firstPanelSx}>
                 {left}
             </Box>
 
@@ -93,33 +129,19 @@ export default function ResizableSplitPane({
                 onPointerUp={handlePointerUp}
                 sx={{
                     flex: '0 0 5px',
-                    cursor: 'col-resize',
+                    cursor: isVertical ? 'row-resize' : 'col-resize',
                     backgroundColor: 'divider',
                     position: 'relative',
                     zIndex: 1,
                     '&:hover, &:active': {
                         backgroundColor: 'primary.main',
                     },
-                    // Wider hit target
-                    '&::before': {
-                        content: '""',
-                        position: 'absolute',
-                        top: 0,
-                        bottom: 0,
-                        left: -4,
-                        right: -4,
-                    },
+                    '&::before': handleHitTarget,
                 }}
             />
 
-            {/* Right panel */}
-            <Box
-                sx={{
-                    flex: 1,
-                    minWidth: 0,
-                    overflow: 'hidden',
-                }}
-            >
+            {/* Second panel */}
+            <Box sx={secondPanelSx}>
                 {right}
             </Box>
         </Box>

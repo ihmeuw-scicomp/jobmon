@@ -4,6 +4,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import WorkflowHeader from '@jobmon_gui/components/workflow_details/WorkflowHeader';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
+import Dialog from '@mui/material/Dialog';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import ToggleButton from '@mui/material/ToggleButton';
@@ -12,6 +13,8 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Typography from '@mui/material/Typography';
+import CloseIcon from '@mui/icons-material/Close';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PauseIcon from '@mui/icons-material/Pause';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -60,6 +63,7 @@ function WorkflowDetails() {
         'concurrency' | 'timeline'
     >('timeline');
     const [dagNodeCount, setDagNodeCount] = useState<number | null>(null);
+    const [dagFullscreen, setDagFullscreen] = useState(false);
 
     // Page-level auto-refresh: invalidate all workflow queries periodically
     useEffect(() => {
@@ -133,14 +137,14 @@ function WorkflowDetails() {
         });
     };
 
-    const selectedTemplateData = (() => {
+    const selectedTemplateData = useMemo(() => {
         if (!selectedTemplateName || !wfTTStatus.data) return null;
         return (
             Object.values(wfTTStatus.data).find(
                 tt => tt.name === selectedTemplateName
             ) ?? null
         );
-    })();
+    }, [selectedTemplateName, wfTTStatus.data]);
 
     const handleTemplateSelect = (name: string) => {
         setSelectedTemplateName(name);
@@ -252,7 +256,7 @@ function WorkflowDetails() {
                   : 55;
     const leftPercent = 100 - dagPercent;
 
-    const dagPanel = (
+    const dagContent = (
         <WorkflowDAG
             workflowId={workflowId}
             ttStatusByName={ttStatusByName}
@@ -263,6 +267,35 @@ function WorkflowDetails() {
             onNodeCount={handleDagNodeCount}
             height="100%"
         />
+    );
+
+    const dagPanel = (
+        <Box
+            sx={{
+                position: 'relative',
+                height: '100%',
+            }}
+        >
+            {dagContent}
+            <Tooltip title="Fullscreen DAG">
+                <IconButton
+                    size="small"
+                    onClick={() => setDagFullscreen(true)}
+                    sx={{
+                        position: 'absolute',
+                        top: 4,
+                        right: 4,
+                        zIndex: 5,
+                        backgroundColor: 'rgba(255,255,255,0.8)',
+                        '&:hover': {
+                            backgroundColor: 'rgba(255,255,255,0.95)',
+                        },
+                    }}
+                >
+                    <FullscreenIcon fontSize="small" />
+                </IconButton>
+            </Tooltip>
+        </Box>
     );
 
     return (
@@ -330,140 +363,176 @@ function WorkflowDetails() {
                 onManageClick={handleManageClick}
             />
 
-            {/* Middle: Template list/detail (left) | DAG (right) */}
-            {isSmall ? (
-                <Box
-                    sx={{
-                        flex: '1 1 45%',
-                        minHeight: 250,
-                        overflow: 'auto',
-                        display: 'flex',
-                        flexDirection: 'column',
-                    }}
-                >
-                    <Box sx={{ flex: '1 1 auto' }}>{leftPanel}</Box>
+            {/* Middle + Bottom with vertical resize */}
+            <ResizableSplitPane
+                orientation="vertical"
+                leftPercent={50}
+                minLeftPercent={20}
+                maxLeftPercent={80}
+                left={
+                    isSmall ? (
+                        <Box
+                            sx={{
+                                overflow: 'auto',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                height: '100%',
+                            }}
+                        >
+                            <Box sx={{ flex: '1 1 auto' }}>{leftPanel}</Box>
+                            <Box
+                                sx={{
+                                    height: 400,
+                                    flexShrink: 0,
+                                    borderTop: '1px solid',
+                                    borderColor: 'divider',
+                                }}
+                            >
+                                {dagPanel}
+                            </Box>
+                        </Box>
+                    ) : (
+                        <ResizableSplitPane
+                            left={leftPanel}
+                            right={dagPanel}
+                            leftPercent={leftPercent}
+                            minLeftPercent={25}
+                            maxLeftPercent={80}
+                        />
+                    )
+                }
+                right={
                     <Box
                         sx={{
-                            height: 400,
-                            flexShrink: 0,
-                            borderTop: '1px solid',
-                            borderColor: 'divider',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            height: '100%',
                         }}
                     >
-                        {dagPanel}
-                    </Box>
-                </Box>
-            ) : (
-                <Box
-                    sx={{
-                        flex: '1 1 45%',
-                        minHeight: 250,
-                        overflow: 'hidden',
-                        display: 'flex',
-                    }}
-                >
-                    <ResizableSplitPane
-                        left={leftPanel}
-                        right={dagPanel}
-                        leftPercent={leftPercent}
-                        minLeftPercent={25}
-                        maxLeftPercent={80}
-                    />
-                </Box>
-            )}
-
-            {/* BOTTOM: Concurrency / Timeline */}
-            <Box
-                sx={{
-                    borderTop: 1,
-                    borderColor: 'divider',
-                    flex: '1 1 45%',
-                    minHeight: 0,
-                    overflow: 'hidden',
-                    display: 'flex',
-                    flexDirection: 'column',
-                }}
-            >
-                <Box
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        px: 1,
-                        py: 0.25,
-                        borderBottom: '1px solid',
-                        borderColor: 'divider',
-                        flexShrink: 0,
-                    }}
-                >
-                    <ToggleButtonGroup
-                        value={bottomPanelView}
-                        exclusive
-                        onChange={(_, val) => {
-                            if (val) setBottomPanelView(val);
-                        }}
-                        size="small"
-                        sx={{
-                            '& .MuiToggleButton-root': {
-                                py: 0.25,
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
                                 px: 1,
-                                textTransform: 'none',
-                                fontSize: '0.75rem',
-                            },
+                                py: 0.25,
+                                borderBottom: '1px solid',
+                                borderColor: 'divider',
+                                flexShrink: 0,
+                            }}
+                        >
+                            <ToggleButtonGroup
+                                value={bottomPanelView}
+                                exclusive
+                                onChange={(_, val) => {
+                                    if (val) setBottomPanelView(val);
+                                }}
+                                size="small"
+                                sx={{
+                                    '& .MuiToggleButton-root': {
+                                        py: 0.25,
+                                        px: 1,
+                                        textTransform: 'none',
+                                        fontSize: '0.75rem',
+                                    },
+                                }}
+                            >
+                                <ToggleButton value="concurrency">
+                                    <Tooltip title="Task status counts over time">
+                                        <Box
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 0.5,
+                                            }}
+                                        >
+                                            <BarChartIcon
+                                                sx={{ fontSize: 16 }}
+                                            />
+                                            Status
+                                        </Box>
+                                    </Tooltip>
+                                </ToggleButton>
+                                <ToggleButton value="timeline">
+                                    <Tooltip title="Template execution spans">
+                                        <Box
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 0.5,
+                                            }}
+                                        >
+                                            <TimelineIcon
+                                                sx={{ fontSize: 16 }}
+                                            />
+                                            Gantt
+                                        </Box>
+                                    </Tooltip>
+                                </ToggleButton>
+                            </ToggleButtonGroup>
+                        </Box>
+                        <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                            {bottomPanelView === 'concurrency' ? (
+                                <TaskConcurrencyTab
+                                    workflowId={workflowId}
+                                    highlightedTemplates={
+                                        selectedTemplateName
+                                            ? [selectedTemplateName]
+                                            : undefined
+                                    }
+                                />
+                            ) : (
+                                <TemplateTimelineTab
+                                    workflowId={workflowId}
+                                    highlightedTemplates={
+                                        selectedTemplateName
+                                            ? [selectedTemplateName]
+                                            : undefined
+                                    }
+                                    onTemplateClick={handleTemplateSelect}
+                                />
+                            )}
+                        </Box>
+                    </Box>
+                }
+            />
+
+            {/* Fullscreen DAG dialog */}
+            {dagFullscreen && (
+                <Dialog open onClose={() => setDagFullscreen(false)} fullScreen>
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            height: '100vh',
                         }}
                     >
-                        <ToggleButton value="concurrency">
-                            <Tooltip title="Task concurrency over time">
-                                <Box
-                                    sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 0.5,
-                                    }}
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                px: 1,
+                                py: 0.5,
+                                borderBottom: '1px solid',
+                                borderColor: 'divider',
+                                flexShrink: 0,
+                            }}
+                        >
+                            <Typography variant="subtitle2" sx={{ flex: 1 }}>
+                                Workflow {workflowId} — DAG
+                            </Typography>
+                            <Tooltip title="Close fullscreen">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => setDagFullscreen(false)}
                                 >
-                                    <BarChartIcon sx={{ fontSize: 16 }} />
-                                    Concurrency
-                                </Box>
+                                    <CloseIcon fontSize="small" />
+                                </IconButton>
                             </Tooltip>
-                        </ToggleButton>
-                        <ToggleButton value="timeline">
-                            <Tooltip title="Template execution Gantt timeline">
-                                <Box
-                                    sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 0.5,
-                                    }}
-                                >
-                                    <TimelineIcon sx={{ fontSize: 16 }} />
-                                    Timeline
-                                </Box>
-                            </Tooltip>
-                        </ToggleButton>
-                    </ToggleButtonGroup>
-                </Box>
-                <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-                    {bottomPanelView === 'concurrency' ? (
-                        <TaskConcurrencyTab
-                            workflowId={workflowId}
-                            highlightedTemplates={
-                                selectedTemplateName
-                                    ? [selectedTemplateName]
-                                    : undefined
-                            }
-                        />
-                    ) : (
-                        <TemplateTimelineTab
-                            workflowId={workflowId}
-                            highlightedTemplates={
-                                selectedTemplateName
-                                    ? [selectedTemplateName]
-                                    : undefined
-                            }
-                            onTemplateClick={handleTemplateSelect}
-                        />
-                    )}
-                </Box>
-            </Box>
+                        </Box>
+                        <Box sx={{ flex: 1, minHeight: 0 }}>{dagContent}</Box>
+                    </Box>
+                </Dialog>
+            )}
         </Box>
     );
 }

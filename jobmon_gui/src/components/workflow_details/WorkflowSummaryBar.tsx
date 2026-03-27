@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
@@ -12,20 +12,9 @@ import { TTStatusResponse } from '@jobmon_gui/types/TaskTemplateStatus';
 import {
     TEMPLATE_STATUS_COLORS,
     TEMPLATE_STATUS_KEYS,
+    getStatusLabel,
 } from '@jobmon_gui/constants/taskStatus';
 import TemplateStatusBar from '@jobmon_gui/components/common/TemplateStatusBar';
-
-const STATUS_DESC: Record<string, string> = {
-    A: 'Aborted',
-    D: 'Done',
-    F: 'Failed',
-    G: 'Registered',
-    H: 'Halted',
-    I: 'Instantiated',
-    O: 'Launched',
-    Q: 'Queued',
-    R: 'Running',
-};
 
 interface WorkflowSummaryBarProps {
     workflowDetails?: WorkflowDetails;
@@ -42,22 +31,25 @@ export default function WorkflowSummaryBar({
     const templates = ttData ? Object.values(ttData) : [];
     const templateCount = templates.length;
 
-    const totals = {
-        PENDING: 0,
-        SCHEDULED: 0,
-        RUNNING: 0,
-        DONE: 0,
-        FATAL: 0,
-        tasks: 0,
-    };
-    for (const tt of templates) {
-        totals.PENDING += tt.PENDING;
-        totals.SCHEDULED += tt.SCHEDULED;
-        totals.RUNNING += tt.RUNNING;
-        totals.DONE += tt.DONE;
-        totals.FATAL += tt.FATAL;
-        totals.tasks += tt.tasks;
-    }
+    const totals = useMemo(() => {
+        const result = {
+            PENDING: 0,
+            SCHEDULED: 0,
+            RUNNING: 0,
+            DONE: 0,
+            FATAL: 0,
+            tasks: 0,
+        };
+        for (const tt of templates) {
+            result.PENDING += tt.PENDING;
+            result.SCHEDULED += tt.SCHEDULED;
+            result.RUNNING += tt.RUNNING;
+            result.DONE += tt.DONE;
+            result.FATAL += tt.FATAL;
+            result.tasks += tt.tasks;
+        }
+        return result;
+    }, [ttData]);
 
     const wfElapsed = workflowDetails
         ? humanizeDuration(
@@ -68,8 +60,7 @@ export default function WorkflowSummaryBar({
         : null;
 
     const statusDesc = workflowDetails
-        ? STATUS_DESC[workflowDetails.wf_status] ||
-          workflowDetails.wf_status
+        ? getStatusLabel(workflowDetails.wf_status)
         : null;
 
     return (

@@ -72,11 +72,18 @@ interface PopoverPosition {
 
 interface DagVisualState {
     hoveredId: string | null;
+    hoveredBase: string | null;
     selectedId: string | null;
+    selectedBase: string | null;
 }
 
 function createDagVisualStore() {
-    let state: DagVisualState = { hoveredId: null, selectedId: null };
+    let state: DagVisualState = {
+        hoveredId: null,
+        hoveredBase: null,
+        selectedId: null,
+        selectedBase: null,
+    };
     const listeners = new Set<() => void>();
 
     const notify = () => listeners.forEach(l => l());
@@ -91,13 +98,21 @@ function createDagVisualStore() {
         },
         setHovered: (id: string | null) => {
             if (state.hoveredId !== id) {
-                state = { ...state, hoveredId: id };
+                state = {
+                    ...state,
+                    hoveredId: id,
+                    hoveredBase: id ? baseTemplateName(id) : null,
+                };
                 notify();
             }
         },
         setSelected: (id: string | null) => {
             if (state.selectedId !== id) {
-                state = { ...state, selectedId: id };
+                state = {
+                    ...state,
+                    selectedId: id,
+                    selectedBase: id ? baseTemplateName(id) : null,
+                };
                 notify();
             }
         },
@@ -114,10 +129,9 @@ function useDagNodeIsHovered(id: string): boolean {
     return useSyncExternalStore(
         store.subscribe,
         useCallback(() => {
-            const hovered = store.getSnapshot().hoveredId;
-            if (!hovered) return false;
-            return hovered === id || hovered === baseName
-                || baseTemplateName(hovered) === baseName;
+            const { hoveredId, hoveredBase } = store.getSnapshot();
+            if (!hoveredId) return false;
+            return hoveredId === id || hoveredBase === baseName;
         }, [store, id, baseName])
     );
 }
@@ -128,10 +142,9 @@ function useDagNodeIsSelected(id: string): boolean {
     return useSyncExternalStore(
         store.subscribe,
         useCallback(() => {
-            const selected = store.getSnapshot().selectedId;
-            if (!selected) return false;
-            return selected === id || selected === baseName
-                || baseTemplateName(selected) === baseName;
+            const { selectedId, selectedBase } = store.getSnapshot();
+            if (!selectedId) return false;
+            return selectedId === id || selectedBase === baseName;
         }, [store, id, baseName])
     );
 }
@@ -141,12 +154,12 @@ function useDagNodeIsSelected(id: string): boolean {
 // ---------------------------------------------------------------------------
 
 const NODE_DIMENSIONS = {
-    minWidth: 100,
-    maxWidthBonus: 40,
-    minHeight: 32,
-    maxHeightBonus: 16,
-    charWidthEstimate: 7,
-    horizontalPadding: 20,
+    minWidth: 120,
+    maxWidthBonus: 60,
+    minHeight: 36,
+    maxHeightBonus: 24,
+    charWidthEstimate: 8,
+    horizontalPadding: 24,
     statusBarHeight: 8,
 } as const;
 
@@ -542,6 +555,12 @@ function WorkflowDAGInner({
         }
     }, [structuralNodes.length, fitView]);
 
+    const doFitViewInstant = useCallback(() => {
+        if (structuralNodes.length > 0) {
+            fitView({ padding: 0.2, duration: 0, minZoom: 0.05 });
+        }
+    }, [structuralNodes.length, fitView]);
+
     useEffect(() => {
         if (structuralNodes.length > 0) {
             const timer = setTimeout(doFitView, 50);
@@ -556,14 +575,14 @@ function WorkflowDAGInner({
         let rafId: number;
         const observer = new ResizeObserver(() => {
             cancelAnimationFrame(rafId);
-            rafId = requestAnimationFrame(doFitView);
+            rafId = requestAnimationFrame(doFitViewInstant);
         });
         observer.observe(el);
         return () => {
             observer.disconnect();
             cancelAnimationFrame(rafId);
         };
-    }, [doFitView, structuralNodes.length]);
+    }, [doFitViewInstant, structuralNodes.length]);
 
     useEffect(() => {
         if (dagQuery.data) {
@@ -575,29 +594,41 @@ function WorkflowDAGInner({
         }
     }, [dagQuery.data, onNodeCount]);
 
-    // Subscribe to hoveredId for edge highlighting
+    // Pre-compute base template name for each node id
+    const nodeIdToBase = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const node of nodes) {
+            map.set(node.id, baseTemplateName(node.id));
+        }
+        return map;
+    }, [nodes]);
+
+    // Subscribe to hover state only — selection changes should not
+    // recompute edge styles.
     const hoveredId = useSyncExternalStore(
         visualStore.subscribe,
         useCallback(() => visualStore.getSnapshot().hoveredId, [visualStore])
+    );
+    const hoveredBase = useSyncExternalStore(
+        visualStore.subscribe,
+        useCallback(() => visualStore.getSnapshot().hoveredBase, [visualStore])
     );
 
     const styledEdges = useMemo(() => {
         if (!hoveredId) {
             return edges.map(e => ({ ...e, style: EDGE_STYLE_DEFAULT }));
         }
-        const hoveredBase = baseTemplateName(hoveredId);
         const matches = (nodeId: string) =>
-            nodeId === hoveredId || baseTemplateName(nodeId) === hoveredBase;
-        return edges.map(e => ({
-            ...e,
-            style:
-                matches(e.source) || matches(e.target)
-                    ? EDGE_STYLE_HIGHLIGHTED
-                    : EDGE_STYLE_DIMMED,
-            zIndex:
-                matches(e.source) || matches(e.target) ? 1 : 0,
-        }));
-    }, [edges, hoveredId]);
+            nodeId === hoveredId || nodeIdToBase.get(nodeId) === hoveredBase;
+        return edges.map(e => {
+            const hit = matches(e.source) || matches(e.target);
+            return {
+                ...e,
+                style: hit ? EDGE_STYLE_HIGHLIGHTED : EDGE_STYLE_DIMMED,
+                zIndex: hit ? 1 : 0,
+            };
+        });
+    }, [edges, hoveredId, hoveredBase, nodeIdToBase]);
 
     const popoverTTData = popoverNodeId
         ? ttStatusByName[baseTemplateName(popoverNodeId)]
