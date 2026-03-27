@@ -1024,10 +1024,19 @@ async def task_template_dag(workflow_id: str, db: Session = Depends(get_db)) -> 
         else:
             tt_dag.append({"name": phase, "downstream_task_template_id": None})
 
-    resp_content = {"tt_dag": tt_dag}
-    resp = JSONResponse(
+    # Build mapping from phase labels to base template names
+    # (only includes entries where the phase label differs)
+    phase_map: dict[str, str] = {}
+    for nid, phase_label in node_to_phase.items():
+        base = node_to_name[nid]
+        if phase_label != base:
+            phase_map[phase_label] = base
+
+    resp_content: dict[str, object] = {"tt_dag": tt_dag}
+    if phase_map:
+        resp_content["phase_map"] = phase_map
+
+    return JSONResponse(
         content=resp_content,
         status_code=StatusCodes.OK,
     )
-
-    return resp
