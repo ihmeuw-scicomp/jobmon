@@ -23,12 +23,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
 import python from 'react-syntax-highlighter/dist/esm/languages/hljs/python';
-import r from 'react-syntax-highlighter/dist/esm/languages/hljs/r';
+import rLang from 'react-syntax-highlighter/dist/esm/languages/hljs/r';
 import bash from 'react-syntax-highlighter/dist/esm/languages/hljs/bash';
 import { error_log_viz_url } from '@jobmon_gui/configs/ApiUrls';
 
 SyntaxHighlighter.registerLanguage('python', python);
-SyntaxHighlighter.registerLanguage('r', r);
+SyntaxHighlighter.registerLanguage('r', rLang);
 SyntaxHighlighter.registerLanguage('bash', bash);
 import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios';
 import HtmlTooltip from '@jobmon_gui/components/HtmlToolTip';

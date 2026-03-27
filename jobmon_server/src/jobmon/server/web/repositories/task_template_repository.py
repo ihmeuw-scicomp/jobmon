@@ -909,6 +909,21 @@ class TaskTemplateRepository:
         )
         resource_error_total = self.session.execute(z_count_sql).scalar() or 0
 
+        # Count tasks that had a resource error TI but recovered
+        # (task is not in ERROR_FATAL state).
+        retried_sql = (
+            select(func.count(func.distinct(Task.id)))
+            .join(TaskInstance, TaskInstance.task_id == Task.id)
+            .join(Node, Task.node_id == Node.id)
+            .where(
+                Task.workflow_id == workflow_id,
+                Node.task_template_version_id == task_template_version_id,
+                TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
+                Task.status != TaskStatus.ERROR_FATAL,
+            )
+        )
+        resource_error_retried = self.session.execute(retried_sql).scalar() or 0
+
         resource_error_ti_ids: List[int] = []
         if resource_error_total > 0:
             z_ids_sql = (
@@ -932,6 +947,7 @@ class TaskTemplateRepository:
             app=app,
             infra=infra,
             resource_error_total=resource_error_total,
+            resource_error_retried=resource_error_retried,
             resource_error_ti_ids=resource_error_ti_ids,
         )
 

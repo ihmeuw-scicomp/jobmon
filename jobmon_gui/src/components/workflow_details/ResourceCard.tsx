@@ -117,13 +117,7 @@ export default function ResourceCard({
     const currentTiId =
         selectedTiIdx !== null ? tiIds[selectedTiIdx] : null;
 
-    const retried = breakdown
-        ? Math.max(
-              0,
-              breakdown.resource_error_total -
-                  breakdown.resource
-          )
-        : 0;
+    const retried = breakdown?.resource_error_retried ?? 0;
 
     const errorDetailQuery = useQuery<{
         error_logs: ErrorLog[];

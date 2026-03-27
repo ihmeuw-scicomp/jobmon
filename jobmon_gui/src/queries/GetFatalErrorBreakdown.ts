@@ -7,6 +7,7 @@ export interface FatalErrorBreakdown {
     app: number;
     infra: number;
     resource_error_total: number;
+    resource_error_retried: number;
     resource_error_ti_ids: number[];
 }
 

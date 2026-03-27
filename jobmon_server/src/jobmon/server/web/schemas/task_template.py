@@ -184,6 +184,7 @@ class FatalErrorBreakdownResponse(BaseModel):
     app: int = 0
     infra: int = 0
     resource_error_total: int = 0
+    resource_error_retried: int = 0
     resource_error_ti_ids: List[int] = []
 
 
