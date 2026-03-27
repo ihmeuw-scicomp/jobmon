@@ -27,7 +27,7 @@ import { get_task_template_dag } from '@jobmon_gui/configs/ApiUrls.ts';
 import TaskTemplatePopover from '@jobmon_gui/components/TaskTemplatePopover.tsx';
 import { useQuery } from '@tanstack/react-query';
 import { TTStatus } from '@jobmon_gui/types/TaskTemplateStatus.ts';
-import { CircularProgress } from '@mui/material';
+import CircularProgress from '@mui/material/CircularProgress';
 import {
     TEMPLATE_STATUS_COLORS,
     TEMPLATE_STATUS_KEYS,

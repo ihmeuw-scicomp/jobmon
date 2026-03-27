@@ -884,6 +884,12 @@ async def task_template_dag(workflow_id: str, db: Session = Depends(get_db)) -> 
 
     dag_id = dag_query.scalar()
 
+    if dag_id is None:
+        return JSONResponse(
+            content={"tt_dag": []},
+            status_code=StatusCodes.OK,
+        )
+
     query = (
         db.query(
             Edge.node_id,

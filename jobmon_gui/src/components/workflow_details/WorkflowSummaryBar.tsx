@@ -28,10 +28,9 @@ export default function WorkflowSummaryBar({
     onManageClick,
 }: WorkflowSummaryBarProps) {
     const [showMore, setShowMore] = useState(false);
-    const templates = ttData ? Object.values(ttData) : [];
-    const templateCount = templates.length;
 
-    const totals = useMemo(() => {
+    const { templates, totals } = useMemo(() => {
+        const tpls = ttData ? Object.values(ttData) : [];
         const result = {
             PENDING: 0,
             SCHEDULED: 0,
@@ -40,7 +39,7 @@ export default function WorkflowSummaryBar({
             FATAL: 0,
             tasks: 0,
         };
-        for (const tt of templates) {
+        for (const tt of tpls) {
             result.PENDING += tt.PENDING;
             result.SCHEDULED += tt.SCHEDULED;
             result.RUNNING += tt.RUNNING;
@@ -48,8 +47,9 @@ export default function WorkflowSummaryBar({
             result.FATAL += tt.FATAL;
             result.tasks += tt.tasks;
         }
-        return result;
+        return { templates: tpls, totals: result };
     }, [ttData]);
+    const templateCount = templates.length;
 
     const wfElapsed = workflowDetails
         ? humanizeDuration(
