@@ -141,6 +141,158 @@ One execution attempt of a task. Multiple instances per task on retry.
 | Edge (execution)         | TaskDependency      | normalized int pairs, indexed          |
 | Node                     | Task.node_args_hash | identity within group                  |
 
+## Client API
+
+### No Breaking Changes
+
+The user-facing API is fully backward compatible. Existing code using
+`Tool`, `TaskTemplate`, `create_task()`, `create_tasks()`, `add_task()`,
+`add_upstream()`, and `Workflow.run()` works unchanged.
+
+What's **added** (not breaking):
+- `TaskGroup` class
+- `workflow.add_group()`
+- `group.interleave_upstream()`
+- `group.get_task()` / `group.get_subset()`
+
+What's **removed from client internals** (not user-facing):
+- `Array` → replaced by auto-created TaskGroup (same behavior)
+- `Dag` → no more client-side DAG building
+- `Node` → folded into Task identity
+
+Users never import Array, Dag, or Node directly. `task.array` becomes a
+deprecated alias for `task.task_group`.
+
+### Backward Compatible Path
+
+`TaskTemplate.create_tasks()` and `TaskTemplate.create_task()` continue
+to work exactly as before. Under the hood, they create leaf TaskGroups
+automatically.
+
+```python
+# Existing code — unchanged in v4
+tt = tool.get_task_template("compute", ...)
+tasks = tt.create_tasks(location_id=[1, 2, 3])  # auto-creates leaf group
+wf.add_tasks(tasks)
+
+task = tt.create_task(location_id=4)  # group assigned in add_task()
+wf.add_task(task)
+```
+
+`TaskTemplate.create_tasks()` internally creates a leaf TaskGroup named
+after the template:
+
+```python
+def create_tasks(self, **node_kwargs):
+    group = TaskGroup(name=self.template_name, template=self)
+    tasks = group.create_tasks(**node_kwargs)
+    self._task_group = group
+    return tasks
+```
+
+`TaskTemplate.create_task()` returns a bare task. `workflow.add_task()`
+auto-creates or finds a leaf group by template name — same inference
+logic as v3's Array assignment:
+
+```python
+def add_task(self, task):
+    if not task.task_group:
+        name = task.template.template_name
+        if name not in self._auto_groups:
+            self._auto_groups[name] = TaskGroup(
+                name=name, template=task.template,
+            )
+        self._auto_groups[name].add_task(task)
+    ...
+```
+
+### Explicit TaskGroup Path (New Capability)
+
+Users opt into explicit groups when they need structure beyond one-group-
+per-template:
+
+```python
+from jobmon.client.task_group import TaskGroup
+
+# Leaf group with template — like Array but with a custom name
+compute = TaskGroup("compute", template=tt_compute)
+compute.create_tasks(location_id=[1, 2, 3])
+
+# Same template at a different stage — impossible with Array
+finalize_gk = TaskGroup("finalize_after_gk", template=tt_finalize)
+finalize_gk.create_tasks(stage="gk")
+finalize_squeeze = TaskGroup("finalize_after_squeeze", template=tt_finalize)
+finalize_squeeze.create_tasks(stage="squeeze")
+
+# Organizational group — no template, holds child groups
+preprocessing = TaskGroup("preprocessing")
+preprocessing.add_child(compute)
+preprocessing.add_child(finalize_gk)
+
+# Mixed group — tasks from multiple templates
+setup = TaskGroup("setup")
+setup.add_task(tt_config.create_task(version="v1"))
+setup.add_task(tt_validate.create_task(version="v1"))
+
+# Group-level dependencies
+finalize_gk.interleave_upstream(compute, {"location_id": "location_id"})
+finalize_squeeze.add_upstream_group(squeeze)
+
+wf.add_groups([preprocessing, squeeze, finalize_squeeze])
+```
+
+### Incremental Migration
+
+Users can adopt TaskGroup gradually without rewriting existing code:
+
+```python
+# Step 1: Existing code works as-is (auto-created leaf groups)
+tasks_a = tt_compute.create_tasks(location_id=[1, 2, 3])
+tasks_b = tt_finalize.create_tasks(location_id=[1, 2, 3])
+for t in tasks_b:
+    loc = t.node_args["location_id"]
+    upstream = [a for a in tasks_a
+                if a.node_args["location_id"] == loc][0]
+    t.add_upstream(upstream)
+wf.add_tasks(tasks_a + tasks_b)
+
+# Step 2: Use interleave on the auto-created groups
+tasks_a = tt_compute.create_tasks(location_id=[1, 2, 3])
+tasks_b = tt_finalize.create_tasks(location_id=[1, 2, 3])
+tt_finalize.task_group.interleave_upstream(
+    tt_compute.task_group,
+    {"location_id": "location_id"},
+)
+wf.add_tasks(tasks_a + tasks_b)
+
+# Step 3: Explicit groups (full v4 API)
+compute = TaskGroup("compute", template=tt_compute)
+compute.create_tasks(location_id=[1, 2, 3])
+finalize = TaskGroup("finalize", template=tt_finalize)
+finalize.create_tasks(location_id=[1, 2, 3])
+finalize.interleave_upstream(compute, {"location_id": "location_id"})
+wf.add_groups([compute, finalize])
+```
+
+### Bind Sequence
+
+**v3 bind (current):**
+1. `dag.bind()` — serialize nodes, upload edge JSON blobs (slow)
+2. `workflow.bind()` — create workflow with dag_id
+3. `array.bind()` — create each array
+4. `_bind_tasks()` — create tasks with array_id, node_id
+
+**v4 bind:**
+1. `workflow.bind()` — create workflow
+2. `group.bind()` — create each group with parent_id
+3. `edge.bind()` — create group edges with dependency_spec
+4. `_bind_tasks()` — create tasks with task_group_id
+5. Server materializes `TaskDependency` from group edges + label
+   matching + explicit add_upstream() calls
+
+The client never builds or uploads JSON edge blobs. The server writes
+normalized (task_id, upstream_task_id) pairs directly.
+
 ## v4 API Coexistence
 
 Built alongside v3 using `/api/v4/` route prefix. Both run simultaneously.
@@ -152,6 +304,9 @@ versions = versions or ["v3"]  # add "v4" here
 
 v3 stays frozen. v4 uses the new tables. A workflow created via v3
 gets backfilled TaskGroup data so the v4 GUI endpoints work.
+
+The only configuration change for users: set `route_prefix = "/api/v4"`
+in jobmonconfig.yaml.
 
 ## Demo Use Cases
 
