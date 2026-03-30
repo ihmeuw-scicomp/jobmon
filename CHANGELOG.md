@@ -7,8 +7,8 @@ All notable changes to Jobmon will be documented in this file.
 ### Added
 - **Latest Attempt Filter**: "Latest attempt only" toggle (default on) on task template details page shows one row per task, hiding old failed attempts for tasks that have since succeeded
 - **Workflow Run Filter**: Dropdown on task template details page to scope scatter plot, task table, error clusters, and KPIs to a specific workflow run
-- **Workflow Run Scoping**: Workflow details page scopes error clusters, resource error counts, and fatal error breakdowns to the latest workflow run, preventing stale errors from prior resumes from appearing
-- **Resource Error Count**: Per-template `resource_error_count` in `workflow_tt_status_viz` response (pre-aggregated subquery), with optional `workflow_run_id` param; drives resource error chips on template list rows with explanatory tooltips
+- **Workflow Run Scoping**: Workflow details page scopes error clusters and fatal error breakdowns to the latest workflow run, preventing stale errors from prior resumes from appearing
+- **Resource Error Chips**: Template list rows show resource error counts with tooltips, fetched lazily per-template from the `fatal_error_breakdown` endpoint for templates with retries
 - **Workflow Run ID in Attempts**: Task details page shows "WF Run" chip in attempt metadata; task instance details API now returns `ti_workflow_run_id`
 - **Tasks Without Instances**: Usage endpoint includes Registered/Queued/Running tasks that have no task instances yet (via subquery anti-join), so the task table shows the complete set of tasks
 - **Query Key Utilities**: Shared `queryKeyUtils.ts` with `extractNumericParam` and `wfrParams` helpers replacing fragile positional query key indexing across 3 query functions
@@ -38,7 +38,7 @@ All notable changes to Jobmon will be documented in this file.
 ### Changed
 - **Error-First Layout**: Task template details page shows error clusters full-width at top; resource profiling collapsed into a compact summary bar with utilization indicators and expand toggle
 - **Error-First Sorting**: Task table sorts error statuses (Fatal, Error, Resource Error) to top by default
-- **Template List Redesign**: Unified `TemplateRow` component with progress bars in both "Needs Attention" (FATAL > 0) and "Other Templates" sections; resource error chips shown on all rows
+- **Template List Redesign**: Unified `TemplateRow` component with progress bars in both "Needs Attention" (FATAL > 0) and "Other Templates" sections; resource error chips shown on templates with retries
 - **Resource Card Simplified**: Stripped resource error UI from `ResourceCard`; resource errors now shown inline as chips on error clusters in `ErrorClustersCard`
 - **Attempt Detail Panel**: Replaced `ResourceComparisonBar` with compact key-value metadata grid and inline utilization bars; stderr/stdout sections visually separated with clear hierarchy
 - **Auto-Expand Failed Attempts**: Task details page auto-expands the latest attempt only when the task is still in an error state; does not expand old failures for tasks that succeeded on retry
@@ -46,7 +46,9 @@ All notable changes to Jobmon will be documented in this file.
 - **Shared Efficiency Status**: Extracted `getEfficiencyStatus` to `usageCalculations.ts` with unified `EfficiencyStatus` type; `getBarColor` exported from `ResourceComparisonBar` for reuse
 - **Latest WFR Detection**: Fixed `workflow_details_viz` to use `max(WorkflowRun.id)` instead of `max(heartbeat_date)` with proper join condition, ensuring the most recently created run is selected (not the longest-running one)
 - **Table Filter Persistence**: Column filters no longer persist in localStorage between sessions (zustand migration v0→v1), preventing stale filters from hiding rows on page load
-- **Optional Workflow Run Params**: `workflow_tt_status_viz`, `fatal_error_breakdown`, and `tt_error_log_viz` endpoints accept optional `workflow_run_id` query param to scope results; existing callers unaffected
+- **Optional Workflow Run Params**: `fatal_error_breakdown` and `tt_error_log_viz` endpoints accept optional `workflow_run_id` query param to scope results; existing callers unaffected
+- **`_find_ttvid` Performance**: Replaced N+1 query loop (one query per template version) with two-step approach: fetch all version IDs, then EXISTS check against workflow tasks. Fixes 60s+ timeouts for templates with many versions
+- **Usage Endpoint Anti-Join**: Replaced `NOT EXISTS` subquery against `task_instance` with Python-side exclusion using task IDs already in memory, avoiding expensive correlated subquery
 - **Bundle Optimization**: Replaced `plotly.js-dist` (3.5 MB) with `plotly.js-cartesian-dist` (1.4 MB); added route-level lazy loading with `React.lazy`; split vendors into separate cacheable chunks (plotly, MUI, reactflow, core); total bundle reduced from 7.1 MB to ~3.2 MB across chunks
 - **Lazy Chart Tabs**: Workflow details chart tabs (Gantt, Status) lazy-load plotly on first render via `React.lazy` + `Suspense`, so the page shell renders without waiting for the 1.4 MB chart library
 - **Lighter Syntax Highlighter**: Switched `react-syntax-highlighter` from Prism (all languages) to Light build with only python, r, and bash registered
