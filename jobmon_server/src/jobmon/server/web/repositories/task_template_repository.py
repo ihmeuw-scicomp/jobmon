@@ -773,10 +773,11 @@ class TaskTemplateRepository:
             )
         )
 
-        # Pre-aggregated resource error counts per task (avoids
-        # correlated subquery that fires per-row at scale)
+        # Pre-aggregated resource error counts, scoped to this
+        # workflow's tasks to avoid scanning the full TI table.
         re_filters = [
             TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
+            Task.workflow_id == workflow_id,
         ]
         if workflow_run_id is not None:
             re_filters.append(TaskInstance.workflow_run_id == workflow_run_id)
@@ -785,6 +786,7 @@ class TaskTemplateRepository:
                 TaskInstance.task_id,
                 func.count(TaskInstance.id).label("re_count"),
             )
+            .join(Task, TaskInstance.task_id == Task.id)
             .where(*re_filters)
             .group_by(TaskInstance.task_id)
             .subquery()
