@@ -1,18 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import {
-    Box,
-    Button,
-    Card,
-    CardContent,
-    Chip,
-    CircularProgress,
-    Divider,
-    Drawer,
-    Grid,
-    IconButton,
-    Skeleton,
-    Typography,
-} from '@mui/material';
+import React, { useEffect, useMemo, useState } from 'react';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Divider from '@mui/material/Divider';
+import Drawer from '@mui/material/Drawer';
+import Grid from '@mui/material/Grid';
+import IconButton from '@mui/material/IconButton';
+import Skeleton from '@mui/material/Skeleton';
+import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
@@ -33,13 +31,16 @@ SyntaxHighlighter.registerLanguage('bash', bash);
 import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios';
 import HtmlTooltip from '@jobmon_gui/components/HtmlToolTip';
 import { formatJobmonDate } from '@jobmon_gui/utils/DayTime.ts';
-import { getTaskDetailsQueryFn } from
-    '@jobmon_gui/queries/GetTaskDetails.ts';
+import { getTaskDetailsQueryFn } from '@jobmon_gui/queries/GetTaskDetails.ts';
+import MemoryIcon from '@mui/icons-material/Memory';
+import Tooltip from '@mui/material/Tooltip';
 import {
     ClusteredError,
     ErrorLog,
     ErrorSampleDetails,
 } from '@jobmon_gui/types/ClusteredErrors.ts';
+import { RESOURCE_ERROR_COLORS } from '@jobmon_gui/constants/taskStatus';
+import { FatalErrorBreakdown } from '@jobmon_gui/queries/GetFatalErrorBreakdown';
 
 interface ErrorClustersCardProps {
     errorLogs: ClusteredError[];
@@ -51,6 +52,10 @@ interface ErrorClustersCardProps {
     scatterInstanceIds?: Set<number>;
     onFilterByInstanceIds?: (instanceIds: number[]) => void;
     maxListHeight?: number;
+    /** Layout mode: 'sidebar' for compact 280px sidebar, 'fullwidth' for prominent full-width display */
+    layout?: 'sidebar' | 'fullwidth';
+    /** Fatal error breakdown with resource error counts — when present, renders a resource error banner */
+    resourceErrorBreakdown?: FatalErrorBreakdown | null;
 }
 
 const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
@@ -62,18 +67,22 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
     scatterInstanceIds,
     onFilterByInstanceIds,
     maxListHeight = 180,
+    layout = 'sidebar',
+    resourceErrorBreakdown,
 }) => {
     const queryClient = useQueryClient();
     const location = useLocation();
-    const [errorDetailIndex, setErrorDetailIndex] = useState<
-        ErrorSampleDetails | null
-    >(null);
+    const [errorDetailIndex, setErrorDetailIndex] =
+        useState<ErrorSampleDetails | null>(null);
     const [language, setLanguage] = useState('python');
 
     // --- Error detail query ---
-    const errorDetails = useQuery<{
-        error_logs: ErrorLog[];
-    } | undefined>({
+    const errorDetails = useQuery<
+        | {
+              error_logs: ErrorLog[];
+          }
+        | undefined
+    >({
         queryKey: [
             'workflow_details',
             'error_details',
@@ -92,11 +101,11 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                 return undefined;
             }
             const ti_id =
-                errorDetailIndex.sample_ids[
-                    errorDetailIndex.sample_index
-                ];
+                errorDetailIndex.sample_ids[errorDetailIndex.sample_index];
             return axios
-                .get<{ error_logs: ErrorLog[] }>(
+                .get<{
+                    error_logs: ErrorLog[];
+                }>(
                     `${error_log_viz_url}${workflowId}/${taskTemplateId}/${ti_id}`,
                     { ...jobmonAxiosConfig, data: null }
                 )
@@ -105,8 +114,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
         enabled: !!taskTemplateId && errorDetailIndex !== null,
     });
 
-    const currentError =
-        errorDetails.data?.error_logs?.[0] ?? null;
+    const currentError = errorDetails.data?.error_logs?.[0] ?? null;
     const taskDetailsQuery = useQuery({
         queryKey: ['task_details', currentError?.task_id],
         queryFn: getTaskDetailsQueryFn,
@@ -115,9 +123,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
     });
 
     // Prefetch next sample
-    const prefetchErrorDetails = async (
-        nextIdx: ErrorSampleDetails
-    ) => {
+    const prefetchErrorDetails = async (nextIdx: ErrorSampleDetails) => {
         await queryClient.prefetchQuery({
             queryKey: [
                 'workflow_details',
@@ -127,14 +133,10 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                 nextIdx,
             ],
             queryFn: async () => {
-                if (
-                    nextIdx.sample_index >=
-                    nextIdx.sample_ids.length
-                ) {
+                if (nextIdx.sample_index >= nextIdx.sample_ids.length) {
                     return;
                 }
-                const ti_id =
-                    nextIdx.sample_ids[nextIdx.sample_index];
+                const ti_id = nextIdx.sample_ids[nextIdx.sample_index];
                 return axios
                     .get(
                         `${error_log_viz_url}${workflowId}/${taskTemplateId}/${ti_id}`,
@@ -169,6 +171,12 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
     );
     const hasErrors = errorClusterCount > 0 || totalFailures > 0;
 
+    // --- Resource error TI lookup ---
+    const resourceErrorTiIdSet = useMemo(
+        () => new Set(resourceErrorBreakdown?.resource_error_ti_ids ?? []),
+        [resourceErrorBreakdown]
+    );
+
     // --- Sample navigation ---
     const nextSample = () => {
         if (errorDetailIndex === null) {
@@ -181,10 +189,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
     };
 
     const previousSample = () => {
-        if (
-            errorDetailIndex === null ||
-            errorDetailIndex.sample_index === 0
-        ) {
+        if (errorDetailIndex === null || errorDetailIndex.sample_index === 0) {
             return;
         }
         setErrorDetailIndex({
@@ -199,9 +204,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
 
     const currentTiID = () => {
         if (errorDetailIndex === null) return '';
-        return errorDetailIndex.sample_ids[
-            errorDetailIndex.sample_index
-        ];
+        return errorDetailIndex.sample_ids[errorDetailIndex.sample_index];
     };
 
     // --- Drawer content ---
@@ -213,13 +216,12 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                 </Box>
             );
         }
-        const error =
-            errorDetails.data?.error_logs?.[0] ?? null;
+        const error = errorDetails.data?.error_logs?.[0] ?? null;
         if (errorDetails.isError || !error) {
             return (
                 <Typography sx={{ p: 2 }}>
-                    Failed to retrieve error details. Please
-                    refresh and try again
+                    Failed to retrieve error details. Please refresh and try
+                    again
                 </Typography>
             );
         }
@@ -233,24 +235,22 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
         return (
             <Box sx={{ p: 2, overflow: 'auto' }}>
                 {/* Metadata */}
-                <Box sx={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: 1.5,
-                    mb: 2,
-                }}>
+                <Box
+                    sx={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: 1.5,
+                        mb: 2,
+                    }}
+                >
                     <Box>
-                        <Typography sx={labelStyles}>
-                            Error Time
-                        </Typography>
+                        <Typography sx={labelStyles}>Error Time</Typography>
                         <Typography variant="body2">
                             {formatJobmonDate(error.error_time)}
                         </Typography>
                     </Box>
                     <Box>
-                        <Typography sx={labelStyles}>
-                            Task ID
-                        </Typography>
+                        <Typography sx={labelStyles}>Task ID</Typography>
                         {error.task_id ? (
                             <Link
                                 to={{
@@ -267,31 +267,24 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                                             'task_details',
                                             error.task_id,
                                         ],
-                                        queryFn:
-                                            getTaskDetailsQueryFn,
+                                        queryFn: getTaskDetailsQueryFn,
                                     });
                                 }}
                             >
                                 {error.task_id}
                             </Link>
                         ) : (
-                            <Typography variant="body2">
-                                —
-                            </Typography>
+                            <Typography variant="body2">—</Typography>
                         )}
                     </Box>
                     <Box>
-                        <Typography sx={labelStyles}>
-                            Error ID
-                        </Typography>
+                        <Typography sx={labelStyles}>Error ID</Typography>
                         <Typography variant="body2">
                             {error.task_instance_err_id}
                         </Typography>
                     </Box>
                     <Box>
-                        <Typography sx={labelStyles}>
-                            WF Run ID
-                        </Typography>
+                        <Typography sx={labelStyles}>WF Run ID</Typography>
                         <Typography variant="body2">
                             {error.workflow_run_id}
                         </Typography>
@@ -301,16 +294,15 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                 <Divider sx={{ mb: 2 }} />
 
                 {/* Error Message */}
-                <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    mb: 1,
-                }}>
-                    <Typography
-                        variant="subtitle2"
-                        fontWeight="bold"
-                    >
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        mb: 1,
+                    }}
+                >
+                    <Typography variant="subtitle2" fontWeight="bold">
                         Error Message
                     </Typography>
                     <Button
@@ -322,22 +314,21 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                         {language === 'python' ? 'R' : 'Python'}
                     </Button>
                 </Box>
-                <Box sx={{
-                    maxHeight: '40vh',
-                    overflow: 'auto',
-                    bgcolor: '#eee',
-                    borderRadius: 1,
-                    fontSize: '0.75rem',
-                    '& pre': {
-                        whiteSpace: 'pre-wrap !important',
-                        wordBreak: 'break-word !important',
-                        m: '0 !important',
-                    },
-                }}>
-                    <SyntaxHighlighter
-                        language={language}
-                        wrapLongLines
-                    >
+                <Box
+                    sx={{
+                        maxHeight: '40vh',
+                        overflow: 'auto',
+                        bgcolor: '#eee',
+                        borderRadius: 1,
+                        fontSize: '0.75rem',
+                        '& pre': {
+                            whiteSpace: 'pre-wrap !important',
+                            wordBreak: 'break-word !important',
+                            m: '0 !important',
+                        },
+                    }}
+                >
+                    <SyntaxHighlighter language={language} wrapLongLines>
                         {error.error}
                     </SyntaxHighlighter>
                 </Box>
@@ -350,22 +341,21 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                 >
                     Task Instance stderr
                 </Typography>
-                <Box sx={{
-                    maxHeight: '40vh',
-                    overflow: 'auto',
-                    bgcolor: '#eee',
-                    borderRadius: 1,
-                    fontSize: '0.75rem',
-                    '& pre': {
-                        whiteSpace: 'pre-wrap !important',
-                        wordBreak: 'break-word !important',
-                        m: '0 !important',
-                    },
-                }}>
-                    <SyntaxHighlighter
-                        language={language}
-                        wrapLongLines
-                    >
+                <Box
+                    sx={{
+                        maxHeight: '40vh',
+                        overflow: 'auto',
+                        bgcolor: '#eee',
+                        borderRadius: 1,
+                        fontSize: '0.75rem',
+                        '& pre': {
+                            whiteSpace: 'pre-wrap !important',
+                            wordBreak: 'break-word !important',
+                            m: '0 !important',
+                        },
+                    }}
+                >
+                    <SyntaxHighlighter language={language} wrapLongLines>
                         {error.task_instance_stderr_log ||
                             'No stderr output found'}
                     </SyntaxHighlighter>
@@ -378,23 +368,16 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                             sx={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent:
-                                    'space-between',
+                                justifyContent: 'space-between',
                                 mt: 2,
                                 mb: 1,
                             }}
                         >
-                            <Typography
-                                variant="subtitle2"
-                                fontWeight="bold"
-                            >
+                            <Typography variant="subtitle2" fontWeight="bold">
                                 Command
                             </Typography>
                             <CopyButton
-                                text={
-                                    taskDetailsQuery.data
-                                        .task_command
-                                }
+                                text={taskDetailsQuery.data.task_command}
                                 tooltip="Copy command"
                             />
                         </Box>
@@ -406,22 +389,14 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                                 borderRadius: 1,
                                 fontSize: '0.75rem',
                                 '& pre': {
-                                    whiteSpace:
-                                        'pre-wrap !important',
-                                    wordBreak:
-                                        'break-word !important',
+                                    whiteSpace: 'pre-wrap !important',
+                                    wordBreak: 'break-word !important',
                                     m: '0 !important',
                                 },
                             }}
                         >
-                            <SyntaxHighlighter
-                                language="bash"
-                                wrapLongLines
-                            >
-                                {
-                                    taskDetailsQuery.data
-                                        .task_command
-                                }
+                            <SyntaxHighlighter language="bash" wrapLongLines>
+                                {taskDetailsQuery.data.task_command}
                             </SyntaxHighlighter>
                         </Box>
                     </>
@@ -442,13 +417,9 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                 sx={{
                     height: '100%',
                     border: '1px solid',
-                    borderColor: hasErrors
-                        ? 'error.light'
-                        : 'divider',
+                    borderColor: hasErrors ? 'error.light' : 'divider',
                     borderLeft: '3px solid',
-                    borderLeftColor: hasErrors
-                        ? 'error.main'
-                        : 'grey.400',
+                    borderLeftColor: hasErrors ? 'error.main' : 'grey.400',
                     borderRadius: 2,
                     transition: 'all 0.2s ease-in-out',
                     '&:hover': { boxShadow: 3 },
@@ -468,11 +439,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                 >
                     <Typography
                         variant="caption"
-                        color={
-                            hasErrors
-                                ? 'error.main'
-                                : 'text.secondary'
-                        }
+                        color={hasErrors ? 'error.main' : 'text.secondary'}
                         fontWeight="bold"
                         sx={{
                             textTransform: 'uppercase',
@@ -501,9 +468,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                                 variant="body2"
                                 fontWeight="bold"
                                 color={
-                                    hasErrors
-                                        ? 'error.main'
-                                        : 'text.primary'
+                                    hasErrors ? 'error.main' : 'text.primary'
                                 }
                                 sx={{ mt: 0.5 }}
                             >
@@ -526,9 +491,7 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                                 variant="body2"
                                 fontWeight="bold"
                                 color={
-                                    hasErrors
-                                        ? 'error.main'
-                                        : 'text.primary'
+                                    hasErrors ? 'error.main' : 'text.primary'
                                 }
                                 sx={{ mt: 0.5 }}
                             >
@@ -542,7 +505,10 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                         <Box
                             sx={{
                                 flex: 1,
-                                maxHeight: maxListHeight,
+                                maxHeight:
+                                    layout === 'fullwidth'
+                                        ? '50vh'
+                                        : maxListHeight,
                                 overflow: 'auto',
                                 border: '1px solid',
                                 borderColor: 'grey.200',
@@ -551,17 +517,25 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                             }}
                         >
                             {errorLogs.map((cluster, idx) => {
+                                const truncLen =
+                                    layout === 'fullwidth' ? 200 : 80;
                                 const truncated =
-                                    cluster.sample_error.length >
-                                    80
-                                        ? `...${cluster.sample_error.slice(-80)}`
+                                    cluster.sample_error.length > truncLen
+                                        ? `...${cluster.sample_error.slice(-truncLen)}`
                                         : cluster.sample_error;
+                                // Count how many of this cluster's TIs are resource errors
+                                const resourceCount =
+                                    resourceErrorTiIdSet.size > 0
+                                        ? cluster.task_instance_ids.filter(id =>
+                                              resourceErrorTiIdSet.has(id)
+                                          ).length
+                                        : 0;
+                                const isResourceCluster = resourceCount > 0;
                                 // Only cluster instances with scatter data can be selected; compare against that subset so clusters with missing usage data still highlight when their scatter-visible instances are selected.
                                 const clusterIdsInScatter =
                                     scatterInstanceIds != null
-                                        ? cluster.task_instance_ids.filter(
-                                              id =>
-                                                  scatterInstanceIds.has(id)
+                                        ? cluster.task_instance_ids.filter(id =>
+                                              scatterInstanceIds.has(id)
                                           )
                                         : cluster.task_instance_ids;
                                 const isActive =
@@ -582,23 +556,19 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                                             px: 1,
                                             py: 0.5,
                                             borderBottom:
-                                                idx <
-                                                errorLogs.length -
-                                                    1
+                                                idx < errorLogs.length - 1
                                                     ? '1px solid'
                                                     : 'none',
-                                            borderColor:
-                                                'grey.200',
+                                            borderColor: 'grey.200',
                                             bgcolor: isActive
                                                 ? 'primary.50'
                                                 : 'transparent',
                                             borderLeft: isActive
                                                 ? '3px solid'
                                                 : '3px solid transparent',
-                                            borderLeftColor:
-                                                isActive
-                                                    ? 'primary.main'
-                                                    : 'transparent',
+                                            borderLeftColor: isActive
+                                                ? 'primary.main'
+                                                : 'transparent',
                                             '&:hover': {
                                                 bgcolor: isActive
                                                     ? 'primary.100'
@@ -608,52 +578,77 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                                     >
                                         <Button
                                             sx={{
-                                                textTransform:
-                                                    'none',
+                                                textTransform: 'none',
                                                 textAlign: 'left',
                                                 flex: 1,
                                                 minWidth: 0,
-                                                justifyContent:
-                                                    'flex-start',
+                                                justifyContent: 'flex-start',
                                                 px: 0.5,
                                                 py: 0,
                                             }}
                                             size="small"
                                             onClick={() =>
-                                                setErrorDetailIndex(
-                                                    {
-                                                        sample_index: 0,
-                                                        sample_ids:
-                                                            cluster.task_instance_ids,
-                                                    }
-                                                )
+                                                setErrorDetailIndex({
+                                                    sample_index: 0,
+                                                    sample_ids:
+                                                        cluster.task_instance_ids,
+                                                })
                                             }
                                         >
                                             <Typography
                                                 variant="caption"
                                                 noWrap
                                                 sx={{
-                                                    fontFamily:
-                                                        'monospace',
-                                                    fontSize:
-                                                        '0.75rem',
+                                                    fontFamily: 'monospace',
+                                                    fontSize: '0.75rem',
                                                 }}
                                             >
                                                 {truncated}
                                             </Typography>
                                         </Button>
+                                        {isResourceCluster && (
+                                            <Tooltip
+                                                title={`${resourceCount} resource error${resourceCount > 1 ? 's' : ''}`}
+                                                arrow
+                                                placement="top"
+                                            >
+                                                <Chip
+                                                    icon={
+                                                        <MemoryIcon
+                                                            sx={{
+                                                                fontSize:
+                                                                    '12px !important',
+                                                                color: '#fff !important',
+                                                            }}
+                                                        />
+                                                    }
+                                                    label={resourceCount}
+                                                    size="small"
+                                                    sx={{
+                                                        mx: 0.25,
+                                                        height: 20,
+                                                        fontSize: '0.65rem',
+                                                        fontWeight: 'bold',
+                                                        backgroundColor:
+                                                            RESOURCE_ERROR_COLORS.main,
+                                                        color: '#fff',
+                                                        '& .MuiChip-icon': {
+                                                            ml: 0.5,
+                                                            mr: -0.25,
+                                                        },
+                                                    }}
+                                                />
+                                            </Tooltip>
+                                        )}
                                         <Chip
-                                            label={
-                                                cluster.group_instance_count
-                                            }
+                                            label={cluster.group_instance_count}
                                             size="small"
                                             color="error"
                                             variant="outlined"
                                             sx={{
                                                 mx: 0.5,
                                                 height: 20,
-                                                fontSize:
-                                                    '0.7rem',
+                                                fontSize: '0.7rem',
                                             }}
                                         />
                                         {onFilterByInstanceIds && (
@@ -726,14 +721,16 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                 }}
             >
                 {/* Header */}
-                <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    pt: 3,
-                    px: 2,
-                    pb: 1,
-                }}>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        pt: 3,
+                        px: 2,
+                        pb: 1,
+                    }}
+                >
                     <Typography variant="subtitle1" fontWeight="bold">
                         Error Sample: TI {currentTiID()}
                     </Typography>
@@ -746,12 +743,14 @@ const ErrorClustersCard: React.FC<ErrorClustersCardProps> = ({
                 </Box>
 
                 {/* Sample navigation */}
-                <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    px: 2,
-                    pb: 1,
-                }}>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        px: 2,
+                        pb: 1,
+                    }}
+                >
                     <IconButton
                         onClick={previousSample}
                         size="small"

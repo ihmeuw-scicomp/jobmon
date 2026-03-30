@@ -16,6 +16,7 @@ import {
     UsageKPIStats,
     ResourceEfficiencyMetrics,
 } from '@jobmon_gui/types/Usage';
+import { getEfficiencyStatus } from './usageCalculations';
 
 interface UsageKPICardsProps {
     kpiStats: UsageKPIStats;
@@ -34,35 +35,6 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
 }) => {
     const isShowingSelection =
         selectedDataCount !== undefined && selectedDataCount > 0;
-
-    // Helper function to get efficiency status
-    const getEfficiencyStatus = (utilization: number) => {
-        if (utilization > 90) {
-            return {
-                label: 'UNDER-ALLOCATED',
-                description: 'High Risk',
-                color: 'error' as const,
-                bgColor: 'error.50',
-                textColor: 'error.main',
-            };
-        } else if (utilization < 50) {
-            return {
-                label: 'OVER-ALLOCATED',
-                description: 'Wasteful',
-                color: 'warning' as const,
-                bgColor: 'warning.50',
-                textColor: 'warning.main',
-            };
-        } else {
-            return {
-                label: 'WELL-ALLOCATED',
-                description: 'Optimal',
-                color: 'success' as const,
-                bgColor: 'success.50',
-                textColor: 'success.main',
-            };
-        }
-    };
 
     const runtimeStatus = getEfficiencyStatus(
         resourceEfficiency.runtimeUtilization
@@ -137,7 +109,10 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                 Runtime
                             </Typography>
 
-                            <Grid container spacing={layout === 'vertical' ? 0.5 : 1.5}>
+                            <Grid
+                                container
+                                spacing={layout === 'vertical' ? 0.5 : 1.5}
+                            >
                                 <Grid item xs={4}>
                                     <Typography
                                         variant="caption"
@@ -157,12 +132,12 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                     >
                                         {kpiStats.minRuntime !== undefined
                                             ? humanizeDuration(
-                                                kpiStats.minRuntime * 1000,
-                                                {
-                                                    largest: 1,
-                                                    round: true,
-                                                }
-                                            )
+                                                  kpiStats.minRuntime * 1000,
+                                                  {
+                                                      largest: 1,
+                                                      round: true,
+                                                  }
+                                              )
                                             : 'N/A'}
                                     </Typography>
                                 </Grid>
@@ -185,12 +160,12 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                     >
                                         {kpiStats.maxRuntime !== undefined
                                             ? humanizeDuration(
-                                                kpiStats.maxRuntime * 1000,
-                                                {
-                                                    largest: 1,
-                                                    round: true,
-                                                }
-                                            )
+                                                  kpiStats.maxRuntime * 1000,
+                                                  {
+                                                      largest: 1,
+                                                      round: true,
+                                                  }
+                                              )
                                             : 'N/A'}
                                     </Typography>
                                 </Grid>
@@ -213,12 +188,12 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                     >
                                         {kpiStats.medianRuntime !== undefined
                                             ? humanizeDuration(
-                                                kpiStats.medianRuntime * 1000,
-                                                {
-                                                    largest: 1,
-                                                    round: true,
-                                                }
-                                            )
+                                                  kpiStats.medianRuntime * 1000,
+                                                  {
+                                                      largest: 1,
+                                                      round: true,
+                                                  }
+                                              )
                                             : 'N/A'}
                                     </Typography>
                                 </Grid>
@@ -259,7 +234,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                                     height: 18,
                                                     backgroundColor:
                                                         runtimeStatus.bgColor,
-                                                    color: runtimeStatus.textColor,
+                                                    color: runtimeStatus.color,
                                                     fontWeight: 'bold',
                                                 }}
                                             />
@@ -276,7 +251,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                                     variant="body2"
                                                     fontWeight="bold"
                                                     sx={{
-                                                        color: runtimeStatus.textColor,
+                                                        color: runtimeStatus.color,
                                                     }}
                                                 >
                                                     {resourceEfficiency.runtimeUtilization.toFixed(
@@ -305,7 +280,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                                         {
                                                             borderRadius: 3,
                                                             backgroundColor:
-                                                                runtimeStatus.textColor,
+                                                                runtimeStatus.color,
                                                         },
                                                 }}
                                             />
@@ -330,13 +305,13 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                                 {kpiStats.medianRequestedRuntime !==
                                                 undefined
                                                     ? humanizeDuration(
-                                                        kpiStats.medianRequestedRuntime *
+                                                          kpiStats.medianRequestedRuntime *
                                                               1000,
-                                                        {
-                                                            largest: 1,
-                                                            round: true,
-                                                        }
-                                                    )
+                                                          {
+                                                              largest: 1,
+                                                              round: true,
+                                                          }
+                                                      )
                                                     : 'N/A'}
                                             </Typography>
                                         </Box>
@@ -384,7 +359,10 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                 Memory
                             </Typography>
 
-                            <Grid container spacing={layout === 'vertical' ? 0.5 : 1.5}>
+                            <Grid
+                                container
+                                spacing={layout === 'vertical' ? 0.5 : 1.5}
+                            >
                                 <Grid item xs={4}>
                                     <Typography
                                         variant="caption"
@@ -488,7 +466,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                                     height: 18,
                                                     backgroundColor:
                                                         memoryStatus.bgColor,
-                                                    color: memoryStatus.textColor,
+                                                    color: memoryStatus.color,
                                                     fontWeight: 'bold',
                                                 }}
                                             />
@@ -505,7 +483,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                                     variant="body2"
                                                     fontWeight="bold"
                                                     sx={{
-                                                        color: memoryStatus.textColor,
+                                                        color: memoryStatus.color,
                                                     }}
                                                 >
                                                     {resourceEfficiency.memoryUtilization.toFixed(
@@ -534,7 +512,7 @@ const UsageKPICards: React.FC<UsageKPICardsProps> = ({
                                                         {
                                                             borderRadius: 3,
                                                             backgroundColor:
-                                                                memoryStatus.textColor,
+                                                                memoryStatus.color,
                                                         },
                                                 }}
                                             />

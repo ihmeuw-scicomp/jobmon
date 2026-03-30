@@ -5,17 +5,9 @@ import {
     Box,
     Button,
     ButtonGroup,
-    Checkbox,
-    Chip,
-    FormControl,
     FormControlLabel,
     IconButton,
-    InputLabel,
-    ListItemText,
-    MenuItem,
-    OutlinedInput,
     Paper,
-    Select,
     Skeleton,
     Switch,
     Tooltip,
@@ -36,7 +28,6 @@ import RuntimeMemoryScatterPlot, {
     ScatterPlotHandle,
 } from './RuntimeMemoryScatterPlot';
 import { ScatterDataPoint } from '@jobmon_gui/types/Usage';
-import { ResourceCluster } from './usageCalculations';
 
 interface UsagePlotSectionProps {
     isLoading: boolean;
@@ -51,12 +42,6 @@ interface UsagePlotSectionProps {
     onShowResourceZonesChange: (show: boolean) => void;
     onDownloadCSV?: () => void;
     hasData?: boolean;
-    availableResourceClusters: ResourceCluster[];
-    selectedResourceClusters: Set<string>;
-    onSelectedResourceClustersChange: (clusters: Set<string>) => void;
-    onResetFilters: () => void;
-    hasActiveSelection?: boolean;
-    onClearSelection?: () => void;
 }
 
 const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
@@ -72,16 +57,7 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
     onShowResourceZonesChange,
     onDownloadCSV,
     hasData = false,
-    availableResourceClusters,
-    selectedResourceClusters,
-    onSelectedResourceClustersChange,
-    onResetFilters,
-    hasActiveSelection,
-    onClearSelection,
 }) => {
-    const isResourceFiltered =
-        selectedResourceClusters.size <
-        availableResourceClusters.length;
     const [dragMode, setDragMode] = useState<
         'zoom' | 'pan' | 'select' | 'lasso'
     >('zoom');
@@ -117,9 +93,7 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                     <Tooltip title="Zoom mode">
                         <Button
                             variant={
-                                dragMode === 'zoom'
-                                    ? 'contained'
-                                    : 'outlined'
+                                dragMode === 'zoom' ? 'contained' : 'outlined'
                             }
                             onClick={() => setDragMode('zoom')}
                             sx={{ minWidth: 0, px: 0.75 }}
@@ -130,9 +104,7 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                     <Tooltip title="Pan mode">
                         <Button
                             variant={
-                                dragMode === 'pan'
-                                    ? 'contained'
-                                    : 'outlined'
+                                dragMode === 'pan' ? 'contained' : 'outlined'
                             }
                             onClick={() => setDragMode('pan')}
                             sx={{ minWidth: 0, px: 0.75 }}
@@ -143,13 +115,9 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                     <Tooltip title="Box select">
                         <Button
                             variant={
-                                dragMode === 'select'
-                                    ? 'contained'
-                                    : 'outlined'
+                                dragMode === 'select' ? 'contained' : 'outlined'
                             }
-                            onClick={() =>
-                                setDragMode('select')
-                            }
+                            onClick={() => setDragMode('select')}
                             sx={{ minWidth: 0, px: 0.75 }}
                         >
                             <SelectIcon fontSize="small" />
@@ -158,13 +126,9 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                     <Tooltip title="Lasso select">
                         <Button
                             variant={
-                                dragMode === 'lasso'
-                                    ? 'contained'
-                                    : 'outlined'
+                                dragMode === 'lasso' ? 'contained' : 'outlined'
                             }
-                            onClick={() =>
-                                setDragMode('lasso')
-                            }
+                            onClick={() => setDragMode('lasso')}
                             sx={{ minWidth: 0, px: 0.75 }}
                         >
                             <LassoIcon fontSize="small" />
@@ -172,9 +136,7 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                     </Tooltip>
                     <Tooltip title="Zoom in">
                         <Button
-                            onClick={() =>
-                                plotHandleRef.current?.zoomIn()
-                            }
+                            onClick={() => plotHandleRef.current?.zoomIn()}
                             sx={{ minWidth: 0, px: 0.75 }}
                         >
                             <AddIcon fontSize="small" />
@@ -182,9 +144,7 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                     </Tooltip>
                     <Tooltip title="Zoom out">
                         <Button
-                            onClick={() =>
-                                plotHandleRef.current?.zoomOut()
-                            }
+                            onClick={() => plotHandleRef.current?.zoomOut()}
                             sx={{ minWidth: 0, px: 0.75 }}
                         >
                             <RemoveIcon fontSize="small" />
@@ -192,9 +152,7 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                     </Tooltip>
                     <Tooltip title="Reset zoom">
                         <Button
-                            onClick={() =>
-                                plotHandleRef.current?.resetZoom()
-                            }
+                            onClick={() => plotHandleRef.current?.resetZoom()}
                             sx={{ minWidth: 0, px: 0.75 }}
                         >
                             <RestartAltIcon fontSize="small" />
@@ -202,95 +160,7 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                     </Tooltip>
                 </ButtonGroup>
 
-                <Box
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        flex: 1,
-                        justifyContent: 'center',
-                    }}
-                >
-                    <FormControl size="small" sx={{ minWidth: 150 }}>
-                        <InputLabel id="resource-cluster-filter-label">
-                            Resource Clusters
-                        </InputLabel>
-                        <Select
-                            labelId="resource-cluster-filter-label"
-                            multiple
-                            value={Array.from(
-                                selectedResourceClusters
-                            )}
-                            onChange={event => {
-                                const {
-                                    target: { value },
-                                } = event;
-                                onSelectedResourceClustersChange(
-                                    new Set(
-                                        typeof value === 'string'
-                                            ? value.split(',')
-                                            : (value as string[])
-                                    )
-                                );
-                            }}
-                            input={
-                                <OutlinedInput label="Resource Clusters" />
-                            }
-                            renderValue={selected =>
-                                selected.length ===
-                                availableResourceClusters.length
-                                    ? 'All'
-                                    : `${selected.length} selected`
-                            }
-                            MenuProps={{
-                                PaperProps: {
-                                    style: { maxHeight: 300 },
-                                },
-                            }}
-                        >
-                            {availableResourceClusters.map(cluster => (
-                                <MenuItem
-                                    key={cluster.id}
-                                    value={cluster.id}
-                                    dense
-                                >
-                                    <Checkbox
-                                        checked={selectedResourceClusters.has(
-                                            cluster.id
-                                        )}
-                                        size="small"
-                                    />
-                                    <ListItemText
-                                        primary={cluster.label}
-                                        primaryTypographyProps={{
-                                            fontSize: '0.875rem',
-                                        }}
-                                    />
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    {hasActiveSelection && onClearSelection && (
-                        <Chip
-                            label="Clear selection"
-                            size="small"
-                            onDelete={onClearSelection}
-                            color="primary"
-                            variant="outlined"
-                            sx={{ height: 28 }}
-                        />
-                    )}
-                    {isResourceFiltered && (
-                        <Chip
-                            label="Reset filters"
-                            size="small"
-                            onClick={onResetFilters}
-                            variant="outlined"
-                            color="default"
-                            sx={{ height: 28 }}
-                        />
-                    )}
-                </Box>
+                <Box sx={{ flex: 1 }} />
 
                 <Box
                     sx={{
@@ -368,12 +238,8 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                             ref={plotHandleRef}
                             data={filteredScatterData}
                             onTaskClick={onTaskClick}
-                            medianRequestedRuntime={
-                                medianRequestedRuntime
-                            }
-                            medianRequestedMemory={
-                                medianRequestedMemoryGiB
-                            }
+                            medianRequestedRuntime={medianRequestedRuntime}
+                            medianRequestedMemory={medianRequestedMemoryGiB}
                             taskTemplateName={taskTemplateName}
                             showResourceZones={showResourceZones}
                             selectedInstanceIds={selectedInstanceIds}
@@ -411,10 +277,9 @@ const UsagePlotSection: React.FC<UsagePlotSectionProps> = ({
                             textAlign="center"
                             sx={{ maxWidth: 400 }}
                         >
-                            No data matches the current filter
-                            criteria. Try adjusting your filters
-                            or check if data exists for this task
-                            template.
+                            No data matches the current filter criteria. Try
+                            adjusting your filters or check if data exists for
+                            this task template.
                         </Typography>
                     </Box>
                 )}

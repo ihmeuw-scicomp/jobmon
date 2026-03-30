@@ -3,6 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
+import Collapse from '@mui/material/Collapse';
 import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
 import { useTheme } from '@mui/material/styles';
@@ -18,6 +19,7 @@ import JobmonProgressBar from '@jobmon_gui/components/JobmonProgressBar';
 import TaskTable from '@jobmon_gui/components/task_template_details/TaskTable';
 import UsageKPICards from '@jobmon_gui/components/task_template_details/usage/UsageKPICards';
 import UsagePlotSection from '@jobmon_gui/components/task_template_details/usage/UsagePlotSection';
+import ResourceSummaryBar from '@jobmon_gui/components/task_template_details/usage/ResourceSummaryBar';
 import ErrorClustersCard from '@jobmon_gui/components/task_template_details/usage/ErrorClustersCard';
 import { useTaskTemplateDetails } from '@jobmon_gui/queries/GetTaskTemplateDetails.ts';
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
@@ -27,6 +29,7 @@ import {
     WorkflowUsageQueryKey,
 } from '@jobmon_gui/queries/GetWorkflowUsage.ts';
 import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors.ts';
+import { getFatalErrorBreakdownFn } from '@jobmon_gui/queries/GetFatalErrorBreakdown';
 import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilterPersistence';
 import { bytes_to_gib } from '@jobmon_gui/utils/formatters';
 import {
@@ -110,6 +113,19 @@ export default function TaskTemplateDetails() {
 
     const errorLogs = clusteredErrorsQuery.data?.error_logs || [];
 
+    // --- Fatal error breakdown (for resource error visibility) ---
+    const breakdownQuery = useQuery({
+        queryKey: [
+            'workflow_details',
+            'fatal_breakdown',
+            workflowId,
+            taskTemplateVersionId,
+        ],
+        queryFn: getFatalErrorBreakdownFn,
+        enabled: !!taskTemplateVersionId && !!workflowId,
+        staleTime: 120000,
+    });
+
     // --- Usage filters ---
     const {
         selectedResourceClusters,
@@ -123,6 +139,17 @@ export default function TaskTemplateDetails() {
     const [showResourceZones, setShowResourceZones] = useState(false);
     const [tableFilteredInstanceIds, setTableFilteredInstanceIds] =
         useState<Set<number> | null>(null);
+
+    // --- Resource section collapse (persisted to localStorage) ---
+    const [resourceSectionExpanded, setResourceSectionExpanded] = useState(
+        () => localStorage.getItem('jobmon_resourceSectionExpanded') === 'true'
+    );
+    useEffect(() => {
+        localStorage.setItem(
+            'jobmon_resourceSectionExpanded',
+            String(resourceSectionExpanded)
+        );
+    }, [resourceSectionExpanded]);
 
     // --- Helper: resource cluster filter predicate ---
     const passesResourceClusterFilter = useCallback(
@@ -561,120 +588,40 @@ export default function TaskTemplateDetails() {
                 </Box>
             </Box>
 
-            {/* --- SECTION A: Analytics (sidebar + main) --- */}
+            {/* --- SECTION A: Errors (full width, prominent) --- */}
+            <Box sx={{ px: 1, mt: 1 }}>
+                <ErrorClustersCard
+                    layout="fullwidth"
+                    errorLogs={errorLogsForCard}
+                    isLoading={clusteredErrorsQuery.isLoading}
+                    workflowId={workflowId}
+                    taskTemplateId={
+                        TaskTemplateDetailsData.data.task_template_id
+                    }
+                    selectedInstanceIds={selectedInstanceIds}
+                    scatterInstanceIds={scatterInstanceIds}
+                    onFilterByInstanceIds={handleErrorFilterByInstanceIds}
+                    resourceErrorBreakdown={breakdownQuery.data}
+                />
+            </Box>
 
-            {usageIsLoading ? (
-                <Box
-                    sx={{
-                        display: 'flex',
-                        flexDirection: { xs: 'column', md: 'row' },
-                        px: 1,
-                        gap: 1,
-                    }}
-                >
-                    <Box
-                        sx={{
-                            flex: {
-                                xs: '1 1 auto',
-                                md: '0 0 280px',
-                            },
-                            maxWidth: { md: 280 },
-                            minWidth: 0,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 1,
-                        }}
-                    >
-                        <Skeleton variant="rectangular" height={150} />
-                        <Skeleton variant="rectangular" height={150} />
-                        <Skeleton variant="rectangular" height={200} />
-                    </Box>
-                    <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
-                        <Skeleton variant="rectangular" height={500} />
-                    </Box>
-                </Box>
-            ) : (
-                <Box
-                    sx={{
-                        display: 'flex',
-                        flexDirection: {
-                            xs: 'column',
-                            md: 'row',
-                        },
-                        px: 1,
-                        gap: 1,
-                    }}
-                >
-                    {/* Sidebar */}
-                    <Box
-                        sx={{
-                            flex: {
-                                xs: '1 1 auto',
-                                md: '0 0 280px',
-                            },
-                            maxWidth: { md: 280 },
-                            minWidth: 0,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 1,
-                        }}
-                    >
-                        <UsageKPICards
-                            layout={isMdUp ? 'vertical' : 'horizontal'}
-                            kpiStats={kpiStats}
+            {/* --- SECTION B: Resource Profiling (summary bar + collapsible detail) --- */}
+            <Box sx={{ px: 1, mt: 1 }}>
+                {usageIsLoading ? (
+                    <Skeleton
+                        variant="rectangular"
+                        height={48}
+                        sx={{ borderRadius: 2 }}
+                    />
+                ) : (
+                    <>
+                        <ResourceSummaryBar
                             resourceEfficiency={resourceEfficiency}
-                            selectedDataCount={
-                                selectedData.length > 0
-                                    ? selectedData.length
-                                    : undefined
+                            expanded={resourceSectionExpanded}
+                            onToggleExpanded={() =>
+                                setResourceSectionExpanded(prev => !prev)
                             }
-                            totalDataCount={effectiveScatterData.length}
-                        />
-                        <ErrorClustersCard
-                            errorLogs={errorLogsForCard}
-                            isLoading={clusteredErrorsQuery.isLoading}
-                            workflowId={workflowId}
-                            taskTemplateId={
-                                TaskTemplateDetailsData.data.task_template_id
-                            }
-                            selectedInstanceIds={selectedInstanceIds}
-                            scatterInstanceIds={scatterInstanceIds}
-                            onFilterByInstanceIds={
-                                handleErrorFilterByInstanceIds
-                            }
-                            maxListHeight={isMdUp ? 400 : 180}
-                        />
-                    </Box>
-
-                    {/* Main content */}
-                    <Box
-                        sx={{
-                            flex: '1 1 0',
-                            minWidth: 0,
-                            display: 'flex',
-                            flexDirection: 'column',
-                        }}
-                    >
-                        <UsagePlotSection
-                            isLoading={usageInfo.isLoading}
-                            filteredScatterData={effectiveScatterData}
-                            taskTemplateName={taskTemplateName || ''}
-                            medianRequestedRuntime={
-                                medianRequestedRuntimeForKPI
-                            }
-                            medianRequestedMemoryGiB={
-                                medianRequestedMemoryGiBForKPI
-                            }
-                            showResourceZones={showResourceZones}
-                            selectedInstanceIds={selectedInstanceIds}
-                            onTaskClick={handleScatterTaskClick}
-                            onSelected={handleDataSelection}
-                            onShowResourceZonesChange={setShowResourceZones}
-                            onDownloadCSV={downloadCSV}
-                            hasData={
-                                rawTaskNodesFromApi &&
-                                rawTaskNodesFromApi.length > 0
-                            }
+                            selectedDataCount={selectedData.length}
                             availableResourceClusters={
                                 availableResourceClusters
                             }
@@ -685,12 +632,92 @@ export default function TaskTemplateDetails() {
                             onResetFilters={resetFilters}
                             hasActiveSelection={selectedData.length > 0}
                             onClearSelection={handleClearSelection}
+                            hasData={
+                                rawTaskNodesFromApi != null &&
+                                rawTaskNodesFromApi.length > 0
+                            }
                         />
-                    </Box>
-                </Box>
-            )}
+                        <Collapse in={resourceSectionExpanded}>
+                            <Box
+                                sx={{
+                                    display: 'flex',
+                                    flexDirection: {
+                                        xs: 'column',
+                                        md: 'row',
+                                    },
+                                    gap: 1,
+                                    mt: 1,
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        flex: {
+                                            xs: '1 1 auto',
+                                            md: '0 0 320px',
+                                        },
+                                        maxWidth: { md: 320 },
+                                        minWidth: 0,
+                                    }}
+                                >
+                                    <UsageKPICards
+                                        layout={
+                                            isMdUp ? 'vertical' : 'horizontal'
+                                        }
+                                        kpiStats={kpiStats}
+                                        resourceEfficiency={resourceEfficiency}
+                                        selectedDataCount={
+                                            selectedData.length > 0
+                                                ? selectedData.length
+                                                : undefined
+                                        }
+                                        totalDataCount={
+                                            effectiveScatterData.length
+                                        }
+                                    />
+                                </Box>
+                                <Box
+                                    sx={{
+                                        flex: '1 1 0',
+                                        minWidth: 0,
+                                    }}
+                                >
+                                    <UsagePlotSection
+                                        isLoading={usageInfo.isLoading}
+                                        filteredScatterData={
+                                            effectiveScatterData
+                                        }
+                                        taskTemplateName={
+                                            taskTemplateName || ''
+                                        }
+                                        medianRequestedRuntime={
+                                            medianRequestedRuntimeForKPI
+                                        }
+                                        medianRequestedMemoryGiB={
+                                            medianRequestedMemoryGiBForKPI
+                                        }
+                                        showResourceZones={showResourceZones}
+                                        selectedInstanceIds={
+                                            selectedInstanceIds
+                                        }
+                                        onTaskClick={handleScatterTaskClick}
+                                        onSelected={handleDataSelection}
+                                        onShowResourceZonesChange={
+                                            setShowResourceZones
+                                        }
+                                        onDownloadCSV={downloadCSV}
+                                        hasData={
+                                            rawTaskNodesFromApi != null &&
+                                            rawTaskNodesFromApi.length > 0
+                                        }
+                                    />
+                                </Box>
+                            </Box>
+                        </Collapse>
+                    </>
+                )}
+            </Box>
 
-            {/* Task Table (full width, below both columns) */}
+            {/* --- SECTION C: Task Table (full width) --- */}
             <Box sx={{ mt: 1 }}>
                 <TaskTable
                     data={tableData}

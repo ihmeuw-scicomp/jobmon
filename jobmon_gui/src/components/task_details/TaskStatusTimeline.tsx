@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -18,6 +18,7 @@ import {
     getStatusTextColor,
     taskStatusMeta,
     RESOURCE_ERROR_COLORS,
+    ERROR_STATUSES,
 } from '@jobmon_gui/constants/taskStatus';
 import { components } from '@jobmon_gui/types/apiSchema';
 import { TaskInstance } from '@jobmon_gui/types/TaskInstance';
@@ -81,11 +82,11 @@ function buildSegment(record: AuditRecord): Segment {
             ? 0
             : !hasValidEnteredMs
               ? 0
-            : active
-              ? Date.now() - enteredMs
-              : hasValidExitedMs
-                ? exitedMs - enteredMs
-                : 0;
+              : active
+                ? Date.now() - enteredMs
+                : hasValidExitedMs
+                  ? exitedMs - enteredMs
+                  : 0;
     const durationText = isTerminal
         ? ''
         : active
@@ -120,8 +121,7 @@ function groupIntoAttempts(records: AuditRecord[]): Attempt[] {
         // or A (Adjusting Resources — resource error retry),
         // except for the very first record which always starts attempt 1.
         const isNewAttempt =
-            (seg.status === 'G' || seg.status === 'A') &&
-            current.length > 0;
+            (seg.status === 'G' || seg.status === 'A') && current.length > 0;
         if (isNewAttempt) {
             attempts.push(finalizeAttempt(current));
             current = [];
@@ -185,7 +185,10 @@ function mapAttemptsToInstances(
     const sortedInstances = sortTaskInstancesById(instances);
     const mapped = attempts.map(() => null as TaskInstance | null);
     const attemptOffset = Math.max(0, attempts.length - sortedInstances.length);
-    const instanceOffset = Math.max(0, sortedInstances.length - attempts.length);
+    const instanceOffset = Math.max(
+        0,
+        sortedInstances.length - attempts.length
+    );
     const overlap = Math.min(attempts.length, sortedInstances.length);
 
     for (let i = 0; i < overlap; i += 1) {
@@ -228,11 +231,7 @@ function AttemptDetailPanel({
             : null;
 
     const stderrPreview = instance.ti_stderr_log
-        ? instance.ti_stderr_log
-              .trim()
-              .split('\n')
-              .slice(-10)
-              .join('\n')
+        ? instance.ti_stderr_log.trim().split('\n').slice(-10).join('\n')
         : null;
 
     // Metadata chips
@@ -260,8 +259,7 @@ function AttemptDetailPanel({
         metaChips.push({ label: 'I/O', value: instance.ti_io });
     }
 
-    const isResourceError =
-        instance.ti_status === 'RESOURCE_ERROR';
+    const isResourceError = instance.ti_status === 'RESOURCE_ERROR';
     const runtimeExceeded =
         utilizedRuntimeSec != null &&
         requestedRuntimeSec != null &&
@@ -368,10 +366,10 @@ function AttemptDetailPanel({
                         utilized={utilizedRuntimeSec}
                         requestedDisplay={
                             requestedRuntimeSec != null
-                                ? humanizeDuration(
-                                      requestedRuntimeSec * 1000,
-                                      { largest: 2, round: true }
-                                  )
+                                ? humanizeDuration(requestedRuntimeSec * 1000, {
+                                      largest: 2,
+                                      round: true,
+                                  })
                                 : 'N/A'
                         }
                         utilizedDisplay={runtimeDisplay ?? 'N/A'}
@@ -390,10 +388,7 @@ function AttemptDetailPanel({
                             mb: 0.25,
                         }}
                     >
-                        <Typography
-                            variant="caption"
-                            fontWeight={700}
-                        >
+                        <Typography variant="caption" fontWeight={700}>
                             STDERR
                         </Typography>
                         <Button
@@ -447,8 +442,7 @@ function AttemptDetailPanel({
                         whiteSpace: 'nowrap',
                     }}
                 >
-                    <strong>Stdout:</strong>{' '}
-                    {instance.ti_stdout || '/dev/null'}
+                    <strong>Stdout:</strong> {instance.ti_stdout || '/dev/null'}
                 </Typography>
                 <Button
                     size="small"
@@ -593,15 +587,12 @@ function AttemptRow({
                                     <br />
                                     Duration: {seg.durationText}
                                     <br />
-                                    Entered:{' '}
-                                    {formatTimestamp(seg.enteredAt)}
+                                    Entered: {formatTimestamp(seg.enteredAt)}
                                     {seg.exitedAt && (
                                         <>
                                             <br />
                                             Exited:{' '}
-                                            {formatTimestamp(
-                                                seg.exitedAt
-                                            )}
+                                            {formatTimestamp(seg.exitedAt)}
                                         </>
                                     )}
                                 </span>
@@ -620,15 +611,12 @@ function AttemptRow({
                                     overflow: 'hidden',
                                     whiteSpace: 'nowrap',
                                     borderRight:
-                                        segIdx <
-                                        attempt.segments.length - 1
+                                        segIdx < attempt.segments.length - 1
                                             ? '1px solid rgba(255,255,255,0.3)'
                                             : 'none',
                                 }}
                             >
-                                {widths[segIdx] > 12
-                                    ? seg.label
-                                    : ''}
+                                {widths[segIdx] > 12 ? seg.label : ''}
                             </Box>
                         </Tooltip>
                     ))}
@@ -647,16 +635,11 @@ function AttemptRow({
                             width: 8,
                             height: 8,
                             borderRadius: '50%',
-                            backgroundColor: outcomeColor(
-                                attempt.outcome
-                            ),
+                            backgroundColor: outcomeColor(attempt.outcome),
                             flexShrink: 0,
                         }}
                     />
-                    <Typography
-                        variant="caption"
-                        sx={{ fontWeight: 500 }}
-                    >
+                    <Typography variant="caption" sx={{ fontWeight: 500 }}>
                         {outcomeLabel(attempt.outcome)}
                     </Typography>
                 </Box>
@@ -669,9 +652,7 @@ function AttemptRow({
                         textAlign: 'right',
                     }}
                 >
-                    {attempt.totalMs > 0
-                        ? formatMs(attempt.totalMs)
-                        : ''}
+                    {attempt.totalMs > 0 ? formatMs(attempt.totalMs) : ''}
                 </Typography>
             </Box>
             <Collapse in={expanded}>
@@ -696,10 +677,7 @@ function AttemptRow({
                             onViewStderr={onViewStderr}
                         />
                     ) : (
-                        <Typography
-                            variant="caption"
-                            color="text.secondary"
-                        >
+                        <Typography variant="caption" color="text.secondary">
                             No instance data available.
                         </Typography>
                     )}
@@ -726,10 +704,7 @@ function FallbackInstanceList({
 
     return (
         <Box sx={{ py: 1 }}>
-            <Typography
-                variant="subtitle2"
-                sx={{ mb: 1, fontWeight: 600 }}
-            >
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
                 Task Instances
             </Typography>
             <Box
@@ -751,9 +726,7 @@ function FallbackInstanceList({
                         <Box key={inst.ti_id}>
                             <Box
                                 onClick={() =>
-                                    setExpandedIdx(
-                                        expanded ? -1 : idx
-                                    )
+                                    setExpandedIdx(expanded ? -1 : idx)
                                 }
                                 sx={{
                                     display: 'flex',
@@ -763,8 +736,7 @@ function FallbackInstanceList({
                                     borderRadius: '4px',
                                     px: 0.5,
                                     '&:hover': {
-                                        backgroundColor:
-                                            'action.hover',
+                                        backgroundColor: 'action.hover',
                                     },
                                 }}
                             >
@@ -805,8 +777,7 @@ function FallbackInstanceList({
                                             width: 8,
                                             height: 8,
                                             borderRadius: '50%',
-                                            backgroundColor:
-                                                statusColor,
+                                            backgroundColor: statusColor,
                                             flexShrink: 0,
                                         }}
                                     />
@@ -854,20 +825,13 @@ function FallbackInstanceList({
             {/* Stdout modal */}
             <JobmonModal
                 title="Standard Out"
-                open={
-                    modalState.type === 'stdout' &&
-                    !!modalInstance
-                }
-                onClose={() =>
-                    setModalState({ type: null, instance: null })
-                }
+                open={modalState.type === 'stdout' && !!modalInstance}
+                onClose={() => setModalState({ type: null, instance: null })}
                 width="80%"
             >
                 <Grid container spacing={2}>
                     <Grid item xs={12}>
-                        <Typography variant="h6">
-                            Standard Out Path:
-                        </Typography>
+                        <Typography variant="h6">Standard Out Path:</Typography>
                     </Grid>
                     <Grid item xs={12}>
                         <ScrollableCodeBlock>
@@ -875,15 +839,11 @@ function FallbackInstanceList({
                         </ScrollableCodeBlock>
                     </Grid>
                     <Grid item xs={12}>
-                        <Typography variant="h6">
-                            Standard Out Log:
-                        </Typography>
+                        <Typography variant="h6">Standard Out Log:</Typography>
                     </Grid>
                     <Grid item xs={12}>
                         <ScrollableCodeBlock>
-                            <pre>
-                                {modalInstance?.ti_stdout_log}
-                            </pre>
+                            <pre>{modalInstance?.ti_stdout_log}</pre>
                         </ScrollableCodeBlock>
                     </Grid>
                 </Grid>
@@ -892,13 +852,8 @@ function FallbackInstanceList({
             {/* Stderr modal */}
             <JobmonModal
                 title="Standard Error"
-                open={
-                    modalState.type === 'stderr' &&
-                    !!modalInstance
-                }
-                onClose={() =>
-                    setModalState({ type: null, instance: null })
-                }
+                open={modalState.type === 'stderr' && !!modalInstance}
+                onClose={() => setModalState({ type: null, instance: null })}
                 width="80%"
             >
                 <Grid container spacing={2}>
@@ -919,9 +874,7 @@ function FallbackInstanceList({
                     </Grid>
                     <Grid item xs={12}>
                         <ScrollableCodeBlock>
-                            <pre>
-                                {modalInstance?.ti_stderr_log}
-                            </pre>
+                            <pre>{modalInstance?.ti_stderr_log}</pre>
                         </ScrollableCodeBlock>
                     </Grid>
                     <Grid item xs={12}>
@@ -931,9 +884,7 @@ function FallbackInstanceList({
                     </Grid>
                     <Grid item xs={12}>
                         <ScrollableCodeBlock>
-                            {
-                                modalInstance?.ti_error_log_description
-                            }
+                            {modalInstance?.ti_error_log_description}
                         </ScrollableCodeBlock>
                     </Grid>
                 </Grid>
@@ -961,6 +912,8 @@ export default function TaskStatusTimeline({
     });
 
     const [expandedAttempt, setExpandedAttempt] = useState<number>(-1);
+    // Track whether we've auto-expanded once (don't override user interaction)
+    const [autoExpanded, setAutoExpanded] = useState(false);
     const [modalState, setModalState] = useState<ModalState>({
         type: null,
         instance: null,
@@ -978,11 +931,27 @@ export default function TaskStatusTimeline({
         [attempts, tiQuery.data]
     );
 
+    // Auto-expand the latest failed attempt on first load
+    useEffect(() => {
+        if (autoExpanded || attempts.length === 0) return;
+        for (let i = attempts.length - 1; i >= 0; i--) {
+            if (
+                (ERROR_STATUSES as readonly string[]).includes(
+                    attempts[i].outcome
+                )
+            ) {
+                setExpandedAttempt(i);
+                setAutoExpanded(true);
+                return;
+            }
+        }
+        setAutoExpanded(true);
+    }, [attempts, autoExpanded]);
+
     // Collect unique statuses across all attempts for the legend
     const legendItems = useMemo(() => {
         const seen = new Set<string>();
-        const items: { code: string; label: string; color: string }[] =
-            [];
+        const items: { code: string; label: string; color: string }[] = [];
         for (const attempt of attempts) {
             for (const seg of attempt.segments) {
                 const code = seg.status.toUpperCase();
@@ -1046,10 +1015,7 @@ export default function TaskStatusTimeline({
 
     return (
         <Box sx={{ py: 1 }}>
-            <Typography
-                variant="subtitle2"
-                sx={{ mb: 1, fontWeight: 600 }}
-            >
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
                 Status Timeline
             </Typography>
             <Box
@@ -1071,9 +1037,7 @@ export default function TaskStatusTimeline({
                             expanded={expandedAttempt === idx}
                             onToggle={() =>
                                 setExpandedAttempt(
-                                    expandedAttempt === idx
-                                        ? -1
-                                        : idx
+                                    expandedAttempt === idx ? -1 : idx
                                 )
                             }
                             onViewStdout={() =>
@@ -1119,10 +1083,7 @@ export default function TaskStatusTimeline({
                                 flexShrink: 0,
                             }}
                         />
-                        <Typography
-                            variant="caption"
-                            color="text.secondary"
-                        >
+                        <Typography variant="caption" color="text.secondary">
                             {item.label}
                         </Typography>
                     </Box>
@@ -1133,16 +1094,12 @@ export default function TaskStatusTimeline({
             <JobmonModal
                 title="Standard Out"
                 open={modalState.type === 'stdout' && !!modalInstance}
-                onClose={() =>
-                    setModalState({ type: null, instance: null })
-                }
+                onClose={() => setModalState({ type: null, instance: null })}
                 width="80%"
             >
                 <Grid container spacing={2}>
                     <Grid item xs={12}>
-                        <Typography variant="h6">
-                            Standard Out Path:
-                        </Typography>
+                        <Typography variant="h6">Standard Out Path:</Typography>
                     </Grid>
                     <Grid item xs={12}>
                         <ScrollableCodeBlock>
@@ -1150,9 +1107,7 @@ export default function TaskStatusTimeline({
                         </ScrollableCodeBlock>
                     </Grid>
                     <Grid item xs={12}>
-                        <Typography variant="h6">
-                            Standard Out Log:
-                        </Typography>
+                        <Typography variant="h6">Standard Out Log:</Typography>
                     </Grid>
                     <Grid item xs={12}>
                         <ScrollableCodeBlock>
@@ -1166,9 +1121,7 @@ export default function TaskStatusTimeline({
             <JobmonModal
                 title="Standard Error"
                 open={modalState.type === 'stderr' && !!modalInstance}
-                onClose={() =>
-                    setModalState({ type: null, instance: null })
-                }
+                onClose={() => setModalState({ type: null, instance: null })}
                 width="80%"
             >
                 <Grid container spacing={2}>

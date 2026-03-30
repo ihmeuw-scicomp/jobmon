@@ -162,10 +162,16 @@ export const useTaskTableStore = create<TaskTableStore>()(
         }),
         {
             name: 'TaskTable',
+            version: 1,
             storage: taskTableStorage,
+            migrate: (persisted: unknown) => {
+                const state = persisted as Record<string, unknown>;
+                delete state.filters;
+                // zustand merges this partial with store defaults
+                return state as Partial<TaskTableStore>;
+            },
             partialize: state => ({
                 maxRows: state.maxRows,
-                filters: state.filters,
                 sorting: state.sorting,
                 columnOrder: state.columnOrder,
                 pagination: state.pagination,

@@ -10,13 +10,11 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import { alpha } from '@mui/material/styles';
 import CopyButton from '@jobmon_gui/components/common/CopyButton';
 import { BiRun } from 'react-icons/bi';
 import { IoMdCloseCircle, IoMdCloseCircleOutline } from 'react-icons/io';
-import {
-    AiFillSchedule,
-    AiFillCheckCircle,
-} from 'react-icons/ai';
+import { AiFillSchedule, AiFillCheckCircle } from 'react-icons/ai';
 import { HiRocketLaunch } from 'react-icons/hi2';
 import { TaskDetails } from '@jobmon_gui/types/TaskDetails';
 import {
@@ -26,8 +24,7 @@ import {
     ERROR_STATUSES,
 } from '@jobmon_gui/constants/taskStatus';
 import { formatJobmonDate } from '@jobmon_gui/utils/DayTime';
-import { ScrollableCodeBlock } from
-    '@jobmon_gui/components/ScrollableTextArea';
+import { ScrollableCodeBlock } from '@jobmon_gui/components/ScrollableTextArea';
 
 const STATUS_ICONS: Record<string, React.ReactNode> = {
     G: <AiFillSchedule />,
@@ -45,9 +42,7 @@ interface TaskSummaryCardProps {
     taskDetails: TaskDetails;
 }
 
-export default function TaskSummaryCard({
-    taskDetails,
-}: TaskSummaryCardProps) {
+export default function TaskSummaryCard({ taskDetails }: TaskSummaryCardProps) {
     const [commandOpen, setCommandOpen] = useState(false);
 
     const status = taskDetails.task_status;
@@ -56,13 +51,11 @@ export default function TaskSummaryCard({
     const statusLabel = getStatusLabel(status);
     const statusIcon = STATUS_ICONS[status] || null;
 
-    const showAttempts =
-        taskDetails.max_attempts > 1 ||
-        (ERROR_STATUSES as readonly string[]).includes(status);
+    const isError = (ERROR_STATUSES as readonly string[]).includes(status);
+    const showAttempts = taskDetails.max_attempts > 1 || isError;
     const attemptProgress =
         taskDetails.max_attempts > 0
-            ? (taskDetails.num_attempts / taskDetails.max_attempts) *
-              100
+            ? (taskDetails.num_attempts / taskDetails.max_attempts) * 100
             : 0;
 
     return (
@@ -70,10 +63,11 @@ export default function TaskSummaryCard({
             elevation={0}
             sx={{
                 border: '1px solid',
-                borderColor: 'divider',
+                borderColor: isError ? statusColor : 'divider',
                 borderLeft: `4px solid ${statusColor}`,
                 borderRadius: 2,
                 mb: 2,
+                bgcolor: isError ? alpha(statusColor, 0.03) : undefined,
                 '&:hover': {
                     boxShadow: 2,
                 },
@@ -130,8 +124,7 @@ export default function TaskSummaryCard({
                     color="text.secondary"
                     sx={{ mb: 1 }}
                 >
-                    Updated:{' '}
-                    {formatJobmonDate(taskDetails.task_status_date)}
+                    Updated: {formatJobmonDate(taskDetails.task_status_date)}
                 </Typography>
 
                 {/* Row 3: Attempts progress (conditional) */}
@@ -207,16 +200,12 @@ export default function TaskSummaryCard({
                         )}
                         <Tooltip
                             title={
-                                commandOpen
-                                    ? 'Hide command'
-                                    : 'Show command'
+                                commandOpen ? 'Hide command' : 'Show command'
                             }
                         >
                             <IconButton
                                 size="small"
-                                onClick={() =>
-                                    setCommandOpen(!commandOpen)
-                                }
+                                onClick={() => setCommandOpen(!commandOpen)}
                             >
                                 {commandOpen ? (
                                     <ExpandLessIcon fontSize="small" />
