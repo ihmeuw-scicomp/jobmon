@@ -114,6 +114,7 @@ class TaskInstanceDetailItem(BaseModel):
     ti_queue_name: Optional[str]
     ti_cpu: Optional[str]
     ti_io: Optional[str]
+    ti_workflow_run_id: Optional[int] = None
 
 
 class TaskInstanceDetailsResponse(BaseModel):

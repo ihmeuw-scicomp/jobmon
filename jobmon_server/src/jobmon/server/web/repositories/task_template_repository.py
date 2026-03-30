@@ -94,6 +94,7 @@ class TaskTemplateRepository:
                 task_command=row_data.get("task_command"),
                 task_num_attempts=row_data.get("task_num_attempts"),
                 task_max_attempts=row_data.get("task_max_attempts"),
+                workflow_run_id=row_data.get("workflow_run_id"),
             )
         except Exception as e:
             logger.error(
@@ -151,8 +152,8 @@ class TaskTemplateRepository:
                     # Requested resources and attempt number
                     TaskResources.requested_resources.label("requested_resources_col"),
                     attempt_number_col,
-                    # TaskInstance.id (not used but kept for consistency)
                     TaskInstance.id.label("task_instance_id_col"),
+                    TaskInstance.workflow_run_id.label("workflow_run_id_col"),
                 )
                 .select_from(TaskTemplateVersion)
                 .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
@@ -182,6 +183,7 @@ class TaskTemplateRepository:
                     "task_num_attempts": row[8],  # task_num_attempts_col
                     "task_max_attempts": row[9],  # task_max_attempts_col
                     "task_instance_id": row[12],  # task_instance_id_col
+                    "workflow_run_id": row[13],  # workflow_run_id_col
                 }
                 item = self._convert_to_task_resource_detail_item(row_data)
                 if item:
@@ -223,6 +225,7 @@ class TaskTemplateRepository:
                 Task.num_attempts.label("task_num_attempts"),
                 Task.max_attempts.label("task_max_attempts"),
                 TaskInstance.id.label("task_instance_id"),
+                TaskInstance.workflow_run_id,
             )
             .select_from(TaskTemplateVersion)
             .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
@@ -265,6 +268,7 @@ class TaskTemplateRepository:
             base_query.c.task_num_attempts,
             base_query.c.task_max_attempts,
             base_query.c.task_instance_id,
+            base_query.c.workflow_run_id,
         ).select_from(base_query)
 
         for subquery in node_arg_subqueries:
@@ -290,6 +294,7 @@ class TaskTemplateRepository:
                 "task_num_attempts": row[10],  # task_num_attempts
                 "task_max_attempts": row[11],  # task_max_attempts
                 "task_instance_id": row[12],  # task_instance_id
+                "workflow_run_id": row[13],  # workflow_run_id
             }
             item = self._convert_to_task_resource_detail_item(row_data)
             if item:
@@ -718,7 +723,10 @@ class TaskTemplateRepository:
         return MostPopularQueueResponse(queue_info=queue_info)
 
     def get_workflow_tt_status_viz(
-        self, workflow_id: int, dialect: str = "sqlite"
+        self,
+        workflow_id: int,
+        dialect: str = "sqlite",
+        workflow_run_id: Optional[int] = None,
     ) -> Dict[int, WorkflowTaskTemplateStatusItem]:
         """Get the status of workflow task templates for GUI visualization.
 
@@ -765,14 +773,30 @@ class TaskTemplateRepository:
             )
         )
 
-        # Single optimized query with SQL aggregation instead of two separate queries
+        # Pre-aggregated resource error counts per task (avoids
+        # correlated subquery that fires per-row at scale)
+        re_filters = [
+            TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
+        ]
+        if workflow_run_id is not None:
+            re_filters.append(TaskInstance.workflow_run_id == workflow_run_id)
+        resource_error_agg = (
+            select(
+                TaskInstance.task_id,
+                func.count(TaskInstance.id).label("re_count"),
+            )
+            .where(*re_filters)
+            .group_by(TaskInstance.task_id)
+            .subquery()
+        )
+
+        # Single optimized query with SQL aggregation
         optimized_sql = (
             select(
                 TaskTemplate.id.label("task_template_id"),
                 TaskTemplate.name.label("task_template_name"),
                 TaskTemplateVersion.id.label("task_template_version_id"),
                 sub_query.c.max_concurrently_running,
-                # SQL aggregation instead of Python loops - much faster
                 func.count(Task.id).label("total_tasks"),
                 func.sum(case((Task.status == "G", 1), else_=0)).label("pending_count"),
                 func.sum(
@@ -789,12 +813,15 @@ class TaskTemplateRepository:
                 func.sum(case((Task.status == "R", 1), else_=0)).label("running_count"),
                 func.sum(case((Task.status == "D", 1), else_=0)).label("done_count"),
                 func.sum(case((Task.status == "F", 1), else_=0)).label("fatal_count"),
-                # Attempt statistics in same query - no second database round-trip
+                func.coalesce(func.sum(resource_error_agg.c.re_count), 0).label(
+                    "resource_error_count"
+                ),
                 func.min(Task.num_attempts).label("min_attempts"),
                 func.max(Task.num_attempts).label("max_attempts"),
                 func.avg(Task.num_attempts).label("avg_attempts"),
             )
             .select_from(join_table)
+            .outerjoin(resource_error_agg, resource_error_agg.c.task_id == Task.id)
             .where(Task.workflow_id == workflow_id)
             .group_by(
                 TaskTemplate.id,
@@ -845,6 +872,7 @@ class TaskTemplateRepository:
                     else None
                 ),
                 task_template_version_id=row.task_template_version_id,
+                resource_error_count=row.resource_error_count,
             )
 
         return result_dict
@@ -853,6 +881,7 @@ class TaskTemplateRepository:
         self,
         workflow_id: int,
         task_template_version_id: int,
+        workflow_run_id: Optional[int] = None,
     ) -> FatalErrorBreakdownResponse:
         """Classify fatal tasks for one template by last TI status.
 
@@ -897,30 +926,27 @@ class TaskTemplateRepository:
             else:
                 infra += row.cnt
 
+        z_filters = [
+            Task.workflow_id == workflow_id,
+            Node.task_template_version_id == task_template_version_id,
+            TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
+        ]
+        if workflow_run_id is not None:
+            z_filters.append(TaskInstance.workflow_run_id == workflow_run_id)
+
         z_count_sql = (
             select(func.count(TaskInstance.id))
             .join(Task, TaskInstance.task_id == Task.id)
             .join(Node, Task.node_id == Node.id)
-            .where(
-                Task.workflow_id == workflow_id,
-                Node.task_template_version_id == task_template_version_id,
-                TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
-            )
+            .where(*z_filters)
         )
         resource_error_total = self.session.execute(z_count_sql).scalar() or 0
 
-        # Count tasks that had a resource error TI but recovered
-        # (task is not in ERROR_FATAL state).
         retried_sql = (
             select(func.count(func.distinct(Task.id)))
             .join(TaskInstance, TaskInstance.task_id == Task.id)
             .join(Node, Task.node_id == Node.id)
-            .where(
-                Task.workflow_id == workflow_id,
-                Node.task_template_version_id == task_template_version_id,
-                TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
-                Task.status != TaskStatus.ERROR_FATAL,
-            )
+            .where(*z_filters, Task.status != TaskStatus.ERROR_FATAL)
         )
         resource_error_retried = self.session.execute(retried_sql).scalar() or 0
 
@@ -930,11 +956,7 @@ class TaskTemplateRepository:
                 select(TaskInstance.id)
                 .join(Task, TaskInstance.task_id == Task.id)
                 .join(Node, Task.node_id == Node.id)
-                .where(
-                    Task.workflow_id == workflow_id,
-                    Node.task_template_version_id == task_template_version_id,
-                    TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
-                )
+                .where(*z_filters)
                 .order_by(TaskInstance.id.desc())
                 .limit(20)
             )
@@ -960,6 +982,7 @@ class TaskTemplateRepository:
         page_size: int = 10,
         recent_errors_only: bool = False,
         cluster_errors: bool = False,
+        workflow_run_id: Optional[int] = None,
     ) -> ErrorLogResponse:
         """Get error logs for a task template ID for GUI visualization.
 
@@ -1086,13 +1109,14 @@ class TaskTemplateRepository:
                 page_size=page_size,
             )
 
-        # recent_error_only case, we should know the wfr id
-        if recent_errors_only:
-            workflow_run_id = self.session.execute(
-                select(func.max(WorkflowRun.id)).where(
-                    WorkflowRun.workflow_id == workflow_id
-                )
-            ).scalar_one()
+        # Scope to a specific workflow run (explicit or latest)
+        if recent_errors_only or workflow_run_id is not None:
+            if workflow_run_id is None:
+                workflow_run_id = self.session.execute(
+                    select(func.max(WorkflowRun.id)).where(
+                        WorkflowRun.workflow_id == workflow_id
+                    )
+                ).scalar_one()
 
             if workflow_run_id is None:
                 return ErrorLogResponse(
@@ -1175,6 +1199,17 @@ class TaskTemplateRepository:
                 Original count query: 3 min 13.148 sec;
                 New combined query: 0.021 sec
             """
+            wfr_filters = [
+                TaskInstance.workflow_run_id == workflow_run_id,
+                Node.task_template_version_id == ttv_id,
+            ]
+            # recent_errors_only: diagnostic view — show all errors
+            # from the run regardless of current task status.
+            # Explicit workflow_run_id (from workflow details page):
+            # only show errors for tasks still in fatal state,
+            # since resolved errors are noise in the current-state view.
+            if not recent_errors_only:
+                wfr_filters.append(Task.status == TaskStatus.ERROR_FATAL)
             query = (
                 select(
                     func.max(TaskInstanceErrorLog.id).label("ttel_id"),
@@ -1187,10 +1222,7 @@ class TaskTemplateRepository:
                 )
                 .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
                 .join_from(Task, Node, Task.node_id == Node.id)
-                .where(
-                    TaskInstance.workflow_run_id == workflow_run_id,
-                    Node.task_template_version_id == ttv_id,
-                )
+                .where(*wfr_filters)
                 .group_by(Task.id)
                 .order_by("ttel_id")
             )

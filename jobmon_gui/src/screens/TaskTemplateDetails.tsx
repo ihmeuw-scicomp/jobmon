@@ -137,6 +137,10 @@ export default function TaskTemplateDetails() {
     // --- Plot interaction state ---
     const [selectedData, setSelectedData] = useState<ScatterDataPoint[]>([]);
     const [showResourceZones, setShowResourceZones] = useState(false);
+    const [showLatestOnly, setShowLatestOnly] = useState(true);
+    const [selectedWorkflowRunId, setSelectedWorkflowRunId] = useState<
+        number | null
+    >(null);
     const [tableFilteredInstanceIds, setTableFilteredInstanceIds] =
         useState<Set<number> | null>(null);
 
@@ -182,8 +186,39 @@ export default function TaskTemplateDetails() {
                 runtime_seconds: typeof item.r === 'number' ? item.r : null,
                 memory_gib:
                     typeof item.m === 'number' ? bytes_to_gib(item.m) : null,
+                workflow_run_id: item.workflow_run_id ?? null,
             }));
     }, [rawTaskNodesFromApi, passesResourceClusterFilter]);
+
+    // --- Available workflow run IDs (sorted descending) ---
+    const availableWorkflowRunIds = useMemo(() => {
+        const ids = new Set<number>();
+        for (const row of filteredInstanceData) {
+            if (row.workflow_run_id != null) {
+                ids.add(row.workflow_run_id);
+            }
+        }
+        return Array.from(ids).sort((a, b) => b - a);
+    }, [filteredInstanceData]);
+
+    // --- Latest attempt + workflow run filters ---
+    const latestFilteredData = useMemo(() => {
+        let data = filteredInstanceData;
+        if (selectedWorkflowRunId != null) {
+            data = data.filter(
+                r => r.workflow_run_id === selectedWorkflowRunId
+            );
+        }
+        if (!showLatestOnly) return data;
+        const latest = new Map<number, TaskInstanceRow>();
+        for (const row of data) {
+            const existing = latest.get(row.task_id);
+            if (!existing || row.attempt_number > existing.attempt_number) {
+                latest.set(row.task_id, row);
+            }
+        }
+        return Array.from(latest.values());
+    }, [filteredInstanceData, showLatestOnly, selectedWorkflowRunId]);
 
     // --- Helper: filtered requested resource values ---
     const getFilteredRequestedResourceValues = useMemo(() => {
@@ -223,7 +258,7 @@ export default function TaskTemplateDetails() {
     }, [rawTaskNodesFromApi]);
 
     const filteredScatterData = useMemo(() => {
-        return filteredInstanceData
+        return latestFilteredData
             .filter(
                 d =>
                     d.runtime_seconds !== null &&
@@ -245,7 +280,7 @@ export default function TaskTemplateDetails() {
                     requestedMemory: req?.requestedMemory,
                 };
             });
-    }, [filteredInstanceData, requestedResourcesById]);
+    }, [latestFilteredData, requestedResourcesById]);
 
     // --- Effective scatter data (narrowed by table column filters) ---
     const effectiveScatterData = useMemo(() => {
@@ -460,7 +495,13 @@ export default function TaskTemplateDetails() {
     }, [selectedResourceClusters, availableResourceClusters]);
 
     const errorLogsForCard = useMemo(() => {
-        if (!isDataFiltered && !tableFilteredInstanceIds) return errorLogs;
+        if (
+            !isDataFiltered &&
+            !tableFilteredInstanceIds &&
+            !showLatestOnly &&
+            selectedWorkflowRunId == null
+        )
+            return errorLogs;
         let effectiveIds = dataFilterInstanceIds;
         if (tableFilteredInstanceIds) {
             effectiveIds = new Set(
@@ -485,16 +526,18 @@ export default function TaskTemplateDetails() {
         dataFilterInstanceIds,
         isDataFiltered,
         tableFilteredInstanceIds,
+        showLatestOnly,
+        selectedWorkflowRunId,
     ]);
 
     // Table data: pre-filtered by scatter selection
     const tableData = useMemo(() => {
-        if (selectedData.length === 0) return filteredInstanceData;
+        if (selectedData.length === 0) return latestFilteredData;
         const selectedIds = new Set(selectedData.map(d => d.task_instance_id));
-        return filteredInstanceData.filter(d =>
+        return latestFilteredData.filter(d =>
             selectedIds.has(d.task_instance_id)
         );
-    }, [filteredInstanceData, selectedData]);
+    }, [latestFilteredData, selectedData]);
 
     // Clear brush selection and table filter feedback when filters change
     useEffect(() => {
@@ -729,6 +772,11 @@ export default function TaskTemplateDetails() {
                     onFilteredInstanceIdsChange={
                         handleTableFilteredInstanceIdsChange
                     }
+                    showLatestOnly={showLatestOnly}
+                    onShowLatestOnlyChange={setShowLatestOnly}
+                    selectedWorkflowRunId={selectedWorkflowRunId}
+                    availableWorkflowRunIds={availableWorkflowRunIds}
+                    onSelectedWorkflowRunIdChange={setSelectedWorkflowRunId}
                 />
             </Box>
         </Box>

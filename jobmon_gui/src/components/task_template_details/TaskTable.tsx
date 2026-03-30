@@ -7,7 +7,17 @@ import {
     MRT_RowData,
     useMaterialReactTable,
 } from 'material-react-table';
-import { Box, Button, TextField } from '@mui/material';
+import {
+    Box,
+    Button,
+    FormControl,
+    FormControlLabel,
+    InputLabel,
+    MenuItem,
+    Select,
+    Switch,
+    TextField,
+} from '@mui/material';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -52,6 +62,11 @@ export default function TaskTable({
     taskTemplateName,
     workflowId,
     onFilteredInstanceIdsChange,
+    showLatestOnly,
+    onShowLatestOnlyChange,
+    selectedWorkflowRunId,
+    availableWorkflowRunIds,
+    onSelectedWorkflowRunIdChange,
 }: TaskTableProps) {
     dayjs.extend(utc);
     const queryClient = useQueryClient();
@@ -378,7 +393,68 @@ export default function TaskTable({
         },
         renderTopToolbarCustomActions: _table => {
             return (
-                <Box>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        flexWrap: 'wrap',
+                    }}
+                >
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={showLatestOnly}
+                                onChange={(_e, checked) =>
+                                    onShowLatestOnlyChange(checked)
+                                }
+                                size="small"
+                            />
+                        }
+                        label="Latest attempt only"
+                        slotProps={{
+                            typography: {
+                                variant: 'body2',
+                            },
+                        }}
+                    />
+                    {availableWorkflowRunIds.length > 1 && (
+                        <FormControl
+                            size="small"
+                            sx={{ minWidth: 140 }}
+                        >
+                            <InputLabel id="wfr-filter-label">
+                                Workflow Run
+                            </InputLabel>
+                            <Select
+                                labelId="wfr-filter-label"
+                                label="Workflow Run"
+                                value={
+                                    selectedWorkflowRunId ?? ''
+                                }
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    onSelectedWorkflowRunIdChange(
+                                        val === ''
+                                            ? null
+                                            : Number(val)
+                                    );
+                                }}
+                            >
+                                <MenuItem value="">All</MenuItem>
+                                {availableWorkflowRunIds.map(
+                                    id => (
+                                        <MenuItem
+                                            key={id}
+                                            value={id}
+                                        >
+                                            {id}
+                                        </MenuItem>
+                                    )
+                                )}
+                            </Select>
+                        </FormControl>
+                    )}
                     <Button
                         onClick={exportToCSV}
                         startIcon={<FileDownloadIcon />}

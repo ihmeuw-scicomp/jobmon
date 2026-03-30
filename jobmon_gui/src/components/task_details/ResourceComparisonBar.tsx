@@ -11,7 +11,7 @@ type ResourceComparisonBarProps = {
     utilizedDisplay: string;
 };
 
-function getBarColor(percent: number): string {
+export function getBarColor(percent: number): string {
     if (percent > 95) return '#d32f2f';
     if (percent >= 80) return '#ed6c02';
     return '#2e7d32';

@@ -7,6 +7,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Collapse from '@mui/material/Collapse';
 import Button from '@mui/material/Button';
 import Grid from '@mui/material/Grid';
+import LinearProgress from '@mui/material/LinearProgress';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import humanizeDuration from 'humanize-duration';
@@ -24,8 +25,8 @@ import { components } from '@jobmon_gui/types/apiSchema';
 import { TaskInstance } from '@jobmon_gui/types/TaskInstance';
 import { formatBytes, bytes_to_gib } from '@jobmon_gui/utils/formatters';
 import { parseResourceJson } from '@jobmon_gui/utils/csvExport';
-import ResourceComparisonBar from './ResourceComparisonBar';
 import { JobmonModal } from '@jobmon_gui/components/JobmonModal';
+import { getBarColor } from './ResourceComparisonBar';
 import { ScrollableCodeBlock } from '@jobmon_gui/components/ScrollableTextArea';
 
 type AuditRecord = components['schemas']['TaskStatusAuditRecord'];
@@ -235,29 +236,65 @@ function AttemptDetailPanel({
         : null;
 
     // Metadata chips
-    const metaChips: { label: string; value: string }[] = [];
+    const metaRows: { label: string; value: string }[] = [];
+    if (instance.ti_workflow_run_id) {
+        metaRows.push({
+            label: 'WF Run',
+            value: String(instance.ti_workflow_run_id),
+        });
+    }
     if (instance.ti_distributor_id) {
-        metaChips.push({
+        metaRows.push({
             label: 'Job ID',
             value: String(instance.ti_distributor_id),
         });
     }
     if (instance.ti_nodename) {
-        metaChips.push({
+        metaRows.push({
             label: 'Node',
             value: instance.ti_nodename,
         });
     }
-    metaChips.push({
+    metaRows.push({
         label: 'Queue',
         value: instance.ti_queue_name || 'N/A',
     });
     if (instance.ti_cpu) {
-        metaChips.push({ label: 'CPU', value: instance.ti_cpu });
+        metaRows.push({ label: 'CPU', value: instance.ti_cpu });
     }
     if (instance.ti_io) {
-        metaChips.push({ label: 'I/O', value: instance.ti_io });
+        metaRows.push({ label: 'I/O', value: instance.ti_io });
     }
+    // Resource utilization (rendered as inline bars, not text rows)
+    const memoryPercent =
+        utilizedMemoryGiB != null &&
+        requestedMemoryGiB != null &&
+        requestedMemoryGiB > 0
+            ? Math.min(
+                  (utilizedMemoryGiB / requestedMemoryGiB) * 100,
+                  100
+              )
+            : null;
+    const runtimePercent =
+        utilizedRuntimeSec != null &&
+        requestedRuntimeSec != null &&
+        requestedRuntimeSec > 0
+            ? Math.min(
+                  (utilizedRuntimeSec / requestedRuntimeSec) * 100,
+                  100
+              )
+            : null;
+    const memoryText =
+        memoryDisplay && memoryDisplay !== 'N/A'
+            ? requestedMemoryGiB != null
+                ? `${memoryDisplay} / ${requestedMemoryGiB} GiB`
+                : memoryDisplay
+            : 'N/A';
+    const runtimeText = runtimeDisplay
+        ? requestedRuntimeSec != null
+            ? `${runtimeDisplay} / ${humanizeDuration(requestedRuntimeSec * 1000, { largest: 2, round: true })}`
+            : runtimeDisplay
+        : 'N/A';
 
     const isResourceError = instance.ti_status === 'RESOURCE_ERROR';
     const runtimeExceeded =
@@ -272,17 +309,19 @@ function AttemptDetailPanel({
         utilizedMemoryGiB / requestedMemoryGiB >= 0.95;
 
     return (
-        <Box sx={{ px: 2, py: 1 }}>
+        <Box sx={{ px: 2, py: 1.5 }}>
             {/* Resource error banner */}
             {isResourceError && (
                 <Box
                     sx={{
-                        backgroundColor: RESOURCE_ERROR_COLORS.bannerBg,
+                        backgroundColor:
+                            RESOURCE_ERROR_COLORS.bannerBg,
                         border: `1px solid ${RESOURCE_ERROR_COLORS.main}`,
+                        borderLeft: `3px solid ${RESOURCE_ERROR_COLORS.main}`,
                         borderRadius: 1,
                         px: 1.5,
                         py: 0.75,
-                        mb: 1,
+                        mb: 1.5,
                     }}
                 >
                     <Typography
@@ -316,116 +355,169 @@ function AttemptDetailPanel({
                 </Box>
             )}
 
-            {/* Metadata row */}
+            {/* Metadata key-value grid */}
             <Box
                 sx={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 0.5,
+                    display: 'grid',
+                    gridTemplateColumns:
+                        'max-content 1fr',
+                    gap: '2px 12px',
+                    alignContent: 'start',
                     mb: 1,
-                    alignItems: 'baseline',
                 }}
             >
-                {metaChips.map(chip => (
-                    <Typography
-                        key={chip.label}
-                        variant="body2"
-                        sx={{ mr: 1.5, whiteSpace: 'nowrap' }}
-                    >
-                        <strong>{chip.label}:</strong> {chip.value}
-                    </Typography>
+                {metaRows.map(row => (
+                    <React.Fragment key={row.label}>
+                        <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            fontWeight={600}
+                        >
+                            {row.label}
+                        </Typography>
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                fontFamily:
+                                    'Roboto Mono Variable',
+                            }}
+                        >
+                            {row.value}
+                        </Typography>
+                    </React.Fragment>
                 ))}
             </Box>
 
-            {/* Resource bars */}
+            {/* Resource inline bars */}
             <Box
                 sx={{
-                    display: 'flex',
-                    gap: 3,
-                    mb: 1,
-                    flexWrap: 'wrap',
+                    display: 'grid',
+                    gridTemplateColumns:
+                        'max-content 1fr max-content',
+                    gap: '6px 10px',
+                    alignItems: 'center',
+                    mb: 1.5,
+                    maxWidth: 500,
                 }}
             >
-                <Box sx={{ flex: '1 1 200px', maxWidth: 350 }}>
-                    <ResourceComparisonBar
-                        label="Memory"
-                        requested={requestedMemoryGiB}
-                        utilized={utilizedMemoryGiB}
-                        requestedDisplay={
-                            requestedMemoryGiB != null
-                                ? `${requestedMemoryGiB} GiB`
-                                : 'N/A'
-                        }
-                        utilizedDisplay={memoryDisplay}
-                    />
-                </Box>
-                <Box sx={{ flex: '1 1 200px', maxWidth: 350 }}>
-                    <ResourceComparisonBar
-                        label="Runtime"
-                        requested={requestedRuntimeSec}
-                        utilized={utilizedRuntimeSec}
-                        requestedDisplay={
-                            requestedRuntimeSec != null
-                                ? humanizeDuration(requestedRuntimeSec * 1000, {
-                                      largest: 2,
-                                      round: true,
-                                  })
-                                : 'N/A'
-                        }
-                        utilizedDisplay={runtimeDisplay ?? 'N/A'}
-                    />
-                </Box>
-            </Box>
-
-            {/* Stderr preview */}
-            {stderrPreview && (
-                <Box sx={{ mb: 0.5 }}>
-                    <Box
-                        sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                            mb: 0.25,
-                        }}
-                    >
-                        <Typography variant="caption" fontWeight={700}>
-                            STDERR
+                {[
+                    { label: 'Memory', percent: memoryPercent, text: memoryText },
+                    { label: 'Runtime', percent: runtimePercent, text: runtimeText },
+                ].map(bar => (
+                    <React.Fragment key={bar.label}>
+                        <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            fontWeight={600}
+                        >
+                            {bar.label}
                         </Typography>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={onViewStderr}
+                        <LinearProgress
+                            variant="determinate"
+                            value={bar.percent ?? 0}
                             sx={{
-                                py: 0,
-                                px: 0.75,
-                                fontSize: '0.7rem',
-                                minHeight: 0,
-                                lineHeight: 1.5,
+                                height: 8,
+                                borderRadius: 4,
+                                bgcolor: 'grey.200',
+                                '& .MuiLinearProgress-bar': {
+                                    borderRadius: 4,
+                                    bgcolor:
+                                        bar.percent != null
+                                            ? getBarColor(bar.percent)
+                                            : 'grey.400',
+                                },
+                            }}
+                        />
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                fontFamily: 'Roboto Mono Variable',
+                                whiteSpace: 'nowrap',
                             }}
                         >
-                            View Full Log
-                        </Button>
-                    </Box>
+                            {bar.text}
+                        </Typography>
+                    </React.Fragment>
+                ))}
+            </Box>
+
+            {/* Divider */}
+            <Box
+                sx={{
+                    borderTop: '1px solid',
+                    borderColor: 'grey.200',
+                    mb: 1.5,
+                }}
+            />
+
+            {/* Stderr */}
+            <Box sx={{ mb: 1.5 }}>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        mb: 0.5,
+                    }}
+                >
+                    <Typography
+                        variant="caption"
+                        fontWeight={700}
+                        sx={{
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5,
+                        }}
+                    >
+                        Stderr
+                    </Typography>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={onViewStderr}
+                        sx={{
+                            py: 0,
+                            px: 0.75,
+                            fontSize: '0.7rem',
+                            minHeight: 0,
+                            lineHeight: 1.5,
+                        }}
+                    >
+                        View Full Log
+                    </Button>
+                </Box>
+                {stderrPreview ? (
                     <Box
                         sx={{
                             fontFamily: 'Roboto Mono Variable',
-                            fontSize: '0.75rem',
-                            backgroundColor: '#eee',
-                            px: 1,
-                            py: 0.5,
-                            borderRadius: 0.5,
-                            maxHeight: '80px',
+                            fontSize: '0.7rem',
+                            backgroundColor: '#f5f5f5',
+                            border: '1px solid',
+                            borderColor: 'grey.300',
+                            px: 1.5,
+                            py: 1,
+                            borderRadius: 1,
+                            maxHeight: 150,
                             overflow: 'auto',
                             whiteSpace: 'pre-wrap',
                             wordBreak: 'break-word',
+                            lineHeight: 1.6,
                         }}
                     >
                         {stderrPreview}
                     </Box>
-                </Box>
-            )}
+                ) : (
+                    <Typography
+                        variant="caption"
+                        color="text.secondary"
+                    >
+                        {isResourceError
+                            ? 'Killed by cluster (no stderr captured)'
+                            : 'No output'}
+                    </Typography>
+                )}
+            </Box>
 
-            {/* Stdout + stderr links */}
+            {/* Stdout */}
             <Box
                 sx={{
                     display: 'flex',
@@ -434,15 +526,29 @@ function AttemptDetailPanel({
                 }}
             >
                 <Typography
-                    variant="body2"
+                    variant="caption"
+                    fontWeight={700}
+                    sx={{
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.5,
+                        flexShrink: 0,
+                    }}
+                >
+                    Stdout
+                </Typography>
+                <Typography
+                    variant="caption"
                     color="text.secondary"
                     sx={{
+                        fontFamily: 'Roboto Mono Variable',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
+                        flex: 1,
+                        minWidth: 0,
                     }}
                 >
-                    <strong>Stdout:</strong> {instance.ti_stdout || '/dev/null'}
+                    {instance.ti_stdout || '/dev/null'}
                 </Typography>
                 <Button
                     size="small"
@@ -459,35 +565,6 @@ function AttemptDetailPanel({
                 >
                     View Full Log
                 </Button>
-                {!stderrPreview && (
-                    <>
-                        <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ ml: 1 }}
-                        >
-                            <strong>Stderr:</strong>{' '}
-                            {isResourceError
-                                ? 'killed by cluster (no stderr captured)'
-                                : 'no output'}
-                        </Typography>
-                        <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={onViewStderr}
-                            sx={{
-                                py: 0,
-                                px: 0.75,
-                                fontSize: '0.7rem',
-                                minHeight: 0,
-                                lineHeight: 1.5,
-                                flexShrink: 0,
-                            }}
-                        >
-                            View Full Log
-                        </Button>
-                    </>
-                )}
             </Box>
         </Box>
     );
@@ -931,19 +1008,16 @@ export default function TaskStatusTimeline({
         [attempts, tiQuery.data]
     );
 
-    // Auto-expand the latest failed attempt on first load
+    // Auto-expand the latest failed attempt, but only if the task
+    // is still in an error state (don't expand old failures for
+    // tasks that have since succeeded on a later attempt/resume).
     useEffect(() => {
         if (autoExpanded || attempts.length === 0) return;
-        for (let i = attempts.length - 1; i >= 0; i--) {
-            if (
-                (ERROR_STATUSES as readonly string[]).includes(
-                    attempts[i].outcome
-                )
-            ) {
-                setExpandedAttempt(i);
-                setAutoExpanded(true);
-                return;
-            }
+        const lastOutcome = attempts[attempts.length - 1].outcome;
+        if (
+            (ERROR_STATUSES as readonly string[]).includes(lastOutcome)
+        ) {
+            setExpandedAttempt(attempts.length - 1);
         }
         setAutoExpanded(true);
     }, [attempts, autoExpanded]);

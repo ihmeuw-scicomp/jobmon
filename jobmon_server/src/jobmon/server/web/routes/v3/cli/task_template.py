@@ -156,6 +156,7 @@ async def get_task_template_resource_usage(
                         task_command=detail_item.task_command,
                         task_num_attempts=detail_item.task_num_attempts,
                         task_max_attempts=detail_item.task_max_attempts,
+                        workflow_run_id=detail_item.workflow_run_id,
                     )
                 )
 
@@ -235,13 +236,16 @@ async def get_task_template_resource_usage(
 @api_v3_router.get("/workflow_tt_status_viz/{workflow_id}")
 def get_workflow_tt_status_viz(
     workflow_id: int,
+    workflow_run_id: Optional[int] = None,
     db: Session = Depends(get_db),
     dialect: str = Depends(get_dialect),
 ) -> Any:
     """Get the status of the workflows for GUI."""
     tt_repo = TaskTemplateRepository(db)
     result_dict = tt_repo.get_workflow_tt_status_viz(
-        workflow_id=workflow_id, dialect=dialect
+        workflow_id=workflow_id,
+        dialect=dialect,
+        workflow_run_id=workflow_run_id,
     )
 
     # Convert Pydantic models back to serializable dict format for JSONResponse
@@ -280,6 +284,7 @@ def get_workflow_has_resource_errors(
 def get_fatal_error_breakdown(
     workflow_id: int,
     tt_version_id: int,
+    workflow_run_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ) -> FatalErrorBreakdownResponse:
     """Classify fatal errors for one template by type."""
@@ -287,6 +292,7 @@ def get_fatal_error_breakdown(
     return tt_repo.get_fatal_error_breakdown_for_tt(
         workflow_id=workflow_id,
         task_template_version_id=tt_version_id,
+        workflow_run_id=workflow_run_id,
     )
 
 
@@ -300,6 +306,7 @@ def get_tt_error_log_viz(
     page_size: int = 10,
     just_recent_errors: str = "false",
     cluster_errors: str = "false",
+    workflow_run_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ) -> Any:
     """Get the error logs for a task template id for GUI."""
@@ -318,6 +325,7 @@ def get_tt_error_log_viz(
         page_size=page_size,
         recent_errors_only=recent_errors,
         cluster_errors=output_clustered_errors,
+        workflow_run_id=workflow_run_id,
     )
 
     return result

@@ -9,5 +9,6 @@ export type WorkflowDetails = {
     wfr_jobmon_version: string;
     wfr_heartbeat_date: string;
     wfr_user: string;
+    wfr_id: number;
 };
 export type WorkflowDetailsResponse = WorkflowDetails[];

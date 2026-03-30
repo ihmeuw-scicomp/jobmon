@@ -12,6 +12,7 @@ export type TaskInstanceRow = {
     task_status_date: dayjs.Dayjs;
     runtime_seconds: number | null;
     memory_gib: number | null;
+    workflow_run_id: number | null;
 };
 
 export type TaskTableProps = {
@@ -20,4 +21,9 @@ export type TaskTableProps = {
     workflowId: number | string;
     taskTemplateName: string;
     onFilteredInstanceIdsChange?: (ids: Set<number> | null) => void;
+    showLatestOnly: boolean;
+    onShowLatestOnlyChange: (value: boolean) => void;
+    selectedWorkflowRunId: number | null;
+    availableWorkflowRunIds: number[];
+    onSelectedWorkflowRunIdChange: (id: number | null) => void;
 };

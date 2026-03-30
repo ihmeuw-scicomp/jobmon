@@ -12,6 +12,7 @@ export type TTStatus = {
     num_attempts_min: number;
     task_template_version_id: number;
     tasks: number;
+    resource_error_count: number;
 };
 
 export type TTStatusResponse = Record<number | string, TTStatus>;

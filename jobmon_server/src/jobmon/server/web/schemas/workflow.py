@@ -125,6 +125,7 @@ class WorkflowDetailsItem(BaseModel):
     wfr_jobmon_version: Optional[str]
     wfr_heartbeat_date: Optional[str]
     wfr_user: str
+    wfr_id: Optional[int] = None
 
 
 class WorkflowDetailsResponse(BaseModel):

@@ -38,6 +38,7 @@ export const getTaskInstanceDetailsQueryFn = async ({
                 ti_queue_name: data.ti_queue_name,
                 ti_cpu: data.ti_cpu,
                 ti_io: data.ti_io,
+                ti_workflow_run_id: data.ti_workflow_run_id ?? null,
             }));
         });
 };

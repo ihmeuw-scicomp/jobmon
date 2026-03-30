@@ -32,7 +32,6 @@ import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTSta
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowUsageQueryFn } from '@jobmon_gui/queries/GetWorkflowUsage.ts';
 import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors.ts';
-import { getWorkflowHasResourceErrorsFn } from '@jobmon_gui/queries/GetWorkflowHasResourceErrors.ts';
 import {
     AppBreadcrumbs,
     BreadcrumbItem,
@@ -123,17 +122,13 @@ function WorkflowDetails() {
         refetchOnMount: true,
     });
 
+    const latestWfrId = wfDetails.data?.wfr_id ?? null;
+
     const wfTTStatus = useQuery({
-        queryKey: ['workflow_details', 'tt_status', workflowId],
+        queryKey: ['workflow_details', 'tt_status', workflowId, latestWfrId],
         queryFn: getWorkflowTTStatusQueryFn,
         refetchOnMount: true,
         refetchOnWindowFocus: true,
-    });
-
-    const hasResourceErrorsQuery = useQuery({
-        queryKey: ['workflow_details', 'has_resource_errors', workflowId],
-        queryFn: getWorkflowHasResourceErrorsFn,
-        staleTime: 120000,
     });
 
     const ttStatusByName = useMemo(() => {
@@ -260,6 +255,7 @@ function WorkflowDetails() {
             onBack={handleTemplateBack}
             onNavigate={() => resetStoresAndNavigate(selectedTemplateData.id)}
             disabled={disabled}
+            workflowRunId={latestWfrId}
         />
     ) : leftPanelView === 'manage' ? (
         <WorkflowManagePanel
@@ -270,12 +266,8 @@ function WorkflowDetails() {
         />
     ) : (
         <TemplateListPanel
-            workflowId={workflowId!}
             ttData={wfTTStatus.data}
             hoveredTemplateName={hoveredTemplateName}
-            hasResourceErrors={
-                hasResourceErrorsQuery.data?.has_resource_errors ?? false
-            }
             onTemplateSelect={handleTemplateSelect}
             onTemplateHover={setHoveredTemplateName}
             onPrefetch={prefetchTemplateData}

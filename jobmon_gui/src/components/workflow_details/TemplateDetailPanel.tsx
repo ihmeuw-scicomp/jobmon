@@ -41,6 +41,7 @@ interface TemplateDetailPanelProps {
     onBack: () => void;
     onNavigate: () => void;
     disabled?: boolean;
+    workflowRunId?: number | null;
 }
 
 export default function TemplateDetailPanel({
@@ -49,6 +50,7 @@ export default function TemplateDetailPanel({
     onBack,
     onNavigate,
     disabled,
+    workflowRunId,
 }: TemplateDetailPanelProps) {
     const [concurrencyValue, setConcurrencyValue] = useState<number | string>(
         templateData.MAXC >= MAX_CONCURRENCY_SENTINEL ? '' : templateData.MAXC
@@ -143,9 +145,13 @@ export default function TemplateDetailPanel({
             'clustered_errors',
             workflowId,
             templateData.id,
+            workflowRunId,
         ],
         queryFn: getClusteredErrorsFn,
-        enabled: templateData.FATAL > 0,
+        enabled:
+            (templateData.FATAL > 0 ||
+                templateData.resource_error_count > 0) &&
+            workflowRunId != null,
     });
 
     const usageQuery = useQuery({
@@ -164,9 +170,13 @@ export default function TemplateDetailPanel({
             'fatal_breakdown',
             workflowId,
             templateData.task_template_version_id,
+            workflowRunId,
         ],
         queryFn: getFatalErrorBreakdownFn,
-        enabled: templateData.FATAL > 0,
+        enabled:
+            (templateData.FATAL > 0 ||
+                templateData.resource_error_count > 0) &&
+            workflowRunId != null,
         staleTime: 120000,
     });
 
@@ -337,7 +347,8 @@ export default function TemplateDetailPanel({
             </Box>
 
             {/* Errors */}
-            {templateData.FATAL > 0 && (
+            {(templateData.FATAL > 0 ||
+                templateData.resource_error_count > 0) && (
                 <Box sx={{ mb: 1 }}>
                     <ErrorClustersCard
                         errorLogs={errorClusters}

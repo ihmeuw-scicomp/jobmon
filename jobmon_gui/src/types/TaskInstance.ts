@@ -16,6 +16,7 @@ export type TaskInstance = {
     ti_queue_name: string | null;
     ti_cpu: string | null;
     ti_io: string | null;
+    ti_workflow_run_id: number | null;
 };
 
 export type TypeInstanceResponse = {

@@ -1240,6 +1240,10 @@ export interface paths {
         /**
          * Task Template Dag
          * @description Compute the shape of a Workflow's DAG by TaskTemplate.
+         *
+         *     Templates whose nodes span multiple pipeline stages are split into
+         *     numbered phases so the resulting graph stays acyclic and faithfully
+         *     represents the execution order.
          */
         get: operations['task_template_dag_api_v3_workflow__workflow_id__task_template_dag_get'];
         put?: never;
@@ -1928,6 +1932,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/api/v3/workflow_has_resource_errors/{workflow_id}': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workflow Has Resource Errors
+         * @description Check if any task instances in this workflow have resource errors.
+         */
+        get: operations['get_workflow_has_resource_errors_api_v3_workflow_has_resource_errors__workflow_id__get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/v3/fatal_error_breakdown/{workflow_id}/{tt_version_id}': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Fatal Error Breakdown
+         * @description Classify fatal errors for one template by type.
+         */
+        get: operations['get_fatal_error_breakdown_api_v3_fatal_error_breakdown__workflow_id___tt_version_id__get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/api/v3/tt_error_log_viz/{wf_id}/{tt_id}/{ti_id}': {
         parameters: {
             query?: never;
@@ -2289,6 +2333,42 @@ export interface components {
             };
         };
         /**
+         * FatalErrorBreakdownResponse
+         * @description Breakdown of fatal errors by type for a single template.
+         */
+        FatalErrorBreakdownResponse: {
+            /**
+             * Resource
+             * @default 0
+             */
+            resource: number;
+            /**
+             * App
+             * @default 0
+             */
+            app: number;
+            /**
+             * Infra
+             * @default 0
+             */
+            infra: number;
+            /**
+             * Resource Error Total
+             * @default 0
+             */
+            resource_error_total: number;
+            /**
+             * Resource Error Retried
+             * @default 0
+             */
+            resource_error_retried: number;
+            /**
+             * Resource Error Ti Ids
+             * @default []
+             */
+            resource_error_ti_ids: number[];
+        };
+        /**
          * FormattedStats
          * @description Formatted statistics for legacy client compatibility.
          */
@@ -2442,6 +2522,8 @@ export interface components {
             ti_cpu: string | null;
             /** Ti Io */
             ti_io: string | null;
+            /** Ti Workflow Run Id */
+            ti_workflow_run_id?: number | null;
         };
         /**
          * TaskInstanceDetailsResponse
@@ -2491,6 +2573,8 @@ export interface components {
             task_num_attempts?: number | null;
             /** Task Max Attempts */
             task_max_attempts?: number | null;
+            /** Workflow Run Id */
+            workflow_run_id?: number | null;
         };
         /**
          * TaskStatusAuditRecord
@@ -2672,6 +2756,10 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
         /**
          * WorkflowDetailsItem
@@ -2698,6 +2786,8 @@ export interface components {
             wfr_heartbeat_date: string | null;
             /** Wfr User */
             wfr_user: string;
+            /** Wfr Id */
+            wfr_id?: number | null;
         };
         /**
          * WorkflowOverviewItem
@@ -2753,6 +2843,14 @@ export interface components {
         WorkflowOverviewResponse: {
             /** Workflows */
             workflows: components['schemas']['WorkflowOverviewItem'][];
+        };
+        /**
+         * WorkflowResourceErrorCheckResponse
+         * @description Response for checking if a workflow has any resource errors.
+         */
+        WorkflowResourceErrorCheckResponse: {
+            /** Has Resource Errors */
+            has_resource_errors: boolean;
         };
         /**
          * WorkflowRunForResetResponse
@@ -5340,7 +5438,9 @@ export interface operations {
     };
     get_workflow_tt_status_viz_api_v3_workflow_tt_status_viz__workflow_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                workflow_run_id?: number | null;
+            };
             header?: never;
             path: {
                 workflow_id: number;
@@ -5369,6 +5469,71 @@ export interface operations {
             };
         };
     };
+    get_workflow_has_resource_errors_api_v3_workflow_has_resource_errors__workflow_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['WorkflowResourceErrorCheckResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_fatal_error_breakdown_api_v3_fatal_error_breakdown__workflow_id___tt_version_id__get: {
+        parameters: {
+            query?: {
+                workflow_run_id?: number | null;
+            };
+            header?: never;
+            path: {
+                workflow_id: number;
+                tt_version_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['FatalErrorBreakdownResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
     get_tt_error_log_viz_api_v3_tt_error_log_viz__wf_id___tt_id___ti_id__get: {
         parameters: {
             query?: {
@@ -5376,6 +5541,7 @@ export interface operations {
                 page_size?: number;
                 just_recent_errors?: string;
                 cluster_errors?: string;
+                workflow_run_id?: number | null;
             };
             header?: never;
             path: {
@@ -5415,6 +5581,7 @@ export interface operations {
                 page_size?: number;
                 just_recent_errors?: string;
                 cluster_errors?: string;
+                workflow_run_id?: number | null;
             };
             header?: never;
             path: {
