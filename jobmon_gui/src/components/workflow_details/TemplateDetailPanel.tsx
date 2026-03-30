@@ -348,11 +348,12 @@ export default function TemplateDetailPanel({
 
             {/* Errors */}
             {(templateData.FATAL > 0 ||
-                templateData.resource_error_count > 0) && (
+                templateData.resource_error_count > 0) &&
+                workflowRunId != null && (
                 <Box sx={{ mb: 1 }}>
                     <ErrorClustersCard
                         errorLogs={errorClusters}
-                        isLoading={errorsQuery.isLoading}
+                        isLoading={errorsQuery.isLoading || errorsQuery.isPending}
                         workflowId={workflowId}
                         taskTemplateId={templateData.id}
                         maxListHeight={120}
