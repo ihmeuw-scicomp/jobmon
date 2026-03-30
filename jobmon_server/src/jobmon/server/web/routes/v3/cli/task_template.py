@@ -162,30 +162,17 @@ async def get_task_template_resource_usage(
 
             # Include tasks without qualifying instances
             # (Registered, Queued, Running — not yet terminal).
-            # Uses a subquery anti-join instead of literal NOT IN
-            # to avoid SQLite's 999-parameter limit.
-            instance_subq = select(TaskInstance.task_id).where(
-                TaskInstance.task_id == Task.id,
-                TaskInstance.status.in_(
-                    [
-                        TaskInstanceStatus.DONE,
-                        TaskInstanceStatus.RESOURCE_ERROR,
-                        TaskInstanceStatus.NO_HEARTBEAT,
-                        TaskInstanceStatus.UNKNOWN_ERROR,
-                        TaskInstanceStatus.ERROR_FATAL,
-                        TaskInstanceStatus.ERROR,
-                    ]
-                ),
-            )
+            # Uses Python-side exclusion to avoid expensive NOT EXISTS
+            # subquery against task_instance.
+            task_ids_with_instances = {d.task_id for d in task_details}
             task_filters = [
                 TaskTemplateVersion.id == request_data.task_template_version_id,
                 Node.task_template_version_id == TaskTemplateVersion.id,
                 Task.node_id == Node.id,
-                ~exists(instance_subq),
             ]
             if request_data.workflows:
                 task_filters.append(Task.workflow_id.in_(request_data.workflows))
-            remaining_tasks_query = select(
+            all_tasks_query = select(
                 Task.id,
                 Task.name,
                 Task.status,
@@ -195,7 +182,9 @@ async def get_task_template_resource_usage(
                 Task.status_date,
                 Node.id.label("node_id"),
             ).where(and_(*task_filters))
-            for row in db.execute(remaining_tasks_query).all():
+            for row in db.execute(all_tasks_query).all():
+                if row[0] in task_ids_with_instances:
+                    continue
                 viz_data.append(
                     TaskResourceVizItem(
                         node_id=row[7],
@@ -236,7 +225,6 @@ async def get_task_template_resource_usage(
 @api_v3_router.get("/workflow_tt_status_viz/{workflow_id}")
 def get_workflow_tt_status_viz(
     workflow_id: int,
-    workflow_run_id: Optional[int] = None,
     db: Session = Depends(get_db),
     dialect: str = Depends(get_dialect),
 ) -> Any:
@@ -245,7 +233,6 @@ def get_workflow_tt_status_viz(
     result_dict = tt_repo.get_workflow_tt_status_viz(
         workflow_id=workflow_id,
         dialect=dialect,
-        workflow_run_id=workflow_run_id,
     )
 
     # Convert Pydantic models back to serializable dict format for JSONResponse

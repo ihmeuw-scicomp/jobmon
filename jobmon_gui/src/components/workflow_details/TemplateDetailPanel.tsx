@@ -149,9 +149,8 @@ export default function TemplateDetailPanel({
         ],
         queryFn: getClusteredErrorsFn,
         enabled:
-            (templateData.FATAL > 0 ||
-                templateData.resource_error_count > 0) &&
-            workflowRunId != null,
+            templateData.FATAL > 0 ||
+            templateData.num_attempts_avg > 1,
     });
 
     const usageQuery = useQuery({
@@ -175,11 +174,13 @@ export default function TemplateDetailPanel({
         queryFn: getFatalErrorBreakdownFn,
         enabled:
             (templateData.FATAL > 0 ||
-                templateData.resource_error_count > 0) &&
+                templateData.num_attempts_avg > 1) &&
             workflowRunId != null,
         staleTime: 120000,
     });
 
+    const hasResourceErrors =
+        (breakdownQuery.data?.resource_error_total ?? 0) > 0;
     const errorClusters = errorsQuery.data?.error_logs ?? [];
 
     return (
@@ -347,9 +348,7 @@ export default function TemplateDetailPanel({
             </Box>
 
             {/* Errors */}
-            {(templateData.FATAL > 0 ||
-                templateData.resource_error_count > 0) &&
-                workflowRunId != null && (
+            {(templateData.FATAL > 0 || hasResourceErrors) && (
                 <Box sx={{ mb: 1 }}>
                     <ErrorClustersCard
                         errorLogs={errorClusters}

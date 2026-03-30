@@ -95,7 +95,10 @@ export default function TaskTemplateDetails() {
             !TaskTemplateDetailsData.isLoading,
     });
 
-    const rawTaskNodesFromApi = usageInfo.data?.result_viz || [];
+    const rawTaskNodesFromApi = useMemo(
+        () => usageInfo.data?.result_viz ?? [],
+        [usageInfo.data?.result_viz]
+    );
 
     // --- Clustered Errors query (for badge + Error Summary card) ---
     const clusteredErrorsQuery = useQuery({
@@ -111,7 +114,10 @@ export default function TaskTemplateDetails() {
             !TaskTemplateDetailsData.isLoading,
     });
 
-    const errorLogs = clusteredErrorsQuery.data?.error_logs || [];
+    const errorLogs = useMemo(
+        () => clusteredErrorsQuery.data?.error_logs ?? [],
+        [clusteredErrorsQuery.data?.error_logs]
+    );
 
     // --- Fatal error breakdown (for resource error visibility) ---
     const breakdownQuery = useQuery({

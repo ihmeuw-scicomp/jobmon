@@ -125,7 +125,7 @@ function WorkflowDetails() {
     const latestWfrId = wfDetails.data?.wfr_id ?? null;
 
     const wfTTStatus = useQuery({
-        queryKey: ['workflow_details', 'tt_status', workflowId, latestWfrId],
+        queryKey: ['workflow_details', 'tt_status', workflowId],
         queryFn: getWorkflowTTStatusQueryFn,
         refetchOnMount: true,
         refetchOnWindowFocus: true,
@@ -266,6 +266,8 @@ function WorkflowDetails() {
         />
     ) : (
         <TemplateListPanel
+            workflowId={workflowId!}
+            workflowRunId={latestWfrId}
             ttData={wfTTStatus.data}
             hoveredTemplateName={hoveredTemplateName}
             onTemplateSelect={handleTemplateSelect}

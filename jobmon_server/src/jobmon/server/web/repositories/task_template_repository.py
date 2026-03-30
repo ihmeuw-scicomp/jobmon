@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 import scipy.stats as st  # type: ignore
 import structlog
-from sqlalchemy import String, and_, case, desc, func, select
+from sqlalchemy import String, and_, case, exists, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement, Label
 
@@ -468,51 +468,41 @@ class TaskTemplateRepository:
         workflow_id: int,
         task_template_id: int,
     ) -> Optional[int]:
-        """Find the task template version id using workflow and task template ids.
+        """Find the task template version id for a workflow + task template.
 
-        This could be slow for tt with huge nodes.
-        However, given one workflow only us one tt version of a tt,
-        we can search all the versions backwords to get the first
-        none 0 version.
-
-        Args:
-            workflow_id: ID of the workflow
-            task_template_id: ID of the task template
-            db: Database session
-
-        Returns:
-            Task template version id
+        Uses a two-step approach: first get the TTVs for this template,
+        then check which one exists in the workflow. This avoids
+        expensive joins through large tables.
         """
-        # get all task template version for the task template
-        sql_all_ttv = (
-            select(TaskTemplateVersion.id)
-            .where(TaskTemplateVersion.task_template_id == task_template_id)
-            .order_by(desc(TaskTemplateVersion.id))
-        )
-
-        rows2 = self.session.execute(sql_all_ttv).all()
-        tt_version_ids = [row2.id for row2 in rows2]
-
-        # considering the for each tt, a wf only has one version
-        # and most likely the latest version,
-        # search all the versions backwords to get the first
-        # none 0 version
-        task_template_version_id = None
-        for tt_version_id in tt_version_ids:
-            sql = (
-                select(func.count(Task.id))
-                .join(Node, Task.node_id == Node.id)
-                .where(
-                    Task.workflow_id == workflow_id,
-                    Node.task_template_version_id == tt_version_id,
+        # Step 1: get all ttv IDs for this template (small set)
+        ttv_ids = [
+            row[0]
+            for row in self.session.execute(
+                select(TaskTemplateVersion.id).where(
+                    TaskTemplateVersion.task_template_id == task_template_id
                 )
-            )
-            count_val = self.session.execute(sql).scalar() or 0
-            if count_val > 0:
-                task_template_version_id = tt_version_id
-                break
+            ).all()
+        ]
+        if not ttv_ids:
+            return None
 
-        return task_template_version_id
+        # Step 2: find which one has tasks in this workflow
+        # Uses EXISTS for early termination — stops at first match
+        sql = (
+            select(Node.task_template_version_id)
+            .where(
+                Node.task_template_version_id.in_(ttv_ids),
+                exists(
+                    select(Task.id).where(
+                        Task.node_id == Node.id,
+                        Task.workflow_id == workflow_id,
+                    )
+                ),
+            )
+            .limit(1)
+        )
+        row = self.session.execute(sql).one_or_none()
+        return row[0] if row else None
 
     def get_task_template_details(
         self, workflow_id: int, task_template_id: int
@@ -726,7 +716,6 @@ class TaskTemplateRepository:
         self,
         workflow_id: int,
         dialect: str = "sqlite",
-        workflow_run_id: Optional[int] = None,
     ) -> Dict[int, WorkflowTaskTemplateStatusItem]:
         """Get the status of workflow task templates for GUI visualization.
 
@@ -773,26 +762,11 @@ class TaskTemplateRepository:
             )
         )
 
-        # Pre-aggregated resource error counts, scoped to this
-        # workflow's tasks to avoid scanning the full TI table.
-        re_filters = [
-            TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
-            Task.workflow_id == workflow_id,
-        ]
-        if workflow_run_id is not None:
-            re_filters.append(TaskInstance.workflow_run_id == workflow_run_id)
-        resource_error_agg = (
-            select(
-                TaskInstance.task_id,
-                func.count(TaskInstance.id).label("re_count"),
-            )
-            .join(Task, TaskInstance.task_id == Task.id)
-            .where(*re_filters)
-            .group_by(TaskInstance.task_id)
-            .subquery()
-        )
-
-        # Single optimized query with SQL aggregation
+        # Single optimized query with SQL aggregation.
+        # resource_error_count is NOT computed here — scanning
+        # task_instance is too expensive (no index on status,
+        # causes locks on prod). Returned as 0; resource error
+        # info is available via the fatal_error_breakdown endpoint.
         optimized_sql = (
             select(
                 TaskTemplate.id.label("task_template_id"),
@@ -815,15 +789,11 @@ class TaskTemplateRepository:
                 func.sum(case((Task.status == "R", 1), else_=0)).label("running_count"),
                 func.sum(case((Task.status == "D", 1), else_=0)).label("done_count"),
                 func.sum(case((Task.status == "F", 1), else_=0)).label("fatal_count"),
-                func.coalesce(func.sum(resource_error_agg.c.re_count), 0).label(
-                    "resource_error_count"
-                ),
                 func.min(Task.num_attempts).label("min_attempts"),
                 func.max(Task.num_attempts).label("max_attempts"),
                 func.avg(Task.num_attempts).label("avg_attempts"),
             )
             .select_from(join_table)
-            .outerjoin(resource_error_agg, resource_error_agg.c.task_id == Task.id)
             .where(Task.workflow_id == workflow_id)
             .group_by(
                 TaskTemplate.id,
@@ -874,7 +844,7 @@ class TaskTemplateRepository:
                     else None
                 ),
                 task_template_version_id=row.task_template_version_id,
-                resource_error_count=row.resource_error_count,
+                resource_error_count=0,
             )
 
         return result_dict

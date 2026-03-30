@@ -6,16 +6,20 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import MemoryIcon from '@mui/icons-material/Memory';
+import { useQuery } from '@tanstack/react-query';
 import { TTStatus, TTStatusResponse } from '@jobmon_gui/types/TaskTemplateStatus';
 import {
     TEMPLATE_STATUS_COLORS,
     RESOURCE_ERROR_COLORS,
 } from '@jobmon_gui/constants/taskStatus';
 import TemplateStatusBar from '@jobmon_gui/components/common/TemplateStatusBar';
+import { getFatalErrorBreakdownFn } from '@jobmon_gui/queries/GetFatalErrorBreakdown';
 
 const HOVER_BG = '#e3f2fd';
 
 interface TemplateListPanelProps {
+    workflowId: string | number;
+    workflowRunId: number | null;
     ttData: TTStatusResponse;
     hoveredTemplateName: string | null;
     onTemplateSelect: (name: string) => void;
@@ -28,12 +32,16 @@ interface TemplateListPanelProps {
 }
 
 function TemplateRow({
+    workflowId,
+    workflowRunId,
     tt,
     isHovered,
     onSelect,
     onHover,
     onPrefetch,
 }: {
+    workflowId: string | number;
+    workflowRunId: number | null;
     tt: TTStatus;
     isHovered: boolean;
     onSelect: () => void;
@@ -44,6 +52,25 @@ function TemplateRow({
         tt.tasks === 0
             ? 0
             : Math.floor((tt.DONE / tt.tasks) * 100);
+
+    // Lazy fetch resource error count from breakdown endpoint
+    const { data: breakdown } = useQuery({
+        queryKey: [
+            'workflow_details',
+            'fatal_breakdown',
+            workflowId,
+            tt.task_template_version_id,
+            workflowRunId,
+        ],
+        queryFn: getFatalErrorBreakdownFn,
+        enabled:
+            (tt.FATAL > 0 || tt.num_attempts_avg > 1) &&
+            workflowRunId != null,
+        staleTime: 120000,
+    });
+
+    const resourceErrorCount =
+        breakdown?.resource_error_total ?? 0;
 
     return (
         <ListItem disablePadding>
@@ -85,7 +112,7 @@ function TemplateRow({
                         >
                             {tt.name}
                         </Typography>
-                        {(tt.resource_error_count > 0 ||
+                        {(resourceErrorCount > 0 ||
                             tt.FATAL > 0) && (
                             <Box
                                 sx={{
@@ -94,9 +121,9 @@ function TemplateRow({
                                     flexShrink: 0,
                                 }}
                             >
-                                {tt.resource_error_count > 0 && (
+                                {resourceErrorCount > 0 && (
                                     <Tooltip
-                                        title={`${tt.resource_error_count} task instance${tt.resource_error_count > 1 ? 's' : ''} hit resource limits (memory or runtime exceeded)`}
+                                        title={`${resourceErrorCount} task instance${resourceErrorCount > 1 ? 's' : ''} hit resource limits (memory or runtime exceeded)`}
                                         arrow
                                     >
                                         <Chip
@@ -109,7 +136,7 @@ function TemplateRow({
                                                     }}
                                                 />
                                             }
-                                            label={`${tt.resource_error_count} resource`}
+                                            label={`${resourceErrorCount} resource`}
                                             size="small"
                                             sx={{
                                                 height: 18,
@@ -163,6 +190,8 @@ function TemplateRow({
 }
 
 export default function TemplateListPanel({
+    workflowId,
+    workflowRunId,
     ttData,
     hoveredTemplateName,
     onTemplateSelect,
@@ -215,6 +244,8 @@ export default function TemplateListPanel({
                         {needsAttention.map(tt => (
                             <TemplateRow
                                 key={tt.id}
+                                workflowId={workflowId}
+                                workflowRunId={workflowRunId}
                                 tt={tt}
                                 isHovered={
                                     hoveredTemplateName ===
@@ -243,6 +274,8 @@ export default function TemplateListPanel({
                 {otherTemplates.map(tt => (
                     <TemplateRow
                         key={tt.id}
+                        workflowId={workflowId}
+                        workflowRunId={workflowRunId}
                         tt={tt}
                         isHovered={
                             hoveredTemplateName === tt.name
