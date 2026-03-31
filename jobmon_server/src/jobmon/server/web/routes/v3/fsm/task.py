@@ -428,45 +428,47 @@ async def set_task_resume_state(
     if not reset_if_running:
         excluded_states.append(TaskStatus.RUNNING)
 
-    # Get task IDs that need to be reset
-    task_ids_query = select(Task.id).where(
-        Task.status.not_in(excluded_states), Task.workflow_id == workflow_id
-    )
-    task_ids = [row[0] for row in db.execute(task_ids_query).all()]
-
-    if task_ids:
-        # Use TransitionService for audit logging
-        # Note: REGISTERING doesn't have valid source statuses in FSM for all states,
-        # so we need to do a direct update with audit records
-        # This is a reset operation, not a normal FSM transition
-
-        # Get current statuses for audit records
-        current_statuses = db.execute(
-            select(Task.id, Task.status, Task.workflow_id).where(Task.id.in_(task_ids))
-        ).all()
-
-        # Bulk update
-        db.execute(
-            update(Task)
-            .where(Task.id.in_(task_ids))
-            .values(
-                status=TaskStatus.REGISTERING,
-                num_attempts=0,
-                status_date=func.now(),
-            )
+    # Get task IDs and their current statuses in one query (indexed on workflow_id,
+    # no IN clause needed). This avoids a second round-trip with a giant IN list.
+    tasks_to_reset = db.execute(
+        select(Task.id, Task.status).where(
+            Task.status.not_in(excluded_states),
+            Task.workflow_id == workflow_id,
         )
+    ).all()
 
-        # Create audit records for the reset (properly closes previous records)
-        audit_records = [
-            {
-                "task_id": task_id,
-                "workflow_id": wf_id,
-                "previous_status": prev_status,
-                "new_status": TaskStatus.REGISTERING,
-            }
-            for task_id, prev_status, wf_id in current_statuses
-        ]
-        TransitionService.create_audit_records_bulk(session=db, records=audit_records)
+    if tasks_to_reset:
+        # Reset is not a normal FSM transition — REGISTERING doesn't have valid
+        # source statuses for all states (e.g. QUEUED, LAUNCHED, ERROR_FATAL).
+        # Use direct update with audit records, batched to avoid MySQL timeouts
+        # on large workflows (10k+ tasks generate enormous IN clauses).
+        batch_size = 1000
+        for i in range(0, len(tasks_to_reset), batch_size):
+            batch = tasks_to_reset[i : i + batch_size]
+            batch_ids = [row.id for row in batch]
+
+            db.execute(
+                update(Task)
+                .where(Task.id.in_(batch_ids))
+                .values(
+                    status=TaskStatus.REGISTERING,
+                    num_attempts=0,
+                    status_date=func.now(),
+                )
+            )
+
+            audit_records = [
+                {
+                    "task_id": row.id,
+                    "workflow_id": workflow_id,
+                    "previous_status": row.status,
+                    "new_status": TaskStatus.REGISTERING,
+                }
+                for row in batch
+            ]
+            TransitionService.create_audit_records_bulk(
+                session=db, records=audit_records
+            )
 
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
