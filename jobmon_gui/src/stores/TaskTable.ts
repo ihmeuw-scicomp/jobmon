@@ -137,7 +137,7 @@ export const useTaskTableStore = create<TaskTableStore>()(
             ),
             getFilters: () => get().filters,
 
-            sorting: [] as SortingState,
+            sorting: [{ id: 'instance_status', desc: false }] as SortingState,
             setSorting: zustandSetter(get, set, 'sorting'),
             getSorting: () => get().sorting,
 
@@ -162,12 +162,12 @@ export const useTaskTableStore = create<TaskTableStore>()(
         }),
         {
             name: 'TaskTable',
-            version: 1,
+            version: 2,
             storage: taskTableStorage,
             migrate: (persisted: unknown) => {
                 const state = persisted as Record<string, unknown>;
                 delete state.filters;
-                // zustand merges this partial with store defaults
+                delete state.sorting;
                 return state as Partial<TaskTableStore>;
             },
             partialize: state => ({

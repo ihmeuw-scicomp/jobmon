@@ -176,9 +176,8 @@ export default function TemplateDetailPanel({
         }),
         queryFn: getFatalErrorBreakdownFn,
         enabled:
-            (templateData.FATAL > 0 ||
-                templateData.num_attempts_avg > 1) &&
-            workflowRunId != null,
+            templateData.FATAL > 0 ||
+            templateData.num_attempts_avg > 1,
         staleTime: 120000,
     });
 

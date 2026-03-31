@@ -991,6 +991,12 @@ export default function TaskStatusTimeline({
     const [expandedAttempt, setExpandedAttempt] = useState<number>(-1);
     // Track whether we've auto-expanded once (don't override user interaction)
     const [autoExpanded, setAutoExpanded] = useState(false);
+
+    // Reset when navigating between tasks (same component, different taskId)
+    useEffect(() => {
+        setAutoExpanded(false);
+        setExpandedAttempt(-1);
+    }, [taskId]);
     const [modalState, setModalState] = useState<ModalState>({
         type: null,
         instance: null,
