@@ -145,12 +145,12 @@ export default function TemplateDetailPanel({
             'clustered_errors',
             workflowId,
             templateData.id,
-            workflowRunId,
+            null,
+            'fatal_tasks_only',
+            templateData.task_template_version_id,
         ],
         queryFn: getClusteredErrorsFn,
-        enabled:
-            templateData.FATAL > 0 ||
-            templateData.num_attempts_avg > 1,
+        enabled: templateData.FATAL > 0,
     });
 
     const usageQuery = useQuery({

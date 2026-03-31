@@ -63,9 +63,13 @@ export default function TaskTemplateDetails() {
     const theme = useTheme();
     const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
 
+    const searchParams = new URLSearchParams(location.search);
+    const ttvFromUrl = searchParams.get('ttv');
+
     const TaskTemplateDetailsData = useTaskTemplateDetails(
         workflowId,
-        taskTemplateId
+        taskTemplateId,
+        ttvFromUrl ? Number(ttvFromUrl) : null
     );
 
     // --- Usage API query (lifted from Usage.tsx) ---
@@ -107,10 +111,14 @@ export default function TaskTemplateDetails() {
             'clustered_errors',
             workflowId,
             TaskTemplateDetailsData.data?.task_template_id,
+            null,
+            null,
+            taskTemplateVersionId,
         ],
         queryFn: getClusteredErrorsFn,
         enabled:
             !!TaskTemplateDetailsData.data?.task_template_id &&
+            !!taskTemplateVersionId &&
             !TaskTemplateDetailsData.isLoading,
     });
 

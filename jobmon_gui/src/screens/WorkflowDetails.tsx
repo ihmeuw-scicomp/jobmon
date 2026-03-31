@@ -198,12 +198,15 @@ function WorkflowDetails() {
         setLeftPanelView('list');
     };
 
-    const resetStoresAndNavigate = (ttId: string | number) => {
+    const resetStoresAndNavigate = (
+        ttId: string | number,
+        ttvId: string | number
+    ) => {
         useTaskTableStore.setState({
             ...useTaskTableStore.getState(),
             filters: [],
         });
-        navigate(`/workflow/${workflowId}/task_template/${ttId}`);
+        navigate(`/workflow/${workflowId}/task_template/${ttId}?ttv=${ttvId}`);
     };
 
     const prefetchTemplateData = (taskTemplate: {
@@ -253,7 +256,12 @@ function WorkflowDetails() {
             workflowId={workflowId}
             templateData={selectedTemplateData}
             onBack={handleTemplateBack}
-            onNavigate={() => resetStoresAndNavigate(selectedTemplateData.id)}
+            onNavigate={() =>
+                resetStoresAndNavigate(
+                    selectedTemplateData.id,
+                    selectedTemplateData.task_template_version_id
+                )
+            }
             disabled={disabled}
             workflowRunId={latestWfrId}
         />

@@ -35,11 +35,14 @@ logger = structlog.get_logger(__name__)
 def get_task_template_details_for_workflow(
     workflow_id: int = Query(..., ge=1),
     task_template_id: int = Query(..., ge=1),
+    task_template_version_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ) -> Any:
     """Fetch Task Template details (ID, Name, and Version) for a given Workflow."""
     tt_repo = TaskTemplateRepository(db)
-    tt_details_data = tt_repo.get_task_template_details(workflow_id, task_template_id)
+    tt_details_data = tt_repo.get_task_template_details(
+        workflow_id, task_template_id, task_template_version_id
+    )
 
     if tt_details_data is None:
         raise HTTPException(
@@ -293,12 +296,15 @@ def get_tt_error_log_viz(
     page_size: int = 10,
     just_recent_errors: str = "false",
     cluster_errors: str = "false",
+    fatal_tasks_only: str = "false",
     workflow_run_id: Optional[int] = None,
+    task_template_version_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ) -> Any:
     """Get the error logs for a task template id for GUI."""
     recent_errors = just_recent_errors.lower() == "true"
     output_clustered_errors = cluster_errors.lower() == "true"
+    fatal_only = fatal_tasks_only.lower() == "true"
 
     if tt_id is None:
         raise ValueError("Task template ID is required")
@@ -312,7 +318,9 @@ def get_tt_error_log_viz(
         page_size=page_size,
         recent_errors_only=recent_errors,
         cluster_errors=output_clustered_errors,
+        fatal_tasks_only=fatal_only,
         workflow_run_id=workflow_run_id,
+        task_template_version_id=task_template_version_id,
     )
 
     return result

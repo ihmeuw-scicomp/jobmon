@@ -6,18 +6,19 @@ import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
 import { TaskTemplateDetailsResponse } from '@jobmon_gui/types/TaskTemplateDetails.ts';
 
 type getTaskTemplateDetailsQueryFnArgs = {
-    queryKey: (string | number | undefined)[];
+    queryKey: (string | number | undefined | null)[];
 };
 
 export const getTaskTemplateDetailsQueryFn = async ({
     queryKey,
 }: getTaskTemplateDetailsQueryFnArgs) => {
-    if (!queryKey || queryKey.length != 3) {
+    if (!queryKey || queryKey.length < 3) {
         return;
     }
 
     const wf_id = queryKey[1] as number;
     const tt_id = queryKey[2] as number;
+    const ttv_id = queryKey.length > 3 ? queryKey[3] : null;
 
     if (!wf_id || !tt_id) {
         return;
@@ -29,6 +30,10 @@ export const getTaskTemplateDetailsQueryFn = async ({
             {
                 ...jobmonAxiosConfig,
                 data: null,
+                params:
+                    ttv_id != null
+                        ? { task_template_version_id: ttv_id }
+                        : undefined,
             }
         )
         .then(response => {
@@ -38,10 +43,16 @@ export const getTaskTemplateDetailsQueryFn = async ({
 
 export const useTaskTemplateDetails = (
     workflowId: number | string,
-    taskTemplateId: number | string
+    taskTemplateId: number | string,
+    taskTemplateVersionId?: number | string | null
 ) => {
     return useQuery({
-        queryKey: ['task_template_details', workflowId, taskTemplateId],
+        queryKey: [
+            'task_template_details',
+            workflowId,
+            taskTemplateId,
+            taskTemplateVersionId ?? null,
+        ],
         queryFn: getTaskTemplateDetailsQueryFn,
         enabled: !!workflowId && !!taskTemplateId,
     });
