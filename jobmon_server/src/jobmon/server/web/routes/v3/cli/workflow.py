@@ -187,9 +187,26 @@ def workflows_by_user_form(
     user_exclude: Optional[List[str]] = Query(None, alias="user!"),
     tool_exclude: Optional[List[str]] = Query(None, alias="tool!"),
     status_exclude: Optional[List[str]] = Query(None, alias="status!"),
+    wf_name_contains: bool = Query(False),
+    wf_args_contains: bool = Query(False),
+    wf_attr: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ) -> WorkflowOverviewResponse:
-    """Fetch associated workflows and workflow runs by username."""
+    """Fetch workflow overview with filtering.
+
+    ``wf_attr`` accepts repeated ``key:value`` pairs for
+    multi-attribute AND filtering, e.g.
+    ``?wf_attr=project:fhs&wf_attr=release_id:7``.
+    """
+    # Parse wf_attr repeated params into tuples.
+    wf_attributes = None
+    if wf_attr:
+        wf_attributes = []
+        for pair in wf_attr:
+            if ":" in pair:
+                k, v = pair.split(":", 1)
+                wf_attributes.append((k.strip(), v.strip()))
+
     workflow_repo = WorkflowRepository(db)
     return workflow_repo.get_workflow_overview(
         user=user,
@@ -205,6 +222,9 @@ def workflows_by_user_form(
         user_exclude=_list_to_comma_separated(user_exclude),
         tool_exclude=_list_to_comma_separated(tool_exclude),
         status_exclude=_list_to_comma_separated(status_exclude),
+        wf_name_contains=wf_name_contains,
+        wf_args_contains=wf_args_contains,
+        wf_attributes=wf_attributes,
     )
 
 

@@ -3,18 +3,28 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import structlog
-from sqlalchemy import Select, func, select, text, update
-from sqlalchemy.orm import Session
+from sqlalchemy import Select, func, select, update
+from sqlalchemy.orm import Session, aliased
 
 from jobmon.core.constants import WorkflowStatus as Statuses
 from jobmon.server.web.models.node import Node
+from jobmon.server.web.models.queue import Queue
 from jobmon.server.web.models.task import Task
+from jobmon.server.web.models.task_resources import TaskResources
 from jobmon.server.web.models.task_status import TaskStatus
 from jobmon.server.web.models.task_template import TaskTemplate
-from jobmon.server.web.models.task_template_version import TaskTemplateVersion
+from jobmon.server.web.models.task_template_version import (
+    TaskTemplateVersion,
+)
 from jobmon.server.web.models.tool import Tool
 from jobmon.server.web.models.tool_version import ToolVersion
 from jobmon.server.web.models.workflow import Workflow
+from jobmon.server.web.models.workflow_attribute import (
+    WorkflowAttribute,
+)
+from jobmon.server.web.models.workflow_attribute_type import (
+    WorkflowAttributeType,
+)
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_status import WorkflowStatus
 from jobmon.server.web.schemas.workflow import (
@@ -434,47 +444,58 @@ class WorkflowRepository:
 
         return return_dic
 
-    def _add_multi_value_filter(
-        self,
+    @staticmethod
+    def _build_csv_condition(
         value: Optional[str],
-        column: str,
-        param_name: str,
-        where_clauses: list,
-        substitution_dict: dict,
+        column: Any,
         exclude: bool = False,
-    ) -> None:
-        """Add a filter that supports comma-separated values with IN/NOT IN logic.
+    ) -> Optional[Any]:
+        """Return an ORM condition for comma-separated values.
 
         Args:
-            value: Comma-separated string of values to filter
-            column: SQL column name to filter on
-            param_name: Base name for substitution parameters
-            where_clauses: List to append WHERE clause strings to
-            substitution_dict: Dictionary to add parameter substitutions to
-            exclude: If True, use NOT IN logic; otherwise use IN logic
+            value: Comma-separated string of values to filter.
+            column: SQLAlchemy column to filter on.
+            exclude: If True, use NOT IN / != logic.
+
+        Returns:
+            A SQLAlchemy BinaryExpression, or None.
         """
         if not value:
-            return
-
+            return None
         value_list = [v.strip() for v in value.split(",") if v.strip()]
         if not value_list:
-            return
-
-        suffix = "_exclude" if exclude else ""
-        operator = "NOT IN" if exclude else "IN"
-        equality_operator = "!=" if exclude else "="
-
+            return None
+        if exclude:
+            if len(value_list) == 1:
+                return column != value_list[0]
+            return column.notin_(value_list)
         if len(value_list) == 1:
-            param_key = f"{param_name}{suffix}"
-            where_clauses.append(f"{column} {equality_operator} :{param_key}")
-            substitution_dict[param_key] = value_list[0]
-        else:
-            placeholders = ",".join(
-                [f":{param_name}{suffix}_{i}" for i in range(len(value_list))]
-            )
-            where_clauses.append(f"{column} {operator} ({placeholders})")
-            for i, v in enumerate(value_list):
-                substitution_dict[f"{param_name}{suffix}_{i}"] = v
+            return column == value_list[0]
+        return column.in_(value_list)
+
+    @staticmethod
+    def _build_text_filter(
+        value: Optional[str],
+        column: Any,
+        contains: bool = False,
+    ) -> Optional[Any]:
+        """Build a text filter with optional wildcard/contains.
+
+        Wildcards: ``*`` in *value* is converted to SQL ``%``.
+        Contains:  wraps the value in ``%…%`` for substring
+        matching.
+
+        Returns:
+            A SQLAlchemy BinaryExpression, or None.
+        """
+        if not value:
+            return None
+        if contains:
+            safe = value.replace("*", "%")
+            return column.like(f"%{safe}%")
+        if "*" in value:
+            return column.like(value.replace("*", "%"))
+        return column == value
 
     def get_workflow_overview(
         self,
@@ -491,135 +512,176 @@ class WorkflowRepository:
         user_exclude: Optional[str] = None,
         tool_exclude: Optional[str] = None,
         status_exclude: Optional[str] = None,
+        wf_name_contains: bool = False,
+        wf_args_contains: bool = False,
+        wf_attributes: Optional[List[Tuple[str, str]]] = None,
     ) -> WorkflowOverviewResponse:
-        """Fetch associated workflows and workflow runs by username."""
-        where_clauses: list[str] = []
-        substitution_dict: dict[str, Any] = {}
+        """Fetch workflow overview filtered by the given criteria.
 
-        self._add_multi_value_filter(
-            user, "workflow_run.user", "user", where_clauses, substitution_dict
-        )
-        self._add_multi_value_filter(
-            tool, "tool.name", "tool", where_clauses, substitution_dict
-        )
-        self._add_multi_value_filter(
-            status, "workflow.status", "status", where_clauses, substitution_dict
-        )
-        self._add_multi_value_filter(
-            user_exclude,
-            "workflow_run.user",
-            "user",
-            where_clauses,
-            substitution_dict,
-            exclude=True,
-        )
-        self._add_multi_value_filter(
-            tool_exclude,
-            "tool.name",
-            "tool",
-            where_clauses,
-            substitution_dict,
-            exclude=True,
-        )
-        self._add_multi_value_filter(
-            status_exclude,
-            "workflow.status",
-            "status",
-            where_clauses,
-            substitution_dict,
-            exclude=True,
-        )
+        The query is structured as three layers:
+        1. Inner subquery: find workflow IDs matching filters.
+        2. Middle subquery: find distinct (queue, workflow)
+           pairs via task → task_resources.
+        3. Outer query: join back to workflow for final
+           SELECT / GROUP BY / ORDER BY.
+        """
+        # -- build filter conditions for the inner subquery --
+        filters: List[Any] = []
 
-        if wf_name:
-            where_clauses.append("workflow.name = :wf_name")
-            substitution_dict["wf_name"] = wf_name
-        if wf_args:
-            where_clauses.append("workflow.workflow_args = :wf_args")
-            substitution_dict["wf_args"] = wf_args
-        if wf_attribute_key:
-            where_clauses.append("workflow_attribute_type.name = :wf_attribute_key")
-            substitution_dict["wf_attribute_key"] = wf_attribute_key
-        if wf_attribute_value:
-            where_clauses.append("workflow_attribute.value = :wf_attribute_value")
-            substitution_dict["wf_attribute_value"] = wf_attribute_value
+        for val, col, exc in [
+            (user, WorkflowRun.user, False),
+            (tool, Tool.name, False),
+            (status, Workflow.status, False),
+            (user_exclude, WorkflowRun.user, True),
+            (tool_exclude, Tool.name, True),
+            (status_exclude, Workflow.status, True),
+        ]:
+            cond = self._build_csv_condition(val, col, exc)
+            if cond is not None:
+                filters.append(cond)
+
+        cond = self._build_text_filter(
+            wf_name,
+            Workflow.name,
+            wf_name_contains,
+        )
+        if cond is not None:
+            filters.append(cond)
+
+        cond = self._build_text_filter(
+            wf_args,
+            Workflow.workflow_args,
+            wf_args_contains,
+        )
+        if cond is not None:
+            filters.append(cond)
+
         if wf_id:
-            where_clauses.append("workflow.id = :wf_id")
-            substitution_dict["wf_id"] = wf_id  # type: ignore
+            filters.append(Workflow.id == int(wf_id))
         if date_submitted:
-            where_clauses.append("workflow.created_date >= :date_submitted")
-            substitution_dict["date_submitted"] = date_submitted
+            filters.append(Workflow.created_date >= date_submitted)
         if date_submitted_end:
-            where_clauses.append("workflow.created_date <= :date_submitted_end")
-            substitution_dict["date_submitted_end"] = date_submitted_end
+            filters.append(Workflow.created_date <= date_submitted_end)
 
-        if where_clauses:
-            inner_where_clause = " WHERE " + (" AND ".join(where_clauses))
-        else:
-            inner_where_clause = ""
-
-        query = text(
-            f"""
-            SELECT
-                workflow.id,
-                workflow.name,
-                workflow.created_date,
-                workflow.status_date,
-                workflow.workflow_args,
-                count(distinct workflow_run.id) as num_attempts,
-                workflow_status.label,
-                tool.name
-            FROM
-                workflow
-                JOIN (
-                    SELECT
-                        distinct queue_id,
-                        workflow_id
-                    FROM
-                        task
-                        JOIN task_resources ON task_resources.id = task.task_resources_id
-                    WHERE
-                        task.workflow_id IN (
-                            SELECT
-                                workflow_run.workflow_id
-                            FROM
-                                workflow
-                                JOIN tool_version ON
-                                    workflow.tool_version_id = tool_version.id
-                                JOIN tool ON tool.id = tool_version.tool_id
-                                JOIN workflow_run ON workflow.id = workflow_run.workflow_id
-                                LEFT JOIN workflow_attribute
-                                    ON workflow.id = workflow_attribute.workflow_id
-                                LEFT JOIN workflow_attribute_type
-                                    ON workflow_attribute.workflow_attribute_type_id =
-                                        workflow_attribute_type.id
-                            {inner_where_clause}
-                        )
-                    GROUP BY
-                        workflow_id, queue_id
-                ) workflow_queue ON workflow.id = workflow_queue.workflow_id
-                JOIN queue ON queue.id = workflow_queue.queue_id
-                JOIN workflow_run ON workflow.id = workflow_run.workflow_id
-                JOIN tool_version ON workflow.tool_version_id = tool_version.id
-                JOIN tool ON tool.id = tool_version.tool_id
-                JOIN workflow_status ON workflow.status = workflow_status.id
-            WHERE
-                cluster_id != 1
-            GROUP BY
-                workflow.id
-            ORDER BY
-                workflow.id DESC
-    """
+        # -- Layer 1: inner subquery (matching workflow IDs) --
+        inner_q = (
+            select(WorkflowRun.workflow_id)
+            .select_from(Workflow)
+            .join(
+                ToolVersion,
+                Workflow.tool_version_id == ToolVersion.id,
+            )
+            .join(Tool, ToolVersion.tool_id == Tool.id)
+            .join(
+                WorkflowRun,
+                Workflow.id == WorkflowRun.workflow_id,
+            )
         )
-        rows = self.session.execute(query, substitution_dict).all()
 
-        def serialize_datetime(obj: Union[datetime, str]) -> str:
-            """Serialize datetime objects into string format."""
+        # Attribute joins: only added when filters require them.
+        # Merge legacy single-pair params into the list.
+        attrs = list(wf_attributes or [])
+        if wf_attribute_key and wf_attribute_value:
+            attrs.append((wf_attribute_key, wf_attribute_value))
+        elif wf_attribute_key:
+            attrs.append((wf_attribute_key, ""))
+        elif wf_attribute_value:
+            attrs.append(("", wf_attribute_value))
+
+        if attrs:
+            for i, (attr_key, attr_val) in enumerate(attrs):
+                wa = aliased(WorkflowAttribute, name=f"wa{i}")
+                wat = aliased(WorkflowAttributeType, name=f"wat{i}")
+                inner_q = inner_q.join(wa, Workflow.id == wa.workflow_id)
+                inner_q = inner_q.join(
+                    wat,
+                    wa.workflow_attribute_type_id == wat.id,
+                )
+                if attr_key:
+                    filters.append(wat.name == attr_key)
+                if attr_val:
+                    filters.append(wa.value == attr_val)
+        else:
+            # No attribute filters — use LEFT JOINs to
+            # preserve the original query semantics for
+            # workflows without attributes.
+            inner_q = inner_q.outerjoin(
+                WorkflowAttribute,
+                Workflow.id == WorkflowAttribute.workflow_id,
+            ).outerjoin(
+                WorkflowAttributeType,
+                WorkflowAttribute.workflow_attribute_type_id
+                == WorkflowAttributeType.id,
+            )
+
+        if filters:
+            inner_q = inner_q.where(*filters)
+
+        # -- Layer 2: queue subquery --
+        workflow_queue_sq = (
+            select(
+                TaskResources.queue_id.label("queue_id"),
+                Task.workflow_id.label("workflow_id"),
+            )
+            .select_from(Task)
+            .join(
+                TaskResources,
+                TaskResources.id == Task.task_resources_id,
+            )
+            .where(Task.workflow_id.in_(inner_q))
+            .group_by(Task.workflow_id, TaskResources.queue_id)
+        ).subquery("workflow_queue")
+
+        # -- Layer 3: outer query --
+        stmt = (
+            select(
+                Workflow.id,
+                Workflow.name,
+                Workflow.created_date,
+                Workflow.status_date,
+                Workflow.workflow_args,
+                func.count(func.distinct(WorkflowRun.id)).label("num_attempts"),
+                WorkflowStatus.label,
+                Tool.name,
+            )
+            .select_from(Workflow)
+            .join(
+                workflow_queue_sq,
+                Workflow.id == workflow_queue_sq.c.workflow_id,
+            )
+            .join(
+                Queue,
+                Queue.id == workflow_queue_sq.c.queue_id,
+            )
+            .join(
+                WorkflowRun,
+                Workflow.id == WorkflowRun.workflow_id,
+            )
+            .join(
+                ToolVersion,
+                Workflow.tool_version_id == ToolVersion.id,
+            )
+            .join(Tool, ToolVersion.tool_id == Tool.id)
+            .join(
+                WorkflowStatus,
+                WorkflowStatus.id == Workflow.status,
+            )
+            .where(Queue.cluster_id != 1)
+            .group_by(Workflow.id)
+            .order_by(Workflow.id.desc())
+        )
+
+        rows = self.session.execute(stmt).all()
+
+        # -- serialise results --
+        def serialize_datetime(
+            obj: Union[datetime, str],
+        ) -> str:
             if isinstance(obj, datetime):
                 return obj.isoformat()
             elif isinstance(obj, str):
-                # Handle case where database returns datetime as string (e.g., SQLite)
                 return obj
-            raise TypeError(f"Type {obj.__class__.__name__} not serializable")
+            raise TypeError(f"Type {obj.__class__.__name__} " "not serializable")
 
         column_names = (
             "wf_id",
@@ -631,20 +693,15 @@ class WorkflowRepository:
             "wf_status",
             "wf_tool",
         )
-        # Initialize all possible states as 0.
-        # No need to return data since it will be refreshed
-        # on demand anyways.
-        initial_status_counts = {
-            label_mapping: 0 for label_mapping in set(_cli_label_mapping.values())
-        }
+        initial_status_counts = {lbl: 0 for lbl in set(_cli_label_mapping.values())}
 
         workflows = []
         for row in rows:
-            workflow_data = dict(zip(column_names, row))
-            workflow_data.update(initial_status_counts)
-            workflow_data["wf_submitted_date"] = serialize_datetime(row[2])
-            workflow_data["wf_status_date"] = serialize_datetime(row[3])
-            workflows.append(WorkflowOverviewItem(**workflow_data))
+            wf = dict(zip(column_names, row))
+            wf.update(initial_status_counts)
+            wf["wf_submitted_date"] = serialize_datetime(row[2])
+            wf["wf_status_date"] = serialize_datetime(row[3])
+            workflows.append(WorkflowOverviewItem(**wf))
 
         return WorkflowOverviewResponse(workflows=workflows)
 

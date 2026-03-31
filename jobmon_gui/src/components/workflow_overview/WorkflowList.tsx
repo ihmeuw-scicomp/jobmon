@@ -94,8 +94,9 @@ export default function WorkflowList() {
             workflowSettings.get().tool,
             workflowSettings.get().wf_name,
             workflowSettings.get().wf_args,
-            workflowSettings.get().wf_attribute_key,
-            workflowSettings.get().wf_attribute_value,
+            workflowSettings.get().wf_name_contains,
+            workflowSettings.get().wf_args_contains,
+            JSON.stringify(workflowSettings.get().wf_attributes),
             workflowSettings.get().wf_id,
             dayjs(workflowSettings.get().date_submitted).format('YYYY-MM-DD'),
             dayjs(workflowSettings.get().date_submitted_end).format(
@@ -135,13 +136,20 @@ export default function WorkflowList() {
 
             if (settings.wf_name) urlParams.append('wf_name', settings.wf_name);
             if (settings.wf_args) urlParams.append('wf_args', settings.wf_args);
-            if (settings.wf_attribute_key)
-                urlParams.append('wf_attribute_key', settings.wf_attribute_key);
-            if (settings.wf_attribute_value)
-                urlParams.append(
-                    'wf_attribute_value',
-                    settings.wf_attribute_value
-                );
+            if (settings.wf_name_contains)
+                urlParams.append('wf_name_contains', 'true');
+            if (settings.wf_args_contains)
+                urlParams.append('wf_args_contains', 'true');
+            if (settings.wf_attributes) {
+                for (const attr of settings.wf_attributes) {
+                    if (attr.key || attr.value) {
+                        urlParams.append(
+                            'wf_attr',
+                            `${attr.key}:${attr.value}`
+                        );
+                    }
+                }
+            }
             if (settings.wf_id) urlParams.append('wf_id', settings.wf_id);
             if (settings.date_submitted) {
                 urlParams.append(

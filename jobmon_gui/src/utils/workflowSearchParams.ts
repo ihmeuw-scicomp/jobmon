@@ -44,10 +44,8 @@ export function settingsToSearchParamsString(
 
     if (settings.wf_name) params.wf_name = settings.wf_name;
     if (settings.wf_args) params.wf_args = settings.wf_args;
-    if (settings.wf_attribute_key)
-        params.wf_attribute_key = settings.wf_attribute_key;
-    if (settings.wf_attribute_value)
-        params.wf_attribute_value = settings.wf_attribute_value;
+    if (settings.wf_name_contains) params.wf_name_contains = 'true';
+    if (settings.wf_args_contains) params.wf_args_contains = 'true';
     if (settings.wf_id) params.wf_id = settings.wf_id;
 
     const date_submitted = dayjs(settings.date_submitted).format('YYYY-MM-DD');
@@ -57,7 +55,19 @@ export function settingsToSearchParamsString(
     if (date_submitted) params.date_submitted = date_submitted;
     if (date_submitted_end) params.date_submitted_end = date_submitted_end;
 
-    return new URLSearchParams(params).toString();
+    // Build base params, then append repeated wf_attr entries
+    const urlParams = new URLSearchParams(params);
+
+    // Serialize wf_attributes as repeated wf_attr=key:value params
+    if (settings.wf_attributes) {
+        for (const attr of settings.wf_attributes) {
+            if (attr.key || attr.value) {
+                urlParams.append('wf_attr', `${attr.key}:${attr.value}`);
+            }
+        }
+    }
+
+    return urlParams.toString();
 }
 
 export function parseUrlFilterParam(

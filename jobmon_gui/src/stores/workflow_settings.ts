@@ -11,26 +11,33 @@ export type FilterValue = {
     exclude?: string[];
 };
 
+export type WfAttributePair = {
+    key: string;
+    value: string;
+};
+
 export type WorkflowSearchSettings = {
     user: string | FilterValue;
     tool: string | FilterValue;
     wf_name: string;
     wf_args: string;
-    wf_attribute_key: string;
-    wf_attribute_value: string;
+    wf_name_contains: boolean;
+    wf_args_contains: boolean;
+    wf_attributes: WfAttributePair[];
     wf_id: string;
     date_submitted: Dayjs;
     date_submitted_end: Dayjs;
     status: string | FilterValue;
 };
 
-const defaultSettings = {
+const defaultSettings: WorkflowSearchSettings = {
     user: '',
     tool: '',
     wf_name: '',
     wf_args: '',
-    wf_attribute_key: '',
-    wf_attribute_value: '',
+    wf_name_contains: false,
+    wf_args_contains: false,
+    wf_attributes: [{ key: '', value: '' }],
     wf_id: '',
     date_submitted: dayjs(),
     date_submitted_end: dayjs(),
@@ -43,7 +50,7 @@ export type WorkflowSearchSettingsStore = {
     refreshData: boolean;
     applyPendingSettings: () => void;
     resetPendingSettings: () => void;
-    setPendingSetting: (key: string, value: string) => void;
+    setPendingSetting: (key: string, value: unknown) => void;
     getRefreshData: () => boolean;
     triggerDataRefresh: () => void;
     clearDataRefresh: () => void;
@@ -53,8 +60,6 @@ export type WorkflowSearchSettingsStore = {
     setTool: (newValue: string) => void;
     setWfName: (newValue: string) => void;
     setWfArgs: (newValue: string) => void;
-    setWfAttributeKey: (newValue: string) => void;
-    setWfAttributeValue: (newValue: string) => void;
     setWfId: (newValue: string) => void;
     setDateSubmitted: (newValue: Dayjs) => void;
     setDateSubmittedEnd: (newValue: Dayjs) => void;
@@ -145,24 +150,6 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
 
                     get().updateUrlSearchParams();
                 },
-                setWfAttributeKey: (newValue: string) => {
-                    set(() => ({
-                        settings: {
-                            ...get().settings,
-                            wf_attribute_key: newValue,
-                        },
-                    }));
-                    get().updateUrlSearchParams();
-                },
-                setWfAttributeValue: (newValue: string) => {
-                    set(() => ({
-                        settings: {
-                            ...get().settings,
-                            wf_attribute_value: newValue,
-                        },
-                    }));
-                    get().updateUrlSearchParams();
-                },
                 setWfId: (newValue: string) => {
                     set(() => ({
                         settings: {
@@ -202,15 +189,36 @@ export const useWorkflowSearchSettings = create<WorkflowSearchSettingsStore>()(
                 get: () => get().settings,
                 getPending: () => get().pendingSettings,
                 loadValuesFromSearchParams: (searchParams: URLSearchParams) => {
-                    const loadedSettings = {
+                    // Parse wf_attr repeated params into pairs
+                    const wfAttrParams = searchParams.getAll('wf_attr');
+                    let wf_attributes: WfAttributePair[] = [
+                        { key: '', value: '' },
+                    ];
+                    if (wfAttrParams.length > 0) {
+                        wf_attributes = wfAttrParams
+                            .filter(p => p.includes(':'))
+                            .map(p => {
+                                const [k, ...rest] = p.split(':');
+                                return {
+                                    key: k.trim(),
+                                    value: rest.join(':').trim(),
+                                };
+                            });
+                        if (wf_attributes.length === 0) {
+                            wf_attributes = [{ key: '', value: '' }];
+                        }
+                    }
+
+                    const loadedSettings: WorkflowSearchSettings = {
                         user: parseUrlFilterParam(searchParams, 'user'),
                         tool: parseUrlFilterParam(searchParams, 'tool'),
                         wf_name: searchParams.get('wf_name') || '',
                         wf_args: searchParams.get('wf_args') || '',
-                        wf_attribute_key:
-                            searchParams.get('wf_attribute_key') || '',
-                        wf_attribute_value:
-                            searchParams.get('wf_attribute_value') || '',
+                        wf_name_contains:
+                            searchParams.get('wf_name_contains') === 'true',
+                        wf_args_contains:
+                            searchParams.get('wf_args_contains') === 'true',
+                        wf_attributes,
                         wf_id: searchParams.get('wf_id') || '',
                         date_submitted: searchParams.get('date_submitted')
                             ? dayjs(searchParams.get('date_submitted'))
