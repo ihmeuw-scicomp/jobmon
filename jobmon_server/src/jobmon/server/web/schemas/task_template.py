@@ -177,7 +177,6 @@ class WorkflowTaskTemplateStatusItem(BaseModel):
     num_attempts_max: Optional[float]
     num_attempts_avg: Optional[float]
     task_template_version_id: int
-    resource_error_count: int = 0
 
 
 class FatalErrorBreakdownResponse(BaseModel):

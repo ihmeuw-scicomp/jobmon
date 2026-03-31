@@ -758,10 +758,6 @@ class TaskTemplateRepository:
         )
 
         # Single optimized query with SQL aggregation.
-        # resource_error_count is NOT computed here — scanning
-        # task_instance is too expensive (no index on status,
-        # causes locks on prod). Returned as 0; resource error
-        # info is available via the fatal_error_breakdown endpoint.
         optimized_sql = (
             select(
                 TaskTemplate.id.label("task_template_id"),
@@ -839,7 +835,6 @@ class TaskTemplateRepository:
                     else None
                 ),
                 task_template_version_id=row.task_template_version_id,
-                resource_error_count=0,
             )
 
         return result_dict

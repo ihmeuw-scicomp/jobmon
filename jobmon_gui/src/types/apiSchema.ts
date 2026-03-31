@@ -5282,6 +5282,7 @@ export interface operations {
             query: {
                 workflow_id: number;
                 task_template_id: number;
+                task_template_version_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -5438,9 +5439,7 @@ export interface operations {
     };
     get_workflow_tt_status_viz_api_v3_workflow_tt_status_viz__workflow_id__get: {
         parameters: {
-            query?: {
-                workflow_run_id?: number | null;
-            };
+            query?: never;
             header?: never;
             path: {
                 workflow_id: number;
@@ -5541,7 +5540,9 @@ export interface operations {
                 page_size?: number;
                 just_recent_errors?: string;
                 cluster_errors?: string;
+                fatal_tasks_only?: string;
                 workflow_run_id?: number | null;
+                task_template_version_id?: number | null;
             };
             header?: never;
             path: {
@@ -5581,7 +5582,9 @@ export interface operations {
                 page_size?: number;
                 just_recent_errors?: string;
                 cluster_errors?: string;
+                fatal_tasks_only?: string;
                 workflow_run_id?: number | null;
+                task_template_version_id?: number | null;
             };
             header?: never;
             path: {
