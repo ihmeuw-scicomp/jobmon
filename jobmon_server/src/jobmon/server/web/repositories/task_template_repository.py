@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 import scipy.stats as st  # type: ignore
 import structlog
-from sqlalchemy import String, and_, case, desc, func, select
+from sqlalchemy import String, and_, case, exists, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement, Label
 
@@ -94,6 +94,7 @@ class TaskTemplateRepository:
                 task_command=row_data.get("task_command"),
                 task_num_attempts=row_data.get("task_num_attempts"),
                 task_max_attempts=row_data.get("task_max_attempts"),
+                workflow_run_id=row_data.get("workflow_run_id"),
             )
         except Exception as e:
             logger.error(
@@ -151,8 +152,8 @@ class TaskTemplateRepository:
                     # Requested resources and attempt number
                     TaskResources.requested_resources.label("requested_resources_col"),
                     attempt_number_col,
-                    # TaskInstance.id (not used but kept for consistency)
                     TaskInstance.id.label("task_instance_id_col"),
+                    TaskInstance.workflow_run_id.label("workflow_run_id_col"),
                 )
                 .select_from(TaskTemplateVersion)
                 .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
@@ -182,6 +183,7 @@ class TaskTemplateRepository:
                     "task_num_attempts": row[8],  # task_num_attempts_col
                     "task_max_attempts": row[9],  # task_max_attempts_col
                     "task_instance_id": row[12],  # task_instance_id_col
+                    "workflow_run_id": row[13],  # workflow_run_id_col
                 }
                 item = self._convert_to_task_resource_detail_item(row_data)
                 if item:
@@ -223,6 +225,7 @@ class TaskTemplateRepository:
                 Task.num_attempts.label("task_num_attempts"),
                 Task.max_attempts.label("task_max_attempts"),
                 TaskInstance.id.label("task_instance_id"),
+                TaskInstance.workflow_run_id,
             )
             .select_from(TaskTemplateVersion)
             .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
@@ -265,6 +268,7 @@ class TaskTemplateRepository:
             base_query.c.task_num_attempts,
             base_query.c.task_max_attempts,
             base_query.c.task_instance_id,
+            base_query.c.workflow_run_id,
         ).select_from(base_query)
 
         for subquery in node_arg_subqueries:
@@ -290,6 +294,7 @@ class TaskTemplateRepository:
                 "task_num_attempts": row[10],  # task_num_attempts
                 "task_max_attempts": row[11],  # task_max_attempts
                 "task_instance_id": row[12],  # task_instance_id
+                "workflow_run_id": row[13],  # workflow_run_id
             }
             item = self._convert_to_task_resource_detail_item(row_data)
             if item:
@@ -458,62 +463,46 @@ class TaskTemplateRepository:
 
         return viz_data
 
-    def _find_ttvid(
+    def _find_ttvid(self, workflow_id: int, task_template_id: int) -> Optional[int]:
+        """Find task template version ID for a workflow + task template.
+
+        Two-step approach: fetch all TTVs for the template (small PK
+        lookup), then EXISTS check against the workflow's tasks.
+        """
+        ttv_ids = [
+            row[0]
+            for row in self.session.execute(
+                select(TaskTemplateVersion.id).where(
+                    TaskTemplateVersion.task_template_id == task_template_id
+                )
+            ).all()
+        ]
+        if not ttv_ids:
+            return None
+
+        sql = (
+            select(Node.task_template_version_id)
+            .where(
+                Node.task_template_version_id.in_(ttv_ids),
+                exists(
+                    select(Task.id).where(
+                        Task.node_id == Node.id,
+                        Task.workflow_id == workflow_id,
+                    )
+                ),
+            )
+            .limit(1)
+        )
+        row = self.session.execute(sql).one_or_none()
+        return row[0] if row else None
+
+    def get_task_template_details(
         self,
         workflow_id: int,
         task_template_id: int,
-    ) -> Optional[int]:
-        """Find the task template version id using workflow and task template ids.
-
-        This could be slow for tt with huge nodes.
-        However, given one workflow only us one tt version of a tt,
-        we can search all the versions backwords to get the first
-        none 0 version.
-
-        Args:
-            workflow_id: ID of the workflow
-            task_template_id: ID of the task template
-            db: Database session
-
-        Returns:
-            Task template version id
-        """
-        # get all task template version for the task template
-        sql_all_ttv = (
-            select(TaskTemplateVersion.id)
-            .where(TaskTemplateVersion.task_template_id == task_template_id)
-            .order_by(desc(TaskTemplateVersion.id))
-        )
-
-        rows2 = self.session.execute(sql_all_ttv).all()
-        tt_version_ids = [row2.id for row2 in rows2]
-
-        # considering the for each tt, a wf only has one version
-        # and most likely the latest version,
-        # search all the versions backwords to get the first
-        # none 0 version
-        task_template_version_id = None
-        for tt_version_id in tt_version_ids:
-            sql = (
-                select(func.count(Task.id))
-                .join(Node, Task.node_id == Node.id)
-                .where(
-                    Task.workflow_id == workflow_id,
-                    Node.task_template_version_id == tt_version_id,
-                )
-            )
-            count_val = self.session.execute(sql).scalar() or 0
-            if count_val > 0:
-                task_template_version_id = tt_version_id
-                break
-
-        return task_template_version_id
-
-    def get_task_template_details(
-        self, workflow_id: int, task_template_id: int
+        task_template_version_id: Optional[int] = None,
     ) -> Optional[TaskTemplateDetailsResponse]:
         """Get task template details."""
-        # break down sql to get task template name separately
         sql1 = select(
             TaskTemplate.name,
         ).where(TaskTemplate.id == task_template_id)
@@ -525,7 +514,8 @@ class TaskTemplateRepository:
         else:
             tt_name = row.name
 
-        task_template_version_id = self._find_ttvid(workflow_id, task_template_id)
+        if task_template_version_id is None:
+            task_template_version_id = self._find_ttvid(workflow_id, task_template_id)
         if task_template_version_id is None:
             return None
 
@@ -718,7 +708,9 @@ class TaskTemplateRepository:
         return MostPopularQueueResponse(queue_info=queue_info)
 
     def get_workflow_tt_status_viz(
-        self, workflow_id: int, dialect: str = "sqlite"
+        self,
+        workflow_id: int,
+        dialect: str = "sqlite",
     ) -> Dict[int, WorkflowTaskTemplateStatusItem]:
         """Get the status of workflow task templates for GUI visualization.
 
@@ -765,14 +757,13 @@ class TaskTemplateRepository:
             )
         )
 
-        # Single optimized query with SQL aggregation instead of two separate queries
+        # Single optimized query with SQL aggregation.
         optimized_sql = (
             select(
                 TaskTemplate.id.label("task_template_id"),
                 TaskTemplate.name.label("task_template_name"),
                 TaskTemplateVersion.id.label("task_template_version_id"),
                 sub_query.c.max_concurrently_running,
-                # SQL aggregation instead of Python loops - much faster
                 func.count(Task.id).label("total_tasks"),
                 func.sum(case((Task.status == "G", 1), else_=0)).label("pending_count"),
                 func.sum(
@@ -789,7 +780,6 @@ class TaskTemplateRepository:
                 func.sum(case((Task.status == "R", 1), else_=0)).label("running_count"),
                 func.sum(case((Task.status == "D", 1), else_=0)).label("done_count"),
                 func.sum(case((Task.status == "F", 1), else_=0)).label("fatal_count"),
-                # Attempt statistics in same query - no second database round-trip
                 func.min(Task.num_attempts).label("min_attempts"),
                 func.max(Task.num_attempts).label("max_attempts"),
                 func.avg(Task.num_attempts).label("avg_attempts"),
@@ -853,6 +843,7 @@ class TaskTemplateRepository:
         self,
         workflow_id: int,
         task_template_version_id: int,
+        workflow_run_id: Optional[int] = None,
     ) -> FatalErrorBreakdownResponse:
         """Classify fatal tasks for one template by last TI status.
 
@@ -897,30 +888,27 @@ class TaskTemplateRepository:
             else:
                 infra += row.cnt
 
+        z_filters = [
+            Task.workflow_id == workflow_id,
+            Node.task_template_version_id == task_template_version_id,
+            TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
+        ]
+        if workflow_run_id is not None:
+            z_filters.append(TaskInstance.workflow_run_id == workflow_run_id)
+
         z_count_sql = (
             select(func.count(TaskInstance.id))
             .join(Task, TaskInstance.task_id == Task.id)
             .join(Node, Task.node_id == Node.id)
-            .where(
-                Task.workflow_id == workflow_id,
-                Node.task_template_version_id == task_template_version_id,
-                TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
-            )
+            .where(*z_filters)
         )
         resource_error_total = self.session.execute(z_count_sql).scalar() or 0
 
-        # Count tasks that had a resource error TI but recovered
-        # (task is not in ERROR_FATAL state).
         retried_sql = (
             select(func.count(func.distinct(Task.id)))
             .join(TaskInstance, TaskInstance.task_id == Task.id)
             .join(Node, Task.node_id == Node.id)
-            .where(
-                Task.workflow_id == workflow_id,
-                Node.task_template_version_id == task_template_version_id,
-                TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
-                Task.status != TaskStatus.ERROR_FATAL,
-            )
+            .where(*z_filters, Task.status != TaskStatus.ERROR_FATAL)
         )
         resource_error_retried = self.session.execute(retried_sql).scalar() or 0
 
@@ -930,11 +918,7 @@ class TaskTemplateRepository:
                 select(TaskInstance.id)
                 .join(Task, TaskInstance.task_id == Task.id)
                 .join(Node, Task.node_id == Node.id)
-                .where(
-                    Task.workflow_id == workflow_id,
-                    Node.task_template_version_id == task_template_version_id,
-                    TaskInstance.status == TaskInstanceStatus.RESOURCE_ERROR,
-                )
+                .where(*z_filters)
                 .order_by(TaskInstance.id.desc())
                 .limit(20)
             )
@@ -951,6 +935,64 @@ class TaskTemplateRepository:
             resource_error_ti_ids=resource_error_ti_ids,
         )
 
+    @staticmethod
+    def _cluster_and_paginate(
+        rows: List[Dict[str, Any]],
+        workflow_id: int,
+        offset: int,
+        page: int,
+        page_size: int,
+    ) -> ErrorLogResponse:
+        """Cluster error rows via TF-IDF and return a paginated response.
+
+        Clustering always runs on the full dataset first, then pagination
+        is applied to the resulting clusters (not the raw rows).
+        """
+        df = pd.DataFrame(rows)
+        if len(df) == 0 or not df["error"].notna().any():
+            return ErrorLogResponse(
+                error_logs=[], total_count=0, page=page, page_size=page_size
+            )
+
+        clustered = cluster_error_logs(df)
+        total_clusters = len(clustered)
+        if total_clusters == 0:
+            return ErrorLogResponse(
+                error_logs=[], total_count=0, page=page, page_size=page_size
+            )
+
+        paged = clustered.iloc[offset : offset + page_size]
+        error_logs = []
+        for _, crow in paged.iterrows():
+            error_logs.append(
+                ErrorLogItem(
+                    task_id=None,
+                    task_instance_id=None,
+                    task_instance_err_id=None,
+                    error_time=None,
+                    error=None,
+                    task_instance_stderr_log=None,
+                    workflow_run_id=int(crow["workflow_run_id"]),
+                    workflow_id=int(crow["workflow_id"]),
+                    error_score=float(crow["error_score"]),
+                    group_instance_count=int(crow["group_instance_count"]),
+                    task_instance_ids=list(map(int, crow["task_instance_ids"])),
+                    task_ids=list(map(int, crow["task_ids"])),
+                    sample_error=(
+                        str(crow["sample_error"])
+                        if crow["sample_error"] is not None
+                        else None
+                    ),
+                    first_error_time=crow["first_error_time"],
+                )
+            )
+        return ErrorLogResponse(
+            error_logs=error_logs,
+            total_count=total_clusters,
+            page=page,
+            page_size=page_size,
+        )
+
     def get_tt_error_log_viz(
         self,
         workflow_id: int,
@@ -960,6 +1002,9 @@ class TaskTemplateRepository:
         page_size: int = 10,
         recent_errors_only: bool = False,
         cluster_errors: bool = False,
+        fatal_tasks_only: bool = False,
+        workflow_run_id: Optional[int] = None,
+        task_template_version_id: Optional[int] = None,  # Required from GUI callers
     ) -> ErrorLogResponse:
         """Get error logs for a task template ID for GUI visualization.
 
@@ -977,8 +1022,9 @@ class TaskTemplateRepository:
         """
         offset = (page - 1) * page_size
 
-        # optimize for large case like wf 490688 tt 9739
-        ttv_id = self._find_ttvid(workflow_id, task_template_id)
+        ttv_id = task_template_version_id or self._find_ttvid(
+            workflow_id, task_template_id
+        )
         if ttv_id is None:
             return ErrorLogResponse(
                 error_logs=[],
@@ -1086,13 +1132,110 @@ class TaskTemplateRepository:
                 page_size=page_size,
             )
 
-        # recent_error_only case, we should know the wfr id
-        if recent_errors_only:
-            workflow_run_id = self.session.execute(
-                select(func.max(WorkflowRun.id)).where(
-                    WorkflowRun.workflow_id == workflow_id
+        # Latest error per fatal task — one error per task regardless
+        # of workflow run, using the most recent error log entry.
+        if fatal_tasks_only:
+            query = (
+                select(
+                    func.max(TaskInstanceErrorLog.id).label("ttel_id"),
+                    Task.id.label("task_id"),
                 )
-            ).scalar_one()
+                .select_from(TaskInstanceErrorLog)
+                .join(
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .join(Task, TaskInstance.task_id == Task.id)
+                .join(Node, Task.node_id == Node.id)
+                .where(
+                    Task.workflow_id == workflow_id,
+                    Task.status == TaskStatus.ERROR_FATAL,
+                    Node.task_template_version_id == ttv_id,
+                )
+                .group_by(Task.id)
+                .order_by("ttel_id")
+            )
+            rows = self.session.execute(query).all()
+            total_count = len(rows)
+
+            if total_count == 0:
+                return ErrorLogResponse(
+                    error_logs=[], total_count=0, page=page, page_size=page_size
+                )
+
+            # For clustering, use all rows; for non-clustered, paginate
+            all_ttel_map = {row.ttel_id: row.task_id for row in rows}
+
+            detail_query = (
+                select(
+                    TaskInstanceErrorLog.id,
+                    TaskInstanceErrorLog.task_instance_id,
+                    TaskInstanceErrorLog.error_time,
+                    TaskInstanceErrorLog.description,
+                    TaskInstance.stderr_log,
+                    TaskInstance.workflow_run_id,
+                )
+                .join(
+                    TaskInstance,
+                    TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
+                )
+                .where(
+                    TaskInstanceErrorLog.id.in_(
+                        list(all_ttel_map.keys())
+                        if cluster_errors
+                        else [r.ttel_id for r in rows[offset : offset + page_size]]
+                    )
+                )
+            )
+            detail_rows = self.session.execute(detail_query).all()
+
+            if cluster_errors:
+                rows_dicts = [
+                    {
+                        "task_instance_err_id": r[0],
+                        "task_instance_id": r[1],
+                        "error_time": r[2],
+                        "error": str(r[3]) if r[3] is not None else None,
+                        "task_instance_stderr_log": r[4],
+                        "workflow_run_id": r[5],
+                        "workflow_id": workflow_id,
+                        "task_id": all_ttel_map.get(r[0]),
+                    }
+                    for r in detail_rows
+                ]
+                return self._cluster_and_paginate(
+                    rows_dicts, workflow_id, offset, page, page_size
+                )
+
+            error_logs = []
+            for r in detail_rows:
+                error_logs.append(
+                    ErrorLogItem(
+                        task_id=all_ttel_map.get(r[0]),
+                        task_instance_id=r[1],
+                        task_instance_err_id=r[0],
+                        error_time=r[2],
+                        error=r[3],
+                        task_instance_stderr_log=r[4],
+                        workflow_run_id=r[5],
+                        workflow_id=workflow_id,
+                    )
+                )
+            return ErrorLogResponse(
+                error_logs=error_logs,
+                total_count=total_count,
+                page=page,
+                page_size=page_size,
+            )
+
+        # Scope to a specific workflow run (explicit or latest)
+        if recent_errors_only or workflow_run_id is not None:
+            if workflow_run_id is None:
+                workflow_run_id = self.session.execute(
+                    select(func.max(WorkflowRun.id)).where(
+                        WorkflowRun.workflow_id == workflow_id
+                    )
+                ).scalar_one()
 
             if workflow_run_id is None:
                 return ErrorLogResponse(
@@ -1175,6 +1318,17 @@ class TaskTemplateRepository:
                 Original count query: 3 min 13.148 sec;
                 New combined query: 0.021 sec
             """
+            wfr_filters = [
+                TaskInstance.workflow_run_id == workflow_run_id,
+                Node.task_template_version_id == ttv_id,
+            ]
+            # recent_errors_only: diagnostic view — show all errors
+            # from the run regardless of current task status.
+            # Explicit workflow_run_id (from workflow details page):
+            # only show errors for tasks still in fatal state,
+            # since resolved errors are noise in the current-state view.
+            if not recent_errors_only:
+                wfr_filters.append(Task.status == TaskStatus.ERROR_FATAL)
             query = (
                 select(
                     func.max(TaskInstanceErrorLog.id).label("ttel_id"),
@@ -1187,10 +1341,7 @@ class TaskTemplateRepository:
                 )
                 .join_from(TaskInstance, Task, TaskInstance.task_id == Task.id)
                 .join_from(Task, Node, Task.node_id == Node.id)
-                .where(
-                    TaskInstance.workflow_run_id == workflow_run_id,
-                    Node.task_template_version_id == ttv_id,
-                )
+                .where(*wfr_filters)
                 .group_by(Task.id)
                 .order_by("ttel_id")
             )
@@ -1206,12 +1357,10 @@ class TaskTemplateRepository:
                     page_size=page_size,
                 )
 
-            # Slice rows according to the requested page and page_size
-            paged_rows = rows[offset : offset + page_size]
-            # build a dict of task_instance_id to task_id
-            ttev_t_map = {row.ttel_id: row.task_id for row in paged_rows}
-            # get details for the error logs
-            query = (
+            # For clustering, use all rows; for non-clustered, paginate
+            all_ttel_map = {row.ttel_id: row.task_id for row in rows}
+
+            detail_query = (
                 select(
                     TaskInstanceErrorLog.id,
                     TaskInstanceErrorLog.task_instance_id,
@@ -1224,69 +1373,44 @@ class TaskTemplateRepository:
                     TaskInstance,
                     TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
                 )
-                .where(TaskInstanceErrorLog.id.in_(ttev_t_map.keys()))
+                .where(
+                    TaskInstanceErrorLog.id.in_(
+                        list(all_ttel_map.keys())
+                        if cluster_errors
+                        else [r.ttel_id for r in rows[offset : offset + page_size]]
+                    )
+                )
             )
-            detail_rows = self.session.execute(query).all()
+            detail_rows = self.session.execute(detail_query).all()
 
             if cluster_errors:
-                # Build DataFrame for clustering
-                df = pd.DataFrame(
-                    [
-                        {
-                            "task_instance_err_id": r[0],
-                            "task_instance_id": r[1],
-                            "error_time": r[2],
-                            "error": str(r[3]) if r[3] is not None else None,
-                            "task_instance_stderr_log": (
-                                str(r[4]) if r[4] is not None else None
-                            ),
-                            "workflow_run_id": r[5],
-                            "workflow_id": workflow_id,
-                            "task_id": ttev_t_map.get(r[0]),
-                        }
-                        for r in detail_rows
-                    ]
-                )
-
-                clustered = cluster_error_logs(df)
-                total_clusters = len(clustered)
-                paged_clusters = clustered.iloc[offset : offset + page_size]
-
-                for _, crow in paged_clusters.iterrows():
-                    error_logs.append(
-                        ErrorLogItem(
-                            task_id=None,
-                            task_instance_id=None,
-                            task_instance_err_id=None,
-                            error_time=None,
-                            error=None,
-                            task_instance_stderr_log=None,
-                            workflow_run_id=int(crow["workflow_run_id"]),
-                            workflow_id=int(crow["workflow_id"]),
-                            error_score=float(crow["error_score"]),
-                            group_instance_count=int(crow["group_instance_count"]),
-                            task_instance_ids=list(map(int, crow["task_instance_ids"])),
-                            task_ids=list(map(int, crow["task_ids"])),
-                            sample_error=(
-                                str(crow["sample_error"])
-                                if crow["sample_error"] is not None
-                                else None
-                            ),
-                            first_error_time=crow["first_error_time"],
-                        )
-                    )
-
-                return ErrorLogResponse(
-                    error_logs=error_logs,
-                    total_count=total_clusters,
-                    page=page,
-                    page_size=page_size,
+                rows_dicts = [
+                    {
+                        "task_instance_err_id": r[0],
+                        "task_instance_id": r[1],
+                        "error_time": r[2],
+                        "error": (str(r[3]) if r[3] is not None else None),
+                        "task_instance_stderr_log": (
+                            str(r[4]) if r[4] is not None else None
+                        ),
+                        "workflow_run_id": r[5],
+                        "workflow_id": workflow_id,
+                        "task_id": all_ttel_map.get(r[0]),
+                    }
+                    for r in detail_rows
+                ]
+                return self._cluster_and_paginate(
+                    rows_dicts, workflow_id, offset, page, page_size
                 )
             else:
+                paged_ttel_map = {
+                    row.ttel_id: row.task_id
+                    for row in rows[offset : offset + page_size]
+                }
                 for row in detail_rows:
                     error_logs.append(
                         ErrorLogItem(
-                            task_id=ttev_t_map[row[0]],
+                            task_id=paged_ttel_map[row[0]],
                             task_instance_id=row[1],
                             task_instance_err_id=row[0],
                             error_time=row[2],
@@ -1404,80 +1528,29 @@ class TaskTemplateRepository:
                     )
 
                 if cluster_errors:
-                    df = pd.DataFrame(
-                        [
-                            {
-                                "task_instance_err_id": r.task_instance_id,
-                                "task_instance_id": r.task_instance_id,
-                                "error_time": r.status_date,
-                                "error": (
-                                    str(r.stderr_log or r.stderr)
-                                    if (r.stderr_log or r.stderr)
-                                    else None
-                                ),
-                                "task_instance_stderr_log": (
-                                    str(r.stderr_log or r.stderr)
-                                    if (r.stderr_log or r.stderr)
-                                    else None
-                                ),
-                                "workflow_run_id": r.workflow_run_id,
-                                "workflow_id": workflow_id,
-                                "task_id": r.task_id,
-                            }
-                            for r in fb_rows
-                        ]
-                    )
-
-                    clustered = cluster_error_logs(df)
-                    total_clusters = len(clustered)
-                    if total_clusters == 0:
-                        return ErrorLogResponse(
-                            error_logs=[],
-                            total_count=0,
-                            page=page,
-                            page_size=page_size,
-                        )
-
-                    paged_clusters = clustered.iloc[offset : offset + page_size]
-                    for _, crow in paged_clusters.iterrows():
-                        error_logs.append(
-                            ErrorLogItem(
-                                task_id=None,
-                                task_instance_id=None,
-                                task_instance_err_id=None,
-                                error_time=None,
-                                error=None,
-                                task_instance_stderr_log=None,
-                                workflow_run_id=int(crow["workflow_run_id"]),
-                                workflow_id=int(crow["workflow_id"]),
-                                error_score=float(crow["error_score"]),
-                                group_instance_count=int(crow["group_instance_count"]),
-                                task_instance_ids=list(
-                                    map(
-                                        int,
-                                        crow["task_instance_ids"],
-                                    )
-                                ),
-                                task_ids=list(
-                                    map(
-                                        int,
-                                        crow["task_ids"],
-                                    )
-                                ),
-                                sample_error=(
-                                    str(crow["sample_error"])
-                                    if crow["sample_error"] is not None
-                                    else None
-                                ),
-                                first_error_time=crow["first_error_time"],
-                            )
-                        )
-
-                    return ErrorLogResponse(
-                        error_logs=error_logs,
-                        total_count=total_clusters,
-                        page=page,
-                        page_size=page_size,
+                    rows_dicts = [
+                        {
+                            "task_instance_err_id": r.task_instance_id,
+                            "task_instance_id": r.task_instance_id,
+                            "error_time": r.status_date,
+                            "error": (
+                                str(r.stderr_log or r.stderr)
+                                if (r.stderr_log or r.stderr)
+                                else None
+                            ),
+                            "task_instance_stderr_log": (
+                                str(r.stderr_log or r.stderr)
+                                if (r.stderr_log or r.stderr)
+                                else None
+                            ),
+                            "workflow_run_id": r.workflow_run_id,
+                            "workflow_id": workflow_id,
+                            "task_id": r.task_id,
+                        }
+                        for r in fb_rows
+                    ]
+                    return self._cluster_and_paginate(
+                        rows_dicts, workflow_id, offset, page, page_size
                     )
 
                 # Non-clustered fallback
@@ -1505,64 +1578,23 @@ class TaskTemplateRepository:
                 )
 
             if cluster_errors and rows:
-                df = pd.DataFrame(
-                    [
-                        {
-                            "task_instance_err_id": r[0],
-                            "task_instance_id": r[1],
-                            "error_time": r[2],
-                            "error": str(r[3]) if r[3] is not None else None,
-                            "task_instance_stderr_log": (
-                                str(r[4]) if r[4] is not None else None
-                            ),
-                            "workflow_run_id": r[5],
-                            "workflow_id": workflow_id,
-                            "task_id": r[6],
-                        }
-                        for r in rows
-                    ]
-                )
-
-                clustered = cluster_error_logs(df)
-                total_clusters = len(clustered)
-                if total_clusters == 0:
-                    return ErrorLogResponse(
-                        error_logs=[],
-                        total_count=0,
-                        page=page,
-                        page_size=page_size,
-                    )
-
-                paged_clusters = clustered.iloc[offset : offset + page_size]
-                for _, crow in paged_clusters.iterrows():
-                    error_logs.append(
-                        ErrorLogItem(
-                            task_id=None,
-                            task_instance_id=None,
-                            task_instance_err_id=None,
-                            error_time=None,
-                            error=None,
-                            task_instance_stderr_log=None,
-                            workflow_run_id=int(crow["workflow_run_id"]),
-                            workflow_id=int(crow["workflow_id"]),
-                            error_score=float(crow["error_score"]),
-                            group_instance_count=int(crow["group_instance_count"]),
-                            task_instance_ids=list(map(int, crow["task_instance_ids"])),
-                            task_ids=list(map(int, crow["task_ids"])),
-                            sample_error=(
-                                str(crow["sample_error"])
-                                if crow["sample_error"] is not None
-                                else None
-                            ),
-                            first_error_time=crow["first_error_time"],
-                        )
-                    )
-
-                return ErrorLogResponse(
-                    error_logs=error_logs,
-                    total_count=total_clusters,
-                    page=page,
-                    page_size=page_size,
+                rows_dicts = [
+                    {
+                        "task_instance_err_id": r[0],
+                        "task_instance_id": r[1],
+                        "error_time": r[2],
+                        "error": (str(r[3]) if r[3] is not None else None),
+                        "task_instance_stderr_log": (
+                            str(r[4]) if r[4] is not None else None
+                        ),
+                        "workflow_run_id": r[5],
+                        "workflow_id": workflow_id,
+                        "task_id": r[6],
+                    }
+                    for r in rows
+                ]
+                return self._cluster_and_paginate(
+                    rows_dicts, workflow_id, offset, page, page_size
                 )
 
             total_count = len(rows)

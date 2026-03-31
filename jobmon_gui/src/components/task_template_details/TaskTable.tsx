@@ -7,7 +7,17 @@ import {
     MRT_RowData,
     useMaterialReactTable,
 } from 'material-react-table';
-import { Box, Button, TextField } from '@mui/material';
+import {
+    Box,
+    Button,
+    FormControl,
+    FormControlLabel,
+    InputLabel,
+    MenuItem,
+    Select,
+    Switch,
+    TextField,
+} from '@mui/material';
 import { mkConfig, generateCsv, download } from 'export-to-csv';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
@@ -30,12 +40,33 @@ import {
 } from '@jobmon_gui/constants/taskStatus';
 import humanizeDuration from 'humanize-duration';
 
+/** Priority order for status sorting — error statuses first. */
+const STATUS_SORT_PRIORITY: Record<string, number> = {
+    F: 0, // Fatal Error
+    E: 1, // Error
+    Z: 2, // Resource Error
+    X: 3, // No Heartbeat
+    U: 4, // Unknown Error
+    A: 5, // Adjusting
+    R: 6, // Running
+    O: 7, // Scheduled
+    Q: 8, // Queued
+    I: 9, // Instantiated
+    G: 10, // Registered
+    D: 11, // Done
+};
+
 export default function TaskTable({
     data,
     isLoading,
     taskTemplateName,
     workflowId,
     onFilteredInstanceIdsChange,
+    showLatestOnly,
+    onShowLatestOnlyChange,
+    selectedWorkflowRunId,
+    availableWorkflowRunIds,
+    onSelectedWorkflowRunIdChange,
 }: TaskTableProps) {
     dayjs.extend(utc);
     const queryClient = useQueryClient();
@@ -99,6 +130,13 @@ export default function TaskTable({
             header: 'Status',
             size: 140,
             grow: false,
+            sortingFn: (rowA, rowB) => {
+                const a = rowA.original.instance_status;
+                const b = rowB.original.instance_status;
+                const pa = STATUS_SORT_PRIORITY[a] ?? 99;
+                const pb = STATUS_SORT_PRIORITY[b] ?? 99;
+                return pa - pb;
+            },
             Cell: ({ row }) => {
                 const status = row.original.instance_status;
                 const label = getStatusLabel(status);
@@ -162,21 +200,12 @@ export default function TaskTable({
             grow: false,
             enableColumnFilterModes: false,
             filterFn: (row, _columnId, filterValue) => {
-                const rowDate = row.getValue<dayjs.Dayjs>(
-                    'task_status_date'
-                );
+                const rowDate = row.getValue<dayjs.Dayjs>('task_status_date');
                 if (!filterValue || !rowDate || !dayjs.isDayjs(rowDate))
                     return true;
-                if (
-                    Array.isArray(filterValue) &&
-                    filterValue.length === 2
-                ) {
+                if (Array.isArray(filterValue) && filterValue.length === 2) {
                     const [from, to] = filterValue;
-                    if (
-                        from &&
-                        dayjs.isDayjs(from) &&
-                        rowDate.isBefore(from)
-                    )
+                    if (from && dayjs.isDayjs(from) && rowDate.isBefore(from))
                         return false;
                     if (to && dayjs.isDayjs(to) && rowDate.isAfter(to))
                         return false;
@@ -192,12 +221,8 @@ export default function TaskTable({
                 let currentFrom: dayjs.Dayjs | undefined;
                 let currentTo: dayjs.Dayjs | undefined;
                 if (Array.isArray(raw) && raw.length === 2) {
-                    currentFrom = dayjs.isDayjs(raw[0])
-                        ? raw[0]
-                        : undefined;
-                    currentTo = dayjs.isDayjs(raw[1])
-                        ? raw[1]
-                        : undefined;
+                    currentFrom = dayjs.isDayjs(raw[0]) ? raw[0] : undefined;
+                    currentTo = dayjs.isDayjs(raw[1]) ? raw[1] : undefined;
                 } else if (dayjs.isDayjs(raw)) {
                     currentFrom = raw;
                 }
@@ -216,9 +241,7 @@ export default function TaskTable({
                             label="From"
                             value={
                                 currentFrom
-                                    ? currentFrom.format(
-                                          'YYYY-MM-DDTHH:mm'
-                                      )
+                                    ? currentFrom.format('YYYY-MM-DDTHH:mm')
                                     : ''
                             }
                             onChange={e => {
@@ -247,9 +270,7 @@ export default function TaskTable({
                             label="To"
                             value={
                                 currentTo
-                                    ? currentTo.format(
-                                          'YYYY-MM-DDTHH:mm'
-                                      )
+                                    ? currentTo.format('YYYY-MM-DDTHH:mm')
                                     : ''
                             }
                             onChange={e => {
@@ -372,7 +393,68 @@ export default function TaskTable({
         },
         renderTopToolbarCustomActions: _table => {
             return (
-                <Box>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        flexWrap: 'wrap',
+                    }}
+                >
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={showLatestOnly}
+                                onChange={(_e, checked) =>
+                                    onShowLatestOnlyChange(checked)
+                                }
+                                size="small"
+                            />
+                        }
+                        label="Latest attempt only"
+                        slotProps={{
+                            typography: {
+                                variant: 'body2',
+                            },
+                        }}
+                    />
+                    {availableWorkflowRunIds.length > 1 && (
+                        <FormControl
+                            size="small"
+                            sx={{ minWidth: 140 }}
+                        >
+                            <InputLabel id="wfr-filter-label">
+                                Workflow Run
+                            </InputLabel>
+                            <Select
+                                labelId="wfr-filter-label"
+                                label="Workflow Run"
+                                value={
+                                    selectedWorkflowRunId ?? ''
+                                }
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    onSelectedWorkflowRunIdChange(
+                                        val === ''
+                                            ? null
+                                            : Number(val)
+                                    );
+                                }}
+                            >
+                                <MenuItem value="">All</MenuItem>
+                                {availableWorkflowRunIds.map(
+                                    id => (
+                                        <MenuItem
+                                            key={id}
+                                            value={id}
+                                        >
+                                            {id}
+                                        </MenuItem>
+                                    )
+                                )}
+                            </Select>
+                        </FormControl>
+                    )}
                     <Button
                         onClick={exportToCSV}
                         startIcon={<FileDownloadIcon />}
@@ -402,9 +484,7 @@ export default function TaskTable({
 
         const filteredRows = table.getFilteredRowModel().rows;
         const ids = new Set(
-            filteredRows.map(
-                row => row.original.task_instance_id
-            )
+            filteredRows.map(row => row.original.task_instance_id)
         );
         const key = [...ids].sort().join(',');
         if (key !== prevFilteredKeyRef.current) {

@@ -31,8 +31,10 @@ import { useTaskTableStore } from '@jobmon_gui/stores/TaskTable.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowUsageQueryFn } from '@jobmon_gui/queries/GetWorkflowUsage.ts';
-import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors.ts';
-import { getWorkflowHasResourceErrorsFn } from '@jobmon_gui/queries/GetWorkflowHasResourceErrors.ts';
+import {
+    getClusteredErrorsFn,
+    clusteredErrorsKey,
+} from '@jobmon_gui/queries/GetClusteredErrors.ts';
 import {
     AppBreadcrumbs,
     BreadcrumbItem,
@@ -123,17 +125,13 @@ function WorkflowDetails() {
         refetchOnMount: true,
     });
 
+    const latestWfrId = wfDetails.data?.wfr_id ?? null;
+
     const wfTTStatus = useQuery({
         queryKey: ['workflow_details', 'tt_status', workflowId],
         queryFn: getWorkflowTTStatusQueryFn,
         refetchOnMount: true,
         refetchOnWindowFocus: true,
-    });
-
-    const hasResourceErrorsQuery = useQuery({
-        queryKey: ['workflow_details', 'has_resource_errors', workflowId],
-        queryFn: getWorkflowHasResourceErrorsFn,
-        staleTime: 120000,
     });
 
     const ttStatusByName = useMemo(() => {
@@ -203,12 +201,15 @@ function WorkflowDetails() {
         setLeftPanelView('list');
     };
 
-    const resetStoresAndNavigate = (ttId: string | number) => {
+    const resetStoresAndNavigate = (
+        ttId: string | number,
+        ttvId: string | number
+    ) => {
         useTaskTableStore.setState({
             ...useTaskTableStore.getState(),
             filters: [],
         });
-        navigate(`/workflow/${workflowId}/task_template/${ttId}`);
+        navigate(`/workflow/${workflowId}/task_template/${ttId}?ttv=${ttvId}`);
     };
 
     const prefetchTemplateData = (taskTemplate: {
@@ -226,12 +227,10 @@ function WorkflowDetails() {
             queryFn: getWorkflowUsageQueryFn,
         });
         void queryClient.prefetchQuery({
-            queryKey: [
-                'workflow_details',
-                'clustered_errors',
+            queryKey: clusteredErrorsKey({
                 workflowId,
-                taskTemplate.id,
-            ],
+                taskTemplateId: taskTemplate.id,
+            }),
             queryFn: getClusteredErrorsFn,
         });
     };
@@ -258,8 +257,14 @@ function WorkflowDetails() {
             workflowId={workflowId}
             templateData={selectedTemplateData}
             onBack={handleTemplateBack}
-            onNavigate={() => resetStoresAndNavigate(selectedTemplateData.id)}
+            onNavigate={() =>
+                resetStoresAndNavigate(
+                    selectedTemplateData.id,
+                    selectedTemplateData.task_template_version_id
+                )
+            }
             disabled={disabled}
+            workflowRunId={latestWfrId}
         />
     ) : leftPanelView === 'manage' ? (
         <WorkflowManagePanel
@@ -271,11 +276,9 @@ function WorkflowDetails() {
     ) : (
         <TemplateListPanel
             workflowId={workflowId!}
+            workflowRunId={latestWfrId}
             ttData={wfTTStatus.data}
             hoveredTemplateName={hoveredTemplateName}
-            hasResourceErrors={
-                hasResourceErrorsQuery.data?.has_resource_errors ?? false
-            }
             onTemplateSelect={handleTemplateSelect}
             onTemplateHover={setHoveredTemplateName}
             onPrefetch={prefetchTemplateData}

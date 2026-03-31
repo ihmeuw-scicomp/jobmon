@@ -5,14 +5,16 @@ from typing import Any, Optional
 
 import structlog
 from fastapi import Depends, HTTPException, Query
-from sqlalchemy import exists, select
+from sqlalchemy import and_, exists, select
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
 from jobmon.server.web.db import get_db, get_dialect
+from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
+from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.repositories.task_template_repository import (
     TaskTemplateRepository,
 )
@@ -33,11 +35,14 @@ logger = structlog.get_logger(__name__)
 def get_task_template_details_for_workflow(
     workflow_id: int = Query(..., ge=1),
     task_template_id: int = Query(..., ge=1),
+    task_template_version_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ) -> Any:
     """Fetch Task Template details (ID, Name, and Version) for a given Workflow."""
     tt_repo = TaskTemplateRepository(db)
-    tt_details_data = tt_repo.get_task_template_details(workflow_id, task_template_id)
+    tt_details_data = tt_repo.get_task_template_details(
+        workflow_id, task_template_id, task_template_version_id
+    )
 
     if tt_details_data is None:
         raise HTTPException(
@@ -136,7 +141,7 @@ async def get_task_template_resource_usage(
 
         # Prepare viz data if requested
         viz_data = None
-        if request_data.viz and task_details:
+        if request_data.viz:
             viz_data = []
             for detail_item in task_details:
                 viz_data.append(
@@ -154,6 +159,45 @@ async def get_task_template_resource_usage(
                         task_command=detail_item.task_command,
                         task_num_attempts=detail_item.task_num_attempts,
                         task_max_attempts=detail_item.task_max_attempts,
+                        workflow_run_id=detail_item.workflow_run_id,
+                    )
+                )
+
+            # Include tasks without qualifying instances
+            # (Registered, Queued, Running — not yet terminal).
+            # Uses Python-side exclusion to avoid expensive NOT EXISTS
+            # subquery against task_instance.
+            task_ids_with_instances = {d.task_id for d in task_details}
+            task_filters = [
+                TaskTemplateVersion.id == request_data.task_template_version_id,
+                Node.task_template_version_id == TaskTemplateVersion.id,
+                Task.node_id == Node.id,
+            ]
+            if request_data.workflows:
+                task_filters.append(Task.workflow_id.in_(request_data.workflows))
+            all_tasks_query = select(
+                Task.id,
+                Task.name,
+                Task.status,
+                Task.command,
+                Task.num_attempts,
+                Task.max_attempts,
+                Task.status_date,
+                Node.id.label("node_id"),
+            ).where(and_(*task_filters))
+            for row in db.execute(all_tasks_query).all():
+                if row[0] in task_ids_with_instances:
+                    continue
+                viz_data.append(
+                    TaskResourceVizItem(
+                        node_id=row[7],
+                        task_id=row[0],
+                        task_name=row[1],
+                        status=row[2],
+                        task_command=row[3],
+                        task_num_attempts=row[4],
+                        task_max_attempts=row[5],
+                        task_status_date=row[6],
                     )
                 )
 
@@ -190,7 +234,8 @@ def get_workflow_tt_status_viz(
     """Get the status of the workflows for GUI."""
     tt_repo = TaskTemplateRepository(db)
     result_dict = tt_repo.get_workflow_tt_status_viz(
-        workflow_id=workflow_id, dialect=dialect
+        workflow_id=workflow_id,
+        dialect=dialect,
     )
 
     # Convert Pydantic models back to serializable dict format for JSONResponse
@@ -229,6 +274,7 @@ def get_workflow_has_resource_errors(
 def get_fatal_error_breakdown(
     workflow_id: int,
     tt_version_id: int,
+    workflow_run_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ) -> FatalErrorBreakdownResponse:
     """Classify fatal errors for one template by type."""
@@ -236,6 +282,7 @@ def get_fatal_error_breakdown(
     return tt_repo.get_fatal_error_breakdown_for_tt(
         workflow_id=workflow_id,
         task_template_version_id=tt_version_id,
+        workflow_run_id=workflow_run_id,
     )
 
 
@@ -249,11 +296,15 @@ def get_tt_error_log_viz(
     page_size: int = 10,
     just_recent_errors: str = "false",
     cluster_errors: str = "false",
+    fatal_tasks_only: str = "false",
+    workflow_run_id: Optional[int] = None,
+    task_template_version_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ) -> Any:
     """Get the error logs for a task template id for GUI."""
     recent_errors = just_recent_errors.lower() == "true"
     output_clustered_errors = cluster_errors.lower() == "true"
+    fatal_only = fatal_tasks_only.lower() == "true"
 
     if tt_id is None:
         raise ValueError("Task template ID is required")
@@ -267,6 +318,9 @@ def get_tt_error_log_viz(
         page_size=page_size,
         recent_errors_only=recent_errors,
         cluster_errors=output_clustered_errors,
+        fatal_tasks_only=fatal_only,
+        workflow_run_id=workflow_run_id,
+        task_template_version_id=task_template_version_id,
     )
 
     return result

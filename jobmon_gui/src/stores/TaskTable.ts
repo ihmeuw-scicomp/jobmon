@@ -137,7 +137,7 @@ export const useTaskTableStore = create<TaskTableStore>()(
             ),
             getFilters: () => get().filters,
 
-            sorting: [] as SortingState,
+            sorting: [{ id: 'instance_status', desc: false }] as SortingState,
             setSorting: zustandSetter(get, set, 'sorting'),
             getSorting: () => get().sorting,
 
@@ -162,10 +162,16 @@ export const useTaskTableStore = create<TaskTableStore>()(
         }),
         {
             name: 'TaskTable',
+            version: 2,
             storage: taskTableStorage,
+            migrate: (persisted: unknown) => {
+                const state = persisted as Record<string, unknown>;
+                delete state.filters;
+                delete state.sorting;
+                return state as Partial<TaskTableStore>;
+            },
             partialize: state => ({
                 maxRows: state.maxRows,
-                filters: state.filters,
                 sorting: state.sorting,
                 columnOrder: state.columnOrder,
                 pagination: state.pagination,

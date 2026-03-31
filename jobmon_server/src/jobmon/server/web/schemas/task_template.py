@@ -34,6 +34,7 @@ class TaskResourceDetailItem(BaseModel):
     task_command: Optional[str] = None
     task_num_attempts: Optional[int] = None
     task_max_attempts: Optional[int] = None
+    workflow_run_id: Optional[int] = None
     model_config = ConfigDict(populate_by_name=True)
 
 
@@ -51,6 +52,7 @@ class TaskResourceVizItem(BaseModel):
     task_command: Optional[str] = None
     task_num_attempts: Optional[int] = None
     task_max_attempts: Optional[int] = None
+    workflow_run_id: Optional[int] = None
 
 
 class FormattedStats(BaseModel):

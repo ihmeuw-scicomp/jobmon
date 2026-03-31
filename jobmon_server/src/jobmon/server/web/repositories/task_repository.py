@@ -680,6 +680,7 @@ class TaskRepository:
                 Queue.name,
                 TaskInstance.cpu,
                 TaskInstance.io,
+                TaskInstance.workflow_run_id,
             )
             .outerjoin_from(
                 TaskInstance,
@@ -725,6 +726,7 @@ class TaskRepository:
                 ti_queue_name=row[14],
                 ti_cpu=row[15],
                 ti_io=row[16],
+                ti_workflow_run_id=row[17],
             )
             for row in rows
         ]

@@ -568,3 +568,57 @@ export const getResourceClusterKey = (
 
     return null;
 };
+
+/**
+ * Efficiency status classification for resource utilization.
+ */
+export type EfficiencyLevel = 'under' | 'over' | 'ok';
+
+export interface EfficiencyStatus {
+    level: EfficiencyLevel;
+    label: string;
+    shortLabel: string;
+    description: string;
+    color: string;
+    bgColor: string;
+    muiColor: 'error' | 'warning' | 'success';
+}
+
+const EFFICIENCY_STATUSES: Record<EfficiencyLevel, EfficiencyStatus> = {
+    under: {
+        level: 'under',
+        label: 'UNDER-ALLOCATED',
+        shortLabel: 'UNDER-ALLOC',
+        description: 'High Risk',
+        color: '#d32f2f',
+        bgColor: '#ffebee',
+        muiColor: 'error',
+    },
+    over: {
+        level: 'over',
+        label: 'OVER-ALLOCATED',
+        shortLabel: 'OVER-ALLOC',
+        description: 'Wasteful',
+        color: '#ed6c02',
+        bgColor: '#fff3e0',
+        muiColor: 'warning',
+    },
+    ok: {
+        level: 'ok',
+        label: 'WELL-ALLOCATED',
+        shortLabel: 'OK',
+        description: 'Optimal',
+        color: '#2e7d32',
+        bgColor: '#e8f5e9',
+        muiColor: 'success',
+    },
+};
+
+/**
+ * Classify resource utilization into efficiency status.
+ */
+export const getEfficiencyStatus = (utilization: number): EfficiencyStatus => {
+    if (utilization > 90) return EFFICIENCY_STATUSES.under;
+    if (utilization < 50) return EFFICIENCY_STATUSES.over;
+    return EFFICIENCY_STATUSES.ok;
+};

@@ -697,7 +697,7 @@ class WorkflowRepository:
         """Fetch name, args, dates, tool for a Workflow provided WF ID."""
         latest_workflow_run_subquery = (
             self.session.query(
-                WorkflowRun.workflow_id, func.max(WorkflowRun.heartbeat_date)
+                WorkflowRun.workflow_id, func.max(WorkflowRun.id).label("max_wfr_id")
             )
             .group_by(WorkflowRun.workflow_id)
             .subquery()
@@ -715,14 +715,19 @@ class WorkflowRepository:
                 WorkflowRun.jobmon_version,
                 WorkflowRun.heartbeat_date,
                 WorkflowRun.user,
+                WorkflowRun.id.label("wfr_id"),
             )
             .select_from(Workflow)
             .join(ToolVersion, Workflow.tool_version_id == ToolVersion.id)
             .join(Tool, ToolVersion.tool_id == Tool.id)
             .join(WorkflowStatus, WorkflowStatus.id == Workflow.status)
-            .join(WorkflowRun, WorkflowRun.workflow_id == Workflow.id)
             .join(
                 latest_workflow_run_subquery,
+                latest_workflow_run_subquery.c.workflow_id == Workflow.id,
+            )
+            .join(
+                WorkflowRun,
+                WorkflowRun.id == latest_workflow_run_subquery.c.max_wfr_id,
             )
             .where(
                 Workflow.id == workflow_id,
@@ -741,6 +746,7 @@ class WorkflowRepository:
             "wfr_jobmon_version",
             "wfr_heartbeat_date",
             "wfr_user",
+            "wfr_id",
         )
 
         result = [dict(zip(column_names, row)) for row in rows]

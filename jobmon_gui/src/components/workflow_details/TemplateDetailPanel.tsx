@@ -16,11 +16,17 @@ import InfoIcon from '@mui/icons-material/Info';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { TTStatus } from '@jobmon_gui/types/TaskTemplateStatus';
-import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors';
+import {
+    getClusteredErrorsFn,
+    clusteredErrorsKey,
+} from '@jobmon_gui/queries/GetClusteredErrors';
 import { getWorkflowUsageQueryFn } from '@jobmon_gui/queries/GetWorkflowUsage';
 import ErrorClustersCard from '@jobmon_gui/components/task_template_details/usage/ErrorClustersCard';
 import ResourceCard from '@jobmon_gui/components/workflow_details/ResourceCard';
-import { getFatalErrorBreakdownFn } from '@jobmon_gui/queries/GetFatalErrorBreakdown';
+import {
+    getFatalErrorBreakdownFn,
+    fatalBreakdownKey,
+} from '@jobmon_gui/queries/GetFatalErrorBreakdown';
 import {
     set_task_template_concurrency_url,
     task_table_url,
@@ -41,6 +47,7 @@ interface TemplateDetailPanelProps {
     onBack: () => void;
     onNavigate: () => void;
     disabled?: boolean;
+    workflowRunId?: number | null;
 }
 
 export default function TemplateDetailPanel({
@@ -49,13 +56,10 @@ export default function TemplateDetailPanel({
     onBack,
     onNavigate,
     disabled,
+    workflowRunId,
 }: TemplateDetailPanelProps) {
-    const [concurrencyValue, setConcurrencyValue] = useState<
-        number | string
-    >(
-        templateData.MAXC >= MAX_CONCURRENCY_SENTINEL
-            ? ''
-            : templateData.MAXC
+    const [concurrencyValue, setConcurrencyValue] = useState<number | string>(
+        templateData.MAXC >= MAX_CONCURRENCY_SENTINEL ? '' : templateData.MAXC
     );
     const [statusMsg, setStatusMsg] = useState('');
     const [showManage, setShowManage] = useState(false);
@@ -90,8 +94,7 @@ export default function TemplateDetailPanel({
     const handleConcurrencyChange = (
         e: React.ChangeEvent<HTMLInputElement>
     ) => {
-        const val =
-            e.target.value === '' ? '' : Number(e.target.value);
+        const val = e.target.value === '' ? '' : Number(e.target.value);
         if (val === '' || (val >= 0 && val <= 2147483647)) {
             setConcurrencyValue(val);
         }
@@ -143,12 +146,13 @@ export default function TemplateDetailPanel({
     };
 
     const errorsQuery = useQuery({
-        queryKey: [
-            'workflow_details',
-            'clustered_errors',
+        queryKey: clusteredErrorsKey({
             workflowId,
-            templateData.id,
-        ],
+            taskTemplateId: templateData.id,
+            fatalTasksOnly: true,
+            taskTemplateVersionId:
+                templateData.task_template_version_id,
+        }),
         queryFn: getClusteredErrorsFn,
         enabled: templateData.FATAL > 0,
     });
@@ -164,17 +168,21 @@ export default function TemplateDetailPanel({
     });
 
     const breakdownQuery = useQuery({
-        queryKey: [
-            'workflow_details',
-            'fatal_breakdown',
+        queryKey: fatalBreakdownKey({
             workflowId,
-            templateData.task_template_version_id,
-        ],
+            taskTemplateVersionId:
+                templateData.task_template_version_id,
+            workflowRunId,
+        }),
         queryFn: getFatalErrorBreakdownFn,
-        enabled: templateData.FATAL > 0,
+        enabled:
+            templateData.FATAL > 0 ||
+            templateData.num_attempts_avg > 1,
         staleTime: 120000,
     });
 
+    const hasResourceErrors =
+        (breakdownQuery.data?.resource_error_total ?? 0) > 0;
     const errorClusters = errorsQuery.data?.error_logs ?? [];
 
     return (
@@ -219,19 +227,38 @@ export default function TemplateDetailPanel({
             {/* Manage controls (toggled by wrench icon) */}
             {showManage && (
                 <Box sx={{ mb: 1.5 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                    <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ mb: 0.5, display: 'block' }}
+                    >
                         Manage Template
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                        <FormControl variant="outlined" size="small" sx={{ flex: 1 }} disabled={disabled}>
-                            <InputLabel id="tt-status-label">Set Status</InputLabel>
+                    <Box
+                        sx={{
+                            display: 'flex',
+                            gap: 1,
+                            alignItems: 'flex-start',
+                        }}
+                    >
+                        <FormControl
+                            variant="outlined"
+                            size="small"
+                            sx={{ flex: 1 }}
+                            disabled={disabled}
+                        >
+                            <InputLabel id="tt-status-label">
+                                Set Status
+                            </InputLabel>
                             <Select
                                 labelId="tt-status-label"
                                 label="Set Status"
                                 onChange={e => {
                                     const val = e.target.value as string;
-                                    if (val === 'G') handleStatusUpdate('rerun');
-                                    else if (val === 'D') handleStatusUpdate('skip');
+                                    if (val === 'G')
+                                        handleStatusUpdate('rerun');
+                                    else if (val === 'D')
+                                        handleStatusUpdate('skip');
                                 }}
                             >
                                 <MenuItem value="G">Re-run</MenuItem>
@@ -259,13 +286,21 @@ export default function TemplateDetailPanel({
                             title="Skip to Done: mark tasks as done. Re-run: reset tasks and downstream."
                             placement="right"
                         >
-                            <InfoIcon fontSize="small" color="action" sx={{ mt: 1, cursor: 'help' }} />
+                            <InfoIcon
+                                fontSize="small"
+                                color="action"
+                                sx={{ mt: 1, cursor: 'help' }}
+                            />
                         </Tooltip>
                     </Box>
                     {statusMsg && (
                         <Typography
                             variant="caption"
-                            color={statusMsg === 'Success' ? 'success.main' : 'error'}
+                            color={
+                                statusMsg === 'Success'
+                                    ? 'success.main'
+                                    : 'error'
+                            }
                             sx={{ display: 'block', mt: 0.5 }}
                         >
                             {statusMsg}
@@ -276,7 +311,11 @@ export default function TemplateDetailPanel({
 
             {/* Status bar + breakdown */}
             <Box sx={{ mb: 1.5 }}>
-                <TemplateStatusBar counts={templateData} height={18} showLabels />
+                <TemplateStatusBar
+                    counts={templateData}
+                    height={18}
+                    showLabels
+                />
                 <Typography
                     variant="body2"
                     color="text.secondary"
@@ -299,8 +338,10 @@ export default function TemplateDetailPanel({
                                     height: 20,
                                     fontSize: '0.7rem',
                                     fontWeight: 600,
-                                    backgroundColor: TEMPLATE_STATUS_COLORS[key],
-                                    color: key === 'SCHEDULED' ? '#333' : '#fff',
+                                    backgroundColor:
+                                        TEMPLATE_STATUS_COLORS[key],
+                                    color:
+                                        key === 'SCHEDULED' ? '#333' : '#fff',
                                 }}
                             />
                         );
@@ -309,28 +350,24 @@ export default function TemplateDetailPanel({
             </Box>
 
             {/* Errors */}
-            {templateData.FATAL > 0 && (
+            {(templateData.FATAL > 0 || hasResourceErrors) && (
                 <Box sx={{ mb: 1 }}>
                     <ErrorClustersCard
                         errorLogs={errorClusters}
-                        isLoading={errorsQuery.isLoading}
+                        isLoading={errorsQuery.isLoading || errorsQuery.isPending}
                         workflowId={workflowId}
                         taskTemplateId={templateData.id}
                         maxListHeight={120}
+                        resourceErrorBreakdown={breakdownQuery.data}
                     />
                 </Box>
             )}
 
             {/* Resources card */}
             <ResourceCard
-                workflowId={workflowId}
-                taskTemplateId={templateData.id}
                 usageData={usageQuery.data ?? null}
                 usageLoading={usageQuery.isLoading}
-                breakdown={breakdownQuery.data}
-                breakdownLoading={breakdownQuery.isLoading}
             />
-
         </Box>
     );
 }
