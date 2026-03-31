@@ -16,11 +16,17 @@ import InfoIcon from '@mui/icons-material/Info';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { TTStatus } from '@jobmon_gui/types/TaskTemplateStatus';
-import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors';
+import {
+    getClusteredErrorsFn,
+    clusteredErrorsKey,
+} from '@jobmon_gui/queries/GetClusteredErrors';
 import { getWorkflowUsageQueryFn } from '@jobmon_gui/queries/GetWorkflowUsage';
 import ErrorClustersCard from '@jobmon_gui/components/task_template_details/usage/ErrorClustersCard';
 import ResourceCard from '@jobmon_gui/components/workflow_details/ResourceCard';
-import { getFatalErrorBreakdownFn } from '@jobmon_gui/queries/GetFatalErrorBreakdown';
+import {
+    getFatalErrorBreakdownFn,
+    fatalBreakdownKey,
+} from '@jobmon_gui/queries/GetFatalErrorBreakdown';
 import {
     set_task_template_concurrency_url,
     task_table_url,
@@ -140,15 +146,13 @@ export default function TemplateDetailPanel({
     };
 
     const errorsQuery = useQuery({
-        queryKey: [
-            'workflow_details',
-            'clustered_errors',
+        queryKey: clusteredErrorsKey({
             workflowId,
-            templateData.id,
-            null,
-            'fatal_tasks_only',
-            templateData.task_template_version_id,
-        ],
+            taskTemplateId: templateData.id,
+            fatalTasksOnly: true,
+            taskTemplateVersionId:
+                templateData.task_template_version_id,
+        }),
         queryFn: getClusteredErrorsFn,
         enabled: templateData.FATAL > 0,
     });
@@ -164,13 +168,12 @@ export default function TemplateDetailPanel({
     });
 
     const breakdownQuery = useQuery({
-        queryKey: [
-            'workflow_details',
-            'fatal_breakdown',
+        queryKey: fatalBreakdownKey({
             workflowId,
-            templateData.task_template_version_id,
+            taskTemplateVersionId:
+                templateData.task_template_version_id,
             workflowRunId,
-        ],
+        }),
         queryFn: getFatalErrorBreakdownFn,
         enabled:
             (templateData.FATAL > 0 ||

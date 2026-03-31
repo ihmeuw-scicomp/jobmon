@@ -940,6 +940,64 @@ class TaskTemplateRepository:
             resource_error_ti_ids=resource_error_ti_ids,
         )
 
+    @staticmethod
+    def _cluster_and_paginate(
+        rows: List[Dict[str, Any]],
+        workflow_id: int,
+        offset: int,
+        page: int,
+        page_size: int,
+    ) -> ErrorLogResponse:
+        """Cluster error rows via TF-IDF and return a paginated response.
+
+        Clustering always runs on the full dataset first, then pagination
+        is applied to the resulting clusters (not the raw rows).
+        """
+        df = pd.DataFrame(rows)
+        if len(df) == 0 or not df["error"].notna().any():
+            return ErrorLogResponse(
+                error_logs=[], total_count=0, page=page, page_size=page_size
+            )
+
+        clustered = cluster_error_logs(df)
+        total_clusters = len(clustered)
+        if total_clusters == 0:
+            return ErrorLogResponse(
+                error_logs=[], total_count=0, page=page, page_size=page_size
+            )
+
+        paged = clustered.iloc[offset : offset + page_size]
+        error_logs = []
+        for _, crow in paged.iterrows():
+            error_logs.append(
+                ErrorLogItem(
+                    task_id=None,
+                    task_instance_id=None,
+                    task_instance_err_id=None,
+                    error_time=None,
+                    error=None,
+                    task_instance_stderr_log=None,
+                    workflow_run_id=int(crow["workflow_run_id"]),
+                    workflow_id=int(crow["workflow_id"]),
+                    error_score=float(crow["error_score"]),
+                    group_instance_count=int(crow["group_instance_count"]),
+                    task_instance_ids=list(map(int, crow["task_instance_ids"])),
+                    task_ids=list(map(int, crow["task_ids"])),
+                    sample_error=(
+                        str(crow["sample_error"])
+                        if crow["sample_error"] is not None
+                        else None
+                    ),
+                    first_error_time=crow["first_error_time"],
+                )
+            )
+        return ErrorLogResponse(
+            error_logs=error_logs,
+            total_count=total_clusters,
+            page=page,
+            page_size=page_size,
+        )
+
     def get_tt_error_log_viz(
         self,
         workflow_id: int,
@@ -1137,55 +1195,22 @@ class TaskTemplateRepository:
             detail_rows = self.session.execute(detail_query).all()
 
             if cluster_errors:
-                df = pd.DataFrame(
-                    [
-                        {
-                            "task_instance_err_id": r[0],
-                            "task_instance_id": r[1],
-                            "error_time": r[2],
-                            "error": str(r[3]) if r[3] is not None else None,
-                            "task_instance_stderr_log": r[4],
-                            "workflow_run_id": r[5],
-                            "workflow_id": workflow_id,
-                            "task_id": all_ttel_map.get(r[0]),
-                        }
-                        for r in detail_rows
-                    ]
+                rows_dicts = [
+                    {
+                        "task_instance_err_id": r[0],
+                        "task_instance_id": r[1],
+                        "error_time": r[2],
+                        "error": str(r[3]) if r[3] is not None else None,
+                        "task_instance_stderr_log": r[4],
+                        "workflow_run_id": r[5],
+                        "workflow_id": workflow_id,
+                        "task_id": all_ttel_map.get(r[0]),
+                    }
+                    for r in detail_rows
+                ]
+                return self._cluster_and_paginate(
+                    rows_dicts, workflow_id, offset, page, page_size
                 )
-                if len(df) > 0 and df["error"].notna().any():
-                    clustered = cluster_error_logs(df)
-                    cluster_logs = []
-                    for _, crow in clustered.iterrows():
-                        cluster_logs.append(
-                            ErrorLogItem(
-                                task_id=None,
-                                task_instance_id=None,
-                                task_instance_err_id=None,
-                                error_time=None,
-                                error=None,
-                                task_instance_stderr_log=None,
-                                workflow_run_id=int(crow["workflow_run_id"]),
-                                workflow_id=workflow_id,
-                                error_score=float(crow["error_score"]),
-                                group_instance_count=int(crow["group_instance_count"]),
-                                task_instance_ids=list(
-                                    map(int, crow["task_instance_ids"])
-                                ),
-                                task_ids=list(map(int, crow["task_ids"])),
-                                sample_error=(
-                                    str(crow["sample_error"])
-                                    if crow["sample_error"] is not None
-                                    else None
-                                ),
-                                first_error_time=crow["first_error_time"],
-                            )
-                        )
-                    return ErrorLogResponse(
-                        error_logs=cluster_logs,
-                        total_count=total_count,
-                        page=page,
-                        page_size=page_size,
-                    )
 
             error_logs = []
             for r in detail_rows:
@@ -1337,12 +1362,10 @@ class TaskTemplateRepository:
                     page_size=page_size,
                 )
 
-            # Slice rows according to the requested page and page_size
-            paged_rows = rows[offset : offset + page_size]
-            # build a dict of task_instance_id to task_id
-            ttev_t_map = {row.ttel_id: row.task_id for row in paged_rows}
-            # get details for the error logs
-            query = (
+            # For clustering, use all rows; for non-clustered, paginate
+            all_ttel_map = {row.ttel_id: row.task_id for row in rows}
+
+            detail_query = (
                 select(
                     TaskInstanceErrorLog.id,
                     TaskInstanceErrorLog.task_instance_id,
@@ -1355,69 +1378,44 @@ class TaskTemplateRepository:
                     TaskInstance,
                     TaskInstanceErrorLog.task_instance_id == TaskInstance.id,
                 )
-                .where(TaskInstanceErrorLog.id.in_(ttev_t_map.keys()))
+                .where(
+                    TaskInstanceErrorLog.id.in_(
+                        list(all_ttel_map.keys())
+                        if cluster_errors
+                        else [r.ttel_id for r in rows[offset : offset + page_size]]
+                    )
+                )
             )
-            detail_rows = self.session.execute(query).all()
+            detail_rows = self.session.execute(detail_query).all()
 
             if cluster_errors:
-                # Build DataFrame for clustering
-                df = pd.DataFrame(
-                    [
-                        {
-                            "task_instance_err_id": r[0],
-                            "task_instance_id": r[1],
-                            "error_time": r[2],
-                            "error": str(r[3]) if r[3] is not None else None,
-                            "task_instance_stderr_log": (
-                                str(r[4]) if r[4] is not None else None
-                            ),
-                            "workflow_run_id": r[5],
-                            "workflow_id": workflow_id,
-                            "task_id": ttev_t_map.get(r[0]),
-                        }
-                        for r in detail_rows
-                    ]
-                )
-
-                clustered = cluster_error_logs(df)
-                total_clusters = len(clustered)
-                paged_clusters = clustered.iloc[offset : offset + page_size]
-
-                for _, crow in paged_clusters.iterrows():
-                    error_logs.append(
-                        ErrorLogItem(
-                            task_id=None,
-                            task_instance_id=None,
-                            task_instance_err_id=None,
-                            error_time=None,
-                            error=None,
-                            task_instance_stderr_log=None,
-                            workflow_run_id=int(crow["workflow_run_id"]),
-                            workflow_id=int(crow["workflow_id"]),
-                            error_score=float(crow["error_score"]),
-                            group_instance_count=int(crow["group_instance_count"]),
-                            task_instance_ids=list(map(int, crow["task_instance_ids"])),
-                            task_ids=list(map(int, crow["task_ids"])),
-                            sample_error=(
-                                str(crow["sample_error"])
-                                if crow["sample_error"] is not None
-                                else None
-                            ),
-                            first_error_time=crow["first_error_time"],
-                        )
-                    )
-
-                return ErrorLogResponse(
-                    error_logs=error_logs,
-                    total_count=total_clusters,
-                    page=page,
-                    page_size=page_size,
+                rows_dicts = [
+                    {
+                        "task_instance_err_id": r[0],
+                        "task_instance_id": r[1],
+                        "error_time": r[2],
+                        "error": (str(r[3]) if r[3] is not None else None),
+                        "task_instance_stderr_log": (
+                            str(r[4]) if r[4] is not None else None
+                        ),
+                        "workflow_run_id": r[5],
+                        "workflow_id": workflow_id,
+                        "task_id": all_ttel_map.get(r[0]),
+                    }
+                    for r in detail_rows
+                ]
+                return self._cluster_and_paginate(
+                    rows_dicts, workflow_id, offset, page, page_size
                 )
             else:
+                paged_ttel_map = {
+                    row.ttel_id: row.task_id
+                    for row in rows[offset : offset + page_size]
+                }
                 for row in detail_rows:
                     error_logs.append(
                         ErrorLogItem(
-                            task_id=ttev_t_map[row[0]],
+                            task_id=paged_ttel_map[row[0]],
                             task_instance_id=row[1],
                             task_instance_err_id=row[0],
                             error_time=row[2],
@@ -1535,80 +1533,29 @@ class TaskTemplateRepository:
                     )
 
                 if cluster_errors:
-                    df = pd.DataFrame(
-                        [
-                            {
-                                "task_instance_err_id": r.task_instance_id,
-                                "task_instance_id": r.task_instance_id,
-                                "error_time": r.status_date,
-                                "error": (
-                                    str(r.stderr_log or r.stderr)
-                                    if (r.stderr_log or r.stderr)
-                                    else None
-                                ),
-                                "task_instance_stderr_log": (
-                                    str(r.stderr_log or r.stderr)
-                                    if (r.stderr_log or r.stderr)
-                                    else None
-                                ),
-                                "workflow_run_id": r.workflow_run_id,
-                                "workflow_id": workflow_id,
-                                "task_id": r.task_id,
-                            }
-                            for r in fb_rows
-                        ]
-                    )
-
-                    clustered = cluster_error_logs(df)
-                    total_clusters = len(clustered)
-                    if total_clusters == 0:
-                        return ErrorLogResponse(
-                            error_logs=[],
-                            total_count=0,
-                            page=page,
-                            page_size=page_size,
-                        )
-
-                    paged_clusters = clustered.iloc[offset : offset + page_size]
-                    for _, crow in paged_clusters.iterrows():
-                        error_logs.append(
-                            ErrorLogItem(
-                                task_id=None,
-                                task_instance_id=None,
-                                task_instance_err_id=None,
-                                error_time=None,
-                                error=None,
-                                task_instance_stderr_log=None,
-                                workflow_run_id=int(crow["workflow_run_id"]),
-                                workflow_id=int(crow["workflow_id"]),
-                                error_score=float(crow["error_score"]),
-                                group_instance_count=int(crow["group_instance_count"]),
-                                task_instance_ids=list(
-                                    map(
-                                        int,
-                                        crow["task_instance_ids"],
-                                    )
-                                ),
-                                task_ids=list(
-                                    map(
-                                        int,
-                                        crow["task_ids"],
-                                    )
-                                ),
-                                sample_error=(
-                                    str(crow["sample_error"])
-                                    if crow["sample_error"] is not None
-                                    else None
-                                ),
-                                first_error_time=crow["first_error_time"],
-                            )
-                        )
-
-                    return ErrorLogResponse(
-                        error_logs=error_logs,
-                        total_count=total_clusters,
-                        page=page,
-                        page_size=page_size,
+                    rows_dicts = [
+                        {
+                            "task_instance_err_id": r.task_instance_id,
+                            "task_instance_id": r.task_instance_id,
+                            "error_time": r.status_date,
+                            "error": (
+                                str(r.stderr_log or r.stderr)
+                                if (r.stderr_log or r.stderr)
+                                else None
+                            ),
+                            "task_instance_stderr_log": (
+                                str(r.stderr_log or r.stderr)
+                                if (r.stderr_log or r.stderr)
+                                else None
+                            ),
+                            "workflow_run_id": r.workflow_run_id,
+                            "workflow_id": workflow_id,
+                            "task_id": r.task_id,
+                        }
+                        for r in fb_rows
+                    ]
+                    return self._cluster_and_paginate(
+                        rows_dicts, workflow_id, offset, page, page_size
                     )
 
                 # Non-clustered fallback
@@ -1636,64 +1583,23 @@ class TaskTemplateRepository:
                 )
 
             if cluster_errors and rows:
-                df = pd.DataFrame(
-                    [
-                        {
-                            "task_instance_err_id": r[0],
-                            "task_instance_id": r[1],
-                            "error_time": r[2],
-                            "error": str(r[3]) if r[3] is not None else None,
-                            "task_instance_stderr_log": (
-                                str(r[4]) if r[4] is not None else None
-                            ),
-                            "workflow_run_id": r[5],
-                            "workflow_id": workflow_id,
-                            "task_id": r[6],
-                        }
-                        for r in rows
-                    ]
-                )
-
-                clustered = cluster_error_logs(df)
-                total_clusters = len(clustered)
-                if total_clusters == 0:
-                    return ErrorLogResponse(
-                        error_logs=[],
-                        total_count=0,
-                        page=page,
-                        page_size=page_size,
-                    )
-
-                paged_clusters = clustered.iloc[offset : offset + page_size]
-                for _, crow in paged_clusters.iterrows():
-                    error_logs.append(
-                        ErrorLogItem(
-                            task_id=None,
-                            task_instance_id=None,
-                            task_instance_err_id=None,
-                            error_time=None,
-                            error=None,
-                            task_instance_stderr_log=None,
-                            workflow_run_id=int(crow["workflow_run_id"]),
-                            workflow_id=int(crow["workflow_id"]),
-                            error_score=float(crow["error_score"]),
-                            group_instance_count=int(crow["group_instance_count"]),
-                            task_instance_ids=list(map(int, crow["task_instance_ids"])),
-                            task_ids=list(map(int, crow["task_ids"])),
-                            sample_error=(
-                                str(crow["sample_error"])
-                                if crow["sample_error"] is not None
-                                else None
-                            ),
-                            first_error_time=crow["first_error_time"],
-                        )
-                    )
-
-                return ErrorLogResponse(
-                    error_logs=error_logs,
-                    total_count=total_clusters,
-                    page=page,
-                    page_size=page_size,
+                rows_dicts = [
+                    {
+                        "task_instance_err_id": r[0],
+                        "task_instance_id": r[1],
+                        "error_time": r[2],
+                        "error": (str(r[3]) if r[3] is not None else None),
+                        "task_instance_stderr_log": (
+                            str(r[4]) if r[4] is not None else None
+                        ),
+                        "workflow_run_id": r[5],
+                        "workflow_id": workflow_id,
+                        "task_id": r[6],
+                    }
+                    for r in rows
+                ]
+                return self._cluster_and_paginate(
+                    rows_dicts, workflow_id, offset, page, page_size
                 )
 
             total_count = len(rows)

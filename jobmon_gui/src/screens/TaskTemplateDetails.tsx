@@ -28,8 +28,14 @@ import {
     getWorkflowUsageQueryFn,
     WorkflowUsageQueryKey,
 } from '@jobmon_gui/queries/GetWorkflowUsage.ts';
-import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors.ts';
-import { getFatalErrorBreakdownFn } from '@jobmon_gui/queries/GetFatalErrorBreakdown';
+import {
+    getClusteredErrorsFn,
+    clusteredErrorsKey,
+} from '@jobmon_gui/queries/GetClusteredErrors.ts';
+import {
+    getFatalErrorBreakdownFn,
+    fatalBreakdownKey,
+} from '@jobmon_gui/queries/GetFatalErrorBreakdown';
 import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilterPersistence';
 import { bytes_to_gib } from '@jobmon_gui/utils/formatters';
 import {
@@ -106,15 +112,11 @@ export default function TaskTemplateDetails() {
 
     // --- Clustered Errors query (for badge + Error Summary card) ---
     const clusteredErrorsQuery = useQuery({
-        queryKey: [
-            'workflow_details',
-            'clustered_errors',
+        queryKey: clusteredErrorsKey({
             workflowId,
-            TaskTemplateDetailsData.data?.task_template_id,
-            null,
-            null,
+            taskTemplateId: TaskTemplateDetailsData.data?.task_template_id ?? 0,
             taskTemplateVersionId,
-        ],
+        }),
         queryFn: getClusteredErrorsFn,
         enabled:
             !!TaskTemplateDetailsData.data?.task_template_id &&
@@ -129,12 +131,10 @@ export default function TaskTemplateDetails() {
 
     // --- Fatal error breakdown (for resource error visibility) ---
     const breakdownQuery = useQuery({
-        queryKey: [
-            'workflow_details',
-            'fatal_breakdown',
+        queryKey: fatalBreakdownKey({
             workflowId,
             taskTemplateVersionId,
-        ],
+        }),
         queryFn: getFatalErrorBreakdownFn,
         enabled: !!taskTemplateVersionId && !!workflowId,
         staleTime: 120000,

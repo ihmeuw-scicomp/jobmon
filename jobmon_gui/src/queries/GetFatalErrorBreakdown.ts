@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { fatal_error_breakdown_url } from '@jobmon_gui/configs/ApiUrls.ts';
 import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
-import { extractNumericParam, wfrParams } from './queryKeyUtils';
 
 export interface FatalErrorBreakdown {
     resource: number;
@@ -12,23 +11,37 @@ export interface FatalErrorBreakdown {
     resource_error_ti_ids: number[];
 }
 
+export interface FatalBreakdownParams {
+    workflowId: string | number;
+    taskTemplateVersionId: string | number | null;
+    workflowRunId?: number | null;
+}
+
+export function fatalBreakdownKey(
+    params: FatalBreakdownParams
+): readonly [string, string, FatalBreakdownParams] {
+    return ['workflow_details', 'fatal_breakdown', params] as const;
+}
+
 type QueryFnArgs = {
-    queryKey: readonly unknown[];
+    queryKey: readonly [string, string, FatalBreakdownParams];
 };
 
 export const getFatalErrorBreakdownFn = async ({
     queryKey,
 }: QueryFnArgs): Promise<FatalErrorBreakdown> => {
-    const workflowId = queryKey[2];
-    const ttVersionId = queryKey[3];
-    const workflowRunId = extractNumericParam(queryKey, 4);
+    const p = queryKey[2];
+    const params: Record<string, string> = {};
+    if (p.workflowRunId != null) {
+        params.workflow_run_id = String(p.workflowRunId);
+    }
     return axios
         .get<FatalErrorBreakdown>(
-            `${fatal_error_breakdown_url}${workflowId}/${ttVersionId}`,
+            `${fatal_error_breakdown_url}${p.workflowId}/${p.taskTemplateVersionId}`,
             {
                 ...jobmonAxiosConfig,
                 data: null,
-                params: wfrParams(workflowRunId),
+                params: Object.keys(params).length > 0 ? params : undefined,
             }
         )
         .then(r => r.data);

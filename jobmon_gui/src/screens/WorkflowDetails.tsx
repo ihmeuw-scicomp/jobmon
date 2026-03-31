@@ -31,7 +31,10 @@ import { useTaskTableStore } from '@jobmon_gui/stores/TaskTable.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowUsageQueryFn } from '@jobmon_gui/queries/GetWorkflowUsage.ts';
-import { getClusteredErrorsFn } from '@jobmon_gui/queries/GetClusteredErrors.ts';
+import {
+    getClusteredErrorsFn,
+    clusteredErrorsKey,
+} from '@jobmon_gui/queries/GetClusteredErrors.ts';
 import {
     AppBreadcrumbs,
     BreadcrumbItem,
@@ -224,12 +227,10 @@ function WorkflowDetails() {
             queryFn: getWorkflowUsageQueryFn,
         });
         void queryClient.prefetchQuery({
-            queryKey: [
-                'workflow_details',
-                'clustered_errors',
+            queryKey: clusteredErrorsKey({
                 workflowId,
-                taskTemplate.id,
-            ],
+                taskTemplateId: taskTemplate.id,
+            }),
             queryFn: getClusteredErrorsFn,
         });
     };

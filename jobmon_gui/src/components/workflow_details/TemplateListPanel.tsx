@@ -13,7 +13,10 @@ import {
     RESOURCE_ERROR_COLORS,
 } from '@jobmon_gui/constants/taskStatus';
 import TemplateStatusBar from '@jobmon_gui/components/common/TemplateStatusBar';
-import { getFatalErrorBreakdownFn } from '@jobmon_gui/queries/GetFatalErrorBreakdown';
+import {
+    getFatalErrorBreakdownFn,
+    fatalBreakdownKey,
+} from '@jobmon_gui/queries/GetFatalErrorBreakdown';
 
 const HOVER_BG = '#e3f2fd';
 
@@ -53,15 +56,12 @@ function TemplateRow({
             ? 0
             : Math.floor((tt.DONE / tt.tasks) * 100);
 
-    // Lazy fetch resource error count from breakdown endpoint
     const { data: breakdown } = useQuery({
-        queryKey: [
-            'workflow_details',
-            'fatal_breakdown',
+        queryKey: fatalBreakdownKey({
             workflowId,
-            tt.task_template_version_id,
+            taskTemplateVersionId: tt.task_template_version_id,
             workflowRunId,
-        ],
+        }),
         queryFn: getFatalErrorBreakdownFn,
         enabled:
             (tt.FATAL > 0 || tt.num_attempts_avg > 1) &&
