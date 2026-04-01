@@ -429,77 +429,76 @@ async def set_task_resume_state(
     if not reset_if_running:
         excluded_states.append(TaskStatus.RUNNING)
 
-    # Snapshot which tasks need resetting and their current statuses
-    # (for audit records). Uses workflow_id index, no IN clause.
+    # Snapshot task statuses for audit records (read-only, no lock).
     tasks_to_reset = db.execute(
         select(Task.id, Task.status).where(
-            Task.status.not_in(excluded_states),
             Task.workflow_id == workflow_id,
+            Task.status.not_in(excluded_states),
         )
     ).all()
 
     if tasks_to_reset:
+        expected_count = len(tasks_to_reset)
         status_map = {row.id: row.status for row in tasks_to_reset}
-        pending_ids = set(status_map.keys())
+        reset_count = 0
 
-        # Use SKIP LOCKED to avoid blocking on rows the distributor
-        # holds mid-transition. Most rows are uncontested; the few
-        # that are locked get retried on subsequent passes.
-        batch_size = 2000
+        # Subquery UPDATE with SKIP LOCKED: locks and updates in one
+        # server-side statement, no 100K-ID round-trip through Python.
+        # Retries with backoff pick up rows the distributor held.
         max_passes = 5
-        for pass_num in range(max_passes):
-            if not pending_ids:
-                break
-
-            batch_ids = list(pending_ids)[:batch_size]
-
-            # Lock available rows, skip any held by the distributor
-            locked_rows = db.execute(
+        for attempt in range(max_passes):
+            locked_subq = (
                 select(Task.id)
-                .where(Task.id.in_(batch_ids))
+                .where(
+                    Task.workflow_id == workflow_id,
+                    Task.status.not_in(excluded_states),
+                )
                 .with_for_update(skip_locked=True)
-            ).all()
-            locked_ids = [r.id for r in locked_rows]
+            ).subquery()
 
-            if not locked_ids:
-                # All remaining rows are locked — brief pause
-                # then retry on next pass
-                db.flush()
-                time.sleep(0.2)
-                continue
-
-            db.execute(
+            result = db.execute(
                 update(Task)
-                .where(Task.id.in_(locked_ids))
+                .where(Task.id.in_(select(locked_subq.c.id)))
                 .values(
                     status=TaskStatus.REGISTERING,
                     num_attempts=0,
                     status_date=func.now(),
                 )
             )
+            reset_count += result.rowcount
 
-            audit_records = [
-                {
-                    "task_id": tid,
-                    "workflow_id": workflow_id,
-                    "previous_status": status_map[tid],
-                    "new_status": TaskStatus.REGISTERING,
-                }
-                for tid in locked_ids
-            ]
-            TransitionService.create_audit_records_bulk(
-                session=db, records=audit_records
-            )
+            if reset_count >= expected_count:
+                break
 
             db.flush()
-            pending_ids -= set(locked_ids)
+            time.sleep(0.2 * (attempt + 1))
 
-        if pending_ids:
+        if reset_count < expected_count:
             logger.warning(
-                f"Resume: {len(pending_ids)} tasks still locked "
-                f"after {max_passes} passes for workflow "
+                f"Resume: {expected_count - reset_count} of "
+                f"{expected_count} tasks still locked after "
+                f"{max_passes} passes for workflow "
                 f"{workflow_id}",
             )
+
+        # Batch audit records with flush() to keep the
+        # task_status_audit lock footprint manageable.
+        batch_size = 2000
+        all_records = [
+            {
+                "task_id": tid,
+                "workflow_id": workflow_id,
+                "previous_status": prev_status,
+                "new_status": TaskStatus.REGISTERING,
+            }
+            for tid, prev_status in status_map.items()
+        ]
+        for i in range(0, len(all_records), batch_size):
+            TransitionService.create_audit_records_bulk(
+                session=db,
+                records=all_records[i : i + batch_size],
+            )
+            db.flush()
 
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
