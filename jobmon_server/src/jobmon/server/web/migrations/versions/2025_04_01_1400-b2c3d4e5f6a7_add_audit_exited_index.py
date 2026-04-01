@@ -14,6 +14,7 @@ Create Date: 2025-04-01
 
 from typing import Sequence, Union
 
+import sqlalchemy as sa
 from alembic import op
 
 revision: str = "b2c3d4e5f6a7"
@@ -24,13 +25,23 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Add composite index for bulk audit close queries."""
-    op.create_index(
-        "ix_task_status_audit_task_exited",
-        "task_status_audit",
-        ["task_id", "exited_at"],
-        mysql_algorithm="INPLACE",
-        mysql_lock="NONE",
-    )
+    bind = op.get_bind()
+    if bind.dialect.name == "mysql":
+        # Online DDL: no table lock, no write blocking
+        op.execute(
+            sa.text(
+                "ALTER TABLE task_status_audit "
+                "ADD INDEX ix_task_status_audit_task_exited "
+                "(task_id, exited_at), "
+                "ALGORITHM=INPLACE, LOCK=NONE"
+            )
+        )
+    else:
+        op.create_index(
+            "ix_task_status_audit_task_exited",
+            "task_status_audit",
+            ["task_id", "exited_at"],
+        )
 
 
 def downgrade() -> None:

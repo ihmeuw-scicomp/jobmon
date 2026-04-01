@@ -1,6 +1,7 @@
 """Routes for Tasks."""
 
 import json
+import time
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Set, Union, cast
 
@@ -455,6 +456,7 @@ async def set_task_resume_state(
             if empty_passes >= MAX_EMPTY_PASSES:
                 break
             db.commit()
+            time.sleep(0.1 * empty_passes)
             continue
 
         empty_passes = 0
