@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class WorkflowValidationRequest(BaseModel):
@@ -54,6 +54,8 @@ class WorkflowStatusVizResponse(BaseModel):
 
 class WorkflowOverviewFilters(BaseModel):
     """Filters for the workflow overview query."""
+
+    model_config = ConfigDict(frozen=True)
 
     user: Optional[str] = None
     tool: Optional[str] = None

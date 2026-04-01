@@ -491,11 +491,14 @@ class WorkflowRepository:
         """
         if not value:
             return None
+        # Escape SQL LIKE metacharacters before converting
+        # user-facing wildcards.
+        escaped = value.replace("%", "\\%").replace("_", "\\_")
         if contains:
-            safe = value.replace("*", "%")
-            return column.like(f"%{safe}%")
+            pattern = escaped.replace("*", "%")
+            return column.like(f"%{pattern}%")
         if "*" in value:
-            return column.like(value.replace("*", "%"))
+            return column.like(escaped.replace("*", "%"))
         return column == value
 
     def get_workflow_overview(
