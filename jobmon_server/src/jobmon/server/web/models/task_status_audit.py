@@ -33,4 +33,5 @@ class TaskStatusAudit(Base):
     __table_args__ = (
         Index("ix_task_status_audit_workflow_time", "workflow_id", "entered_at"),
         Index("ix_task_status_audit_task_time", "task_id", "entered_at"),
+        Index("ix_task_status_audit_task_exited", "task_id", "exited_at"),
     )
