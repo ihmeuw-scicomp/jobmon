@@ -22,11 +22,18 @@ class TaskFSM:
             TaskStatus.LAUNCHED,
             TaskStatus.RUNNING,  # Race condition: worker reports before distributor
             TaskStatus.ERROR_RECOVERABLE,
+            # Direct transitions (skip ERROR_RECOVERABLE):
+            TaskStatus.REGISTERING,  # Retry (e.g. NO_DISTRIBUTOR_ID)
+            TaskStatus.ADJUSTING_RESOURCES,  # Resource error retry
+            TaskStatus.ERROR_FATAL,  # Max attempts exceeded
         },
         TaskStatus.LAUNCHED: {
             TaskStatus.RUNNING,
             TaskStatus.ERROR_RECOVERABLE,
-            TaskStatus.ERROR_FATAL,  # Kill operation
+            TaskStatus.ERROR_FATAL,  # Kill operation or max attempts
+            # Direct transitions (skip ERROR_RECOVERABLE):
+            TaskStatus.REGISTERING,  # Retry (e.g. NO_HEARTBEAT)
+            TaskStatus.ADJUSTING_RESOURCES,  # Resource error retry
         },
         TaskStatus.RUNNING: {
             TaskStatus.DONE,
