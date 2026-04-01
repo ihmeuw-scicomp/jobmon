@@ -17,6 +17,7 @@ from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.schemas.workflow import (
     TaskTableResponse,
     WorkflowDetailsItem,
+    WorkflowOverviewFilters,
     WorkflowOverviewResponse,
     WorkflowRunForResetResponse,
     WorkflowStatusResponse,
@@ -201,14 +202,14 @@ def workflows_by_user_form(
     # Parse wf_attr repeated params into tuples.
     wf_attributes = None
     if wf_attr:
-        wf_attributes = []
-        for pair in wf_attr:
-            if ":" in pair:
-                k, v = pair.split(":", 1)
-                wf_attributes.append((k.strip(), v.strip()))
+        wf_attributes = [
+            (k.strip(), v.strip())
+            for pair in wf_attr
+            if ":" in pair
+            for k, v in [pair.split(":", 1)]
+        ]
 
-    workflow_repo = WorkflowRepository(db)
-    return workflow_repo.get_workflow_overview(
+    filters = WorkflowOverviewFilters(
         user=user,
         tool=tool,
         wf_name=wf_name,
@@ -226,6 +227,9 @@ def workflows_by_user_form(
         wf_args_contains=wf_args_contains,
         wf_attributes=wf_attributes,
     )
+
+    workflow_repo = WorkflowRepository(db)
+    return workflow_repo.get_workflow_overview(filters)
 
 
 @api_v3_router.get("/task_table_viz/{workflow_id}")

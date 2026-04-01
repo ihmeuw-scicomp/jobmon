@@ -31,6 +31,7 @@ from jobmon.server.web.schemas.workflow import (
     TaskTableItem,
     TaskTableResponse,
     WorkflowDetailsItem,
+    WorkflowOverviewFilters,
     WorkflowOverviewItem,
     WorkflowOverviewResponse,
     WorkflowRunForResetResponse,
@@ -499,22 +500,7 @@ class WorkflowRepository:
 
     def get_workflow_overview(
         self,
-        user: Optional[str] = None,
-        tool: Optional[str] = None,
-        wf_name: Optional[str] = None,
-        wf_args: Optional[str] = None,
-        wf_attribute_value: Optional[str] = None,
-        wf_attribute_key: Optional[str] = None,
-        wf_id: Optional[str] = None,
-        date_submitted: Optional[str] = None,
-        date_submitted_end: Optional[str] = None,
-        status: Optional[str] = None,
-        user_exclude: Optional[str] = None,
-        tool_exclude: Optional[str] = None,
-        status_exclude: Optional[str] = None,
-        wf_name_contains: bool = False,
-        wf_args_contains: bool = False,
-        wf_attributes: Optional[List[Tuple[str, str]]] = None,
+        f: Optional[WorkflowOverviewFilters] = None,
     ) -> WorkflowOverviewResponse:
         """Fetch workflow overview filtered by the given criteria.
 
@@ -525,43 +511,46 @@ class WorkflowRepository:
         3. Outer query: join back to workflow for final
            SELECT / GROUP BY / ORDER BY.
         """
+        if f is None:
+            f = WorkflowOverviewFilters()
+
         # -- build filter conditions for the inner subquery --
         filters: List[Any] = []
 
         for val, col, exc in [
-            (user, WorkflowRun.user, False),
-            (tool, Tool.name, False),
-            (status, Workflow.status, False),
-            (user_exclude, WorkflowRun.user, True),
-            (tool_exclude, Tool.name, True),
-            (status_exclude, Workflow.status, True),
+            (f.user, WorkflowRun.user, False),
+            (f.tool, Tool.name, False),
+            (f.status, Workflow.status, False),
+            (f.user_exclude, WorkflowRun.user, True),
+            (f.tool_exclude, Tool.name, True),
+            (f.status_exclude, Workflow.status, True),
         ]:
             cond = self._build_csv_condition(val, col, exc)
             if cond is not None:
                 filters.append(cond)
 
         cond = self._build_text_filter(
-            wf_name,
+            f.wf_name,
             Workflow.name,
-            wf_name_contains,
+            f.wf_name_contains,
         )
         if cond is not None:
             filters.append(cond)
 
         cond = self._build_text_filter(
-            wf_args,
+            f.wf_args,
             Workflow.workflow_args,
-            wf_args_contains,
+            f.wf_args_contains,
         )
         if cond is not None:
             filters.append(cond)
 
-        if wf_id:
-            filters.append(Workflow.id == int(wf_id))
-        if date_submitted:
-            filters.append(Workflow.created_date >= date_submitted)
-        if date_submitted_end:
-            filters.append(Workflow.created_date <= date_submitted_end)
+        if f.wf_id:
+            filters.append(Workflow.id == int(f.wf_id))
+        if f.date_submitted:
+            filters.append(Workflow.created_date >= f.date_submitted)
+        if f.date_submitted_end:
+            filters.append(Workflow.created_date <= f.date_submitted_end)
 
         # -- Layer 1: inner subquery (matching workflow IDs) --
         inner_q = (
@@ -580,13 +569,13 @@ class WorkflowRepository:
 
         # Attribute joins: only added when filters require them.
         # Merge legacy single-pair params into the list.
-        attrs = list(wf_attributes or [])
-        if wf_attribute_key and wf_attribute_value:
-            attrs.append((wf_attribute_key, wf_attribute_value))
-        elif wf_attribute_key:
-            attrs.append((wf_attribute_key, ""))
-        elif wf_attribute_value:
-            attrs.append(("", wf_attribute_value))
+        attrs = list(f.wf_attributes or [])
+        if f.wf_attribute_key and f.wf_attribute_value:
+            attrs.append((f.wf_attribute_key, f.wf_attribute_value))
+        elif f.wf_attribute_key:
+            attrs.append((f.wf_attribute_key, ""))
+        elif f.wf_attribute_value:
+            attrs.append(("", f.wf_attribute_value))
 
         if attrs:
             for i, (attr_key, attr_val) in enumerate(attrs):
