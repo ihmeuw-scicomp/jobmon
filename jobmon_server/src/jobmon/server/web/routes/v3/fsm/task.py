@@ -6,7 +6,7 @@ from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Set, Union, cast
 
 import structlog
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy import desc, insert, select, tuple_, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.mysql.dml import Insert as MySQLInsert
@@ -473,32 +473,57 @@ async def set_task_resume_state(
             db.flush()
             time.sleep(0.2 * (attempt + 1))
 
-        if reset_count < expected_count:
-            logger.warning(
-                f"Resume: {expected_count - reset_count} of "
-                f"{expected_count} tasks still locked after "
-                f"{max_passes} passes for workflow "
-                f"{workflow_id}",
+        # Find which tasks were actually reset so we only audit those.
+        actually_reset = (
+            db.execute(
+                select(Task.id).where(
+                    Task.workflow_id == workflow_id,
+                    Task.status == TaskStatus.REGISTERING,
+                    Task.id.in_(list(status_map.keys())),
+                )
             )
+            .scalars()
+            .all()
+        )
+        reset_ids = set(actually_reset)
 
         # Batch audit records with flush() to keep the
         # task_status_audit lock footprint manageable.
         batch_size = 2000
-        all_records = [
+        audit_records = [
             {
                 "task_id": tid,
                 "workflow_id": workflow_id,
-                "previous_status": prev_status,
+                "previous_status": status_map[tid],
                 "new_status": TaskStatus.REGISTERING,
             }
-            for tid, prev_status in status_map.items()
+            for tid in reset_ids
         ]
-        for i in range(0, len(all_records), batch_size):
+        for i in range(0, len(audit_records), batch_size):
             TransitionService.create_audit_records_bulk(
                 session=db,
-                records=all_records[i : i + batch_size],
+                records=audit_records[i : i + batch_size],
             )
             db.flush()
+
+        # If some tasks couldn't be reset, commit the progress
+        # and raise so the client retries for the remainder.
+        remaining = expected_count - len(reset_ids)
+        if remaining > 0:
+            db.commit()
+            logger.warning(
+                f"Resume: {remaining} of {expected_count} tasks "
+                f"still locked after {max_passes} passes for "
+                f"workflow {workflow_id}, committed partial reset",
+            )
+            raise HTTPException(
+                status_code=StatusCodes.SERVICE_UNAVAILABLE,
+                detail=(
+                    f"Reset {len(reset_ids)}/{expected_count} "
+                    f"tasks. {remaining} locked by active "
+                    f"transitions — retry to complete."
+                ),
+            )
 
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
