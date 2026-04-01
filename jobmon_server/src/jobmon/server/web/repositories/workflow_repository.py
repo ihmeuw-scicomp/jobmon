@@ -491,9 +491,9 @@ class WorkflowRepository:
         """
         if not value:
             return None
-        # Escape SQL LIKE metacharacters before converting
-        # user-facing wildcards.
-        escaped = value.replace("%", "\\%").replace("_", "\\_")
+        # Escape SQL LIKE metacharacters (including the escape
+        # char itself) before converting user-facing wildcards.
+        escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         if contains:
             pattern = escaped.replace("*", "%")
             return column.like(f"%{pattern}%", escape="\\")
