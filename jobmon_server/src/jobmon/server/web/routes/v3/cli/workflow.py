@@ -17,6 +17,7 @@ from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.schemas.workflow import (
     TaskTableResponse,
     WorkflowDetailsItem,
+    WorkflowOverviewFilters,
     WorkflowOverviewResponse,
     WorkflowRunForResetResponse,
     WorkflowStatusResponse,
@@ -187,11 +188,28 @@ def workflows_by_user_form(
     user_exclude: Optional[List[str]] = Query(None, alias="user!"),
     tool_exclude: Optional[List[str]] = Query(None, alias="tool!"),
     status_exclude: Optional[List[str]] = Query(None, alias="status!"),
+    wf_name_contains: bool = Query(False),
+    wf_args_contains: bool = Query(False),
+    wf_attr: Optional[List[str]] = Query(None),
     db: Session = Depends(get_db),
 ) -> WorkflowOverviewResponse:
-    """Fetch associated workflows and workflow runs by username."""
-    workflow_repo = WorkflowRepository(db)
-    return workflow_repo.get_workflow_overview(
+    """Fetch workflow overview with filtering.
+
+    ``wf_attr`` accepts repeated ``key:value`` pairs for
+    multi-attribute AND filtering, e.g.
+    ``?wf_attr=project:fhs&wf_attr=release_id:7``.
+    """
+    # Parse wf_attr repeated params into tuples.
+    wf_attributes = None
+    if wf_attr:
+        wf_attributes = [
+            (k.strip(), v.strip())
+            for pair in wf_attr
+            if ":" in pair
+            for k, v in [pair.split(":", 1)]
+        ]
+
+    filters = WorkflowOverviewFilters(
         user=user,
         tool=tool,
         wf_name=wf_name,
@@ -205,7 +223,13 @@ def workflows_by_user_form(
         user_exclude=_list_to_comma_separated(user_exclude),
         tool_exclude=_list_to_comma_separated(tool_exclude),
         status_exclude=_list_to_comma_separated(status_exclude),
+        wf_name_contains=wf_name_contains,
+        wf_args_contains=wf_args_contains,
+        wf_attributes=wf_attributes,
     )
+
+    workflow_repo = WorkflowRepository(db)
+    return workflow_repo.get_workflow_overview(filters)
 
 
 @api_v3_router.get("/task_table_viz/{workflow_id}")

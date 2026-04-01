@@ -1,6 +1,6 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class WorkflowValidationRequest(BaseModel):
@@ -52,19 +52,29 @@ class WorkflowStatusVizResponse(BaseModel):
     # Empty model — FastAPI returns raw dict directly
 
 
-class WorkflowOverviewRequest(BaseModel):
-    """Request model for workflow overview filters."""
+class WorkflowOverviewFilters(BaseModel):
+    """Filters for the workflow overview query."""
+
+    model_config = ConfigDict(frozen=True)
 
     user: Optional[str] = None
     tool: Optional[str] = None
     wf_name: Optional[str] = None
     wf_args: Optional[str] = None
-    wf_attribute_value: Optional[str] = None
-    wf_attribute_key: Optional[str] = None
     wf_id: Optional[str] = None
     date_submitted: Optional[str] = None
     date_submitted_end: Optional[str] = None
     status: Optional[str] = None
+    user_exclude: Optional[str] = None
+    tool_exclude: Optional[str] = None
+    status_exclude: Optional[str] = None
+    wf_name_contains: bool = False
+    wf_args_contains: bool = False
+    wf_attributes: Optional[List[Tuple[str, str]]] = None
+    # Legacy single-pair attribute params (merged into
+    # wf_attributes by the route handler).
+    wf_attribute_key: Optional[str] = None
+    wf_attribute_value: Optional[str] = None
 
 
 class WorkflowOverviewItem(BaseModel):
