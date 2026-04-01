@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 import structlog
-from sqlalchemy import Select, func, select, update
+from sqlalchemy import Select, func, literal, select, update
 from sqlalchemy.orm import Session, aliased
 
 from jobmon.core.constants import WorkflowStatus as Statuses
@@ -496,9 +496,9 @@ class WorkflowRepository:
         escaped = value.replace("%", "\\%").replace("_", "\\_")
         if contains:
             pattern = escaped.replace("*", "%")
-            return column.like(f"%{pattern}%")
+            return column.like(f"%{pattern}%", escape="\\")
         if "*" in value:
-            return column.like(escaped.replace("*", "%"))
+            return column.like(escaped.replace("*", "%"), escape="\\")
         return column == value
 
     def get_workflow_overview(
@@ -549,7 +549,11 @@ class WorkflowRepository:
             filters.append(cond)
 
         if f.wf_id:
-            filters.append(Workflow.id == int(f.wf_id))
+            try:
+                filters.append(Workflow.id == int(f.wf_id))
+            except ValueError:
+                logger.warning("Non-numeric wf_id filter ignored", wf_id=f.wf_id)
+                filters.append(literal(False))
         if f.date_submitted:
             filters.append(Workflow.created_date >= f.date_submitted)
         if f.date_submitted_end:

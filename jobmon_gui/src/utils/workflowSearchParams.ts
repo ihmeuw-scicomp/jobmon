@@ -13,21 +13,21 @@ function isFilterValue(value: string | FilterValue): value is FilterValue {
 }
 
 function addFilterToParams(
-    params: Record<string, string>,
+    params: URLSearchParams,
     key: string,
     value: string | FilterValue
 ): void {
     if (typeof value === 'string') {
         if (value) {
-            params[key] = value;
+            params.set(key, value);
         }
     } else if (isFilterValue(value)) {
         if (value.include && value.include.length > 0) {
-            params[key] = value.include.join(',');
+            params.set(key, value.include.join(','));
         }
         if (value.exclude && value.exclude.length > 0) {
             value.exclude.forEach(excluded => {
-                params[`${key}!`] = excluded;
+                params.append(`${key}!`, excluded);
             });
         }
     }
@@ -41,31 +41,31 @@ export function settingsToURLSearchParams(
     settings: WorkflowSearchSettings,
     forAPI = false
 ): URLSearchParams {
-    const params: Record<string, string> = {};
+    const urlParams = new URLSearchParams();
 
-    addFilterToParams(params, 'user', settings.user);
-    addFilterToParams(params, 'tool', settings.tool);
-    addFilterToParams(params, 'status', settings.status);
+    addFilterToParams(urlParams, 'user', settings.user);
+    addFilterToParams(urlParams, 'tool', settings.tool);
+    addFilterToParams(urlParams, 'status', settings.status);
 
-    if (settings.wf_name) params.wf_name = settings.wf_name;
-    if (settings.wf_args) params.wf_args = settings.wf_args;
-    if (settings.wf_name_contains) params.wf_name_contains = 'true';
-    if (settings.wf_args_contains) params.wf_args_contains = 'true';
-    if (settings.wf_id) params.wf_id = settings.wf_id;
+    if (settings.wf_name) urlParams.set('wf_name', settings.wf_name);
+    if (settings.wf_args) urlParams.set('wf_args', settings.wf_args);
+    if (settings.wf_name_contains) urlParams.set('wf_name_contains', 'true');
+    if (settings.wf_args_contains) urlParams.set('wf_args_contains', 'true');
+    if (settings.wf_id) urlParams.set('wf_id', settings.wf_id);
 
     if (settings.date_submitted) {
-        params.date_submitted = dayjs(settings.date_submitted).format(
-            'YYYY-MM-DD'
+        urlParams.set(
+            'date_submitted',
+            dayjs(settings.date_submitted).format('YYYY-MM-DD')
         );
     }
     if (settings.date_submitted_end) {
         const end = dayjs(settings.date_submitted_end);
-        params.date_submitted_end = (forAPI ? end.add(1, 'day') : end).format(
-            'YYYY-MM-DD'
+        urlParams.set(
+            'date_submitted_end',
+            (forAPI ? end.add(1, 'day') : end).format('YYYY-MM-DD')
         );
     }
-
-    const urlParams = new URLSearchParams(params);
 
     if (settings.wf_attributes) {
         for (const attr of settings.wf_attributes) {
