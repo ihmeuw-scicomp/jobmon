@@ -8,6 +8,7 @@ import dayjs from 'dayjs';
 import { workflow_overview_url } from '@jobmon_gui/configs/ApiUrls';
 import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios';
 import { useWorkflowSearchSettings } from '@jobmon_gui/stores/workflow_settings';
+import { settingsToURLSearchParams } from '@jobmon_gui/utils/workflowSearchParams';
 import { CircularProgress, Grid } from '@mui/material';
 import {
     Box,
@@ -37,7 +38,6 @@ import advancedFormat from 'dayjs/plugin/advancedFormat';
 import timezone from 'dayjs/plugin/timezone';
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
-import { FilterValue } from '@jobmon_gui/stores/workflow_settings';
 
 type WorkflowType = {
     DONE: number;
@@ -96,7 +96,7 @@ export default function WorkflowList() {
             workflowSettings.get().wf_args,
             workflowSettings.get().wf_name_contains,
             workflowSettings.get().wf_args_contains,
-            JSON.stringify(workflowSettings.get().wf_attributes),
+            workflowSettings.get().wf_attributes,
             workflowSettings.get().wf_id,
             dayjs(workflowSettings.get().date_submitted).format('YYYY-MM-DD'),
             dayjs(workflowSettings.get().date_submitted_end).format(
@@ -107,64 +107,10 @@ export default function WorkflowList() {
         queryFn: async () => {
             workflowSettings.clearDataRefresh();
 
-            const settings = workflowSettings.get();
-            const urlParams = new URLSearchParams();
-
-            const addFilterParam = (
-                key: string,
-                value: string | FilterValue,
-            ) => {
-                if (typeof value === 'string') {
-                    if (value) urlParams.append(key, value);
-                } else if (
-                    value &&
-                    typeof value === 'object' &&
-                    ('include' in value || 'exclude' in value)
-                ) {
-                    if (value.include?.length) {
-                        urlParams.append(key, value.include.join(','));
-                    }
-                    value.exclude?.forEach(excluded => {
-                        urlParams.append(`${key}!`, excluded);
-                    });
-                }
-            };
-
-            addFilterParam('user', settings.user);
-            addFilterParam('tool', settings.tool);
-            addFilterParam('status', settings.status);
-
-            if (settings.wf_name) urlParams.append('wf_name', settings.wf_name);
-            if (settings.wf_args) urlParams.append('wf_args', settings.wf_args);
-            if (settings.wf_name_contains)
-                urlParams.append('wf_name_contains', 'true');
-            if (settings.wf_args_contains)
-                urlParams.append('wf_args_contains', 'true');
-            if (settings.wf_attributes) {
-                for (const attr of settings.wf_attributes) {
-                    if (attr.key || attr.value) {
-                        urlParams.append(
-                            'wf_attr',
-                            `${attr.key}:${attr.value}`
-                        );
-                    }
-                }
-            }
-            if (settings.wf_id) urlParams.append('wf_id', settings.wf_id);
-            if (settings.date_submitted) {
-                urlParams.append(
-                    'date_submitted',
-                    dayjs(settings.date_submitted).format('YYYY-MM-DD')
-                );
-            }
-            if (settings.date_submitted_end) {
-                urlParams.append(
-                    'date_submitted_end',
-                    dayjs(settings.date_submitted_end)
-                        .add(1, 'day')
-                        .format('YYYY-MM-DD')
-                );
-            }
+            const urlParams = settingsToURLSearchParams(
+                workflowSettings.get(),
+                true
+            );
 
             return axios
                 .get<WorkflowsQueryResponse>(workflow_overview_url, {

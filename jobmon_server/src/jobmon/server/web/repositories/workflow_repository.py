@@ -601,18 +601,6 @@ class WorkflowRepository:
                     filters.append(wat.name == attr_key)
                 if attr_val:
                     filters.append(wa.value == attr_val)
-        else:
-            # No attribute filters — use LEFT JOINs to
-            # preserve the original query semantics for
-            # workflows without attributes.
-            inner_q = inner_q.outerjoin(
-                WorkflowAttribute,
-                Workflow.id == WorkflowAttribute.workflow_id,
-            ).outerjoin(
-                WorkflowAttributeType,
-                WorkflowAttribute.workflow_attribute_type_id
-                == WorkflowAttributeType.id,
-            )
 
         if filters:
             inner_q = inner_q.where(*filters)

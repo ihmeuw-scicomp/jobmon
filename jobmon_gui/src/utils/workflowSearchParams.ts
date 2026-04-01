@@ -33,9 +33,14 @@ function addFilterToParams(
     }
 }
 
-export function settingsToSearchParamsString(
-    settings: WorkflowSearchSettings
-): string {
+/**
+ * Build URLSearchParams from settings. When {@link forAPI} is true,
+ * adds one day to date_submitted_end so the backend range is inclusive.
+ */
+export function settingsToURLSearchParams(
+    settings: WorkflowSearchSettings,
+    forAPI = false
+): URLSearchParams {
     const params: Record<string, string> = {};
 
     addFilterToParams(params, 'user', settings.user);
@@ -48,17 +53,20 @@ export function settingsToSearchParamsString(
     if (settings.wf_args_contains) params.wf_args_contains = 'true';
     if (settings.wf_id) params.wf_id = settings.wf_id;
 
-    const date_submitted = dayjs(settings.date_submitted).format('YYYY-MM-DD');
-    const date_submitted_end = dayjs(settings.date_submitted_end).format(
-        'YYYY-MM-DD'
-    );
-    if (date_submitted) params.date_submitted = date_submitted;
-    if (date_submitted_end) params.date_submitted_end = date_submitted_end;
+    if (settings.date_submitted) {
+        params.date_submitted = dayjs(settings.date_submitted).format(
+            'YYYY-MM-DD'
+        );
+    }
+    if (settings.date_submitted_end) {
+        const end = dayjs(settings.date_submitted_end);
+        params.date_submitted_end = (forAPI ? end.add(1, 'day') : end).format(
+            'YYYY-MM-DD'
+        );
+    }
 
-    // Build base params, then append repeated wf_attr entries
     const urlParams = new URLSearchParams(params);
 
-    // Serialize wf_attributes as repeated wf_attr=key:value params
     if (settings.wf_attributes) {
         for (const attr of settings.wf_attributes) {
             if (attr.key || attr.value) {
@@ -67,7 +75,13 @@ export function settingsToSearchParamsString(
         }
     }
 
-    return urlParams.toString();
+    return urlParams;
+}
+
+export function settingsToSearchParamsString(
+    settings: WorkflowSearchSettings
+): string {
+    return settingsToURLSearchParams(settings).toString();
 }
 
 export function parseUrlFilterParam(

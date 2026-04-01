@@ -50,7 +50,10 @@ export type WorkflowSearchSettingsStore = {
     refreshData: boolean;
     applyPendingSettings: () => void;
     resetPendingSettings: () => void;
-    setPendingSetting: (key: string, value: unknown) => void;
+    setPendingSetting: <K extends keyof WorkflowSearchSettings>(
+        key: K,
+        value: WorkflowSearchSettings[K]
+    ) => void;
     getRefreshData: () => boolean;
     triggerDataRefresh: () => void;
     clearDataRefresh: () => void;

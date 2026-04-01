@@ -25,6 +25,7 @@ import React, { useEffect, useState } from 'react';
 import {
     useWorkflowSearchSettings,
     WfAttributePair,
+    WorkflowSearchSettings,
 } from '@jobmon_gui/stores/workflow_settings';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -92,7 +93,12 @@ export default function WorkflowFilters() {
         });
     };
 
-    const handleInputChange = (key: string, value: unknown) => {
+    const handleInputChange = <
+        K extends keyof WorkflowSearchSettings,
+    >(
+        key: K,
+        value: WorkflowSearchSettings[K]
+    ) => {
         workflowSettings.setPendingSetting(key, value);
     };
 
