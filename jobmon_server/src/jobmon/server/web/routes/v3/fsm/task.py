@@ -6,7 +6,7 @@ from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Set, Union, cast
 
 import structlog
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, Request
 from sqlalchemy import desc, insert, select, tuple_, update
 from sqlalchemy.dialects.mysql import insert as mysql_insert
 from sqlalchemy.dialects.mysql.dml import Insert as MySQLInsert
@@ -429,100 +429,85 @@ async def set_task_resume_state(
     if not reset_if_running:
         excluded_states.append(TaskStatus.RUNNING)
 
-    # Snapshot task statuses for audit records (read-only, no lock).
-    tasks_to_reset = db.execute(
-        select(Task.id, Task.status).where(
-            Task.workflow_id == workflow_id,
-            Task.status.not_in(excluded_states),
-        )
-    ).all()
+    # Count tasks needing reset (read-only snapshot).
+    total = (
+        db.execute(
+            select(func.count(Task.id)).where(
+                Task.workflow_id == workflow_id,
+                Task.status.not_in(excluded_states),
+            )
+        ).scalar()
+        or 0
+    )
 
-    if tasks_to_reset:
-        expected_count = len(tasks_to_reset)
-        status_map = {row.id: row.status for row in tasks_to_reset}
+    if total:
+        # Process in batched commits: each iteration locks a batch
+        # of tasks, updates them, writes audit records, and commits.
+        # Commit releases all row locks so we never hold more than
+        # batch_size locks at once — no timeout or distributor
+        # contention on large workflows.
         reset_count = 0
+        batch_size = 5000
+        empty_passes = 0
+        max_empty_passes = 10
 
-        # Subquery UPDATE with SKIP LOCKED: locks and updates in one
-        # server-side statement, no 100K-ID round-trip through Python.
-        # Retries with backoff pick up rows the distributor held.
-        max_passes = 5
-        for attempt in range(max_passes):
-            locked_subq = (
-                select(Task.id)
+        while reset_count < total:
+            # Lock a batch, skipping rows the distributor holds.
+            locked_rows = db.execute(
+                select(Task.id, Task.status)
                 .where(
                     Task.workflow_id == workflow_id,
                     Task.status.not_in(excluded_states),
                 )
                 .with_for_update(skip_locked=True)
-            ).subquery()
+                .limit(batch_size)
+            ).all()
 
-            result = db.execute(
+            if not locked_rows:
+                empty_passes += 1
+                if empty_passes >= max_empty_passes:
+                    break
+                db.commit()
+                time.sleep(0.2)
+                continue
+
+            empty_passes = 0
+            locked_ids = [row.id for row in locked_rows]
+
+            db.execute(
                 update(Task)
-                .where(Task.id.in_(select(locked_subq.c.id)))
+                .where(Task.id.in_(locked_ids))
                 .values(
                     status=TaskStatus.REGISTERING,
                     num_attempts=0,
                     status_date=func.now(),
                 )
             )
-            reset_count += result.rowcount
 
-            if reset_count >= expected_count:
-                break
-
-            db.flush()
-            time.sleep(0.2 * (attempt + 1))
-
-        # Find which tasks were actually reset so we only audit those.
-        actually_reset = (
-            db.execute(
-                select(Task.id).where(
-                    Task.workflow_id == workflow_id,
-                    Task.status == TaskStatus.REGISTERING,
-                    Task.id.in_(list(status_map.keys())),
-                )
-            )
-            .scalars()
-            .all()
-        )
-        reset_ids = set(actually_reset)
-
-        # Batch audit records with flush() to keep the
-        # task_status_audit lock footprint manageable.
-        batch_size = 2000
-        audit_records = [
-            {
-                "task_id": tid,
-                "workflow_id": workflow_id,
-                "previous_status": status_map[tid],
-                "new_status": TaskStatus.REGISTERING,
-            }
-            for tid in reset_ids
-        ]
-        for i in range(0, len(audit_records), batch_size):
             TransitionService.create_audit_records_bulk(
                 session=db,
-                records=audit_records[i : i + batch_size],
+                records=[
+                    {
+                        "task_id": row.id,
+                        "workflow_id": workflow_id,
+                        "previous_status": row.status,
+                        "new_status": TaskStatus.REGISTERING,
+                    }
+                    for row in locked_rows
+                ],
             )
-            db.flush()
 
-        # If some tasks couldn't be reset, commit the progress
-        # and raise so the client retries for the remainder.
-        remaining = expected_count - len(reset_ids)
-        if remaining > 0:
+            # Commit releases locks and saves progress.
+            # If we crash here, committed batches are safe
+            # and the client retries for the remainder.
             db.commit()
+            reset_count += len(locked_ids)
+
+        if reset_count < total:
             logger.warning(
-                f"Resume: {remaining} of {expected_count} tasks "
-                f"still locked after {max_passes} passes for "
-                f"workflow {workflow_id}, committed partial reset",
-            )
-            raise HTTPException(
-                status_code=StatusCodes.SERVICE_UNAVAILABLE,
-                detail=(
-                    f"Reset {len(reset_ids)}/{expected_count} "
-                    f"tasks. {remaining} locked by active "
-                    f"transitions — retry to complete."
-                ),
+                f"Resume: reset {reset_count}/{total} tasks "
+                f"for workflow {workflow_id}, "
+                f"{total - reset_count} still locked"
             )
 
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
