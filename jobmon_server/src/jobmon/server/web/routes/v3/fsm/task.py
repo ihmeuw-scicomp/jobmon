@@ -1,7 +1,6 @@
 """Routes for Tasks."""
 
 import json
-import time
 from http import HTTPStatus as StatusCodes
 from typing import Any, Dict, List, Set, Union, cast
 
@@ -429,86 +428,66 @@ async def set_task_resume_state(
     if not reset_if_running:
         excluded_states.append(TaskStatus.RUNNING)
 
-    # Count tasks needing reset (read-only snapshot).
-    total = (
-        db.execute(
-            select(func.count(Task.id)).where(
+    # Batched commits: lock a batch → update → audit → commit.
+    # Each commit releases row locks so we never hold more than
+    # RESET_BATCH_SIZE locks at once. SKIP LOCKED avoids blocking
+    # on rows the distributor holds mid-transition. REGISTERING
+    # is in excluded_states, so already-reset tasks are skipped
+    # on re-entry (idempotent for client retries).
+    RESET_BATCH_SIZE = 5000
+    MAX_EMPTY_PASSES = 10
+    reset_count = 0
+    empty_passes = 0
+
+    while True:
+        locked_rows = db.execute(
+            select(Task.id, Task.status)
+            .where(
                 Task.workflow_id == workflow_id,
                 Task.status.not_in(excluded_states),
             )
-        ).scalar()
-        or 0
-    )
+            .with_for_update(skip_locked=True)
+            .limit(RESET_BATCH_SIZE)
+        ).all()
 
-    if total:
-        # Process in batched commits: each iteration locks a batch
-        # of tasks, updates them, writes audit records, and commits.
-        # Commit releases all row locks so we never hold more than
-        # batch_size locks at once — no timeout or distributor
-        # contention on large workflows.
-        reset_count = 0
-        batch_size = 5000
-        empty_passes = 0
-        max_empty_passes = 10
-
-        while reset_count < total:
-            # Lock a batch, skipping rows the distributor holds.
-            locked_rows = db.execute(
-                select(Task.id, Task.status)
-                .where(
-                    Task.workflow_id == workflow_id,
-                    Task.status.not_in(excluded_states),
-                )
-                .with_for_update(skip_locked=True)
-                .limit(batch_size)
-            ).all()
-
-            if not locked_rows:
-                empty_passes += 1
-                if empty_passes >= max_empty_passes:
-                    break
-                db.commit()
-                time.sleep(0.2)
-                continue
-
-            empty_passes = 0
-            locked_ids = [row.id for row in locked_rows]
-
-            db.execute(
-                update(Task)
-                .where(Task.id.in_(locked_ids))
-                .values(
-                    status=TaskStatus.REGISTERING,
-                    num_attempts=0,
-                    status_date=func.now(),
-                )
-            )
-
-            TransitionService.create_audit_records_bulk(
-                session=db,
-                records=[
-                    {
-                        "task_id": row.id,
-                        "workflow_id": workflow_id,
-                        "previous_status": row.status,
-                        "new_status": TaskStatus.REGISTERING,
-                    }
-                    for row in locked_rows
-                ],
-            )
-
-            # Commit releases locks and saves progress.
-            # If we crash here, committed batches are safe
-            # and the client retries for the remainder.
+        if not locked_rows:
+            empty_passes += 1
+            if empty_passes >= MAX_EMPTY_PASSES:
+                break
             db.commit()
-            reset_count += len(locked_ids)
+            continue
 
-        if reset_count < total:
-            logger.warning(
-                f"Resume: reset {reset_count}/{total} tasks "
-                f"for workflow {workflow_id}, "
-                f"{total - reset_count} still locked"
+        empty_passes = 0
+        locked_ids = [row.id for row in locked_rows]
+
+        db.execute(
+            update(Task)
+            .where(Task.id.in_(locked_ids))
+            .values(
+                status=TaskStatus.REGISTERING,
+                num_attempts=0,
+                status_date=func.now(),
             )
+        )
+
+        TransitionService.create_audit_records_bulk(
+            session=db,
+            records=[
+                {
+                    "task_id": row.id,
+                    "workflow_id": workflow_id,
+                    "previous_status": row.status,
+                    "new_status": TaskStatus.REGISTERING,
+                }
+                for row in locked_rows
+            ],
+        )
+
+        db.commit()
+        reset_count += len(locked_ids)
+
+    if reset_count > 0:
+        logger.info(f"Resume: reset {reset_count} tasks for " f"workflow {workflow_id}")
 
     resp = JSONResponse(content={}, status_code=StatusCodes.OK)
     return resp
