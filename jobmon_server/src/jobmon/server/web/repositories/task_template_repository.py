@@ -108,23 +108,24 @@ class TaskTemplateRepository:
         workflows: Optional[List[int]],
         node_args: Optional[Dict[str, List[Any]]],
     ) -> List[TaskResourceDetailItem]:
-        """Fetch and filter task resource details with optimized single-query approach."""
+        """Fetch and filter task resource details with optimized single-query approach.
+
+        Uses LEFT JOINs on TaskInstance and TaskResources so that every
+        task appears in the result set regardless of instance state:
+        - Tasks with terminal instances → full resource data
+        - Tasks with running/launched instances → instance row, null resources
+        - Tasks with no instances yet (registered) → single row, null instance fields
+        Status falls back to Task.status when no instance exists.
+        """
         base_filters = [
             TaskTemplateVersion.id == task_template_version_id,
-            TaskInstance.status.in_(
-                [
-                    TaskInstanceStatus.DONE,
-                    TaskInstanceStatus.RESOURCE_ERROR,
-                    TaskInstanceStatus.NO_HEARTBEAT,
-                    TaskInstanceStatus.UNKNOWN_ERROR,
-                    TaskInstanceStatus.ERROR_FATAL,
-                    TaskInstanceStatus.ERROR,
-                ]
-            ),
         ]
 
         if workflows:
             base_filters.append(Task.workflow_id.in_(workflows))
+
+        # COALESCE gives instance status when present, task status otherwise
+        status_col = func.coalesce(TaskInstance.status, Task.status).label("status_col")
 
         attempt_number_col = (
             func.row_number()
@@ -139,7 +140,7 @@ class TaskTemplateRepository:
                     # TaskInstance resource usage fields
                     TaskInstance.wallclock,
                     TaskInstance.maxrss,
-                    TaskInstance.status.label("status_col"),
+                    status_col,
                     # Node and Task identifiers
                     Node.id.label("node_id_col"),
                     Task.id.label("task_id_col"),
@@ -156,10 +157,16 @@ class TaskTemplateRepository:
                     TaskInstance.workflow_run_id.label("workflow_run_id_col"),
                 )
                 .select_from(TaskTemplateVersion)
-                .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+                .join(
+                    Node,
+                    TaskTemplateVersion.id == Node.task_template_version_id,
+                )
                 .join(Task, Node.id == Task.node_id)
-                .join(TaskInstance, Task.id == TaskInstance.task_id)
-                .join(TaskResources, TaskInstance.task_resources_id == TaskResources.id)
+                .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
+                .outerjoin(
+                    TaskResources,
+                    TaskInstance.task_resources_id == TaskResources.id,
+                )
                 .where(and_(*base_filters))
             )
 
@@ -177,7 +184,7 @@ class TaskTemplateRepository:
                     "task_name": row[5],  # task_name_col
                     "requested_resources": row[10],  # requested_resources_col
                     "attempt_number_of_instance": row[11],  # attempt_number_col
-                    "status_orig": row[2],  # status_col (from TaskInstance)
+                    "status_orig": row[2],  # status_col (coalesced)
                     "task_status_date": row[6],  # task_status_date_col
                     "task_command": row[7],  # task_command_col
                     "task_num_attempts": row[8],  # task_num_attempts_col
@@ -198,6 +205,7 @@ class TaskTemplateRepository:
                 workflows,
                 node_args,
                 base_filters,
+                status_col,
                 attempt_number_col,
             )
 
@@ -207,6 +215,7 @@ class TaskTemplateRepository:
         workflows: Optional[List[int]],
         node_args: Dict[str, List[Any]],
         base_filters: List[ColumnElement],
+        status_col: Label,
         attempt_number_col: Label,
     ) -> List[TaskResourceDetailItem]:
         """Optimized node_args filtering using database-level joins and filtering."""
@@ -219,7 +228,7 @@ class TaskTemplateRepository:
                 Task.name.label("task_name"),
                 TaskResources.requested_resources,
                 attempt_number_col,
-                TaskInstance.status,
+                status_col,
                 Task.status_date.label("task_status_date"),
                 Task.command.label("task_command"),
                 Task.num_attempts.label("task_num_attempts"),
@@ -228,10 +237,16 @@ class TaskTemplateRepository:
                 TaskInstance.workflow_run_id,
             )
             .select_from(TaskTemplateVersion)
-            .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+            .join(
+                Node,
+                TaskTemplateVersion.id == Node.task_template_version_id,
+            )
             .join(Task, Node.id == Task.node_id)
-            .join(TaskInstance, Task.id == TaskInstance.task_id)
-            .join(TaskResources, TaskInstance.task_resources_id == TaskResources.id)
+            .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
+            .outerjoin(
+                TaskResources,
+                TaskInstance.task_resources_id == TaskResources.id,
+            )
             .where(and_(*base_filters))
         ).cte("base_tasks")
 
@@ -262,7 +277,7 @@ class TaskTemplateRepository:
             base_query.c.task_name,
             base_query.c.requested_resources,
             base_query.c.attempt_number_of_instance,
-            base_query.c.status,
+            base_query.c.status_col,
             base_query.c.task_status_date,
             base_query.c.task_command,
             base_query.c.task_num_attempts,

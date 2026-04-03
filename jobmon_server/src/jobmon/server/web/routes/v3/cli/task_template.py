@@ -5,16 +5,14 @@ from typing import Any, Optional
 
 import structlog
 from fastapi import Depends, HTTPException, Query
-from sqlalchemy import and_, exists, select
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
 from jobmon.server.web.db import get_db, get_dialect
-from jobmon.server.web.models.node import Node
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_status import TaskInstanceStatus
-from jobmon.server.web.models.task_template_version import TaskTemplateVersion
 from jobmon.server.web.repositories.task_template_repository import (
     TaskTemplateRepository,
 )
@@ -160,44 +158,6 @@ async def get_task_template_resource_usage(
                         task_num_attempts=detail_item.task_num_attempts,
                         task_max_attempts=detail_item.task_max_attempts,
                         workflow_run_id=detail_item.workflow_run_id,
-                    )
-                )
-
-            # Include tasks without qualifying instances
-            # (Registered, Queued, Running — not yet terminal).
-            # Uses Python-side exclusion to avoid expensive NOT EXISTS
-            # subquery against task_instance.
-            task_ids_with_instances = {d.task_id for d in task_details}
-            task_filters = [
-                TaskTemplateVersion.id == request_data.task_template_version_id,
-                Node.task_template_version_id == TaskTemplateVersion.id,
-                Task.node_id == Node.id,
-            ]
-            if request_data.workflows:
-                task_filters.append(Task.workflow_id.in_(request_data.workflows))
-            all_tasks_query = select(
-                Task.id,
-                Task.name,
-                Task.status,
-                Task.command,
-                Task.num_attempts,
-                Task.max_attempts,
-                Task.status_date,
-                Node.id.label("node_id"),
-            ).where(and_(*task_filters))
-            for row in db.execute(all_tasks_query).all():
-                if row[0] in task_ids_with_instances:
-                    continue
-                viz_data.append(
-                    TaskResourceVizItem(
-                        node_id=row[7],
-                        task_id=row[0],
-                        task_name=row[1],
-                        status=row[2],
-                        task_command=row[3],
-                        task_num_attempts=row[4],
-                        task_max_attempts=row[5],
-                        task_status_date=row[6],
                     )
                 )
 
