@@ -170,7 +170,19 @@ class DistributorService:
                     status = todo.pop(0)
 
                     # refresh internal state from db
-                    self.refresh_status_from_db(status)
+                    try:
+                        self.refresh_status_from_db(status)
+                    except DistributorInterruptedError:
+                        raise
+                    except Exception as e:
+                        logger.warning(
+                            "Status refresh failed, will retry next cycle",
+                            status=status,
+                            error=str(e),
+                        )
+                        done.append(status)
+                        time_till_next_heartbeat -= time.time() - start_time
+                        continue
 
                     # how long the heartbeat took
                     refresh_time = time.time()
@@ -205,13 +217,18 @@ class DistributorService:
                 if time_till_next_heartbeat > 0:
                     time.sleep(time_till_next_heartbeat)
 
-                self.log_task_instance_report_by_date()
+                try:
+                    self.log_task_instance_report_by_date()
+                except DistributorInterruptedError:
+                    raise
+                except Exception as e:
+                    logger.warning(
+                        "Heartbeat logging failed, will retry next cycle",
+                        error=str(e),
+                    )
 
         except DistributorInterruptedError as e:
             logger.info(f"Distributor interrupted: {e}")
-        except Exception as e:
-            logger.exception("Distributor error", error=str(e))
-            raise
         finally:
             logger.info("Distributor stopping")
             # stop distributor
@@ -587,9 +604,19 @@ class DistributorService:
         task_instances_launched = self._task_instance_status_map[
             TaskInstanceStatus.LAUNCHED
         ]
-        submitted_or_running = self.cluster_interface.get_submitted_or_running(
-            [x.distributor_id for x in task_instances_launched]
-        )
+        try:
+            submitted_or_running = self.cluster_interface.get_submitted_or_running(
+                [x.distributor_id for x in task_instances_launched]
+            )
+        except DistributorInterruptedError:
+            raise
+        except Exception as e:
+            logger.warning(
+                "Failed to query submitted/running jobs, skipping heartbeat",
+                error=str(e),
+            )
+            self._last_heartbeat_time = time.time()
+            return
 
         task_instance_ids_to_heartbeat: List[int] = []
         for task_instance_launched in task_instances_launched:
@@ -623,7 +650,16 @@ class DistributorService:
                 asyncio.create_task(self._log_heartbeat_by_batch(session, batch))
                 for batch in task_instance_batches
             ]
-            await asyncio.gather(*heartbeat_tasks)
+            results = await asyncio.gather(*heartbeat_tasks, return_exceptions=True)
+            for i, result in enumerate(results):
+                if isinstance(result, DistributorInterruptedError):
+                    raise result
+                if isinstance(result, Exception):
+                    logger.warning(
+                        "Heartbeat batch failed",
+                        batch_index=i,
+                        error=str(result),
+                    )
 
     async def _log_heartbeat_by_batch(
         self, session: aiohttp.ClientSession, task_instance_ids_to_heartbeat: List[int]
