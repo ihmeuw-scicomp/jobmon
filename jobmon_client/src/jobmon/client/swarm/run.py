@@ -440,7 +440,11 @@ async def _run_orchestrator(
                 raise
 
             # For fail-fast and other RuntimeErrors, construct result from state
-            logger.warning(f"Workflow run RuntimeError: {e}")
+            logger.exception(
+                "Workflow run RuntimeError — constructing result from state",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return _build_result_from_state(state, start_time)
 
         except (DistributorNotAlive, DistributorInterruptedError, WorkflowTestError):
@@ -452,7 +456,11 @@ async def _run_orchestrator(
 
         except Exception as e:
             # On other errors, construct result from state
-            logger.warning(f"Workflow run error: {e}")
+            logger.exception(
+                "Workflow run error — constructing result from state",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             return _build_result_from_state(state, start_time)
 
     finally:

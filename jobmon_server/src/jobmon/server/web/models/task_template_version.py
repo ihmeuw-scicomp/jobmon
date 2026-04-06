@@ -42,7 +42,7 @@ class TaskTemplateVersion(Base):
             task_args=args_by_type["task_args"],
             op_args=args_by_type["op_args"],
             id_name_map=id_name_map,
-            task_template_id=self.task_template.id,
+            task_template_id=int(self.task_template_id),
         )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

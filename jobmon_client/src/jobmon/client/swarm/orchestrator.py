@@ -404,6 +404,16 @@ class WorkflowRunOrchestrator:
                 # No observable work still queued, but tasks remain outstanding
                 # Force an immediate full sync before deciding to exit
                 if not self._state.all_tasks_final():
+                    logger.warning(
+                        "Main loop exiting with non-final tasks — "
+                        "forcing full sync before exit",
+                        status=self._state.status,
+                        total_tasks=len(self._state.tasks),
+                        done=self._state.get_done_count(),
+                        failed=self._state.get_failed_count(),
+                        active=self._state.get_active_task_count(),
+                        ready_to_run=self._state.get_ready_to_run_count(),
+                    )
                     await self._do_sync(full_sync=True)
                     time_since_last_full_sync = 0.0
 
@@ -702,6 +712,16 @@ class WorkflowRunOrchestrator:
                 f"Workflow run exited with server-set status: {self._state.status}"
             )
         else:
+            logger.error(
+                "Workflow run finalizing as ERROR — main loop exited "
+                "with incomplete tasks",
+                status=self._state.status,
+                total_tasks=total_tasks,
+                done=done_count,
+                failed=failed_count,
+                active=self._state.get_active_task_count(),
+                ready_to_run=self._state.get_ready_to_run_count(),
+            )
             await self._update_status(WorkflowRunStatus.ERROR)
 
         # Build task-level results

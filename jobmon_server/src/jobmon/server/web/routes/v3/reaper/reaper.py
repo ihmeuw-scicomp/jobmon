@@ -5,7 +5,7 @@ from typing import Any, Union
 
 import structlog
 from fastapi import Depends, Query, Request
-from sqlalchemy import case, func, insert, select, text, update
+from sqlalchemy import case, func, insert, select, update
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
@@ -305,16 +305,16 @@ def reap_workflow_run(workflow_run_id: int, db: Session = Depends(get_db)) -> An
             logger.debug(f"Unable to reap workflow_run {wfr_id}: {e}")
 
     # update status
-    query1 = f"""UPDATE workflow_run
-                SET status="{target_wfr_status}"
-                WHERE id={wfr_id}
-            """
-    db.execute(text(query1))
-    query2 = f"""UPDATE workflow
-                    SET status="{target_wf_status}"
-                    WHERE id={wf_id}
-            """
-    db.execute(text(query2))
+    db.execute(
+        update(WorkflowRun)
+        .where(WorkflowRun.id == wfr_id)
+        .values(status=target_wfr_status, status_date=func.now())
+    )
+    db.execute(
+        update(Workflow)
+        .where(Workflow.id == wf_id)
+        .values(status=target_wf_status, status_date=func.now())
+    )
     db.commit()
     resp = JSONResponse(
         content={"status": target_wfr_status}, status_code=StatusCodes.OK
