@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from jobmon.core.cluster_protocol import ClusterDistributor, ClusterWorkerNode
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import RemoteExitInfoNotAvailable, ReturnCodes
+from jobmon.core.exit_info import RemoteExitInfo
 from jobmon.worker_node.cli import WorkerNodeCLI
 
 logger = logging.getLogger(__name__)
@@ -99,15 +100,19 @@ class SequentialDistributor(ClusterDistributor):
         """
         return {}
 
-    def get_remote_exit_info(self, distributor_id: str) -> Tuple[str, str]:
+    def get_remote_exit_info(self, distributor_id: str) -> RemoteExitInfo:
         """Get exit info from task instances that have run."""
         try:
             exit_code = self._exit_info[distributor_id]
             if exit_code == 199:
-                msg = "job was in kill self state"
-                return TaskInstanceStatus.UNKNOWN_ERROR, msg
-            else:
-                return TaskInstanceStatus.UNKNOWN_ERROR, f"found {exit_code}"
+                return RemoteExitInfo(
+                    error_state=TaskInstanceStatus.UNKNOWN_ERROR,
+                    error_message="job was in kill self state",
+                )
+            return RemoteExitInfo(
+                error_state=TaskInstanceStatus.UNKNOWN_ERROR,
+                error_message=f"found {exit_code}",
+            )
         except KeyError:
             raise RemoteExitInfoNotAvailable
 

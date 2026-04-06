@@ -203,10 +203,15 @@ def test_triaging_to_specific_error(
     # synchronize statuses from the db and get new work
     # distributor_service._check_for_work(TaskInstanceStatus.TRIAGING)
 
+    from jobmon.core.exit_info import RemoteExitInfo
+
     with mock.patch(
         "jobmon.plugins.multiprocess.multiproc_distributor."
         "MultiprocessDistributor.get_remote_exit_info",
-        return_value=(error_state, error_message),
+        return_value=RemoteExitInfo(
+            error_state=error_state,
+            error_message=error_message,
+        ),
     ):
         # code logic to test
         distributor_service.refresh_status_from_db(TaskInstanceStatus.TRIAGING)
