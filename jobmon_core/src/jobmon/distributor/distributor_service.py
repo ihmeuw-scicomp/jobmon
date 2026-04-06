@@ -608,6 +608,8 @@ class DistributorService:
             submitted_or_running = self.cluster_interface.get_submitted_or_running(
                 [x.distributor_id for x in task_instances_launched]
             )
+        except DistributorInterruptedError:
+            raise
         except Exception as e:
             logger.warning(
                 "Failed to query submitted/running jobs, skipping heartbeat",
