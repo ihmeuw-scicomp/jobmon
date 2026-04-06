@@ -652,6 +652,8 @@ class DistributorService:
             ]
             results = await asyncio.gather(*heartbeat_tasks, return_exceptions=True)
             for i, result in enumerate(results):
+                if isinstance(result, DistributorInterruptedError):
+                    raise result
                 if isinstance(result, Exception):
                     logger.warning(
                         "Heartbeat batch failed",
