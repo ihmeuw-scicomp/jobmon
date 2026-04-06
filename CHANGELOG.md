@@ -5,6 +5,19 @@ All notable changes to Jobmon will be documented in this file.
 
 ## [Unreleased]
 ### Added
+- **Deferred Triage for Cluster Accounting**: New `RemoteExitInfo` dataclass in `ClusterDistributor` protocol. When cluster accounting hasn't finalized (e.g., Slurm still reporting `state=RUNNING` for a dead job), the distributor defers the triage transition and retries each cycle up to 5 minutes. This ensures accurate exit codes for resource scaling — OOM'd tasks now reliably get bumped memory on retry instead of retrying with the same resources.
+
+### Changed
+- **Distributor Resilience**: Heartbeat failures, `squeue` errors, and HTTP timeouts no longer crash the distributor. Non-critical operations are wrapped in try/except and retried on the next cycle. `asyncio.gather` for heartbeat batches uses `return_exceptions=True` so one failed batch doesn't kill all batches. Shutdown signals (`SIGTERM`/`SIGHUP`) are correctly re-raised through all error handlers.
+
+### Fixed
+- **Reaper Status Timestamps**: The reaper now updates `status_date` when transitioning workflow runs to Error, fixing a bug where reaped runs appeared to fail within seconds of creation in the GUI. Converted raw SQL to SQLAlchemy expressions.
+- **Task Template Version Race Condition**: Fixed `AttributeError` on concurrent `TaskTemplateVersion` creation. The `to_wire` method now uses the FK column (`task_template_id`) instead of the ORM relationship (`task_template.id`), which is `None` after an `IntegrityError` rollback.
+- **Orchestrator Premature Exit Diagnostics**: Added logging when the orchestrator main loop exits with non-final tasks and when `_finalize()` sets ERROR status, including full state breakdown (total, done, failed, active, ready_to_run). Swallowed exceptions in `_run_orchestrator` now log full tracebacks via `logger.exception` instead of one-line warnings.
+- **Resource Usage Query**: Fixed resource usage scatter plot to include task instances in Running and Registered states (previously only showed completed instances).
+
+## [Previously Released]
+### Added
 - **Latest Attempt Filter**: "Latest attempt only" toggle (default on) on task template details page shows one row per task, hiding old failed attempts for tasks that have since succeeded
 - **Workflow Run Filter**: Dropdown on task template details page to scope scatter plot, task table, error clusters, and KPIs to a specific workflow run
 - **Workflow Run Scoping**: Workflow details page scopes error clusters and fatal error breakdowns to the latest workflow run, preventing stale errors from prior resumes from appearing
