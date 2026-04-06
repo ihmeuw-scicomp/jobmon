@@ -2,6 +2,7 @@ import pytest
 
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import RemoteExitInfoNotAvailable
+from jobmon.core.exit_info import RemoteExitInfo
 from jobmon.plugins.multiprocess.multiproc_distributor import (
     MultiprocessDistributor,
     MultiprocessWorkerNode,
@@ -19,25 +20,29 @@ def distributor():
 def test_get_remote_exit_info_kill_self(distributor):
     """Exit code 199 should return UNKNOWN_ERROR with kill self message."""
     distributor._exit_info["1"] = 199
-    status, msg = distributor.get_remote_exit_info("1")
-    assert status == TaskInstanceStatus.UNKNOWN_ERROR
-    assert "kill self" in msg
+    result = distributor.get_remote_exit_info("1")
+    assert isinstance(result, RemoteExitInfo)
+    assert result.error_state == TaskInstanceStatus.UNKNOWN_ERROR
+    assert "kill self" in result.error_message
+    assert result.finalized is True
 
 
 def test_get_remote_exit_info_nonzero(distributor):
     """Non-zero exit code should return UNKNOWN_ERROR with the code."""
     distributor._exit_info["2"] = 1
-    status, msg = distributor.get_remote_exit_info("2")
-    assert status == TaskInstanceStatus.UNKNOWN_ERROR
-    assert "1" in msg
+    result = distributor.get_remote_exit_info("2")
+    assert isinstance(result, RemoteExitInfo)
+    assert result.error_state == TaskInstanceStatus.UNKNOWN_ERROR
+    assert "1" in result.error_message
 
 
 def test_get_remote_exit_info_zero(distributor):
     """Zero exit code should still return UNKNOWN_ERROR (triaging path)."""
     distributor._exit_info["3"] = 0
-    status, msg = distributor.get_remote_exit_info("3")
-    assert status == TaskInstanceStatus.UNKNOWN_ERROR
-    assert "0" in msg
+    result = distributor.get_remote_exit_info("3")
+    assert isinstance(result, RemoteExitInfo)
+    assert result.error_state == TaskInstanceStatus.UNKNOWN_ERROR
+    assert "0" in result.error_message
 
 
 def test_get_remote_exit_info_missing(distributor):

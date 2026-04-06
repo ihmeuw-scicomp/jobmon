@@ -18,6 +18,7 @@ import psutil
 from jobmon.core.cluster_protocol import ClusterDistributor, ClusterWorkerNode
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.exceptions import RemoteExitInfoNotAvailable
+from jobmon.core.exit_info import RemoteExitInfo
 
 logger = logging.getLogger(__name__)
 
@@ -231,18 +232,18 @@ class MultiprocessDistributor(ClusterDistributor):
                 errors[did] = self._queueing_errors.pop(did)
         return errors
 
-    def get_remote_exit_info(self, distributor_id: str) -> Tuple[str, str]:
+    def get_remote_exit_info(self, distributor_id: str) -> RemoteExitInfo:
         """Get the exit info about the task instance once done."""
         try:
             exit_code = self._exit_info[distributor_id]
             if exit_code == 199:
-                return (
-                    TaskInstanceStatus.UNKNOWN_ERROR,
-                    "job was in kill self state",
+                return RemoteExitInfo(
+                    error_state=TaskInstanceStatus.UNKNOWN_ERROR,
+                    error_message="job was in kill self state",
                 )
-            return (
-                TaskInstanceStatus.UNKNOWN_ERROR,
-                f"Process exited with code {exit_code}",
+            return RemoteExitInfo(
+                error_state=TaskInstanceStatus.UNKNOWN_ERROR,
+                error_message=f"Process exited with code {exit_code}",
             )
         except KeyError:
             raise RemoteExitInfoNotAvailable

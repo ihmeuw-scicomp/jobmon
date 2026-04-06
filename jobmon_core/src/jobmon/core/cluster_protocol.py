@@ -12,6 +12,7 @@ except ImportError:
 
 from jobmon.core import __version__
 from jobmon.core.exceptions import RemoteExitInfoNotAvailable
+from jobmon.core.exit_info import RemoteExitInfo
 
 
 class ClusterQueue(Protocol):
@@ -114,8 +115,16 @@ class ClusterDistributor(Protocol):
         raise NotImplementedError
 
     @abstractmethod
-    def get_remote_exit_info(self, distributor_id: str) -> Tuple[str, str]:
-        """Get the exit info about the task instance once it is done running."""
+    def get_remote_exit_info(
+        self, distributor_id: str
+    ) -> Union[RemoteExitInfo, Tuple[str, str]]:
+        """Get the exit info about the task instance once it is done running.
+
+        Returns:
+            RemoteExitInfo with error_state, error_message, and finalized flag.
+            Legacy plugins may return a (error_state, error_message) tuple,
+            which is treated as finalized=True.
+        """
         raise RemoteExitInfoNotAvailable
 
     @abstractmethod

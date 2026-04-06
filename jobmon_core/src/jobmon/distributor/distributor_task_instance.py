@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Set, Tuple
+from typing import TYPE_CHECKING, List, Optional, Set, Tuple
 
 import structlog
 
@@ -43,6 +43,11 @@ class DistributorTaskInstance:
         self.error_msg = ""
 
         self.requester = requester
+
+        # Triage retry tracking — used when cluster accounting
+        # is not yet finalized after a worker death
+        self.first_triage_time: Optional[float] = None
+        self.triage_attempts: int = 0
 
     @property
     def submission_name(self) -> str:

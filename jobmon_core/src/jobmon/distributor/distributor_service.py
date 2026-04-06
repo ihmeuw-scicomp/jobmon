@@ -484,27 +484,77 @@ class DistributorService:
                 distributor_id, self._next_report_increment
             )
 
+    # Maximum wall-clock time to wait for cluster accounting to
+    # finalize before proceeding with potentially inaccurate metadata.
+    MAX_TRIAGE_DURATION: float = 300.0  # 5 minutes
+
     @bind_context(task_instance_id="task_instance.task_instance_id")
     def triage_error(self, task_instance: DistributorTaskInstance) -> None:
         """Triage a running task instance that has missed a heartbeat.
 
+        Queries the cluster for exit info. If accounting has not
+        finalized yet (plugin returns finalized=False), defers the
+        transition and retries on the next distributor cycle, up to
+        MAX_TRIAGE_DURATION wall-clock seconds.
+
         Allowed transitions are (R, U, Z, F)
         """
+        now = time.time()
+        if task_instance.first_triage_time is None:
+            task_instance.first_triage_time = now
+        task_instance.triage_attempts += 1
+
         logger.info(
             "Distributor triaging task instance error",
             distributor_id=task_instance.distributor_id,
+            triage_attempt=task_instance.triage_attempts,
         )
 
-        r_value, r_msg = self.cluster_interface.get_remote_exit_info(
+        result = self.cluster_interface.get_remote_exit_info(
             task_instance.distributor_id
         )
+
+        # Support legacy plugins returning (error_state, error_message)
+        if isinstance(result, tuple):
+            r_value, r_msg = result
+            finalized = True
+        else:
+            r_value = result.error_state
+            r_msg = result.error_message
+            finalized = result.finalized
+
         logger.info(
             "Retrieved exit info from cluster",
             return_code=r_value,
             error_message=(
                 r_msg[:100] if r_msg else None
             ),  # Truncate for log readability
+            finalized=finalized,
         )
+
+        # Defer if accounting hasn't finalized and we're within the
+        # retry window. Accurate exit info is needed for resource
+        # scaling (e.g., OOM → bumped memory on retry).
+        if not finalized:
+            elapsed = now - task_instance.first_triage_time
+            if elapsed < self.MAX_TRIAGE_DURATION:
+                logger.info(
+                    "Cluster accounting not finalized, "
+                    "deferring triage to next cycle",
+                    distributor_id=task_instance.distributor_id,
+                    triage_attempts=task_instance.triage_attempts,
+                    elapsed_seconds=round(elapsed, 1),
+                    max_duration=self.MAX_TRIAGE_DURATION,
+                )
+                return  # Stay in TRIAGING — next cycle retries
+
+            logger.warning(
+                "Cluster accounting still unfinalized after timeout, "
+                "proceeding with available metadata",
+                distributor_id=task_instance.distributor_id,
+                triage_attempts=task_instance.triage_attempts,
+                elapsed_seconds=round(elapsed, 1),
+            )
 
         task_instance.transition_to_error(r_msg, r_value)
 

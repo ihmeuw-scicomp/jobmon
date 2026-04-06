@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from jobmon.core.cluster_protocol import ClusterDistributor, ClusterWorkerNode
 from jobmon.core.constants import TaskInstanceStatus
+from jobmon.core.exit_info import RemoteExitInfo
 from jobmon.worker_node.cli import WorkerNodeCLI
 from jobmon.worker_node.worker_node_factory import WorkerNodeFactory
 
@@ -87,9 +88,12 @@ class DummyDistributor(ClusterDistributor):
         """
         return {}
 
-    def get_remote_exit_info(self, distributor_id: str) -> Tuple[str, str]:
+    def get_remote_exit_info(self, distributor_id: str) -> RemoteExitInfo:
         """Get exit info from task instances that have run."""
-        return TaskInstanceStatus.UNKNOWN_ERROR, "Whatever"
+        return RemoteExitInfo(
+            error_state=TaskInstanceStatus.UNKNOWN_ERROR,
+            error_message="Whatever",
+        )
 
     def get_submitted_or_running(
         self, distributor_ids: Optional[List[str]] = None
