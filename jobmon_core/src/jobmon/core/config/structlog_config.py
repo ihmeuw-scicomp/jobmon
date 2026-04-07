@@ -68,6 +68,12 @@ _thread_local = threading.local()
 # Reference count so multiple OTLP handlers can co-exist safely.
 _otlp_handler_count = 0
 _otlp_capture_lock = threading.Lock()
+# Guards against installing the structlog reconfigure hook more than once.
+_structlog_hook_installed = False
+_structlog_hook_lock = threading.Lock()
+# Per-thread reentrancy guard: prevents infinite recursion when our hook calls
+# prepend_jobmon_processors_to_existing_config(), which calls structlog.configure().
+_reinjecting = threading.local()
 
 
 def _store_event_dict_for_otlp(
@@ -369,11 +375,55 @@ def _extract_exc_info(event_dict: Dict[str, Any]) -> Optional[Any]:
     return None
 
 
+def _install_structlog_reconfigure_hook() -> None:
+    """Wrap structlog.configure so jobmon processors survive host reconfiguration.
+
+    Host applications (e.g. FHS) call ``structlog.reset_defaults()`` followed by
+    ``structlog.configure(...)`` during their own logging setup, silently wiping
+    jobmon's ``_forward_event_to_logging_handlers`` processor.  This hook re-prepends
+    jobmon's processors after every ``structlog.configure`` call so the stdlib →
+    OTLP bridge remains intact regardless of when the host configures structlog.
+
+    Installed at most once per process (guarded by ``_structlog_hook_lock``).
+    A per-thread reentrancy flag prevents infinite recursion because
+    ``prepend_jobmon_processors_to_existing_config`` itself calls
+    ``structlog.configure``.
+    """
+    global _structlog_hook_installed
+
+    if _structlog_hook_installed:
+        return
+
+    with _structlog_hook_lock:
+        if _structlog_hook_installed:
+            return
+
+        import structlog as _structlog
+
+        _orig_configure = _structlog.configure
+
+        def _hooked_configure(**kwargs: Any) -> None:
+            _orig_configure(**kwargs)
+            if not getattr(_reinjecting, "active", False):
+                _reinjecting.active = True
+                try:
+                    prepend_jobmon_processors_to_existing_config()
+                finally:
+                    _reinjecting.active = False
+
+        _hooked_configure.__jobmon_hooked__ = True  # type: ignore[attr-defined]
+        _structlog.configure = _hooked_configure  # type: ignore[attr-defined]
+
+        _structlog_hook_installed = True
+
+
 def enable_structlog_otlp_capture() -> None:
     """Enable thread-local capture for OTLP handlers."""
     global _otlp_handler_count
     with _otlp_capture_lock:
         _otlp_handler_count += 1
+        if _otlp_handler_count == 1:
+            _install_structlog_reconfigure_hook()
 
 
 def disable_structlog_otlp_capture() -> None:
