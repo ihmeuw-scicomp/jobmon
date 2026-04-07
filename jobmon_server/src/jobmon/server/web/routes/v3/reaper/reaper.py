@@ -1,18 +1,19 @@
 """Routes used to move through the finite state."""
 
+import time
 from http import HTTPStatus as StatusCodes
-from typing import Any, Union
+from typing import Any, List, Union
 
 import structlog
 from fastapi import Depends, Query, Request
 from sqlalchemy import case, func, insert, select, update
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
 from jobmon.core import constants
-from jobmon.core.exceptions import InvalidStateTransition
 from jobmon.core.logging import set_jobmon_context
-from jobmon.server.web.db.deps import get_db
+from jobmon.server.web.db.deps import get_db, get_dialect
 from jobmon.server.web.models.task import Task
 from jobmon.server.web.models.task_instance import TaskInstance
 from jobmon.server.web.models.task_instance_error_log import TaskInstanceErrorLog
@@ -24,6 +25,101 @@ from jobmon.server.web.routes.v3.reaper import reaper_router as api_v3_router
 
 # new structlog logger per flask request context. internally stored as flask.g.logger
 logger = structlog.get_logger(__name__)
+
+REAP_BATCH_SIZE = 2000
+MAX_EMPTY_PASSES = 5
+
+
+def _batched_ti_transition(
+    db: Session,
+    wfr_id: int,
+    source_states: List[str],
+    target_status: str,
+    error_description_prefix: str,
+    dialect: str = "mysql",
+) -> int:
+    """Transition task instances in batches with SKIP LOCKED.
+
+    Each batch: lock TIs -> insert error log -> update status -> commit.
+    Committed batches survive crashes; already-transitioned TIs are
+    skipped on re-entry (idempotent).
+
+    Returns the total number of TIs transitioned.
+    """
+    total = 0
+    empty_passes = 0
+
+    while True:
+        try:
+            stmt = (
+                select(TaskInstance.id, TaskInstance.status)
+                .where(
+                    TaskInstance.workflow_run_id == wfr_id,
+                    TaskInstance.status.in_(source_states),
+                )
+                .limit(REAP_BATCH_SIZE)
+            )
+            if dialect != "sqlite":
+                stmt = stmt.with_for_update(skip_locked=True)
+            locked_rows = db.execute(stmt).all()
+        except OperationalError:
+            db.rollback()
+            logger.warning(
+                "DB error during reaper batch SELECT, will retry",
+                workflow_run_id=wfr_id,
+                target_status=target_status,
+            )
+            time.sleep(1.0)
+            continue
+
+        if not locked_rows:
+            empty_passes += 1
+            if empty_passes >= MAX_EMPTY_PASSES:
+                break
+            db.commit()
+            time.sleep(0.1 * empty_passes)
+            continue
+
+        empty_passes = 0
+        locked_ids = [row.id for row in locked_rows]
+
+        try:
+            db.execute(
+                insert(TaskInstanceErrorLog).from_select(
+                    ["task_instance_id", "description", "error_time"],
+                    select(
+                        TaskInstance.id,
+                        (error_description_prefix + TaskInstance.status),
+                        func.now(),
+                    ).where(TaskInstance.id.in_(locked_ids)),
+                )
+            )
+
+            db.execute(
+                update(TaskInstance)
+                .where(TaskInstance.id.in_(locked_ids))
+                .values(
+                    status=target_status,
+                    status_date=func.now(),
+                )
+            )
+
+            db.commit()
+            total += len(locked_ids)
+        except OperationalError:
+            db.rollback()
+            logger.warning(
+                "DB error during reaper batch UPDATE, will retry",
+                workflow_run_id=wfr_id,
+                target_status=target_status,
+                batch_size=len(locked_ids),
+            )
+            time.sleep(1.0)
+            # Retry — the rolled-back rows are unlocked and will be
+            # re-selected on the next iteration
+            continue
+
+    return total
 
 
 @api_v3_router.put("/workflow/{workflow_id}/fix_status_inconsistency")
@@ -140,7 +236,11 @@ def get_lost_workflow_runs(
 
 
 @api_v3_router.put("/workflow_run/{workflow_run_id}/reap")
-def reap_workflow_run(workflow_run_id: int, db: Session = Depends(get_db)) -> Any:
+def reap_workflow_run(
+    workflow_run_id: int,
+    db: Session = Depends(get_db),
+    dialect: str = Depends(get_dialect),
+) -> Any:
     """If the last task was more than 2 minutes ago, transition wfr to A state.
 
     Also check WorkflowRun status_date to avoid possible race condition where reaper
@@ -168,48 +268,32 @@ def reap_workflow_run(workflow_run_id: int, db: Session = Depends(get_db)) -> An
         logger.debug(f"Transitioning wfr {wfr_id} to ABORTED")
         target_wfr_status = WorkflowRunStatus.ABORTED
         target_wf_status = WorkflowStatus.ABORTED
-    if wfr_status in [WorkflowRunStatus.COLD_RESUME, WorkflowRunStatus.HOT_RESUME]:
+    elif wfr_status in [
+        WorkflowRunStatus.COLD_RESUME,
+        WorkflowRunStatus.HOT_RESUME,
+    ]:
         # Terminate task instances that the old distributor never cleaned up
-        # (ungraceful shutdown case - distributor died before calling terminate_task_instances)
+        # (ungraceful shutdown case - distributor died before calling
+        # terminate_task_instances)
         #
-        # QUEUED/INSTANTIATED: No job in cluster, no worker will run → ERROR_FATAL directly
-        # LAUNCHED/RUNNING: Job in cluster, worker will detect KILL_SELF and clean up
+        # QUEUED/INSTANTIATED: No job in cluster, no worker → ERROR_FATAL
+        # LAUNCHED/RUNNING: Job in cluster, worker detects KILL_SELF
 
-        # 1) Set QUEUED/INSTANTIATED directly to ERROR_FATAL (no worker to clean them up)
-        ti_states_to_error_fatal = [
-            constants.TaskInstanceStatus.QUEUED,
-            constants.TaskInstanceStatus.INSTANTIATED,
-        ]
-
-        insert_error_fatal_log = insert(TaskInstanceErrorLog).from_select(
-            ["task_instance_id", "description", "error_time"],
-            select(
-                TaskInstance.id,
-                (
-                    "Reaper: Workflow resume cleanup. Setting to ERROR_FATAL from status: "
-                    + TaskInstance.status
-                    + " (no worker to clean up)"
-                ),
-                func.now(),
-            ).where(
-                TaskInstance.workflow_run_id == wfr_id,
-                TaskInstance.status.in_(ti_states_to_error_fatal),
+        # 1) Set QUEUED/INSTANTIATED directly to ERROR_FATAL
+        num_error_fatal = _batched_ti_transition(
+            db=db,
+            wfr_id=wfr_id,
+            source_states=[
+                constants.TaskInstanceStatus.QUEUED,
+                constants.TaskInstanceStatus.INSTANTIATED,
+            ],
+            target_status=constants.TaskInstanceStatus.ERROR_FATAL,
+            error_description_prefix=(
+                "Reaper: Workflow resume cleanup."
+                " Setting to ERROR_FATAL from status: "
             ),
+            dialect=dialect,
         )
-        db.execute(insert_error_fatal_log)
-
-        update_to_error_fatal = (
-            update(TaskInstance)
-            .where(
-                TaskInstance.workflow_run_id == wfr_id,
-                TaskInstance.status.in_(ti_states_to_error_fatal),
-            )
-            .values(
-                status=constants.TaskInstanceStatus.ERROR_FATAL,
-                status_date=func.now(),
-            )
-        )
-        result_error_fatal = db.execute(update_to_error_fatal)
 
         # 2) Set LAUNCHED (and RUNNING for COLD_RESUME) to KILL_SELF
         if wfr_status == WorkflowRunStatus.HOT_RESUME:
@@ -222,45 +306,28 @@ def reap_workflow_run(workflow_run_id: int, db: Session = Depends(get_db)) -> An
                 constants.TaskInstanceStatus.RUNNING,
             ]
 
-        insert_kill_self_log = insert(TaskInstanceErrorLog).from_select(
-            ["task_instance_id", "description", "error_time"],
-            select(
-                TaskInstance.id,
-                (
-                    "Reaper: Workflow resume cleanup. Setting to KILL_SELF from status: "
-                    + TaskInstance.status
-                ),
-                func.now(),
-            ).where(
-                TaskInstance.workflow_run_id == wfr_id,
-                TaskInstance.status.in_(ti_states_to_kill_self),
+        num_kill_self = _batched_ti_transition(
+            db=db,
+            wfr_id=wfr_id,
+            source_states=ti_states_to_kill_self,
+            target_status=constants.TaskInstanceStatus.KILL_SELF,
+            error_description_prefix=(
+                "Reaper: Workflow resume cleanup." " Setting to KILL_SELF from status: "
             ),
+            dialect=dialect,
         )
-        db.execute(insert_kill_self_log)
-
-        update_to_kill_self = (
-            update(TaskInstance)
-            .where(
-                TaskInstance.workflow_run_id == wfr_id,
-                TaskInstance.status.in_(ti_states_to_kill_self),
-            )
-            .values(
-                status=constants.TaskInstanceStatus.KILL_SELF,
-                status_date=func.now(),
-            )
-        )
-        result_kill_self = db.execute(update_to_kill_self)
 
         logger.info(
             "Reaper terminated task instances",
             workflow_run_id=wfr_id,
-            num_error_fatal=result_error_fatal.rowcount,
-            num_kill_self=result_kill_self.rowcount,
+            num_error_fatal=num_error_fatal,
+            num_kill_self=num_kill_self,
             resume_type=wfr_status,
         )
 
-        # 3) Check if there are any KILL_SELF TIs remaining - if so, don't transition
-        # WFR to TERMINATED yet. Keep it in resume state until workers clean up.
+        # 3) Check if there are any KILL_SELF TIs remaining — if so,
+        # don't transition WFR yet. Keep it in resume state until
+        # workers clean up.
         kill_self_count = db.execute(
             select(func.count(TaskInstance.id)).where(
                 TaskInstance.workflow_run_id == wfr_id,
@@ -270,39 +337,53 @@ def reap_workflow_run(workflow_run_id: int, db: Session = Depends(get_db)) -> An
 
         if kill_self_count is not None and kill_self_count > 0:
             logger.info(
-                "Reaper waiting for KILL_SELF task instances to be cleaned up",
+                "Reaper waiting for KILL_SELF cleanup",
                 workflow_run_id=wfr_id,
                 kill_self_remaining=kill_self_count,
             )
-            # Don't transition WFR yet - return early
             db.commit()
             resp = JSONResponse(
-                content={"status": wfr_status, "kill_self_remaining": kill_self_count},
+                content={
+                    "status": wfr_status,
+                    "kill_self_remaining": kill_self_count,
+                },
                 status_code=StatusCodes.OK,
             )
             return resp
 
-        # All TIs cleaned up - proceed to transition WFR to TERMINATED
+        # All TIs cleaned up — proceed to transition WFR
         logger.debug(f"Transitioning wfr {wfr_id} to TERMINATED")
         target_wfr_status = WorkflowRunStatus.TERMINATED
         target_wf_status = WorkflowStatus.HALTED
-    if wfr_status == WorkflowRunStatus.RUNNING:
+    elif wfr_status == WorkflowRunStatus.RUNNING:
         logger.debug(f"Transitioning wfr {wfr_id} to ERROR")
         target_wfr_status = WorkflowRunStatus.ERROR
         target_wf_status = WorkflowStatus.FAILED
+    else:
+        logger.warning(
+            "Unexpected WFR status during reap",
+            workflow_run_id=wfr_id,
+            status=wfr_status,
+        )
+        resp = JSONResponse(
+            content={"status": wfr_status},
+            status_code=StatusCodes.OK,
+        )
+        return resp
 
     # validate transition
     if (wfr_status, target_wfr_status) not in WorkflowRun().valid_transitions:
-        try:
-            raise InvalidStateTransition(
-                model="WorkflowRun",
-                id=wfr_id,
-                old_state=wfr_status,
-                new_state=target_wfr_status,
-            )
-        except (InvalidStateTransition, AttributeError) as e:
-            # this branch handles race condition or case where no wfr was returned
-            logger.debug(f"Unable to reap workflow_run {wfr_id}: {e}")
+        logger.warning(
+            "Invalid WFR transition during reap, skipping",
+            workflow_run_id=wfr_id,
+            old_state=wfr_status,
+            new_state=target_wfr_status,
+        )
+        resp = JSONResponse(
+            content={"status": wfr_status},
+            status_code=StatusCodes.OK,
+        )
+        return resp
 
     # update status
     db.execute(
@@ -317,6 +398,7 @@ def reap_workflow_run(workflow_run_id: int, db: Session = Depends(get_db)) -> An
     )
     db.commit()
     resp = JSONResponse(
-        content={"status": target_wfr_status}, status_code=StatusCodes.OK
+        content={"status": target_wfr_status},
+        status_code=StatusCodes.OK,
     )
     return resp
