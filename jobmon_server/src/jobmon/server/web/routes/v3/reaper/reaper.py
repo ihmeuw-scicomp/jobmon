@@ -28,6 +28,7 @@ logger = structlog.get_logger(__name__)
 
 REAP_BATCH_SIZE = 2000
 MAX_EMPTY_PASSES = 5
+MAX_DB_RETRIES = 3
 
 
 def _batched_ti_transition(
@@ -48,6 +49,7 @@ def _batched_ti_transition(
     """
     total = 0
     empty_passes = 0
+    consecutive_errors = 0
 
     while True:
         try:
@@ -64,12 +66,22 @@ def _batched_ti_transition(
             locked_rows = db.execute(stmt).all()
         except OperationalError:
             db.rollback()
+            consecutive_errors += 1
+            if consecutive_errors > MAX_DB_RETRIES:
+                logger.error(
+                    "Reaper batch SELECT failed after max retries",
+                    workflow_run_id=wfr_id,
+                    target_status=target_status,
+                    retries=MAX_DB_RETRIES,
+                )
+                break
             logger.warning(
                 "DB error during reaper batch SELECT, will retry",
                 workflow_run_id=wfr_id,
                 target_status=target_status,
+                attempt=consecutive_errors,
             )
-            time.sleep(1.0)
+            time.sleep(1.0 * consecutive_errors)
             continue
 
         if not locked_rows:
@@ -106,15 +118,26 @@ def _batched_ti_transition(
 
             db.commit()
             total += len(locked_ids)
+            consecutive_errors = 0
         except OperationalError:
             db.rollback()
+            consecutive_errors += 1
+            if consecutive_errors > MAX_DB_RETRIES:
+                logger.error(
+                    "Reaper batch UPDATE failed after max retries",
+                    workflow_run_id=wfr_id,
+                    target_status=target_status,
+                    retries=MAX_DB_RETRIES,
+                )
+                break
             logger.warning(
                 "DB error during reaper batch UPDATE, will retry",
                 workflow_run_id=wfr_id,
                 target_status=target_status,
                 batch_size=len(locked_ids),
+                attempt=consecutive_errors,
             )
-            time.sleep(1.0)
+            time.sleep(1.0 * consecutive_errors)
             # Retry — the rolled-back rows are unlocked and will be
             # re-selected on the next iteration
             continue
