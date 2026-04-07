@@ -720,11 +720,14 @@ async def increase_resources_for_resource_error_tasks(
     logger.info("Increase resources for tasks with RESOURCE_ERROR latest TI")
 
     # Subquery to get latest TaskInstance per task by most recent status_date
+    # Scoped to this workflow's tasks to avoid full table scan
     latest_ti_subq = (
         select(
             TaskInstance.task_id,
             func.max(TaskInstance.status_date).label("max_status_date"),
         )
+        .join(Task, TaskInstance.task_id == Task.id)
+        .where(Task.workflow_id == workflow_id)
         .group_by(TaskInstance.task_id)
         .subquery()
     )
