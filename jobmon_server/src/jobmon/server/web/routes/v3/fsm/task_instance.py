@@ -212,7 +212,7 @@ async def log_ti_report_by(
                 f"retrying attempt {attempt + 1}/{max_retries}. {e}"
             )
             db.rollback()
-            sleep(0.001 * (2 ** (attempt + 1)))  # 2ms, 4ms, 8ms delays
+            sleep(TransitionService._calculate_backoff_delay(attempt))
             continue
         except Exception as e:
             logger.error(
@@ -285,7 +285,7 @@ async def log_ti_report_by_batch(
                     f"retrying attempt {attempt + 1}/{max_retries}"
                 )
                 db.rollback()
-                sleep(0.001 * (2 ** (attempt + 1)))  # 2ms, 4ms, 8ms delays
+                sleep(TransitionService._calculate_backoff_delay(attempt))
                 continue
             except Exception as e:
                 # The bulk update may fail if any row is locked by another transaction.
@@ -571,7 +571,7 @@ async def log_no_distributor_id(
                 f"retrying attempt {attempt + 1}/{max_retries}. {e}"
             )
             db.rollback()
-            sleep(0.001 * (2 ** (attempt + 1)))  # 2ms, 4ms, 8ms delays
+            sleep(TransitionService._calculate_backoff_delay(attempt))
             continue
         except Exception as e:
             logger.error(
@@ -623,7 +623,7 @@ async def log_distributor_id(
                 f"retrying attempt {attempt + 1}/{max_retries}. {e}"
             )
             db.rollback()
-            sleep(0.001 * (2 ** (attempt + 1)))  # 2ms, 4ms, 8ms delays
+            sleep(TransitionService._calculate_backoff_delay(attempt))
             continue
         except Exception as e:
             logger.error(
@@ -987,7 +987,7 @@ async def instantiate_task_instances(
                     f"retrying attempt {attempt + 1}/{max_retries}. {e}"
                 )
                 db.rollback()  # Clear the corrupted session state
-                sleep(0.001 * (2 ** (attempt + 1)))  # Exponential backoff: 2ms, 4ms...
+                sleep(TransitionService._calculate_backoff_delay(attempt))
             else:
                 logger.error(f"Unexpected database error in atomic instantiation: {e}")
                 db.rollback()
