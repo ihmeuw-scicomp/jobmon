@@ -152,7 +152,7 @@ async def log_ti_report_by(
     set_jobmon_context(task_instance_id=task_instance_id)
     data = cast(Dict, await request.json())
 
-    logger.debug(
+    logger.info(
         "Server received heartbeat",
         distributor_id=data.get("distributor_id"),
     )
@@ -199,7 +199,7 @@ async def log_ti_report_by(
                         f"Unable to transition to running from {task_instance.status}"
                     )
 
-            logger.debug("Heartbeat processed successfully")
+            logger.info("Heartbeat processed successfully")
 
             resp = JSONResponse(
                 content={"status": task_instance.status}, status_code=StatusCodes.OK
