@@ -1,5 +1,6 @@
 """Unified transition service with TI-centric architecture and audit logging."""
 
+import random
 from time import sleep
 from typing import Any, Dict, List, Optional, Set, Tuple, Type
 
@@ -39,7 +40,7 @@ class TransitionService:
     """
 
     DEFAULT_MAX_RETRIES = 5
-    DEFAULT_BASE_DELAY_MS = 2  # Exponential backoff: 2ms, 4ms, 8ms, 16ms, 32ms
+    DEFAULT_BASE_DELAY_MS = 50  # Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1.6s
 
     # TaskInstance valid transitions (mirrors TaskInstance.valid_transitions)
     TI_VALID_TRANSITIONS: Set[Tuple[str, str]] = {
@@ -115,8 +116,9 @@ class TransitionService:
 
     @classmethod
     def _calculate_backoff_delay(cls: Type["TransitionService"], attempt: int) -> float:
-        """Calculate exponential backoff delay in seconds."""
-        return cls.DEFAULT_BASE_DELAY_MS * (2 ** (attempt + 1)) / 1000
+        """Calculate exponential backoff delay in seconds with ±50% jitter."""
+        base = cls.DEFAULT_BASE_DELAY_MS * (2 ** (attempt + 1)) / 1000
+        return base * random.uniform(0.5, 1.5)
 
     @classmethod
     def _is_error_retry_transition(
