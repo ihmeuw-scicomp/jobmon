@@ -218,7 +218,8 @@ async def record_array_batch_num(
                         f"{attempt + 1}/{max_retries}"
                     )
                     db.rollback()
-                    sleep(TransitionService._calculate_backoff_delay(attempt))
+                    if attempt < max_retries - 1:
+                        sleep(TransitionService._calculate_backoff_delay(attempt))
             else:
                 # All retries failed
                 logger.error(
@@ -354,7 +355,8 @@ async def transition_array_to_launched(
                     f"retrying attempt {attempt + 1}/{max_retries}. {e}"
                 )
                 db.rollback()  # Clear the corrupted session state
-                sleep(TransitionService._calculate_backoff_delay(attempt))
+                if attempt < max_retries - 1:
+                    sleep(TransitionService._calculate_backoff_delay(attempt))
             else:
                 logger.error(f"Unexpected database error in atomic launch update: {e}")
                 db.rollback()
@@ -493,7 +495,8 @@ async def transition_to_killed(
                     f"retrying attempt {attempt + 1}/{max_retries}. {e}"
                 )
                 db.rollback()  # Clear the corrupted session state
-                sleep(TransitionService._calculate_backoff_delay(attempt))
+                if attempt < max_retries - 1:
+                    sleep(TransitionService._calculate_backoff_delay(attempt))
             else:
                 logger.error(f"Unexpected database error in atomic update: {e}")
                 db.rollback()

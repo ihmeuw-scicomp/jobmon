@@ -212,7 +212,8 @@ async def log_ti_report_by(
                 f"retrying attempt {attempt + 1}/{max_retries}. {e}"
             )
             db.rollback()
-            sleep(TransitionService._calculate_backoff_delay(attempt))
+            if attempt < max_retries - 1:
+                sleep(TransitionService._calculate_backoff_delay(attempt))
             continue
         except Exception as e:
             logger.error(
@@ -285,7 +286,8 @@ async def log_ti_report_by_batch(
                     f"retrying attempt {attempt + 1}/{max_retries}"
                 )
                 db.rollback()
-                sleep(TransitionService._calculate_backoff_delay(attempt))
+                if attempt < max_retries - 1:
+                    sleep(TransitionService._calculate_backoff_delay(attempt))
                 continue
             except Exception as e:
                 # The bulk update may fail if any row is locked by another transaction.
@@ -571,7 +573,8 @@ async def log_no_distributor_id(
                 f"retrying attempt {attempt + 1}/{max_retries}. {e}"
             )
             db.rollback()
-            sleep(TransitionService._calculate_backoff_delay(attempt))
+            if attempt < max_retries - 1:
+                sleep(TransitionService._calculate_backoff_delay(attempt))
             continue
         except Exception as e:
             logger.error(
@@ -623,7 +626,8 @@ async def log_distributor_id(
                 f"retrying attempt {attempt + 1}/{max_retries}. {e}"
             )
             db.rollback()
-            sleep(TransitionService._calculate_backoff_delay(attempt))
+            if attempt < max_retries - 1:
+                sleep(TransitionService._calculate_backoff_delay(attempt))
             continue
         except Exception as e:
             logger.error(
@@ -987,7 +991,8 @@ async def instantiate_task_instances(
                     f"retrying attempt {attempt + 1}/{max_retries}. {e}"
                 )
                 db.rollback()  # Clear the corrupted session state
-                sleep(TransitionService._calculate_backoff_delay(attempt))
+                if attempt < max_retries - 1:
+                    sleep(TransitionService._calculate_backoff_delay(attempt))
             else:
                 logger.error(f"Unexpected database error in atomic instantiation: {e}")
                 db.rollback()
