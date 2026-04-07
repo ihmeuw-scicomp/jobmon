@@ -817,6 +817,17 @@ async def log_unknown_error(
                     nodename,
                     request,
                 )
+            return resp
+
+        # Task instance heartbeat recovered since triage began — skip
+        logger.info(
+            f"Task instance {task_instance_id} heartbeat recovered "
+            "during triage, skipping error transition"
+        )
+        resp = JSONResponse(
+            content={"status": "skipped"},
+            status_code=StatusCodes.OK,
+        )
         return resp
     except Exception as e:
         raise e
