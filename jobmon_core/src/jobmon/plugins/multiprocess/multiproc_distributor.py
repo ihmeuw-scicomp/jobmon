@@ -258,6 +258,31 @@ class MultiprocessDistributor(ClusterDistributor):
         """Async version — in-memory lookup, no I/O needed."""
         return self.get_remote_exit_info(distributor_id)
 
+    async def submit_to_batch_distributor_async(
+        self,
+        command: str,
+        name: str,
+        requested_resources: Dict[str, Any],
+    ) -> str:
+        """Async version — submits to internal thread pool, non-blocking."""
+        return self.submit_to_batch_distributor(command, name, requested_resources)
+
+    async def submit_array_to_batch_distributor_async(
+        self,
+        command: str,
+        name: str,
+        requested_resources: Dict[str, Any],
+        array_length: int,
+    ) -> Dict[int, str]:
+        """Async version — submits to internal thread pool, non-blocking."""
+        return self.submit_array_to_batch_distributor(
+            command, name, requested_resources, array_length
+        )
+
+    async def terminate_task_instances_async(self, distributor_ids: List[str]) -> None:
+        """Async version — signal-based termination, non-blocking."""
+        self.terminate_task_instances(distributor_ids)
+
 
 class MultiprocessWorkerNode(ClusterWorkerNode):
     """Task instance info for the Multiprocess distributor."""

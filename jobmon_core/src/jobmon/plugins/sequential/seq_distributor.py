@@ -148,6 +148,20 @@ class SequentialDistributor(ClusterDistributor):
             f"{self.__class__.__name__}"
         )
 
+    async def terminate_task_instances_async(self, distributor_ids: List[str]) -> None:
+        """Async version — just logs a warning, no I/O."""
+        self.terminate_task_instances(distributor_ids)
+
+    async def submit_array_to_batch_distributor_async(
+        self,
+        command: str,
+        name: str,
+        requested_resources: Dict[str, Any],
+        array_length: int,
+    ) -> Dict[int, str]:
+        """Not supported — raise directly without to_thread overhead."""
+        raise NotImplementedError
+
     def submit_to_batch_distributor(
         self,
         command: str,
