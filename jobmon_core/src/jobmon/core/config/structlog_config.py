@@ -402,8 +402,8 @@ def _install_structlog_reconfigure_hook() -> None:
 
         _orig_configure = _structlog.configure
 
-        def _hooked_configure(**kwargs: Any) -> None:
-            _orig_configure(**kwargs)
+        def _hooked_configure(*args: Any, **kwargs: Any) -> None:
+            _orig_configure(*args, **kwargs)
             if not getattr(_reinjecting, "active", False):
                 _reinjecting.active = True
                 try:
