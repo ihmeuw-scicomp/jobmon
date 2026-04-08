@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import functools
 import json
-from typing import Any, Callable, Dict, Tuple, Type
+from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 import aiohttp
 import requests
@@ -57,6 +58,45 @@ class Requester:
             self._init_otlp()
 
         self.server_structlog_context: Dict[str, str] = {}
+
+        # Persistent aiohttp session for async_request()
+        self._async_session: Optional[aiohttp.ClientSession] = None
+
+    async def async_request(
+        self,
+        app_route: str,
+        message: dict,
+        request_type: str,
+        tenacious: bool = True,
+    ) -> Tuple[int, Any]:
+        """Simple async request using a persistent session.
+
+        Uses the same retry logic, tracing, and error handling as
+        send_request_async() but manages its own aiohttp session.
+        """
+        # Create a new session if needed. aiohttp sessions are tied to
+        # the event loop that created them, so we must recreate when the
+        # loop changes (e.g., between asyncio.run() calls in tests).
+        loop = asyncio.get_running_loop()
+        if (
+            self._async_session is None
+            or self._async_session.closed
+            or self._async_session._loop is not loop  # type: ignore[attr-defined]
+        ):
+            self._async_session = aiohttp.ClientSession()
+        return await self.send_request_async(
+            session=self._async_session,
+            app_route=app_route,
+            message=message,
+            request_type=request_type,
+            tenacious=tenacious,
+        )
+
+    async def close_async_session(self) -> None:
+        """Close the persistent async session."""
+        if self._async_session and not self._async_session.closed:
+            await self._async_session.close()
+            self._async_session = None
 
     @classmethod
     def _init_otlp(cls: Type[Requester]) -> None:

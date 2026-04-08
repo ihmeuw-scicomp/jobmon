@@ -1,5 +1,6 @@
 """Tests for deferred triage when cluster accounting is not finalized."""
 
+import asyncio
 import time
 from unittest import mock
 
@@ -49,7 +50,7 @@ def test_finalized_exit_info_transitions_immediately(
         "get_remote_exit_info",
         return_value=finalized_result,
     ):
-        distributor_service.triage_error(task_instance)
+        asyncio.run(distributor_service.triage_error(task_instance))
 
     assert task_instance.triage_attempts == 1
     assert task_instance.error_state == TaskInstanceStatus.UNKNOWN_ERROR
@@ -68,7 +69,7 @@ def test_unfinalized_exit_info_defers_transition(distributor_service, task_insta
         "get_remote_exit_info",
         return_value=unfinalized_result,
     ):
-        distributor_service.triage_error(task_instance)
+        asyncio.run(distributor_service.triage_error(task_instance))
 
     assert task_instance.triage_attempts == 1
     assert task_instance.first_triage_time is not None
@@ -96,7 +97,7 @@ def test_unfinalized_then_finalized_transitions_on_retry(
         "get_remote_exit_info",
         return_value=unfinalized,
     ):
-        distributor_service.triage_error(task_instance)
+        asyncio.run(distributor_service.triage_error(task_instance))
 
     assert task_instance.triage_attempts == 1
     assert task_instance.error_state == ""  # Not transitioned
@@ -106,7 +107,7 @@ def test_unfinalized_then_finalized_transitions_on_retry(
         "get_remote_exit_info",
         return_value=finalized,
     ):
-        distributor_service.triage_error(task_instance)
+        asyncio.run(distributor_service.triage_error(task_instance))
 
     assert task_instance.triage_attempts == 2
     assert task_instance.error_state == TaskInstanceStatus.RESOURCE_ERROR
@@ -130,7 +131,7 @@ def test_unfinalized_past_timeout_transitions_anyway(
         "get_remote_exit_info",
         return_value=unfinalized,
     ):
-        distributor_service.triage_error(task_instance)
+        asyncio.run(distributor_service.triage_error(task_instance))
 
     # Should have transitioned despite being unfinalized
     assert task_instance.error_state == TaskInstanceStatus.UNKNOWN_ERROR
@@ -146,7 +147,7 @@ def test_legacy_tuple_return_treated_as_finalized(distributor_service, task_inst
             "legacy error message",
         ),
     ):
-        distributor_service.triage_error(task_instance)
+        asyncio.run(distributor_service.triage_error(task_instance))
 
     assert task_instance.error_state == TaskInstanceStatus.UNKNOWN_ERROR
 
@@ -165,7 +166,7 @@ def test_triage_attempts_increment_across_deferrals(distributor_service, task_in
         return_value=unfinalized,
     ):
         for i in range(5):
-            distributor_service.triage_error(task_instance)
+            asyncio.run(distributor_service.triage_error(task_instance))
 
     assert task_instance.triage_attempts == 5
     assert task_instance.error_state == ""  # Still deferred

@@ -50,8 +50,7 @@ def test_instantiate_job(tool, db_engine, task_template):
         raise_on_error=True,
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.QUEUED)
 
     # Check that batches have the correct submission name
     instantiated_task_instances = list(
@@ -93,8 +92,7 @@ def test_instantiate_job(tool, db_engine, task_template):
         == 0
     )
 
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.INSTANTIATED)
 
     # Once processed from INSTANTIATED, the sequential (being a single process), would
     # carry it all the way through to D
@@ -142,8 +140,7 @@ def test_instantiate_array(tool, db_engine, task_template):
         raise_on_error=True,
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.QUEUED)
 
     # check the job turned into I
     with Session(bind=db_engine) as session:
@@ -177,8 +174,7 @@ def test_instantiate_array(tool, db_engine, task_template):
         == 0
     )
 
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.INSTANTIATED)
 
     # check the job to be Launched
     with Session(bind=db_engine) as session:
@@ -238,10 +234,9 @@ def test_job_submit_raises_error(db_engine, tool):
         raise_on_error=True,
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     # check the job finished
     with Session(bind=db_engine) as session:
@@ -291,10 +286,9 @@ def test_array_submit_raises_error(db_engine, tool):
         raise_on_error=True,
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     # check the job finished
     with Session(bind=db_engine) as session:
@@ -353,10 +347,9 @@ def test_array_submit_error_no_stuck_batch(db_engine, tool):
     distributor_service.set_workflow_run(wfr.workflow_run_id)
 
     # Cycle 1: QUEUED -> INSTANTIATED, then batch submit fails -> W
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     # Verify TIs moved to NO_DISTRIBUTOR_ID in DB
     with Session(bind=db_engine) as session:
@@ -372,8 +365,7 @@ def test_array_submit_error_no_stuck_batch(db_engine, tool):
 
     # Cycle 2: re-process INSTANTIATED — previously crashed with
     # KeyError on the already-popped batch
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.INSTANTIATED)
 
     # No TIs should be stuck in INSTANTIATED
     assert (
@@ -415,10 +407,9 @@ def test_workflow_concurrency_limiting(tool, task_template):
         raise_on_error=True,
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     assert (
         len(distributor_service._task_instance_status_map[TaskInstanceStatus.LAUNCHED])
@@ -466,10 +457,9 @@ def test_array_concurrency(tool, array_template, wf_limit, array_limit, expected
         raise_on_error=True,
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     assert (
         len(distributor_service._task_instance_status_map[TaskInstanceStatus.LAUNCHED])
@@ -512,10 +502,9 @@ def test_dynamic_concurrency_limiting(tool, task_template):
         raise_on_error=True,
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     assert (
         len(distributor_service._task_instance_status_map[TaskInstanceStatus.LAUNCHED])
@@ -550,10 +539,9 @@ def test_dynamic_concurrency_limiting(tool, task_template):
             await session.close()
 
     asyncio.run(sync_and_process())
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
     assert (
         len(distributor_service._task_instance_status_map[TaskInstanceStatus.LAUNCHED])
         == 5

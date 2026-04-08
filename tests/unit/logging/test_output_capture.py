@@ -51,11 +51,9 @@ def test_sequential_logging(tool, task_template, tmp_path):
         raise_on_error=True,
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.QUEUED)
 
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.INSTANTIATED)
 
     # Find the stdout file (task instance ID varies in parallel tests)
     stdout_files = glob.glob(str(tmp_path / "stdout_task.o*"))
@@ -66,11 +64,9 @@ def test_sequential_logging(tool, task_template, tmp_path):
     synchronize_state(state, gateway, orchestrator)
     queue_tasks(state, gateway, orchestrator)
 
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.QUEUED)
 
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.INSTANTIATED)
 
     # Find the stderr file
     stderr_files = glob.glob(str(tmp_path / "stderr_task.e*"))
@@ -119,11 +115,9 @@ def test_multiprocess_logging(tool, task_template, tmp_path):
     )
     distributor_service.cluster_interface.start()
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.QUEUED)
 
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.INSTANTIATED)
 
     # Wait for task to complete using original waiting logic
     counter = 0
@@ -142,11 +136,9 @@ def test_multiprocess_logging(tool, task_template, tmp_path):
     synchronize_state(state, gateway, orchestrator)
     queue_tasks(state, gateway, orchestrator)
 
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.QUEUED)
 
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.INSTANTIATED)
 
     # Wait for task to complete
     counter = 0

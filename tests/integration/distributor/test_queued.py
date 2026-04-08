@@ -1,3 +1,5 @@
+import asyncio
+
 from jobmon.client.workflow_run import WorkflowRunFactory
 from jobmon.core.constants import TaskInstanceStatus
 from jobmon.distributor.distributor_service import DistributorService
@@ -38,13 +40,13 @@ def test_queued(tool, task_template):
         DummyDistributor("dummy"), requester=workflow.requester, raise_on_error=True
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
+    asyncio.run(distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED))
     assert (
         len(distributor_service._task_instance_status_map[TaskInstanceStatus.QUEUED])
         == 10
     )
 
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    asyncio.run(distributor_service.process_status(TaskInstanceStatus.QUEUED))
     assert (
         len(
             distributor_service._task_instance_status_map[

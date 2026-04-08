@@ -177,10 +177,9 @@ def test_cold_resume(tool):
     state.status = WorkflowRunStatus.RUNNING
     gateway.update_status_sync(WorkflowRunStatus.RUNNING)
 
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
     distributor_service.cluster_interface.start()
 
     i = 0
@@ -220,8 +219,7 @@ def test_cold_resume(tool):
 
     asyncio.run(terminate_task_instances())
 
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.KILL_SELF)
-    distributor_service.process_status(TaskInstanceStatus.KILL_SELF)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.KILL_SELF)
     gateway.update_status_sync(WorkflowRunStatus.TERMINATED)
     state.status = WorkflowRunStatus.TERMINATED
 
@@ -271,10 +269,9 @@ def test_hot_resume(tool, task_template):
 
     # create task instances
     prepare_and_queue_tasks(state, gateway, orchestrator)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
     distributor_service.cluster_interface.start()
 
     i = 0

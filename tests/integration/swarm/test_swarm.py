@@ -119,10 +119,9 @@ def test_sync_statuses(client_env, tool, task_template):
 
     # distribute the task
     prepare_and_queue_tasks(state, gateway, orchestrator)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
     time.sleep(2)
 
     synchronize_state(state, gateway, orchestrator, full_sync=True)
@@ -220,15 +219,13 @@ def test_wedged_dag(db_engine, tool, task_template, requester_no_retry):
     prepare_and_queue_tasks(state, gateway, orchestrator)
 
     # check that we get the instantiating signal
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.QUEUED)
     synchronize_state(state, gateway, orchestrator)
     assert state.tasks[t1.task_id].status == TaskStatus.INSTANTIATING
     assert state.tasks[t2.task_id].status == TaskStatus.INSTANTIATING
 
     # run the normal workflow sync protocol. only t1 should be done
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.INSTANTIATED)
     synchronize_state(state, gateway, orchestrator)
     assert state.tasks[t1.task_id].status == TaskStatus.DONE
     assert state.tasks[t2.task_id].status == TaskStatus.INSTANTIATING

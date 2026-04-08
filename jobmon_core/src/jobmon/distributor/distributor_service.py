@@ -196,7 +196,7 @@ class DistributorService:
 
                     # refresh internal state from db
                     try:
-                        self.refresh_status_from_db(status)
+                        await self.refresh_status_from_db(status)
                     except DistributorInterruptedError:
                         raise
                     except Exception as e:
@@ -241,6 +241,7 @@ class DistributorService:
         finally:
             self._stopping = True
             heartbeat_task.cancel()
+            await self.requester.close_async_session()
             try:
                 await heartbeat_task
             except asyncio.CancelledError:
@@ -749,6 +750,21 @@ class DistributorService:
             tenacious=True,
         )
 
+    def run_next_status_cycle(self, *statuses: str) -> None:
+        """Drive statuses through refresh + process synchronously.
+
+        Convenience method for tests and scripts. In production,
+        _async_run handles this via the async event loop.
+        """
+
+        async def _cycle() -> None:
+            for status in statuses:
+                await self.refresh_status_from_db(status)
+                if status in self._command_generator_map:
+                    await self.process_status(status)
+
+        asyncio.run(_cycle())
+
     def _initialize_signal_handlers(self) -> None:
         def handle_sighup(signal: int, frame: Any) -> None:
             raise DistributorInterruptedError("Got signal SIGHUP.")
@@ -763,8 +779,8 @@ class DistributorService:
         signal.signal(signal.SIGHUP, handle_sighup)
         signal.signal(signal.SIGINT, handle_sigint)
 
-    def refresh_status_from_db(self, status: str) -> None:
-        """Got to DB to check the list tis status."""
+    async def refresh_status_from_db(self, status: str) -> None:
+        """Check DB for status changes via async HTTP."""
         message = {
             "task_instance_ids": [
                 task_instance.task_instance_id
@@ -772,8 +788,8 @@ class DistributorService:
             ],
             "status": status,
         }
-        app_route = f"/workflow_run/{self.workflow_run.workflow_run_id}" f"/sync_status"
-        _, result = self.requester.send_request(
+        app_route = f"/workflow_run/{self.workflow_run.workflow_run_id}/sync_status"
+        _, result = await self.requester.async_request(
             app_route=app_route, message=message, request_type="post"
         )
         # mutate the statuses and update the status map

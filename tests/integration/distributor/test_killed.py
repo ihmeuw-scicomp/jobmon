@@ -44,10 +44,9 @@ def test_transition_to_killed(tool, db_engine, task_template):
     distributor_service.set_workflow_run(wfr.workflow_run_id)
 
     # Move tasks from QUEUED -> INSTANTIATED
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     # 4) Force these TaskInstances into KILL_SELF (simulating a reason to kill them).
     with Session(bind=db_engine) as session:
@@ -62,8 +61,7 @@ def test_transition_to_killed(tool, db_engine, task_template):
 
     # 5) Refresh and process the KILL_SELF state; this should trigger your new logic,
     #    which calls `transition_to_killed` (or the DB endpoint) behind the scenes.
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.KILL_SELF)
-    distributor_service.process_status(TaskInstanceStatus.KILL_SELF)
+    distributor_service.run_next_status_cycle(TaskInstanceStatus.KILL_SELF)
 
     # 6) Check that TIs are now in ERROR_FATAL and that an error log was recorded
     with Session(bind=db_engine) as session:

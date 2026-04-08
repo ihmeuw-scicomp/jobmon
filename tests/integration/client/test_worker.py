@@ -77,10 +77,9 @@ def test_task_instance(db_engine, tool):
         DoNothingDistributor("dummy"), requester=workflow.requester, raise_on_error=True
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     with Session(bind=db_engine) as session:
         task_instance_id_query = select(TaskInstance.id).where(
@@ -130,10 +129,9 @@ def test_array_task_instance(
         raise_on_error=True,
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     with Session(bind=db_engine) as session:
         task_instance_id_query = select(
@@ -183,10 +181,9 @@ def test_ti_kill_self_state(db_engine, tool):
         DoNothingDistributor("dummy"), requester=workflow.requester, raise_on_error=True
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     # Bring in the worker node here since dummy executor is never run
 
@@ -273,10 +270,9 @@ def test_limited_error_log(tool, db_engine):
         SequentialDistributor("sequential"), requester=wf.requester, raise_on_error=True
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     # check db
     with Session(bind=db_engine) as session:
@@ -358,10 +354,9 @@ def test_worker_node_add_attributes(tool, db_engine):
         cluster_interface, requester=wf.requester, raise_on_error=True
     )
     distributor_service.set_workflow_run(wfr.workflow_run_id)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
-    distributor_service.process_status(TaskInstanceStatus.QUEUED)
-    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
-    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.run_next_status_cycle(
+        TaskInstanceStatus.QUEUED, TaskInstanceStatus.INSTANTIATED
+    )
 
     # Wait for tasks to complete by polling state
     max_wait = 60
