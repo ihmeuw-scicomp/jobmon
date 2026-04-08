@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
@@ -105,6 +106,17 @@ class ClusterDistributor(Protocol):
         """
         raise NotImplementedError
 
+    async def get_submitted_or_running_async(
+        self, distributor_ids: Optional[List[str]] = None
+    ) -> Set[str]:
+        """Async version of get_submitted_or_running.
+
+        Default wraps the sync method via to_thread for backward
+        compatibility with plugins that only implement the sync version.
+        Native async plugins should override this directly.
+        """
+        return await asyncio.to_thread(self.get_submitted_or_running, distributor_ids)
+
     @abstractmethod
     def terminate_task_instances(self, distributor_ids: List[str]) -> None:
         """Terminate task instances.
@@ -113,6 +125,10 @@ class ClusterDistributor(Protocol):
         task_instances that are terminated.
         """
         raise NotImplementedError
+
+    async def terminate_task_instances_async(self, distributor_ids: List[str]) -> None:
+        """Async version of terminate_task_instances."""
+        return await asyncio.to_thread(self.terminate_task_instances, distributor_ids)
 
     @abstractmethod
     def get_remote_exit_info(
@@ -126,6 +142,16 @@ class ClusterDistributor(Protocol):
             which is treated as finalized=True.
         """
         raise RemoteExitInfoNotAvailable
+
+    async def get_remote_exit_info_async(
+        self, distributor_id: str
+    ) -> Union[RemoteExitInfo, Tuple[str, str]]:
+        """Async version of get_remote_exit_info.
+
+        Default wraps the sync method via to_thread for backward
+        compatibility. Native async plugins should override this.
+        """
+        return await asyncio.to_thread(self.get_remote_exit_info, distributor_id)
 
     @abstractmethod
     def submit_to_batch_distributor(
@@ -152,6 +178,24 @@ class ClusterDistributor(Protocol):
         """
         raise NotImplementedError
 
+    async def submit_to_batch_distributor_async(
+        self,
+        command: str,
+        name: str,
+        requested_resources: Dict[str, Any],
+    ) -> str:
+        """Async version of submit_to_batch_distributor.
+
+        Default wraps sync method in to_thread. Plugins that call
+        asyncio.run() internally (e.g., sequential) must override this.
+        """
+        return await asyncio.to_thread(
+            self.submit_to_batch_distributor,
+            command,
+            name,
+            requested_resources,
+        )
+
     def submit_array_to_batch_distributor(
         self,
         command: str,
@@ -173,6 +217,22 @@ class ClusterDistributor(Protocol):
             a mapping of array_step_id to distributor_id, output location, and error location.
         """
         raise NotImplementedError
+
+    async def submit_array_to_batch_distributor_async(
+        self,
+        command: str,
+        name: str,
+        requested_resources: Dict[str, Any],
+        array_length: int,
+    ) -> Dict[int, str]:
+        """Async version of submit_array_to_batch_distributor."""
+        return await asyncio.to_thread(
+            self.submit_array_to_batch_distributor,
+            command,
+            name,
+            requested_resources,
+            array_length,
+        )
 
     def build_worker_node_command(
         self,

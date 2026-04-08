@@ -95,6 +95,10 @@ class DummyDistributor(ClusterDistributor):
             error_message="Whatever",
         )
 
+    async def get_remote_exit_info_async(self, distributor_id: str) -> RemoteExitInfo:
+        """Async version — no I/O needed."""
+        return self.get_remote_exit_info(distributor_id)
+
     def get_submitted_or_running(
         self, distributor_ids: Optional[List[str]] = None
     ) -> Set[str]:
@@ -104,6 +108,12 @@ class DummyDistributor(ClusterDistributor):
         so nothing is ever submitted or running at heartbeat time.
         """
         return set()
+
+    async def get_submitted_or_running_async(
+        self, distributor_ids: Optional[List[str]] = None
+    ) -> Set[str]:
+        """Async version — no I/O needed."""
+        return self.get_submitted_or_running(distributor_ids)
 
     def terminate_task_instances(self, distributor_ids: List[str]) -> None:
         """Terminate task instances.

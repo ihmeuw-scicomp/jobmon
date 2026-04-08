@@ -198,6 +198,12 @@ class MultiprocessDistributor(ClusterDistributor):
         """Get tasks that are active."""
         return set(self._futures.keys())
 
+    async def get_submitted_or_running_async(
+        self, distributor_ids: Optional[List[str]] = None
+    ) -> Set[str]:
+        """Async version — in-memory lookup, no I/O needed."""
+        return self.get_submitted_or_running(distributor_ids)
+
     def terminate_task_instances(self, distributor_ids: List[str]) -> None:
         """Terminate task instances.
 
@@ -247,6 +253,10 @@ class MultiprocessDistributor(ClusterDistributor):
             )
         except KeyError:
             raise RemoteExitInfoNotAvailable
+
+    async def get_remote_exit_info_async(self, distributor_id: str) -> RemoteExitInfo:
+        """Async version — in-memory lookup, no I/O needed."""
+        return self.get_remote_exit_info(distributor_id)
 
 
 class MultiprocessWorkerNode(ClusterWorkerNode):

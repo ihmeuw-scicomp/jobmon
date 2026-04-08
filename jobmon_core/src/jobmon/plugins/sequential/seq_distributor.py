@@ -116,6 +116,10 @@ class SequentialDistributor(ClusterDistributor):
         except KeyError:
             raise RemoteExitInfoNotAvailable
 
+    async def get_remote_exit_info_async(self, distributor_id: str) -> RemoteExitInfo:
+        """Async version — in-memory lookup, no I/O needed."""
+        return self.get_remote_exit_info(distributor_id)
+
     def get_submitted_or_running(
         self, distributor_ids: Optional[List[str]] = None
     ) -> Set[str]:
@@ -126,6 +130,12 @@ class SequentialDistributor(ClusterDistributor):
         time.
         """
         return set()
+
+    async def get_submitted_or_running_async(
+        self, distributor_ids: Optional[List[str]] = None
+    ) -> Set[str]:
+        """Async version — no I/O needed."""
+        return self.get_submitted_or_running(distributor_ids)
 
     def terminate_task_instances(self, distributor_ids: List[str]) -> None:
         """Terminate task instances.
@@ -144,7 +154,12 @@ class SequentialDistributor(ClusterDistributor):
         name: str,
         requested_resources: Dict[str, Any],
     ) -> str:
-        """Execute sequentially."""
+        """Execute sequentially.
+
+        The worker node uses asyncio.run() internally, so this must
+        run in a thread when called from the distributor's async event
+        loop to avoid nested event loop errors.
+        """
         # add an executor id to the environment
         os.environ["JOB_ID"] = str(self._next_distributor_id)
         distributor_id = str(self._next_distributor_id)
