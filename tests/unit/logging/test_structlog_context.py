@@ -5,6 +5,7 @@ from __future__ import annotations
 import structlog
 
 from jobmon.core.config.structlog_config import (
+    _reset_structlog_reconfigure_hook,
     _store_event_dict_for_otlp,
     create_telemetry_isolation_processor,
 )
@@ -18,6 +19,7 @@ from jobmon.core.logging.context import (
 
 
 def setup_function() -> None:
+    _reset_structlog_reconfigure_hook()
     structlog.reset_defaults()
     structlog.contextvars.clear_contextvars()
     clear_jobmon_context()
@@ -297,3 +299,70 @@ def test_lazy_configuration_allows_host_to_configure_first():
         logger.info("Test message")
     output = captured.getvalue()
     assert "[FHS_LAZY]" in output
+
+
+def test_reconfigure_hook_reinjects_processors_after_host_configure():
+    """The hook should re-prepend jobmon processors when the host reconfigures."""
+    from jobmon.core.config.structlog_config import (
+        _install_structlog_reconfigure_hook,
+        _store_event_dict_for_otlp,
+    )
+
+    # Install the hook (simulates OTLP manager startup)
+    _install_structlog_reconfigure_hook()
+
+    # Simulate host app reconfiguring structlog, wiping all processors
+    def host_renderer(logger, method_name, event_dict):
+        return event_dict
+
+    structlog.configure(
+        processors=[host_renderer],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+    )
+
+    processors = structlog.get_config().get("processors", [])
+
+    # Hook should have re-injected jobmon processors
+    assert len(processors) > 1, "Hook did not re-inject processors"
+
+    # Host renderer should still be present (at the end)
+    assert host_renderer in processors
+
+    # Jobmon's OTLP capture should be present
+    assert _store_event_dict_for_otlp in processors
+
+    # Isolation processor should be present
+    isolation = [p for p in processors if hasattr(p, "__jobmon_telemetry_isolation__")]
+    assert len(isolation) == 1
+    assert isolation[0].__jobmon_telemetry_isolation__ == ("jobmon.",)
+
+
+def test_reconfigure_hook_exception_does_not_break_host():
+    """If re-injection fails, host's structlog.configure should still work."""
+    from unittest.mock import patch
+
+    from jobmon.core.config.structlog_config import (
+        _install_structlog_reconfigure_hook,
+    )
+
+    _install_structlog_reconfigure_hook()
+
+    def host_renderer(logger, method_name, event_dict):
+        return event_dict
+
+    # Make re-injection blow up
+    with patch(
+        "jobmon.core.config.structlog_config"
+        ".prepend_jobmon_processors_to_existing_config",
+        side_effect=RuntimeError("boom"),
+    ):
+        # Host's configure should NOT raise
+        structlog.configure(
+            processors=[host_renderer],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+        )
+
+    processors = structlog.get_config().get("processors", [])
+    # Host renderer should still be there — exception was swallowed
+    assert host_renderer in processors

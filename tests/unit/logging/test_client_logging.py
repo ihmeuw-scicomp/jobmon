@@ -504,6 +504,7 @@ def test_print_logger_factory_adds_logger_name(client_env):
 
 
 def test_direct_rendering_console_output_is_message_only(client_env):
+    core_structlog_config._reset_structlog_reconfigure_hook()
     structlog.reset_defaults()
     jobmon_client_logging._structlog_configured_by_jobmon = False
 

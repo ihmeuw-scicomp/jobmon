@@ -160,6 +160,21 @@ class JobmonOTLPManager:
                 # Set the global tracer provider
                 trace.set_tracer_provider(self.tracer_provider)
 
+                # Install structlog reconfigure hook so jobmon's bridge processors
+                # survive any future host calls to structlog.configure() or
+                # structlog.reset_defaults() (e.g. FHS tiny_structured_logger).
+                # Must be installed here — before any host logging setup runs —
+                # rather than in enable_structlog_otlp_capture() which fires too
+                # late (after the host has already reconfigured structlog).
+                try:
+                    from jobmon.core.config.structlog_config import (
+                        _install_structlog_reconfigure_hook,
+                    )
+
+                    _install_structlog_reconfigure_hook()
+                except Exception:
+                    pass
+
                 self._initialized = True
 
             except Exception:
