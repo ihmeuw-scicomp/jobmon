@@ -31,6 +31,7 @@ dev = [
     "isort",
     "autoflake",
     "mypy",
+    "types-aiofiles",
     "types-Flask",
     "types-requests",
     "types-PyMySQL",

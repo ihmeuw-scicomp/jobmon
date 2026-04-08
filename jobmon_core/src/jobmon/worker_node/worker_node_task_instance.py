@@ -5,8 +5,9 @@ import os
 import signal
 import socket
 from time import time
-from typing import Dict, Optional, TextIO
+from typing import Dict, Optional
 
+import aiofiles
 import structlog
 
 from jobmon.core.cluster_protocol import ClusterWorkerNode
@@ -367,7 +368,7 @@ class WorkerNodeTaskInstance:
     @bind_method_context(task_instance_id="_task_instance_id")
     def log_report_by(self) -> None:
         """Log the heartbeat to show that the task instance is still alive."""
-        logger.debug("Worker node logging heartbeat")
+        logger.info("Worker node sending heartbeat")
         message: Dict = {
             "next_report_increment": (
                 self._task_instance_heartbeat_interval
@@ -462,34 +463,30 @@ class WorkerNodeTaskInstance:
 
     @staticmethod
     async def _communicate(
-        async_stream: asyncio.StreamReader, output_stream: TextIO, chunk_size: int = 64
+        async_stream: asyncio.StreamReader,
+        output_path: str,
+        chunk_size: int = 64,
     ) -> str:
         mem_buffer = ""
         try:
-            while True:
-                # Read a chunk of data. If no data is returned, we've reached EOF.
-                data_chunk = await async_stream.read(chunk_size)
-                if not data_chunk:
-                    break  # EOF reached
+            async with aiofiles.open(output_path, "w") as output_stream:
+                while True:
+                    data_chunk = await async_stream.read(chunk_size)
+                    if not data_chunk:
+                        break  # EOF reached
 
-                # Attempt to decode and write the data chunk.
-                try:
-                    data_chunk_str = data_chunk.decode()
-                    output_stream.write(data_chunk_str)
-                    output_stream.flush()
-                    mem_buffer += data_chunk_str
-                    # Keep only the last 10k characters in memory.
-                    mem_buffer = mem_buffer[-10000:]
-                except UnicodeDecodeError:
-                    pass  # Ignore decoding errors and continue reading the stream.
+                    try:
+                        data_chunk_str = data_chunk.decode()
+                        await output_stream.write(data_chunk_str)
+                        await output_stream.flush()
+                        mem_buffer += data_chunk_str
+                        mem_buffer = mem_buffer[-10000:]
+                    except UnicodeDecodeError:
+                        pass
         except Exception as e:
-            # Log unexpected errors. This could be any exception raised by
-            # the reading or writing operations. Consider appending an error message
-            # to `mem_buffer` to indicate that an error occurred.
             logger.exception("Stream reading error", error=str(e))
             mem_buffer += "\n[Error reading stream: {}]".format(e)
         finally:
-            # Ensure that the method always returns the buffer, even if an error occurred.
             return mem_buffer
 
     async def _process_poller(self, process: asyncio.subprocess.Process) -> int:
@@ -535,24 +532,21 @@ class WorkerNodeTaskInstance:
         stdout_task = stderr_task = heartbeat_task = None
 
         try:
-            # Context manager to ensure file streams are properly closed after writing.
-            with open(self.stdout, "w") as stdout_stream, open(
-                self.stderr, "w"
-            ) as stderr_stream:
-                # Create asyncio tasks for reading subprocess stdout and stderr.
-                stdout_task = asyncio.create_task(
-                    self._communicate(process.stdout, stdout_stream)
-                )
-                stderr_task = asyncio.create_task(
-                    self._communicate(process.stderr, stderr_stream)
-                )
-                # Task for monitoring the subprocess (e.g., for timeouts or heartbeats).
-                heartbeat_task = asyncio.create_task(self._process_poller(process))
+            # Create asyncio tasks for reading subprocess stdout and stderr.
+            # File I/O is handled via aiofiles inside _communicate so that
+            # slow NFS writes cannot block the event loop or delay heartbeats.
+            stdout_task = asyncio.create_task(
+                self._communicate(process.stdout, self.stdout)
+            )
+            stderr_task = asyncio.create_task(
+                self._communicate(process.stderr, self.stderr)
+            )
+            # Task for monitoring the subprocess (e.g., for timeouts or heartbeats).
+            heartbeat_task = asyncio.create_task(self._process_poller(process))
 
-                # Await the completion of communication and monitoring tasks.
-                # We gather all tasks together, ensuring they are completed before proceeding.
-                valid_tasks = [stdout_task, stderr_task, heartbeat_task]
-                await asyncio.gather(*valid_tasks)
+            # Await the completion of communication and monitoring tasks.
+            valid_tasks = [stdout_task, stderr_task, heartbeat_task]
+            await asyncio.gather(*valid_tasks)
 
         except Exception as e:
             # If an exception occurs, cancel all ongoing tasks to prevent dangling operations.
