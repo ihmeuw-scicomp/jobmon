@@ -170,6 +170,7 @@ class JobmonOTLPManager:
                     from jobmon.core.config.structlog_config import (
                         _install_structlog_reconfigure_hook,
                     )
+
                     _install_structlog_reconfigure_hook()
                 except Exception:
                     pass

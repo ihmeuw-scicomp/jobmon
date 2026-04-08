@@ -408,11 +408,13 @@ def _install_structlog_reconfigure_hook() -> None:
                 _reinjecting.active = True
                 try:
                     prepend_jobmon_processors_to_existing_config()
+                except Exception:
+                    pass
                 finally:
                     _reinjecting.active = False
 
         _hooked_configure.__jobmon_hooked__ = True  # type: ignore[attr-defined]
-        _structlog.configure = _hooked_configure  # type: ignore[attr-defined]
+        _structlog.configure = _hooked_configure  # type: ignore[assignment]
 
         _structlog_hook_installed = True
 
