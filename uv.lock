@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.9"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -15,6 +15,15 @@ members = [
     "jobmon-core",
     "jobmon-server",
     "jobmon-workspace",
+]
+
+[[package]]
+name = "aiofiles"
+version = "25.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/41/c3/534eac40372d8ee36ef40df62ec129bee4fdb5ad9706e58a29be53b2c970/aiofiles-25.1.0.tar.gz", hash = "sha256:a8d728f0a29de45dc521f18f07297428d56992a742f0cd2701ba86e44d23d5b2", size = 46354, upload-time = "2025-10-09T20:51:04.358Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bc/8a/340a1555ae33d7354dbca4faa54948d76d89a27ceef032c8c3bc661d003e/aiofiles-25.1.0-py3-none-any.whl", hash = "sha256:abe311e527c862958650f9438e859c1fa7568a141b22abcd015e120e86a85695", size = 14668, upload-time = "2025-10-09T20:51:03.174Z" },
 ]
 
 [[package]]
@@ -1487,6 +1496,7 @@ provides-extras = ["server"]
 name = "jobmon-core"
 source = { editable = "jobmon_core" }
 dependencies = [
+    { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "docstring-parser" },
     { name = "docutils" },
@@ -1511,6 +1521,7 @@ otlp = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiofiles" },
     { name = "aiohttp" },
     { name = "docstring-parser" },
     { name = "docutils" },
@@ -1623,6 +1634,8 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-mock" },
     { name = "pytest-xdist" },
+    { name = "types-aiofiles", version = "25.1.0.20251011", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "types-aiofiles", version = "25.1.0.20260408", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
     { name = "types-flask" },
     { name = "types-flask-cors" },
     { name = "types-mysqlclient" },
@@ -1671,6 +1684,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-mock" },
     { name = "pytest-xdist" },
+    { name = "types-aiofiles" },
     { name = "types-flask" },
     { name = "types-flask-cors" },
     { name = "types-mysqlclient" },
@@ -3637,6 +3651,33 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/98/1a/5f36851f439884bcfe8539f6a20ff7516e7b60f319bbaf69a90dc35cc2eb/typer-0.15.3.tar.gz", hash = "sha256:818873625d0569653438316567861899f7e9972f2e6e0c16dab608345ced713c", size = 101641, upload-time = "2025-04-28T21:40:59.204Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/48/20/9d953de6f4367163d23ec823200eb3ecb0050a2609691e512c8b95827a9b/typer-0.15.3-py3-none-any.whl", hash = "sha256:c86a65ad77ca531f03de08d1b9cb67cd09ad02ddddf4b34745b5008f43b239bd", size = 45253, upload-time = "2025-04-28T21:40:56.269Z" },
+]
+
+[[package]]
+name = "types-aiofiles"
+version = "25.1.0.20251011"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.10'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/84/6c/6d23908a8217e36704aa9c79d99a620f2fdd388b66a4b7f72fbc6b6ff6c6/types_aiofiles-25.1.0.20251011.tar.gz", hash = "sha256:1c2b8ab260cb3cd40c15f9d10efdc05a6e1e6b02899304d80dfa0410e028d3ff", size = 14535, upload-time = "2025-10-11T02:44:51.237Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/71/0f/76917bab27e270bb6c32addd5968d69e558e5b6f7fb4ac4cbfa282996a96/types_aiofiles-25.1.0.20251011-py3-none-any.whl", hash = "sha256:8ff8de7f9d42739d8f0dadcceeb781ce27cd8d8c4152d4a7c52f6b20edb8149c", size = 14338, upload-time = "2025-10-11T02:44:50.054Z" },
+]
+
+[[package]]
+name = "types-aiofiles"
+version = "25.1.0.20260408"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.13'",
+    "python_full_version == '3.12.*'",
+    "python_full_version == '3.11.*'",
+    "python_full_version == '3.10.*'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e0/74/0760ad0b138edba9ba77b968c44d66ab834b7fc5a1d06ec447701851e321/types_aiofiles-25.1.0.20260408.tar.gz", hash = "sha256:7023ff9fac150f7d69c34436daa1e42c8358b5742dc69471053b533894b7d328", size = 14764, upload-time = "2026-04-08T04:33:11.248Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e3/8e/fd2a1385795005cae5037f679c42d673cdb08faea527e36b52003efd059b/types_aiofiles-25.1.0.20260408-py3-none-any.whl", hash = "sha256:45e4c39f49f515c6e147e94c9cba52eeca0b5bf30dd0f0439378d95a5c724292", size = 14339, upload-time = "2026-04-08T04:33:10.077Z" },
 ]
 
 [[package]]
