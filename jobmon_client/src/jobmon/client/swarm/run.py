@@ -78,7 +78,9 @@ def _is_event_loop_running() -> bool:
 
 
 def _build_result_from_state(
-    state: SwarmState, start_time: float
+    state: SwarmState,
+    start_time: float,
+    error: Optional[BaseException] = None,
 ) -> OrchestratorResult:
     """Build an OrchestratorResult from current state when orchestrator exits early.
 
@@ -88,6 +90,7 @@ def _build_result_from_state(
     Args:
         state: The current SwarmState.
         start_time: When execution started (from time.perf_counter()).
+        error: The fatal exception that caused early exit, if any.
 
     Returns:
         OrchestratorResult with current state snapshot.
@@ -112,6 +115,7 @@ def _build_result_from_state(
         task_final_statuses=task_final_statuses,
         done_task_ids=done_task_ids,
         failed_task_ids=failed_task_ids,
+        error=error,
     )
 
 
@@ -445,7 +449,7 @@ async def _run_orchestrator(
                 error=str(e),
                 error_type=type(e).__name__,
             )
-            return _build_result_from_state(state, start_time)
+            return _build_result_from_state(state, start_time, error=e)
 
         except (DistributorNotAlive, DistributorInterruptedError, WorkflowTestError):
             # Critical exceptions must propagate to callers
@@ -461,7 +465,7 @@ async def _run_orchestrator(
                 error=str(e),
                 error_type=type(e).__name__,
             )
-            return _build_result_from_state(state, start_time)
+            return _build_result_from_state(state, start_time, error=e)
 
     finally:
         # Cleanup
