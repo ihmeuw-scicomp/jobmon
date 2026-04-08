@@ -271,14 +271,19 @@ class DistributorService:
         {TaskInstanceStatus.TRIAGING, TaskInstanceStatus.NO_HEARTBEAT}
     )
 
+    # Max concurrent commands for parallel statuses. Limits load on
+    # the cluster API and jobmon server during large triage batches.
+    PARALLEL_CONCURRENCY = 20
+
     async def process_status(
         self, status: str, timeout: Union[int, float] = -1
     ) -> None:
         """Process commands for a status.
 
         For TRIAGING and NO_HEARTBEAT, commands are independent per-TI
-        and run concurrently via asyncio.gather(). For other statuses,
-        commands run sequentially to preserve ordering.
+        and run concurrently via asyncio.gather() with a concurrency
+        limit. For other statuses, commands run sequentially to
+        preserve ordering.
 
         Args:
             status: which status to process work for.
@@ -293,8 +298,14 @@ class DistributorService:
         if status in self.PARALLELIZABLE_STATUSES:
             commands = list(command_generator)
             if commands:
+                sem = asyncio.Semaphore(self.PARALLEL_CONCURRENCY)
+
+                async def limited(cmd: DistributorCommand) -> None:
+                    async with sem:
+                        await cmd(self.raise_on_error)
+
                 results = await asyncio.gather(
-                    *(cmd(self.raise_on_error) for cmd in commands),
+                    *(limited(cmd) for cmd in commands),
                     return_exceptions=True,
                 )
                 for i, result in enumerate(results):

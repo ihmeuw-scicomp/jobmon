@@ -62,6 +62,24 @@ class Requester:
         # Persistent aiohttp session for async_request()
         self._async_session: Optional[aiohttp.ClientSession] = None
 
+    def _needs_new_session(self) -> bool:
+        """Check if the persistent async session needs recreation."""
+        if self._async_session is None or self._async_session.closed:
+            return True
+        # aiohttp sessions are tied to the event loop that created them.
+        # Detect loop mismatch (e.g., between asyncio.run() calls in
+        # tests) without relying on private attributes.
+        try:
+            loop = asyncio.get_running_loop()
+            # Use getattr with fallback — _loop is internal to aiohttp
+            # but is the only way to detect loop mismatch.
+            session_loop = getattr(self._async_session, "_loop", None)
+            if session_loop is not None and session_loop is not loop:
+                return True
+        except RuntimeError:
+            return True
+        return False
+
     async def async_request(
         self,
         app_route: str,
@@ -73,17 +91,11 @@ class Requester:
 
         Uses the same retry logic, tracing, and error handling as
         send_request_async() but manages its own aiohttp session.
+        Reuses TCP connections across requests for efficiency.
         """
-        # Create a new session if needed. aiohttp sessions are tied to
-        # the event loop that created them, so we must recreate when the
-        # loop changes (e.g., between asyncio.run() calls in tests).
-        loop = asyncio.get_running_loop()
-        if (
-            self._async_session is None
-            or self._async_session.closed
-            or self._async_session._loop is not loop  # type: ignore[attr-defined]
-        ):
+        if self._needs_new_session():
             self._async_session = aiohttp.ClientSession()
+        assert self._async_session is not None
         return await self.send_request_async(
             session=self._async_session,
             app_route=app_route,
