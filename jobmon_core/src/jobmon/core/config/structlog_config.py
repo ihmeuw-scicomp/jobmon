@@ -731,7 +731,13 @@ def prepend_jobmon_processors_to_existing_config() -> None:
     if wrapper_class is not None:
         new_config["wrapper_class"] = wrapper_class
 
-    structlog.configure(**new_config)
+    # Set reentrancy flag so the reconfigure hook (if installed) does not
+    # call us again when we call structlog.configure below.
+    _reinjecting.active = True
+    try:
+        structlog.configure(**new_config)
+    finally:
+        _reinjecting.active = False
 
 
 def is_structlog_configured() -> bool:
