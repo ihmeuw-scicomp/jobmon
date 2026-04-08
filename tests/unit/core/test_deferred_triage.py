@@ -25,6 +25,7 @@ def distributor_service():
 @pytest.fixture
 def task_instance():
     requester = mock.MagicMock(spec=Requester)
+    requester.async_request = mock.AsyncMock(return_value=(200, {}))
     ti = DistributorTaskInstance(
         task_instance_id=1,
         workflow_run_id=1,

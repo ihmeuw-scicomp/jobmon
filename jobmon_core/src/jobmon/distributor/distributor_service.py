@@ -327,7 +327,7 @@ class DistributorService:
             except KeyError:
                 del self._task_instances[task_instance.task_instance_id]
 
-    def instantiate_task_instances(
+    async def instantiate_task_instances(
         self, task_instances: List[DistributorTaskInstance]
     ) -> None:
         task_instance_ids = [ti.task_instance_id for ti in task_instances]
@@ -344,7 +344,7 @@ class DistributorService:
         )
 
         app_route = "/task_instance/instantiate_task_instances"
-        _, result = self.requester.send_request(
+        _, result = await self.requester.async_request(
             app_route=app_route,
             message={"task_instance_ids": task_instance_ids},
             request_type="post",
@@ -424,7 +424,7 @@ class DistributorService:
                 task_instance_id=ti.task_instance_id,
             )
 
-        task_instance_batch.prepare_task_instance_batch_for_launch()
+        await task_instance_batch.prepare_task_instance_batch_for_launch()
 
         command = self.cluster_interface.build_worker_node_command(
             task_instance_id=None,
@@ -510,7 +510,7 @@ class DistributorService:
         try:
             requested_resources = task_instance.batch.requested_resources
         except AttributeError:
-            task_instance.batch.load_requested_resources()
+            await task_instance.batch.load_requested_resources()
             requested_resources = task_instance.batch.requested_resources
 
         command = self.cluster_interface.build_worker_node_command(
@@ -529,10 +529,12 @@ class DistributorService:
         except Exception as e:
             stack_trace = traceback.format_exc()
             logger.exception("Task instance launch failed", error=str(e))
-            task_instance.transition_to_no_distributor_id(no_id_err_msg=stack_trace)
+            await task_instance.transition_to_no_distributor_id(
+                no_id_err_msg=stack_trace
+            )
 
         else:
-            task_instance.transition_to_launched(
+            await task_instance.transition_to_launched(
                 distributor_id, self._next_report_increment
             )
 
@@ -600,7 +602,7 @@ class DistributorService:
                 elapsed_seconds=round(elapsed, 1),
             )
 
-        task_instance.transition_to_error(r_msg, r_value)
+        await task_instance.transition_to_error(r_msg, r_value)
 
         logger.info(
             "Task instance triage completed",
@@ -638,17 +640,17 @@ class DistributorService:
                 num_tasks=len(distributor_ids),
             )
 
-        task_instance_batch.transition_to_killed()
+        await task_instance_batch.transition_to_killed()
 
     @bind_context(task_instance_id="task_instance.task_instance_id")
-    def no_heartbeat_error(self, task_instance: DistributorTaskInstance) -> None:
+    async def no_heartbeat_error(self, task_instance: DistributorTaskInstance) -> None:
         """Move a NO_HEARTBEAT task instance to a recoverable error state."""
         logger.info(
             "Distributor processing NO_HEARTBEAT task instance",
             distributor_id=task_instance.distributor_id,
         )
 
-        task_instance.transition_to_error(
+        await task_instance.transition_to_error(
             "Task instance never reported a heartbeat after scheduling. "
             "Will retry. May be caused by distributor heartbeat failure "
             "or worker startup issue often due to cluster node problem. "

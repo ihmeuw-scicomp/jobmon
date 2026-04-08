@@ -84,17 +84,17 @@ class DistributorTaskInstance:
     def distributor_id(self, val: str) -> None:
         self._distributor_id = val
 
-    def transition_to_launched(
+    async def transition_to_launched(
         self, distributor_id: str, next_report_increment: float
     ) -> None:
         """Register the submission of a new task instance to a cluster.
 
-        This method is never called by the happy path - only if array submission is not
-        implemented on a particular cluster type.
+        This method is never called by the happy path - only if array
+        submission is not implemented on a particular cluster type.
         """
         self.distributor_id = distributor_id
         app_route = f"/task_instance/{self.task_instance_id}/log_distributor_id"
-        self.requester.send_request(
+        await self.requester.async_request(
             app_route=app_route,
             message={
                 "distributor_id": str(distributor_id),
@@ -104,24 +104,19 @@ class DistributorTaskInstance:
         )
         self.status = TaskInstanceStatus.LAUNCHED
 
-    def transition_to_no_distributor_id(
+    async def transition_to_no_distributor_id(
         self,
         no_id_err_msg: str,
     ) -> None:
-        """Register that submission failed with the central service.
-
-        Args:
-            no_id_err_msg: The error msg from the executor when failed to obtain distributor
-                id.
-        """
+        """Register that submission failed with the central service."""
         logger.info(
             "Distributor failed to get distributor ID for task instance",
             task_instance_id=self.task_instance_id,
-            error_msg=no_id_err_msg[:200],  # Truncate for readability
+            error_msg=no_id_err_msg[:200],
         )
 
         app_route = f"/task_instance/{self.task_instance_id}/log_no_distributor_id"
-        self.requester.send_request(
+        await self.requester.async_request(
             app_route=app_route,
             message={"no_id_err_msg": no_id_err_msg},
             request_type="post",
@@ -133,7 +128,7 @@ class DistributorTaskInstance:
             task_instance_id=self.task_instance_id,
         )
 
-    def _transition_to_error(self, error_message: str, error_state: str) -> None:
+    async def _transition_to_error(self, error_message: str, error_state: str) -> None:
         """Transitions the TaskInstance to the specified error state."""
         if self.distributor_id is None:
             raise ValueError("distributor_id cannot be None during log_error")
@@ -142,7 +137,6 @@ class DistributorTaskInstance:
         if not error_state:
             raise ValueError("cannot log error if error_state isn't set")
 
-        # Only log error details not captured by main service
         error_type = (
             "unknown" if error_state == TaskInstanceStatus.UNKNOWN_ERROR else "known"
         )
@@ -158,7 +152,7 @@ class DistributorTaskInstance:
         else:
             app_route = f"/task_instance/{self.task_instance_id}/log_known_error"
 
-        self.requester.send_request(
+        await self.requester.async_request(
             app_route=app_route,
             message={
                 "error_state": error_state,
@@ -169,25 +163,25 @@ class DistributorTaskInstance:
         )
         self.error_state = error_state
 
-    def transition_to_unknown_error(
+    async def transition_to_unknown_error(
         self, error_message: str, error_state: str
     ) -> Tuple[Set[DistributorTaskInstance], List]:
-        """Register that an unknown error was discovered during reconciliation."""
-        self._transition_to_error(error_message, error_state)
+        """Register that an unknown error was discovered."""
+        await self._transition_to_error(error_message, error_state)
         return {self}, []
 
-    def transition_to_resource_error(
+    async def transition_to_resource_error(
         self, error_message: str, error_state: str
     ) -> Tuple[Set[DistributorTaskInstance], List]:
-        """Register that a resource error was discovered during reconciliation."""
-        self._transition_to_error(error_message, error_state)
+        """Register that a resource error was discovered."""
+        await self._transition_to_error(error_message, error_state)
         return {self}, []
 
-    def transition_to_error(
+    async def transition_to_error(
         self, error_message: str, error_state: str
     ) -> Tuple[Set[DistributorTaskInstance], List]:
-        """Register that a known error occurred during reconciliation."""
-        self._transition_to_error(error_message, error_state)
+        """Register that a known error occurred."""
+        await self._transition_to_error(error_message, error_state)
         return {self}, []
 
     def __hash__(self) -> int:

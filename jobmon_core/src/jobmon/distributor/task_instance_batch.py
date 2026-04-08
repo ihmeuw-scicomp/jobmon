@@ -10,7 +10,9 @@ from jobmon.core.constants import TaskInstanceStatus
 from jobmon.core.requester import Requester
 
 if TYPE_CHECKING:
-    from jobmon.distributor.distributor_task_instance import DistributorTaskInstance
+    from jobmon.distributor.distributor_task_instance import (
+        DistributorTaskInstance,
+    )
 
 
 logger = structlog.get_logger(__name__)
@@ -41,8 +43,8 @@ class TaskInstanceBatch:
     def requested_resources(self) -> Dict:
         if not hasattr(self, "_requested_resources"):
             raise AttributeError(
-                "Requested Resources cannot be accessed before the array batch is prepared for"
-                " launch."
+                "Requested Resources cannot be accessed before the "
+                "array batch is prepared for launch."
             )
         return self._requested_resources
 
@@ -50,9 +52,9 @@ class TaskInstanceBatch:
         self.task_instances.add(task_instsance)
         task_instsance.batch = self
 
-    def load_requested_resources(self) -> None:
+    async def load_requested_resources(self) -> None:
         app_route = f"/task_resources/{self.task_resources_id}"
-        _, response = self.requester.send_request(
+        _, response = await self.requester.async_request(
             app_route=app_route, message={}, request_type="post"
         )
         self._requested_resources: Dict[str, Any] = ast.literal_eval(
@@ -60,25 +62,21 @@ class TaskInstanceBatch:
         )
         self._requested_resources["queue"] = response["queue_name"]
 
-    def prepare_task_instance_batch_for_launch(self) -> None:
-        """Add the current batch number to the current set of registered task instance ids."""
+    async def prepare_task_instance_batch_for_launch(self) -> None:
+        """Prepare batch for launch: assign step IDs and load resources."""
         array_step_id = 0
         for task_instance in sorted(self.task_instances):
             task_instance.array_step_id = array_step_id
             array_step_id += 1
 
-        self.load_requested_resources()
+        await self.load_requested_resources()
 
     def set_distributor_ids(self, distributor_id_map: Dict) -> None:
-        """Set the distributor_ids on the task instances in the array.
-
-        Args:
-            distributor_id_map: map of array_step_id to distributor_id
-        """
+        """Set the distributor_ids on the task instances in the array."""
         for ti in self.task_instances:
             ti.distributor_id = distributor_id_map[ti.array_step_id]
 
-    def transition_to_launched(self, next_report_by: float) -> None:
+    async def transition_to_launched(self, next_report_by: float) -> None:
         """Transition all associated task instances to LAUNCHED state."""
         logger.info(
             "Transitioning batch to LAUNCHED",
@@ -87,10 +85,8 @@ class TaskInstanceBatch:
             batch_size=len(self.task_instances),
         )
 
-        # Assertion that all bound task instances are indeed instantiated
         for ti in self.task_instances:
             if ti.status != TaskInstanceStatus.INSTANTIATED:
-                # Log validation error - this adds info beyond main service
                 logger.error(
                     "Task instance in incorrect state for launch",
                     task_instance_id=ti.task_instance_id,
@@ -100,7 +96,7 @@ class TaskInstanceBatch:
                     batch_number=self.batch_number,
                 )
                 raise ValueError(
-                    f"{ti} is not in INSTANTIATED state, prior to launching."
+                    f"{ti} is not in INSTANTIATED state, " f"prior to launching."
                 )
 
         app_route = f"/array/{self.array_id}/transition_to_launched"
@@ -109,11 +105,10 @@ class TaskInstanceBatch:
             "next_report_increment": next_report_by,
         }
 
-        self.requester.send_request(
+        await self.requester.async_request(
             app_route=app_route, message=data, request_type="post"
         )
 
-        # Update local status and log each task instance (info level - state transition)
         for ti in self.task_instances:
             ti.status = TaskInstanceStatus.LAUNCHED
             logger.info(
@@ -130,16 +125,16 @@ class TaskInstanceBatch:
             batch_size=len(self.task_instances),
         )
 
-    def log_distributor_ids(self) -> None:
-        """Log the distributor ID in the database for all task instances in the batch."""
+    async def log_distributor_ids(self) -> None:
+        """Log distributor IDs in the database for all TIs in the batch."""
         app_route = f"/array/{self.array_id}/log_distributor_id"
         data = {ti.task_instance_id: ti.distributor_id for ti in self.task_instances}
-        self.requester.send_request(
+        await self.requester.async_request(
             app_route=app_route, message=data, request_type="post"
         )
 
-    def transition_to_killed(self) -> None:
-        """Mark all TIs in this batch as killed in the DB (ERROR_FATAL)."""
+    async def transition_to_killed(self) -> None:
+        """Mark all TIs in this batch as killed (ERROR_FATAL)."""
         logger.info(
             "Transitioning killed batch to ERROR_FATAL",
             array_id=self.array_id,
@@ -147,7 +142,6 @@ class TaskInstanceBatch:
             batch_size=len(self.task_instances),
         )
 
-        # Log each task instance being killed (info level - state transition)
         for ti in self.task_instances:
             logger.info(
                 "Task instance transitioning to ERROR_FATAL (killed)",
@@ -156,11 +150,9 @@ class TaskInstanceBatch:
                 array_batch_num=self.batch_number,
             )
 
-        # 1) Make an HTTP call to the server if you have a relevant endpoint
-        #    that transitions them to a 'killed' or ERROR_FATAL state in bulk.
         app_route = f"/array/{self.array_id}/transition_to_killed"
         data = {"batch_number": self.batch_number}
-        self.requester.send_request(
+        await self.requester.async_request(
             app_route=app_route, message=data, request_type="post"
         )
 
