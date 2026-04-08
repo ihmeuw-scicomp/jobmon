@@ -9,6 +9,7 @@ import itertools
 import os
 import sys
 import time
+import traceback
 import uuid
 from subprocess import PIPE, Popen, TimeoutExpired
 from types import TracebackType
@@ -287,6 +288,7 @@ class Workflow(object):
 
         self._fail_after_n_executions = 1_000_000_000
         self.last_workflow_run_id: Optional[int] = None
+        self.error: Optional[BaseException] = None
 
     @property
     def tool(self) -> Tool:
@@ -647,8 +649,24 @@ class Workflow(object):
             for task in self.tasks.values():
                 task.final_status = result.task_final_statuses[task.task_id]
 
+            # Store error for programmatic access
+            self.error = result.error
+
             # Log completion
             if result.final_status != WorkflowRunStatus.DONE:
+                if result.error is not None:
+                    tb = "".join(
+                        traceback.format_exception(
+                            type(result.error),
+                            result.error,
+                            result.error.__traceback__,
+                        )
+                    )
+                    logger.error(
+                        "WorkflowRun failed with error",
+                        error_type=type(result.error).__name__,
+                        traceback=tb,
+                    )
                 logger.info(
                     f"WorkflowRun execution ended, num failed {result.failed_count}"
                 )

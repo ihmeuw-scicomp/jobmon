@@ -70,6 +70,8 @@ class OrchestratorResult:
     done_task_ids: frozenset[int]
     #: Immutable set of task IDs that failed fatally.
     failed_task_ids: frozenset[int]
+    #: The fatal exception that terminated the run, if any.
+    error: Optional[BaseException] = None
 
 
 # ──────────────────────────────────────────────────────────────────────────────

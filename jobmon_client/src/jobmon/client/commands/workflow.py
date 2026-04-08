@@ -9,6 +9,7 @@ Commands for querying and managing workflow state, including:
 """
 
 import getpass
+import traceback
 from io import StringIO
 from typing import Dict, List, Optional, Union
 
@@ -293,7 +294,18 @@ def resume_workflow_from_id(
     if result.final_status == WorkflowRunStatus.DONE:
         print(f"Workflow {workflow_id} has successfully resumed to completion.")
     else:
+        error_detail = f"failed with status {result.final_status}"
+        if result.error is not None:
+            tb = "".join(
+                traceback.format_exception(
+                    type(result.error),
+                    result.error,
+                    result.error.__traceback__,
+                )
+            )
+            error_detail += f"\n\nCaused by:\n{tb}"
         raise WorkflowRunStateError(
-            f"Workflow run {new_wfr.workflow_run_id}, associated with workflow {workflow_id}",
-            f"failed with status {result.final_status}",
+            f"Workflow run {new_wfr.workflow_run_id},"
+            f" associated with workflow {workflow_id}",
+            error_detail,
         )
