@@ -414,9 +414,23 @@ def _install_structlog_reconfigure_hook() -> None:
                     _reinjecting.active = False
 
         _hooked_configure.__jobmon_hooked__ = True  # type: ignore[attr-defined]
+        _hooked_configure.__wrapped__ = _orig_configure  # type: ignore[attr-defined]
         _structlog.configure = _hooked_configure  # type: ignore[assignment]
 
         _structlog_hook_installed = True
+
+
+def _reset_structlog_reconfigure_hook() -> None:
+    """Remove the structlog.configure hook. For testing only."""
+    global _structlog_hook_installed
+    import structlog as _structlog
+
+    with _structlog_hook_lock:
+        current = _structlog.configure
+        if getattr(current, "__jobmon_hooked__", False):
+            # The hooked function closes over _orig_configure
+            _structlog.configure = current.__wrapped__  # type: ignore[attr-defined]
+        _structlog_hook_installed = False
 
 
 def enable_structlog_otlp_capture() -> None:
