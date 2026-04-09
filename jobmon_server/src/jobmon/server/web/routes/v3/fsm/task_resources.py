@@ -1,6 +1,7 @@
 """Routes for Task Resources."""
 
 import ast
+import json
 from http import HTTPStatus as StatusCodes
 from typing import Any
 
@@ -19,6 +20,20 @@ from jobmon.server.web.routes.v3.fsm import fsm_router as api_v3_router
 logger = structlog.get_logger(__name__)
 
 
+def _deserialize_requested_resources(raw: str) -> Any:
+    """Deserialize a requested_resources column value.
+
+    New rows are written via ``json.dumps`` by ``/task/bind_resources``, which
+    emits JSON (lowercase ``true``/``false``/``null``). Older rows may be
+    Python ``repr``-style (``True``/``False``/``None``) from pre-FastAPI
+    versions. Try JSON first, fall back to ``ast.literal_eval``.
+    """
+    try:
+        return json.loads(raw)
+    except (ValueError, TypeError):
+        return ast.literal_eval(raw)
+
+
 @api_v3_router.post("/task_resources/{task_resources_id}")
 def get_task_resources(task_resources_id: int, db: Session = Depends(get_db)) -> Any:
     """Return an task_resources."""
@@ -32,7 +47,9 @@ def get_task_resources(task_resources_id: int, db: Session = Depends(get_db)) ->
     row = db.execute(select_stmt).fetchone()
     requested_resources_raw, queue_name = row if row else (None, None)
     requested_resources = (
-        ast.literal_eval(requested_resources_raw) if requested_resources_raw else None
+        _deserialize_requested_resources(requested_resources_raw)
+        if requested_resources_raw
+        else None
     )
 
     resp = JSONResponse(
