@@ -31,6 +31,7 @@ from sphinx.util import nodes as sphinx_nodes  # type: ignore
 from jobmon.client.api import Tool
 from jobmon.client.task import Task
 from jobmon.client.workflow import Workflow
+from jobmon.core.exceptions import UserTaskFunctionError
 
 SIMPLE_TYPES = {str, int, float, bool}
 BUILT_IN_COLLECTIONS = {list, tuple, set}
@@ -860,7 +861,13 @@ class TaskGenerator:
                 )
 
         # Run the task_function
-        return self.task_function(**deserialized_args)
+        try:
+            return self.task_function(**deserialized_args)
+        except Exception as e:
+            # Wrap user task failures so they can be distinguished from
+            # jobmon-internal errors at log boundaries. Preserve the original
+            # traceback via exception chaining.
+            raise UserTaskFunctionError(str(e)) from e
 
     def help(self) -> str:
         """Return help text for the task_function."""

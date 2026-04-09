@@ -1791,3 +1791,30 @@ def test_complex_string_annotations(client_env) -> None:
     # List[str] should be a parameterized list
     assert hasattr(tg.params["b"], "__origin__")
     assert tg.params["b"].__origin__ is list
+
+
+def test_user_task_function_error_wraps_exception(client_env) -> None:
+    """User task function exceptions should be wrapped in UserTaskFunctionError.
+
+    This lets log boundaries (e.g. WorkerNodeCLI.run_task_generator) distinguish
+    user task failures from jobmon-internal errors. The original exception must
+    remain chained so stderr capture still shows the real traceback.
+    """
+    from jobmon.core.exceptions import UserTaskFunctionError
+
+    def raising_task(x: int) -> None:
+        raise RuntimeError("user code boom")
+
+    tg = task_generator.TaskGenerator(
+        task_function=raising_task,
+        serializers={},
+        tool_name="test_tool",
+        default_cluster_name="sequential",
+    )
+
+    with pytest.raises(UserTaskFunctionError, match="user code boom") as exc_info:
+        tg.run(["x=1"])
+
+    # Original exception is chained via `raise ... from e`
+    assert isinstance(exc_info.value.__cause__, RuntimeError)
+    assert str(exc_info.value.__cause__) == "user code boom"
