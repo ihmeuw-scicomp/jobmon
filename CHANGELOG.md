@@ -70,6 +70,12 @@ All notable changes to Jobmon will be documented in this file.
 - Unified status colors across all views (DAG, popover, concurrency chart, summary panel) into shared constants
 
 ### Fixed
+- **Orchestrator HTTP failure cascade**: Fixed the `File descriptor N is used by transport <_SelectorSocketTransport>` runaway cascade where a single aiohttp `ClientTimeout` could leak an asyncio transport and cause the orchestrator main loop to spin at ~300 errors/sec indefinitely. Four-layer fix:
+  - `asyncio.TimeoutError` is now included in `Requester._should_retry_exception`, closing a Python 3.10 gap where it did not inherit from builtin `TimeoutError` and silently bypassed tenacity's retry/backoff
+  - `ServerGateway._request` tracks consecutive post-tenacity failures and recycles the underlying `aiohttp.ClientSession` after `SESSION_RECYCLE_THRESHOLD` (5) consecutive failures, rebuilding the `TCPConnector` to clear leaked transport state
+  - `WorkflowRunOrchestrator._main_loop` enforces a `MIN_LOOP_SLEEP` (1.0s) floor per iteration so the loop cannot spin hot when `time_till_next_sync` collapses to 0 during sustained heartbeat failure
+  - `Synchronizer.tick()` and `HeartbeatService.run_background()` now raise a new `FatalOrchestratorError` after sustained failure (3 consecutive all-failed sync ticks or 5 consecutive heartbeat failures). `WorkflowRunOrchestrator._check_heartbeat_task_healthy()` surfaces background-task failures into the main loop, and `run.py` propagates `FatalOrchestratorError` alongside `DistributorNotAlive` so users see a clean failure instead of a silent spin
+  - `Synchronizer._get_array_concurrency_limits` now raises when every per-array query fails (instead of silently returning an empty `StateUpdate`), ensuring complete array-concurrency outages are counted by the consecutive-failure guard
 - **WorkflowDAG Missing CSS**: Added `reactflow/dist/style.css` import to `WorkflowDAG.tsx`; previously relied on `TaskDAG.tsx` importing it, which broke when route-level code splitting separated them into different chunks
 - **Concurrency Input**: PUT request now fires on blur instead of every keystroke
 - **Template Detail State**: Panel resets local state (concurrency value, status message) when switching templates

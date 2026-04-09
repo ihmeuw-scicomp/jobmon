@@ -31,6 +31,7 @@ from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 from jobmon.core.exceptions import (
     DistributorInterruptedError,
     DistributorNotAlive,
+    FatalOrchestratorError,
     TransitionError,
     WorkflowTestError,
 )
@@ -451,10 +452,18 @@ async def _run_orchestrator(
             )
             return _build_result_from_state(state, start_time, error=e)
 
-        except (DistributorNotAlive, DistributorInterruptedError, WorkflowTestError):
+        except (
+            DistributorNotAlive,
+            DistributorInterruptedError,
+            FatalOrchestratorError,
+            WorkflowTestError,
+        ):
             # Critical exceptions must propagate to callers
             # - DistributorNotAlive: Distributor died unexpectedly (documented in docstring)
             # - DistributorInterruptedError: Distributor received interrupt signal
+            # - FatalOrchestratorError: Sustained HTTP failure that recycling
+            #   and backoff could not recover from — user must restart the
+            #   workflow run on a fresh process/session.
             # - WorkflowTestError: Test infrastructure error that should fail tests
             raise
 

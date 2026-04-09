@@ -93,6 +93,13 @@ class ServerGateway:
         response = await gateway.log_heartbeat(...)
     """
 
+    #: Number of consecutive post-tenacity failures before recycling the aiohttp
+    #: session. Tenacity already handles per-request transient failures, so
+    #: reaching this count means a true sustained failure (or session-state
+    #: corruption like the asyncio selector fd leak). Recycling creates a fresh
+    #: ClientSession/TCPConnector, which clears any leaked transports.
+    SESSION_RECYCLE_THRESHOLD: int = 5
+
     def __init__(
         self,
         requester: Requester,
@@ -111,6 +118,9 @@ class ServerGateway:
         self.workflow_run_id = workflow_run_id
         self._session: Optional[aiohttp.ClientSession] = None
         self._owns_session: bool = False
+        #: Counter for consecutive failures through _request. Reset on any
+        #: successful call. Drives session recycling.
+        self._consecutive_failures: int = 0
 
     async def __aenter__(self) -> "ServerGateway":
         """Async context manager entry - creates session."""
@@ -150,6 +160,35 @@ class ServerGateway:
             self._owns_session = True
         return self._session
 
+    async def _recycle_session(self) -> None:
+        """Close the current aiohttp session so the next request gets a fresh one.
+
+        This is the recovery path for cases where the existing session's
+        underlying event-loop state has become corrupted — most notably the
+        asyncio ``_SelectorSocketTransport`` fd leak that can occur when
+        aiohttp+aiohappyeyeballs cancellation races a connect. Creating a new
+        ``ClientSession`` builds a new ``TCPConnector`` with fresh transport
+        registrations, which breaks the collision cycle.
+
+        Idempotent under concurrent callers: the first coroutine to reach here
+        transfers ownership of the old session to a local variable and nulls
+        out ``self._session``, so later callers see ``None`` and return
+        without double-closing.
+        """
+        old = self._session
+        if old is None or old.closed:
+            return
+        # Swap out the reference before awaiting close() so concurrent callers
+        # in _ensure_session will build a new session on their next attempt.
+        self._session = None
+        try:
+            await old.close()
+        except Exception as e:
+            logger.warning(
+                "Error closing aiohttp session during recycle",
+                error=str(e),
+            )
+
     async def _request(
         self,
         app_route: str,
@@ -158,6 +197,12 @@ class ServerGateway:
         tenacious: bool = True,
     ) -> tuple[int, Any]:
         """Make an async HTTP request.
+
+        Every public gateway method routes through this chokepoint. We track
+        consecutive post-tenacity failures here so that sustained HTTP pain
+        (true server outage OR session-state corruption like a leaked asyncio
+        transport) triggers a session recycle rather than an unbounded log
+        cascade from the orchestrator's main loop.
 
         Args:
             app_route: The API route to request.
@@ -169,13 +214,31 @@ class ServerGateway:
             Tuple of (status_code, response_content).
         """
         session = await self._ensure_session()
-        return await self.requester.send_request_async(
-            session=session,
-            app_route=app_route,
-            message=message,
-            request_type=request_type,
-            tenacious=tenacious,
-        )
+        try:
+            result = await self.requester.send_request_async(
+                session=session,
+                app_route=app_route,
+                message=message,
+                request_type=request_type,
+                tenacious=tenacious,
+            )
+        except Exception:
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= self.SESSION_RECYCLE_THRESHOLD:
+                logger.error(
+                    "Recycling aiohttp session after consecutive HTTP failures",
+                    consecutive_failures=self._consecutive_failures,
+                    app_route=app_route,
+                    threshold=self.SESSION_RECYCLE_THRESHOLD,
+                )
+                await self._recycle_session()
+                # Reset so the next batch of failures has to hit the threshold
+                # on the new session before we recycle again.
+                self._consecutive_failures = 0
+            raise
+        else:
+            self._consecutive_failures = 0
+            return result
 
     # ──────────────────────────────────────────────────────────────────────────
     # Heartbeat Operations
