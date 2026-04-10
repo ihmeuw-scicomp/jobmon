@@ -510,6 +510,14 @@ class WorkerNodeTaskInstance:
         don't abort the whole task — ``log_report_by`` only raises after
         the sync requester's tenacity retry budget is exhausted, and even
         then we want to keep ticking in case the next attempt recovers.
+
+        The first heartbeat is deliberately deferred by one full
+        ``_task_instance_heartbeat_interval``. For short subprocesses
+        that finish in less than an interval, no async heartbeat ever
+        fires — which is fine because the sync ``log_running()`` HTTP
+        call already set ``report_by_date`` to
+        ``now + interval * buffer`` on the server, so the TI remains
+        in-date on the server throughout the entire short run.
         """
         while True:
             await asyncio.sleep(self._task_instance_heartbeat_interval)
@@ -688,6 +696,20 @@ class WorkerNodeTaskInstance:
             done, pending = await asyncio.wait(
                 pending, return_when=asyncio.FIRST_COMPLETED
             )
+            # Surface exceptions with heartbeat_task prioritized. If
+            # multiple tasks completed in the same wait round — e.g. a
+            # drain task hit an IOError at the same instant the
+            # heartbeat raised TransitionError — set iteration order is
+            # non-deterministic, so check heartbeat_task explicitly first
+            # to guarantee the KILL_SELF path (which depends on the
+            # TransitionError surfacing to run() via __cause__) takes
+            # priority over incidental drain errors.
+            if (
+                heartbeat_task in done
+                and not heartbeat_task.cancelled()
+                and heartbeat_task.exception() is not None
+            ):
+                heartbeat_task.result()
             for task in done:
                 if not task.cancelled() and task.exception() is not None:
                     task.result()
