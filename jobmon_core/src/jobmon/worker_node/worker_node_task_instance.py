@@ -90,9 +90,6 @@ class WorkerNodeTaskInstance:
         self._stdout: Optional[str] = None
         self._stderr: Optional[str] = None
 
-        # set last heartbeat
-        self.last_heartbeat_time = time()
-
     @property
     def task_instance_id(self) -> int:
         """Returns a task instance ID if it's been bound."""
@@ -350,7 +347,6 @@ class WorkerNodeTaskInstance:
         self._command_add_env = {
             f"JOBMON_{k.upper()}": str(v) for k, v in kwargs.items()
         }
-        self.last_heartbeat_time = time()
         if self.status != TaskInstanceStatus.RUNNING:
             logger.error(
                 "Task instance failed to transition to RUNNING",
@@ -401,7 +397,6 @@ class WorkerNodeTaskInstance:
         )
 
         self._status = response["status"]
-        self.last_heartbeat_time = time()
 
         if self.status != TaskInstanceStatus.RUNNING:
             raise TransitionError(
@@ -631,7 +626,24 @@ class WorkerNodeTaskInstance:
             ) from e
 
         finally:
-            await self._record_final_command_output(process, stdout_task, stderr_task)
+            # Protect the pending exception (if any) from being masked
+            # by a cleanup error. If the except block above raised a
+            # RuntimeError whose __cause__ is TransitionError, run()'s
+            # KILL_SELF handler depends on that chain; an uncaught
+            # exception from _record_final_command_output would replace
+            # the propagating exception and strip the __cause__ link.
+            # set_command_output is the only state-mutating call and
+            # cannot raise, so the worst case here is losing the
+            # stdout/stderr tails from the log_done/log_error payload.
+            try:
+                await self._record_final_command_output(
+                    process, stdout_task, stderr_task
+                )
+            except Exception as cleanup_exc:
+                logger.exception(
+                    "Failed to record final command output during cleanup",
+                    error=str(cleanup_exc),
+                )
 
     @staticmethod
     async def _race_work_tasks(
