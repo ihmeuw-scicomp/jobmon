@@ -680,11 +680,18 @@ class WorkerNodeTaskInstance:
                 if not task.cancelled() and task.exception() is not None:
                     task.result()
             # Defensive: _heartbeat_loop is infinite, so reaching "done
-            # without exception" would mean it was cancelled externally,
-            # which nothing in this method does. Bail to avoid a tight
-            # loop on a stable done set if that assumption is ever
-            # broken.
-            if heartbeat_task.done() and heartbeat_task.exception() is None:
+            # without a visible exception" would mean it was cancelled
+            # externally, which nothing in this method does. Bail to
+            # avoid a tight loop on a stable done set if that assumption
+            # is ever broken. The cancelled() check must come first —
+            # asyncio.Task.exception() raises CancelledError on a
+            # cancelled task rather than returning None, and that
+            # CancelledError would bypass the caller's ``except
+            # Exception`` (it inherits from BaseException) and crash the
+            # worker.
+            if heartbeat_task.done() and (
+                heartbeat_task.cancelled() or heartbeat_task.exception() is None
+            ):
                 break
 
         # Subprocess has exited (or heartbeat terminated unexpectedly).
