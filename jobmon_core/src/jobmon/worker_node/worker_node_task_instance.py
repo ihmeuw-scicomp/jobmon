@@ -659,20 +659,28 @@ class WorkerNodeTaskInstance:
         process_wait_task: "asyncio.Task[int]",
         drain_tasks: List["asyncio.Task[str]"],
     ) -> None:
-        """Wait for the subprocess to exit while watching the heartbeat.
+        """Run the subprocess and its drain tasks while the heartbeat ticks.
 
-        Loops over ``asyncio.wait(FIRST_COMPLETED)`` until
-        ``process_wait_task`` is specifically the one that completed —
-        **not** just any work task. A drain task finishing early does NOT
-        mean work is done: ``_communicate`` has a ``finally: return
-        mem_buffer`` that silently absorbs ``IOError`` during shared-fs
-        writes, so a failed drain task looks identical to a successful
-        one (no stored exception, empty-string result). The subprocess
-        may still be running and writing to the now-undrained pipe, in
-        which case we must keep heartbeating until the subprocess
-        actually exits — otherwise the pipe fills, the subprocess
-        blocks on its next write, and the server marks the TI overdue,
-        reproducing the exact failure mode this refactor fixes.
+        Loops over ``asyncio.wait(FIRST_COMPLETED)`` until **every** work
+        task (``process_wait_task`` and all ``drain_tasks``) has
+        completed. Heartbeats run concurrently for the entire window,
+        including the post-exit drain phase, so the server's
+        ``report_by_date`` can't expire while the worker is still
+        finalizing. On a slow shared filesystem a fast subprocess can be
+        followed by minutes of ``aiofiles`` flush/close work, which the
+        old "cancel heartbeat as soon as ``process_wait_task`` returns"
+        policy left uncovered — the server would mark the TI TRIAGING
+        mid-drain and the subsequent ``log_done`` would fail.
+
+        A drain task finishing early does NOT mean work is done:
+        ``_communicate`` has a ``finally: return mem_buffer`` that
+        silently absorbs ``IOError`` during shared-fs writes, so a failed
+        drain task looks identical to a successful one (no stored
+        exception, empty-string result). The subprocess may still be
+        running and writing to the now-undrained pipe, in which case we
+        must keep heartbeating until the subprocess actually exits —
+        otherwise the pipe fills, the subprocess blocks on its next
+        write, and the server marks the TI overdue.
 
         Any task exception (heartbeat ``TransitionError``, unexpected
         drain error) surfaces immediately via ``task.result()`` inside
@@ -681,18 +689,20 @@ class WorkerNodeTaskInstance:
         normal happy path, ``task.exception()`` is ``None`` for every
         completed task and the check is a no-op.
 
-        Once ``process_wait_task`` has completed, the heartbeat task is
-        cancelled before the remaining drain tasks are awaited. This
-        matches the old ``_process_poller`` behavior of stopping
-        heartbeats as soon as ``process.wait()`` returned, and prevents a
-        KILL_SELF race during the final drain phase from raising a
-        ``TransitionError`` on a heartbeat task that nobody is watching —
-        such an exception would be silently swallowed by
-        ``_stop_heartbeat_task`` in the outer ``finally``, mutating
-        ``self._status`` behind ``run()``'s back.
+        A server-initiated KILL_SELF arriving while drain is in flight
+        is handled via the same exception path: the next heartbeat call
+        observes the ``K`` status from the server, raises
+        ``TransitionError``, gets surfaced here, and propagates up
+        through ``_run_subprocess_with_heartbeat_race``'s
+        ``except Exception`` wrap so ``run()``'s ``except RuntimeError``
+        block can route to ``ERROR_FATAL`` via the ``__cause__`` chain.
+        This replaces the old "cancel heartbeat eagerly" policy that
+        closed the KILL_SELF race by silencing it — exceptions are now
+        surfaced rather than swallowed.
         """
-        pending: set = {heartbeat_task, process_wait_task, *drain_tasks}
-        while process_wait_task in pending:
+        work_tasks = {process_wait_task, *drain_tasks}
+        pending: set = {heartbeat_task, *work_tasks}
+        while work_tasks & pending:
             done, pending = await asyncio.wait(
                 pending, return_when=asyncio.FIRST_COMPLETED
             )
@@ -728,16 +738,11 @@ class WorkerNodeTaskInstance:
             ):
                 break
 
-        # Subprocess has exited (or heartbeat terminated unexpectedly).
-        # Stop the heartbeat so a KILL_SELF race during the final drain
-        # phase can't silently update self._status, then wait for any
-        # remaining drain tasks to hit EOF.
+        # All work tasks have completed (subprocess exit + drains) or
+        # the heartbeat terminated unexpectedly. Cancel the heartbeat so
+        # no further HTTP requests fire between here and log_done.
         if not heartbeat_task.done():
             heartbeat_task.cancel()
-
-        remaining_drains = [t for t in drain_tasks if not t.done()]
-        if remaining_drains:
-            await asyncio.gather(*remaining_drains)
 
     async def _abort_subprocess(
         self,

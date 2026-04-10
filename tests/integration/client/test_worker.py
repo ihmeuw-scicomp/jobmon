@@ -500,6 +500,78 @@ def test_drain_task_finishes_before_subprocess_keeps_heartbeating(db_engine, too
     )
 
 
+def test_heartbeats_fire_during_slow_drain_tail_after_subprocess_exits(db_engine, tool):
+    """Regression test for the production failure mode where a fast
+    subprocess followed by a slow drain phase starved heartbeats and
+    caused the server to move the TI to TRIAGING before ``log_done``.
+
+    The subprocess itself exits immediately (``true``). ``_communicate``
+    is patched so that once the pipe hits EOF (subprocess closed its
+    end), the drain coroutine sleeps for several seconds before
+    returning — simulating ``aiofiles`` ``flush()``/``close()`` stalling
+    on a slow shared filesystem during the final write phase.
+
+    The previous policy cancelled the heartbeat task as soon as
+    ``process_wait_task`` returned and then awaited the drain tasks,
+    leaving a multi-minute window in which no heartbeats fired. On a
+    slow NFS mount that window exceeded ``report_by_date``, the server
+    moved the TI to ``T``, and the subsequent ``log_done`` failed with
+    ``"Current status is T"``. This test fails against that regression
+    (``heartbeat_calls_during_drain_tail == 0``) and passes once the
+    heartbeat keeps running through the drain phase.
+    """
+    wnti, _ = _build_running_worker_node_ti(
+        db_engine,
+        tool,
+        name="test_heartbeats_fire_during_slow_drain_tail_after_subprocess_exits",
+        command="true",
+        heartbeat_interval=1,
+    )
+
+    drain_tail_started = False
+    heartbeat_calls_during_drain_tail = 0
+    original_log_report_by = WorkerNodeTaskInstance.log_report_by
+
+    async def counting_log_report_by(self, session):
+        nonlocal heartbeat_calls_during_drain_tail
+        if drain_tail_started:
+            heartbeat_calls_during_drain_tail += 1
+        await original_log_report_by(self, session)
+
+    original_communicate = WorkerNodeTaskInstance._communicate
+
+    async def slow_tail_communicate(async_stream, output_path, chunk_size=64):
+        nonlocal drain_tail_started
+        # Let the normal pipe-drain complete (fast because ``true`` wrote
+        # nothing and exited immediately).
+        result = await original_communicate(async_stream, output_path, chunk_size)
+        # Pipe is at EOF; simulate a slow final ``aiofiles`` flush/close
+        # on a stalled shared filesystem. The real bug surfaces when the
+        # subprocess exits fast but this phase takes minutes.
+        drain_tail_started = True
+        await asyncio.sleep(3)
+        return result
+
+    worker_node = "jobmon.worker_node."
+    WNTI = "worker_node_task_instance.WorkerNodeTaskInstance."
+    with patch(worker_node + WNTI + "log_report_by", new=counting_log_report_by):
+        with patch(
+            worker_node + WNTI + "_communicate",
+            new=staticmethod(slow_tail_communicate),
+        ):
+            wnti.run()
+
+    assert heartbeat_calls_during_drain_tail >= 2, (
+        "Expected heartbeats to fire during the slow drain tail after the "
+        f"subprocess exited, but only {heartbeat_calls_during_drain_tail} "
+        "fired. A zero count means the heartbeat was cancelled as soon as "
+        "process_wait_task completed, which lets report_by_date expire on "
+        "slow shared filesystems and causes log_done to fail with "
+        "'Current status is T'."
+    )
+    assert wnti.status == TaskInstanceStatus.DONE
+
+
 def test_limited_error_log(tool, db_engine):
     thisdir = os.path.dirname(os.path.realpath(os.path.expanduser(__file__)))
 
