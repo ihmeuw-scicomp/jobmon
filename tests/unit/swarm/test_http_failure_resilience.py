@@ -201,6 +201,55 @@ class TestGatewaySessionRecycling:
         await gateway._recycle_session()
         assert gateway._session is None
 
+    @pytest.mark.asyncio
+    async def test_recycled_session_is_closed_by_gateway_close(
+        self,
+        gateway: ServerGateway,
+        mock_requester: MagicMock,
+    ) -> None:
+        """Regression guard for the cleanup-after-recycle leak.
+
+        When ``_run_orchestrator`` in run.py passes an externally-owned
+        session via ``set_session``, the gateway's ``_owns_session`` is
+        False. If ``_recycle_session`` then runs during the workflow (due
+        to sustained HTTP failure), the old session is closed and
+        ``_ensure_session`` creates a replacement with ``_owns_session``
+        flipped to True. At cleanup time, the run.py finally block's local
+        ``session`` variable points at the stale original, so it can't
+        close the replacement. ``gateway.close()`` must be called to
+        avoid leaking the recycle-created session and its TCPConnector.
+        """
+        # Simulate the run.py lifecycle: externally-owned session
+        external_session = aiohttp.ClientSession()
+        gateway.set_session(external_session)
+        assert gateway._owns_session is False
+
+        try:
+            # Simulate a recycle mid-run (the bug path)
+            await gateway._recycle_session()
+            assert external_session.closed
+            assert gateway._session is None
+            assert gateway._owns_session is False
+
+            # Next request-triggered _ensure_session creates a new one,
+            # which the gateway now owns.
+            replacement = await gateway._ensure_session()
+            assert replacement is not external_session
+            assert gateway._owns_session is True
+            assert not replacement.closed
+
+            # gateway.close() must close the gateway-owned replacement.
+            # This is what the fix in run.py's finally block invokes.
+            await gateway.close()
+            assert replacement.closed
+            assert gateway._session is None
+        finally:
+            # Belt and suspenders in case an assertion failed mid-test.
+            if not external_session.closed:
+                await external_session.close()
+            if gateway._session is not None and not gateway._session.closed:
+                await gateway._session.close()
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Layer 3 — Orchestrator main-loop sleep floor
