@@ -333,6 +333,173 @@ def test_log_error_kill_self_rescue(db_engine, tool):
     assert "simulated task failure during KILL_SELF race" in descriptions[0][0]
 
 
+def _build_running_worker_node_ti(
+    db_engine, tool, name: str, command: str, heartbeat_interval: int = 1
+):
+    """Set up a workflow → workflow run → DistributorService pipeline and
+    return a ``WorkerNodeTaskInstance`` that has already called
+    ``log_running()`` (i.e. is in RUNNING state on the server).
+    """
+    workflow = tool.create_workflow(name=name)
+    task_a = tool.active_task_templates["simple_template"].create_task(arg=command)
+    workflow.add_task(task_a)
+    workflow.bind()
+    workflow._bind_tasks()
+    factory = WorkflowRunFactory(workflow.workflow_id)
+    wfr = factory.create_workflow_run()
+    wfr._update_status(WorkflowRunStatus.BOUND)
+
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
+    )
+    prepare_and_queue_tasks(state, gateway, orchestrator)
+
+    distributor_service = DistributorService(
+        DoNothingDistributor("dummy"),
+        requester=workflow.requester,
+        raise_on_error=True,
+    )
+    distributor_service.set_workflow_run(wfr.workflow_run_id)
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
+    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+
+    with Session(bind=db_engine) as session:
+        task_instance_id = session.execute(
+            select(TaskInstance.id).where(TaskInstance.task_id == task_a.task_id)
+        ).scalar()
+
+    cluster = Cluster.get_cluster("dummy")
+    worker_node_task_instance = WorkerNodeTaskInstance(
+        task_instance_id=task_instance_id,
+        cluster_interface=cluster.get_worker_node(),
+        task_instance_heartbeat_interval=heartbeat_interval,
+    )
+    worker_node_task_instance.log_running()
+    return worker_node_task_instance, task_a
+
+
+def test_heartbeats_fire_during_slow_logfile_init(db_engine, tool):
+    """Regression test for PR #388: heartbeats must fire during a slow
+    ``_ensure_logfile_parent_dir``.
+
+    Simulates a slow shared-filesystem metadata op by patching
+    ``_ensure_logfile_parent_dir`` to ``asyncio.sleep(3)``, and patches
+    ``log_report_by`` to count how many times it gets called during the
+    stall. The subprocess itself is fast (``true``). If the event loop
+    is properly sharing time between the heartbeat task and the slow
+    coroutine, several heartbeat ticks should fire before the subprocess
+    even starts.
+
+    This is the core property the refactor is meant to provide — the
+    old sync ``os.makedirs`` inside ``log_running`` blocked the main
+    thread and starved heartbeats, which is the failure mode PR #388
+    fixes. A regression that reintroduces the starvation would make
+    ``heartbeat_call_count`` stay at zero.
+    """
+    wnti, _ = _build_running_worker_node_ti(
+        db_engine,
+        tool,
+        name="test_heartbeats_fire_during_slow_logfile_init",
+        command="true",
+        heartbeat_interval=1,
+    )
+
+    heartbeat_call_count = 0
+    original_log_report_by = WorkerNodeTaskInstance.log_report_by
+
+    async def counting_log_report_by(self, session):
+        nonlocal heartbeat_call_count
+        heartbeat_call_count += 1
+        await original_log_report_by(self, session)
+
+    original_ensure = WorkerNodeTaskInstance._ensure_logfile_parent_dir
+
+    async def slow_ensure(self, output_path):
+        await asyncio.sleep(3)
+        await original_ensure(self, output_path)
+
+    worker_node = "jobmon.worker_node."
+    WNTI = "worker_node_task_instance.WorkerNodeTaskInstance."
+    with patch(worker_node + WNTI + "log_report_by", new=counting_log_report_by):
+        with patch(worker_node + WNTI + "_ensure_logfile_parent_dir", new=slow_ensure):
+            wnti.run()
+
+    # With interval=1s and a 3s stall, we expect at least 2 heartbeat
+    # calls to fire during the stall. Give some slack for scheduling
+    # jitter by requiring only >= 2.
+    assert heartbeat_call_count >= 2, (
+        f"Expected heartbeats to fire during slow _ensure_logfile_parent_dir, "
+        f"but only {heartbeat_call_count} fired"
+    )
+    # Subprocess should still complete normally despite the pre-subprocess stall
+    assert wnti.status == TaskInstanceStatus.DONE
+
+
+def test_drain_task_finishes_before_subprocess_keeps_heartbeating(db_engine, tool):
+    """Regression test for PR #388 round-2 fix (``1f069be6``): if a drain
+    task finishes before ``process_wait_task`` (e.g. because
+    ``_communicate`` hit an internal error and its
+    ``finally: return mem_buffer`` absorbed it into a clean return),
+    ``_race_work_tasks`` must keep heartbeating instead of cancelling
+    the heartbeat task and leaving the still-running subprocess with no
+    heartbeats.
+
+    Simulates the scenario by patching one of the ``_communicate`` calls
+    to return early while the subprocess is still running, and counts
+    heartbeats during the remaining subprocess lifetime. At least one
+    heartbeat should fire after the drain task finishes but before the
+    subprocess exits — if the heartbeat was cancelled prematurely
+    (the regression), zero would fire in that window.
+    """
+    wnti, _ = _build_running_worker_node_ti(
+        db_engine,
+        tool,
+        name="test_drain_task_finishes_before_subprocess_keeps_heartbeating",
+        command="sleep 3",
+        heartbeat_interval=1,
+    )
+
+    heartbeat_calls_after_drain_finished = 0
+    drain_finished_marker = False
+    original_log_report_by = WorkerNodeTaskInstance.log_report_by
+
+    async def counting_log_report_by(self, session):
+        nonlocal heartbeat_calls_after_drain_finished
+        if drain_finished_marker:
+            heartbeat_calls_after_drain_finished += 1
+        await original_log_report_by(self, session)
+
+    original_communicate = WorkerNodeTaskInstance._communicate
+
+    async def early_exit_stdout_communicate(async_stream, output_path, chunk_size=64):
+        nonlocal drain_finished_marker
+        drain_finished_marker = True
+        # Return immediately with empty tail — simulates the silent
+        # _communicate failure mode that bugbot flagged (an IOError
+        # absorbed by `finally: return mem_buffer`).
+        return ""
+
+    worker_node = "jobmon.worker_node."
+    WNTI = "worker_node_task_instance.WorkerNodeTaskInstance."
+    # Only patch stdout drain — stderr keeps normal behavior. This leaves
+    # the subprocess running while the stdout drain task is "done".
+    with patch(worker_node + WNTI + "log_report_by", new=counting_log_report_by):
+        with patch(
+            worker_node + WNTI + "_communicate",
+            new=staticmethod(early_exit_stdout_communicate),
+        ):
+            wnti.run()
+
+    assert heartbeat_calls_after_drain_finished >= 1, (
+        "Expected at least one heartbeat to fire after the drain task "
+        "finished but while the subprocess was still running; got "
+        f"{heartbeat_calls_after_drain_finished}. A zero count means the "
+        "heartbeat was cancelled prematurely (round-2 regression)."
+    )
+
+
 def test_limited_error_log(tool, db_engine):
     thisdir = os.path.dirname(os.path.realpath(os.path.expanduser(__file__)))
 
@@ -482,7 +649,6 @@ def test_worker_node_add_attributes(tool, db_engine):
 class UnicodeInstance(WorkerNodeTaskInstance):
     def __init__(self, command):
         self._command = command
-        self.last_heartbeat_time = time.time()
 
         # config
         config = JobmonConfig()

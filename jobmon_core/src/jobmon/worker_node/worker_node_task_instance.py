@@ -5,9 +5,11 @@ import os
 import signal
 import socket
 from time import time
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import aiofiles
+import aiofiles.os
+import aiohttp
 import structlog
 
 from jobmon.core.cluster_protocol import ClusterWorkerNode
@@ -87,9 +89,6 @@ class WorkerNodeTaskInstance:
         self._command_add_env: Optional[Dict[str, str]] = None
         self._stdout: Optional[str] = None
         self._stderr: Optional[str] = None
-
-        # set last heartbeat
-        self.last_heartbeat_time = time()
 
     @property
     def task_instance_id(self) -> int:
@@ -348,7 +347,6 @@ class WorkerNodeTaskInstance:
         self._command_add_env = {
             f"JOBMON_{k.upper()}": str(v) for k, v in kwargs.items()
         }
-        self.last_heartbeat_time = time()
         if self.status != TaskInstanceStatus.RUNNING:
             logger.error(
                 "Task instance failed to transition to RUNNING",
@@ -366,8 +364,16 @@ class WorkerNodeTaskInstance:
         )
 
     @bind_method_context(task_instance_id="_task_instance_id")
-    def log_report_by(self) -> None:
-        """Log the heartbeat to show that the task instance is still alive."""
+    async def log_report_by(self, session: aiohttp.ClientSession) -> None:
+        """Log the heartbeat to show that the task instance is still alive.
+
+        Uses the async requester with an aiohttp ClientSession so heartbeats
+        can run concurrently with other asyncio work (subprocess pipe drain,
+        lazy log-directory creation in ``_communicate``). Running on the event
+        loop instead of the default thread-pool avoids the executor pressure
+        that ``asyncio.to_thread`` would add when multiple slow I/O paths are
+        in flight at the same time.
+        """
         logger.info("Worker node sending heartbeat")
         message: Dict = {
             "next_report_increment": (
@@ -383,14 +389,14 @@ class WorkerNodeTaskInstance:
             logger.debug("No distributor_id was found in the sbatch env at this time")
 
         app_route = f"/task_instance/{self.task_instance_id}/log_report_by"
-        _, response = self.requester.send_request(
+        _, response = await self.requester.send_request_async(
+            session=session,
             app_route=app_route,
             message=message,
             request_type="post",
         )
 
         self._status = response["status"]
-        self.last_heartbeat_time = time()
 
         if self.status != TaskInstanceStatus.RUNNING:
             raise TransitionError(
@@ -489,87 +495,135 @@ class WorkerNodeTaskInstance:
         finally:
             return mem_buffer
 
-    async def _process_poller(self, process: asyncio.subprocess.Process) -> int:
-        keep_polling = True
-        while keep_polling:
-            time_till_next_heartbeat = self._task_instance_heartbeat_interval - (
-                time() - self.last_heartbeat_time
-            )
+    async def _heartbeat_loop(self, session: aiohttp.ClientSession) -> None:
+        """Periodically send heartbeats for the entire duration of ``_run_cmd``.
+
+        Runs concurrently with pre-subprocess log-directory creation, the
+        subprocess itself, and the stream-drain phase. The caller in
+        ``_run_cmd`` races this task against the subprocess work tasks via
+        ``asyncio.wait(FIRST_COMPLETED)``, so a ``TransitionError`` raised
+        from ``log_report_by`` (e.g. the server moved the TI out of R)
+        triggers immediate subprocess cleanup instead of being discovered
+        only when the subprocess finishes on its own.
+
+        Transient network/server errors are logged and swallowed so they
+        don't abort the whole task — ``log_report_by`` only raises after
+        the sync requester's tenacity retry budget is exhausted, and even
+        then we want to keep ticking in case the next attempt recovers.
+
+        The first heartbeat is deliberately deferred by one full
+        ``_task_instance_heartbeat_interval``. For short subprocesses
+        that finish in less than an interval, no async heartbeat ever
+        fires — which is fine because the sync ``log_running()`` HTTP
+        call already set ``report_by_date`` to
+        ``now + interval * buffer`` on the server, so the TI remains
+        in-date on the server throughout the entire short run.
+        """
+        while True:
+            await asyncio.sleep(self._task_instance_heartbeat_interval)
             try:
-                await asyncio.wait_for(process.wait(), timeout=time_till_next_heartbeat)
-                keep_polling = False
-            except asyncio.TimeoutError:
-                self.log_report_by()
+                await self.log_report_by(session)
+            except TransitionError:
+                raise
+            except Exception as e:
+                logger.warning(
+                    "Worker node heartbeat failed, retrying next tick",
+                    error=str(e),
+                )
 
-        # keep typecheck happy
-        returncode = process.returncode
-        if returncode is None:
-            raise AttributeError(
-                "process finished polling but does not a a return code."
-            )
+    async def _ensure_logfile_parent_dir(self, output_path: str) -> None:
+        """Create the parent directory of a logfile path if needed.
 
-        return returncode
+        Uses ``aiofiles.os.makedirs`` so the underlying syscall runs on the
+        event loop's default executor while the coroutine awaits the
+        future. The event loop stays responsive throughout, so a concurrent
+        ``_heartbeat_loop`` task keeps firing heartbeats even if the
+        filesystem stalls for minutes.
+        """
+        if not output_path or output_path == "/dev/null":
+            return
+        parent = os.path.dirname(output_path)
+        if not parent:
+            return
+        await aiofiles.os.makedirs(parent, exist_ok=True)
 
     async def _run_cmd(self) -> None:
-        # Copy the current environment variables and update them with additional settings
-        env = os.environ.copy()
-        env.update(self.command_add_env)
+        """Run the user's command under a concurrent heartbeat task.
 
-        # capture stdout and stderr for asynchronous reading
-        process = await asyncio.create_subprocess_shell(
-            self.command,
-            env=env,
-            stdout=asyncio.subprocess.PIPE,  # Captures stdout
-            stderr=asyncio.subprocess.PIPE,  # Captures stderr
-        )
+        The heartbeat loop runs for the entire lifetime of this method —
+        from pre-subprocess log-dir creation through subprocess exit and
+        stream drain — so a slow filesystem or long subprocess can't
+        starve the TI's ``report_by_date`` on the server.
+        """
+        async with aiohttp.ClientSession() as session:
+            heartbeat_task = asyncio.create_task(self._heartbeat_loop(session))
+            try:
+                await self._run_subprocess_with_heartbeat_race(heartbeat_task)
+            finally:
+                await self._stop_heartbeat_task(heartbeat_task)
 
-        # Assert that stdout and stderr are not None for the type checker.
-        assert process.stdout is not None
-        assert process.stderr is not None
+    async def _run_subprocess_with_heartbeat_race(
+        self, heartbeat_task: "asyncio.Task[None]"
+    ) -> None:
+        """Pre-create log dirs, spawn the subprocess, and race it.
 
-        # Initialize task variables to None. These will hold the asyncio tasks for
-        # communicating with and monitoring the subprocess.
-        stdout_task = stderr_task = heartbeat_task = None
-
+        All failures — pre-create ``OSError``, heartbeat
+        ``TransitionError``, stream drain errors, subprocess spawn
+        errors — are caught and re-raised wrapped in ``RuntimeError`` via
+        ``raise ... from e``. The outer ``run()`` method's
+        ``except RuntimeError`` block depends on
+        ``isinstance(e.__cause__, TransitionError)`` to route KILL_SELF
+        handling, so the wrap must happen here regardless of whether the
+        subprocess ever actually started.
+        """
+        process: Optional[asyncio.subprocess.Process] = None
+        stdout_task: Optional["asyncio.Task[str]"] = None
+        stderr_task: Optional["asyncio.Task[str]"] = None
+        process_wait_task: Optional["asyncio.Task[int]"] = None
         try:
-            # Create asyncio tasks for reading subprocess stdout and stderr.
-            # File I/O is handled via aiofiles inside _communicate so that
-            # slow NFS writes cannot block the event loop or delay heartbeats.
+            env = os.environ.copy()
+            env.update(self.command_add_env)
+
+            # Pre-create log parent directories. If the shared filesystem
+            # stalls here, ``heartbeat_task`` keeps the TI alive on the
+            # server. Because we wait to spawn the subprocess until the
+            # directories exist, the subprocess's stdout/stderr pipes can
+            # never fill while we're blocked on a metadata op.
+            await self._ensure_logfile_parent_dir(self.stdout)
+            await self._ensure_logfile_parent_dir(self.stderr)
+
+            # Surface an early heartbeat failure (e.g. KILL_SELF) before
+            # we spawn a subprocess we'll immediately have to kill.
+            if heartbeat_task.done():
+                heartbeat_task.result()
+
+            process = await asyncio.create_subprocess_shell(
+                self.command,
+                env=env,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            assert process.stdout is not None
+            assert process.stderr is not None
+
             stdout_task = asyncio.create_task(
                 self._communicate(process.stdout, self.stdout)
             )
             stderr_task = asyncio.create_task(
                 self._communicate(process.stderr, self.stderr)
             )
-            # Task for monitoring the subprocess (e.g., for timeouts or heartbeats).
-            heartbeat_task = asyncio.create_task(self._process_poller(process))
+            process_wait_task = asyncio.create_task(process.wait())
 
-            # Await the completion of communication and monitoring tasks.
-            valid_tasks = [stdout_task, stderr_task, heartbeat_task]
-            await asyncio.gather(*valid_tasks)
+            await self._race_work_tasks(
+                heartbeat_task=heartbeat_task,
+                process_wait_task=process_wait_task,
+                drain_tasks=[stdout_task, stderr_task],
+            )
 
         except Exception as e:
-            # If an exception occurs, cancel all ongoing tasks to prevent dangling operations.
-            tasks_to_cancel = [
-                t for t in [stdout_task, stderr_task, heartbeat_task] if t is not None
-            ]
-            for task in tasks_to_cancel:
-                task.cancel()
-            # Await cancellation, ignoring any exceptions raised from cancellation.
-            await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
-
-            # Attempt a graceful shutdown of the subprocess if it's still running.
-            process.send_signal(signal.SIGINT)
-            try:
-                # Wait for the process to terminate, with a specified timeout.
-                await asyncio.wait_for(
-                    process.wait(), timeout=self._command_interrupt_timeout
-                )
-            except asyncio.TimeoutError:
-                # Forcefully terminate the subprocess
-                process.kill()
-                await process.wait()
-
+            await self._abort_subprocess(
+                process, [stdout_task, stderr_task, process_wait_task]
+            )
             logger.exception(
                 "Task instance command execution failed",
                 error=str(e),
@@ -580,20 +634,195 @@ class WorkerNodeTaskInstance:
             ) from e
 
         finally:
-            # After tasks have been handled and the subprocess is ensured to be terminated,
-            # retrieve the results from the tasks if they were successfully completed.
-            stdout_result = stderr_result = ""
-            if stdout_task and stdout_task.done():
-                stdout_result = stdout_task.result()
-            if stderr_task and stderr_task.done():
-                stderr_result = stderr_task.result()
+            # Protect the pending exception (if any) from being masked
+            # by a cleanup error. If the except block above raised a
+            # RuntimeError whose __cause__ is TransitionError, run()'s
+            # KILL_SELF handler depends on that chain; an uncaught
+            # exception from _record_final_command_output would replace
+            # the propagating exception and strip the __cause__ link.
+            # set_command_output is the only state-mutating call and
+            # cannot raise, so the worst case here is losing the
+            # stdout/stderr tails from the log_done/log_error payload.
+            try:
+                await self._record_final_command_output(
+                    process, stdout_task, stderr_task
+                )
+            except Exception as cleanup_exc:
+                logger.exception(
+                    "Failed to record final command output during cleanup",
+                    error=str(cleanup_exc),
+                )
 
-            # Ensure the subprocess is fully terminated before exiting this method.
-            returncode = await process.wait()
+    @staticmethod
+    async def _race_work_tasks(
+        heartbeat_task: "asyncio.Task[None]",
+        process_wait_task: "asyncio.Task[int]",
+        drain_tasks: List["asyncio.Task[str]"],
+    ) -> None:
+        """Wait for the subprocess to exit while watching the heartbeat.
 
-            # Update the task instance with the final results of command execution.
-            self.set_command_output(
-                returncode=returncode,
-                stdout=stdout_result,
-                stderr=stderr_result,
+        Loops over ``asyncio.wait(FIRST_COMPLETED)`` until
+        ``process_wait_task`` is specifically the one that completed —
+        **not** just any work task. A drain task finishing early does NOT
+        mean work is done: ``_communicate`` has a ``finally: return
+        mem_buffer`` that silently absorbs ``IOError`` during shared-fs
+        writes, so a failed drain task looks identical to a successful
+        one (no stored exception, empty-string result). The subprocess
+        may still be running and writing to the now-undrained pipe, in
+        which case we must keep heartbeating until the subprocess
+        actually exits — otherwise the pipe fills, the subprocess
+        blocks on its next write, and the server marks the TI overdue,
+        reproducing the exact failure mode this refactor fixes.
+
+        Any task exception (heartbeat ``TransitionError``, unexpected
+        drain error) surfaces immediately via ``task.result()`` inside
+        the loop and propagates out to
+        ``_run_subprocess_with_heartbeat_race``'s except block. On the
+        normal happy path, ``task.exception()`` is ``None`` for every
+        completed task and the check is a no-op.
+
+        Once ``process_wait_task`` has completed, the heartbeat task is
+        cancelled before the remaining drain tasks are awaited. This
+        matches the old ``_process_poller`` behavior of stopping
+        heartbeats as soon as ``process.wait()`` returned, and prevents a
+        KILL_SELF race during the final drain phase from raising a
+        ``TransitionError`` on a heartbeat task that nobody is watching —
+        such an exception would be silently swallowed by
+        ``_stop_heartbeat_task`` in the outer ``finally``, mutating
+        ``self._status`` behind ``run()``'s back.
+        """
+        pending: set = {heartbeat_task, process_wait_task, *drain_tasks}
+        while process_wait_task in pending:
+            done, pending = await asyncio.wait(
+                pending, return_when=asyncio.FIRST_COMPLETED
             )
+            # Surface exceptions with heartbeat_task prioritized. If
+            # multiple tasks completed in the same wait round — e.g. a
+            # drain task hit an IOError at the same instant the
+            # heartbeat raised TransitionError — set iteration order is
+            # non-deterministic, so check heartbeat_task explicitly first
+            # to guarantee the KILL_SELF path (which depends on the
+            # TransitionError surfacing to run() via __cause__) takes
+            # priority over incidental drain errors.
+            if (
+                heartbeat_task in done
+                and not heartbeat_task.cancelled()
+                and heartbeat_task.exception() is not None
+            ):
+                heartbeat_task.result()
+            for task in done:
+                if not task.cancelled() and task.exception() is not None:
+                    task.result()
+            # Defensive: _heartbeat_loop is infinite, so reaching "done
+            # without a visible exception" would mean it was cancelled
+            # externally, which nothing in this method does. Bail to
+            # avoid a tight loop on a stable done set if that assumption
+            # is ever broken. The cancelled() check must come first —
+            # asyncio.Task.exception() raises CancelledError on a
+            # cancelled task rather than returning None, and that
+            # CancelledError would bypass the caller's ``except
+            # Exception`` (it inherits from BaseException) and crash the
+            # worker.
+            if heartbeat_task.done() and (
+                heartbeat_task.cancelled() or heartbeat_task.exception() is None
+            ):
+                break
+
+        # Subprocess has exited (or heartbeat terminated unexpectedly).
+        # Stop the heartbeat so a KILL_SELF race during the final drain
+        # phase can't silently update self._status, then wait for any
+        # remaining drain tasks to hit EOF.
+        if not heartbeat_task.done():
+            heartbeat_task.cancel()
+
+        remaining_drains = [t for t in drain_tasks if not t.done()]
+        if remaining_drains:
+            await asyncio.gather(*remaining_drains)
+
+    async def _abort_subprocess(
+        self,
+        process: Optional[asyncio.subprocess.Process],
+        work_tasks: List[Optional["asyncio.Task"]],
+    ) -> None:
+        """Cancel work tasks and gracefully terminate the subprocess.
+
+        Safe to call even if the subprocess never started. The escalation
+        is SIGINT → wait up to ``_command_interrupt_timeout`` → SIGKILL.
+        """
+        tasks_to_cancel = [t for t in work_tasks if t is not None and not t.done()]
+        for task in tasks_to_cancel:
+            task.cancel()
+        await asyncio.gather(*tasks_to_cancel, return_exceptions=True)
+
+        if process is not None and process.returncode is None:
+            process.send_signal(signal.SIGINT)
+            try:
+                await asyncio.wait_for(
+                    process.wait(), timeout=self._command_interrupt_timeout
+                )
+            except asyncio.TimeoutError:
+                process.kill()
+                await process.wait()
+
+    async def _record_final_command_output(
+        self,
+        process: Optional[asyncio.subprocess.Process],
+        stdout_task: Optional["asyncio.Task[str]"],
+        stderr_task: Optional["asyncio.Task[str]"],
+    ) -> None:
+        """Collect the final command output and store it on ``self``.
+
+        Gathers the stdout/stderr tails from the drain tasks, awaits the
+        subprocess return code, and calls ``set_command_output``. If the
+        subprocess never spawned (e.g. a ``TransitionError`` during
+        pre-create), falls back to a sentinel return code so the outer
+        ``run()`` method's KILL_SELF handler can still access
+        ``command_returncode`` without ``AttributeError``.
+        """
+        stdout_result = self._get_drain_result(stdout_task)
+        stderr_result = self._get_drain_result(stderr_task)
+
+        if process is not None:
+            returncode = await process.wait()
+        else:
+            returncode = -1
+
+        self.set_command_output(
+            returncode=returncode,
+            stdout=stdout_result,
+            stderr=stderr_result,
+        )
+
+    @staticmethod
+    def _get_drain_result(task: Optional["asyncio.Task[str]"]) -> str:
+        """Return a stream drain task's accumulated output, or empty.
+
+        Returns an empty string if the task is None, still running,
+        cancelled, or raised an exception.
+        """
+        if task is None or not task.done() or task.cancelled():
+            return ""
+        try:
+            return task.result()
+        except Exception:
+            return ""
+
+    @staticmethod
+    async def _stop_heartbeat_task(
+        heartbeat_task: "asyncio.Task[None]",
+    ) -> None:
+        """Cancel and consume the heartbeat task.
+
+        Called from an outer ``finally`` — swallows the task's final
+        exception (``TransitionError``, ``CancelledError``, etc.) so it
+        can't mask the real in-flight error. The relevant exception has
+        already been surfaced by ``_race_work_tasks`` or the early
+        ``heartbeat_task.result()`` check in
+        ``_run_subprocess_with_heartbeat_race``.
+        """
+        if not heartbeat_task.done():
+            heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except BaseException:
+            pass
