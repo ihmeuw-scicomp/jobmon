@@ -234,6 +234,105 @@ def test_ti_kill_self_state(db_engine, tool):
     assert worker_node_task_instance.status == TaskInstanceStatus.ERROR_FATAL
 
 
+def test_log_error_kill_self_rescue(db_engine, tool):
+    """log_error on a KILL_SELF-state TI should rescue to ERROR_FATAL.
+
+    Regression test for the race where the workflow resume machinery
+    moves a TI to KILL_SELF while the worker is in the middle of
+    reporting an error. (KILL_SELF, ERROR) is in
+    ``TI_UNTIMELY_TRANSITIONS`` on the server, so the first transition
+    attempt is silently refused and the TI gets stuck in K state. The
+    ``log_error_worker_node`` route detects this case and re-issues the
+    transition as (KILL_SELF, ERROR_FATAL), which is in
+    ``TI_VALID_TRANSITIONS``. Mirrors the existing KILL_SELF rescue in
+    the ``log_running`` handler.
+    """
+    workflow = tool.create_workflow(name="test_log_error_kill_self_rescue")
+    task_a = tool.active_task_templates["simple_template"].create_task(arg="sleep 1")
+    workflow.add_task(task_a)
+    workflow.bind()
+    workflow._bind_tasks()
+    factory = WorkflowRunFactory(workflow.workflow_id)
+    wfr = factory.create_workflow_run()
+    wfr._update_status(WorkflowRunStatus.BOUND)
+
+    # Get the TI into RUNNING state via the normal distributor path
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
+    )
+    prepare_and_queue_tasks(state, gateway, orchestrator)
+
+    distributor_service = DistributorService(
+        DoNothingDistributor("dummy"),
+        requester=workflow.requester,
+        raise_on_error=True,
+    )
+    distributor_service.set_workflow_run(wfr.workflow_run_id)
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
+    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+
+    with Session(bind=db_engine) as session:
+        task_instance_id = session.execute(
+            select(TaskInstance.id).where(TaskInstance.task_id == task_a.task_id)
+        ).scalar()
+
+    cluster = Cluster.get_cluster("dummy")
+    worker_node_task_instance = WorkerNodeTaskInstance(
+        task_instance_id=task_instance_id,
+        cluster_interface=cluster.get_worker_node(),
+        task_instance_heartbeat_interval=5,
+    )
+    worker_node_task_instance.log_running()
+
+    # Simulate the race: workflow resume moves the TI to KILL_SELF after
+    # log_running but before the worker has a chance to call log_error.
+    with Session(bind=db_engine) as session:
+        session.execute(
+            text(
+                f"UPDATE task_instance SET status = '{TaskInstanceStatus.KILL_SELF}' "
+                f"WHERE id = {task_instance_id}"
+            )
+        )
+        session.commit()
+
+    # Worker tries to report an error (e.g. non-zero exit code from
+    # the subprocess). (KILL_SELF, ERROR) is untimely — the server
+    # should rescue it to ERROR_FATAL instead of leaving the TI in K.
+    workflow.requester.send_request(
+        app_route=f"/task_instance/{task_instance_id}/log_error_worker_node",
+        message={
+            "error_state": TaskInstanceStatus.ERROR,
+            "error_description": "simulated task failure during KILL_SELF race",
+            "nodename": "test-node",
+            "distributor_id": worker_node_task_instance.distributor_id,
+        },
+        request_type="post",
+    )
+
+    # TI should now be in ERROR_FATAL, not stuck in KILL_SELF.
+    with Session(bind=db_engine) as session:
+        row = session.execute(
+            select(TaskInstance.status).where(TaskInstance.id == task_instance_id)
+        ).one()
+    assert (
+        row.status == TaskInstanceStatus.ERROR_FATAL
+    ), f"Expected rescue to ERROR_FATAL, got {row.status}"
+
+    # And an error log entry should have been created with the worker's
+    # original error description (not silently dropped by the rescue).
+    with Session(bind=db_engine) as session:
+        descriptions = session.execute(
+            text(
+                "SELECT description FROM task_instance_error_log "
+                f"WHERE task_instance_id = {task_instance_id}"
+            )
+        ).fetchall()
+    assert len(descriptions) == 1
+    assert "simulated task failure during KILL_SELF race" in descriptions[0][0]
+
+
 def _build_running_worker_node_ti(
     db_engine, tool, name: str, command: str, heartbeat_interval: int = 1
 ):

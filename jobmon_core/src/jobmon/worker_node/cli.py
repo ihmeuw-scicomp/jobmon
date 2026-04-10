@@ -11,6 +11,7 @@ from typing import Optional
 import structlog
 
 from jobmon.core.cli import CLI
+from jobmon.core.exceptions import UserTaskFunctionError
 from jobmon.core.logging import set_jobmon_context
 from jobmon.core.task_generator import TaskGenerator
 
@@ -162,6 +163,11 @@ class WorkerNodeCLI(CLI):
 
             task_generator.run(args.args[0])
             return ReturnCodes.OK
+        except UserTaskFunctionError:
+            # User's task function raised — not a jobmon error. The original
+            # exception is chained and will surface in the task instance
+            # stderr_log via normal propagation.
+            raise
         except Exception as e:
             logger.exception("Worker node task generator error", error=str(e))
             raise e

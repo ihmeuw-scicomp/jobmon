@@ -454,6 +454,47 @@ async def log_error_worker_node(
             db.add(error)
             # release locks immediately
             db.commit()
+        elif (
+            result["error"] == "untimely_transition"
+            and task_instance.status == constants.TaskInstanceStatus.KILL_SELF
+        ):
+            # Worker is trying to report an error but the workflow resume
+            # machinery has already moved the TI to KILL_SELF. The error
+            # states (ERROR/UNKNOWN_ERROR/RESOURCE_ERROR) are all in
+            # TI_UNTIMELY_TRANSITIONS from KILL_SELF, so the first
+            # TransitionService call refused the transition silently and
+            # left the TI stuck in K. Transition directly to ERROR_FATAL
+            # instead — (KILL_SELF, ERROR_FATAL) is in TI_VALID_TRANSITIONS
+            # and is exactly the terminal state this race should produce.
+            # Mirrors the existing KILL_SELF rescue in the log_running
+            # handler above.
+            logger.info(
+                "Worker reported error while TI was in KILL_SELF; "
+                "rescuing to ERROR_FATAL",
+                original_error_state=error_state,
+            )
+            result = TransitionService.transition_task_instance(
+                session=db,
+                task_instance_id=task_instance.id,
+                task_id=task_instance.task_id,
+                current_ti_status=task_instance.status,
+                new_ti_status=constants.TaskInstanceStatus.ERROR_FATAL,
+                task_num_attempts=task_instance.task.num_attempts,
+                task_max_attempts=task_instance.task.max_attempts,
+            )
+            if result["ti_updated"]:
+                error = TaskInstanceErrorLog(
+                    task_instance_id=task_instance.id,
+                    description=error_description,
+                )
+                db.add(error)
+                db.commit()
+                db.refresh(task_instance)
+            else:
+                logger.error(
+                    "KILL_SELF rescue to ERROR_FATAL failed",
+                    rescue_error=result["error"],
+                )
         else:
             if result["error"] == "untimely_transition":
                 logger.warning(

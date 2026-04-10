@@ -104,3 +104,12 @@ class DistributorInterruptedError(Exception):
 
 class CyclicGraphError(Exception):
     """Cyclic graph detected."""
+
+
+class UserTaskFunctionError(Exception):
+    """Raised when a user's task function raises an exception.
+
+    Used as a marker to distinguish user task failures from jobmon-internal
+    errors at log boundaries. The original exception is chained via ``raise
+    ... from e`` so the full traceback is preserved.
+    """
