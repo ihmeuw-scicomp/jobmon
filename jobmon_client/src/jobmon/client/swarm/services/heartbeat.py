@@ -150,8 +150,13 @@ class HeartbeatService:
     async def tick(self) -> StateUpdate:
         """Log a heartbeat and return any status change.
 
-        Successful ticks reset the consecutive-failure counter that drives
-        ``run_background``'s fatal-exit guard.
+        This is a pure "do one heartbeat" primitive: it does not touch
+        ``_consecutive_failures``. That counter is owned exclusively by
+        ``run_background``'s supervisor loop (the only site that reads
+        the threshold and raises ``FatalOrchestratorError``). Keeping
+        ownership in one place avoids a race where a direct ``tick()``
+        call from outside the supervisor could silently clear the
+        supervisor's failure state and mask a sustained outage.
 
         Returns:
             StateUpdate with workflow_run_status if status changed,
@@ -165,7 +170,6 @@ class HeartbeatService:
             status=self._current_status,
             next_report_increment=self.next_report_increment,
         )
-        self._consecutive_failures = 0
         return self._handle_heartbeat_response(response.status)
 
     def tick_sync(self) -> StateUpdate:

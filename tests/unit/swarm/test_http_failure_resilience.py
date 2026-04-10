@@ -561,10 +561,17 @@ class TestHeartbeatServiceFatalExit:
         )
 
     @pytest.mark.asyncio
-    async def test_successful_heartbeat_resets_counter(
+    async def test_tick_does_not_mutate_failure_counter(
         self, succeeding_gateway: MagicMock
     ) -> None:
-        """A successful tick must reset the counter."""
+        """``tick()`` must not touch ``_consecutive_failures``.
+
+        The counter is owned by ``run_background``'s supervisor loop.
+        ``tick()`` is a pure "do one heartbeat" primitive — if it also
+        reset the counter, a concurrent direct ``tick()`` call could
+        silently clear the supervisor's failure state and mask a
+        sustained outage.
+        """
         service = HeartbeatService(
             gateway=succeeding_gateway,
             interval=1.0,
@@ -575,7 +582,62 @@ class TestHeartbeatServiceFatalExit:
 
         await service.tick()
 
+        # Counter unchanged — tick() has no side effect on it
+        assert service._consecutive_failures == 3
+
+    @pytest.mark.asyncio
+    async def test_run_background_resets_counter_on_success(self) -> None:
+        """``run_background`` is the sole site that resets the counter.
+
+        Simulate a flaky gateway: first N-1 heartbeats fail (counter
+        climbs), then a success (counter must reset to 0), then a stop
+        signal to exit the loop cleanly.
+        """
+        call_count = {"n": 0}
+
+        async def flaky_log_heartbeat(
+            status: str, next_report_increment: float
+        ) -> HeartbeatResponse:
+            call_count["n"] += 1
+            if call_count["n"] < HeartbeatService.MAX_CONSECUTIVE_HEARTBEAT_FAILURES:
+                raise RuntimeError(f"transient failure #{call_count['n']}")
+            return HeartbeatResponse(status="R")
+
+        gateway = MagicMock()
+        gateway.log_heartbeat = AsyncMock(side_effect=flaky_log_heartbeat)
+
+        service = HeartbeatService(
+            gateway=gateway,
+            interval=0.01,  # force heartbeats to fire immediately
+            report_by_buffer=1.5,
+            initial_status="R",
+        )
+        stop_event = asyncio.Event()
+
+        async def stop_after_success() -> None:
+            # Wait until the success path has run (counter reset), then stop
+            deadline = asyncio.get_event_loop().time() + 5.0
+            while asyncio.get_event_loop().time() < deadline:
+                if (
+                    call_count["n"]
+                    >= HeartbeatService.MAX_CONSECUTIVE_HEARTBEAT_FAILURES
+                    and service._consecutive_failures == 0
+                ):
+                    stop_event.set()
+                    return
+                await asyncio.sleep(0.01)
+            stop_event.set()  # safety net
+
+        await asyncio.gather(
+            service.run_background(stop_event),
+            stop_after_success(),
+        )
+
+        # After the loop exits, the counter should be 0 (reset by the
+        # successful heartbeat) and we should have reached the success
+        # case without tripping the fatal-exit threshold.
         assert service._consecutive_failures == 0
+        assert call_count["n"] >= HeartbeatService.MAX_CONSECUTIVE_HEARTBEAT_FAILURES
 
     @pytest.mark.asyncio
     async def test_fatal_error_from_tick_propagates_through_background(
