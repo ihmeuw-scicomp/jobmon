@@ -644,9 +644,18 @@ class WorkerNodeTaskInstance:
         completion. Any task exception (heartbeat ``TransitionError``,
         stream drain errors) surfaces via ``task.result()``; on the normal
         happy path no task has a stored exception and this loop is a
-        no-op. After the first completion, the remaining work tasks are
-        awaited — typically ``process_wait_task`` finishes first and we
-        wait for the stdout/stderr drains to hit EOF.
+        no-op.
+
+        Once a work task completes successfully (typically
+        ``process_wait_task`` after the subprocess exits), the heartbeat
+        task is cancelled before the remaining drain tasks are awaited.
+        This matches the old ``_process_poller`` behavior of stopping
+        heartbeats as soon as ``process.wait()`` returned, and prevents a
+        KILL_SELF race during the drain phase from raising a
+        ``TransitionError`` on a heartbeat task that nobody is watching —
+        such an exception would be silently swallowed by
+        ``_stop_heartbeat_task`` in the outer ``finally``, mutating
+        ``self._status`` behind ``run()``'s back.
         """
         done, _pending = await asyncio.wait(
             [heartbeat_task, *work_tasks],
@@ -655,6 +664,14 @@ class WorkerNodeTaskInstance:
         for task in done:
             if not task.cancelled() and task.exception() is not None:
                 task.result()
+
+        # A work task completed first (heartbeat errors were raised above
+        # and never reach this point). Stop heartbeating before draining
+        # the remaining stdout/stderr EOFs, so a KILL_SELF race during
+        # drain can't silently update self._status.
+        if not heartbeat_task.done():
+            heartbeat_task.cancel()
+
         still_pending = [t for t in work_tasks if not t.done()]
         if still_pending:
             await asyncio.gather(*still_pending)
