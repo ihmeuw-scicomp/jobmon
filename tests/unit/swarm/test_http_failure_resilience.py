@@ -275,6 +275,105 @@ class TestOrchestratorLoopFloor:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Orchestrator — _check_heartbeat_task_healthy behavior
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class TestCheckHeartbeatTaskHealthy:
+    """Verify _check_heartbeat_task_healthy handles all Task states correctly."""
+
+    def _make_orchestrator(self) -> "WorkflowRunOrchestrator":  # type: ignore[name-defined]
+        """Construct a bare orchestrator without running the full constructor chain."""
+        from jobmon.client.swarm.orchestrator import WorkflowRunOrchestrator
+
+        orch = WorkflowRunOrchestrator.__new__(WorkflowRunOrchestrator)
+        orch._heartbeat_task = None
+        return orch
+
+    def test_no_task_is_noop(self) -> None:
+        """With no heartbeat task set, the check must not raise."""
+        orch = self._make_orchestrator()
+        orch._check_heartbeat_task_healthy()  # Should not raise
+
+    @pytest.mark.asyncio
+    async def test_running_task_is_noop(self) -> None:
+        """With a running task, the check must not raise."""
+        orch = self._make_orchestrator()
+
+        async def never_finishes() -> None:
+            await asyncio.sleep(60)
+
+        task = asyncio.create_task(never_finishes())
+        orch._heartbeat_task = task
+        try:
+            orch._check_heartbeat_task_healthy()  # Should not raise
+        finally:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_cleanly_completed_task_is_noop(self) -> None:
+        """A task that completed without exception must not raise."""
+        orch = self._make_orchestrator()
+
+        async def finishes_cleanly() -> None:
+            return None
+
+        task = asyncio.create_task(finishes_cleanly())
+        await task
+        orch._heartbeat_task = task
+        orch._check_heartbeat_task_healthy()  # Should not raise
+
+    @pytest.mark.asyncio
+    async def test_failed_task_propagates_exception(self) -> None:
+        """A task that raised must have its exception re-raised here."""
+        orch = self._make_orchestrator()
+
+        async def raises_fatal() -> None:
+            raise FatalOrchestratorError("heartbeat gave up")
+
+        task = asyncio.create_task(raises_fatal())
+        try:
+            await task
+        except FatalOrchestratorError:
+            pass  # Expected — task stores the exception
+        orch._heartbeat_task = task
+        with pytest.raises(FatalOrchestratorError, match="gave up"):
+            orch._check_heartbeat_task_healthy()
+
+    @pytest.mark.asyncio
+    async def test_cancelled_task_does_not_raise_cancelled_error(self) -> None:
+        """Regression guard for the Task.exception() + CancelledError footgun.
+
+        ``asyncio.Task.exception()`` *raises* ``CancelledError`` (a
+        ``BaseException``) rather than returning it for cancelled tasks.
+        If ``_check_heartbeat_task_healthy`` called ``.exception()``
+        unconditionally, a cancelled heartbeat task would leak
+        ``CancelledError`` past every ``except Exception`` handler in the
+        orchestrator's main loop, bypassing clean termination.
+        """
+        orch = self._make_orchestrator()
+
+        async def never_finishes() -> None:
+            await asyncio.sleep(60)
+
+        task = asyncio.create_task(never_finishes())
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        assert task.cancelled()
+        orch._heartbeat_task = task
+        # Must not raise — especially not CancelledError
+        orch._check_heartbeat_task_healthy()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Layer 4b — Synchronizer fatal exit on sustained total failure
 # ──────────────────────────────────────────────────────────────────────────────
 

@@ -479,12 +479,26 @@ class WorkflowRunOrchestrator:
         object but does not propagate to this main loop automatically. We
         poll the task state each iteration and re-raise any stored exception
         so the orchestrator can terminate the run cleanly.
+
+        Guards against a cancelled task: in current code paths the heartbeat
+        task is only cancelled in ``_teardown`` after the main loop has
+        exited, so we should never observe a cancelled task here. But
+        ``asyncio.Task.exception()`` *raises* ``CancelledError`` (a
+        ``BaseException``) rather than returning it for cancelled tasks,
+        which would bypass every ``except Exception`` handler upstream.
+        Check ``task.cancelled()`` first to make this defensive against
+        any future refactor that cancels the heartbeat mid-run.
         """
         task = self._heartbeat_task
         if task is None or not task.done():
             return
-        # Task finished. If it has an exception, propagate it. If it exited
-        # cleanly (e.g. stop_event was set), nothing to do.
+        if task.cancelled():
+            # Nothing to surface — cancellation is driven by our own
+            # teardown path, which handles propagation explicitly.
+            return
+        # Task finished without cancellation. If it stored an exception,
+        # propagate it; if it exited cleanly (stop_event was set),
+        # nothing to do.
         exc = task.exception()
         if exc is not None:
             raise exc
