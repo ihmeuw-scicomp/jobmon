@@ -386,7 +386,9 @@ def test_array_submit_error_no_stuck_batch(db_engine, tool):
     )
 
 
-def test_prepare_batch_raises_transitions_to_no_distributor_id(db_engine, tool):
+def test_prepare_batch_raises_transitions_to_no_distributor_id(
+    db_engine, tool, monkeypatch
+):
     """Regression test: if ``prepare_task_instance_batch_for_launch`` raises
     (e.g. ``load_requested_resources`` gets a malformed server response and
     hits ``TypeError: string indices must be integers``), the batch's TIs
@@ -404,12 +406,8 @@ def test_prepare_batch_raises_transitions_to_no_distributor_id(db_engine, tool):
     from jobmon.distributor.task_instance_batch import TaskInstanceBatch
     from jobmon.server.web.models.task_instance import TaskInstance
 
-    original_prepare = TaskInstanceBatch.prepare_task_instance_batch_for_launch
-
     def boom_prepare(self) -> None:
-        # Invoke the real code up to the point that normally raises, then
-        # substitute a realistic TypeError. Using ``TypeError`` directly
-        # matches the prod signature (malformed /task_resources response
+        # Matches the prod signature (malformed /task_resources response
         # where ``response`` became ``response.text`` — a str — so
         # ``response["requested_resources"]`` raised
         # "string indices must be integers").
@@ -443,11 +441,11 @@ def test_prepare_batch_raises_transitions_to_no_distributor_id(db_engine, tool):
     distributor_service.process_status(TaskInstanceStatus.QUEUED)
     distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
 
-    TaskInstanceBatch.prepare_task_instance_batch_for_launch = boom_prepare
-    try:
-        distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
-    finally:
-        TaskInstanceBatch.prepare_task_instance_batch_for_launch = original_prepare
+    monkeypatch.setattr(
+        TaskInstanceBatch, "prepare_task_instance_batch_for_launch", boom_prepare
+    )
+    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    monkeypatch.undo()
 
     with Session(bind=db_engine) as session:
         select_stmt = (
