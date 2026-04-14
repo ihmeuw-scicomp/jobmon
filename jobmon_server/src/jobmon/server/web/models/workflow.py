@@ -76,6 +76,12 @@ class Workflow(Base):
         (WorkflowStatus.LAUNCHED, WorkflowStatus.FAILED),
         # workflow runs. normal happy path
         (WorkflowStatus.LAUNCHED, WorkflowStatus.RUNNING),
+        # Mirror of the WorkflowRun B->R and I->R shortcuts: when the
+        # orchestrator transitions a WFR directly from BOUND or INSTANTIATED
+        # to RUNNING, the cascading Workflow.transition(RUNNING) must also
+        # succeed from its current Q or I state.
+        (WorkflowStatus.QUEUED, WorkflowStatus.RUNNING),
+        (WorkflowStatus.INSTANTIATING, WorkflowStatus.RUNNING),
         # workflow run was running and then got moved to a resume state
         (WorkflowStatus.RUNNING, WorkflowStatus.HALTED),
         # workflow run was bound, and then got moved to a resume state
