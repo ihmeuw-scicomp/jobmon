@@ -323,6 +323,30 @@ class TestSwarmStateQueries:
         state.ready_to_run.append(MockSwarmTask(2))  # type: ignore
         assert state.has_pending_work()
 
+    def test_has_pending_work_adjusting_resources(self) -> None:
+        """ADJUSTING_RESOURCES tasks must count as pending work.
+
+        Regression guard for orchestrator premature exit: when the only in-flight
+        work was in ADJUSTING_RESOURCES, has_pending_work() incorrectly returned
+        False, causing the main loop to finalize the run as ERROR with downstream
+        REGISTERING tasks still waiting. See workflow 565558 (Apr 2026).
+        """
+        state = SwarmState(workflow_id=1, workflow_run_id=1, dag_id=1)
+        # Mix: some DONE tasks, an upstream in ADJUSTING, downstream REGISTERING.
+        state.add_task(MockSwarmTask(1, status=TaskStatus.DONE))  # type: ignore
+        state.add_task(MockSwarmTask(2, status=TaskStatus.ADJUSTING_RESOURCES))  # type: ignore
+        state.add_task(MockSwarmTask(3, status=TaskStatus.REGISTERING))  # type: ignore
+
+        # No QUEUED/INSTANTIATING/LAUNCHED/RUNNING and ready_to_run is empty — but
+        # Adjusting is transient and will re-queue, so the run still has pending work.
+        assert state.get_active_task_count() == 0
+        assert len(state.ready_to_run) == 0
+        assert state.has_pending_work()
+
+        # Transition the Adjusting task to DONE; now truly nothing pending.
+        state.update_task_status(2, TaskStatus.DONE)
+        assert not state.has_pending_work()
+
     def test_get_available_capacity(self, state_with_tasks: SwarmState) -> None:
         """Test calculating available capacity."""
         # max=100, active=2
