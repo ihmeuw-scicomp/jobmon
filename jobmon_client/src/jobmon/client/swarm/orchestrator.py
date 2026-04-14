@@ -676,8 +676,9 @@ class WorkflowRunOrchestrator:
 
         if new_status != status:
             raise TransitionError(
-                f"Cannot transition WFR {self._state.workflow_run_id} from current status "
-                f"{self._state.status} to {status}."
+                f"Cannot transition WFR {self._state.workflow_run_id}: "
+                f"requested={status}, local_cached={self._state.status}, "
+                f"server_returned={new_status}."
             )
 
         self._state.status = new_status
