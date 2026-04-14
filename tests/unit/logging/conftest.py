@@ -10,6 +10,47 @@ from typing import Any, Callable, Optional
 from unittest.mock import MagicMock
 
 import pytest
+import structlog
+
+
+@pytest.fixture(autouse=True)
+def _reset_structlog_state_between_logging_tests():
+    """Restore structlog global state after every test in tests/unit/logging.
+
+    Many tests in this directory call ``structlog.configure(...)`` with
+    ``structlog.stdlib.LoggerFactory`` or custom factories to exercise
+    jobmon's reconfigure hook. Without a teardown, the final test to run on
+    an xdist worker leaves that factory installed, and any non-logging
+    test subsequently scheduled on the same worker process (e.g.
+    ``tests/unit/swarm/test_builder.py``) fails with
+    ``TypeError: Logger.debug() missing 1 required positional argument:
+    'msg'`` because structlog is now producing stdlib Loggers that reject
+    structlog's kwargs-only call convention.
+
+    Cross-module leakage is invisible in serial runs and only surfaces
+    under ``pytest -n>1`` where xdist packs multiple test modules into
+    one worker.
+    """
+    yield
+    structlog.reset_defaults()
+    structlog.contextvars.clear_contextvars()
+    # Reset jobmon's own "already configured" flags so the next test gets
+    # a clean reconfigure path.
+    try:
+        from jobmon.client import logging as jobmon_client_logging
+
+        jobmon_client_logging._structlog_configured_by_jobmon = False
+    except (ImportError, AttributeError):
+        pass
+    try:
+        from jobmon.core.config import structlog_config as core_structlog_config
+
+        if hasattr(core_structlog_config, "_structlog_configured"):
+            core_structlog_config._structlog_configured = False
+        if hasattr(core_structlog_config, "_reset_structlog_reconfigure_hook"):
+            core_structlog_config._reset_structlog_reconfigure_hook()
+    except (ImportError, AttributeError):
+        pass
 
 
 @dataclass
