@@ -68,6 +68,16 @@ class WorkflowRun(Base):
         (WorkflowRunStatus.INSTANTIATED, WorkflowRunStatus.LAUNCHED),
         # a workflow run moves from launched to running
         (WorkflowRunStatus.LAUNCHED, WorkflowRunStatus.RUNNING),
+        # The orchestrator may request RUNNING from any pre-R non-terminal
+        # state. The distributor's B->I->O chain is driven by a sibling
+        # subprocess; the orchestrator only knows its own stale snapshot
+        # (BOUND) from before the distributor was spawned. Allowing B->R
+        # and I->R directly lets the orchestrator succeed regardless of
+        # where the distributor's chain currently is, eliminating a
+        # startup race where a slow I->O commit caused the orchestrator's
+        # update_status(R) to fail with InvalidStateTransition.
+        (WorkflowRunStatus.BOUND, WorkflowRunStatus.RUNNING),
+        (WorkflowRunStatus.INSTANTIATED, WorkflowRunStatus.RUNNING),
         # a workflow run can't be launched for some reason. TODO: implement triaging
         (WorkflowRunStatus.INSTANTIATED, WorkflowRunStatus.ERROR),
         (WorkflowRunStatus.LAUNCHED, WorkflowRunStatus.ERROR),
