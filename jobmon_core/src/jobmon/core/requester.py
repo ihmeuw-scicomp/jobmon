@@ -406,9 +406,25 @@ class Requester:
         if "application/json" in content_type:
             try:
                 content = await response.json()
-            except (json.decoder.JSONDecodeError, ValueError, aiohttp.ContentTypeError):
-                # For cases where the response body is empty or malformed JSON
-                content = await response.text()
+            except (
+                json.decoder.JSONDecodeError,
+                ValueError,
+                aiohttp.ContentTypeError,
+            ) as e:
+                # application/json header but unparseable body. Historically we
+                # fell through and returned response.text() (a str), which
+                # crashed callers downstream with "string indices must be
+                # integers" when they indexed the "dict" (see the W-state
+                # stranding bug this branch fixes). Almost always a transient
+                # truncation/empty-body on a 2xx (stale keep-alive, LB hiccup),
+                # so raise InvalidResponse to let the retry layer handle it. A
+                # persistent bad body exhausts the retry budget and surfaces
+                # with real context instead of a stranded batch.
+                body = await response.text()
+                raise InvalidResponse(
+                    f"Malformed application/json body (status={response.status}, "
+                    f"len={len(body)}, parse_err={e!r}, body_head={body[:200]!r})"
+                ) from e
         else:
             content = await response.read()
         return response.status, content
@@ -501,9 +517,18 @@ def get_content(response: Any) -> Tuple[int, Any]:
         except TypeError:
             # for test_client, response.json is a dict not fn
             content = response.json
-        except (json.decoder.JSONDecodeError, ValueError):
-            # For cases where the response body is empty or malformed JSON
-            content = response.text
+        except (json.decoder.JSONDecodeError, ValueError) as e:
+            # application/json header but unparseable body. Previously this
+            # silently returned response.text (a str), which crashed callers
+            # downstream with "string indices must be integers". Raise
+            # InvalidResponse so the Requester retry layer can recover from
+            # transient truncation/empty-body on 2xx responses.
+            body = response.text
+            raise InvalidResponse(
+                f"Malformed application/json body (status={response.status_code}, "
+                f"len={len(body) if body is not None else 0}, parse_err={e!r}, "
+                f"body_head={(body or '')[:200]!r})"
+            ) from e
     else:
         content = response.content
     return response.status_code, content

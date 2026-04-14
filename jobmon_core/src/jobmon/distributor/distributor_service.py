@@ -382,82 +382,99 @@ class DistributorService:
                 task_instance_id=ti.task_instance_id,
             )
 
-        # record batch info in db
-        task_instance_batch.prepare_task_instance_batch_for_launch()
-
-        # build worker node command
-        command = self.cluster_interface.build_worker_node_command(
-            task_instance_id=None,
-            array_id=task_instance_batch.array_id,
-            batch_number=task_instance_batch.batch_number,
-        )
         distributor_commands: List[DistributorCommand] = []
 
         try:
-            # submit array to batch distributor
-            logger.debug(
-                "Submitting batch to cluster",
+            # Prepare + build + submit share one failure policy: on any
+            # uncaught exception, mark the batch's TIs as W
+            # (NO_DISTRIBUTOR_ID) so the task FSM retries via
+            # REGISTERING. Previously only submission failures were
+            # covered, which let prep-time errors (e.g. a malformed
+            # /task_resources response that made ``response`` a string
+            # instead of a dict) strand the batch's TIs in INSTANTIATED
+            # forever while the distributor looped every 30s on
+            # "Batch already removed from tracking".
+            task_instance_batch.prepare_task_instance_batch_for_launch()
+
+            # build worker node command
+            command = self.cluster_interface.build_worker_node_command(
+                task_instance_id=None,
                 array_id=task_instance_batch.array_id,
-                array_batch_num=task_instance_batch.batch_number,
-                batch_size=batch_size,
-                submission_name=task_instance_batch.submission_name,
-            )
-            distributor_id_map = (
-                self.cluster_interface.submit_array_to_batch_distributor(
-                    command=command,
-                    name=task_instance_batch.submission_name,
-                    requested_resources=task_instance_batch.requested_resources,
-                    array_length=batch_size,
-                )
-            )
-            task_instance_batch.set_distributor_ids(distributor_id_map)
-            logger.info(
-                "Batch submitted to cluster successfully",
-                array_id=task_instance_batch.array_id,
-                array_batch_num=task_instance_batch.batch_number,
-                batch_size=batch_size,
+                batch_number=task_instance_batch.batch_number,
             )
 
-        except NotImplementedError:
-            # create DistributorCommands to submit the launch if array isn't implemented
-            logger.debug(
-                "Array submission not supported, launching individually",
-                batch_size=batch_size,
-            )
-            for task_instance in task_instance_batch.task_instances:
-                distributor_command = DistributorCommand(
-                    self.launch_task_instance,
-                    task_instance,
+            try:
+                # submit array to batch distributor
+                logger.debug(
+                    "Submitting batch to cluster",
+                    array_id=task_instance_batch.array_id,
+                    array_batch_num=task_instance_batch.batch_number,
+                    batch_size=batch_size,
+                    submission_name=task_instance_batch.submission_name,
                 )
-                distributor_commands.append(distributor_command)
+                distributor_id_map = (
+                    self.cluster_interface.submit_array_to_batch_distributor(
+                        command=command,
+                        name=task_instance_batch.submission_name,
+                        requested_resources=task_instance_batch.requested_resources,
+                        array_length=batch_size,
+                    )
+                )
+                task_instance_batch.set_distributor_ids(distributor_id_map)
+
+            except NotImplementedError:
+                # Cluster plugin doesn't support array submission; fall
+                # back to launching each TI individually.
+                logger.debug(
+                    "Array submission not supported, launching individually",
+                    batch_size=batch_size,
+                )
+                for task_instance in task_instance_batch.task_instances:
+                    distributor_commands.append(
+                        DistributorCommand(
+                            self.launch_task_instance,
+                            task_instance,
+                        )
+                    )
+
+            else:
+                # Successful array submission.
+                logger.info(
+                    "Batch submitted to cluster successfully",
+                    array_id=task_instance_batch.array_id,
+                    array_batch_num=task_instance_batch.batch_number,
+                    batch_size=batch_size,
+                )
+                distributor_commands.append(
+                    DistributorCommand(
+                        task_instance_batch.transition_to_launched,
+                        self._next_report_increment,
+                    )
+                )
+                distributor_commands.append(
+                    DistributorCommand(task_instance_batch.log_distributor_ids)
+                )
 
         except Exception as e:
-            # if other error, transition to No ID status
+            # Unrecoverable prep/build/submit failure → mark TIs as W
+            # (NO_DISTRIBUTOR_ID) so the task FSM retries via
+            # REGISTERING. Discard any partial commands queued in the
+            # inner block (none should be populated on this path, but
+            # be defensive in case a future refactor adds early
+            # appends).
             stack_trace = traceback.format_exc()
             logger.exception(
                 "Batch launch failed",
                 error=str(e),
                 batch_size=batch_size,
             )
-            for task_instance in task_instance_batch.task_instances:
-                distributor_command = DistributorCommand(
+            distributor_commands = [
+                DistributorCommand(
                     task_instance.transition_to_no_distributor_id,
                     no_id_err_msg=stack_trace,
                 )
-                distributor_commands.append(distributor_command)
-
-        else:
-            # if successful log a transition to launched
-            launch_command = DistributorCommand(
-                task_instance_batch.transition_to_launched, self._next_report_increment
-            )
-            # Log the distributor IDs
-            log_distributor_ids_command = DistributorCommand(
-                task_instance_batch.log_distributor_ids
-            )
-
-            distributor_commands.append(launch_command)
-            distributor_commands.append(log_distributor_ids_command)
+                for task_instance in task_instance_batch.task_instances
+            ]
 
         finally:
             self._distributor_commands = it.chain(

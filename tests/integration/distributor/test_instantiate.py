@@ -386,6 +386,158 @@ def test_array_submit_error_no_stuck_batch(db_engine, tool):
     )
 
 
+def test_prepare_batch_raises_transitions_to_no_distributor_id(
+    db_engine, tool, monkeypatch
+):
+    """Regression test: if ``prepare_task_instance_batch_for_launch`` raises
+    (e.g. ``load_requested_resources`` gets a malformed server response and
+    hits ``TypeError: string indices must be integers``), the batch's TIs
+    must transition to ``W`` (NO_DISTRIBUTOR_ID) so the task FSM can retry
+    via REGISTERING.
+
+    Before this fix, the prepare call ran *outside* ``launch_task_instance_batch``'s
+    try/except. Any exception escaped to ``DistributorCommand.__call__`` which
+    swallowed it after the batch had already been popped from
+    ``_task_instance_batches``. Subsequent distributor cycles saw the TIs
+    still in INSTANTIATED, re-enqueued launch commands, and looped forever
+    on "Batch already removed from tracking, skipping launch" — 5000+
+    warnings per stranded batch observed in prod.
+    """
+    from jobmon.distributor.task_instance_batch import TaskInstanceBatch
+    from jobmon.server.web.models.task_instance import TaskInstance
+
+    def boom_prepare(self) -> None:
+        # Matches the prod signature (malformed /task_resources response
+        # where ``response`` became ``response.text`` — a str — so
+        # ``response["requested_resources"]`` raised
+        # "string indices must be integers").
+        raise TypeError("string indices must be integers")
+
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="multiprocess", compute_resources={"queue": "null.q"}
+    )
+    t1 = tool.active_task_templates["simple_template"].create_task(arg="echo 1")
+    t2 = tool.active_task_templates["simple_template"].create_task(arg="echo 2")
+    workflow = tool.create_workflow(
+        name="test_prepare_batch_raises_transitions_to_no_distributor_id"
+    )
+    workflow.add_tasks([t1, t2])
+    workflow.bind()
+    workflow._bind_tasks()
+    factory = WorkflowRunFactory(workflow.workflow_id)
+    wfr = factory.create_workflow_run()
+
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
+    )
+    prepare_and_queue_tasks(state, gateway, orchestrator)
+
+    distributor_service = DistributorService(
+        MultiprocessDistributor("sequential"),
+        requester=workflow.requester,
+    )
+    distributor_service.set_workflow_run(wfr.workflow_run_id)
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
+    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
+
+    monkeypatch.setattr(
+        TaskInstanceBatch, "prepare_task_instance_batch_for_launch", boom_prepare
+    )
+    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    monkeypatch.undo()
+
+    with Session(bind=db_engine) as session:
+        select_stmt = (
+            select(TaskInstance)
+            .where(TaskInstance.task_id.in_([t1.task_id, t2.task_id]))
+            .order_by(TaskInstance.id)
+        )
+        task_instances = session.execute(select_stmt).scalars().all()
+        session.commit()
+        for ti in task_instances:
+            assert ti.status == "W", (
+                f"Expected TI {ti.id} to transition to W after prepare failure, "
+                f"got {ti.status}. A non-W status means the TI is stranded in "
+                f"INSTANTIATED and will trigger the 'Batch already removed from "
+                f"tracking' infinite loop."
+            )
+
+    # Second cycle must see zero TIs still in INSTANTIATED (i.e. no
+    # recurrence of the stuck-batch loop).
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+    assert (
+        len(
+            distributor_service._task_instance_status_map[
+                TaskInstanceStatus.INSTANTIATED
+            ]
+        )
+        == 0
+    )
+
+
+def test_build_worker_node_command_raises_transitions_to_no_distributor_id(
+    db_engine, tool
+):
+    """Regression test: if ``cluster_interface.build_worker_node_command`` raises
+    during launch, the batch's TIs must transition to ``W`` instead of being
+    stranded in INSTANTIATED. Covers the same widened try/except as the prepare
+    case — any unrecoverable error in the prep + build + submit path must
+    funnel through the NO_DISTRIBUTOR_ID path.
+    """
+    from jobmon.server.web.models.task_instance import TaskInstance
+
+    class BadCommandDistributor(MultiprocessDistributor):
+        def build_worker_node_command(
+            self,
+            task_instance_id=None,
+            array_id=None,
+            batch_number=None,
+        ) -> str:
+            raise RuntimeError("build_worker_node_command failed")
+
+    tool.set_default_compute_resources_from_dict(
+        cluster_name="multiprocess", compute_resources={"queue": "null.q"}
+    )
+    t1 = tool.active_task_templates["simple_template"].create_task(arg="echo 1")
+    t2 = tool.active_task_templates["simple_template"].create_task(arg="echo 2")
+    workflow = tool.create_workflow(
+        name="test_build_worker_node_command_raises_transitions_to_no_distributor_id"
+    )
+    workflow.add_tasks([t1, t2])
+    workflow.bind()
+    workflow._bind_tasks()
+    factory = WorkflowRunFactory(workflow.workflow_id)
+    wfr = factory.create_workflow_run()
+
+    state, gateway, orchestrator = create_test_context(
+        workflow, wfr.workflow_run_id, workflow.requester
+    )
+    prepare_and_queue_tasks(state, gateway, orchestrator)
+
+    distributor_service = DistributorService(
+        BadCommandDistributor("sequential"),
+        requester=workflow.requester,
+    )
+    distributor_service.set_workflow_run(wfr.workflow_run_id)
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.QUEUED)
+    distributor_service.process_status(TaskInstanceStatus.QUEUED)
+    distributor_service.refresh_status_from_db(TaskInstanceStatus.INSTANTIATED)
+    distributor_service.process_status(TaskInstanceStatus.INSTANTIATED)
+
+    with Session(bind=db_engine) as session:
+        select_stmt = (
+            select(TaskInstance)
+            .where(TaskInstance.task_id.in_([t1.task_id, t2.task_id]))
+            .order_by(TaskInstance.id)
+        )
+        task_instances = session.execute(select_stmt).scalars().all()
+        session.commit()
+        for ti in task_instances:
+            assert ti.status == "W"
+
+
 def test_workflow_concurrency_limiting(tool, task_template):
     """tests that we only return a subset of queued jobs based on the n_queued
     parameter"""
