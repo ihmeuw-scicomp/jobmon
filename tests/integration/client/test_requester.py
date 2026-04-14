@@ -313,10 +313,11 @@ async def test_async_get_content_json(client_env, mocker):
 
 @pytest.mark.asyncio
 async def test_async_get_content_malformed_json(client_env, mocker):
-    """Test async content parsing for malformed JSON responses."""
+    """Malformed application/json bodies raise InvalidResponse for retry."""
+    from jobmon.core.exceptions import InvalidResponse
+
     requester = Requester(client_env)
 
-    # Mock aiohttp response with malformed JSON
     mock_response = mocker.MagicMock()
     mock_response.status = 200
     mock_response.headers = {"Content-Type": "application/json"}
@@ -325,10 +326,8 @@ async def test_async_get_content_malformed_json(client_env, mocker):
     )
     mock_response.text = mocker.AsyncMock(return_value="malformed json")
 
-    status, content = await requester._get_content_async(mock_response)
-
-    assert status == 200
-    assert content == "malformed json"
+    with pytest.raises(InvalidResponse, match="Malformed application/json body"):
+        await requester._get_content_async(mock_response)
     mock_response.text.assert_called_once()
 
 
