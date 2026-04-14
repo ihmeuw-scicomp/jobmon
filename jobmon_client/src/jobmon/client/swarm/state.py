@@ -313,8 +313,16 @@ class SwarmState:
         return len(self.tasks) == self.get_done_count() + self.get_failed_count()
 
     def has_pending_work(self) -> bool:
-        """True if there's in-flight or ready-to-run work."""
-        return self.get_active_task_count() > 0 or len(self.ready_to_run) > 0
+        """True if there's in-flight or ready-to-run work.
+
+        Tasks in ADJUSTING_RESOURCES count as pending: they are transient and will be
+        re-queued on the next scheduling pass. Excluding them causes the orchestrator
+        main loop to exit prematurely when the only in-flight work is adjusting, even
+        though downstream REGISTERING tasks are still waiting on them.
+        """
+        if self.get_active_task_count() > 0 or len(self.ready_to_run) > 0:
+            return True
+        return len(self._task_status_map[TaskStatus.ADJUSTING_RESOURCES]) > 0
 
     def get_available_capacity(self) -> int:
         """How many more tasks can be queued at workflow level."""

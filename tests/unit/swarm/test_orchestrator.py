@@ -692,6 +692,40 @@ class TestShouldContinue:
 
         assert orchestrator._should_continue() is True
 
+    def test_should_continue_only_adjusting_resources(
+        self, mock_task, mock_array, mock_gateway, default_config
+    ):
+        """Regression: a DAG whose only in-flight work is ADJUSTING_RESOURCES must
+        keep the main loop running. Previously _should_continue() returned False
+        because ADJUSTING wasn't counted as active or ready_to_run, causing the
+        orchestrator to finalize as ERROR with downstream REGISTERING tasks still
+        waiting. See workflow 565558 (Apr 2026)."""
+        adjusting = mock_task(1, status=TaskStatus.ADJUSTING_RESOURCES)
+        waiting = mock_task(2, status=TaskStatus.REGISTERING, all_upstreams_done=False)
+        done = mock_task(3, status=TaskStatus.DONE)
+        array = mock_array(1)
+        array.tasks.update({adjusting, waiting, done})
+
+        state = create_state_with_tasks(
+            tasks={1: adjusting, 2: waiting, 3: done},
+            arrays={1: array},
+            task_status_map={
+                TaskStatus.REGISTERING: {waiting},
+                TaskStatus.QUEUED: set(),
+                TaskStatus.INSTANTIATING: set(),
+                TaskStatus.LAUNCHED: set(),
+                TaskStatus.RUNNING: set(),
+                TaskStatus.DONE: {done},
+                TaskStatus.ADJUSTING_RESOURCES: {adjusting},
+                TaskStatus.ERROR_FATAL: set(),
+            },
+            status=WorkflowRunStatus.RUNNING,
+            max_concurrently_running=100,
+        )
+        orchestrator = WorkflowRunOrchestrator(state, mock_gateway, default_config)
+
+        assert orchestrator._should_continue() is True
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Test Status Updates
