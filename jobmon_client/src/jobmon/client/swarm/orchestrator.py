@@ -416,8 +416,63 @@ class WorkflowRunOrchestrator:
                         active=self._state.get_active_task_count(),
                         ready_to_run=self._state.get_ready_to_run_count(),
                     )
+                    self._dump_stuck_registering_tasks()
                     await self._do_sync(full_sync=True)
                     time_since_last_full_sync = 0.0
+
+    def _dump_stuck_registering_tasks(self) -> None:
+        """Log per-task diagnostics for REGISTERING tasks at premature exit.
+
+        Three signatures we want to distinguish:
+          1. counter under-count (num_upstreams_done < num_upstreams but all
+             upstreams in DONE status in the swarm) — missed propagation
+          2. counter fine, status stuck (num_upstreams_done == num_upstreams
+             and all upstreams DONE, but task still REGISTERING) — enqueue
+             step dropped the task
+          3. num_upstreams inflated (num_upstreams != count of reverse edges
+             observed in the swarm graph) — build-time graph corruption
+
+        Only logs tasks matching one of the above signatures, so benign
+        cascade-blocked tasks do not flood the log.
+        """
+        # Build reverse-edge index once: task_id -> list of upstream SwarmTasks
+        reverse: dict[int, list] = {}
+        for t in self._state.tasks.values():
+            for d in t.downstream_swarm_tasks:
+                reverse.setdefault(d.task_id, []).append(t)
+
+        for t in self._state.get_tasks_by_status(TaskStatus.REGISTERING):
+            upstreams = reverse.get(t.task_id, [])
+            rev_count = len(upstreams)
+            done_upstreams = sum(1 for u in upstreams if u.status == TaskStatus.DONE)
+            # all_upstreams_done raises RuntimeError when overcounted
+            try:
+                all_done_prop: object = t.all_upstreams_done
+            except RuntimeError as e:
+                all_done_prop = f"RAISE: {e}"
+
+            all_up_done_in_swarm = rev_count > 0 and done_upstreams == rev_count
+            counter_mismatch = t.num_upstreams != rev_count
+
+            if all_up_done_in_swarm:
+                logger.warning(
+                    "Stuck task: all upstreams DONE in swarm but task still "
+                    "REGISTERING",
+                    task_id=t.task_id,
+                    num_upstreams=t.num_upstreams,
+                    num_upstreams_done=t.num_upstreams_done,
+                    reverse_edge_count=rev_count,
+                    all_upstreams_done_property=all_done_prop,
+                    sample_upstream_ids=[u.task_id for u in upstreams[:10]],
+                )
+            elif counter_mismatch:
+                logger.warning(
+                    "Stuck task: num_upstreams != reverse edge count",
+                    task_id=t.task_id,
+                    num_upstreams=t.num_upstreams,
+                    num_upstreams_done=t.num_upstreams_done,
+                    reverse_edge_count=rev_count,
+                )
 
     def _should_continue(self) -> bool:
         """Determine if the main loop should continue."""
