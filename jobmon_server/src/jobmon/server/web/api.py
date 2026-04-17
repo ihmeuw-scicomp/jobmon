@@ -16,6 +16,7 @@ from starlette.staticfiles import StaticFiles
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.db import db_lifespan
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
+from jobmon.server.web.middleware.db_reset_retry import DBResetRetryMiddleware
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
 from jobmon.server.web.routes.utils import (
     get_user,
@@ -155,6 +156,14 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         )
 
     app.add_middleware(SecurityHeadersMiddleware, csp=True)
+
+    # Retry middleware wraps the entire request pipeline (handler +
+    # dependency finalizers) so transient DB connection-resets on Azure
+    # Private Link are retried once instead of surfacing as 5xx. Added
+    # last → innermost among user middleware, closest to the router,
+    # so route handler and dependency finalizer exceptions hit us before
+    # FastAPI's generic exception handler converts them to a 500 response.
+    app.add_middleware(DBResetRetryMiddleware)
 
     # Include routers with conditional authentication
     versions = versions or (["auth", "v3"] if auth_enabled else ["v3"])
