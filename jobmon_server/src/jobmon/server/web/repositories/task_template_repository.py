@@ -49,6 +49,18 @@ from jobmon.server.web.schemas.task_template import (
 logger = structlog.get_logger(__name__)
 
 
+def _js_num(n: float) -> str:
+    """Format a float like JS ``Number.prototype.toString()``.
+
+    Integer-valued floats render without the trailing ``.0`` so cluster
+    IDs built server-side align byte-for-byte with keys the frontend
+    produces from template literals (e.g. ``15.0 -> "15"``, not
+    ``"15.0"``). Non-integer values use Python's default repr, which
+    matches JS for the small-decimal cases we actually hit here.
+    """
+    return str(int(n)) if n == int(n) else repr(n)
+
+
 @dataclass
 class ResourceUsageStatistics:
     """Clean data class for resource usage statistics."""
@@ -654,8 +666,8 @@ class TaskTemplateRepository:
 
             if req_runtime is not None and req_memory is not None:
                 key = (
-                    f"{round(req_memory * 10) / 10}G-"
-                    f"{round(req_runtime / 3600 * 10) / 10}h"
+                    f"{_js_num(round(req_memory * 10) / 10)}G-"
+                    f"{_js_num(round(req_runtime / 3600 * 10) / 10)}h"
                 )
                 cluster = clusters.setdefault(
                     key,
