@@ -143,7 +143,6 @@ class DBResetRetryMiddleware:
             await self.app(scope, _replay_receive(b"", disconnected=True), send)
             return
 
-        last_exc: BaseException | None = None
         for attempt in range(1, self._max_attempts + 1):
             staged: List[Message] = []
 
@@ -157,7 +156,6 @@ class DBResetRetryMiddleware:
             ) as exc:  # noqa: BLE001 - intentionally broad, filtered below
                 if not is_connection_reset(exc):
                     raise
-                last_exc = exc
                 if attempt >= self._max_attempts:
                     logger.warning(
                         "DB reset retry exhausted after %d attempts on %s %s: %s",
@@ -181,10 +179,6 @@ class DBResetRetryMiddleware:
             for message in staged:
                 await send(message)
             return
-
-        # Unreachable: either we returned on success or raised on final failure.
-        assert last_exc is not None  # pragma: no cover
-        raise last_exc  # pragma: no cover
 
 
 async def _buffer_request_body(receive: Receive) -> Tuple[bytes, bool]:

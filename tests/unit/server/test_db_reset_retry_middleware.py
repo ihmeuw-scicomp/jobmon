@@ -1,15 +1,14 @@
 """Tests for :class:`DBResetRetryMiddleware`.
 
 Uses a real Starlette app with a tunable endpoint that can fail once
-before succeeding, so we exercise the middleware exactly as it runs
-in production (BaseHTTPMiddleware wrapping call_next) without needing
-a real database.
+before succeeding, so we exercise the raw-ASGI middleware exactly as
+it runs in production without needing a real database.
 """
 
 from __future__ import annotations
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import OperationalError
 
@@ -98,8 +97,6 @@ def _make_app(
             state["finalizer_calls"] += 1
             if state["finalizer_calls"] <= fail_times:
                 raise exc_factory()
-
-        from fastapi import Depends
 
         @app.get("/probe")
         def probe(_dep: None = Depends(dep)) -> dict:
