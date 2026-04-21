@@ -1,6 +1,11 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+    InfiniteData,
+    useInfiniteQuery,
+    useQuery,
+    useQueryClient,
+} from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
@@ -25,9 +30,13 @@ import { useTaskTemplateDetails } from '@jobmon_gui/queries/GetTaskTemplateDetai
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
 import {
-    getWorkflowUsageQueryFn,
+    getWorkflowUsagePageQueryFn,
     WorkflowUsageQueryKey,
 } from '@jobmon_gui/queries/GetWorkflowUsage.ts';
+import {
+    getTaskTemplateAggregatesQueryFn,
+    TaskTemplateAggregatesQueryKey,
+} from '@jobmon_gui/queries/GetTaskTemplateAggregates.ts';
 import {
     getClusteredErrorsFn,
     clusteredErrorsKey,
@@ -46,7 +55,9 @@ import { useUsageFilters } from '@jobmon_gui/hooks/useUsageFilters';
 import {
     calculateResourceEfficiency,
     calculateMedian,
+    createResourceClusterLabel,
     getResourceClusterKey,
+    ResourceCluster,
 } from '@jobmon_gui/components/task_template_details/usage/usageCalculations';
 import { components } from '@jobmon_gui/types/apiSchema';
 import {
@@ -60,6 +71,8 @@ dayjs.extend(utc);
 
 type TaskTemplateResourceUsageResponse =
     components['schemas']['TaskTemplateResourceUsageResponse'];
+type TaskTemplateResourceAggregatesResponse =
+    components['schemas']['TaskTemplateResourceAggregatesResponse'];
 
 export default function TaskTemplateDetails() {
     const { workflowId, taskTemplateId } = useParams();
@@ -85,19 +98,30 @@ export default function TaskTemplateDetails() {
 
     const queryKeyForWorkflowUsage: WorkflowUsageQueryKey = [
         'workflow_details',
-        'usage',
+        'usage_paged',
         taskTemplateVersionId,
         workflowId,
     ];
 
-    const usageInfo = useQuery<
+    const usageInfo = useInfiniteQuery<
         TaskTemplateResourceUsageResponse | undefined,
         Error,
-        TaskTemplateResourceUsageResponse | undefined,
-        WorkflowUsageQueryKey
+        InfiniteData<TaskTemplateResourceUsageResponse | undefined>,
+        WorkflowUsageQueryKey,
+        number
     >({
         queryKey: queryKeyForWorkflowUsage,
-        queryFn: getWorkflowUsageQueryFn,
+        queryFn: getWorkflowUsagePageQueryFn,
+        initialPageParam: 0,
+        getNextPageParam: (lastPage, allPages) => {
+            const total = lastPage?.total_count;
+            if (total == null) return undefined;
+            const fetched = allPages.reduce(
+                (sum, p) => sum + (p?.result_viz?.length ?? 0),
+                0
+            );
+            return fetched < total ? allPages.length : undefined;
+        },
         staleTime: 5000,
         enabled:
             !!taskTemplateVersionId &&
@@ -105,10 +129,76 @@ export default function TaskTemplateDetails() {
             !TaskTemplateDetailsData.isLoading,
     });
 
+    // Eagerly drain pages in the background so scatter/table fill up while
+    // the user reads the KPIs sourced from the aggregates endpoint.
+    useEffect(() => {
+        if (usageInfo.hasNextPage && !usageInfo.isFetchingNextPage) {
+            usageInfo.fetchNextPage();
+        }
+    }, [
+        usageInfo.hasNextPage,
+        usageInfo.isFetchingNextPage,
+        usageInfo.data?.pages.length,
+        usageInfo.fetchNextPage,
+    ]);
+
     const rawTaskNodesFromApi = useMemo(
-        () => usageInfo.data?.result_viz ?? [],
-        [usageInfo.data?.result_viz]
+        () => usageInfo.data?.pages.flatMap(p => p?.result_viz ?? []) ?? [],
+        [usageInfo.data?.pages]
     );
+
+    // Page-wide filters — these feed both the aggregates query scope and
+    // client-side filtering of the streaming viz rows. Declared up here so
+    // the aggregates query key can depend on them.
+    const [showLatestOnly, setShowLatestOnly] = useState(true);
+    const [selectedWorkflowRunId, setSelectedWorkflowRunId] = useState<
+        number | null
+    >(null);
+
+    // Aggregates query: fast server-computed KPIs that render immediately
+    // while the paginated viz query streams in. Key includes
+    // `showLatestOnly` so toggling the filter refetches a matching view.
+    const aggregatesQueryKey: TaskTemplateAggregatesQueryKey = [
+        'workflow_details',
+        'usage_aggregates',
+        taskTemplateVersionId,
+        workflowId,
+        showLatestOnly,
+    ];
+    const aggregatesQuery = useQuery<
+        TaskTemplateResourceAggregatesResponse | undefined,
+        Error,
+        TaskTemplateResourceAggregatesResponse | undefined,
+        TaskTemplateAggregatesQueryKey
+    >({
+        queryKey: aggregatesQueryKey,
+        queryFn: getTaskTemplateAggregatesQueryFn,
+        staleTime: 5000,
+        enabled:
+            !!taskTemplateVersionId &&
+            !!workflowId &&
+            !TaskTemplateDetailsData.isLoading,
+    });
+
+    // Adapt server clusters to the frontend ResourceCluster shape (adds
+    // camelCase taskCount + human-readable label). Memory from the server
+    // is already in GiB, matching the client-side cluster builder.
+    const serverResourceClusters: ResourceCluster[] | undefined =
+        useMemo(() => {
+            const clusters = aggregatesQuery.data?.resource_clusters;
+            if (!clusters) return undefined;
+            return clusters.map(c => ({
+                id: c.id,
+                runtime: c.runtime,
+                memory: c.memory,
+                taskCount: c.task_count,
+                label: createResourceClusterLabel(
+                    c.runtime,
+                    c.memory,
+                    c.task_count
+                ),
+            }));
+        }, [aggregatesQuery.data?.resource_clusters]);
 
     // --- Clustered Errors query (for badge + Error Summary card) ---
     const clusteredErrorsQuery = useQuery({
@@ -146,15 +236,11 @@ export default function TaskTemplateDetails() {
         availableResourceClusters,
         setSelectedResourceClusters,
         resetFilters,
-    } = useUsageFilters({ rawTaskNodesFromApi });
+    } = useUsageFilters({ rawTaskNodesFromApi, serverResourceClusters });
 
     // --- Plot interaction state ---
     const [selectedData, setSelectedData] = useState<ScatterDataPoint[]>([]);
     const [showResourceZones, setShowResourceZones] = useState(false);
-    const [showLatestOnly, setShowLatestOnly] = useState(true);
-    const [selectedWorkflowRunId, setSelectedWorkflowRunId] = useState<
-        number | null
-    >(null);
     const [tableFilteredInstanceIds, setTableFilteredInstanceIds] =
         useState<Set<number> | null>(null);
 
@@ -436,7 +522,7 @@ export default function TaskTemplateDetails() {
         [dataForKPICalculations]
     );
 
-    const kpiStats: UsageKPIStats = useMemo(
+    const clientKpiStats: UsageKPIStats = useMemo(
         () => ({
             minRuntime:
                 kpiRuntimes.length > 0 ? Math.min(...kpiRuntimes) : undefined,
@@ -473,7 +559,7 @@ export default function TaskTemplateDetails() {
         ]
     );
 
-    const resourceEfficiency: ResourceEfficiencyMetrics = useMemo(() => {
+    const clientResourceEfficiency: ResourceEfficiencyMetrics = useMemo(() => {
         if (dataForKPICalculations.length === 0) {
             return {
                 memoryUtilization: 0,
@@ -489,6 +575,60 @@ export default function TaskTemplateDetails() {
         }
         return calculateResourceEfficiency(dataForKPICalculations);
     }, [dataForKPICalculations]);
+
+    // Adapt the server aggregates response into the frontend KPI/efficiency
+    // shapes. Backend ships memory fields in bytes; frontend uses GiB.
+    const bytesToGiB = (b: number | null | undefined): number | undefined =>
+        b == null ? undefined : b / 1024 ** 3;
+    const serverKpiStats: UsageKPIStats | undefined = useMemo(() => {
+        const a = aggregatesQuery.data;
+        if (!a) return undefined;
+        return {
+            minRuntime: a.min_runtime ?? undefined,
+            maxRuntime: a.max_runtime ?? undefined,
+            meanRuntime: a.mean_runtime ?? undefined,
+            medianRuntime: a.median_runtime ?? undefined,
+            minMemoryGiB: bytesToGiB(a.min_mem),
+            maxMemoryGiB: bytesToGiB(a.max_mem),
+            meanMemoryGiB: bytesToGiB(a.mean_mem),
+            medianMemoryGiB: bytesToGiB(a.median_mem),
+            medianRequestedRuntime: a.median_requested_runtime ?? undefined,
+            medianRequestedMemoryGiB: a.median_requested_memory ?? undefined,
+        };
+    }, [aggregatesQuery.data]);
+    const serverResourceEfficiency: ResourceEfficiencyMetrics | undefined =
+        useMemo(() => {
+            const e = aggregatesQuery.data?.efficiency;
+            if (!e) return undefined;
+            return {
+                memoryUtilization: e.memory_utilization,
+                runtimeUtilization: e.runtime_utilization,
+                overAllocatedMemory: e.over_allocated_memory,
+                underAllocatedMemory: e.under_allocated_memory,
+                overAllocatedRuntime: e.over_allocated_runtime,
+                underAllocatedRuntime: e.under_allocated_runtime,
+                p95Memory: e.p95_memory ?? undefined,
+                p95Runtime: e.p95_runtime ?? undefined,
+                outlierCount: e.outlier_count,
+            };
+        }, [aggregatesQuery.data?.efficiency]);
+
+    // True when no user-driven filter narrows the page; in that state the
+    // server aggregates are an exact match for what the client would
+    // compute from the full streaming rowset, so we render them directly
+    // for instant KPIs without waiting for pagination to drain.
+    const isUnfilteredDefault =
+        selectedData.length === 0 &&
+        tableFilteredInstanceIds === null &&
+        selectedWorkflowRunId === null &&
+        selectedResourceClusters.size === availableResourceClusters.length;
+
+    const kpiStats: UsageKPIStats =
+        isUnfilteredDefault && serverKpiStats ? serverKpiStats : clientKpiStats;
+    const resourceEfficiency: ResourceEfficiencyMetrics =
+        isUnfilteredDefault && serverResourceEfficiency
+            ? serverResourceEfficiency
+            : clientResourceEfficiency;
 
     // --- CSV download ---
     const downloadCSV = () => {

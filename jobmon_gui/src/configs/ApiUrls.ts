@@ -8,6 +8,8 @@ export const userInfoURL = oidcBaseUrl + '/userinfo';
 export const task_table_url = api_base_url + '/task_table_viz/';
 
 export const usage_url = api_base_url + '/task_template_resource_usage';
+export const usage_aggregates_url =
+    api_base_url + '/task_template_resource_aggregates';
 
 export const workflow_details_url = api_base_url + '/workflow_details_viz/';
 export const workflow_tt_status_url = api_base_url + '/workflow_tt_status_viz/';

@@ -16,6 +16,8 @@ export type WorkflowUsageQueryKey = readonly [
     string | number | undefined,
 ];
 
+export const USAGE_PAGE_SIZE = 2000;
+
 export const getWorkflowUsageQueryFn = async (
     context: QueryFunctionContext<WorkflowUsageQueryKey>
 ): Promise<TaskTemplateResourceUsageResponse | undefined> => {
@@ -45,4 +47,33 @@ export const getWorkflowUsageQueryFn = async (
         jobmonAxiosConfig
     );
     return response.data; // This should now be TaskTemplateResourceUsageResponse
+};
+
+export const getWorkflowUsagePageQueryFn = async (
+    context: QueryFunctionContext<WorkflowUsageQueryKey, number>
+): Promise<TaskTemplateResourceUsageResponse | undefined> => {
+    const { queryKey, pageParam = 0 } = context;
+    if (
+        !queryKey ||
+        queryKey.length !== 4 ||
+        queryKey[2] === undefined ||
+        queryKey[3] === undefined
+    ) {
+        return undefined;
+    }
+    const taskTemplateVersionId = queryKey[2];
+    const workflowId = queryKey[3];
+
+    const response = await axios.post<TaskTemplateResourceUsageResponse>(
+        usage_url,
+        {
+            task_template_version_id: taskTemplateVersionId,
+            workflows: [workflowId],
+            viz: true,
+            page: pageParam,
+            page_size: USAGE_PAGE_SIZE,
+        },
+        jobmonAxiosConfig
+    );
+    return response.data;
 };

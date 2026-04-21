@@ -20,6 +20,8 @@ from jobmon.server.web.routes.v3.cli import cli_router as api_v3_router
 from jobmon.server.web.schemas.task_template import (
     FatalErrorBreakdownResponse,
     TaskResourceVizItem,
+    TaskTemplateResourceAggregatesRequest,
+    TaskTemplateResourceAggregatesResponse,
     TaskTemplateResourceUsageRequest,
     TaskTemplateResourceUsageResponse,
     WorkflowResourceErrorCheckResponse,
@@ -123,19 +125,41 @@ async def get_task_template_resource_usage(
     repo = TaskTemplateRepository(db)
 
     try:
+        paginated = request_data.page is not None and request_data.page_size is not None
+        limit: Optional[int] = None
+        offset = 0
+        total_count: Optional[int] = None
+        if paginated:
+            page = request_data.page or 0
+            page_size = request_data.page_size or 500
+            limit = page_size
+            offset = page * page_size
+            total_count = repo.count_task_resource_details(
+                task_template_version_id=request_data.task_template_version_id,
+                workflows=request_data.workflows,
+                node_args=request_data.node_args,
+            )
+
         # Get task details using the repository
         task_details = repo.get_task_resource_details(
             task_template_version_id=request_data.task_template_version_id,
             workflows=request_data.workflows,
             node_args=request_data.node_args,
+            limit=limit,
+            offset=offset,
         )
 
-        # Calculate statistics using repository method
-        stats = repo.calculate_resource_statistics(
-            task_details=task_details,
-            confidence_interval=request_data.ci,
-            task_template_version_id=request_data.task_template_version_id,
-        )
+        # Skip stats computation for paginated requests — callers should use
+        # the aggregates endpoint for KPIs rather than stats derived from
+        # a single page. Legacy unpaged requests still get full stats.
+        if paginated:
+            stats = None
+        else:
+            stats = repo.calculate_resource_statistics(
+                task_details=task_details,
+                confidence_interval=request_data.ci,
+                task_template_version_id=request_data.task_template_version_id,
+            )
 
         # Prepare viz data if requested
         viz_data = None
@@ -163,18 +187,21 @@ async def get_task_template_resource_usage(
 
         # Return unified Pydantic response
         return TaskTemplateResourceUsageResponse(
-            num_tasks=stats.num_tasks,
-            min_mem=stats.min_mem,
-            max_mem=stats.max_mem,
-            mean_mem=stats.mean_mem,
-            min_runtime=stats.min_runtime,
-            max_runtime=stats.max_runtime,
-            mean_runtime=stats.mean_runtime,
-            median_mem=stats.median_mem,
-            median_runtime=stats.median_runtime,
-            ci_mem=stats.ci_mem,
-            ci_runtime=stats.ci_runtime,
+            num_tasks=(stats.num_tasks if stats is not None else total_count),
+            min_mem=stats.min_mem if stats is not None else None,
+            max_mem=stats.max_mem if stats is not None else None,
+            mean_mem=stats.mean_mem if stats is not None else None,
+            min_runtime=stats.min_runtime if stats is not None else None,
+            max_runtime=stats.max_runtime if stats is not None else None,
+            mean_runtime=stats.mean_runtime if stats is not None else None,
+            median_mem=stats.median_mem if stats is not None else None,
+            median_runtime=stats.median_runtime if stats is not None else None,
+            ci_mem=stats.ci_mem if stats is not None else None,
+            ci_runtime=stats.ci_runtime if stats is not None else None,
             result_viz=viz_data,
+            total_count=total_count,
+            page=request_data.page if paginated else None,
+            page_size=request_data.page_size if paginated else None,
         )
 
     except Exception as e:
@@ -182,6 +209,36 @@ async def get_task_template_resource_usage(
         raise HTTPException(
             status_code=StatusCodes.INTERNAL_SERVER_ERROR,
             detail="Error processing resource usage data.",
+        ) from e
+
+
+@api_v3_router.post(
+    "/task_template_resource_aggregates",
+    response_model=TaskTemplateResourceAggregatesResponse,
+)
+async def get_task_template_resource_aggregates(
+    request_data: TaskTemplateResourceAggregatesRequest,
+    db: Session = Depends(get_db),
+) -> TaskTemplateResourceAggregatesResponse:
+    """Server-computed aggregates (KPIs, clusters, efficiency) for a task template.
+
+    Uses a narrow-column query and avoids materializing the full
+    task_instance × task × task_resources payload that the viz endpoint
+    returns.
+    """
+    repo = TaskTemplateRepository(db)
+    try:
+        return repo.get_task_resource_aggregates(
+            task_template_version_id=request_data.task_template_version_id,
+            workflows=request_data.workflows,
+            node_args=request_data.node_args,
+            latest_only=request_data.latest_only,
+        )
+    except Exception as e:
+        logger.error(f"Error fetching resource aggregates: {e}")
+        raise HTTPException(
+            status_code=StatusCodes.INTERNAL_SERVER_ERROR,
+            detail="Error processing resource aggregates.",
         ) from e
 
 

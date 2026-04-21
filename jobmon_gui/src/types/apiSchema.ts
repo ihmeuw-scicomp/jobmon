@@ -1563,7 +1563,11 @@ export interface paths {
         };
         /**
          * Workflows By User Form
-         * @description Fetch associated workflows and workflow runs by username.
+         * @description Fetch workflow overview with filtering.
+         *
+         *     ``wf_attr`` accepts repeated ``key:value`` pairs for
+         *     multi-attribute AND filtering, e.g.
+         *     ``?wf_attr=project:fhs&wf_attr=release_id:7``.
          */
         get: operations['workflows_by_user_form_api_v3_workflow_overview_viz_get'];
         put?: never;
@@ -1906,6 +1910,30 @@ export interface paths {
          *     and Python client consumption with full type safety.
          */
         post: operations['get_task_template_resource_usage_api_v3_task_template_resource_usage_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/v3/task_template_resource_aggregates': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Task Template Resource Aggregates
+         * @description Server-computed aggregates (KPIs, clusters, efficiency) for a task template.
+         *
+         *     Uses a narrow-column query and avoids materializing the full
+         *     task_instance × task × task_resources payload that the viz endpoint
+         *     returns.
+         */
+        post: operations['get_task_template_resource_aggregates_api_v3_task_template_resource_aggregates_post'];
         delete?: never;
         options?: never;
         head?: never;
@@ -2402,6 +2430,70 @@ export interface components {
             detail?: components['schemas']['ValidationError'][];
         };
         /**
+         * ResourceClusterItem
+         * @description One requested-resource cluster summary.
+         *
+         *     Cluster → instance membership is recomputed on the frontend as the
+         *     scatter rows stream in, so we deliberately do not ship instance IDs
+         *     here — for large templates that list alone would dominate the
+         *     aggregates payload.
+         */
+        ResourceClusterItem: {
+            /** Id */
+            id: string;
+            /** Runtime */
+            runtime: number;
+            /** Memory */
+            memory: number;
+            /** Task Count */
+            task_count: number;
+        };
+        /**
+         * ResourceEfficiencyMetrics
+         * @description Aggregate resource efficiency metrics for a task template.
+         */
+        ResourceEfficiencyMetrics: {
+            /**
+             * Memory Utilization
+             * @default 0
+             */
+            memory_utilization: number;
+            /**
+             * Runtime Utilization
+             * @default 0
+             */
+            runtime_utilization: number;
+            /**
+             * Over Allocated Memory
+             * @default 0
+             */
+            over_allocated_memory: number;
+            /**
+             * Under Allocated Memory
+             * @default 0
+             */
+            under_allocated_memory: number;
+            /**
+             * Over Allocated Runtime
+             * @default 0
+             */
+            over_allocated_runtime: number;
+            /**
+             * Under Allocated Runtime
+             * @default 0
+             */
+            under_allocated_runtime: number;
+            /** P95 Memory */
+            p95_memory?: number | null;
+            /** P95 Runtime */
+            p95_runtime?: number | null;
+            /**
+             * Outlier Count
+             * @default 0
+             */
+            outlier_count: number;
+        };
+        /**
          * TaskConcurrencyResponse
          * @description Response model for task concurrency timeline.
          *
@@ -2648,6 +2740,63 @@ export interface components {
             /** Tasks */
             tasks: components['schemas']['TaskTableItem'][];
         };
+        /**
+         * TaskTemplateResourceAggregatesRequest
+         * @description Request for the lightweight aggregates endpoint.
+         */
+        TaskTemplateResourceAggregatesRequest: {
+            /** Task Template Version Id */
+            task_template_version_id: number;
+            /** Workflows */
+            workflows?: number[] | null;
+            /** Node Args */
+            node_args?: {
+                [key: string]: string[];
+            } | null;
+            /**
+             * Latest Only
+             * @default true
+             */
+            latest_only: boolean;
+        };
+        /**
+         * TaskTemplateResourceAggregatesResponse
+         * @description Compact server-computed aggregates for a task template.
+         */
+        TaskTemplateResourceAggregatesResponse: {
+            /** Num Tasks */
+            num_tasks?: number | null;
+            /** Min Mem */
+            min_mem?: number | null;
+            /** Max Mem */
+            max_mem?: number | null;
+            /** Mean Mem */
+            mean_mem?: number | null;
+            /** Median Mem */
+            median_mem?: number | null;
+            /** P95 Mem */
+            p95_mem?: number | null;
+            /** Min Runtime */
+            min_runtime?: number | null;
+            /** Max Runtime */
+            max_runtime?: number | null;
+            /** Mean Runtime */
+            mean_runtime?: number | null;
+            /** Median Runtime */
+            median_runtime?: number | null;
+            /** P95 Runtime */
+            p95_runtime?: number | null;
+            /** Median Requested Runtime */
+            median_requested_runtime?: number | null;
+            /** Median Requested Memory */
+            median_requested_memory?: number | null;
+            /**
+             * Resource Clusters
+             * @default []
+             */
+            resource_clusters: components['schemas']['ResourceClusterItem'][];
+            efficiency?: components['schemas']['ResourceEfficiencyMetrics'];
+        };
         /** TaskTemplateResourceUsageRequest */
         TaskTemplateResourceUsageRequest: {
             /** Task Template Version Id */
@@ -2665,6 +2814,10 @@ export interface components {
              * @default false
              */
             viz: boolean;
+            /** Page */
+            page?: number | null;
+            /** Page Size */
+            page_size?: number | null;
         };
         /**
          * TaskTemplateResourceUsageResponse
@@ -2695,6 +2848,12 @@ export interface components {
             ci_runtime?: (number | null)[] | null;
             /** Result Viz */
             result_viz?: components['schemas']['TaskResourceVizItem'][] | null;
+            /** Total Count */
+            total_count?: number | null;
+            /** Page */
+            page?: number | null;
+            /** Page Size */
+            page_size?: number | null;
             /** @description Provide formatted statistics similar to legacy client format. */
             readonly formatted_stats: components['schemas']['FormattedStats'];
         };
@@ -4939,6 +5098,9 @@ export interface operations {
                 'user!'?: string[] | null;
                 'tool!'?: string[] | null;
                 'status!'?: string[] | null;
+                wf_name_contains?: boolean;
+                wf_args_contains?: boolean;
+                wf_attr?: string[] | null;
             };
             header?: never;
             path?: never;
@@ -5424,6 +5586,39 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['TaskTemplateResourceUsageResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_task_template_resource_aggregates_api_v3_task_template_resource_aggregates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['TaskTemplateResourceAggregatesRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['TaskTemplateResourceAggregatesResponse'];
                 };
             };
             /** @description Validation Error */
