@@ -29,13 +29,16 @@ class TaskTemplateResourceAggregatesRequest(BaseModel):
 class ResourceClusterItem(BaseModel):
     """One requested-resource cluster summary.
 
-    Cluster → instance membership is recomputed on the frontend as the
-    scatter rows stream in, so we deliberately do not ship instance IDs
-    here — for large templates that list alone would dominate the
-    aggregates payload.
+    We ship only the numeric ``(runtime, memory)`` pair plus the count;
+    the frontend derives the string cluster key itself using the same
+    rounding/formatting it applies to scatter rows, so there's no
+    cross-language string contract that can drift between Python and JS.
+
+    Cluster → instance membership is also recomputed frontend-side from
+    streaming scatter rows — shipping per-instance IDs here would
+    dominate the aggregates payload on large templates.
     """
 
-    id: str
     runtime: float
     memory: float
     task_count: int

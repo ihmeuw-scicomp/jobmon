@@ -1,4 +1,5 @@
 import json
+import math
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Union
@@ -49,16 +50,17 @@ from jobmon.server.web.schemas.task_template import (
 logger = structlog.get_logger(__name__)
 
 
-def _js_num(n: float) -> str:
-    """Format a float like JS ``Number.prototype.toString()``.
+def _js_round_tenth(x: float) -> float:
+    """Round ``x`` to one decimal using JS ``Math.round`` semantics.
 
-    Integer-valued floats render without the trailing ``.0`` so cluster
-    IDs built server-side align byte-for-byte with keys the frontend
-    produces from template literals (e.g. ``15.0 -> "15"``, not
-    ``"15.0"``). Non-integer values use Python's default repr, which
-    matches JS for the small-decimal cases we actually hit here.
+    JS rounds half up toward +∞ (``Math.round(0.5) === 1``), while
+    Python's ``round`` uses banker's rounding (``round(0.5) == 0``).
+    Cluster boundaries must align with the frontend's rounding so a
+    task-instance row the UI classifies as cluster A is counted as
+    cluster A on the server too. ``requested_resources`` values are
+    always non-negative here, so ``floor(x + 0.5)`` suffices.
     """
-    return str(int(n)) if n == int(n) else repr(n)
+    return math.floor(x * 10 + 0.5) / 10
 
 
 @dataclass
@@ -637,7 +639,10 @@ class TaskTemplateRepository:
         maxrss_values: List[float] = []
         requested_runtimes: List[float] = []
         requested_memories: List[float] = []
-        clusters: Dict[str, Dict[str, Any]] = {}
+        # Keyed by (rounded memory GiB, rounded runtime hours) — the same
+        # pair the frontend rounds scatter rows to — so each cluster maps
+        # 1:1 to what the UI will classify from the viz rows.
+        clusters: Dict[tuple, Dict[str, Any]] = {}
         utilization_points: List[Dict[str, float]] = []
 
         for wc, mr, raw_req_rt, raw_req_mem in rows:
@@ -665,9 +670,12 @@ class TaskTemplateRepository:
                 requested_memories.append(req_memory)
 
             if req_runtime is not None and req_memory is not None:
+                # Round identically to the frontend's ``createResourceClusterKey``
+                # (memory in GiB, runtime in hours, one decimal place) so
+                # server clusters match what the UI produces from scatter rows.
                 key = (
-                    f"{_js_num(round(req_memory * 10) / 10)}G-"
-                    f"{_js_num(round(req_runtime / 3600 * 10) / 10)}h"
+                    _js_round_tenth(req_memory),
+                    _js_round_tenth(req_runtime / 3600),
                 )
                 cluster = clusters.setdefault(
                     key,
@@ -741,12 +749,11 @@ class TaskTemplateRepository:
         resp.resource_clusters = sorted(
             [
                 ResourceClusterItem(
-                    id=key,
                     runtime=data["runtime"],
                     memory=data["memory"],
                     task_count=data["count"],
                 )
-                for key, data in clusters.items()
+                for data in clusters.values()
             ],
             key=lambda c: c.task_count,
             reverse=True,

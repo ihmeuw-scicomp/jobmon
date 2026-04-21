@@ -55,6 +55,7 @@ import { useUsageFilters } from '@jobmon_gui/hooks/useUsageFilters';
 import {
     calculateResourceEfficiency,
     calculateMedian,
+    createResourceClusterKey,
     createResourceClusterLabel,
     getResourceClusterKey,
     ResourceCluster,
@@ -180,15 +181,17 @@ export default function TaskTemplateDetails() {
             !TaskTemplateDetailsData.isLoading,
     });
 
-    // Adapt server clusters to the frontend ResourceCluster shape (adds
-    // camelCase taskCount + human-readable label). Memory from the server
-    // is already in GiB, matching the client-side cluster builder.
+    // Adapt server clusters to the frontend ResourceCluster shape. The
+    // server ships only numbers (runtime, memory, task_count); we derive
+    // the string cluster id via the same ``createResourceClusterKey`` the
+    // scatter-row predicate uses, so the two sides never rely on a
+    // cross-language string contract to agree.
     const serverResourceClusters: ResourceCluster[] | undefined =
         useMemo(() => {
             const clusters = aggregatesQuery.data?.resource_clusters;
             if (!clusters) return undefined;
             return clusters.map(c => ({
-                id: c.id,
+                id: createResourceClusterKey(c.runtime, c.memory),
                 runtime: c.runtime,
                 memory: c.memory,
                 taskCount: c.task_count,
