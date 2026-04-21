@@ -156,6 +156,19 @@ class TaskTemplateRepository:
             .label("attempt_number_of_instance")
         )
 
+        # Narrow ``requested_resources`` to the two fields the UI actually
+        # uses on the viz path (memory + runtime). The full blob averages
+        # ~700 bytes/row on templates like ``pixel`` (paths, project
+        # config, stderr/stdout paths, command args) and dominated the
+        # per-row payload size. MySQL ``JSON_OBJECT`` builds the narrow
+        # JSON server-side so we ship ~30 bytes/row instead.
+        narrow_req_res = func.json_object(
+            "memory",
+            func.json_extract(TaskResources.requested_resources, "$.memory"),
+            "runtime",
+            func.json_extract(TaskResources.requested_resources, "$.runtime"),
+        ).label("requested_resources_col")
+
         if not node_args:
             # No node_args filtering - use optimized single query
             query = (
@@ -173,8 +186,8 @@ class TaskTemplateRepository:
                     Task.command.label("task_command_col"),
                     Task.num_attempts.label("task_num_attempts_col"),
                     Task.max_attempts.label("task_max_attempts_col"),
-                    # Requested resources and attempt number
-                    TaskResources.requested_resources.label("requested_resources_col"),
+                    # Requested resources (narrowed to memory+runtime only)
+                    narrow_req_res,
                     attempt_number_col,
                     TaskInstance.id.label("task_instance_id_col"),
                     TaskInstance.workflow_run_id.label("workflow_run_id_col"),
@@ -251,6 +264,14 @@ class TaskTemplateRepository:
         offset: int = 0,
     ) -> List[TaskResourceDetailItem]:
         """Optimized node_args filtering using database-level joins and filtering."""
+        # See ``get_task_resource_details`` for rationale — ship only the
+        # two requested-resource fields the UI needs on the viz path.
+        narrow_req_res = func.json_object(
+            "memory",
+            func.json_extract(TaskResources.requested_resources, "$.memory"),
+            "runtime",
+            func.json_extract(TaskResources.requested_resources, "$.runtime"),
+        ).label("requested_resources")
         base_query = (
             select(
                 TaskInstance.wallclock,
@@ -258,7 +279,7 @@ class TaskTemplateRepository:
                 Node.id.label("node_id"),
                 Task.id.label("task_id"),
                 Task.name.label("task_name"),
-                TaskResources.requested_resources,
+                narrow_req_res,
                 attempt_number_col,
                 status_col,
                 Task.status_date.label("task_status_date"),
