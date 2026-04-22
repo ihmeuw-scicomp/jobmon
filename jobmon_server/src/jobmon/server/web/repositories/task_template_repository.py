@@ -178,10 +178,24 @@ class TaskTemplateRepository:
             # ids, avoiding the filesort + 2000 heap-probes the naive
             # plan does on the full join. Measured on pixel page 0:
             # SQL time ~3s → ~0.6s.
+            #
+            # ``attempt_num`` is computed inside pass 1 (before the
+            # LIMIT applies) so the window sees every matching
+            # task_instance per task, not just the paged subset — a
+            # task's attempts that span page boundaries still number
+            # correctly.
             paged_ids = None
             if limit is not None:
                 paged_ids = (
-                    select(TaskInstance.id.label("paged_ti_id"))
+                    select(
+                        TaskInstance.id.label("paged_ti_id"),
+                        func.row_number()
+                        .over(
+                            partition_by=TaskInstance.task_id,
+                            order_by=TaskInstance.id,
+                        )
+                        .label("paged_attempt_num"),
+                    )
                     .select_from(TaskTemplateVersion)
                     .join(
                         Node,
@@ -212,7 +226,11 @@ class TaskTemplateRepository:
                 Task.max_attempts.label("task_max_attempts_col"),
                 # Requested resources (narrowed to memory+runtime only)
                 narrow_req_res,
-                attempt_number_col,
+                (
+                    paged_ids.c.paged_attempt_num.label("attempt_number_of_instance")
+                    if paged_ids is not None
+                    else attempt_number_col
+                ),
                 TaskInstance.id.label("task_instance_id_col"),
                 TaskInstance.workflow_run_id.label("workflow_run_id_col"),
             )
@@ -687,7 +705,13 @@ class TaskTemplateRepository:
         if workflows:
             base_filters.append(Task.workflow_id.in_(workflows))
 
-        if latest_only:
+        dialect = self.session.bind.dialect.name if self.session.bind else ""
+        if latest_only and dialect == "mysql":
+            # LATERAL lets MySQL's planner use the covering index
+            # ``ix_ti_task_id_covering`` index-only — no heap reads on
+            # wallclock/maxrss/task_resources_id. ~3-4x faster on pixel.
+            # SQLite doesn't support LATERAL, so tests fall through to
+            # the correlated-scalar branch below.
             latest_lat = (
                 select(
                     TaskInstance.wallclock.label("wc_raw"),
@@ -739,6 +763,18 @@ class TaskTemplateRepository:
                 )
                 .where(and_(*base_filters))
             )
+
+            if latest_only:
+                # Fallback for dialects without LATERAL (sqlite tests).
+                # Correlated scalar subquery on MAX(id); less optimal on
+                # MySQL (no covering-index benefit) but portable.
+                latest_ti_id = (
+                    select(func.max(TaskInstance.id))
+                    .where(TaskInstance.task_id == Task.id)
+                    .correlate(Task)
+                    .scalar_subquery()
+                )
+                q = q.where(TaskInstance.id == latest_ti_id)
 
         if node_args:
             for arg_name, arg_values in node_args.items():
@@ -820,10 +856,10 @@ class TaskTemplateRepository:
             func.min(case((r_wc > 0, r_wc), else_=None)).label("min_rt"),
             func.max(case((r_wc > 0, r_wc), else_=None)).label("max_rt"),
             func.avg(case((r_wc > 0, r_wc), else_=None)).label("mean_rt"),
-            # requested stats (mean is cheap and matches UI's median
-            # expectation closely for uniform-resource templates)
-            func.avg(case((r_rrt > 0, r_rrt), else_=None)).label("mean_req_rt"),
-            func.avg(case((r_rmem > 0, r_rmem), else_=None)).label("mean_req_mem"),
+            # NB: no ``median_requested_*`` here — true medians need a
+            # sort and the server path deliberately skips them. The
+            # frontend has a client-side fallback that computes the
+            # median from streaming viz rows once they've loaded.
             # efficiency totals
             func.sum(case((r_eff, 1), else_=0)).label("eff_n"),
             func.sum(case((r_eff, r_mem_gib), else_=0)).label("tot_actual_mem"),
@@ -916,10 +952,8 @@ class TaskTemplateRepository:
             resp.max_runtime = int(stats["max_rt"])
             resp.mean_runtime = float(stats["mean_rt"])
 
-        if stats["mean_req_rt"] is not None:
-            resp.median_requested_runtime = float(stats["mean_req_rt"])
-        if stats["mean_req_mem"] is not None:
-            resp.median_requested_memory = float(stats["mean_req_mem"])
+        # median_requested_runtime / median_requested_memory left unset —
+        # frontend computes from the streaming viz rows.
 
         # Build clusters by binning unique (runtime, memory) pairs using
         # the same JS-round formula as the frontend's cluster-key builder.

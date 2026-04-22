@@ -709,12 +709,35 @@ export default function TaskTemplateDetails() {
         selectedWorkflowRunId === null &&
         selectedResourceClusters.size === availableResourceClusters.length;
 
-    const kpiStats: UsageKPIStats =
-        isUnfilteredDefault && serverKpiStats ? serverKpiStats : clientKpiStats;
-    const resourceEfficiency: ResourceEfficiencyMetrics =
-        isUnfilteredDefault && serverResourceEfficiency
-            ? serverResourceEfficiency
-            : clientResourceEfficiency;
+    // Per-field merge so the server's fast values (min/max/mean, count)
+    // render instantly while fields the server doesn't compute
+    // (median, p95 — require sort) fall back to the client-side result
+    // as soon as enough viz pages have streamed in. A whole-object
+    // pick would permanently hide the server's undefined medians.
+    const kpiStats: UsageKPIStats = useMemo(() => {
+        if (!isUnfilteredDefault || !serverKpiStats) return clientKpiStats;
+        const merged = { ...clientKpiStats } as Record<string, unknown>;
+        for (const [k, v] of Object.entries(serverKpiStats)) {
+            if (v !== undefined && v !== null) merged[k] = v;
+        }
+        return merged as UsageKPIStats;
+    }, [isUnfilteredDefault, serverKpiStats, clientKpiStats]);
+    const resourceEfficiency: ResourceEfficiencyMetrics = useMemo(() => {
+        if (!isUnfilteredDefault || !serverResourceEfficiency)
+            return clientResourceEfficiency;
+        const merged = { ...clientResourceEfficiency } as Record<
+            string,
+            unknown
+        >;
+        for (const [k, v] of Object.entries(serverResourceEfficiency)) {
+            if (v !== undefined && v !== null) merged[k] = v;
+        }
+        return merged as unknown as ResourceEfficiencyMetrics;
+    }, [
+        isUnfilteredDefault,
+        serverResourceEfficiency,
+        clientResourceEfficiency,
+    ]);
 
     // --- CSV download ---
     const downloadCSV = () => {
