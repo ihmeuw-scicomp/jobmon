@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 import scipy.stats as st  # type: ignore
 import structlog
-from sqlalchemy import Float, String, and_, case, exists, func, select
+from sqlalchemy import Float, String, and_, case, exists, func, or_, select, true
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement, Label
 
@@ -170,45 +170,100 @@ class TaskTemplateRepository:
         ).label("requested_resources_col")
 
         if not node_args:
-            # No node_args filtering - use optimized single query
-            query = (
-                select(
-                    # TaskInstance resource usage fields
-                    TaskInstance.wallclock,
-                    TaskInstance.maxrss,
-                    status_col,
-                    # Node and Task identifiers
-                    Node.id.label("node_id_col"),
-                    Task.id.label("task_id_col"),
-                    Task.name.label("task_name_col"),
-                    # Task metadata fields
-                    Task.status_date.label("task_status_date_col"),
-                    Task.command.label("task_command_col"),
-                    Task.num_attempts.label("task_num_attempts_col"),
-                    Task.max_attempts.label("task_max_attempts_col"),
-                    # Requested resources (narrowed to memory+runtime only)
-                    narrow_req_res,
-                    attempt_number_col,
-                    TaskInstance.id.label("task_instance_id_col"),
-                    TaskInstance.workflow_run_id.label("workflow_run_id_col"),
+            # Deferred-join pagination: when paging, first find the 2000
+            # ``task_instance.id`` values we want via the covering index
+            # (``ix_ti_task_id_covering`` on ``(task_id, id, wallclock,
+            # maxrss, task_resources_id)`` — ordered by ``(task_id, id)``
+            # naturally). Then look up full row data for only those
+            # ids, avoiding the filesort + 2000 heap-probes the naive
+            # plan does on the full join. Measured on pixel page 0:
+            # SQL time ~3s → ~0.6s.
+            #
+            # ``attempt_num`` is computed inside pass 1 (before the
+            # LIMIT applies) so the window sees every matching
+            # task_instance per task, not just the paged subset — a
+            # task's attempts that span page boundaries still number
+            # correctly.
+            paged_ids = None
+            if limit is not None:
+                paged_ids = (
+                    select(
+                        TaskInstance.id.label("paged_ti_id"),
+                        func.row_number()
+                        .over(
+                            partition_by=TaskInstance.task_id,
+                            order_by=TaskInstance.id,
+                        )
+                        .label("paged_attempt_num"),
+                    )
+                    .select_from(TaskTemplateVersion)
+                    .join(
+                        Node,
+                        TaskTemplateVersion.id == Node.task_template_version_id,
+                    )
+                    .join(Task, Node.id == Task.node_id)
+                    .join(TaskInstance, Task.id == TaskInstance.task_id)
+                    .where(and_(*base_filters))
+                    .order_by(TaskInstance.task_id, TaskInstance.id)
+                    .offset(offset)
+                    .limit(limit)
+                    .subquery("paged")
                 )
-                .select_from(TaskTemplateVersion)
-                .join(
-                    Node,
-                    TaskTemplateVersion.id == Node.task_template_version_id,
-                )
-                .join(Task, Node.id == Task.node_id)
-                .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
-                .outerjoin(
-                    TaskResources,
-                    TaskInstance.task_resources_id == TaskResources.id,
-                )
-                .where(and_(*base_filters))
+
+            query = select(
+                # TaskInstance resource usage fields
+                TaskInstance.wallclock,
+                TaskInstance.maxrss,
+                status_col,
+                # Node and Task identifiers
+                Node.id.label("node_id_col"),
+                Task.id.label("task_id_col"),
+                Task.name.label("task_name_col"),
+                # Task metadata fields
+                Task.status_date.label("task_status_date_col"),
+                Task.command.label("task_command_col"),
+                Task.num_attempts.label("task_num_attempts_col"),
+                Task.max_attempts.label("task_max_attempts_col"),
+                # Requested resources (narrowed to memory+runtime only)
+                narrow_req_res,
+                (
+                    paged_ids.c.paged_attempt_num.label("attempt_number_of_instance")
+                    if paged_ids is not None
+                    else attempt_number_col
+                ),
+                TaskInstance.id.label("task_instance_id_col"),
+                TaskInstance.workflow_run_id.label("workflow_run_id_col"),
             )
 
-            if limit is not None:
+            if paged_ids is not None:
                 query = (
-                    query.order_by(Task.id, TaskInstance.id).offset(offset).limit(limit)
+                    query.select_from(paged_ids)
+                    .join(
+                        TaskInstance,
+                        TaskInstance.id == paged_ids.c.paged_ti_id,
+                    )
+                    .join(Task, Task.id == TaskInstance.task_id)
+                    .join(Node, Node.id == Task.node_id)
+                    .outerjoin(
+                        TaskResources,
+                        TaskInstance.task_resources_id == TaskResources.id,
+                    )
+                    .order_by(Task.id, TaskInstance.id)
+                )
+            else:
+                query = (
+                    query.select_from(TaskTemplateVersion)
+                    .join(
+                        Node,
+                        TaskTemplateVersion.id == Node.task_template_version_id,
+                    )
+                    .join(Task, Node.id == Task.node_id)
+                    .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
+                    .outerjoin(
+                        TaskResources,
+                        TaskInstance.task_resources_id == TaskResources.id,
+                    )
+                    .where(and_(*base_filters))
                 )
 
             rows = self.session.execute(query).all()
@@ -555,92 +610,33 @@ class TaskTemplateRepository:
     ) -> TaskTemplateResourceAggregatesResponse:
         """Compute compact aggregates for a task template.
 
-        Uses a narrow-column query (wallclock, maxrss, JSON-extracted
-        requested runtime and memory) to avoid materializing the full
-        detail payload. Aggregates (median, p95, efficiency, requested-
-        resource clusters) are computed Python-side on the small numeric
-        arrays.
+        Aggregation runs entirely in MySQL: a single main query returns
+        one row of stats + efficiency totals + outlier count, and a
+        second query groups by ``task_resources_id`` for cluster
+        breakdown. Avoids the previous 78K-row ship-to-Python pattern
+        which was bottlenecked on row serialization (~10s for pixel).
+
+        Median / p95 for wallclock and maxrss are not computed
+        server-side — percentiles don't compose across GROUP BYs and
+        running separate ``ORDER BY LIMIT OFFSET`` scans per column
+        erodes the win. The frontend computes these client-side from
+        the streaming viz rows instead, falling back to ``undefined``
+        on the initial paint.
 
         When ``latest_only`` is True (the UI default), only the latest
-        TaskInstance per Task is aggregated so the numbers match the
-        latest-only scatter / table view. Correlated subquery on
-        ``MAX(task_instance.id)`` is index-covered via the
-        ``(task_id, id)`` key on task_instance.
+        TaskInstance per Task is included, so the numbers match the
+        latest-only scatter / table view.
         """
-        base_filters: List[ColumnElement] = [
-            TaskTemplateVersion.id == task_template_version_id,
-        ]
-        if workflows:
-            base_filters.append(Task.workflow_id.in_(workflows))
-
-        # Pull only the two JSON fields we actually use, not the whole blob.
-        # Avoids shipping ~1 KB of requested_resources JSON per task_instance
-        # row over the wire, which dominated the aggregates query cost.
-        req_runtime_col = func.cast(
-            func.json_extract(TaskResources.requested_resources, "$.runtime"),
-            Float,
-        ).label("req_runtime")
-        req_memory_col = func.cast(
-            func.json_extract(TaskResources.requested_resources, "$.memory"),
-            Float,
-        ).label("req_memory")
-
-        query = (
-            select(
-                TaskInstance.wallclock,
-                TaskInstance.maxrss,
-                req_runtime_col,
-                req_memory_col,
-            )
-            .select_from(TaskTemplateVersion)
-            .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
-            .join(Task, Node.id == Task.node_id)
-            .join(TaskInstance, Task.id == TaskInstance.task_id)
-            .outerjoin(
-                TaskResources, TaskInstance.task_resources_id == TaskResources.id
-            )
-            .where(and_(*base_filters))
+        inner = self._build_aggregates_rowset(
+            task_template_version_id, workflows, node_args, latest_only
         )
 
-        if latest_only:
-            latest_ti_id = (
-                select(func.max(TaskInstance.id))
-                .where(TaskInstance.task_id == Task.id)
-                .correlate(Task)
-                .scalar_subquery()
-            )
-            query = query.where(TaskInstance.id == latest_ti_id)
-
-        if node_args:
-            for arg_name, arg_values in node_args.items():
-                str_values = [str(v) for v in arg_values]
-                subquery = (
-                    select(NodeArg.node_id)
-                    .join(Arg, NodeArg.arg_id == Arg.id)
-                    .where(
-                        and_(
-                            Arg.name == arg_name,
-                            func.cast(NodeArg.val, String).in_(str_values),
-                        )
-                    )
-                )
-                query = query.where(Node.id.in_(subquery))
-
-        rows = self.session.execute(query).all()
-        return self._build_aggregates_response(rows, task_template_version_id)
-
-    def _build_aggregates_response(
-        self,
-        rows: Any,
-        task_template_version_id: int,
-    ) -> TaskTemplateResourceAggregatesResponse:
-        """Compute aggregates in Python from the narrow rowset.
-
-        Operates on ``(wallclock, maxrss, req_runtime, req_memory)`` tuples
-        where ``req_runtime`` / ``req_memory`` are already JSON-extracted by
-        SQL rather than shipped as a full JSON blob.
-        """
-        if not rows:
+        stats = (
+            self.session.execute(self._main_aggregates_query(inner.subquery("t")))
+            .mappings()
+            .one_or_none()
+        )
+        if stats is None or (stats["num_tasks"] or 0) == 0:
             has_any = (
                 self.session.execute(
                     select(Task.id)
@@ -656,200 +652,366 @@ class TaskTemplateRepository:
                 num_tasks=0 if has_any else None
             )
 
-        wallclocks: List[float] = []
-        maxrss_values: List[float] = []
-        requested_runtimes: List[float] = []
-        requested_memories: List[float] = []
-        # Keyed by (rounded memory GiB, rounded runtime hours) — the same
-        # pair the frontend rounds scatter rows to — so each cluster maps
-        # 1:1 to what the UI will classify from the viz rows.
-        clusters: Dict[tuple, Dict[str, Any]] = {}
-        utilization_points: List[Dict[str, float]] = []
+        cluster_counts = self.session.execute(
+            self._cluster_groupby_query(
+                self._build_aggregates_rowset(
+                    task_template_version_id, workflows, node_args, latest_only
+                ).subquery("t_clust")
+            )
+        ).all()
+        cluster_resources = self._fetch_cluster_resources(
+            [int(r.tr_id) for r in cluster_counts if r.tr_id is not None]
+        )
 
-        for wc, mr, raw_req_rt, raw_req_mem in rows:
-            if wc is not None and float(wc) != 0:
-                wallclocks.append(float(wc))
-            if mr is not None:
-                maxrss_values.append(max(0.0, float(mr)))
+        return self._build_aggregates_response_from_sql(
+            stats, cluster_counts, cluster_resources
+        )
 
-            req_runtime: Optional[float] = None
-            req_memory: Optional[float] = None
-            try:
-                if raw_req_rt is not None and float(raw_req_rt) > 0:
-                    req_runtime = float(raw_req_rt)
-            except (ValueError, TypeError):
-                pass
-            try:
-                if raw_req_mem is not None and float(raw_req_mem) > 0:
-                    req_memory = float(raw_req_mem)
-            except (ValueError, TypeError):
-                pass
+    def _build_aggregates_rowset(
+        self,
+        task_template_version_id: int,
+        workflows: Optional[List[int]],
+        node_args: Optional[Dict[str, List[Any]]],
+        latest_only: bool,
+    ) -> Any:
+        """Build the scoped inner SELECT for the aggregate queries.
 
-            if req_runtime is not None:
-                requested_runtimes.append(req_runtime)
-            if req_memory is not None:
-                requested_memories.append(req_memory)
+        This is the per-task_instance rowset the main aggregate and the
+        cluster-GROUP BY queries both project onto. Values are CAST
+        here so outer queries see typed numeric columns (``wallclock``
+        and ``maxrss`` are VARCHAR(50) in the schema).
 
-            if req_runtime is not None and req_memory is not None:
-                # Round identically to the frontend's ``createResourceClusterKey``
-                # (memory in GiB, runtime in hours, one decimal place) so
-                # server clusters match what the UI produces from scatter rows.
-                key = (
-                    _js_round_tenth(req_memory),
-                    _js_round_tenth(req_runtime / 3600),
+        When ``latest_only`` is True we pick the latest ``task_instance``
+        per task via a ``LATERAL`` subquery ordered by ``id DESC LIMIT 1``.
+        With the ``ix_ti_task_id_covering`` covering index in place, the
+        latest row is served index-only — no heap read for
+        ``wallclock`` / ``maxrss`` / ``task_resources_id``. EXPLAIN shows
+        ``Using index`` on the lateral side. Previously we used a
+        correlated ``MAX(id)`` subquery and MySQL's optimizer fell back
+        to a PK heap lookup for the outer row (~78K of them on pixel).
+        """
+        req_rt_num = func.cast(
+            func.json_extract(TaskResources.requested_resources, "$.runtime"),
+            Float,
+        ).label("req_rt")
+        req_mem_num = func.cast(
+            func.json_extract(TaskResources.requested_resources, "$.memory"),
+            Float,
+        ).label("req_mem")
+
+        base_filters: List[ColumnElement] = [
+            TaskTemplateVersion.id == task_template_version_id,
+        ]
+        if workflows:
+            base_filters.append(Task.workflow_id.in_(workflows))
+
+        dialect = self.session.bind.dialect.name if self.session.bind else ""
+        if latest_only and dialect == "mysql":
+            # LATERAL lets MySQL's planner use the covering index
+            # ``ix_ti_task_id_covering`` index-only — no heap reads on
+            # wallclock/maxrss/task_resources_id. ~3-4x faster on pixel.
+            # SQLite doesn't support LATERAL, so tests fall through to
+            # the correlated-scalar branch below.
+            latest_lat = (
+                select(
+                    TaskInstance.wallclock.label("wc_raw"),
+                    TaskInstance.maxrss.label("mr_raw"),
+                    TaskInstance.task_resources_id.label("tr_id"),
                 )
-                cluster = clusters.setdefault(
-                    key,
-                    {
-                        "runtime": req_runtime,
-                        "memory": req_memory,
-                        "count": 0,
-                    },
+                .where(TaskInstance.task_id == Task.id)
+                .order_by(TaskInstance.id.desc())
+                .limit(1)
+                .lateral("lti")
+            )
+
+            q = (
+                select(
+                    func.cast(latest_lat.c.wc_raw, Float).label("wc"),
+                    func.cast(latest_lat.c.mr_raw, Float).label("mr"),
+                    req_rt_num,
+                    req_mem_num,
+                    latest_lat.c.tr_id.label("tr_id"),
                 )
-                cluster["count"] += 1
-
-            if (
-                wc is not None
-                and mr is not None
-                and req_runtime is not None
-                and req_memory is not None
-                and float(wc) > 0
-                and float(mr) > 0
-            ):
-                # memory in bytes; requested memory is GiB — match the frontend
-                # efficiency calc which compares memory_gib to requested memory.
-                actual_mem_gib = float(mr) / (1024.0**3)
-                utilization_points.append(
-                    {
-                        "runtime": float(wc),
-                        "memory": actual_mem_gib,
-                        "requested_runtime": req_runtime,
-                        "requested_memory": req_memory,
-                    }
+                .select_from(TaskTemplateVersion)
+                .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+                .join(Task, Node.id == Task.node_id)
+                .join(latest_lat, true())
+                .outerjoin(
+                    TaskResources,
+                    latest_lat.c.tr_id == TaskResources.id,
                 )
-
-        memories_for_stats = [m for m in maxrss_values if m > 0]
-
-        def _p(data: List[float], pct: float) -> Optional[float]:
-            if not data:
-                return None
-            return float(np.percentile(data, pct))
-
-        resp = TaskTemplateResourceAggregatesResponse(num_tasks=len(rows))
-
-        if memories_for_stats:
-            resp.min_mem = int(min(memories_for_stats))
-            resp.max_mem = int(max(memories_for_stats))
-            resp.mean_mem = float(np.mean(memories_for_stats))
-            resp.median_mem = float(np.median(memories_for_stats))
-            resp.p95_mem = _p(memories_for_stats, 95)
-        elif maxrss_values:
-            resp.min_mem = 0
-            resp.max_mem = 0
-            resp.mean_mem = 0.0
-            resp.median_mem = 0.0
-            resp.p95_mem = 0.0
-
-        if wallclocks:
-            resp.min_runtime = int(min(wallclocks))
-            resp.max_runtime = int(max(wallclocks))
-            resp.mean_runtime = float(np.mean(wallclocks))
-            resp.median_runtime = float(np.median(wallclocks))
-            resp.p95_runtime = _p(wallclocks, 95)
+                .where(and_(*base_filters))
+            )
         else:
-            resp.min_runtime = 0
-            resp.max_runtime = 0
-            resp.mean_runtime = 0.0
-            resp.median_runtime = 0.0
+            wc_num = func.cast(TaskInstance.wallclock, Float).label("wc")
+            mr_num = func.cast(TaskInstance.maxrss, Float).label("mr")
+            q = (
+                select(
+                    wc_num,
+                    mr_num,
+                    req_rt_num,
+                    req_mem_num,
+                    TaskInstance.task_resources_id.label("tr_id"),
+                )
+                .select_from(TaskTemplateVersion)
+                .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+                .join(Task, Node.id == Task.node_id)
+                .join(TaskInstance, Task.id == TaskInstance.task_id)
+                .outerjoin(
+                    TaskResources,
+                    TaskInstance.task_resources_id == TaskResources.id,
+                )
+                .where(and_(*base_filters))
+            )
 
-        if requested_runtimes:
-            resp.median_requested_runtime = float(np.median(requested_runtimes))
-        if requested_memories:
-            resp.median_requested_memory = float(np.median(requested_memories))
+            if latest_only:
+                # Fallback for dialects without LATERAL (sqlite tests).
+                # Correlated scalar subquery on MAX(id); less optimal on
+                # MySQL (no covering-index benefit) but portable.
+                latest_ti_id = (
+                    select(func.max(TaskInstance.id))
+                    .where(TaskInstance.task_id == Task.id)
+                    .correlate(Task)
+                    .scalar_subquery()
+                )
+                q = q.where(TaskInstance.id == latest_ti_id)
 
+        if node_args:
+            for arg_name, arg_values in node_args.items():
+                str_values = [str(v) for v in arg_values]
+                subquery = (
+                    select(NodeArg.node_id)
+                    .join(Arg, NodeArg.arg_id == Arg.id)
+                    .where(
+                        and_(
+                            Arg.name == arg_name,
+                            func.cast(NodeArg.val, String).in_(str_values),
+                        )
+                    )
+                )
+                q = q.where(Node.id.in_(subquery))
+
+        return q
+
+    @staticmethod
+    def _main_aggregates_query(t: Any) -> Any:
+        """Single-row aggregate: KPIs + efficiency totals + outlier count.
+
+        Outlier gate requires the mean and stddev of wallclock and
+        (maxrss/GiB) over the efficiency subset. MySQL 8 window
+        aggregates let us compute those alongside row filtering in one
+        scan — no need for a second pass.
+        """
+        GIB = 1024.0**3
+        wc = t.c.wc
+        mr = t.c.mr
+        req_rt = t.c.req_rt
+        req_mem = t.c.req_mem
+        eff = and_(wc > 0, mr > 0, req_rt > 0, req_mem > 0)
+        wc_eff = case((eff, wc), else_=None)
+        mem_gib_eff = case((eff, mr / GIB), else_=None)
+
+        # Ranked subquery to compute window aggregates (mean/stddev of
+        # efficiency-gated wc and mem_gib) in the same scan. Main outer
+        # query then counts outliers using those window values.
+        ranked = (
+            select(
+                wc.label("wc"),
+                mr.label("mr"),
+                req_rt.label("req_rt"),
+                req_mem.label("req_mem"),
+                func.avg(wc_eff).over().label("mean_eff_wc"),
+                func.coalesce(func.stddev_pop(wc_eff).over(), 0.0).label("std_eff_wc"),
+                func.avg(mem_gib_eff).over().label("mean_eff_mem"),
+                func.coalesce(func.stddev_pop(mem_gib_eff).over(), 0.0).label(
+                    "std_eff_mem"
+                ),
+            )
+            .select_from(t)
+            .subquery("r")
+        )
+
+        r_wc = ranked.c.wc
+        r_mr = ranked.c.mr
+        r_rrt = ranked.c.req_rt
+        r_rmem = ranked.c.req_mem
+        r_eff = and_(r_wc > 0, r_mr > 0, r_rrt > 0, r_rmem > 0)
+        r_mem_gib = r_mr / GIB
+        r_mem_util = case((r_eff, r_mem_gib / r_rmem * 100), else_=None)
+        r_rt_util = case((r_eff, r_wc / r_rrt * 100), else_=None)
+        outlier_gate = or_(
+            func.abs(r_wc - ranked.c.mean_eff_wc) > 2 * ranked.c.std_eff_wc,
+            func.abs(r_mem_gib - ranked.c.mean_eff_mem) > 2 * ranked.c.std_eff_mem,
+        )
+
+        return select(
+            func.count().label("num_tasks"),
+            # memory stats
+            func.count(case((r_mr > 0, 1), else_=None)).label("n_mr"),
+            func.min(case((r_mr > 0, r_mr), else_=None)).label("min_mem"),
+            func.max(case((r_mr > 0, r_mr), else_=None)).label("max_mem"),
+            func.avg(case((r_mr > 0, r_mr), else_=None)).label("mean_mem"),
+            # runtime stats
+            func.count(case((r_wc > 0, 1), else_=None)).label("n_wc"),
+            func.min(case((r_wc > 0, r_wc), else_=None)).label("min_rt"),
+            func.max(case((r_wc > 0, r_wc), else_=None)).label("max_rt"),
+            func.avg(case((r_wc > 0, r_wc), else_=None)).label("mean_rt"),
+            # NB: no ``median_requested_*`` here — true medians need a
+            # sort and the server path deliberately skips them. The
+            # frontend has a client-side fallback that computes the
+            # median from streaming viz rows once they've loaded.
+            # efficiency totals
+            func.sum(case((r_eff, 1), else_=0)).label("eff_n"),
+            func.sum(case((r_eff, r_mem_gib), else_=0)).label("tot_actual_mem"),
+            func.sum(case((r_eff, r_rmem), else_=0)).label("tot_req_mem"),
+            func.sum(case((r_eff, r_wc), else_=0)).label("tot_actual_rt"),
+            func.sum(case((r_eff, r_rrt), else_=0)).label("tot_req_rt"),
+            func.sum(case((and_(r_eff, r_mem_util < 50), 1), else_=0)).label(
+                "over_mem"
+            ),
+            func.sum(case((and_(r_eff, r_mem_util > 90), 1), else_=0)).label(
+                "under_mem"
+            ),
+            func.sum(case((and_(r_eff, r_rt_util < 50), 1), else_=0)).label("over_rt"),
+            func.sum(case((and_(r_eff, r_rt_util > 90), 1), else_=0)).label("under_rt"),
+            func.sum(case((and_(r_eff, outlier_gate), 1), else_=0)).label("outliers"),
+        ).select_from(ranked)
+
+    @staticmethod
+    def _cluster_groupby_query(t: Any) -> Any:
+        """Count rows per task_resources_id, skipping NULLs.
+
+        Represents one cluster per unique task_resources row; the
+        ``requested_resources`` JSON fields are fetched separately to
+        avoid JSON_EXTRACT per row.
+        """
+        return (
+            select(
+                t.c.tr_id.label("tr_id"),
+                func.count().label("n"),
+            )
+            .select_from(t)
+            .where(t.c.tr_id.is_not(None))
+            .group_by(t.c.tr_id)
+        )
+
+    def _fetch_cluster_resources(self, tr_ids: List[int]) -> Dict[int, tuple]:
+        """Fetch (runtime, memory) per unique task_resources_id.
+
+        One query returning ``len(tr_ids)`` rows — typically a handful
+        even for workflows with tens of thousands of task_instances.
+        """
+        if not tr_ids:
+            return {}
+        rows = self.session.execute(
+            select(
+                TaskResources.id,
+                func.cast(
+                    func.json_extract(TaskResources.requested_resources, "$.runtime"),
+                    Float,
+                ),
+                func.cast(
+                    func.json_extract(TaskResources.requested_resources, "$.memory"),
+                    Float,
+                ),
+            ).where(TaskResources.id.in_(tr_ids))
+        ).all()
+        return {
+            int(r[0]): (
+                float(r[1]) if r[1] is not None else None,
+                float(r[2]) if r[2] is not None else None,
+            )
+            for r in rows
+        }
+
+    def _build_aggregates_response_from_sql(
+        self,
+        stats: Any,
+        cluster_counts: Any,
+        cluster_resources: Dict[int, tuple],
+    ) -> TaskTemplateResourceAggregatesResponse:
+        """Assemble the response from the two SQL aggregate results.
+
+        ``stats``: single-row mapping of KPIs + efficiency totals.
+        ``cluster_counts``: one row per task_resources_id with count.
+        ``cluster_resources``: tr_id → (runtime, memory) lookup.
+
+        Percentiles are left as ``None`` on the response — the frontend
+        fills them in from streaming viz rows so the aggregate endpoint
+        can complete without a second full scan.
+        """
+        num_tasks = int(stats["num_tasks"])
+        resp = TaskTemplateResourceAggregatesResponse(num_tasks=num_tasks)
+
+        if (stats["n_mr"] or 0) > 0:
+            resp.min_mem = int(stats["min_mem"])
+            resp.max_mem = int(stats["max_mem"])
+            resp.mean_mem = float(stats["mean_mem"])
+        if (stats["n_wc"] or 0) > 0:
+            resp.min_runtime = int(stats["min_rt"])
+            resp.max_runtime = int(stats["max_rt"])
+            resp.mean_runtime = float(stats["mean_rt"])
+
+        # median_requested_runtime / median_requested_memory left unset —
+        # frontend computes from the streaming viz rows.
+
+        # Build clusters by binning unique (runtime, memory) pairs using
+        # the same JS-round formula as the frontend's cluster-key builder.
+        # Merging multiple task_resources rows that share the same bin
+        # avoids duplicate chips when only ancillary fields differ.
+        merged: Dict[tuple, Dict[str, Any]] = {}
+        for row in cluster_counts:
+            tr_id = int(row.tr_id)
+            rt_mem = cluster_resources.get(tr_id)
+            if rt_mem is None:
+                continue
+            runtime, memory = rt_mem
+            if runtime is None or runtime <= 0 or memory is None or memory <= 0:
+                continue
+            key = (_js_round_tenth(memory), _js_round_tenth(runtime / 3600))
+            bucket = merged.setdefault(
+                key,
+                {"runtime": runtime, "memory": memory, "count": 0},
+            )
+            bucket["count"] += int(row.n)
         resp.resource_clusters = sorted(
             [
                 ResourceClusterItem(
-                    runtime=data["runtime"],
-                    memory=data["memory"],
-                    task_count=data["count"],
+                    runtime=b["runtime"],
+                    memory=b["memory"],
+                    task_count=b["count"],
                 )
-                for data in clusters.values()
+                for b in merged.values()
             ],
             key=lambda c: c.task_count,
             reverse=True,
         )
 
-        resp.efficiency = self._compute_efficiency(utilization_points)
-        return resp
-
-    @staticmethod
-    def _compute_efficiency(
-        points: List[Dict[str, float]],
-    ) -> ResourceEfficiencyMetrics:
-        """Match the frontend calculateResourceEfficiency math.
-
-        memory passed in here is GiB to align with the frontend's bytes_to_gib
-        conversion before scatter plotting.
-        """
-        if not points:
-            return ResourceEfficiencyMetrics()
-
-        total_actual_mem = 0.0
-        total_requested_mem = 0.0
-        total_actual_runtime = 0.0
-        total_requested_runtime = 0.0
-        over_mem = over_rt = under_mem = under_rt = 0
-
-        for p in points:
-            total_actual_mem += p["memory"]
-            total_requested_mem += p["requested_memory"]
-            total_actual_runtime += p["runtime"]
-            total_requested_runtime += p["requested_runtime"]
-
-            mem_util = (p["memory"] / p["requested_memory"]) * 100
-            rt_util = (p["runtime"] / p["requested_runtime"]) * 100
-            if mem_util < 50:
-                over_mem += 1
-            if mem_util > 90:
-                under_mem += 1
-            if rt_util < 50:
-                over_rt += 1
-            if rt_util > 90:
-                under_rt += 1
-
-        n = len(points)
-        runtimes = np.array([p["runtime"] for p in points], dtype=float)
-        memories = np.array([p["memory"] for p in points], dtype=float)
-        rt_mean, rt_std = float(runtimes.mean()), float(runtimes.std())
-        mem_mean, mem_std = float(memories.mean()), float(memories.std())
-        outliers = int(
-            sum(
-                abs(p["runtime"] - rt_mean) > 2 * rt_std
-                or abs(p["memory"] - mem_mean) > 2 * mem_std
-                for p in points
+        eff_n = int(stats["eff_n"] or 0)
+        if eff_n > 0:
+            tot_actual_mem = float(stats["tot_actual_mem"] or 0.0)
+            tot_req_mem = float(stats["tot_req_mem"] or 0.0)
+            tot_actual_rt = float(stats["tot_actual_rt"] or 0.0)
+            tot_req_rt = float(stats["tot_req_rt"] or 0.0)
+            resp.efficiency = ResourceEfficiencyMetrics(
+                memory_utilization=(
+                    (tot_actual_mem / tot_req_mem * 100) if tot_req_mem > 0 else 0.0
+                ),
+                runtime_utilization=(
+                    (tot_actual_rt / tot_req_rt * 100) if tot_req_rt > 0 else 0.0
+                ),
+                over_allocated_memory=round(int(stats["over_mem"] or 0) / eff_n * 100),
+                under_allocated_memory=round(
+                    int(stats["under_mem"] or 0) / eff_n * 100
+                ),
+                over_allocated_runtime=round(int(stats["over_rt"] or 0) / eff_n * 100),
+                under_allocated_runtime=round(
+                    int(stats["under_rt"] or 0) / eff_n * 100
+                ),
+                outlier_count=int(stats["outliers"] or 0),
             )
-        )
 
-        return ResourceEfficiencyMetrics(
-            memory_utilization=(
-                (total_actual_mem / total_requested_mem * 100)
-                if total_requested_mem > 0
-                else 0.0
-            ),
-            runtime_utilization=(
-                (total_actual_runtime / total_requested_runtime * 100)
-                if total_requested_runtime > 0
-                else 0.0
-            ),
-            over_allocated_memory=round(over_mem / n * 100),
-            under_allocated_memory=round(under_mem / n * 100),
-            over_allocated_runtime=round(over_rt / n * 100),
-            under_allocated_runtime=round(under_rt / n * 100),
-            p95_memory=float(np.percentile(memories, 95)),
-            p95_runtime=float(np.percentile(runtimes, 95)),
-            outlier_count=outliers,
-        )
+        return resp
 
     def get_task_template_resource_usage(
         self, req: TaskTemplateResourceUsageRequest
