@@ -663,28 +663,44 @@ export default function TaskTemplateDetails() {
     }, [dataForKPICalculations]);
 
     // Adapt the server aggregates response into the frontend KPI/efficiency
-    // shapes. Backend ships memory fields in bytes; frontend uses GiB.
-    const bytesToGiB = (b: number | null | undefined): number | undefined =>
-        b == null ? undefined : b / 1024 ** 3;
+    // shapes. Only treat the server data as authoritative when it actually
+    // represents real task instances:
+    //   * ``num_tasks > 0`` — zero-TI workflows (all tasks still
+    //     REGISTERING) come back with a default-zero efficiency object
+    //     we don't want overwriting client-computed values.
+    //   * ``!isFetching`` — a ``showLatestOnly`` toggle refetches
+    //     aggregates; during the transition the cached response is for
+    //     the *previous* toggle value while the client has already
+    //     recomputed for the new one, so we gate on ``isFetching`` to
+    //     avoid mixing the two.
+    const serverDataUsable =
+        !!aggregatesQuery.data &&
+        (aggregatesQuery.data.num_tasks ?? 0) > 0 &&
+        !aggregatesQuery.isFetching;
     const serverKpiStats: UsageKPIStats | undefined = useMemo(() => {
-        const a = aggregatesQuery.data;
-        if (!a) return undefined;
+        if (!serverDataUsable) return undefined;
+        const a = aggregatesQuery.data!;
         return {
             minRuntime: a.min_runtime ?? undefined,
             maxRuntime: a.max_runtime ?? undefined,
             meanRuntime: a.mean_runtime ?? undefined,
             medianRuntime: a.median_runtime ?? undefined,
-            minMemoryGiB: bytesToGiB(a.min_mem),
-            maxMemoryGiB: bytesToGiB(a.max_mem),
-            meanMemoryGiB: bytesToGiB(a.mean_mem),
-            medianMemoryGiB: bytesToGiB(a.median_mem),
+            minMemoryGiB:
+                a.min_mem != null ? bytes_to_gib(a.min_mem) : undefined,
+            maxMemoryGiB:
+                a.max_mem != null ? bytes_to_gib(a.max_mem) : undefined,
+            meanMemoryGiB:
+                a.mean_mem != null ? bytes_to_gib(a.mean_mem) : undefined,
+            medianMemoryGiB:
+                a.median_mem != null ? bytes_to_gib(a.median_mem) : undefined,
             medianRequestedRuntime: a.median_requested_runtime ?? undefined,
             medianRequestedMemoryGiB: a.median_requested_memory ?? undefined,
         };
-    }, [aggregatesQuery.data]);
+    }, [serverDataUsable, aggregatesQuery.data]);
     const serverResourceEfficiency: ResourceEfficiencyMetrics | undefined =
         useMemo(() => {
-            const e = aggregatesQuery.data?.efficiency;
+            if (!serverDataUsable) return undefined;
+            const e = aggregatesQuery.data!.efficiency;
             if (!e) return undefined;
             return {
                 memoryUtilization: e.memory_utilization,
@@ -697,7 +713,7 @@ export default function TaskTemplateDetails() {
                 p95Runtime: e.p95_runtime ?? undefined,
                 outlierCount: e.outlier_count,
             };
-        }, [aggregatesQuery.data?.efficiency]);
+        }, [serverDataUsable, aggregatesQuery.data]);
 
     // True when no user-driven filter narrows the page; in that state the
     // server aggregates are an exact match for what the client would
