@@ -11,6 +11,10 @@ type TaskResourceVizItem = components['schemas']['TaskResourceVizItem'];
 
 interface UseUsageFiltersProps {
     rawTaskNodesFromApi: TaskResourceVizItem[];
+    // Server-computed cluster list from the aggregates endpoint. When
+    // present, takes precedence over deriving from streaming scatter rows
+    // so the filter UI is complete on first paint.
+    serverResourceClusters?: ResourceCluster[];
 }
 
 interface UseUsageFiltersReturn {
@@ -22,14 +26,18 @@ interface UseUsageFiltersReturn {
 
 export const useUsageFilters = ({
     rawTaskNodesFromApi,
+    serverResourceClusters,
 }: UseUsageFiltersProps): UseUsageFiltersReturn => {
     const [selectedResourceClusters, setSelectedResourceClusters] = useState<
         Set<string>
     >(new Set());
 
     const availableResourceClusters = useMemo(() => {
+        if (serverResourceClusters && serverResourceClusters.length > 0) {
+            return serverResourceClusters;
+        }
         return extractResourceClusters(rawTaskNodesFromApi);
-    }, [rawTaskNodesFromApi]);
+    }, [serverResourceClusters, rawTaskNodesFromApi]);
 
     // Initialize filters when data changes
     useEffect(() => {

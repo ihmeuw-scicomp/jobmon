@@ -1,6 +1,13 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import axios from 'axios';
+import {
+    InfiniteData,
+    QueryFunctionContext,
+    useInfiniteQuery,
+    useQuery,
+    useQueryClient,
+} from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Collapse from '@mui/material/Collapse';
@@ -24,10 +31,13 @@ import ErrorClustersCard from '@jobmon_gui/components/task_template_details/usag
 import { useTaskTemplateDetails } from '@jobmon_gui/queries/GetTaskTemplateDetails.ts';
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
+import { USAGE_PAGE_SIZE } from '@jobmon_gui/queries/GetWorkflowUsage.ts';
+import { usage_url } from '@jobmon_gui/configs/ApiUrls.ts';
+import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
 import {
-    getWorkflowUsageQueryFn,
-    WorkflowUsageQueryKey,
-} from '@jobmon_gui/queries/GetWorkflowUsage.ts';
+    getTaskTemplateAggregatesQueryFn,
+    TaskTemplateAggregatesQueryKey,
+} from '@jobmon_gui/queries/GetTaskTemplateAggregates.ts';
 import {
     getClusteredErrorsFn,
     clusteredErrorsKey,
@@ -46,7 +56,10 @@ import { useUsageFilters } from '@jobmon_gui/hooks/useUsageFilters';
 import {
     calculateResourceEfficiency,
     calculateMedian,
+    createResourceClusterKey,
+    createResourceClusterLabel,
     getResourceClusterKey,
+    ResourceCluster,
 } from '@jobmon_gui/components/task_template_details/usage/usageCalculations';
 import { components } from '@jobmon_gui/types/apiSchema';
 import {
@@ -60,6 +73,9 @@ dayjs.extend(utc);
 
 type TaskTemplateResourceUsageResponse =
     components['schemas']['TaskTemplateResourceUsageResponse'];
+type TaskResourceVizItem = components['schemas']['TaskResourceVizItem'];
+type TaskTemplateResourceAggregatesResponse =
+    components['schemas']['TaskTemplateResourceAggregatesResponse'];
 
 export default function TaskTemplateDetails() {
     const { workflowId, taskTemplateId } = useParams();
@@ -83,21 +99,164 @@ export default function TaskTemplateDetails() {
         TaskTemplateDetailsData.data?.task_template_version_id;
     const taskTemplateName = TaskTemplateDetailsData.data?.task_template_name;
 
-    const queryKeyForWorkflowUsage: WorkflowUsageQueryKey = [
-        'workflow_details',
-        'usage',
-        taskTemplateVersionId,
-        workflowId,
+    // Page-drain concurrency. Three parallel useInfiniteQuery "streams"
+    // each drain a strided subset of pages (stream 0: 0, 3, 6, 9...;
+    // stream 1: 1, 4, 7, 10...; stream 2: 2, 5, 8, 11...). Each stream
+    // drains sequentially via its own ``fetchNextPage``, so the three
+    // together run 3 HTTP requests concurrently — chosen to stay under
+    // the 6-per-host browser cap and leave headroom for prod MySQL
+    // under load.
+    const USAGE_STREAMS = 3;
+    type StreamKey = readonly [
+        string,
+        string,
+        string | number | undefined,
+        string | number | undefined,
+        number,
     ];
-
-    const usageInfo = useQuery<
+    const makeStreamKey = (streamIndex: number): StreamKey =>
+        [
+            'workflow_details',
+            'usage_paged',
+            taskTemplateVersionId,
+            workflowId,
+            streamIndex,
+        ] as const;
+    const usageStreamFn = async (
+        context: QueryFunctionContext<StreamKey, number>
+    ): Promise<TaskTemplateResourceUsageResponse | undefined> => {
+        const { queryKey, pageParam = 0 } = context;
+        if (queryKey[2] === undefined || queryKey[3] === undefined) {
+            return undefined;
+        }
+        const response = await axios.post<TaskTemplateResourceUsageResponse>(
+            usage_url,
+            {
+                task_template_version_id: queryKey[2],
+                workflows: [queryKey[3]],
+                viz: true,
+                page: pageParam,
+                page_size: USAGE_PAGE_SIZE,
+            },
+            jobmonAxiosConfig
+        );
+        return response.data;
+    };
+    const usageStreamOptions = (streamIndex: number) => ({
+        queryKey: makeStreamKey(streamIndex),
+        queryFn: usageStreamFn,
+        initialPageParam: streamIndex,
+        getNextPageParam: (
+            lastPage: TaskTemplateResourceUsageResponse | undefined,
+            _allPages: (TaskTemplateResourceUsageResponse | undefined)[],
+            lastPageParam: number
+        ) => {
+            const total = lastPage?.total_count;
+            if (total == null) return undefined;
+            const totalPages = Math.ceil(total / USAGE_PAGE_SIZE);
+            const next = lastPageParam + USAGE_STREAMS;
+            return next < totalPages ? next : undefined;
+        },
+        staleTime: 5000,
+        enabled:
+            !!taskTemplateVersionId &&
+            !!workflowId &&
+            !TaskTemplateDetailsData.isLoading,
+    });
+    const usageStream0 = useInfiniteQuery<
         TaskTemplateResourceUsageResponse | undefined,
         Error,
+        InfiniteData<TaskTemplateResourceUsageResponse | undefined>,
+        StreamKey,
+        number
+    >(usageStreamOptions(0));
+    const usageStream1 = useInfiniteQuery<
         TaskTemplateResourceUsageResponse | undefined,
-        WorkflowUsageQueryKey
+        Error,
+        InfiniteData<TaskTemplateResourceUsageResponse | undefined>,
+        StreamKey,
+        number
+    >(usageStreamOptions(1));
+    const usageStream2 = useInfiniteQuery<
+        TaskTemplateResourceUsageResponse | undefined,
+        Error,
+        InfiniteData<TaskTemplateResourceUsageResponse | undefined>,
+        StreamKey,
+        number
+    >(usageStreamOptions(2));
+
+    // Eagerly drain each stream in the background.
+    useEffect(() => {
+        if (usageStream0.hasNextPage && !usageStream0.isFetchingNextPage) {
+            usageStream0.fetchNextPage();
+        }
+    }, [
+        usageStream0.hasNextPage,
+        usageStream0.isFetchingNextPage,
+        usageStream0.data?.pages.length,
+        usageStream0.fetchNextPage,
+    ]);
+    useEffect(() => {
+        if (usageStream1.hasNextPage && !usageStream1.isFetchingNextPage) {
+            usageStream1.fetchNextPage();
+        }
+    }, [
+        usageStream1.hasNextPage,
+        usageStream1.isFetchingNextPage,
+        usageStream1.data?.pages.length,
+        usageStream1.fetchNextPage,
+    ]);
+    useEffect(() => {
+        if (usageStream2.hasNextPage && !usageStream2.isFetchingNextPage) {
+            usageStream2.fetchNextPage();
+        }
+    }, [
+        usageStream2.hasNextPage,
+        usageStream2.isFetchingNextPage,
+        usageStream2.data?.pages.length,
+        usageStream2.fetchNextPage,
+    ]);
+
+    const rawTaskNodesFromApi = useMemo(() => {
+        const all: TaskResourceVizItem[] = [];
+        for (const stream of [usageStream0, usageStream1, usageStream2]) {
+            stream.data?.pages.forEach(p => {
+                if (p?.result_viz) all.push(...p.result_viz);
+            });
+        }
+        return all;
+    }, [
+        usageStream0.data?.pages,
+        usageStream1.data?.pages,
+        usageStream2.data?.pages,
+    ]);
+
+    // Page-wide filters — these feed both the aggregates query scope and
+    // client-side filtering of the streaming viz rows. Declared up here so
+    // the aggregates query key can depend on them.
+    const [showLatestOnly, setShowLatestOnly] = useState(true);
+    const [selectedWorkflowRunId, setSelectedWorkflowRunId] = useState<
+        number | null
+    >(null);
+
+    // Aggregates query: fast server-computed KPIs that render immediately
+    // while the paginated viz query streams in. Key includes
+    // `showLatestOnly` so toggling the filter refetches a matching view.
+    const aggregatesQueryKey: TaskTemplateAggregatesQueryKey = [
+        'workflow_details',
+        'usage_aggregates',
+        taskTemplateVersionId,
+        workflowId,
+        showLatestOnly,
+    ];
+    const aggregatesQuery = useQuery<
+        TaskTemplateResourceAggregatesResponse | undefined,
+        Error,
+        TaskTemplateResourceAggregatesResponse | undefined,
+        TaskTemplateAggregatesQueryKey
     >({
-        queryKey: queryKeyForWorkflowUsage,
-        queryFn: getWorkflowUsageQueryFn,
+        queryKey: aggregatesQueryKey,
+        queryFn: getTaskTemplateAggregatesQueryFn,
         staleTime: 5000,
         enabled:
             !!taskTemplateVersionId &&
@@ -105,10 +264,27 @@ export default function TaskTemplateDetails() {
             !TaskTemplateDetailsData.isLoading,
     });
 
-    const rawTaskNodesFromApi = useMemo(
-        () => usageInfo.data?.result_viz ?? [],
-        [usageInfo.data?.result_viz]
-    );
+    // Adapt server clusters to the frontend ResourceCluster shape. The
+    // server ships only numbers (runtime, memory, task_count); we derive
+    // the string cluster id via the same ``createResourceClusterKey`` the
+    // scatter-row predicate uses, so the two sides never rely on a
+    // cross-language string contract to agree.
+    const serverResourceClusters: ResourceCluster[] | undefined =
+        useMemo(() => {
+            const clusters = aggregatesQuery.data?.resource_clusters;
+            if (!clusters) return undefined;
+            return clusters.map(c => ({
+                id: createResourceClusterKey(c.runtime, c.memory),
+                runtime: c.runtime,
+                memory: c.memory,
+                taskCount: c.task_count,
+                label: createResourceClusterLabel(
+                    c.runtime,
+                    c.memory,
+                    c.task_count
+                ),
+            }));
+        }, [aggregatesQuery.data?.resource_clusters]);
 
     // --- Clustered Errors query (for badge + Error Summary card) ---
     const clusteredErrorsQuery = useQuery({
@@ -146,15 +322,11 @@ export default function TaskTemplateDetails() {
         availableResourceClusters,
         setSelectedResourceClusters,
         resetFilters,
-    } = useUsageFilters({ rawTaskNodesFromApi });
+    } = useUsageFilters({ rawTaskNodesFromApi, serverResourceClusters });
 
     // --- Plot interaction state ---
     const [selectedData, setSelectedData] = useState<ScatterDataPoint[]>([]);
     const [showResourceZones, setShowResourceZones] = useState(false);
-    const [showLatestOnly, setShowLatestOnly] = useState(true);
-    const [selectedWorkflowRunId, setSelectedWorkflowRunId] = useState<
-        number | null
-    >(null);
     const [tableFilteredInstanceIds, setTableFilteredInstanceIds] =
         useState<Set<number> | null>(null);
 
@@ -436,7 +608,7 @@ export default function TaskTemplateDetails() {
         [dataForKPICalculations]
     );
 
-    const kpiStats: UsageKPIStats = useMemo(
+    const clientKpiStats: UsageKPIStats = useMemo(
         () => ({
             minRuntime:
                 kpiRuntimes.length > 0 ? Math.min(...kpiRuntimes) : undefined,
@@ -473,7 +645,7 @@ export default function TaskTemplateDetails() {
         ]
     );
 
-    const resourceEfficiency: ResourceEfficiencyMetrics = useMemo(() => {
+    const clientResourceEfficiency: ResourceEfficiencyMetrics = useMemo(() => {
         if (dataForKPICalculations.length === 0) {
             return {
                 memoryUtilization: 0,
@@ -489,6 +661,99 @@ export default function TaskTemplateDetails() {
         }
         return calculateResourceEfficiency(dataForKPICalculations);
     }, [dataForKPICalculations]);
+
+    // Adapt the server aggregates response into the frontend KPI/efficiency
+    // shapes. Only treat the server data as authoritative when it actually
+    // represents real task instances:
+    //   * ``num_tasks > 0`` — zero-TI workflows (all tasks still
+    //     REGISTERING) come back with a default-zero efficiency object
+    //     we don't want overwriting client-computed values.
+    //   * ``!isFetching`` — a ``showLatestOnly`` toggle refetches
+    //     aggregates; during the transition the cached response is for
+    //     the *previous* toggle value while the client has already
+    //     recomputed for the new one, so we gate on ``isFetching`` to
+    //     avoid mixing the two.
+    const serverDataUsable =
+        !!aggregatesQuery.data &&
+        (aggregatesQuery.data.num_tasks ?? 0) > 0 &&
+        !aggregatesQuery.isFetching;
+    const serverKpiStats: UsageKPIStats | undefined = useMemo(() => {
+        if (!serverDataUsable) return undefined;
+        const a = aggregatesQuery.data!;
+        return {
+            minRuntime: a.min_runtime ?? undefined,
+            maxRuntime: a.max_runtime ?? undefined,
+            meanRuntime: a.mean_runtime ?? undefined,
+            medianRuntime: a.median_runtime ?? undefined,
+            minMemoryGiB:
+                a.min_mem != null ? bytes_to_gib(a.min_mem) : undefined,
+            maxMemoryGiB:
+                a.max_mem != null ? bytes_to_gib(a.max_mem) : undefined,
+            meanMemoryGiB:
+                a.mean_mem != null ? bytes_to_gib(a.mean_mem) : undefined,
+            medianMemoryGiB:
+                a.median_mem != null ? bytes_to_gib(a.median_mem) : undefined,
+            medianRequestedRuntime: a.median_requested_runtime ?? undefined,
+            medianRequestedMemoryGiB: a.median_requested_memory ?? undefined,
+        };
+    }, [serverDataUsable, aggregatesQuery.data]);
+    const serverResourceEfficiency: ResourceEfficiencyMetrics | undefined =
+        useMemo(() => {
+            if (!serverDataUsable) return undefined;
+            const e = aggregatesQuery.data!.efficiency;
+            if (!e) return undefined;
+            return {
+                memoryUtilization: e.memory_utilization,
+                runtimeUtilization: e.runtime_utilization,
+                overAllocatedMemory: e.over_allocated_memory,
+                underAllocatedMemory: e.under_allocated_memory,
+                overAllocatedRuntime: e.over_allocated_runtime,
+                underAllocatedRuntime: e.under_allocated_runtime,
+                p95Memory: e.p95_memory ?? undefined,
+                p95Runtime: e.p95_runtime ?? undefined,
+                outlierCount: e.outlier_count,
+            };
+        }, [serverDataUsable, aggregatesQuery.data]);
+
+    // True when no user-driven filter narrows the page; in that state the
+    // server aggregates are an exact match for what the client would
+    // compute from the full streaming rowset, so we render them directly
+    // for instant KPIs without waiting for pagination to drain.
+    const isUnfilteredDefault =
+        selectedData.length === 0 &&
+        tableFilteredInstanceIds === null &&
+        selectedWorkflowRunId === null &&
+        selectedResourceClusters.size === availableResourceClusters.length;
+
+    // Per-field merge so the server's fast values (min/max/mean, count)
+    // render instantly while fields the server doesn't compute
+    // (median, p95 — require sort) fall back to the client-side result
+    // as soon as enough viz pages have streamed in. A whole-object
+    // pick would permanently hide the server's undefined medians.
+    const kpiStats: UsageKPIStats = useMemo(() => {
+        if (!isUnfilteredDefault || !serverKpiStats) return clientKpiStats;
+        const merged = { ...clientKpiStats } as Record<string, unknown>;
+        for (const [k, v] of Object.entries(serverKpiStats)) {
+            if (v !== undefined && v !== null) merged[k] = v;
+        }
+        return merged as UsageKPIStats;
+    }, [isUnfilteredDefault, serverKpiStats, clientKpiStats]);
+    const resourceEfficiency: ResourceEfficiencyMetrics = useMemo(() => {
+        if (!isUnfilteredDefault || !serverResourceEfficiency)
+            return clientResourceEfficiency;
+        const merged = { ...clientResourceEfficiency } as Record<
+            string,
+            unknown
+        >;
+        for (const [k, v] of Object.entries(serverResourceEfficiency)) {
+            if (v !== undefined && v !== null) merged[k] = v;
+        }
+        return merged as unknown as ResourceEfficiencyMetrics;
+    }, [
+        isUnfilteredDefault,
+        serverResourceEfficiency,
+        clientResourceEfficiency,
+    ]);
 
     // --- CSV download ---
     const downloadCSV = () => {
@@ -608,7 +873,10 @@ export default function TaskTemplateDetails() {
         return <Typography>Error loading template.</Typography>;
     }
 
-    const usageIsLoading = usageInfo.isLoading;
+    const usageIsLoading =
+        usageStream0.isLoading ||
+        usageStream1.isLoading ||
+        usageStream2.isLoading;
 
     return (
         <Box>
@@ -739,7 +1007,7 @@ export default function TaskTemplateDetails() {
                                     }}
                                 >
                                     <UsagePlotSection
-                                        isLoading={usageInfo.isLoading}
+                                        isLoading={usageIsLoading}
                                         filteredScatterData={
                                             effectiveScatterData
                                         }

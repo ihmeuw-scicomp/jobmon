@@ -16,6 +16,8 @@ export type WorkflowUsageQueryKey = readonly [
     string | number | undefined,
 ];
 
+export const USAGE_PAGE_SIZE = 2000;
+
 export const getWorkflowUsageQueryFn = async (
     context: QueryFunctionContext<WorkflowUsageQueryKey>
 ): Promise<TaskTemplateResourceUsageResponse | undefined> => {

@@ -10,6 +10,81 @@ class TaskTemplateResourceUsageRequest(BaseModel):
     node_args: Optional[Dict[str, List[str]]] = None
     ci: Optional[str] = None
     viz: bool = False
+    page: Optional[int] = Field(default=None, ge=0)
+    page_size: Optional[int] = Field(default=None, ge=1, le=5000)
+
+
+class TaskTemplateResourceAggregatesRequest(BaseModel):
+    """Request for the lightweight aggregates endpoint."""
+
+    task_template_version_id: int
+    workflows: Optional[List[int]] = None
+    node_args: Optional[Dict[str, List[str]]] = None
+    # When True (default, matches the UI's default "latest only" toggle),
+    # aggregate only over the latest TaskInstance per Task. When False,
+    # aggregate across all attempts — useful for diagnosing retry waste.
+    latest_only: bool = True
+
+
+class ResourceClusterItem(BaseModel):
+    """One requested-resource cluster summary.
+
+    We ship only the numeric ``(runtime, memory)`` pair plus the count;
+    the frontend derives the string cluster key itself using the same
+    rounding/formatting it applies to scatter rows, so there's no
+    cross-language string contract that can drift between Python and JS.
+
+    Cluster → instance membership is also recomputed frontend-side from
+    streaming scatter rows — shipping per-instance IDs here would
+    dominate the aggregates payload on large templates.
+    """
+
+    runtime: float
+    memory: float
+    task_count: int
+
+
+class ResourceEfficiencyMetrics(BaseModel):
+    """Aggregate resource efficiency metrics for a task template."""
+
+    memory_utilization: float = 0.0
+    runtime_utilization: float = 0.0
+    over_allocated_memory: int = 0
+    under_allocated_memory: int = 0
+    over_allocated_runtime: int = 0
+    under_allocated_runtime: int = 0
+    p95_memory: Optional[float] = None
+    p95_runtime: Optional[float] = None
+    outlier_count: int = 0
+
+
+class TaskTemplateResourceAggregatesResponse(BaseModel):
+    """Compact server-computed aggregates for a task template.
+
+    Memory and runtime stats are ``Optional[float]`` (not ``int``) so
+    the client's per-field merge doesn't permanently overwrite more
+    precise client-computed floats with a truncated integer.
+    ``efficiency`` defaults to ``None`` when the template has no
+    efficiency-relevant data (zero-TI workflow, or TIs without
+    requested resources) so the frontend can distinguish "no server
+    data" from "server says all zeros".
+    """
+
+    num_tasks: Optional[int] = None
+    min_mem: Optional[float] = None
+    max_mem: Optional[float] = None
+    mean_mem: Optional[float] = None
+    median_mem: Optional[float] = None
+    p95_mem: Optional[float] = None
+    min_runtime: Optional[float] = None
+    max_runtime: Optional[float] = None
+    mean_runtime: Optional[float] = None
+    median_runtime: Optional[float] = None
+    p95_runtime: Optional[float] = None
+    median_requested_runtime: Optional[float] = None
+    median_requested_memory: Optional[float] = None
+    resource_clusters: List[ResourceClusterItem] = []
+    efficiency: Optional[ResourceEfficiencyMetrics] = None
 
 
 class RequestedResourcesModel(BaseModel):  # Optional: For parsing the JSON string
@@ -93,6 +168,11 @@ class TaskTemplateResourceUsageResponse(BaseModel):
 
     # Visualization data (optional, only when viz=True)
     result_viz: Optional[List[TaskResourceVizItem]] = None
+
+    # Pagination metadata (only populated when request supplied page/page_size)
+    total_count: Optional[int] = None
+    page: Optional[int] = None
+    page_size: Optional[int] = None
 
     # Computed properties for client convenience
     @computed_field

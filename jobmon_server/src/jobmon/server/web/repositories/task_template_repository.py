@@ -1,4 +1,5 @@
 import json
+import math
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Union
@@ -7,7 +8,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 import scipy.stats as st  # type: ignore
 import structlog
-from sqlalchemy import String, and_, case, exists, func, select
+from sqlalchemy import Double, String, and_, case, exists, func, or_, select, true
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement, Label
 
@@ -34,9 +35,12 @@ from jobmon.server.web.schemas.task_template import (
     MostPopularQueueResponse,
     QueueInfoItem,
     RequestedCoresResponse,
+    ResourceClusterItem,
+    ResourceEfficiencyMetrics,
     TaskResourceDetailItem,
     TaskResourceVizItem,
     TaskTemplateDetailsResponse,
+    TaskTemplateResourceAggregatesResponse,
     TaskTemplateResourceUsageRequest,
     TaskTemplateVersionItem,
     TaskTemplateVersionResponse,
@@ -44,6 +48,19 @@ from jobmon.server.web.schemas.task_template import (
 )
 
 logger = structlog.get_logger(__name__)
+
+
+def _js_round_tenth(x: float) -> float:
+    """Round ``x`` to one decimal using JS ``Math.round`` semantics.
+
+    JS rounds half up toward +∞ (``Math.round(0.5) === 1``), while
+    Python's ``round`` uses banker's rounding (``round(0.5) == 0``).
+    Cluster boundaries must align with the frontend's rounding so a
+    task-instance row the UI classifies as cluster A is counted as
+    cluster A on the server too. ``requested_resources`` values are
+    always non-negative here, so ``floor(x + 0.5)`` suffices.
+    """
+    return math.floor(x * 10 + 0.5) / 10
 
 
 @dataclass
@@ -107,6 +124,8 @@ class TaskTemplateRepository:
         task_template_version_id: int,
         workflows: Optional[List[int]],
         node_args: Optional[Dict[str, List[Any]]],
+        limit: Optional[int] = None,
+        offset: int = 0,
     ) -> List[TaskResourceDetailItem]:
         """Fetch and filter task resource details with optimized single-query approach.
 
@@ -116,6 +135,10 @@ class TaskTemplateRepository:
         - Tasks with running/launched instances → instance row, null resources
         - Tasks with no instances yet (registered) → single row, null instance fields
         Status falls back to Task.status when no instance exists.
+
+        Pagination: when ``limit`` is provided, rows are ordered by
+        ``(Task.id, TaskInstance.id)`` for deterministic paging and the
+        supplied ``offset`` / ``limit`` are applied.
         """
         base_filters = [
             TaskTemplateVersion.id == task_template_version_id,
@@ -133,42 +156,125 @@ class TaskTemplateRepository:
             .label("attempt_number_of_instance")
         )
 
+        # Narrow ``requested_resources`` to the fields the UI and CSV
+        # export actually need — the documented ``RequestedResourcesModel``
+        # schema (memory, runtime, cores, queue). The full blob averages
+        # ~700 bytes/row on templates like ``pixel`` (paths, project
+        # config, stderr/stdout paths, command args) and dominated the
+        # per-row payload size. MySQL ``JSON_OBJECT`` builds the narrow
+        # JSON server-side so we ship ~60 bytes/row instead. CSV
+        # export's ``requested_resources_json`` column now exposes the
+        # narrowed blob, but all four documented fields are preserved.
+        narrow_req_res = func.json_object(
+            "memory",
+            func.json_extract(TaskResources.requested_resources, "$.memory"),
+            "runtime",
+            func.json_extract(TaskResources.requested_resources, "$.runtime"),
+            "cores",
+            func.json_extract(TaskResources.requested_resources, "$.cores"),
+            "queue",
+            func.json_extract(TaskResources.requested_resources, "$.queue"),
+        ).label("requested_resources_col")
+
         if not node_args:
-            # No node_args filtering - use optimized single query
-            query = (
-                select(
-                    # TaskInstance resource usage fields
-                    TaskInstance.wallclock,
-                    TaskInstance.maxrss,
-                    status_col,
-                    # Node and Task identifiers
-                    Node.id.label("node_id_col"),
-                    Task.id.label("task_id_col"),
-                    Task.name.label("task_name_col"),
-                    # Task metadata fields
-                    Task.status_date.label("task_status_date_col"),
-                    Task.command.label("task_command_col"),
-                    Task.num_attempts.label("task_num_attempts_col"),
-                    Task.max_attempts.label("task_max_attempts_col"),
-                    # Requested resources and attempt number
-                    TaskResources.requested_resources.label("requested_resources_col"),
-                    attempt_number_col,
-                    TaskInstance.id.label("task_instance_id_col"),
-                    TaskInstance.workflow_run_id.label("workflow_run_id_col"),
+            # Deferred-join pagination: pass 1 enumerates the
+            # ``(task_id, task_instance_id)`` pairs we want, pass 2
+            # fetches full row data for those ids. The outer join on
+            # ``task_instance`` in pass 1 preserves tasks with no
+            # instances yet (registered-but-not-launched), which show
+            # up as a single row with null instance / resource fields
+            # — matching the unpaged path's behavior. Pass 2 also
+            # outer-joins on ``task_instance_id`` so the row survives
+            # when ``paged.ti_id`` is null.
+            #
+            # ``attempt_num`` is computed inside pass 1 (before the
+            # LIMIT applies) so the window sees every matching
+            # task_instance per task, not just the paged subset — a
+            # task's attempts that span page boundaries still number
+            # correctly. Tasks without an instance get rank 1 for
+            # their null row.
+            paged_ids = None
+            if limit is not None:
+                paged_ids = (
+                    select(
+                        Task.id.label("paged_task_id"),
+                        TaskInstance.id.label("paged_ti_id"),
+                        func.row_number()
+                        .over(
+                            partition_by=Task.id,
+                            order_by=TaskInstance.id,
+                        )
+                        .label("paged_attempt_num"),
+                    )
+                    .select_from(TaskTemplateVersion)
+                    .join(
+                        Node,
+                        TaskTemplateVersion.id == Node.task_template_version_id,
+                    )
+                    .join(Task, Node.id == Task.node_id)
+                    .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
+                    .where(and_(*base_filters))
+                    .order_by(Task.id, TaskInstance.id)
+                    .offset(offset)
+                    .limit(limit)
+                    .subquery("paged")
                 )
-                .select_from(TaskTemplateVersion)
-                .join(
-                    Node,
-                    TaskTemplateVersion.id == Node.task_template_version_id,
-                )
-                .join(Task, Node.id == Task.node_id)
-                .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
-                .outerjoin(
-                    TaskResources,
-                    TaskInstance.task_resources_id == TaskResources.id,
-                )
-                .where(and_(*base_filters))
+
+            query = select(
+                # TaskInstance resource usage fields
+                TaskInstance.wallclock,
+                TaskInstance.maxrss,
+                status_col,
+                # Node and Task identifiers
+                Node.id.label("node_id_col"),
+                Task.id.label("task_id_col"),
+                Task.name.label("task_name_col"),
+                # Task metadata fields
+                Task.status_date.label("task_status_date_col"),
+                Task.command.label("task_command_col"),
+                Task.num_attempts.label("task_num_attempts_col"),
+                Task.max_attempts.label("task_max_attempts_col"),
+                # Requested resources (narrowed to memory+runtime only)
+                narrow_req_res,
+                (
+                    paged_ids.c.paged_attempt_num.label("attempt_number_of_instance")
+                    if paged_ids is not None
+                    else attempt_number_col
+                ),
+                TaskInstance.id.label("task_instance_id_col"),
+                TaskInstance.workflow_run_id.label("workflow_run_id_col"),
             )
+
+            if paged_ids is not None:
+                query = (
+                    query.select_from(paged_ids)
+                    .join(Task, Task.id == paged_ids.c.paged_task_id)
+                    .join(Node, Node.id == Task.node_id)
+                    .outerjoin(
+                        TaskInstance,
+                        TaskInstance.id == paged_ids.c.paged_ti_id,
+                    )
+                    .outerjoin(
+                        TaskResources,
+                        TaskInstance.task_resources_id == TaskResources.id,
+                    )
+                    .order_by(Task.id, TaskInstance.id)
+                )
+            else:
+                query = (
+                    query.select_from(TaskTemplateVersion)
+                    .join(
+                        Node,
+                        TaskTemplateVersion.id == Node.task_template_version_id,
+                    )
+                    .join(Task, Node.id == Task.node_id)
+                    .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
+                    .outerjoin(
+                        TaskResources,
+                        TaskInstance.task_resources_id == TaskResources.id,
+                    )
+                    .where(and_(*base_filters))
+                )
 
             rows = self.session.execute(query).all()
 
@@ -207,6 +313,8 @@ class TaskTemplateRepository:
                 base_filters,
                 status_col,
                 attempt_number_col,
+                limit=limit,
+                offset=offset,
             )
 
     def _get_task_resource_details_with_node_args(
@@ -217,8 +325,25 @@ class TaskTemplateRepository:
         base_filters: List[ColumnElement],
         status_col: Label,
         attempt_number_col: Label,
+        limit: Optional[int] = None,
+        offset: int = 0,
     ) -> List[TaskResourceDetailItem]:
         """Optimized node_args filtering using database-level joins and filtering."""
+        # See ``get_task_resource_details`` for rationale — ship only
+        # the documented ``RequestedResourcesModel`` fields (memory,
+        # runtime, cores, queue) so the viz path stays narrow while
+        # CSV export's ``requested_resources_json`` preserves all
+        # four.
+        narrow_req_res = func.json_object(
+            "memory",
+            func.json_extract(TaskResources.requested_resources, "$.memory"),
+            "runtime",
+            func.json_extract(TaskResources.requested_resources, "$.runtime"),
+            "cores",
+            func.json_extract(TaskResources.requested_resources, "$.cores"),
+            "queue",
+            func.json_extract(TaskResources.requested_resources, "$.queue"),
+        ).label("requested_resources")
         base_query = (
             select(
                 TaskInstance.wallclock,
@@ -226,7 +351,7 @@ class TaskTemplateRepository:
                 Node.id.label("node_id"),
                 Task.id.label("task_id"),
                 Task.name.label("task_name"),
-                TaskResources.requested_resources,
+                narrow_req_res,
                 attempt_number_col,
                 status_col,
                 Task.status_date.label("task_status_date"),
@@ -288,6 +413,15 @@ class TaskTemplateRepository:
 
         for subquery in node_arg_subqueries:
             final_query = final_query.where(base_query.c.node_id.in_(subquery))
+
+        if limit is not None:
+            final_query = (
+                final_query.order_by(
+                    base_query.c.task_id, base_query.c.task_instance_id
+                )
+                .offset(offset)
+                .limit(limit)
+            )
 
         rows = self.session.execute(final_query).all()
 
@@ -442,6 +576,508 @@ class TaskTemplateRepository:
                 ]
 
         return stats
+
+    def count_task_resource_details(
+        self,
+        task_template_version_id: int,
+        workflows: Optional[List[int]],
+        node_args: Optional[Dict[str, List[Any]]],
+    ) -> int:
+        """Count rows that get_task_resource_details would return.
+
+        Used by the paginated endpoint to report ``total_count`` without
+        materializing the full detail payload. Uses ``LEFT OUTER JOIN``
+        on ``task_instance`` to match the paged detail query shape:
+        tasks with no instances yet (registered-but-not-launched)
+        appear as a single row in the paged output, so they must be
+        counted here too or ``total_count`` understates the true row
+        count and the frontend stops paginating early.
+        """
+        base_filters = [TaskTemplateVersion.id == task_template_version_id]
+        if workflows:
+            base_filters.append(Task.workflow_id.in_(workflows))
+
+        count_query = (
+            select(func.count())
+            .select_from(TaskTemplateVersion)
+            .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+            .join(Task, Node.id == Task.node_id)
+            .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
+            .where(and_(*base_filters))
+        )
+
+        if node_args:
+            for arg_name, arg_values in node_args.items():
+                str_values = [str(v) for v in arg_values]
+                subquery = (
+                    select(NodeArg.node_id)
+                    .join(Arg, NodeArg.arg_id == Arg.id)
+                    .where(
+                        and_(
+                            Arg.name == arg_name,
+                            func.cast(NodeArg.val, String).in_(str_values),
+                        )
+                    )
+                )
+                count_query = count_query.where(Node.id.in_(subquery))
+
+        return int(self.session.execute(count_query).scalar_one())
+
+    def get_task_resource_aggregates(
+        self,
+        task_template_version_id: int,
+        workflows: Optional[List[int]],
+        node_args: Optional[Dict[str, List[Any]]] = None,
+        latest_only: bool = True,
+    ) -> TaskTemplateResourceAggregatesResponse:
+        """Compute compact aggregates for a task template.
+
+        Aggregation runs entirely in MySQL: a single main query returns
+        one row of stats + efficiency totals + outlier count, and a
+        second query groups by ``task_resources_id`` for cluster
+        breakdown. Avoids the previous 78K-row ship-to-Python pattern
+        which was bottlenecked on row serialization (~10s for pixel).
+
+        Median / p95 for wallclock and maxrss are not computed
+        server-side — percentiles don't compose across GROUP BYs and
+        running separate ``ORDER BY LIMIT OFFSET`` scans per column
+        erodes the win. The frontend computes these client-side from
+        the streaming viz rows instead, falling back to ``undefined``
+        on the initial paint.
+
+        When ``latest_only`` is True (the UI default), only the latest
+        TaskInstance per Task is included, so the numbers match the
+        latest-only scatter / table view.
+        """
+        inner = self._build_aggregates_rowset(
+            task_template_version_id, workflows, node_args, latest_only
+        )
+
+        stats = (
+            self.session.execute(self._main_aggregates_query(inner.subquery("t")))
+            .mappings()
+            .one_or_none()
+        )
+        if stats is None or (stats["num_tasks"] or 0) == 0:
+            has_any = (
+                self.session.execute(
+                    select(Task.id)
+                    .select_from(TaskTemplateVersion)
+                    .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+                    .join(Task, Node.id == Task.node_id)
+                    .where(TaskTemplateVersion.id == task_template_version_id)
+                    .limit(1)
+                ).first()
+                is not None
+            )
+            return TaskTemplateResourceAggregatesResponse(
+                num_tasks=0 if has_any else None
+            )
+
+        # Reuse the already-built ``inner`` select rather than constructing
+        # a second copy. MySQL still executes the subquery once per outer
+        # statement, but this halves the Python-side construction cost
+        # and keeps the two aggregate queries guaranteed-identical.
+        cluster_counts = self.session.execute(
+            self._cluster_groupby_query(inner.subquery("t_clust"))
+        ).all()
+        cluster_resources = self._fetch_cluster_resources(
+            [int(r.tr_id) for r in cluster_counts if r.tr_id is not None]
+        )
+
+        return self._build_aggregates_response_from_sql(
+            stats, cluster_counts, cluster_resources
+        )
+
+    def _build_aggregates_rowset(
+        self,
+        task_template_version_id: int,
+        workflows: Optional[List[int]],
+        node_args: Optional[Dict[str, List[Any]]],
+        latest_only: bool,
+    ) -> Any:
+        """Build the scoped inner SELECT for the aggregate queries.
+
+        This is the per-task_instance rowset the main aggregate and the
+        cluster-GROUP BY queries both project onto. Values are CAST
+        here so outer queries see typed numeric columns (``wallclock``
+        and ``maxrss`` are VARCHAR(50) in the schema).
+
+        When ``latest_only`` is True we pick the latest ``task_instance``
+        per task via a ``LATERAL`` subquery ordered by ``id DESC LIMIT 1``.
+        With the ``ix_ti_task_id_covering`` covering index in place, the
+        latest row is served index-only — no heap read for
+        ``wallclock`` / ``maxrss`` / ``task_resources_id``. EXPLAIN shows
+        ``Using index`` on the lateral side. Previously we used a
+        correlated ``MAX(id)`` subquery and MySQL's optimizer fell back
+        to a PK heap lookup for the outer row (~78K of them on pixel).
+        """
+        # Cast to DOUBLE (64-bit) not FLOAT (32-bit) so values like 5.05
+        # survive the roundtrip without the ``5.050000190734863`` artifact
+        # that MySQL FLOAT introduces — that artifact rounds differently
+        # from a 64-bit JS number and would shift cluster keys between
+        # server and client.
+        req_rt_num = func.cast(
+            func.json_extract(TaskResources.requested_resources, "$.runtime"),
+            Double,
+        ).label("req_rt")
+        req_mem_num = func.cast(
+            func.json_extract(TaskResources.requested_resources, "$.memory"),
+            Double,
+        ).label("req_mem")
+
+        base_filters: List[ColumnElement] = [
+            TaskTemplateVersion.id == task_template_version_id,
+        ]
+        if workflows:
+            base_filters.append(Task.workflow_id.in_(workflows))
+
+        dialect = self.session.bind.dialect.name if self.session.bind else ""
+        if latest_only and dialect == "mysql":
+            # LATERAL lets MySQL's planner use the covering index
+            # ``ix_ti_task_id_covering`` index-only — no heap reads on
+            # wallclock/maxrss/task_resources_id. ~3-4x faster on pixel.
+            # SQLite doesn't support LATERAL, so tests fall through to
+            # the correlated-scalar branch below.
+            latest_lat = (
+                select(
+                    TaskInstance.wallclock.label("wc_raw"),
+                    TaskInstance.maxrss.label("mr_raw"),
+                    TaskInstance.task_resources_id.label("tr_id"),
+                )
+                .where(TaskInstance.task_id == Task.id)
+                .order_by(TaskInstance.id.desc())
+                .limit(1)
+                .lateral("lti")
+            )
+
+            q = (
+                select(
+                    func.cast(latest_lat.c.wc_raw, Double).label("wc"),
+                    func.cast(latest_lat.c.mr_raw, Double).label("mr"),
+                    req_rt_num,
+                    req_mem_num,
+                    latest_lat.c.tr_id.label("tr_id"),
+                )
+                .select_from(TaskTemplateVersion)
+                .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+                .join(Task, Node.id == Task.node_id)
+                .join(latest_lat, true())
+                .outerjoin(
+                    TaskResources,
+                    latest_lat.c.tr_id == TaskResources.id,
+                )
+                .where(and_(*base_filters))
+            )
+        else:
+            wc_num = func.cast(TaskInstance.wallclock, Double).label("wc")
+            mr_num = func.cast(TaskInstance.maxrss, Double).label("mr")
+            q = (
+                select(
+                    wc_num,
+                    mr_num,
+                    req_rt_num,
+                    req_mem_num,
+                    TaskInstance.task_resources_id.label("tr_id"),
+                )
+                .select_from(TaskTemplateVersion)
+                .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+                .join(Task, Node.id == Task.node_id)
+                .join(TaskInstance, Task.id == TaskInstance.task_id)
+                .outerjoin(
+                    TaskResources,
+                    TaskInstance.task_resources_id == TaskResources.id,
+                )
+                .where(and_(*base_filters))
+            )
+
+            if latest_only:
+                # Fallback for dialects without LATERAL (sqlite tests).
+                # Correlated scalar subquery on MAX(id); less optimal on
+                # MySQL (no covering-index benefit) but portable.
+                latest_ti_id = (
+                    select(func.max(TaskInstance.id))
+                    .where(TaskInstance.task_id == Task.id)
+                    .correlate(Task)
+                    .scalar_subquery()
+                )
+                q = q.where(TaskInstance.id == latest_ti_id)
+
+        if node_args:
+            for arg_name, arg_values in node_args.items():
+                str_values = [str(v) for v in arg_values]
+                subquery = (
+                    select(NodeArg.node_id)
+                    .join(Arg, NodeArg.arg_id == Arg.id)
+                    .where(
+                        and_(
+                            Arg.name == arg_name,
+                            func.cast(NodeArg.val, String).in_(str_values),
+                        )
+                    )
+                )
+                q = q.where(Node.id.in_(subquery))
+
+        return q
+
+    @staticmethod
+    def _main_aggregates_query(t: Any) -> Any:
+        """Single-row aggregate: KPIs + efficiency totals + outlier count.
+
+        Two gates are used, matching the frontend's data populations so
+        numbers don't visibly jump when the user toggles a filter:
+
+          * ``kpi_valid = wc > 0 AND mr > 0`` — the upstream scatter
+            row filter (``filteredScatterData``). Runtime + memory
+            KPIs, outlier mean / stddev / count all compute over this
+            subset.
+          * ``eff_valid = kpi_valid AND req_rt > 0 AND req_mem > 0`` —
+            additionally requires both requested resources. Utilization
+            totals and over/under-allocated percentages need all four
+            fields for their math, so they use this stricter subset.
+        """
+        GIB = 1024.0**3
+        wc = t.c.wc
+        mr = t.c.mr
+        req_rt = t.c.req_rt
+        req_mem = t.c.req_mem
+        kpi_valid = and_(wc > 0, mr > 0)
+        wc_kpi = case((kpi_valid, wc), else_=None)
+        mem_gib_kpi = case((kpi_valid, mr / GIB), else_=None)
+
+        # Ranked subquery: window aggregates for outlier detection
+        # (mean + stddev of kpi-valid wc and mem_gib) computed in the
+        # same scan. Outer query counts outliers using those values.
+        ranked = (
+            select(
+                wc.label("wc"),
+                mr.label("mr"),
+                req_rt.label("req_rt"),
+                req_mem.label("req_mem"),
+                func.avg(wc_kpi).over().label("mean_kpi_wc"),
+                func.coalesce(func.stddev_pop(wc_kpi).over(), 0.0).label("std_kpi_wc"),
+                func.avg(mem_gib_kpi).over().label("mean_kpi_mem"),
+                func.coalesce(func.stddev_pop(mem_gib_kpi).over(), 0.0).label(
+                    "std_kpi_mem"
+                ),
+            )
+            .select_from(t)
+            .subquery("r")
+        )
+
+        r_wc = ranked.c.wc
+        r_mr = ranked.c.mr
+        r_rrt = ranked.c.req_rt
+        r_rmem = ranked.c.req_mem
+        r_kpi = and_(r_wc > 0, r_mr > 0)
+        r_eff = and_(r_kpi, r_rrt > 0, r_rmem > 0)
+        r_mem_gib = r_mr / GIB
+        r_mem_util = case((r_eff, r_mem_gib / r_rmem * 100), else_=None)
+        r_rt_util = case((r_eff, r_wc / r_rrt * 100), else_=None)
+        outlier_gate = or_(
+            func.abs(r_wc - ranked.c.mean_kpi_wc) > 2 * ranked.c.std_kpi_wc,
+            func.abs(r_mem_gib - ranked.c.mean_kpi_mem) > 2 * ranked.c.std_kpi_mem,
+        )
+
+        return select(
+            func.count().label("num_tasks"),
+            # KPI stats (kpi_valid subset — matches client's
+            # ScatterDataPoint universe: runtime > 0 AND memory > 0)
+            func.count(case((r_kpi, 1), else_=None)).label("n_kpi"),
+            func.min(case((r_kpi, r_mr), else_=None)).label("min_mem"),
+            func.max(case((r_kpi, r_mr), else_=None)).label("max_mem"),
+            func.avg(case((r_kpi, r_mr), else_=None)).label("mean_mem"),
+            func.min(case((r_kpi, r_wc), else_=None)).label("min_rt"),
+            func.max(case((r_kpi, r_wc), else_=None)).label("max_rt"),
+            func.avg(case((r_kpi, r_wc), else_=None)).label("mean_rt"),
+            # NB: no ``median_requested_*`` here — true medians need a
+            # sort and the server path deliberately skips them. The
+            # frontend has a client-side fallback that computes the
+            # median from streaming viz rows once they've loaded.
+            # Efficiency totals (eff_valid subset — additionally
+            # requires both requested resources for the utilization
+            # math to be defined).
+            func.sum(case((r_eff, 1), else_=0)).label("eff_n"),
+            func.sum(case((r_eff, r_mem_gib), else_=0)).label("tot_actual_mem"),
+            func.sum(case((r_eff, r_rmem), else_=0)).label("tot_req_mem"),
+            func.sum(case((r_eff, r_wc), else_=0)).label("tot_actual_rt"),
+            func.sum(case((r_eff, r_rrt), else_=0)).label("tot_req_rt"),
+            func.sum(case((and_(r_eff, r_mem_util < 50), 1), else_=0)).label(
+                "over_mem"
+            ),
+            func.sum(case((and_(r_eff, r_mem_util > 90), 1), else_=0)).label(
+                "under_mem"
+            ),
+            func.sum(case((and_(r_eff, r_rt_util < 50), 1), else_=0)).label("over_rt"),
+            func.sum(case((and_(r_eff, r_rt_util > 90), 1), else_=0)).label("under_rt"),
+            # Outlier count over the kpi_valid subset, matching the
+            # client's outlier calc which runs against all scatter
+            # points.
+            func.sum(case((and_(r_kpi, outlier_gate), 1), else_=0)).label("outliers"),
+        ).select_from(ranked)
+
+    @staticmethod
+    def _cluster_groupby_query(t: Any) -> Any:
+        """Count rows per task_resources_id, skipping NULLs.
+
+        Represents one cluster per unique task_resources row; the
+        ``requested_resources`` JSON fields are fetched separately to
+        avoid JSON_EXTRACT per row.
+        """
+        return (
+            select(
+                t.c.tr_id.label("tr_id"),
+                func.count().label("n"),
+            )
+            .select_from(t)
+            .where(t.c.tr_id.is_not(None))
+            .group_by(t.c.tr_id)
+        )
+
+    def _fetch_cluster_resources(self, tr_ids: List[int]) -> Dict[int, tuple]:
+        """Fetch (runtime, memory) per unique task_resources_id.
+
+        One query returning ``len(tr_ids)`` rows — typically a handful
+        even for workflows with tens of thousands of task_instances.
+        """
+        if not tr_ids:
+            return {}
+        rows = self.session.execute(
+            select(
+                TaskResources.id,
+                func.cast(
+                    func.json_extract(TaskResources.requested_resources, "$.runtime"),
+                    Double,
+                ),
+                func.cast(
+                    func.json_extract(TaskResources.requested_resources, "$.memory"),
+                    Double,
+                ),
+            ).where(TaskResources.id.in_(tr_ids))
+        ).all()
+        return {
+            int(r[0]): (
+                float(r[1]) if r[1] is not None else None,
+                float(r[2]) if r[2] is not None else None,
+            )
+            for r in rows
+        }
+
+    def _build_aggregates_response_from_sql(
+        self,
+        stats: Any,
+        cluster_counts: Any,
+        cluster_resources: Dict[int, tuple],
+    ) -> TaskTemplateResourceAggregatesResponse:
+        """Assemble the response from the two SQL aggregate results.
+
+        ``stats``: single-row mapping of KPIs + efficiency totals.
+        ``cluster_counts``: one row per task_resources_id with count.
+        ``cluster_resources``: tr_id → (runtime, memory) lookup.
+
+        Percentiles are left as ``None`` on the response — the frontend
+        fills them in from streaming viz rows so the aggregate endpoint
+        can complete without a second full scan.
+        """
+        num_tasks = int(stats["num_tasks"])
+        resp = TaskTemplateResourceAggregatesResponse(num_tasks=num_tasks)
+
+        # Both runtime and memory stats gate on the same ``kpi_valid``
+        # subset (wallclock > 0 AND maxrss > 0) to match the client's
+        # ScatterDataPoint universe, so toggling a filter doesn't shift
+        # numbers between the server-computed and client-computed paths.
+        # Stored as floats so the frontend per-field merge doesn't
+        # overwrite more precise client-computed values with a
+        # truncated integer.
+        if (stats["n_kpi"] or 0) > 0:
+            resp.min_mem = float(stats["min_mem"])
+            resp.max_mem = float(stats["max_mem"])
+            resp.mean_mem = float(stats["mean_mem"])
+            resp.min_runtime = float(stats["min_rt"])
+            resp.max_runtime = float(stats["max_rt"])
+            resp.mean_runtime = float(stats["mean_rt"])
+
+        # median_requested_runtime / median_requested_memory left unset —
+        # frontend computes from the streaming viz rows.
+
+        # Build clusters by binning unique (runtime, memory) pairs using
+        # the same JS-round formula as the frontend's cluster-key builder.
+        # Merging multiple task_resources rows that share the same bin
+        # avoids duplicate chips when only ancillary fields differ.
+        # Use the bin-rounded values (memory in GiB, runtime in hours
+        # → back to seconds) as the cluster's representative values so
+        # two task_resources rows with raw inputs that round to the
+        # same bin (e.g. 3599s vs 3601s → 1.0h) produce the same
+        # shipped runtime/memory, not whichever row arrived first.
+        merged: Dict[tuple, Dict[str, Any]] = {}
+        for row in cluster_counts:
+            tr_id = int(row.tr_id)
+            rt_mem = cluster_resources.get(tr_id)
+            if rt_mem is None:
+                continue
+            runtime, memory = rt_mem
+            if runtime is None or runtime <= 0 or memory is None or memory <= 0:
+                continue
+            mem_bin = _js_round_tenth(memory)
+            rt_hours_bin = _js_round_tenth(runtime / 3600)
+            key = (mem_bin, rt_hours_bin)
+            bucket = merged.setdefault(
+                key,
+                {
+                    "runtime": rt_hours_bin * 3600,
+                    "memory": mem_bin,
+                    "count": 0,
+                },
+            )
+            bucket["count"] += int(row.n)
+        resp.resource_clusters = sorted(
+            [
+                ResourceClusterItem(
+                    runtime=b["runtime"],
+                    memory=b["memory"],
+                    task_count=b["count"],
+                )
+                for b in merged.values()
+            ],
+            key=lambda c: c.task_count,
+            reverse=True,
+        )
+
+        # Efficiency is populated only when ``eff_n > 0`` (rows with
+        # all of wallclock, maxrss, and both requested resources valid
+        # — the subset the utilization math is defined on). When
+        # ``eff_n = 0`` the response ships ``efficiency = None`` rather
+        # than a partial object, so the frontend per-field merge
+        # doesn't overwrite client-computed values with zero defaults.
+        # Outlier count is part of that object: for templates without
+        # requested resources the client computes it from streaming
+        # viz rows instead.
+        eff_n = int(stats["eff_n"] or 0)
+        if eff_n > 0:
+            outliers = int(stats["outliers"] or 0)
+            tot_actual_mem = float(stats["tot_actual_mem"] or 0.0)
+            tot_req_mem = float(stats["tot_req_mem"] or 0.0)
+            tot_actual_rt = float(stats["tot_actual_rt"] or 0.0)
+            tot_req_rt = float(stats["tot_req_rt"] or 0.0)
+            resp.efficiency = ResourceEfficiencyMetrics(
+                memory_utilization=(
+                    (tot_actual_mem / tot_req_mem * 100) if tot_req_mem > 0 else 0.0
+                ),
+                runtime_utilization=(
+                    (tot_actual_rt / tot_req_rt * 100) if tot_req_rt > 0 else 0.0
+                ),
+                over_allocated_memory=round(int(stats["over_mem"] or 0) / eff_n * 100),
+                under_allocated_memory=round(
+                    int(stats["under_mem"] or 0) / eff_n * 100
+                ),
+                over_allocated_runtime=round(int(stats["over_rt"] or 0) / eff_n * 100),
+                under_allocated_runtime=round(
+                    int(stats["under_rt"] or 0) / eff_n * 100
+                ),
+                outlier_count=outliers,
+            )
+
+        return resp
 
     def get_task_template_resource_usage(
         self, req: TaskTemplateResourceUsageRequest
