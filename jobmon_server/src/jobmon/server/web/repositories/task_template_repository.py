@@ -170,28 +170,31 @@ class TaskTemplateRepository:
         ).label("requested_resources_col")
 
         if not node_args:
-            # Deferred-join pagination: when paging, first find the 2000
-            # ``task_instance.id`` values we want via the covering index
-            # (``ix_ti_task_id_covering`` on ``(task_id, id, wallclock,
-            # maxrss, task_resources_id)`` — ordered by ``(task_id, id)``
-            # naturally). Then look up full row data for only those
-            # ids, avoiding the filesort + 2000 heap-probes the naive
-            # plan does on the full join. Measured on pixel page 0:
-            # SQL time ~3s → ~0.6s.
+            # Deferred-join pagination: pass 1 enumerates the
+            # ``(task_id, task_instance_id)`` pairs we want, pass 2
+            # fetches full row data for those ids. The outer join on
+            # ``task_instance`` in pass 1 preserves tasks with no
+            # instances yet (registered-but-not-launched), which show
+            # up as a single row with null instance / resource fields
+            # — matching the unpaged path's behavior. Pass 2 also
+            # outer-joins on ``task_instance_id`` so the row survives
+            # when ``paged.ti_id`` is null.
             #
             # ``attempt_num`` is computed inside pass 1 (before the
             # LIMIT applies) so the window sees every matching
             # task_instance per task, not just the paged subset — a
             # task's attempts that span page boundaries still number
-            # correctly.
+            # correctly. Tasks without an instance get rank 1 for
+            # their null row.
             paged_ids = None
             if limit is not None:
                 paged_ids = (
                     select(
+                        Task.id.label("paged_task_id"),
                         TaskInstance.id.label("paged_ti_id"),
                         func.row_number()
                         .over(
-                            partition_by=TaskInstance.task_id,
+                            partition_by=Task.id,
                             order_by=TaskInstance.id,
                         )
                         .label("paged_attempt_num"),
@@ -202,9 +205,9 @@ class TaskTemplateRepository:
                         TaskTemplateVersion.id == Node.task_template_version_id,
                     )
                     .join(Task, Node.id == Task.node_id)
-                    .join(TaskInstance, Task.id == TaskInstance.task_id)
+                    .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
                     .where(and_(*base_filters))
-                    .order_by(TaskInstance.task_id, TaskInstance.id)
+                    .order_by(Task.id, TaskInstance.id)
                     .offset(offset)
                     .limit(limit)
                     .subquery("paged")
@@ -238,12 +241,12 @@ class TaskTemplateRepository:
             if paged_ids is not None:
                 query = (
                     query.select_from(paged_ids)
-                    .join(
+                    .join(Task, Task.id == paged_ids.c.paged_task_id)
+                    .join(Node, Node.id == Task.node_id)
+                    .outerjoin(
                         TaskInstance,
                         TaskInstance.id == paged_ids.c.paged_ti_id,
                     )
-                    .join(Task, Task.id == TaskInstance.task_id)
-                    .join(Node, Node.id == Task.node_id)
                     .outerjoin(
                         TaskResources,
                         TaskInstance.task_resources_id == TaskResources.id,
@@ -569,11 +572,12 @@ class TaskTemplateRepository:
         """Count rows that get_task_resource_details would return.
 
         Used by the paginated endpoint to report ``total_count`` without
-        materializing the full detail payload. Uses ``INNER JOIN`` on
-        ``task_instance`` to match the paged detail query shape —
-        ``outerjoin`` would over-count by including tasks with zero
-        instances, making ``total_count`` diverge from the number of
-        rows the frontend will actually receive across all pages.
+        materializing the full detail payload. Uses ``LEFT OUTER JOIN``
+        on ``task_instance`` to match the paged detail query shape:
+        tasks with no instances yet (registered-but-not-launched)
+        appear as a single row in the paged output, so they must be
+        counted here too or ``total_count`` understates the true row
+        count and the frontend stops paginating early.
         """
         base_filters = [TaskTemplateVersion.id == task_template_version_id]
         if workflows:
@@ -584,7 +588,7 @@ class TaskTemplateRepository:
             .select_from(TaskTemplateVersion)
             .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
             .join(Task, Node.id == Task.node_id)
-            .join(TaskInstance, Task.id == TaskInstance.task_id)
+            .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
             .where(and_(*base_filters))
         )
 
