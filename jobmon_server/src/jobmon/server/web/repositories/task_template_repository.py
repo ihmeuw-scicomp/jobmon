@@ -156,17 +156,24 @@ class TaskTemplateRepository:
             .label("attempt_number_of_instance")
         )
 
-        # Narrow ``requested_resources`` to the two fields the UI actually
-        # uses on the viz path (memory + runtime). The full blob averages
+        # Narrow ``requested_resources`` to the fields the UI and CSV
+        # export actually need — the documented ``RequestedResourcesModel``
+        # schema (memory, runtime, cores, queue). The full blob averages
         # ~700 bytes/row on templates like ``pixel`` (paths, project
         # config, stderr/stdout paths, command args) and dominated the
         # per-row payload size. MySQL ``JSON_OBJECT`` builds the narrow
-        # JSON server-side so we ship ~30 bytes/row instead.
+        # JSON server-side so we ship ~60 bytes/row instead. CSV
+        # export's ``requested_resources_json`` column now exposes the
+        # narrowed blob, but all four documented fields are preserved.
         narrow_req_res = func.json_object(
             "memory",
             func.json_extract(TaskResources.requested_resources, "$.memory"),
             "runtime",
             func.json_extract(TaskResources.requested_resources, "$.runtime"),
+            "cores",
+            func.json_extract(TaskResources.requested_resources, "$.cores"),
+            "queue",
+            func.json_extract(TaskResources.requested_resources, "$.queue"),
         ).label("requested_resources_col")
 
         if not node_args:
@@ -322,13 +329,20 @@ class TaskTemplateRepository:
         offset: int = 0,
     ) -> List[TaskResourceDetailItem]:
         """Optimized node_args filtering using database-level joins and filtering."""
-        # See ``get_task_resource_details`` for rationale — ship only the
-        # two requested-resource fields the UI needs on the viz path.
+        # See ``get_task_resource_details`` for rationale — ship only
+        # the documented ``RequestedResourcesModel`` fields (memory,
+        # runtime, cores, queue) so the viz path stays narrow while
+        # CSV export's ``requested_resources_json`` preserves all
+        # four.
         narrow_req_res = func.json_object(
             "memory",
             func.json_extract(TaskResources.requested_resources, "$.memory"),
             "runtime",
             func.json_extract(TaskResources.requested_resources, "$.runtime"),
+            "cores",
+            func.json_extract(TaskResources.requested_resources, "$.cores"),
+            "queue",
+            func.json_extract(TaskResources.requested_resources, "$.queue"),
         ).label("requested_resources")
         base_query = (
             select(
