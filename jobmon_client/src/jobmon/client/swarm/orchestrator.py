@@ -451,7 +451,11 @@ class WorkflowRunOrchestrator:
             except RuntimeError as e:
                 all_done_prop = f"RAISE: {e}"
 
-            all_up_done_in_swarm = rev_count > 0 and done_upstreams == rev_count
+            # ``done_upstreams == rev_count`` is vacuously true for root
+            # tasks (both sides zero). That's the correct signal — a
+            # root task stuck in REGISTERING is signature #2 (nothing
+            # blocking it, but never enqueued), so we want to log it.
+            all_up_done_in_swarm = done_upstreams == rev_count
             counter_mismatch = t.num_upstreams != rev_count
 
             if all_up_done_in_swarm:
