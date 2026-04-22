@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 import scipy.stats as st  # type: ignore
 import structlog
-from sqlalchemy import Float, String, and_, case, exists, func, or_, select
+from sqlalchemy import Float, String, and_, case, exists, func, or_, select, true
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement, Label
 
@@ -625,9 +625,16 @@ class TaskTemplateRepository:
         cluster-GROUP BY queries both project onto. Values are CAST
         here so outer queries see typed numeric columns (``wallclock``
         and ``maxrss`` are VARCHAR(50) in the schema).
+
+        When ``latest_only`` is True we pick the latest ``task_instance``
+        per task via a ``LATERAL`` subquery ordered by ``id DESC LIMIT 1``.
+        With the ``ix_ti_task_id_covering`` covering index in place, the
+        latest row is served index-only — no heap read for
+        ``wallclock`` / ``maxrss`` / ``task_resources_id``. EXPLAIN shows
+        ``Using index`` on the lateral side. Previously we used a
+        correlated ``MAX(id)`` subquery and MySQL's optimizer fell back
+        to a PK heap lookup for the outer row (~78K of them on pixel).
         """
-        wc_num = func.cast(TaskInstance.wallclock, Float).label("wc")
-        mr_num = func.cast(TaskInstance.maxrss, Float).label("mr")
         req_rt_num = func.cast(
             func.json_extract(TaskResources.requested_resources, "$.runtime"),
             Float,
@@ -643,33 +650,58 @@ class TaskTemplateRepository:
         if workflows:
             base_filters.append(Task.workflow_id.in_(workflows))
 
-        q = (
-            select(
-                wc_num,
-                mr_num,
-                req_rt_num,
-                req_mem_num,
-                TaskInstance.task_resources_id.label("tr_id"),
-            )
-            .select_from(TaskTemplateVersion)
-            .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
-            .join(Task, Node.id == Task.node_id)
-            .join(TaskInstance, Task.id == TaskInstance.task_id)
-            .outerjoin(
-                TaskResources,
-                TaskInstance.task_resources_id == TaskResources.id,
-            )
-            .where(and_(*base_filters))
-        )
-
         if latest_only:
-            latest_ti_id = (
-                select(func.max(TaskInstance.id))
+            latest_lat = (
+                select(
+                    TaskInstance.wallclock.label("wc_raw"),
+                    TaskInstance.maxrss.label("mr_raw"),
+                    TaskInstance.task_resources_id.label("tr_id"),
+                )
                 .where(TaskInstance.task_id == Task.id)
-                .correlate(Task)
-                .scalar_subquery()
+                .order_by(TaskInstance.id.desc())
+                .limit(1)
+                .lateral("lti")
             )
-            q = q.where(TaskInstance.id == latest_ti_id)
+
+            q = (
+                select(
+                    func.cast(latest_lat.c.wc_raw, Float).label("wc"),
+                    func.cast(latest_lat.c.mr_raw, Float).label("mr"),
+                    req_rt_num,
+                    req_mem_num,
+                    latest_lat.c.tr_id.label("tr_id"),
+                )
+                .select_from(TaskTemplateVersion)
+                .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+                .join(Task, Node.id == Task.node_id)
+                .join(latest_lat, true())
+                .outerjoin(
+                    TaskResources,
+                    latest_lat.c.tr_id == TaskResources.id,
+                )
+                .where(and_(*base_filters))
+            )
+        else:
+            wc_num = func.cast(TaskInstance.wallclock, Float).label("wc")
+            mr_num = func.cast(TaskInstance.maxrss, Float).label("mr")
+            q = (
+                select(
+                    wc_num,
+                    mr_num,
+                    req_rt_num,
+                    req_mem_num,
+                    TaskInstance.task_resources_id.label("tr_id"),
+                )
+                .select_from(TaskTemplateVersion)
+                .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
+                .join(Task, Node.id == Task.node_id)
+                .join(TaskInstance, Task.id == TaskInstance.task_id)
+                .outerjoin(
+                    TaskResources,
+                    TaskInstance.task_resources_id == TaskResources.id,
+                )
+                .where(and_(*base_filters))
+            )
 
         if node_args:
             for arg_name, arg_values in node_args.items():
