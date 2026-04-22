@@ -170,45 +170,82 @@ class TaskTemplateRepository:
         ).label("requested_resources_col")
 
         if not node_args:
-            # No node_args filtering - use optimized single query
-            query = (
-                select(
-                    # TaskInstance resource usage fields
-                    TaskInstance.wallclock,
-                    TaskInstance.maxrss,
-                    status_col,
-                    # Node and Task identifiers
-                    Node.id.label("node_id_col"),
-                    Task.id.label("task_id_col"),
-                    Task.name.label("task_name_col"),
-                    # Task metadata fields
-                    Task.status_date.label("task_status_date_col"),
-                    Task.command.label("task_command_col"),
-                    Task.num_attempts.label("task_num_attempts_col"),
-                    Task.max_attempts.label("task_max_attempts_col"),
-                    # Requested resources (narrowed to memory+runtime only)
-                    narrow_req_res,
-                    attempt_number_col,
-                    TaskInstance.id.label("task_instance_id_col"),
-                    TaskInstance.workflow_run_id.label("workflow_run_id_col"),
+            # Deferred-join pagination: when paging, first find the 2000
+            # ``task_instance.id`` values we want via the covering index
+            # (``ix_ti_task_id_covering`` on ``(task_id, id, wallclock,
+            # maxrss, task_resources_id)`` — ordered by ``(task_id, id)``
+            # naturally). Then look up full row data for only those
+            # ids, avoiding the filesort + 2000 heap-probes the naive
+            # plan does on the full join. Measured on pixel page 0:
+            # SQL time ~3s → ~0.6s.
+            paged_ids = None
+            if limit is not None:
+                paged_ids = (
+                    select(TaskInstance.id.label("paged_ti_id"))
+                    .select_from(TaskTemplateVersion)
+                    .join(
+                        Node,
+                        TaskTemplateVersion.id == Node.task_template_version_id,
+                    )
+                    .join(Task, Node.id == Task.node_id)
+                    .join(TaskInstance, Task.id == TaskInstance.task_id)
+                    .where(and_(*base_filters))
+                    .order_by(TaskInstance.task_id, TaskInstance.id)
+                    .offset(offset)
+                    .limit(limit)
+                    .subquery("paged")
                 )
-                .select_from(TaskTemplateVersion)
-                .join(
-                    Node,
-                    TaskTemplateVersion.id == Node.task_template_version_id,
-                )
-                .join(Task, Node.id == Task.node_id)
-                .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
-                .outerjoin(
-                    TaskResources,
-                    TaskInstance.task_resources_id == TaskResources.id,
-                )
-                .where(and_(*base_filters))
+
+            query = select(
+                # TaskInstance resource usage fields
+                TaskInstance.wallclock,
+                TaskInstance.maxrss,
+                status_col,
+                # Node and Task identifiers
+                Node.id.label("node_id_col"),
+                Task.id.label("task_id_col"),
+                Task.name.label("task_name_col"),
+                # Task metadata fields
+                Task.status_date.label("task_status_date_col"),
+                Task.command.label("task_command_col"),
+                Task.num_attempts.label("task_num_attempts_col"),
+                Task.max_attempts.label("task_max_attempts_col"),
+                # Requested resources (narrowed to memory+runtime only)
+                narrow_req_res,
+                attempt_number_col,
+                TaskInstance.id.label("task_instance_id_col"),
+                TaskInstance.workflow_run_id.label("workflow_run_id_col"),
             )
 
-            if limit is not None:
+            if paged_ids is not None:
                 query = (
-                    query.order_by(Task.id, TaskInstance.id).offset(offset).limit(limit)
+                    query.select_from(paged_ids)
+                    .join(
+                        TaskInstance,
+                        TaskInstance.id == paged_ids.c.paged_ti_id,
+                    )
+                    .join(Task, Task.id == TaskInstance.task_id)
+                    .join(Node, Node.id == Task.node_id)
+                    .outerjoin(
+                        TaskResources,
+                        TaskInstance.task_resources_id == TaskResources.id,
+                    )
+                    .order_by(Task.id, TaskInstance.id)
+                )
+            else:
+                query = (
+                    query.select_from(TaskTemplateVersion)
+                    .join(
+                        Node,
+                        TaskTemplateVersion.id == Node.task_template_version_id,
+                    )
+                    .join(Task, Node.id == Task.node_id)
+                    .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
+                    .outerjoin(
+                        TaskResources,
+                        TaskInstance.task_resources_id == TaskResources.id,
+                    )
+                    .where(and_(*base_filters))
                 )
 
             rows = self.session.execute(query).all()
