@@ -16,6 +16,7 @@ from starlette.staticfiles import StaticFiles
 from jobmon.core.configuration import JobmonConfig
 from jobmon.server.web.db import db_lifespan
 from jobmon.server.web.hooks_and_handlers import add_hooks_and_handlers
+from jobmon.server.web.middleware.db_reset_retry import DBResetRetryMiddleware
 from jobmon.server.web.middleware.security_headers import SecurityHeadersMiddleware
 from jobmon.server.web.routes.utils import (
     get_user,
@@ -155,6 +156,39 @@ def get_app(versions: Optional[List[str]] = None) -> FastAPI:
         )
 
     app.add_middleware(SecurityHeadersMiddleware, csp=True)
+
+    # Retry middleware wraps the entire request pipeline (handler +
+    # dependency finalizers) so transient DB connection-resets on Azure
+    # Private Link are retried once instead of surfacing as 5xx. The
+    # generic exception handler in ``hooks_and_handlers`` re-raises
+    # connection-reset errors so they escape FastAPI's
+    # ``ExceptionMiddleware`` and land here; the ``budget_seconds`` cap
+    # prevents a slow query + retry from blowing past the client's
+    # read_timeout (default 20s).
+    retry_cfg: dict = {}
+    try:
+        db_cfg = config.get_section_coerced("db")
+        retry_cfg = db_cfg.get("retry") or {}
+        if not isinstance(retry_cfg, dict):
+            retry_cfg = {}
+    except Exception:
+        retry_cfg = {}
+    app.add_middleware(
+        DBResetRetryMiddleware,
+        max_attempts=int(
+            retry_cfg.get("max_attempts", DBResetRetryMiddleware.DEFAULT_MAX_ATTEMPTS)
+        ),
+        backoff_seconds=float(
+            retry_cfg.get(
+                "backoff_seconds", DBResetRetryMiddleware.DEFAULT_BACKOFF_SECONDS
+            )
+        ),
+        budget_seconds=float(
+            retry_cfg.get(
+                "budget_seconds", DBResetRetryMiddleware.DEFAULT_BUDGET_SECONDS
+            )
+        ),
+    )
 
     # Include routers with conditional authentication
     versions = versions or (["auth", "v3"] if auth_enabled else ["v3"])

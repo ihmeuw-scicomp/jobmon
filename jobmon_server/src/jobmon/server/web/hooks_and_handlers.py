@@ -11,6 +11,10 @@ from starlette.responses import Response
 from starlette.status import HTTP_404_NOT_FOUND
 
 from jobmon.core.logging import set_jobmon_context
+from jobmon.server.web.middleware.db_reset_retry import (
+    DBResetRetryMiddleware,
+    is_connection_reset,
+)
 from jobmon.server.web.server_side_exception import InvalidUsage, ServerError
 
 logger = structlog.get_logger(__name__)
@@ -119,6 +123,18 @@ def add_hooks_and_handlers(app: FastAPI) -> FastAPI:
 
     @app.exception_handler(Exception)
     def handle_generic_exception(request: Request, error: Any) -> Any:
+        # Let ``DBResetRetryMiddleware`` see transient DB connection
+        # resets so it can retry. Starlette's ``ExceptionMiddleware``
+        # does not re-catch exceptions raised from exception handlers,
+        # so re-raising here propagates up to the retry middleware.
+        # We only re-raise when the middleware still has retry budget
+        # left — otherwise (final attempt / budget exhausted) we fall
+        # through to ``_handle_error`` for a normal 500 response so
+        # clients see the structured error body.
+        if is_connection_reset(
+            error
+        ) and DBResetRetryMiddleware.should_retry_connection_reset(request.scope):
+            raise error
         if isinstance(error, StarletteHTTPException):
             if error.status_code == HTTP_404_NOT_FOUND:
                 logger.warning("Route not found:", route=request.url)
