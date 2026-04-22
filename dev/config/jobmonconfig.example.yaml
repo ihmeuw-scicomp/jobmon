@@ -94,3 +94,11 @@ db:
     recycle: 300
     pre_ping: true
     timeout: 20
+  retry:
+    # DBResetRetryMiddleware — transparent retry on transient connection
+    # resets (Azure Private Link idle reap, mid-query TLS reset, etc.).
+    # ``budget_seconds`` caps total retry time so a slow query + retry
+    # can't blow past the client's read_timeout.
+    max_attempts: 2
+    backoff_seconds: 0.2
+    budget_seconds: 15.0

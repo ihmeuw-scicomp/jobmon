@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Awaitable, Callable, List, Tuple, Type
 
 from sqlalchemy.exc import OperationalError
@@ -117,19 +118,35 @@ class DBResetRetryMiddleware:
 
     DEFAULT_MAX_ATTEMPTS = 2
     DEFAULT_BACKOFF_SECONDS = 0.2
+    DEFAULT_BUDGET_SECONDS = 15.0
+
+    # Scope key the retry middleware uses to publish its state to the
+    # generic exception handler. The handler checks this to decide
+    # whether to re-raise a connection-reset exception (so we can
+    # retry) or let it flow through to a normal 5xx response.
+    SCOPE_STATE_KEY = "db_reset_retry"
 
     def __init__(
         self,
         app: ASGIApp,
         max_attempts: int = DEFAULT_MAX_ATTEMPTS,
         backoff_seconds: float = DEFAULT_BACKOFF_SECONDS,
+        budget_seconds: float = DEFAULT_BUDGET_SECONDS,
     ) -> None:
-        """Store retry policy; ``max_attempts`` must be >= 1."""
+        """Store retry policy.
+
+        ``max_attempts`` must be >= 1. ``budget_seconds`` caps total
+        time spent retrying so a slow-query + retry doesn't blow past
+        the client's read_timeout (default 20s). We stop retrying when
+        the next backoff would land us outside the budget, even if
+        attempts remain.
+        """
         if max_attempts < 1:
             raise ValueError("max_attempts must be >= 1")
         self.app = app
         self._max_attempts = max_attempts
         self._backoff_seconds = backoff_seconds
+        self._budget_seconds = budget_seconds
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Route HTTP through the retry loop; pass other scopes through."""
@@ -143,7 +160,18 @@ class DBResetRetryMiddleware:
             await self.app(scope, _replay_receive(b"", disconnected=True), send)
             return
 
+        start = time.monotonic()
+        state = {
+            "max_attempts": self._max_attempts,
+            "backoff_seconds": self._backoff_seconds,
+            "budget_seconds": self._budget_seconds,
+            "start": start,
+            "attempt": 0,
+        }
+        scope[self.SCOPE_STATE_KEY] = state
+
         for attempt in range(1, self._max_attempts + 1):
+            state["attempt"] = attempt
             staged: List[Message] = []
 
             async def staged_send(message: Message) -> None:
@@ -165,6 +193,18 @@ class DBResetRetryMiddleware:
                         exc,
                     )
                     raise
+                elapsed = time.monotonic() - start
+                if elapsed + self._backoff_seconds >= self._budget_seconds:
+                    logger.warning(
+                        "DB reset retry budget exhausted on %s %s (%.2fs elapsed, "
+                        "budget %.2fs): %s",
+                        scope.get("method"),
+                        scope.get("path"),
+                        elapsed,
+                        self._budget_seconds,
+                        exc,
+                    )
+                    raise
                 logger.warning(
                     "Retrying %s %s after transient DB error (%s): %s",
                     scope.get("method"),
@@ -175,10 +215,28 @@ class DBResetRetryMiddleware:
                 await asyncio.sleep(self._backoff_seconds)
                 continue
 
-            # Success: flush the staged response messages to the real send.
+            # Success or non-retryable response: flush staged messages.
             for message in staged:
                 await send(message)
             return
+
+    @staticmethod
+    def should_retry_connection_reset(scope: Scope) -> bool:
+        """Return True iff a retry attempt remains within the configured budget.
+
+        Called from the generic exception handler to decide whether to
+        re-raise a connection-reset error (so this middleware sees it
+        and retries) or to let it flow through to a normal error
+        response. Safe to call when no retry middleware is registered —
+        returns False.
+        """
+        state = scope.get(DBResetRetryMiddleware.SCOPE_STATE_KEY)
+        if not state:
+            return False
+        elapsed = time.monotonic() - state["start"]
+        attempts_left = state["attempt"] < state["max_attempts"]
+        budget_left = elapsed + state["backoff_seconds"] < state["budget_seconds"]
+        return attempts_left and budget_left
 
 
 async def _buffer_request_body(receive: Receive) -> Tuple[bytes, bool]:
