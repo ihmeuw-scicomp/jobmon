@@ -797,34 +797,41 @@ class TaskTemplateRepository:
     def _main_aggregates_query(t: Any) -> Any:
         """Single-row aggregate: KPIs + efficiency totals + outlier count.
 
-        Outlier gate requires the mean and stddev of wallclock and
-        (maxrss/GiB) over the efficiency subset. MySQL 8 window
-        aggregates let us compute those alongside row filtering in one
-        scan — no need for a second pass.
+        Two gates are used, matching the frontend's data populations so
+        numbers don't visibly jump when the user toggles a filter:
+
+          * ``kpi_valid = wc > 0 AND mr > 0`` — the upstream scatter
+            row filter (``filteredScatterData``). Runtime + memory
+            KPIs, outlier mean / stddev / count all compute over this
+            subset.
+          * ``eff_valid = kpi_valid AND req_rt > 0 AND req_mem > 0`` —
+            additionally requires both requested resources. Utilization
+            totals and over/under-allocated percentages need all four
+            fields for their math, so they use this stricter subset.
         """
         GIB = 1024.0**3
         wc = t.c.wc
         mr = t.c.mr
         req_rt = t.c.req_rt
         req_mem = t.c.req_mem
-        eff = and_(wc > 0, mr > 0, req_rt > 0, req_mem > 0)
-        wc_eff = case((eff, wc), else_=None)
-        mem_gib_eff = case((eff, mr / GIB), else_=None)
+        kpi_valid = and_(wc > 0, mr > 0)
+        wc_kpi = case((kpi_valid, wc), else_=None)
+        mem_gib_kpi = case((kpi_valid, mr / GIB), else_=None)
 
-        # Ranked subquery to compute window aggregates (mean/stddev of
-        # efficiency-gated wc and mem_gib) in the same scan. Main outer
-        # query then counts outliers using those window values.
+        # Ranked subquery: window aggregates for outlier detection
+        # (mean + stddev of kpi-valid wc and mem_gib) computed in the
+        # same scan. Outer query counts outliers using those values.
         ranked = (
             select(
                 wc.label("wc"),
                 mr.label("mr"),
                 req_rt.label("req_rt"),
                 req_mem.label("req_mem"),
-                func.avg(wc_eff).over().label("mean_eff_wc"),
-                func.coalesce(func.stddev_pop(wc_eff).over(), 0.0).label("std_eff_wc"),
-                func.avg(mem_gib_eff).over().label("mean_eff_mem"),
-                func.coalesce(func.stddev_pop(mem_gib_eff).over(), 0.0).label(
-                    "std_eff_mem"
+                func.avg(wc_kpi).over().label("mean_kpi_wc"),
+                func.coalesce(func.stddev_pop(wc_kpi).over(), 0.0).label("std_kpi_wc"),
+                func.avg(mem_gib_kpi).over().label("mean_kpi_mem"),
+                func.coalesce(func.stddev_pop(mem_gib_kpi).over(), 0.0).label(
+                    "std_kpi_mem"
                 ),
             )
             .select_from(t)
@@ -835,32 +842,34 @@ class TaskTemplateRepository:
         r_mr = ranked.c.mr
         r_rrt = ranked.c.req_rt
         r_rmem = ranked.c.req_mem
-        r_eff = and_(r_wc > 0, r_mr > 0, r_rrt > 0, r_rmem > 0)
+        r_kpi = and_(r_wc > 0, r_mr > 0)
+        r_eff = and_(r_kpi, r_rrt > 0, r_rmem > 0)
         r_mem_gib = r_mr / GIB
         r_mem_util = case((r_eff, r_mem_gib / r_rmem * 100), else_=None)
         r_rt_util = case((r_eff, r_wc / r_rrt * 100), else_=None)
         outlier_gate = or_(
-            func.abs(r_wc - ranked.c.mean_eff_wc) > 2 * ranked.c.std_eff_wc,
-            func.abs(r_mem_gib - ranked.c.mean_eff_mem) > 2 * ranked.c.std_eff_mem,
+            func.abs(r_wc - ranked.c.mean_kpi_wc) > 2 * ranked.c.std_kpi_wc,
+            func.abs(r_mem_gib - ranked.c.mean_kpi_mem) > 2 * ranked.c.std_kpi_mem,
         )
 
         return select(
             func.count().label("num_tasks"),
-            # memory stats
-            func.count(case((r_mr > 0, 1), else_=None)).label("n_mr"),
-            func.min(case((r_mr > 0, r_mr), else_=None)).label("min_mem"),
-            func.max(case((r_mr > 0, r_mr), else_=None)).label("max_mem"),
-            func.avg(case((r_mr > 0, r_mr), else_=None)).label("mean_mem"),
-            # runtime stats
-            func.count(case((r_wc > 0, 1), else_=None)).label("n_wc"),
-            func.min(case((r_wc > 0, r_wc), else_=None)).label("min_rt"),
-            func.max(case((r_wc > 0, r_wc), else_=None)).label("max_rt"),
-            func.avg(case((r_wc > 0, r_wc), else_=None)).label("mean_rt"),
+            # KPI stats (kpi_valid subset — matches client's
+            # ScatterDataPoint universe: runtime > 0 AND memory > 0)
+            func.count(case((r_kpi, 1), else_=None)).label("n_kpi"),
+            func.min(case((r_kpi, r_mr), else_=None)).label("min_mem"),
+            func.max(case((r_kpi, r_mr), else_=None)).label("max_mem"),
+            func.avg(case((r_kpi, r_mr), else_=None)).label("mean_mem"),
+            func.min(case((r_kpi, r_wc), else_=None)).label("min_rt"),
+            func.max(case((r_kpi, r_wc), else_=None)).label("max_rt"),
+            func.avg(case((r_kpi, r_wc), else_=None)).label("mean_rt"),
             # NB: no ``median_requested_*`` here — true medians need a
             # sort and the server path deliberately skips them. The
             # frontend has a client-side fallback that computes the
             # median from streaming viz rows once they've loaded.
-            # efficiency totals
+            # Efficiency totals (eff_valid subset — additionally
+            # requires both requested resources for the utilization
+            # math to be defined).
             func.sum(case((r_eff, 1), else_=0)).label("eff_n"),
             func.sum(case((r_eff, r_mem_gib), else_=0)).label("tot_actual_mem"),
             func.sum(case((r_eff, r_rmem), else_=0)).label("tot_req_mem"),
@@ -874,7 +883,10 @@ class TaskTemplateRepository:
             ),
             func.sum(case((and_(r_eff, r_rt_util < 50), 1), else_=0)).label("over_rt"),
             func.sum(case((and_(r_eff, r_rt_util > 90), 1), else_=0)).label("under_rt"),
-            func.sum(case((and_(r_eff, outlier_gate), 1), else_=0)).label("outliers"),
+            # Outlier count over the kpi_valid subset, matching the
+            # client's outlier calc which runs against all scatter
+            # points.
+            func.sum(case((and_(r_kpi, outlier_gate), 1), else_=0)).label("outliers"),
         ).select_from(ranked)
 
     @staticmethod
@@ -943,11 +955,14 @@ class TaskTemplateRepository:
         num_tasks = int(stats["num_tasks"])
         resp = TaskTemplateResourceAggregatesResponse(num_tasks=num_tasks)
 
-        if (stats["n_mr"] or 0) > 0:
+        # Both runtime and memory stats gate on the same ``kpi_valid``
+        # subset (wallclock > 0 AND maxrss > 0) to match the client's
+        # ScatterDataPoint universe, so toggling a filter doesn't shift
+        # numbers between the server-computed and client-computed paths.
+        if (stats["n_kpi"] or 0) > 0:
             resp.min_mem = int(stats["min_mem"])
             resp.max_mem = int(stats["max_mem"])
             resp.mean_mem = float(stats["mean_mem"])
-        if (stats["n_wc"] or 0) > 0:
             resp.min_runtime = int(stats["min_rt"])
             resp.max_runtime = int(stats["max_rt"])
             resp.mean_runtime = float(stats["mean_rt"])
