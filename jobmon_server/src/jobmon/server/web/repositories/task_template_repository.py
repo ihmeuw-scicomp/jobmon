@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd  # type: ignore
 import scipy.stats as st  # type: ignore
 import structlog
-from sqlalchemy import Float, String, and_, case, exists, func, or_, select, true
+from sqlalchemy import Double, String, and_, case, exists, func, or_, select, true
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.elements import ColumnElement, Label
 
@@ -698,13 +698,18 @@ class TaskTemplateRepository:
         correlated ``MAX(id)`` subquery and MySQL's optimizer fell back
         to a PK heap lookup for the outer row (~78K of them on pixel).
         """
+        # Cast to DOUBLE (64-bit) not FLOAT (32-bit) so values like 5.05
+        # survive the roundtrip without the ``5.050000190734863`` artifact
+        # that MySQL FLOAT introduces — that artifact rounds differently
+        # from a 64-bit JS number and would shift cluster keys between
+        # server and client.
         req_rt_num = func.cast(
             func.json_extract(TaskResources.requested_resources, "$.runtime"),
-            Float,
+            Double,
         ).label("req_rt")
         req_mem_num = func.cast(
             func.json_extract(TaskResources.requested_resources, "$.memory"),
-            Float,
+            Double,
         ).label("req_mem")
 
         base_filters: List[ColumnElement] = [
@@ -734,8 +739,8 @@ class TaskTemplateRepository:
 
             q = (
                 select(
-                    func.cast(latest_lat.c.wc_raw, Float).label("wc"),
-                    func.cast(latest_lat.c.mr_raw, Float).label("mr"),
+                    func.cast(latest_lat.c.wc_raw, Double).label("wc"),
+                    func.cast(latest_lat.c.mr_raw, Double).label("mr"),
                     req_rt_num,
                     req_mem_num,
                     latest_lat.c.tr_id.label("tr_id"),
@@ -751,8 +756,8 @@ class TaskTemplateRepository:
                 .where(and_(*base_filters))
             )
         else:
-            wc_num = func.cast(TaskInstance.wallclock, Float).label("wc")
-            mr_num = func.cast(TaskInstance.maxrss, Float).label("mr")
+            wc_num = func.cast(TaskInstance.wallclock, Double).label("wc")
+            mr_num = func.cast(TaskInstance.maxrss, Double).label("mr")
             q = (
                 select(
                     wc_num,
@@ -928,11 +933,11 @@ class TaskTemplateRepository:
                 TaskResources.id,
                 func.cast(
                     func.json_extract(TaskResources.requested_resources, "$.runtime"),
-                    Float,
+                    Double,
                 ),
                 func.cast(
                     func.json_extract(TaskResources.requested_resources, "$.memory"),
-                    Float,
+                    Double,
                 ),
             ).where(TaskResources.id.in_(tr_ids))
         ).all()
