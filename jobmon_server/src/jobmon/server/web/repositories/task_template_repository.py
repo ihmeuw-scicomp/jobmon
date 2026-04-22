@@ -569,7 +569,11 @@ class TaskTemplateRepository:
         """Count rows that get_task_resource_details would return.
 
         Used by the paginated endpoint to report ``total_count`` without
-        materializing the full detail payload.
+        materializing the full detail payload. Uses ``INNER JOIN`` on
+        ``task_instance`` to match the paged detail query shape —
+        ``outerjoin`` would over-count by including tasks with zero
+        instances, making ``total_count`` diverge from the number of
+        rows the frontend will actually receive across all pages.
         """
         base_filters = [TaskTemplateVersion.id == task_template_version_id]
         if workflows:
@@ -580,7 +584,7 @@ class TaskTemplateRepository:
             .select_from(TaskTemplateVersion)
             .join(Node, TaskTemplateVersion.id == Node.task_template_version_id)
             .join(Task, Node.id == Task.node_id)
-            .outerjoin(TaskInstance, Task.id == TaskInstance.task_id)
+            .join(TaskInstance, Task.id == TaskInstance.task_id)
             .where(and_(*base_filters))
         )
 
@@ -652,12 +656,12 @@ class TaskTemplateRepository:
                 num_tasks=0 if has_any else None
             )
 
+        # Reuse the already-built ``inner`` select rather than constructing
+        # a second copy. MySQL still executes the subquery once per outer
+        # statement, but this halves the Python-side construction cost
+        # and keeps the two aggregate queries guaranteed-identical.
         cluster_counts = self.session.execute(
-            self._cluster_groupby_query(
-                self._build_aggregates_rowset(
-                    task_template_version_id, workflows, node_args, latest_only
-                ).subquery("t_clust")
-            )
+            self._cluster_groupby_query(inner.subquery("t_clust"))
         ).all()
         cluster_resources = self._fetch_cluster_resources(
             [int(r.tr_id) for r in cluster_counts if r.tr_id is not None]
@@ -1002,7 +1006,14 @@ class TaskTemplateRepository:
             reverse=True,
         )
 
+        # Outlier count lives on the ``kpi_valid`` subset (wc>0 AND mr>0)
+        # independent of requested resources, so populate it whenever we
+        # have ANY kpi-valid rows — not only when utilization-valid rows
+        # exist. Otherwise templates with real wallclock+maxrss data but
+        # no requested resources would permanently render
+        # ``outlier_count=0``.
         eff_n = int(stats["eff_n"] or 0)
+        outliers = int(stats["outliers"] or 0)
         if eff_n > 0:
             tot_actual_mem = float(stats["tot_actual_mem"] or 0.0)
             tot_req_mem = float(stats["tot_req_mem"] or 0.0)
@@ -1023,8 +1034,10 @@ class TaskTemplateRepository:
                 under_allocated_runtime=round(
                     int(stats["under_rt"] or 0) / eff_n * 100
                 ),
-                outlier_count=int(stats["outliers"] or 0),
+                outlier_count=outliers,
             )
+        elif outliers > 0:
+            resp.efficiency = ResourceEfficiencyMetrics(outlier_count=outliers)
 
         return resp
 
