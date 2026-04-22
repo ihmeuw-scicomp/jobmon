@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import {
     InfiniteData,
+    QueryFunctionContext,
     useInfiniteQuery,
     useQuery,
     useQueryClient,
@@ -29,10 +31,9 @@ import ErrorClustersCard from '@jobmon_gui/components/task_template_details/usag
 import { useTaskTemplateDetails } from '@jobmon_gui/queries/GetTaskTemplateDetails.ts';
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
-import {
-    getWorkflowUsagePageQueryFn,
-    WorkflowUsageQueryKey,
-} from '@jobmon_gui/queries/GetWorkflowUsage.ts';
+import { USAGE_PAGE_SIZE } from '@jobmon_gui/queries/GetWorkflowUsage.ts';
+import { usage_url } from '@jobmon_gui/configs/ApiUrls.ts';
+import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
 import {
     getTaskTemplateAggregatesQueryFn,
     TaskTemplateAggregatesQueryKey,
@@ -72,6 +73,7 @@ dayjs.extend(utc);
 
 type TaskTemplateResourceUsageResponse =
     components['schemas']['TaskTemplateResourceUsageResponse'];
+type TaskResourceVizItem = components['schemas']['TaskResourceVizItem'];
 type TaskTemplateResourceAggregatesResponse =
     components['schemas']['TaskTemplateResourceAggregatesResponse'];
 
@@ -97,31 +99,63 @@ export default function TaskTemplateDetails() {
         TaskTemplateDetailsData.data?.task_template_version_id;
     const taskTemplateName = TaskTemplateDetailsData.data?.task_template_name;
 
-    const queryKeyForWorkflowUsage: WorkflowUsageQueryKey = [
-        'workflow_details',
-        'usage_paged',
-        taskTemplateVersionId,
-        workflowId,
+    // Page-drain concurrency. Three parallel useInfiniteQuery "streams"
+    // each drain a strided subset of pages (stream 0: 0, 3, 6, 9...;
+    // stream 1: 1, 4, 7, 10...; stream 2: 2, 5, 8, 11...). Each stream
+    // drains sequentially via its own ``fetchNextPage``, so the three
+    // together run 3 HTTP requests concurrently — chosen to stay under
+    // the 6-per-host browser cap and leave headroom for prod MySQL
+    // under load.
+    const USAGE_STREAMS = 3;
+    type StreamKey = readonly [
+        string,
+        string,
+        string | number | undefined,
+        string | number | undefined,
+        number,
     ];
-
-    const usageInfo = useInfiniteQuery<
-        TaskTemplateResourceUsageResponse | undefined,
-        Error,
-        InfiniteData<TaskTemplateResourceUsageResponse | undefined>,
-        WorkflowUsageQueryKey,
-        number
-    >({
-        queryKey: queryKeyForWorkflowUsage,
-        queryFn: getWorkflowUsagePageQueryFn,
-        initialPageParam: 0,
-        getNextPageParam: (lastPage, allPages) => {
+    const makeStreamKey = (streamIndex: number): StreamKey =>
+        [
+            'workflow_details',
+            'usage_paged',
+            taskTemplateVersionId,
+            workflowId,
+            streamIndex,
+        ] as const;
+    const usageStreamFn = async (
+        context: QueryFunctionContext<StreamKey, number>
+    ): Promise<TaskTemplateResourceUsageResponse | undefined> => {
+        const { queryKey, pageParam = 0 } = context;
+        if (queryKey[2] === undefined || queryKey[3] === undefined) {
+            return undefined;
+        }
+        const response = await axios.post<TaskTemplateResourceUsageResponse>(
+            usage_url,
+            {
+                task_template_version_id: queryKey[2],
+                workflows: [queryKey[3]],
+                viz: true,
+                page: pageParam,
+                page_size: USAGE_PAGE_SIZE,
+            },
+            jobmonAxiosConfig
+        );
+        return response.data;
+    };
+    const usageStreamOptions = (streamIndex: number) => ({
+        queryKey: makeStreamKey(streamIndex),
+        queryFn: usageStreamFn,
+        initialPageParam: streamIndex,
+        getNextPageParam: (
+            lastPage: TaskTemplateResourceUsageResponse | undefined,
+            _allPages: (TaskTemplateResourceUsageResponse | undefined)[],
+            lastPageParam: number
+        ) => {
             const total = lastPage?.total_count;
             if (total == null) return undefined;
-            const fetched = allPages.reduce(
-                (sum, p) => sum + (p?.result_viz?.length ?? 0),
-                0
-            );
-            return fetched < total ? allPages.length : undefined;
+            const totalPages = Math.ceil(total / USAGE_PAGE_SIZE);
+            const next = lastPageParam + USAGE_STREAMS;
+            return next < totalPages ? next : undefined;
         },
         staleTime: 5000,
         enabled:
@@ -129,24 +163,73 @@ export default function TaskTemplateDetails() {
             !!workflowId &&
             !TaskTemplateDetailsData.isLoading,
     });
+    const usageStream0 = useInfiniteQuery<
+        TaskTemplateResourceUsageResponse | undefined,
+        Error,
+        InfiniteData<TaskTemplateResourceUsageResponse | undefined>,
+        StreamKey,
+        number
+    >(usageStreamOptions(0));
+    const usageStream1 = useInfiniteQuery<
+        TaskTemplateResourceUsageResponse | undefined,
+        Error,
+        InfiniteData<TaskTemplateResourceUsageResponse | undefined>,
+        StreamKey,
+        number
+    >(usageStreamOptions(1));
+    const usageStream2 = useInfiniteQuery<
+        TaskTemplateResourceUsageResponse | undefined,
+        Error,
+        InfiniteData<TaskTemplateResourceUsageResponse | undefined>,
+        StreamKey,
+        number
+    >(usageStreamOptions(2));
 
-    // Eagerly drain pages in the background so scatter/table fill up while
-    // the user reads the KPIs sourced from the aggregates endpoint.
+    // Eagerly drain each stream in the background.
     useEffect(() => {
-        if (usageInfo.hasNextPage && !usageInfo.isFetchingNextPage) {
-            usageInfo.fetchNextPage();
+        if (usageStream0.hasNextPage && !usageStream0.isFetchingNextPage) {
+            usageStream0.fetchNextPage();
         }
     }, [
-        usageInfo.hasNextPage,
-        usageInfo.isFetchingNextPage,
-        usageInfo.data?.pages.length,
-        usageInfo.fetchNextPage,
+        usageStream0.hasNextPage,
+        usageStream0.isFetchingNextPage,
+        usageStream0.data?.pages.length,
+        usageStream0.fetchNextPage,
+    ]);
+    useEffect(() => {
+        if (usageStream1.hasNextPage && !usageStream1.isFetchingNextPage) {
+            usageStream1.fetchNextPage();
+        }
+    }, [
+        usageStream1.hasNextPage,
+        usageStream1.isFetchingNextPage,
+        usageStream1.data?.pages.length,
+        usageStream1.fetchNextPage,
+    ]);
+    useEffect(() => {
+        if (usageStream2.hasNextPage && !usageStream2.isFetchingNextPage) {
+            usageStream2.fetchNextPage();
+        }
+    }, [
+        usageStream2.hasNextPage,
+        usageStream2.isFetchingNextPage,
+        usageStream2.data?.pages.length,
+        usageStream2.fetchNextPage,
     ]);
 
-    const rawTaskNodesFromApi = useMemo(
-        () => usageInfo.data?.pages.flatMap(p => p?.result_viz ?? []) ?? [],
-        [usageInfo.data?.pages]
-    );
+    const rawTaskNodesFromApi = useMemo(() => {
+        const all: TaskResourceVizItem[] = [];
+        for (const stream of [usageStream0, usageStream1, usageStream2]) {
+            stream.data?.pages.forEach(p => {
+                if (p?.result_viz) all.push(...p.result_viz);
+            });
+        }
+        return all;
+    }, [
+        usageStream0.data?.pages,
+        usageStream1.data?.pages,
+        usageStream2.data?.pages,
+    ]);
 
     // Page-wide filters — these feed both the aggregates query scope and
     // client-side filtering of the streaming viz rows. Declared up here so
@@ -751,7 +834,10 @@ export default function TaskTemplateDetails() {
         return <Typography>Error loading template.</Typography>;
     }
 
-    const usageIsLoading = usageInfo.isLoading;
+    const usageIsLoading =
+        usageStream0.isLoading ||
+        usageStream1.isLoading ||
+        usageStream2.isLoading;
 
     return (
         <Box>
@@ -882,7 +968,7 @@ export default function TaskTemplateDetails() {
                                     }}
                                 >
                                     <UsagePlotSection
-                                        isLoading={usageInfo.isLoading}
+                                        isLoading={usageIsLoading}
                                         filteredScatterData={
                                             effectiveScatterData
                                         }
