@@ -967,12 +967,15 @@ class TaskTemplateRepository:
         # subset (wallclock > 0 AND maxrss > 0) to match the client's
         # ScatterDataPoint universe, so toggling a filter doesn't shift
         # numbers between the server-computed and client-computed paths.
+        # Stored as floats so the frontend per-field merge doesn't
+        # overwrite more precise client-computed values with a
+        # truncated integer.
         if (stats["n_kpi"] or 0) > 0:
-            resp.min_mem = int(stats["min_mem"])
-            resp.max_mem = int(stats["max_mem"])
+            resp.min_mem = float(stats["min_mem"])
+            resp.max_mem = float(stats["max_mem"])
             resp.mean_mem = float(stats["mean_mem"])
-            resp.min_runtime = int(stats["min_rt"])
-            resp.max_runtime = int(stats["max_rt"])
+            resp.min_runtime = float(stats["min_rt"])
+            resp.max_runtime = float(stats["max_rt"])
             resp.mean_runtime = float(stats["mean_rt"])
 
         # median_requested_runtime / median_requested_memory left unset —
@@ -982,6 +985,11 @@ class TaskTemplateRepository:
         # the same JS-round formula as the frontend's cluster-key builder.
         # Merging multiple task_resources rows that share the same bin
         # avoids duplicate chips when only ancillary fields differ.
+        # Use the bin-rounded values (memory in GiB, runtime in hours
+        # → back to seconds) as the cluster's representative values so
+        # two task_resources rows with raw inputs that round to the
+        # same bin (e.g. 3599s vs 3601s → 1.0h) produce the same
+        # shipped runtime/memory, not whichever row arrived first.
         merged: Dict[tuple, Dict[str, Any]] = {}
         for row in cluster_counts:
             tr_id = int(row.tr_id)
@@ -991,10 +999,16 @@ class TaskTemplateRepository:
             runtime, memory = rt_mem
             if runtime is None or runtime <= 0 or memory is None or memory <= 0:
                 continue
-            key = (_js_round_tenth(memory), _js_round_tenth(runtime / 3600))
+            mem_bin = _js_round_tenth(memory)
+            rt_hours_bin = _js_round_tenth(runtime / 3600)
+            key = (mem_bin, rt_hours_bin)
             bucket = merged.setdefault(
                 key,
-                {"runtime": runtime, "memory": memory, "count": 0},
+                {
+                    "runtime": rt_hours_bin * 3600,
+                    "memory": mem_bin,
+                    "count": 0,
+                },
             )
             bucket["count"] += int(row.n)
         resp.resource_clusters = sorted(
@@ -1010,15 +1024,18 @@ class TaskTemplateRepository:
             reverse=True,
         )
 
-        # Outlier count lives on the ``kpi_valid`` subset (wc>0 AND mr>0)
-        # independent of requested resources, so populate it whenever we
-        # have ANY kpi-valid rows — not only when utilization-valid rows
-        # exist. Otherwise templates with real wallclock+maxrss data but
-        # no requested resources would permanently render
-        # ``outlier_count=0``.
+        # Efficiency is populated only when ``eff_n > 0`` (rows with
+        # all of wallclock, maxrss, and both requested resources valid
+        # — the subset the utilization math is defined on). When
+        # ``eff_n = 0`` the response ships ``efficiency = None`` rather
+        # than a partial object, so the frontend per-field merge
+        # doesn't overwrite client-computed values with zero defaults.
+        # Outlier count is part of that object: for templates without
+        # requested resources the client computes it from streaming
+        # viz rows instead.
         eff_n = int(stats["eff_n"] or 0)
-        outliers = int(stats["outliers"] or 0)
         if eff_n > 0:
+            outliers = int(stats["outliers"] or 0)
             tot_actual_mem = float(stats["tot_actual_mem"] or 0.0)
             tot_req_mem = float(stats["tot_req_mem"] or 0.0)
             tot_actual_rt = float(stats["tot_actual_rt"] or 0.0)
@@ -1040,8 +1057,6 @@ class TaskTemplateRepository:
                 ),
                 outlier_count=outliers,
             )
-        elif outliers > 0:
-            resp.efficiency = ResourceEfficiencyMetrics(outlier_count=outliers)
 
         return resp
 

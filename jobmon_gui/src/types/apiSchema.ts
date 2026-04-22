@@ -2764,6 +2764,14 @@ export interface components {
         /**
          * TaskTemplateResourceAggregatesResponse
          * @description Compact server-computed aggregates for a task template.
+         *
+         *     Memory and runtime stats are ``Optional[float]`` (not ``int``) so
+         *     the client's per-field merge doesn't permanently overwrite more
+         *     precise client-computed floats with a truncated integer.
+         *     ``efficiency`` defaults to ``None`` when the template has no
+         *     efficiency-relevant data (zero-TI workflow, or TIs without
+         *     requested resources) so the frontend can distinguish "no server
+         *     data" from "server says all zeros".
          */
         TaskTemplateResourceAggregatesResponse: {
             /** Num Tasks */
@@ -2797,7 +2805,9 @@ export interface components {
              * @default []
              */
             resource_clusters: components['schemas']['ResourceClusterItem'][];
-            efficiency?: components['schemas']['ResourceEfficiencyMetrics'];
+            efficiency?:
+                | components['schemas']['ResourceEfficiencyMetrics']
+                | null;
         };
         /** TaskTemplateResourceUsageRequest */
         TaskTemplateResourceUsageRequest: {

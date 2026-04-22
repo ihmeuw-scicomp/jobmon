@@ -59,25 +59,32 @@ class ResourceEfficiencyMetrics(BaseModel):
 
 
 class TaskTemplateResourceAggregatesResponse(BaseModel):
-    """Compact server-computed aggregates for a task template."""
+    """Compact server-computed aggregates for a task template.
+
+    Memory and runtime stats are ``Optional[float]`` (not ``int``) so
+    the client's per-field merge doesn't permanently overwrite more
+    precise client-computed floats with a truncated integer.
+    ``efficiency`` defaults to ``None`` when the template has no
+    efficiency-relevant data (zero-TI workflow, or TIs without
+    requested resources) so the frontend can distinguish "no server
+    data" from "server says all zeros".
+    """
 
     num_tasks: Optional[int] = None
-    min_mem: Optional[int] = None
-    max_mem: Optional[int] = None
+    min_mem: Optional[float] = None
+    max_mem: Optional[float] = None
     mean_mem: Optional[float] = None
     median_mem: Optional[float] = None
     p95_mem: Optional[float] = None
-    min_runtime: Optional[int] = None
-    max_runtime: Optional[int] = None
+    min_runtime: Optional[float] = None
+    max_runtime: Optional[float] = None
     mean_runtime: Optional[float] = None
     median_runtime: Optional[float] = None
     p95_runtime: Optional[float] = None
     median_requested_runtime: Optional[float] = None
     median_requested_memory: Optional[float] = None
     resource_clusters: List[ResourceClusterItem] = []
-    efficiency: ResourceEfficiencyMetrics = Field(
-        default_factory=ResourceEfficiencyMetrics
-    )
+    efficiency: Optional[ResourceEfficiencyMetrics] = None
 
 
 class RequestedResourcesModel(BaseModel):  # Optional: For parsing the JSON string
