@@ -39,6 +39,12 @@ import {
     getStatusColor,
 } from '@jobmon_gui/constants/taskStatus';
 import humanizeDuration from 'humanize-duration';
+import Tooltip from '@mui/material/Tooltip';
+import {
+    formatRequestedResourcesFull,
+    formatRequestedResourcesSummary,
+} from '@jobmon_gui/utils/requestedResources';
+import RequestedResourcesGrid from '@jobmon_gui/components/common/RequestedResourcesGrid';
 
 /** Priority order for status sorting — error statuses first. */
 const STATUS_SORT_PRIORITY: Record<string, number> = {
@@ -67,6 +73,7 @@ export default function TaskTable({
     selectedWorkflowRunId,
     availableWorkflowRunIds,
     onSelectedWorkflowRunIdChange,
+    fullResourcesById,
 }: TaskTableProps) {
     dayjs.extend(utc);
     const queryClient = useQueryClient();
@@ -324,6 +331,56 @@ export default function TaskTable({
                 return val.toFixed(2);
             },
         }),
+        columnHelper.accessor('requested_resources', {
+            header: 'Requested',
+            size: 220,
+            grow: 1,
+            enableSorting: false,
+            enableColumnFilter: false,
+            Cell: ({ row }) => {
+                const narrowBlob = row.original.requested_resources;
+                const fullBlob =
+                    row.original.task_resources_id != null
+                        ? fullResourcesById?.get(
+                              row.original.task_resources_id
+                          )
+                        : undefined;
+                const summary = formatRequestedResourcesSummary(narrowBlob);
+                if (!summary) return 'N/A';
+                // Prefer the full server blob for the expanded tooltip;
+                // fall back to the narrowed viz-row blob until the batch
+                // fetch lands.
+                const rows = formatRequestedResourcesFull(
+                    fullBlob ?? narrowBlob
+                );
+                return (
+                    <Tooltip
+                        arrow
+                        slotProps={{
+                            tooltip: { sx: { maxWidth: 600 } },
+                        }}
+                        title={
+                            <RequestedResourcesGrid
+                                rows={rows}
+                                sx={{ fontSize: '0.75rem' }}
+                                labelSx={{ opacity: 0.8 }}
+                            />
+                        }
+                    >
+                        <Box
+                            sx={{
+                                fontFamily: 'monospace',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            {summary}
+                        </Box>
+                    </Tooltip>
+                );
+            },
+        }),
     ];
 
     const table = useMaterialReactTable({
@@ -505,6 +562,9 @@ export default function TaskTable({
         const csvData = data.map(r => ({
             ...r,
             task_status_date: formatDayjsDate(r.task_status_date),
+            requested_resources: formatRequestedResourcesSummary(
+                r.requested_resources
+            ),
         }));
         const csv = generateCsv(csvConfig)(csvData);
         download(csvConfig)(csv);

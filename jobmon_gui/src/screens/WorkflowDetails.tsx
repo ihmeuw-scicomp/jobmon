@@ -44,6 +44,7 @@ import TemplateDetailPanel from '@jobmon_gui/components/workflow_details/Templat
 import WorkflowSummaryBar from '@jobmon_gui/components/workflow_details/WorkflowSummaryBar.tsx';
 import TemplateListPanel from '@jobmon_gui/components/workflow_details/TemplateListPanel.tsx';
 import WorkflowManagePanel from '@jobmon_gui/components/workflow_details/WorkflowManagePanel.tsx';
+import WorkflowResourcesPanel from '@jobmon_gui/components/workflow_details/WorkflowResourcesPanel.tsx';
 import ResizableSplitPane from '@jobmon_gui/components/common/ResizableSplitPane.tsx';
 
 const TaskConcurrencyTab = lazy(
@@ -74,7 +75,7 @@ import { getWorkflowFiltersForNavigation } from '@jobmon_gui/utils/workflowFilte
 import { TTStatus } from '@jobmon_gui/types/TaskTemplateStatus';
 import { compare } from 'compare-versions';
 
-type LeftPanelView = 'list' | 'template' | 'manage';
+type LeftPanelView = 'list' | 'template' | 'manage' | 'resources';
 
 function WorkflowDetails() {
     const { workflowId } = useParams();
@@ -201,6 +202,14 @@ function WorkflowDetails() {
         setLeftPanelView('list');
     };
 
+    const handleResourcesClick = () => {
+        setLeftPanelView('resources');
+    };
+
+    const handleResourcesBack = () => {
+        setLeftPanelView('list');
+    };
+
     const resetStoresAndNavigate = (
         ttId: string | number,
         ttvId: string | number
@@ -272,6 +281,11 @@ function WorkflowDetails() {
             workflowDetails={wfDetails.data}
             onBack={handleManageBack}
             onClose={handleManageClose}
+        />
+    ) : leftPanelView === 'resources' ? (
+        <WorkflowResourcesPanel
+            workflowId={workflowId!}
+            onBack={handleResourcesBack}
         />
     ) : (
         <TemplateListPanel
@@ -418,6 +432,7 @@ function WorkflowDetails() {
                 workflowDetails={wfDetails.data}
                 ttData={wfTTStatus.data}
                 onManageClick={handleManageClick}
+                onResourcesClick={handleResourcesClick}
             />
 
             {/* Middle + Bottom with vertical resize */}

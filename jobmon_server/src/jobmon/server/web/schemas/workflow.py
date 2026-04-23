@@ -1,4 +1,4 @@
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict
 
@@ -142,3 +142,29 @@ class WorkflowDetailsResponse(BaseModel):
     """Response model for workflow details."""
 
     pass  # This will be a List[WorkflowDetailsItem] but FastAPI handles this automatically
+
+
+class RequestedResourceClusterItem(BaseModel):
+    """One (task_template, task_resources_id) cluster of requested resources.
+
+    Sourced from ``task_resources`` rows joined through ``task`` — so the
+    cluster is visible as soon as the workflow has been bound, even before
+    any TaskInstances have launched. ``requested_resources`` is the raw
+    JSON blob the user configured; fields are intentionally unrestricted
+    (``Dict[str, Any]``) because ``RequestedResourcesModel`` is only a
+    hint — users can stuff arbitrary keys into compute_resources.
+    """
+
+    task_template_id: int
+    task_template_name: str
+    task_template_version_id: int
+    task_resources_id: int
+    queue_name: Optional[str] = None
+    num_tasks: int
+    requested_resources: Dict[str, Any]
+
+
+class WorkflowRequestedResourcesResponse(BaseModel):
+    """Response for ``GET /workflow/{wfid}/requested_resources``."""
+
+    clusters: List[RequestedResourceClusterItem]

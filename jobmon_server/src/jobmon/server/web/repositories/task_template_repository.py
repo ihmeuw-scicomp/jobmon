@@ -105,6 +105,7 @@ class TaskTemplateRepository:
                 task_instance_id=row_data.get("task_instance_id"),
                 task_name=row_data.get("task_name"),
                 requested_resources=row_data["requested_resources"],
+                task_resources_id=row_data.get("task_resources_id"),
                 attempt_number_of_instance=row_data.get("attempt_number_of_instance"),
                 status=row_data.get("status_orig"),
                 task_status_date=row_data.get("task_status_date"),
@@ -243,6 +244,7 @@ class TaskTemplateRepository:
                 ),
                 TaskInstance.id.label("task_instance_id_col"),
                 TaskInstance.workflow_run_id.label("workflow_run_id_col"),
+                TaskInstance.task_resources_id.label("task_resources_id_col"),
             )
 
             if paged_ids is not None:
@@ -297,6 +299,7 @@ class TaskTemplateRepository:
                     "task_max_attempts": row[9],  # task_max_attempts_col
                     "task_instance_id": row[12],  # task_instance_id_col
                     "workflow_run_id": row[13],  # workflow_run_id_col
+                    "task_resources_id": row[14],  # task_resources_id_col
                 }
                 item = self._convert_to_task_resource_detail_item(row_data)
                 if item:
@@ -360,6 +363,7 @@ class TaskTemplateRepository:
                 Task.max_attempts.label("task_max_attempts"),
                 TaskInstance.id.label("task_instance_id"),
                 TaskInstance.workflow_run_id,
+                TaskInstance.task_resources_id.label("task_resources_id"),
             )
             .select_from(TaskTemplateVersion)
             .join(
@@ -409,6 +413,7 @@ class TaskTemplateRepository:
             base_query.c.task_max_attempts,
             base_query.c.task_instance_id,
             base_query.c.workflow_run_id,
+            base_query.c.task_resources_id,
         ).select_from(base_query)
 
         for subquery in node_arg_subqueries:
@@ -444,6 +449,7 @@ class TaskTemplateRepository:
                 "task_max_attempts": row[11],  # task_max_attempts
                 "task_instance_id": row[12],  # task_instance_id
                 "workflow_run_id": row[13],  # workflow_run_id
+                "task_resources_id": row[14],  # task_resources_id
             }
             item = self._convert_to_task_resource_detail_item(row_data)
             if item:

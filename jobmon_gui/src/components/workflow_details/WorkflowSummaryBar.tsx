@@ -5,6 +5,7 @@ import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import BuildIcon from '@mui/icons-material/Build';
+import TuneIcon from '@mui/icons-material/Tune';
 import humanizeDuration from 'humanize-duration';
 import { formatJobmonDate } from '@jobmon_gui/utils/DayTime.ts';
 import { WorkflowDetails } from '@jobmon_gui/types/WorkflowDetails.ts';
@@ -20,12 +21,14 @@ interface WorkflowSummaryBarProps {
     workflowDetails?: WorkflowDetails;
     ttData?: TTStatusResponse;
     onManageClick?: () => void;
+    onResourcesClick?: () => void;
 }
 
 export default function WorkflowSummaryBar({
     workflowDetails,
     ttData,
     onManageClick,
+    onResourcesClick,
 }: WorkflowSummaryBarProps) {
     const [showMore, setShowMore] = useState(false);
 
@@ -132,6 +135,16 @@ export default function WorkflowSummaryBar({
                         {showMore ? 'Less' : 'More \u25B8'}
                     </Typography>
                     <Box sx={{ flex: 1 }} />
+                    {onResourcesClick && (
+                        <Tooltip title="Requested Resources">
+                            <IconButton
+                                size="small"
+                                onClick={onResourcesClick}
+                            >
+                                <TuneIcon fontSize="small" />
+                            </IconButton>
+                        </Tooltip>
+                    )}
                     {onManageClick && (
                         <Tooltip title="Manage Workflow">
                             <IconButton

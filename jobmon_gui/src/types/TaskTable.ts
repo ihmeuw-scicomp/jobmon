@@ -13,6 +13,8 @@ export type TaskInstanceRow = {
     runtime_seconds: number | null;
     memory_gib: number | null;
     workflow_run_id: number | null;
+    requested_resources: Record<string, unknown>;
+    task_resources_id: number | null;
 };
 
 export type TaskTableProps = {
@@ -26,4 +28,5 @@ export type TaskTableProps = {
     selectedWorkflowRunId: number | null;
     availableWorkflowRunIds: number[];
     onSelectedWorkflowRunIdChange: (id: number | null) => void;
+    fullResourcesById?: Map<number, Record<string, unknown>>;
 };

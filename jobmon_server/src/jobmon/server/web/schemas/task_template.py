@@ -103,6 +103,7 @@ class TaskResourceDetailItem(BaseModel):
     task_instance_id: Optional[int] = None
     task_name: Optional[str] = None
     requested_resources: Optional[str] = None  # Raw JSON string from DB
+    task_resources_id: Optional[int] = None
     attempt_number_of_instance: Optional[int] = None  # Added field
     status: Optional[str] = None  # Added field: Will hold 'D', 'F', etc.
     task_status_date: Optional[datetime] = None
@@ -121,6 +122,7 @@ class TaskResourceVizItem(BaseModel):
     task_instance_id: Optional[int] = None
     task_name: Optional[str] = None
     requested_resources: Optional[str] = None
+    task_resources_id: Optional[int] = None
     attempt_number_of_instance: Optional[int] = None
     status: Optional[str] = None
     task_status_date: Optional[datetime] = None

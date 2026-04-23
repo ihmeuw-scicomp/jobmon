@@ -368,6 +368,53 @@ def test_get_workflow_tasks(db_engine, tool):
     assert len(result) == 1
 
 
+def test_get_workflow_requested_resources(db_engine, tool):
+    """Two tasks with distinct compute_resources should produce two clusters.
+
+    Exercises the post-bind, pre-launch state — we never call ``wf.run()``
+    so no TaskInstance exists; the endpoint must still find the
+    task_resources rows via ``Task.task_resources_id``.
+    """
+    t = tool
+    wf = t.create_workflow(name="requested_resources_test")
+    tt = t.get_task_template(
+        template_name="tt_requested_resources",
+        command_template="echo {arg}",
+        node_args=["arg"],
+    )
+    t1 = tt.create_task(
+        arg=1,
+        cluster_name="sequential",
+        compute_resources={"queue": "null.q", "num_cores": 2},
+    )
+    t2 = tt.create_task(
+        arg=2,
+        cluster_name="sequential",
+        compute_resources={"queue": "null.q", "num_cores": 4},
+    )
+    wf.add_tasks([t1, t2])
+    wf.bind()
+    wf._bind_tasks()
+
+    app_route = f"/workflow/{wf.workflow_id}/requested_resources"
+    return_code, msg = wf.requester.send_request(
+        app_route=app_route,
+        message={},
+        request_type="get",
+    )
+    assert return_code == 200
+    clusters = msg["clusters"]
+    # Two distinct compute_resources → two task_resources rows → two clusters.
+    assert len(clusters) == 2
+    cluster_by_cores = {c["requested_resources"].get("num_cores"): c for c in clusters}
+    assert set(cluster_by_cores) == {2, 4}
+    for c in clusters:
+        assert c["num_tasks"] == 1
+        assert c["queue_name"] == "null.q"
+        assert c["task_template_name"] == "tt_requested_resources"
+        assert c["task_resources_id"] > 0
+
+
 def test_get_workflow_user_validation(db_engine, tool):
     t = tool
     wf = t.create_workflow(name="i_am_a_fake_wf")

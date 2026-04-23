@@ -32,6 +32,10 @@ import { useTaskTemplateDetails } from '@jobmon_gui/queries/GetTaskTemplateDetai
 import { getWorkflowDetailsQueryFn } from '@jobmon_gui/queries/GetWorkflowDetails.ts';
 import { getWorkflowTTStatusQueryFn } from '@jobmon_gui/queries/GetWorkflowTTStatus.ts';
 import { USAGE_PAGE_SIZE } from '@jobmon_gui/queries/GetWorkflowUsage.ts';
+import {
+    getTaskResourcesBatchQueryFn,
+    TaskResourcesBatchResponse,
+} from '@jobmon_gui/queries/GetWorkflowRequestedResources.ts';
 import { usage_url } from '@jobmon_gui/configs/ApiUrls.ts';
 import { jobmonAxiosConfig } from '@jobmon_gui/configs/Axios.ts';
 import {
@@ -52,6 +56,7 @@ import {
     downloadUsageCSV,
     parseResourceJson,
 } from '@jobmon_gui/utils/csvExport';
+import { parseRequestedResources } from '@jobmon_gui/utils/requestedResources';
 import { useUsageFilters } from '@jobmon_gui/hooks/useUsageFilters';
 import {
     calculateResourceEfficiency,
@@ -264,6 +269,44 @@ export default function TaskTemplateDetails() {
             !TaskTemplateDetailsData.isLoading,
     });
 
+    // Full ``requested_resources`` blobs keyed by
+    // ``TaskInstance.task_resources_id`` for the Task Table's Requested
+    // column tooltip. Collected from the viz rows we already have —
+    // typically a handful of unique ids even on large templates — and
+    // hydrated in one batch request.
+    const uniqueTaskResourcesIds = useMemo(() => {
+        const ids = new Set<number>();
+        for (const row of rawTaskNodesFromApi) {
+            if (row.task_resources_id != null) {
+                ids.add(row.task_resources_id);
+            }
+        }
+        return Array.from(ids).sort((a, b) => a - b);
+    }, [rawTaskNodesFromApi]);
+    // Defer the batch fetch until all three streams have drained, so
+    // we issue one request with the full id set instead of N growing
+    // requests (one per page as new ids trickle in).
+    const streamsDone =
+        !usageStream0.hasNextPage &&
+        !usageStream1.hasNextPage &&
+        !usageStream2.hasNextPage;
+    const resourcesBatchQuery = useQuery<TaskResourcesBatchResponse, Error>({
+        queryKey: ['task_resources_batch', workflowId, taskTemplateVersionId],
+        queryFn: () => getTaskResourcesBatchQueryFn(uniqueTaskResourcesIds),
+        enabled: streamsDone && uniqueTaskResourcesIds.length > 0,
+        staleTime: 60_000,
+    });
+    const fullResourcesById = useMemo(() => {
+        const map = new Map<number, Record<string, unknown>>();
+        for (const item of resourcesBatchQuery.data?.resources ?? []) {
+            map.set(
+                item.task_resources_id,
+                (item.requested_resources as Record<string, unknown>) ?? {}
+            );
+        }
+        return map;
+    }, [resourcesBatchQuery.data]);
+
     // Adapt server clusters to the frontend ResourceCluster shape. The
     // server ships only numbers (runtime, memory, task_count); we derive
     // the string cluster id via the same ``createResourceClusterKey`` the
@@ -373,6 +416,10 @@ export default function TaskTemplateDetails() {
                 memory_gib:
                     typeof item.m === 'number' ? bytes_to_gib(item.m) : null,
                 workflow_run_id: item.workflow_run_id ?? null,
+                requested_resources: parseRequestedResources(
+                    item.requested_resources
+                ),
+                task_resources_id: item.task_resources_id ?? null,
             }));
     }, [rawTaskNodesFromApi, passesResourceClusterFilter]);
 
@@ -1051,6 +1098,7 @@ export default function TaskTemplateDetails() {
                         TaskTemplateDetailsData.data.task_template_name
                     }
                     workflowId={workflowId}
+                    fullResourcesById={fullResourcesById}
                     onFilteredInstanceIdsChange={
                         handleTableFilteredInstanceIdsChange
                     }

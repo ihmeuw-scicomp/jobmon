@@ -53,3 +53,8 @@ export const fatal_error_breakdown_url =
 export const get_task_template_id_url = (
     task_template_version_id: number | string
 ) => api_base_url + `/task_template/id/${task_template_version_id}`;
+
+export const workflow_requested_resources_url = (wf_id: number | string) =>
+    api_base_url + `/workflow/${wf_id}/requested_resources`;
+
+export const task_resources_batch_url = api_base_url + '/task_resources/batch';
