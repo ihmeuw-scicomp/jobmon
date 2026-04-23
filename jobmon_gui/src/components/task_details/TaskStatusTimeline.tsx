@@ -29,6 +29,8 @@ import {
     formatResourceLabel,
     parseRequestedResources,
 } from '@jobmon_gui/utils/requestedResources';
+import { JobmonModal } from '@jobmon_gui/components/JobmonModal';
+import { getBarColor } from './ResourceComparisonBar';
 
 // Keys shown elsewhere in the attempt panel (resource bars, Queue /
 // Cores rows, captured-log section) — skip them in the generic
@@ -42,8 +44,6 @@ const HIDDEN_REQ_RES_KEYS = new Set([
     'stdout',
     'stderr',
 ]);
-import { JobmonModal } from '@jobmon_gui/components/JobmonModal';
-import { getBarColor } from './ResourceComparisonBar';
 
 type AuditRecord = components['schemas']['TaskStatusAuditRecord'];
 

@@ -163,16 +163,22 @@ class WorkflowRepository:
         pre-launch. The Task Template Details task table (TI-indexed)
         uses ``/task_resources/batch`` for its lookup instead.
         """
-        # Group only on the two PKs — all other selected columns are
-        # functionally determined by them, so ``MAX(...)`` keeps MySQL
-        # ``ONLY_FULL_GROUP_BY`` (and SQLite) happy without grouping on
-        # the TEXT ``requested_resources`` column (which forces a
-        # temp-table filesort on large workflows).
+        # Group by every column whose identity must be preserved in
+        # the output row: ``TaskTemplateVersion.id`` isn't FD'd by
+        # ``(TaskTemplate.id, TaskResources.id)`` — a single
+        # (template, resources) pair can span versions — so it goes in
+        # the GROUP BY rather than being wrapped in ``MAX`` (which
+        # would arbitrarily pick one version). ``TaskTemplate.name``
+        # and ``Queue.name`` are FD'd by their own PKs and stay under
+        # ``MAX`` to avoid grouping on non-key columns. The TEXT
+        # ``requested_resources`` blob is FD'd by ``TaskResources.id``
+        # and also stays under ``MAX`` so MySQL doesn't temp-table
+        # filesort on it.
         rows = self.session.execute(
             select(
                 TaskTemplate.id,
                 func.max(TaskTemplate.name),
-                func.max(TaskTemplateVersion.id),
+                TaskTemplateVersion.id,
                 TaskResources.id,
                 func.max(Queue.name),
                 func.count(Task.id),
@@ -191,7 +197,7 @@ class WorkflowRepository:
             .join(TaskResources, Task.task_resources_id == TaskResources.id)
             .outerjoin(Queue, TaskResources.queue_id == Queue.id)
             .where(Task.workflow_id == workflow_id)
-            .group_by(TaskTemplate.id, TaskResources.id)
+            .group_by(TaskTemplate.id, TaskTemplateVersion.id, TaskResources.id)
             .order_by(TaskTemplate.id, TaskResources.id)
         ).all()
 
