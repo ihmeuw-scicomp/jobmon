@@ -94,8 +94,12 @@ export const formatRequestedResourcesSummary = (
 ): string => {
     if (!blob || typeof blob !== 'object') return '';
     const parts: string[] = [];
+    // ``cores`` takes precedence over the legacy ``num_cores`` alias —
+    // showing both would render "4 cores · 4 cores".
+    const hasCores = blob.cores !== undefined && blob.cores !== null;
     for (const k of ['memory', 'runtime', 'cores', 'num_cores', 'queue']) {
         if (blob[k] === undefined || blob[k] === null) continue;
+        if (k === 'num_cores' && hasCores) continue;
         if (k === 'queue') {
             parts.push(String(blob[k]));
         } else {
@@ -112,7 +116,9 @@ export const formatRequestedResourcesFull = (
     if (!blob || typeof blob !== 'object') return [];
     const seen = new Set<string>();
     const rows: { key: string; value: string }[] = [];
+    const hasCores = blob.cores !== undefined && blob.cores !== null;
     for (const k of KNOWN_KEYS) {
+        if (k === 'num_cores' && hasCores) continue;
         if (k in blob && blob[k] !== null && blob[k] !== undefined) {
             rows.push({ key: k, value: formatValue(k, blob[k]) });
             seen.add(k);

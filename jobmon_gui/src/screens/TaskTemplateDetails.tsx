@@ -290,8 +290,17 @@ export default function TaskTemplateDetails() {
         !usageStream0.hasNextPage &&
         !usageStream1.hasNextPage &&
         !usageStream2.hasNextPage;
+    // Include the id set in the key so the cache keys on inputs — the
+    // ``streamsDone`` gate prevents this from churning mid-stream
+    // because ``uniqueTaskResourcesIds`` only gets queried once
+    // pagination finishes.
     const resourcesBatchQuery = useQuery<TaskResourcesBatchResponse, Error>({
-        queryKey: ['task_resources_batch', workflowId, taskTemplateVersionId],
+        queryKey: [
+            'task_resources_batch',
+            workflowId,
+            taskTemplateVersionId,
+            uniqueTaskResourcesIds,
+        ],
         queryFn: () => getTaskResourcesBatchQueryFn(uniqueTaskResourcesIds),
         enabled: streamsDone && uniqueTaskResourcesIds.length > 0,
         staleTime: 60_000,
