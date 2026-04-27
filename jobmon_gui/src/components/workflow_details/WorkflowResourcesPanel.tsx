@@ -113,7 +113,7 @@ export default function WorkflowResourcesPanel({
                         </Typography>
                         {group.clusters.map(c => (
                             <RequestedResourceClusterCard
-                                key={c.task_resources_id}
+                                key={`${c.task_template_version_id}-${c.task_resources_id}`}
                                 cluster={c}
                                 defaultOpen
                             />
