@@ -118,7 +118,10 @@ export const formatRequestedResourcesFull = (
     const rows: { key: string; value: string }[] = [];
     const hasCores = blob.cores !== undefined && blob.cores !== null;
     for (const k of KNOWN_KEYS) {
-        if (k === 'num_cores' && hasCores) continue;
+        if (k === 'num_cores' && hasCores) {
+            seen.add(k);
+            continue;
+        }
         if (k in blob && blob[k] !== null && blob[k] !== undefined) {
             rows.push({ key: k, value: formatValue(k, blob[k]) });
             seen.add(k);
