@@ -345,14 +345,13 @@ export default function TaskTable({
                               row.original.task_resources_id
                           )
                         : undefined;
-                const summary = formatRequestedResourcesSummary(narrowBlob);
+                // narrowBlob only carries memory/runtime/cores/queue,
+                // so legacy num_cores and user-defined keys are missing
+                // until the batch fetch lands.
+                const blob = fullBlob ?? narrowBlob;
+                const summary = formatRequestedResourcesSummary(blob);
                 if (!summary) return 'N/A';
-                // Prefer the full server blob for the expanded tooltip;
-                // fall back to the narrowed viz-row blob until the batch
-                // fetch lands.
-                const rows = formatRequestedResourcesFull(
-                    fullBlob ?? narrowBlob
-                );
+                const rows = formatRequestedResourcesFull(blob);
                 return (
                     <Tooltip
                         arrow
