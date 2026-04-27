@@ -41,7 +41,6 @@ from jobmon.server.web.schemas.task_template import (
     TaskResourceVizItem,
     TaskTemplateDetailsResponse,
     TaskTemplateResourceAggregatesResponse,
-    TaskTemplateResourceUsageRequest,
     TaskTemplateVersionItem,
     TaskTemplateVersionResponse,
     WorkflowTaskTemplateStatusItem,
@@ -1084,41 +1083,6 @@ class TaskTemplateRepository:
             )
 
         return resp
-
-    def get_task_template_resource_usage(
-        self, req: TaskTemplateResourceUsageRequest
-    ) -> Optional[List[TaskResourceVizItem]]:
-        task_details_list: List[TaskResourceDetailItem] = (
-            self.get_task_resource_details(
-                task_template_version_id=req.task_template_version_id,
-                workflows=req.workflows,
-                node_args=req.node_args,
-            )
-        )
-
-        viz_data: Optional[List[TaskResourceVizItem]] = None
-        if req.viz:
-            viz_data = []
-            for detail_item in task_details_list:
-                viz_data.append(
-                    TaskResourceVizItem(
-                        r=detail_item.r,
-                        m=detail_item.m,
-                        node_id=detail_item.node_id,
-                        task_id=detail_item.task_id,
-                        task_instance_id=detail_item.task_instance_id,
-                        task_name=detail_item.task_name,
-                        requested_resources=detail_item.requested_resources,
-                        attempt_number_of_instance=detail_item.attempt_number_of_instance,
-                        status=detail_item.status,
-                        task_status_date=detail_item.task_status_date,
-                        task_command=detail_item.task_command,
-                        task_num_attempts=detail_item.task_num_attempts,
-                        task_max_attempts=detail_item.task_max_attempts,
-                    )
-                )
-
-        return viz_data
 
     def _find_ttvid(self, workflow_id: int, task_template_id: int) -> Optional[int]:
         """Find task template version ID for a workflow + task template.
