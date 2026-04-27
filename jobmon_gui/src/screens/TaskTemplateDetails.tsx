@@ -285,10 +285,16 @@ export default function TaskTemplateDetails() {
     }, [rawTaskNodesFromApi]);
     // Defer the batch fetch until all three streams have drained, so
     // we issue one request with the full id set instead of N growing
-    // requests (one per page as new ids trickle in).
+    // requests (one per page as new ids trickle in). ``hasNextPage``
+    // is ``false`` in TanStack Query's pre-fetch initial state, so we
+    // also gate on ``isFetchedAfterMount`` to make sure the stream has
+    // actually returned at least one page.
     const streamsDone =
+        usageStream0.isFetchedAfterMount &&
         !usageStream0.hasNextPage &&
+        usageStream1.isFetchedAfterMount &&
         !usageStream1.hasNextPage &&
+        usageStream2.isFetchedAfterMount &&
         !usageStream2.hasNextPage;
     // Include the id set in the key so the cache keys on inputs — the
     // ``streamsDone`` gate prevents this from churning mid-stream
