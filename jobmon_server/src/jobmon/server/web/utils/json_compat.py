@@ -1,7 +1,25 @@
 """Utility functions for JSON compatibility between old and new client versions."""
 
+import ast
 import json
 from typing import Any, List, Optional
+
+
+def deserialize_requested_resources(raw: Optional[str]) -> Any:
+    """Parse a ``task_resources.requested_resources`` column value.
+
+    New rows are ``json.dumps``'d by ``/task/bind_resources`` (lowercase
+    ``true``/``false``/``null``). Older rows are Python ``repr``-style
+    (``True``/``False``/``None``) from pre-FastAPI versions. Try JSON
+    first, fall back to ``ast.literal_eval``.
+    """
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (ValueError, TypeError):
+        return ast.literal_eval(raw)
+
 
 # Version cutoff for JSON compatibility
 # Clients <= this version expect quoted JSON strings (old format)

@@ -19,6 +19,7 @@ from jobmon.server.web.schemas.workflow import (
     WorkflowDetailsItem,
     WorkflowOverviewFilters,
     WorkflowOverviewResponse,
+    WorkflowRequestedResourcesResponse,
     WorkflowRunForResetResponse,
     WorkflowStatusResponse,
     WorkflowTasksResponse,
@@ -103,6 +104,22 @@ def get_workflow_tasks(
     """Get the tasks for a given workflow."""
     workflow_repo = WorkflowRepository(db)
     return workflow_repo.get_workflow_tasks(workflow_id, limit, status)
+
+
+@api_v3_router.get("/workflow/{workflow_id}/requested_resources")
+def get_workflow_requested_resources(
+    workflow_id: int,
+    db: Session = Depends(get_db),
+) -> WorkflowRequestedResourcesResponse:
+    """Return the requested-resource clusters for a workflow.
+
+    One entry per unique ``(task_template, task_resources_id)``, with
+    ``num_tasks``, ``queue_name``, and the raw ``requested_resources``
+    JSON blob. Available as soon as the workflow is bound — no
+    TaskInstance required.
+    """
+    workflow_repo = WorkflowRepository(db)
+    return workflow_repo.get_workflow_requested_resources(workflow_id)
 
 
 @api_v3_router.get("/workflow/{workflow_id}/validate_username/{username}")

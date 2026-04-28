@@ -790,6 +790,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/api/v3/task_resources/batch': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Task Resources Batch
+         * @description Return ``requested_resources`` + ``queue_name`` for many ids in one query.
+         *
+         *     Used by the Task Template Details task table to build a
+         *     ``task_resources_id → full blob`` map keyed on
+         *     ``TaskInstance.task_resources_id``. The single-id ``POST
+         *     /task_resources/{id}`` endpoint works fine for one-off lookups but
+         *     issues N round-trips when the frontend needs N entries.
+         */
+        post: operations['get_task_resources_batch_api_v3_task_resources_batch_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/api/v3/tool': {
         parameters: {
             query?: never;
@@ -1439,6 +1465,31 @@ export interface paths {
          * @description Get the tasks for a given workflow.
          */
         get: operations['get_workflow_tasks_api_v3_workflow__workflow_id__workflow_tasks_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/v3/workflow/{workflow_id}/requested_resources': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workflow Requested Resources
+         * @description Return the requested-resource clusters for a workflow.
+         *
+         *     One entry per unique ``(task_template, task_resources_id)``, with
+         *     ``num_tasks``, ``queue_name``, and the raw ``requested_resources``
+         *     JSON blob. Available as soon as the workflow is bound — no
+         *     TaskInstance required.
+         */
+        get: operations['get_workflow_requested_resources_api_v3_workflow__workflow_id__requested_resources_get'];
         put?: never;
         post?: never;
         delete?: never;
@@ -2430,6 +2481,35 @@ export interface components {
             detail?: components['schemas']['ValidationError'][];
         };
         /**
+         * RequestedResourceClusterItem
+         * @description One (task_template, task_resources_id) cluster of requested resources.
+         *
+         *     Sourced from ``task_resources`` rows joined through ``task`` — so the
+         *     cluster is visible as soon as the workflow has been bound, even before
+         *     any TaskInstances have launched. ``requested_resources`` is the raw
+         *     JSON blob the user configured; fields are intentionally unrestricted
+         *     (``Dict[str, Any]``) because ``RequestedResourcesModel`` is only a
+         *     hint — users can stuff arbitrary keys into compute_resources.
+         */
+        RequestedResourceClusterItem: {
+            /** Task Template Id */
+            task_template_id: number;
+            /** Task Template Name */
+            task_template_name: string;
+            /** Task Template Version Id */
+            task_template_version_id: number;
+            /** Task Resources Id */
+            task_resources_id: number;
+            /** Queue Name */
+            queue_name?: string | null;
+            /** Num Tasks */
+            num_tasks: number;
+            /** Requested Resources */
+            requested_resources: {
+                [key: string]: unknown;
+            };
+        };
+        /**
          * ResourceClusterItem
          * @description One requested-resource cluster summary.
          *
@@ -2655,6 +2735,8 @@ export interface components {
             task_name?: string | null;
             /** Requested Resources */
             requested_resources?: string | null;
+            /** Task Resources Id */
+            task_resources_id?: number | null;
             /** Attempt Number Of Instance */
             attempt_number_of_instance?: number | null;
             /** Status */
@@ -2669,6 +2751,34 @@ export interface components {
             task_max_attempts?: number | null;
             /** Workflow Run Id */
             workflow_run_id?: number | null;
+        };
+        /**
+         * TaskResourcesBatchItem
+         * @description One entry in the batch response.
+         */
+        TaskResourcesBatchItem: {
+            /** Task Resources Id */
+            task_resources_id: number;
+            /** Requested Resources */
+            requested_resources?: unknown;
+            /** Queue Name */
+            queue_name?: string | null;
+        };
+        /**
+         * TaskResourcesBatchRequest
+         * @description Request body for ``/task_resources/batch``.
+         */
+        TaskResourcesBatchRequest: {
+            /** Task Resources Ids */
+            task_resources_ids: number[];
+        };
+        /**
+         * TaskResourcesBatchResponse
+         * @description Response for ``/task_resources/batch``.
+         */
+        TaskResourcesBatchResponse: {
+            /** Resources */
+            resources: components['schemas']['TaskResourcesBatchItem'][];
         };
         /**
          * TaskStatusAuditRecord
@@ -3014,6 +3124,14 @@ export interface components {
         WorkflowOverviewResponse: {
             /** Workflows */
             workflows: components['schemas']['WorkflowOverviewItem'][];
+        };
+        /**
+         * WorkflowRequestedResourcesResponse
+         * @description Response for ``GET /workflow/{wfid}/requested_resources``.
+         */
+        WorkflowRequestedResourcesResponse: {
+            /** Clusters */
+            clusters: components['schemas']['RequestedResourceClusterItem'][];
         };
         /**
          * WorkflowResourceErrorCheckResponse
@@ -4089,6 +4207,39 @@ export interface operations {
             };
         };
     };
+    get_task_resources_batch_api_v3_task_resources_batch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['TaskResourcesBatchRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['TaskResourcesBatchResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
     add_tool_api_v3_tool_post: {
         parameters: {
             query?: never;
@@ -4922,6 +5073,37 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['WorkflowTasksResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_workflow_requested_resources_api_v3_workflow__workflow_id__requested_resources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workflow_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['WorkflowRequestedResourcesResponse'];
                 };
             };
             /** @description Validation Error */

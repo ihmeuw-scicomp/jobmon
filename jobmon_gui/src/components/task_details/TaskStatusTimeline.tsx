@@ -6,7 +6,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Tooltip from '@mui/material/Tooltip';
 import Collapse from '@mui/material/Collapse';
 import Button from '@mui/material/Button';
-import Grid from '@mui/material/Grid';
 import LinearProgress from '@mui/material/LinearProgress';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
@@ -25,9 +24,26 @@ import { components } from '@jobmon_gui/types/apiSchema';
 import { TaskInstance } from '@jobmon_gui/types/TaskInstance';
 import { formatBytes, bytes_to_gib } from '@jobmon_gui/utils/formatters';
 import { parseResourceJson } from '@jobmon_gui/utils/csvExport';
+import {
+    formatRequestedResourcesFull,
+    formatResourceLabel,
+    parseRequestedResources,
+} from '@jobmon_gui/utils/requestedResources';
 import { JobmonModal } from '@jobmon_gui/components/JobmonModal';
 import { getBarColor } from './ResourceComparisonBar';
-import { ScrollableCodeBlock } from '@jobmon_gui/components/ScrollableTextArea';
+
+// Keys shown elsewhere in the attempt panel (resource bars, Queue /
+// Cores rows, captured-log section) — skip them in the generic
+// "other fields" rendering so values don't show up twice.
+const HIDDEN_REQ_RES_KEYS = new Set([
+    'memory',
+    'runtime',
+    'queue',
+    'cores',
+    'num_cores',
+    'stdout',
+    'stderr',
+]);
 
 type AuditRecord = components['schemas']['TaskStatusAuditRecord'];
 
@@ -201,6 +217,207 @@ function mapAttemptsToInstances(
 
 // --- Sub-components ---
 
+function AttemptColumn({
+    heading,
+    rows,
+}: {
+    heading: string;
+    rows: { label: string; value: string }[];
+}) {
+    return (
+        <Box>
+            <Typography
+                variant="caption"
+                fontWeight={700}
+                sx={{
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    display: 'block',
+                    mb: 0.5,
+                }}
+            >
+                {heading}
+            </Typography>
+            <Box
+                sx={{
+                    display: 'grid',
+                    gridTemplateColumns: 'max-content 1fr',
+                    gap: '2px 12px',
+                }}
+            >
+                {rows.map(row => (
+                    <React.Fragment key={row.label}>
+                        <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            fontWeight={600}
+                        >
+                            {row.label}
+                        </Typography>
+                        <Typography
+                            variant="caption"
+                            sx={{
+                                fontFamily: 'Roboto Mono Variable',
+                                wordBreak: 'break-all',
+                            }}
+                        >
+                            {row.value}
+                        </Typography>
+                    </React.Fragment>
+                ))}
+            </Box>
+        </Box>
+    );
+}
+
+function LogModalSection({
+    label,
+    value,
+    kind,
+    emphasize = false,
+}: {
+    label: string;
+    value: string | null | undefined;
+    kind: 'path' | 'content';
+    emphasize?: boolean;
+}) {
+    const hasContent =
+        value != null && value !== '' && value !== '/dev/null';
+    return (
+        <Box sx={{ mb: 1.5 }}>
+            <Typography
+                variant="caption"
+                sx={{
+                    display: 'block',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    color: emphasize ? 'error.main' : 'text.secondary',
+                    mb: 0.25,
+                }}
+            >
+                {label}
+            </Typography>
+            {!hasContent ? (
+                <Typography variant="body2" color="text.secondary">
+                    No output captured.
+                </Typography>
+            ) : kind === 'path' ? (
+                <Box
+                    sx={{
+                        fontFamily: 'Roboto Mono Variable',
+                        fontSize: '0.8rem',
+                        bgcolor: '#f5f5f5',
+                        border: '1px solid',
+                        borderColor: 'grey.300',
+                        borderRadius: 1,
+                        px: 1,
+                        py: 0.5,
+                        whiteSpace: 'pre',
+                        overflowX: 'auto',
+                        userSelect: 'all',
+                    }}
+                >
+                    {value}
+                </Box>
+            ) : (
+                <Box
+                    component="pre"
+                    sx={{
+                        fontFamily: 'Roboto Mono Variable',
+                        fontSize: '0.75rem',
+                        bgcolor: '#f5f5f5',
+                        border: '1px solid',
+                        borderColor: 'grey.300',
+                        borderRadius: 1,
+                        px: 1.5,
+                        py: 1,
+                        m: 0,
+                        maxHeight: '50vh',
+                        overflow: 'auto',
+                        whiteSpace: 'pre',
+                    }}
+                >
+                    {value}
+                </Box>
+            )}
+        </Box>
+    );
+}
+
+function CapturedStdoutModal({
+    instance,
+    open,
+    onClose,
+}: {
+    instance: TaskInstance | null;
+    open: boolean;
+    onClose: () => void;
+}) {
+    return (
+        <JobmonModal
+            title="Captured Stdout"
+            open={open && !!instance}
+            onClose={onClose}
+            width="min(900px, 85vw)"
+            minHeight="auto"
+        >
+            <LogModalSection
+                label="File path"
+                value={instance?.ti_stdout}
+                kind="path"
+            />
+            <LogModalSection
+                label="Log content"
+                value={instance?.ti_stdout_log}
+                kind="content"
+            />
+        </JobmonModal>
+    );
+}
+
+function CapturedStderrModal({
+    instance,
+    open,
+    onClose,
+}: {
+    instance: TaskInstance | null;
+    open: boolean;
+    onClose: () => void;
+}) {
+    const hasErrorSummary =
+        instance?.ti_error_log_description != null &&
+        instance.ti_error_log_description !== '';
+    return (
+        <JobmonModal
+            title="Captured Stderr"
+            open={open && !!instance}
+            onClose={onClose}
+            width="min(900px, 85vw)"
+            minHeight="auto"
+        >
+            {hasErrorSummary && (
+                <LogModalSection
+                    label="Error summary"
+                    value={instance?.ti_error_log_description}
+                    kind="content"
+                    emphasize
+                />
+            )}
+            <LogModalSection
+                label="File path"
+                value={instance?.ti_stderr}
+                kind="path"
+            />
+            <LogModalSection
+                label="Log content"
+                value={instance?.ti_stderr_log}
+                kind="content"
+            />
+        </JobmonModal>
+    );
+}
+
 function AttemptDetailPanel({
     instance,
     onViewStdout,
@@ -211,6 +428,13 @@ function AttemptDetailPanel({
     onViewStderr: () => void;
 }) {
     const resources = parseResourceJson(instance.ti_resources);
+    // ``parseResourceJson`` projects to {memory, runtime} only. Use the
+    // full-blob parser here so the section shows cores, project,
+    // stdout/stderr, and any user-defined fields.
+    const fullResources = parseRequestedResources(instance.ti_resources);
+    const requestedResourceRows = formatRequestedResourcesFull(
+        fullResources
+    ).filter(r => !HIDDEN_REQ_RES_KEYS.has(r.key));
 
     const requestedMemoryGiB = resources?.memory ?? null;
     const utilizedMemoryGiB = bytes_to_gib(
@@ -231,39 +455,46 @@ function AttemptDetailPanel({
               })
             : null;
 
-    const stderrPreview = instance.ti_stderr_log
-        ? instance.ti_stderr_log.trim().split('\n').slice(-10).join('\n')
-        : null;
+    const tail10 = (s: string | null | undefined) =>
+        s ? s.trim().split('\n').slice(-10).join('\n') : null;
+    const stderrPreview = tail10(instance.ti_stderr_log);
+    const stdoutPreview = tail10(instance.ti_stdout_log);
 
-    // Metadata chips
-    const metaRows: { label: string; value: string }[] = [];
+    const executionRows: { label: string; value: string }[] = [];
     if (instance.ti_workflow_run_id) {
-        metaRows.push({
+        executionRows.push({
             label: 'WF Run',
             value: String(instance.ti_workflow_run_id),
         });
     }
     if (instance.ti_distributor_id) {
-        metaRows.push({
+        executionRows.push({
             label: 'Job ID',
             value: String(instance.ti_distributor_id),
         });
     }
     if (instance.ti_nodename) {
-        metaRows.push({
-            label: 'Node',
-            value: instance.ti_nodename,
-        });
+        executionRows.push({ label: 'Node', value: instance.ti_nodename });
     }
-    metaRows.push({
+    if (instance.ti_cpu) {
+        executionRows.push({ label: 'CPU Usage', value: instance.ti_cpu });
+    }
+    if (instance.ti_io) {
+        executionRows.push({ label: 'I/O', value: instance.ti_io });
+    }
+
+    const requestedRows: { label: string; value: string }[] = [];
+    requestedRows.push({
         label: 'Queue',
         value: instance.ti_queue_name || 'N/A',
     });
-    if (instance.ti_cpu) {
-        metaRows.push({ label: 'CPU', value: instance.ti_cpu });
+    const requestedCores =
+        fullResources.cores ?? fullResources.num_cores ?? null;
+    if (requestedCores !== null && requestedCores !== undefined) {
+        requestedRows.push({ label: 'Cores', value: String(requestedCores) });
     }
-    if (instance.ti_io) {
-        metaRows.push({ label: 'I/O', value: instance.ti_io });
+    for (const { key, value } of requestedResourceRows) {
+        requestedRows.push({ label: formatResourceLabel(key), value });
     }
     // Resource utilization (rendered as inline bars, not text rows)
     const memoryPercent =
@@ -355,40 +586,21 @@ function AttemptDetailPanel({
                 </Box>
             )}
 
-            {/* Metadata key-value grid */}
             <Box
                 sx={{
                     display: 'grid',
-                    gridTemplateColumns:
-                        'max-content 1fr',
-                    gap: '2px 12px',
-                    alignContent: 'start',
-                    mb: 1,
+                    gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                    columnGap: 3,
+                    rowGap: 1.5,
+                    mb: 1.5,
                 }}
             >
-                {metaRows.map(row => (
-                    <React.Fragment key={row.label}>
-                        <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            fontWeight={600}
-                        >
-                            {row.label}
-                        </Typography>
-                        <Typography
-                            variant="caption"
-                            sx={{
-                                fontFamily:
-                                    'Roboto Mono Variable',
-                            }}
-                        >
-                            {row.value}
-                        </Typography>
-                    </React.Fragment>
-                ))}
+                <AttemptColumn heading="Execution" rows={executionRows} />
+                <AttemptColumn heading="Requested" rows={requestedRows} />
             </Box>
 
-            {/* Resource inline bars */}
+            {/* Resource inline bars — span full panel width so they
+                don't feel orphaned under the Execution column. */}
             <Box
                 sx={{
                     display: 'grid',
@@ -397,7 +609,6 @@ function AttemptDetailPanel({
                     gap: '6px 10px',
                     alignItems: 'center',
                     mb: 1.5,
-                    maxWidth: 500,
                 }}
             >
                 {[
@@ -450,122 +661,88 @@ function AttemptDetailPanel({
                 }}
             />
 
-            {/* Stderr */}
-            <Box sx={{ mb: 1.5 }}>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        mb: 0.5,
-                    }}
-                >
-                    <Typography
-                        variant="caption"
-                        fontWeight={700}
-                        sx={{
-                            textTransform: 'uppercase',
-                            letterSpacing: 0.5,
-                        }}
-                    >
-                        Stderr
-                    </Typography>
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={onViewStderr}
-                        sx={{
-                            py: 0,
-                            px: 0.75,
-                            fontSize: '0.7rem',
-                            minHeight: 0,
-                            lineHeight: 1.5,
-                        }}
-                    >
-                        View Full Log
-                    </Button>
-                </Box>
-                {stderrPreview ? (
+            {[
+                {
+                    key: 'stderr',
+                    label: 'Captured Stderr',
+                    preview: stderrPreview,
+                    onView: onViewStderr,
+                    emptyText: isResourceError
+                        ? 'Killed by cluster (no stderr captured)'
+                        : 'No output',
+                },
+                {
+                    key: 'stdout',
+                    label: 'Captured Stdout',
+                    preview: stdoutPreview,
+                    onView: onViewStdout,
+                    emptyText: 'No output',
+                },
+            ].map(section => (
+                <Box key={section.key} sx={{ mb: 1.5 }}>
                     <Box
                         sx={{
-                            fontFamily: 'Roboto Mono Variable',
-                            fontSize: '0.7rem',
-                            backgroundColor: '#f5f5f5',
-                            border: '1px solid',
-                            borderColor: 'grey.300',
-                            px: 1.5,
-                            py: 1,
-                            borderRadius: 1,
-                            maxHeight: 150,
-                            overflow: 'auto',
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                            lineHeight: 1.6,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            mb: 0.5,
                         }}
                     >
-                        {stderrPreview}
+                        <Typography
+                            variant="caption"
+                            fontWeight={700}
+                            sx={{
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.5,
+                            }}
+                        >
+                            {section.label}
+                        </Typography>
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={section.onView}
+                            sx={{
+                                py: 0,
+                                px: 0.75,
+                                fontSize: '0.7rem',
+                                minHeight: 0,
+                                lineHeight: 1.5,
+                            }}
+                        >
+                            View Full Log
+                        </Button>
                     </Box>
-                ) : (
-                    <Typography
-                        variant="caption"
-                        color="text.secondary"
-                    >
-                        {isResourceError
-                            ? 'Killed by cluster (no stderr captured)'
-                            : 'No output'}
-                    </Typography>
-                )}
-            </Box>
-
-            {/* Stdout */}
-            <Box
-                sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1,
-                }}
-            >
-                <Typography
-                    variant="caption"
-                    fontWeight={700}
-                    sx={{
-                        textTransform: 'uppercase',
-                        letterSpacing: 0.5,
-                        flexShrink: 0,
-                    }}
-                >
-                    Stdout
-                </Typography>
-                <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{
-                        fontFamily: 'Roboto Mono Variable',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        flex: 1,
-                        minWidth: 0,
-                    }}
-                >
-                    {instance.ti_stdout || '/dev/null'}
-                </Typography>
-                <Button
-                    size="small"
-                    variant="outlined"
-                    onClick={onViewStdout}
-                    sx={{
-                        py: 0,
-                        px: 0.75,
-                        fontSize: '0.7rem',
-                        minHeight: 0,
-                        lineHeight: 1.5,
-                        flexShrink: 0,
-                    }}
-                >
-                    View Full Log
-                </Button>
-            </Box>
+                    {section.preview ? (
+                        <Box
+                            sx={{
+                                fontFamily: 'Roboto Mono Variable',
+                                fontSize: '0.7rem',
+                                backgroundColor: '#f5f5f5',
+                                border: '1px solid',
+                                borderColor: 'grey.300',
+                                px: 1.5,
+                                py: 1,
+                                borderRadius: 1,
+                                maxHeight: 150,
+                                overflow: 'auto',
+                                whiteSpace: 'pre-wrap',
+                                wordBreak: 'break-word',
+                                lineHeight: 1.6,
+                            }}
+                        >
+                            {section.preview}
+                        </Box>
+                    ) : (
+                        <Typography
+                            variant="caption"
+                            color="text.secondary"
+                        >
+                            {section.emptyText}
+                        </Typography>
+                    )}
+                </Box>
+            ))}
         </Box>
     );
 }
@@ -899,73 +1076,16 @@ function FallbackInstanceList({
                 })}
             </Box>
 
-            {/* Stdout modal */}
-            <JobmonModal
-                title="Standard Out"
-                open={modalState.type === 'stdout' && !!modalInstance}
+            <CapturedStdoutModal
+                instance={modalInstance}
+                open={modalState.type === 'stdout'}
                 onClose={() => setModalState({ type: null, instance: null })}
-                width="80%"
-            >
-                <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                        <Typography variant="h6">Standard Out Path:</Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            {modalInstance?.ti_stdout}
-                        </ScrollableCodeBlock>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <Typography variant="h6">Standard Out Log:</Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            <pre>{modalInstance?.ti_stdout_log}</pre>
-                        </ScrollableCodeBlock>
-                    </Grid>
-                </Grid>
-            </JobmonModal>
-
-            {/* Stderr modal */}
-            <JobmonModal
-                title="Standard Error"
-                open={modalState.type === 'stderr' && !!modalInstance}
+            />
+            <CapturedStderrModal
+                instance={modalInstance}
+                open={modalState.type === 'stderr'}
                 onClose={() => setModalState({ type: null, instance: null })}
-                width="80%"
-            >
-                <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                        <Typography variant="h6">
-                            Standard Error Path:
-                        </Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            {modalInstance?.ti_stderr}
-                        </ScrollableCodeBlock>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <Typography variant="h6">
-                            Standard Error Log:
-                        </Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            <pre>{modalInstance?.ti_stderr_log}</pre>
-                        </ScrollableCodeBlock>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <Typography variant="h6">
-                            Standard Error Description:
-                        </Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            {modalInstance?.ti_error_log_description}
-                        </ScrollableCodeBlock>
-                    </Grid>
-                </Grid>
-            </JobmonModal>
+            />
         </Box>
     );
 }
@@ -1170,73 +1290,16 @@ export default function TaskStatusTimeline({
                 ))}
             </Box>
 
-            {/* Stdout modal */}
-            <JobmonModal
-                title="Standard Out"
-                open={modalState.type === 'stdout' && !!modalInstance}
+            <CapturedStdoutModal
+                instance={modalInstance}
+                open={modalState.type === 'stdout'}
                 onClose={() => setModalState({ type: null, instance: null })}
-                width="80%"
-            >
-                <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                        <Typography variant="h6">Standard Out Path:</Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            {modalInstance?.ti_stdout}
-                        </ScrollableCodeBlock>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <Typography variant="h6">Standard Out Log:</Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            <pre>{modalInstance?.ti_stdout_log}</pre>
-                        </ScrollableCodeBlock>
-                    </Grid>
-                </Grid>
-            </JobmonModal>
-
-            {/* Stderr modal */}
-            <JobmonModal
-                title="Standard Error"
-                open={modalState.type === 'stderr' && !!modalInstance}
+            />
+            <CapturedStderrModal
+                instance={modalInstance}
+                open={modalState.type === 'stderr'}
                 onClose={() => setModalState({ type: null, instance: null })}
-                width="80%"
-            >
-                <Grid container spacing={2}>
-                    <Grid item xs={12}>
-                        <Typography variant="h6">
-                            Standard Error Path:
-                        </Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            {modalInstance?.ti_stderr}
-                        </ScrollableCodeBlock>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <Typography variant="h6">
-                            Standard Error Log:
-                        </Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            <pre>{modalInstance?.ti_stderr_log}</pre>
-                        </ScrollableCodeBlock>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <Typography variant="h6">
-                            Standard Error Description:
-                        </Typography>
-                    </Grid>
-                    <Grid item xs={12}>
-                        <ScrollableCodeBlock>
-                            {modalInstance?.ti_error_log_description}
-                        </ScrollableCodeBlock>
-                    </Grid>
-                </Grid>
-            </JobmonModal>
+            />
         </Box>
     );
 }

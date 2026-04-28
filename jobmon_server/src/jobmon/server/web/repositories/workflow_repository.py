@@ -28,12 +28,14 @@ from jobmon.server.web.models.workflow_attribute_type import (
 from jobmon.server.web.models.workflow_run import WorkflowRun
 from jobmon.server.web.models.workflow_status import WorkflowStatus
 from jobmon.server.web.schemas.workflow import (
+    RequestedResourceClusterItem,
     TaskTableItem,
     TaskTableResponse,
     WorkflowDetailsItem,
     WorkflowOverviewFilters,
     WorkflowOverviewItem,
     WorkflowOverviewResponse,
+    WorkflowRequestedResourcesResponse,
     WorkflowRunForResetResponse,
     WorkflowStatusResponse,
     WorkflowTasksResponse,
@@ -41,6 +43,7 @@ from jobmon.server.web.schemas.workflow import (
     WorkflowValidationResponse,
 )
 from jobmon.server.web.services.transition_service import TransitionService
+from jobmon.server.web.utils.json_compat import deserialize_requested_resources
 
 logger = structlog.get_logger(__name__)
 
@@ -150,6 +153,74 @@ class WorkflowRepository:
             df_json = df.to_json()
 
         return WorkflowTasksResponse(workflow_tasks=df_json)
+
+    def get_workflow_requested_resources(
+        self, workflow_id: int
+    ) -> WorkflowRequestedResourcesResponse:
+        """Return one cluster per unique ``(task_template, task_resources_id)``.
+
+        Sourced from ``Task.task_resources_id`` so the panel works
+        pre-launch. The Task Template Details task table (TI-indexed)
+        uses ``/task_resources/batch`` for its lookup instead.
+        """
+        # Group by every column whose identity must be preserved in
+        # the output row: ``TaskTemplateVersion.id`` isn't FD'd by
+        # ``(TaskTemplate.id, TaskResources.id)`` — a single
+        # (template, resources) pair can span versions — so it goes in
+        # the GROUP BY rather than being wrapped in ``MAX`` (which
+        # would arbitrarily pick one version). ``TaskTemplate.name``
+        # and ``Queue.name`` are FD'd by their own PKs and stay under
+        # ``MAX`` to avoid grouping on non-key columns. The TEXT
+        # ``requested_resources`` blob is FD'd by ``TaskResources.id``
+        # and also stays under ``MAX`` so MySQL doesn't temp-table
+        # filesort on it.
+        rows = self.session.execute(
+            select(
+                TaskTemplate.id,
+                func.max(TaskTemplate.name),
+                TaskTemplateVersion.id,
+                TaskResources.id,
+                func.max(Queue.name),
+                func.count(Task.id),
+                func.max(TaskResources.requested_resources),
+            )
+            .select_from(Task)
+            .join(Node, Task.node_id == Node.id)
+            .join(
+                TaskTemplateVersion,
+                Node.task_template_version_id == TaskTemplateVersion.id,
+            )
+            .join(
+                TaskTemplate,
+                TaskTemplateVersion.task_template_id == TaskTemplate.id,
+            )
+            .join(TaskResources, Task.task_resources_id == TaskResources.id)
+            .outerjoin(Queue, TaskResources.queue_id == Queue.id)
+            .where(Task.workflow_id == workflow_id)
+            .group_by(TaskTemplate.id, TaskTemplateVersion.id, TaskResources.id)
+            .order_by(TaskTemplate.id, TaskResources.id)
+        ).all()
+
+        clusters: List[RequestedResourceClusterItem] = []
+        for tt_id, tt_name, ttv_id, tr_id, q_name, n, raw_blob in rows:
+            try:
+                parsed = deserialize_requested_resources(raw_blob) or {}
+            except (ValueError, SyntaxError):
+                parsed = {"_raw": raw_blob}
+            if not isinstance(parsed, dict):
+                parsed = {"_raw": parsed}
+            clusters.append(
+                RequestedResourceClusterItem(
+                    task_template_id=int(tt_id),
+                    task_template_name=tt_name,
+                    task_template_version_id=int(ttv_id),
+                    task_resources_id=int(tr_id),
+                    queue_name=q_name,
+                    num_tasks=int(n),
+                    requested_resources=parsed,
+                )
+            )
+        return WorkflowRequestedResourcesResponse(clusters=clusters)
 
     def get_workflow_user_validation(
         self, workflow_id: int, username: str

@@ -2,8 +2,8 @@
 
 import pytest
 
-from jobmon.server.web.routes.v3.fsm.task_resources import (
-    _deserialize_requested_resources,
+from jobmon.server.web.utils.json_compat import (
+    deserialize_requested_resources as _deserialize_requested_resources,
 )
 
 
