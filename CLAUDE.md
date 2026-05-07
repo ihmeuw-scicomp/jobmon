@@ -35,3 +35,14 @@ cd jobmon_gui && npm run build   # Production build
 - Read relevant docs in `design/` directory
 - Check existing patterns in `.flake8` and `pyproject.toml`
 - See `.claude/rules/` for detailed conventions
+
+## Git Commits
+- Use conventional commit format: `feat:`, `fix:`, `chore:`, `refactor:`, `docs:`, `test:`, etc.
+- Keep the commit message to a single line
+- NEVER include `Co-Authored-By` lines in commit messages
+- End every commit message with the Jira ticket in parentheses, e.g., `feat: add migration history endpoint (DEVOPS-2531)`
+- Ticket sourcing priority:
+  1. If provided explicitly, use it
+  2. Extract from branch name (e.g., `feat/DEVOPS-1234`)
+  3. If user says "use previous", extract from the most recent commit message
+  4. If none of the above, ask
