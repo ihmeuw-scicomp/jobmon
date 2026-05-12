@@ -127,30 +127,39 @@ async def record_array_batch_num(
 
         # Process each batch with TransitionService
         for batch in task_batches:
-            # Use TransitionService for Task transition with audit logging
-            # Service has internal retries and handles SKIP LOCKED
-            result = TransitionService.gate_tasks_for_queueing(
-                session=db,
-                task_ids=batch,
-            )
-
-            gated_task_ids = result["gated"]
-
-            if result["locked"]:
-                logger.warning(
-                    f"Some tasks were locked during queueing, will retry: "
-                    f"{result['locked']}"
-                )
-
-            if not gated_task_ids:
-                # No tasks were gated in this batch
-                continue
-
             # Calculate array_batch_num and create TaskInstances
             # This still uses retry logic for the TI creation part
             max_retries = 5
             for attempt in range(max_retries):
                 try:
+                    # Gate Tasks (G/A -> Q) inside the retry loop. The OperationalError
+                    # handler below calls db.rollback(), which reverts both the gate
+                    # transitions and any partial TI work. If the gate ran only once
+                    # outside the loop, retries would issue a 0-row INSERT (the SELECT
+                    # filters Task.status == QUEUED, but the rollback put the tasks
+                    # back to REGISTERING) and the response would report all tasks
+                    # still at REGISTERING — even though the client had already
+                    # dequeued them. Re-gating on every attempt keeps the gate and
+                    # the TI insert in the same atomic unit.
+                    result = TransitionService.gate_tasks_for_queueing(
+                        session=db,
+                        task_ids=batch,
+                    )
+
+                    gated_task_ids = result["gated"]
+
+                    if result["locked"]:
+                        logger.warning(
+                            f"Some tasks were locked during queueing, will retry: "
+                            f"{result['locked']}"
+                        )
+
+                    if not gated_task_ids:
+                        # No tasks were gated in this batch. Commit any audit work
+                        # written by the gate (typically none) and move on.
+                        db.commit()
+                        break
+
                     # Calculate array_batch_num separately to avoid deadlock
                     # Use SELECT FOR UPDATE with NOWAIT to prevent waiting on locks
                     batch_num_result = db.execute(
