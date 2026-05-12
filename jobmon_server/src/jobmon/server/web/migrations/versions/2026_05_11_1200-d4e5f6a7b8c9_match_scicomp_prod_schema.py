@@ -23,7 +23,7 @@ NULL in those columns at downgrade time -- backfill first if running on a
 populated database.
 
 Revision ID: d4e5f6a7b8c9
-Revises: b2c3d4e5f6a7
+Revises: c3d4e5f6a7b8
 Create Date: 2026-05-11
 """
 
@@ -33,7 +33,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "d4e5f6a7b8c9"
-down_revision: Union[str, None] = "b2c3d4e5f6a7"
+down_revision: Union[str, None] = "c3d4e5f6a7b8"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
