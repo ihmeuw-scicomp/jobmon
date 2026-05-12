@@ -35,6 +35,27 @@ docker compose exec jobmon_client bash
 docker compose exec jobmon_client python six_job_test.py sequential
 ```
 
+### 3a. Alternative: Run from the Host venv
+
+The client scripts can also run directly from your host venv against the
+Dockerized backend. Because the host venv does not load
+`dev/config/jobmonconfig.local.yaml`, you must point the client at the
+host-published backend port in your script:
+
+```python
+import os
+os.environ["JOBMON__HTTP__SERVICE_URL"] = "http://localhost:8070"
+```
+
+Then run:
+
+```bash
+uv run python dev/workflows/simple_test.py
+```
+
+(Inside the `jobmon_client` container the YAML config already sets
+`service_url: http://jobmon_backend:80`, so no override is needed there.)
+
 ### 4. Available Directories in the Container
 
 - `/app/test_scripts/` - Your development workflows (this directory: `dev/workflows/`)

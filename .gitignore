@@ -21,6 +21,7 @@ dist
 .test_report.xml
 jobmon.db
 jobmon_server/jobmon.db
+test.db
 
 # ignore cache directories
 *__pycache__*
