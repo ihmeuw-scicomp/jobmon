@@ -139,8 +139,19 @@ class DistributorService:
         # start the cluster
         try:
             self._initialize_signal_handlers()
+            # Phase breadcrumbs land in the stderr buffer the orchestrator
+            # surfaces in DistributorStartupTimeout.  See
+            # ``jobmon.distributor.cli._phase`` for the protocol; carefully
+            # avoid the ``ALIVE`` substring so the orchestrator's signal
+            # detector isn't fooled.
+            sys.stderr.write("JOBMON_PHASE: signal_handlers_set\n")
+            sys.stderr.flush()
             self.cluster_interface.start()
+            sys.stderr.write("JOBMON_PHASE: cluster_started\n")
+            sys.stderr.flush()
             self.workflow_run.transition_to_launched()
+            sys.stderr.write("JOBMON_PHASE: transitioned_to_launched\n")
+            sys.stderr.flush()
 
             # Send simple startup signal
             sys.stderr.write("ALIVE")
