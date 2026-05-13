@@ -19,6 +19,7 @@ dist
 .coverage
 .coverage.*
 .test_report.xml
+.test_report.mysql.xml
 jobmon.db
 jobmon_server/jobmon.db
 

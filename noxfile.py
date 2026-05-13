@@ -40,6 +40,102 @@ def tests(session: Session) -> None:
 
 
 @nox.session(venv_backend="venv")
+def mysql_tests(session: Session) -> None:
+    """Run tests that require a real MySQL backend.
+
+    Brings up the throwaway MySQL container from ``docker-compose.test.yml``,
+    applies migrations against it, runs only the tests gated on
+    ``JOBMON_MYSQL_TEST_URI``, then tears the container down.
+
+    Use this for InnoDB-lock-geometry regressions (e.g. the
+    ``task_status_audit`` bulk-deadlock test) — SQLite cannot reproduce the
+    REPEATABLE READ gap-lock pathology, and you should never aim these at
+    a shared MySQL instance (least of all prod).
+    """
+    session.install("uv")
+    session.run("uv", "sync", "--active", "--group", "dev")
+
+    compose_file = "docker-compose.test.yml"
+    # Use pymysql (pure Python, in default deps) rather than mysqldb
+    # (C extension, optional ``mysql`` extra, requires system libmysql
+    # on macOS). The deadlock geometry the test exercises is server-side
+    # InnoDB behavior and is identical across drivers; we only need a
+    # MySQL connection.
+    uri = (
+        "mysql+pymysql://root:test@127.0.0.1:3307/jobmon_test"
+        "?charset=utf8mb4"
+    )
+
+    # Bring the container up and wait for the healthcheck.
+    # ``--wait`` blocks until each service's healthcheck passes, so we
+    # don't have to poll docker inspect ourselves.
+    session.run(
+        "docker",
+        "compose",
+        "-f",
+        compose_file,
+        "up",
+        "-d",
+        "--wait",
+        "--wait-timeout",
+        "90",
+        external=True,
+    )
+
+    try:
+        # Apply migrations against the fresh DB. We use jobmon's own
+        # ``init_db`` rather than alembic directly so seed metadata
+        # (workflow statuses, task statuses, etc.) lands too — same path
+        # the SQLite test fixture uses.
+        session.run(
+            "python",
+            "-c",
+            (
+                "import os; "
+                f"os.environ['JOBMON__DB__SQLALCHEMY_DATABASE_URI'] = "
+                f"'{uri}'; "
+                "os.environ['JOBMON__DB__SQLALCHEMY_CONNECT_ARGS'] = '{}'; "
+                "from jobmon.server.web.db import init_db; init_db()"
+            ),
+        )
+
+        # Run only the MySQL-gated tests. Anything else (the SQLite suite)
+        # should be run via `nox -s tests`.
+        args = session.posargs or [
+            "tests/integration/server/test_audit_bulk_deadlock.py",
+        ]
+        test_env = {
+            "JOBMON_MYSQL_TEST_URI": uri,
+            "SQLALCHEMY_WARN_20": "1",
+        }
+        if sys.platform == "darwin":
+            test_env["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
+
+        session.run(
+            "coverage",
+            "run",
+            "-m",
+            "pytest",
+            "--junitxml=.test_report.mysql.xml",
+            "-v",
+            *args,
+            env=test_env,
+        )
+    finally:
+        # Tear down even on failure so re-running starts clean. `-v`
+        # removes the tmpfs volume too.
+        session.run(
+            "docker",
+            "compose",
+            "-f",
+            compose_file,
+            "down",
+            "-v",
+            external=True,
+        )
+
+
+@nox.session(venv_backend="venv")
 def lint(session: Session) -> None:
     """Lint code using various plugins.
 
