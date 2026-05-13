@@ -233,29 +233,74 @@ class TransitionService:
     ) -> None:
         """Bulk create audit records with proper exited_at handling.
 
-        Uses database func.now() for timestamps.
+        Closes any open audit rows for the supplied task_ids and inserts
+        a new open row per record. Runs as a three-phase sequence to
+        avoid the next-key gap-lock cycle the original
+        ``UPDATE … WHERE exited_at IS NULL`` would trigger on the
+        ``(task_id, exited_at)`` secondary index when two transactions
+        with interleaved task_ids ran the close-then-INSERT pair
+        concurrently (InnoDB errno 1213).
+
+        The ``exited_at`` column stays nullable. NULL continues to mean
+        "no observed exit yet" — currently open OR orphaned by workflow
+        death — and downstream consumers (``MAX(exited_at)`` ignoring
+        opens, ``COALESCE(exited_at, NOW())`` duration math, the GUI's
+        ``active = !exitedAt``) keep working unchanged.
 
         Args:
             session: Database session
-            records: List of dicts with task_id, workflow_id, previous_status, new_status
+            records: List of dicts with task_id, workflow_id,
+                previous_status, new_status
         """
         if not records:
             return
 
         task_ids = [r["task_id"] for r in records]
 
-        # Bulk close previous open records
-        session.execute(
-            update(TaskStatusAudit)
-            .where(
-                TaskStatusAudit.task_id.in_(task_ids),
-                TaskStatusAudit.exited_at.is_(None),
+        # Phase 1: non-locking MVCC read finds the PKs of the rows we
+        # want to close. The (task_id, exited_at) index still speeds
+        # this up — same lookup the original migration intended, but
+        # in a non-locking context, so it contributes no gap locks to
+        # any later cycle.
+        open_audit_ids = (
+            session.execute(
+                select(TaskStatusAudit.id).where(
+                    TaskStatusAudit.task_id.in_(task_ids),
+                    TaskStatusAudit.exited_at.is_(None),
+                )
             )
-            .values(exited_at=func.now())
-            .execution_options(synchronize_session=False)
+            .scalars()
+            .all()
         )
 
-        # Bulk insert new records (entered_at uses model default)
+        # Phase 2: close by primary key. MySQL plans this via the PK
+        # (PK list is more selective than the secondary index), so the
+        # WHERE clause takes record-level X locks on specific PK rows
+        # and does NOT scan ``(task_id, exited_at)`` with an IS NULL
+        # predicate — the scan that previously took next-key gap locks
+        # across every matched entry.
+        #
+        # The residual ``IS NULL`` predicate is kept to guard against
+        # TOCTOU: if a concurrent transaction closed one of the rows
+        # we found in Phase 1, our UPDATE on that row is a no-op
+        # instead of clobbering the other transaction's exited_at
+        # with our (later) NOW().
+        if open_audit_ids:
+            session.execute(
+                update(TaskStatusAudit)
+                .where(
+                    TaskStatusAudit.id.in_(open_audit_ids),
+                    TaskStatusAudit.exited_at.is_(None),
+                )
+                .values(exited_at=func.now())
+                .execution_options(synchronize_session=False)
+            )
+
+        # Phase 3: bulk insert new opens. Insert-intention locks in the
+        # ``(task_id, NULL)`` gap are mutually compatible across
+        # transactions; they only conflict with plain gap locks, which
+        # Phase 2 no longer takes. The cycle that produced the 1213s
+        # cannot form.
         session.execute(insert(TaskStatusAudit).values(records))
 
     @classmethod

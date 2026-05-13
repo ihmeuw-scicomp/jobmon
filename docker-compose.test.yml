@@ -1,0 +1,55 @@
+name: jobmon-test
+
+# Throwaway MySQL for tests that require real InnoDB lock geometry
+# (e.g. tests/integration/server/test_audit_bulk_deadlock.py).
+#
+# The image is pinned to the same major version as prod
+# (Azure MySQL Flexible Server 8.0.x) so the gap-lock behavior under
+# REPEATABLE READ matches what we'd see in production. Bumping this
+# without verifying that production has moved invalidates the
+# regression test's assumptions.
+#
+# Bring up:
+#   docker compose -f docker-compose.test.yml up -d
+#   docker compose -f docker-compose.test.yml exec mysql_test mysqladmin ping -u root -ptest
+#
+# Run the gated tests:
+#   JOBMON_MYSQL_TEST_URI="mysql+mysqldb://root:test@127.0.0.1:3307/jobmon_test" \
+#     uv run nox -s mysql_tests
+#
+# Tear down:
+#   docker compose -f docker-compose.test.yml down -v
+
+services:
+  mysql_test:
+    image: mysql:8.0.44
+    container_name: jobmon-mysql-test
+    restart: "no"
+    environment:
+      MYSQL_ROOT_PASSWORD: test
+      MYSQL_DATABASE: jobmon_test
+    ports:
+      # Distinct from the default 3306 so this can run alongside an
+      # operator's own MySQL without colliding.
+      - "127.0.0.1:3307:3306"
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      # Match prod isolation level so the deadlock geometry the test
+      # targets reproduces faithfully.
+      - --transaction-isolation=REPEATABLE-READ
+      - --innodb-lock-wait-timeout=5
+      # Speeds up cold start; this DB is ephemeral.
+      - --innodb-flush-log-at-trx-commit=2
+      - --sync-binlog=0
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    tmpfs:
+      # InnoDB data on tmpfs — no on-disk persistence, faster, and
+      # forces a clean slate every `down`.
+      - /var/lib/mysql:rw,size=512m
