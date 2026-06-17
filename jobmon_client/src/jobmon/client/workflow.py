@@ -55,10 +55,14 @@ class DistributorContext:
         self._cluster_name = cluster_name
         self._workflow_run_id = workflow_run_id
         self._timeout = timeout
+        # Everything the distributor wrote to stderr while we waited for the
+        # ALIVE signal. Holds the JOBMON_PHASE startup breadcrumbs so a startup
+        # timeout can report which phase the distributor reached before hanging.
+        self._startup_stderr = ""
 
     def wait_for_startup_signal(self, timeout: int = 180) -> bool:
         """Wait for startup signal with non-blocking reads to handle timing issues."""
-        buffer = ""
+        self._startup_stderr = ""
         start_time = time.time()
 
         assert self.process.stderr is not None  # keep mypy happy
@@ -71,14 +75,8 @@ class DistributorContext:
         while time.time() - start_time < timeout:
             try:
                 chunk = self.process.stderr.read(100)
-                if chunk:
-                    buffer += chunk
-                    # Look for startup signal (handles package warnings naturally)
-                    if "ALIVE" in buffer:
-                        logger.info("Received startup signal")
-                        return True
             except BlockingIOError:
-                # No data available, check if process died
+                # No data available right now; bail out if the process died.
                 if self.process.poll() is not None:
                     logger.error(
                         f"Distributor process exited with code: "
@@ -86,8 +84,31 @@ class DistributorContext:
                     )
                     return False
                 time.sleep(0.1)
+                continue
             except Exception as e:
                 logger.warning(f"Error reading stderr: {e}")
+                time.sleep(0.1)
+                continue
+
+            if chunk:
+                # Accumulate on self so a timeout can surface the breadcrumbs.
+                self._startup_stderr += chunk
+                # Look for startup signal (handles package warnings naturally)
+                if "ALIVE" in self._startup_stderr:
+                    logger.info("Received startup signal")
+                    return True
+            elif self.process.poll() is not None:
+                # EOF: the distributor closed stderr and exited before
+                # signalling. Without this branch read() returns "" forever and
+                # we busy-spin to the full timeout instead of failing fast and
+                # surfacing the breadcrumbs captured so far.
+                logger.error(
+                    f"Distributor process exited with code: "
+                    f"{self.process.returncode}"
+                )
+                return False
+            else:
+                # No data but process still alive; avoid a hot spin loop.
                 time.sleep(0.1)
 
         return False
@@ -122,17 +143,54 @@ class DistributorContext:
 
         # Use simple non-blocking startup detection
         if not self.wait_for_startup_signal(self._timeout):
-            stderr_all = ""
+            # wait_for_startup_signal consumes the distributor's stderr as it
+            # polls for ALIVE, so the JOBMON_PHASE breadcrumbs already live in
+            # self._startup_stderr. Drain anything still buffered and append it.
+            startup_stderr = self._startup_stderr
             try:
-                _, stderr_all = self.process.communicate(timeout=5)
+                _, remaining = self.process.communicate(timeout=5)
             except TimeoutExpired:
-                pass
+                remaining = ""
             err = self._shutdown()
+            full_stderr = "".join(
+                part for part in (startup_stderr, remaining, err) if part
+            )
+            last_phase = self._last_startup_phase(full_stderr)
+            # The raised exception is invisible in ES for non-interactive runs
+            # (e.g. svc_* nightly batches), but the jobmon.client.workflow
+            # logger exports reliably. Log the captured breadcrumbs here so the
+            # stalled startup phase is diagnosable from telemetry alone.
+            logger.error(
+                "Distributor failed to emit startup signal before timeout",
+                workflow_run_id=self._workflow_run_id,
+                timeout_s=self._timeout,
+                last_startup_phase=last_phase,
+                distributor_stderr=full_stderr,
+            )
             raise DistributorStartupTimeout(
-                f"Distributor process did not start within {self._timeout}s, "
-                f"stderr='{err}'\n\nFull stderr: {stderr_all}"
+                f"Distributor process did not start within {self._timeout}s "
+                f"(last startup phase reached: {last_phase}).\n"
+                f"Full stderr:\n{full_stderr}"
             )
         return self
+
+    @staticmethod
+    def _last_startup_phase(stderr: str) -> str:
+        """Return the last ``JOBMON_PHASE`` breadcrumb seen in captured stderr.
+
+        Distinguishes where the distributor hung: e.g. ``cluster_bound``
+        (reached but no ``cluster_interface_built``) implicates the
+        SlurmDistributor constructor's ``shutil.which`` over a slow shared
+        filesystem, while ``cli_entered`` / ``context_bound`` point at Python
+        import or interpreter startup. ``"none"`` means no breadcrumb was
+        captured at all (process never produced output).
+        """
+        last_phase = "none"
+        for line in stderr.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("JOBMON_PHASE:"):
+                last_phase = stripped.split(":", 1)[1].strip()
+        return last_phase
 
     def __exit__(
         self,

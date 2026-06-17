@@ -125,7 +125,7 @@ sys.stderr.write("Starting up...\\n")
 sys.stderr.flush()
 time.sleep(0.5)
 
-sys.stderr.write("Still starting...\\n") 
+sys.stderr.write("Still starting...\\n")
 sys.stderr.flush()
 time.sleep(0.5)
 
@@ -169,6 +169,79 @@ time.sleep(2)  # This should cause timeout
                     test_process.communicate(timeout=2)
                 except subprocess.TimeoutExpired:
                     test_process.kill()
+
+        finally:
+            os.unlink(script_path)
+
+    def test_timeout_surfaces_startup_breadcrumbs(self):
+        """A startup timeout must surface the captured JOBMON_PHASE breadcrumbs.
+
+        wait_for_startup_signal consumes the distributor's stderr while polling
+        for ALIVE; if that buffer is discarded the breadcrumbs never reach the
+        DistributorStartupTimeout body or the log, leaving startup hangs
+        undiagnosable in production. This locks in that the last reached phase
+        is reported both in the exception body and via the logger (the channel
+        that reaches telemetry for non-interactive svc_* runs).
+        """
+        test_script = """#!/usr/bin/env python3
+import sys
+import time
+
+# Emit breadcrumbs up to cluster_bound, then hang without ALIVE -- the
+# signature of a shutil.which / cluster-interface stall.
+sys.stderr.write("JOBMON_PHASE: cli_entered\\n")
+sys.stderr.flush()
+sys.stderr.write("JOBMON_PHASE: context_bound\\n")
+sys.stderr.flush()
+sys.stderr.write("JOBMON_PHASE: cluster_bound\\n")
+sys.stderr.flush()
+time.sleep(30)  # hang past the timeout
+"""
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
+            f.write(test_script)
+            script_path = f.name
+
+        try:
+            os.chmod(script_path, 0o755)
+
+            with patch("jobmon.client.workflow.Popen") as mock_popen, patch(
+                "jobmon.client.workflow.logger"
+            ) as mock_logger:
+                test_process = subprocess.Popen(
+                    [sys.executable, script_path],
+                    stderr=subprocess.PIPE,
+                    universal_newlines=True,
+                )
+                mock_popen.return_value = test_process
+
+                distributor_context = DistributorContext("sequential", 12345, 2)
+
+                try:
+                    with distributor_context:
+                        assert False, "Should have timed out"
+                except DistributorStartupTimeout as exc:
+                    # Last reached phase is reported in the exception body...
+                    assert "last startup phase reached: cluster_bound" in str(exc)
+                    # ...and the full breadcrumb trail is preserved.
+                    assert "context_bound" in str(exc)
+
+                # ...and logged with the phase as structured context so the
+                # stall is diagnosable from telemetry alone.
+                error_calls = [
+                    c
+                    for c in mock_logger.error.call_args_list
+                    if c.kwargs.get("last_startup_phase") == "cluster_bound"
+                ]
+                assert error_calls, "timeout phase was not logged"
+                assert "cluster_bound" in error_calls[0].kwargs["distributor_stderr"]
+
+                if test_process.poll() is None:
+                    test_process.terminate()
+                    try:
+                        test_process.communicate(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        test_process.kill()
 
         finally:
             os.unlink(script_path)
