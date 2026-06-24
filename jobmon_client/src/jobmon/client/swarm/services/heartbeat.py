@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from jobmon.client.swarm.state import StateUpdate
+from jobmon.core.exceptions import FatalOrchestratorError
 
 if TYPE_CHECKING:
     from jobmon.client.swarm.gateway import ServerGateway
@@ -52,6 +53,13 @@ class HeartbeatService:
         await task
     """
 
+    #: After this many consecutive heartbeat failures in the background loop,
+    #: raise FatalOrchestratorError so the orchestrator terminates the
+    #: workflow run instead of silently looping forever with stale state. At
+    #: the default heartbeat interval of 30s this represents ~2.5 minutes of
+    #: total darkness before fatal exit.
+    MAX_CONSECUTIVE_HEARTBEAT_FAILURES: int = 5
+
     def __init__(
         self,
         gateway: "ServerGateway",
@@ -75,6 +83,9 @@ class HeartbeatService:
         # Initialize to current time so the main loop doesn't spin without sleeping
         # while waiting for the first heartbeat to be logged
         self._last_heartbeat_time: float = time.time()
+        #: Number of consecutive failed heartbeats in the background loop.
+        #: Reset on any successful heartbeat.
+        self._consecutive_failures: int = 0
 
     @property
     def interval(self) -> float:
@@ -139,12 +150,21 @@ class HeartbeatService:
     async def tick(self) -> StateUpdate:
         """Log a heartbeat and return any status change.
 
+        This is a pure "do one heartbeat" primitive: it does not touch
+        ``_consecutive_failures``. That counter is owned exclusively by
+        ``run_background``'s supervisor loop (the only site that reads
+        the threshold and raises ``FatalOrchestratorError``). Keeping
+        ownership in one place avoids a race where a direct ``tick()``
+        call from outside the supervisor could silently clear the
+        supervisor's failure state and mask a sustained outage.
+
         Returns:
             StateUpdate with workflow_run_status if status changed,
             otherwise an empty StateUpdate.
 
         Raises:
-            Exception: If the heartbeat request fails.
+            Exception: If the heartbeat request fails. The caller is
+                responsible for deciding whether to retry or bail.
         """
         response = await self._gateway.log_heartbeat(
             status=self._current_status,
@@ -206,6 +226,34 @@ class HeartbeatService:
                 if self.is_heartbeat_due():
                     try:
                         update = await self.tick()
+                    except FatalOrchestratorError:
+                        # Already-fatal error from a downstream component (e.g.
+                        # gateway session recycle loop giving up). Propagate
+                        # directly so the orchestrator can terminate the run.
+                        raise
+                    except Exception:
+                        self._consecutive_failures += 1
+                        logger.exception(
+                            "Background heartbeat failed",
+                            consecutive_failures=self._consecutive_failures,
+                            threshold=self.MAX_CONSECUTIVE_HEARTBEAT_FAILURES,
+                        )
+                        if (
+                            self._consecutive_failures
+                            >= self.MAX_CONSECUTIVE_HEARTBEAT_FAILURES
+                        ):
+                            raise FatalOrchestratorError(
+                                "HeartbeatService: "
+                                f"{self._consecutive_failures} consecutive "
+                                "heartbeats failed — terminating workflow "
+                                "run. The server is unreachable or the "
+                                "aiohttp session is unrecoverable. See "
+                                "preceding exceptions for details."
+                            )
+                        # Keep trying heartbeats until we hit the threshold.
+                    else:
+                        # Successful heartbeat — reset the failure counter.
+                        self._consecutive_failures = 0
                         if update.workflow_run_status:
                             # Log that we received a status change
                             # The orchestrator should handle applying this
@@ -213,12 +261,13 @@ class HeartbeatService:
                                 "Background heartbeat detected status change",
                                 new_status=update.workflow_run_status,
                             )
-                    except Exception:
-                        logger.exception("Background heartbeat failed")
-                        # Don't re-raise - keep trying heartbeats
 
         except asyncio.CancelledError:
             logger.debug("Heartbeat background loop cancelled")
+            raise
+        except FatalOrchestratorError:
+            # Propagate fatal errors directly without logger.exception noise;
+            # the caller (orchestrator) is expected to handle termination.
             raise
         except Exception:
             logger.exception("Heartbeat loop error")

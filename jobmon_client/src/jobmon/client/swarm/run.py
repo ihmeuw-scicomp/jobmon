@@ -31,6 +31,7 @@ from jobmon.core.constants import TaskStatus, WorkflowRunStatus
 from jobmon.core.exceptions import (
     DistributorInterruptedError,
     DistributorNotAlive,
+    FatalOrchestratorError,
     TransitionError,
     WorkflowTestError,
 )
@@ -451,10 +452,18 @@ async def _run_orchestrator(
             )
             return _build_result_from_state(state, start_time, error=e)
 
-        except (DistributorNotAlive, DistributorInterruptedError, WorkflowTestError):
+        except (
+            DistributorNotAlive,
+            DistributorInterruptedError,
+            FatalOrchestratorError,
+            WorkflowTestError,
+        ):
             # Critical exceptions must propagate to callers
             # - DistributorNotAlive: Distributor died unexpectedly (documented in docstring)
             # - DistributorInterruptedError: Distributor received interrupt signal
+            # - FatalOrchestratorError: Sustained HTTP failure that recycling
+            #   and backoff could not recover from — user must restart the
+            #   workflow run on a fresh process/session.
             # - WorkflowTestError: Test infrastructure error that should fail tests
             raise
 
@@ -468,8 +477,16 @@ async def _run_orchestrator(
             return _build_result_from_state(state, start_time, error=e)
 
     finally:
-        # Cleanup
+        # Cleanup. Close both the original externally-owned session AND any
+        # gateway-owned replacement that may have been created by
+        # ``gateway._recycle_session`` during the run. The local ``session``
+        # variable here still points at the original — it goes stale after
+        # any recycle, and closing it becomes a no-op. ``gateway.close()``
+        # is idempotent and only closes sessions the gateway owns (i.e.
+        # those built by ``_ensure_session`` after a recycle), so it is
+        # safe to call in both the recycle and no-recycle paths.
         if not session.closed:
             await session.close()
+        await gateway.close()
         # Unbind workflow context
         unset_jobmon_context("workflow_run_id", "workflow_id")

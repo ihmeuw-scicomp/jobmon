@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Optional
 import structlog
 
 from jobmon.client.swarm.state import StateUpdate
+from jobmon.core.exceptions import FatalOrchestratorError
 
 if TYPE_CHECKING:
     from jobmon.client.swarm.gateway import ServerGateway
@@ -49,6 +50,15 @@ class Synchronizer:
         state.apply_update(update)
     """
 
+    #: After this many consecutive ticks where *every* operation fails, raise
+    #: FatalOrchestratorError to terminate the workflow run. Individual
+    #: operation failures are still tolerated (other operations may still
+    #: succeed). With a default heartbeat_interval of 30s this is ~90s of
+    #: total-darkness before fatal exit, which is generous enough to ride
+    #: through a brief server restart but short enough to prevent an
+    #: unbounded wedge during a real outage.
+    MAX_CONSECUTIVE_TOTAL_FAILURE_TICKS: int = 3
+
     def __init__(
         self,
         gateway: "ServerGateway",
@@ -65,6 +75,9 @@ class Synchronizer:
         self._gateway = gateway
         self._task_ids = task_ids
         self._array_ids = array_ids
+        #: Number of consecutive tick() calls where every sync operation
+        #: failed. Reset when any operation succeeds.
+        self._consecutive_total_failure_ticks: int = 0
 
     @property
     def task_ids(self) -> set[int]:
@@ -136,8 +149,10 @@ class Synchronizer:
         if self._array_ids:
             op_names.append("array_concurrency")
 
+        num_failed = 0
         for i, result in enumerate(results):
             if isinstance(result, BaseException):
+                num_failed += 1
                 logger.warning(
                     f"Sync operation '{op_names[i]}' failed",
                     error=str(result),
@@ -145,6 +160,26 @@ class Synchronizer:
                 )
             elif isinstance(result, StateUpdate):
                 combined = combined.merge(result)
+
+        # Track sustained failure: if *every* operation in this tick failed,
+        # increment the consecutive-failure counter. Any successful operation
+        # resets it. After MAX_CONSECUTIVE_TOTAL_FAILURE_TICKS all-failed
+        # ticks, raise a fatal error so the orchestrator terminates the run
+        # instead of silently spinning forever on a broken connection.
+        if num_failed == len(results) and num_failed > 0:
+            self._consecutive_total_failure_ticks += 1
+            if (
+                self._consecutive_total_failure_ticks
+                >= self.MAX_CONSECUTIVE_TOTAL_FAILURE_TICKS
+            ):
+                raise FatalOrchestratorError(
+                    "Synchronizer: all sync operations failed for "
+                    f"{self._consecutive_total_failure_ticks} consecutive "
+                    "ticks — terminating workflow run. Check server "
+                    "reachability and see preceding warnings for details."
+                )
+        else:
+            self._consecutive_total_failure_ticks = 0
 
         logger.debug(
             "Synchronization complete",
@@ -210,6 +245,14 @@ class Synchronizer:
 
         Returns:
             StateUpdate with array_limits.
+
+        Raises:
+            RuntimeError: If every per-array query failed. This lets the
+                outer ``tick()`` count this operation as failed so the
+                consecutive-total-failure guard can fire during sustained
+                HTTP outages. A partial failure (some arrays succeed, some
+                fail) is still tolerated — we log the failures and return
+                whatever we got.
         """
         if not self._array_ids:
             return StateUpdate.empty()
@@ -224,8 +267,12 @@ class Synchronizer:
         )
 
         array_limits: dict[int, int] = {}
+        num_failed = 0
+        last_exception: Optional[BaseException] = None
         for result in results:
             if isinstance(result, BaseException):
+                num_failed += 1
+                last_exception = result
                 logger.warning(
                     "Failed to fetch array concurrency limit",
                     error=str(result),
@@ -234,6 +281,16 @@ class Synchronizer:
             else:
                 aid, limit = result
                 array_limits[aid] = limit
+
+        # If every per-array query failed, propagate as a single failure
+        # signal so the outer tick() can count this entire operation as
+        # failed. Keeping the old "return empty StateUpdate" behavior would
+        # hide complete outages from the consecutive-failure guard.
+        if num_failed == len(results) and num_failed > 0:
+            assert last_exception is not None
+            raise RuntimeError(
+                f"All {num_failed} array concurrency queries failed"
+            ) from last_exception
 
         return StateUpdate(array_limits=array_limits)
 

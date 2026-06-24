@@ -102,6 +102,20 @@ class DistributorInterruptedError(Exception):
     """raised when signal is sent to distributor."""
 
 
+class FatalOrchestratorError(Exception):
+    """Raised when the orchestrator cannot recover from sustained HTTP failures.
+
+    This indicates the workflow run cannot continue in the current process and
+    must be terminated. It is raised by orchestrator services (Synchronizer,
+    HeartbeatService) after a configured number of consecutive failures to
+    signal that retries, backoff, and session recycling have all been exhausted.
+
+    Unlike transient errors, this must propagate out of ``run_workflow`` so the
+    user sees a clear failure message rather than a silent hang or a
+    result-from-state with stale data.
+    """
+
+
 class CyclicGraphError(Exception):
     """Cyclic graph detected."""
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import functools
 import json
@@ -184,11 +185,18 @@ class Requester:
             return False
 
         # Retry for specific exceptions (sync and async compatible).
+        # Note: asyncio.TimeoutError is listed explicitly because on Python 3.10
+        # it is a distinct class that does NOT inherit from the builtin
+        # TimeoutError (that merge landed in 3.11). Without this entry, aiohttp
+        # ClientTimeout failures on 3.10 silently fall through to the
+        # non-retriable branch, which was the root-cause trigger of the
+        # "File descriptor N is used by transport" cascade seen in prod.
         return isinstance(
             exception,
             (
                 InvalidResponse,
                 TimeoutError,
+                asyncio.TimeoutError,
                 requests.ConnectionError,
                 requests.adapters.MaxRetryError,
                 requests.exceptions.ReadTimeout,

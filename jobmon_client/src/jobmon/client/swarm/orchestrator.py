@@ -176,6 +176,16 @@ class WorkflowRunOrchestrator:
         result = await orchestrator.run(distributor_alive_callable)
     """
 
+    #: Minimum wall-clock seconds between main-loop iterations, independent of
+    #: the heartbeat interval. This is a hard floor that prevents the main loop
+    #: from spinning at hundreds of iterations per second in pathological
+    #: scenarios — for example when heartbeats are failing and
+    #: ``time_since_last_heartbeat()`` collapses ``time_till_next_sync`` to 0.
+    #: A 1-second floor has no practical impact on healthy runs (normal sync
+    #: interval is 30s) but caps worst-case log volume by 2+ orders of
+    #: magnitude during sustained HTTP failure.
+    MIN_LOOP_SLEEP: float = 1.0
+
     def __init__(
         self,
         state: SwarmState,
@@ -352,6 +362,10 @@ class WorkflowRunOrchestrator:
             # Check constraints
             self._check_timeout(start_time)
             await self._check_distributor_alive(distributor_alive_callable)
+            # Surface background heartbeat task failures (e.g. sustained HTTP
+            # failure → FatalOrchestratorError) so the main loop terminates
+            # instead of continuing with stale state.
+            self._check_heartbeat_task_healthy()
 
             # Check if heartbeat service detected a status change
             self._sync_heartbeat_status()
@@ -384,10 +398,14 @@ class WorkflowRunOrchestrator:
             if self._state.status == WorkflowRunStatus.RUNNING:
                 await self._do_scheduling(timeout=time_till_next_sync)
 
-            # Sleep if we finished early
+            # Sleep if we finished early. Apply MIN_LOOP_SLEEP as a hard floor
+            # so the loop cannot spin hot when time_till_next_sync collapses to
+            # 0 (e.g. during sustained heartbeat failure). Defense in depth on
+            # top of the gateway's session-recycle + fatal-exit counters.
             loop_elapsed = time.perf_counter() - iteration_start
-            if loop_elapsed < time_till_next_sync:
-                await asyncio.sleep(time_till_next_sync - loop_elapsed)
+            target_sleep = max(self.MIN_LOOP_SLEEP, time_till_next_sync) - loop_elapsed
+            if target_sleep > 0:
+                await asyncio.sleep(target_sleep)
                 loop_elapsed = time.perf_counter() - iteration_start
 
             # Sync with server
@@ -510,6 +528,39 @@ class WorkflowRunOrchestrator:
             raise DistributorNotAlive(
                 "Distributor process unexpectedly stopped. Workflow will error."
             )
+
+    def _check_heartbeat_task_healthy(self) -> None:
+        """Verify the background heartbeat task has not died with an exception.
+
+        The heartbeat service runs as an asyncio.Task created in ``run()``. If
+        it raises (for example ``FatalOrchestratorError`` after too many
+        consecutive heartbeat failures), the exception is stored in the task
+        object but does not propagate to this main loop automatically. We
+        poll the task state each iteration and re-raise any stored exception
+        so the orchestrator can terminate the run cleanly.
+
+        Guards against a cancelled task: in current code paths the heartbeat
+        task is only cancelled in ``_teardown`` after the main loop has
+        exited, so we should never observe a cancelled task here. But
+        ``asyncio.Task.exception()`` *raises* ``CancelledError`` (a
+        ``BaseException``) rather than returning it for cancelled tasks,
+        which would bypass every ``except Exception`` handler upstream.
+        Check ``task.cancelled()`` first to make this defensive against
+        any future refactor that cancels the heartbeat mid-run.
+        """
+        task = self._heartbeat_task
+        if task is None or not task.done():
+            return
+        if task.cancelled():
+            # Nothing to surface — cancellation is driven by our own
+            # teardown path, which handles propagation explicitly.
+            return
+        # Task finished without cancellation. If it stored an exception,
+        # propagate it; if it exited cleanly (stop_event was set),
+        # nothing to do.
+        exc = task.exception()
+        if exc is not None:
+            raise exc
 
     def _check_fail_fast(self) -> None:
         """Check fail-fast condition."""
@@ -808,13 +859,30 @@ class WorkflowRunOrchestrator:
         )
 
     async def _handle_error(self) -> None:
-        """Transition to ERROR state on exception."""
+        """Transition to ERROR state on exception.
+
+        Best-effort only — this is called from the exception handler in
+        ``run()`` and must not raise, or it will mask the original exception.
+        If the status update fails (e.g. because the server is unreachable,
+        which is exactly the scenario that raised FatalOrchestratorError in
+        the first place), we log and continue. The server-side reaper will
+        eventually transition the run to ERROR once the heartbeat goes stale.
+        """
         try:
             await self._update_status(WorkflowRunStatus.ERROR)
         except TransitionError as e:
             logger.warning(
                 "Failed to update workflow run status to ERROR",
                 error=str(e),
+            )
+        except Exception as e:
+            # Cannot reach the server to set ERROR status. Log and continue
+            # so the original exception propagates unmasked.
+            logger.warning(
+                "Could not update workflow run status to ERROR "
+                "(server unreachable) — relying on server-side reaper",
+                error=str(e),
+                error_type=type(e).__name__,
             )
 
     async def _teardown(self) -> None:
